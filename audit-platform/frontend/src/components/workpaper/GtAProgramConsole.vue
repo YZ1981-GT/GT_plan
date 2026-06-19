@@ -22,6 +22,16 @@
 
 <template>
   <div class="gt-a-program-console">
+    <!-- B30 等仅限合并审计：standalone 项目不适用覆盖层 -->
+    <div v-if="isNotApplicable" class="gt-a-program-console__not-applicable">
+      <el-result icon="info" title="不适用">
+        <template #sub-title>
+          <span>本底稿仅适用于合并审计项目（当前项目为单体审计）</span>
+        </template>
+      </el-result>
+    </div>
+
+    <template v-else>
     <!-- ─── 顶部：进度条 + 工具栏 ─── -->
     <div class="gt-a-program-console__header">
       <!-- 进度条 -->
@@ -593,8 +603,10 @@
       :wp-code="popupWpCode"
       :wp-id="wpId"
       :project-id="projectId"
+      :project-info="projectInfo"
       @save="onPopupSave"
     />
+    </template>
   </div>
 </template>
 
@@ -610,6 +622,7 @@ import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
 import { isReviewRoleRef, resolveReviewWpCode as resolveReviewWpCodeUtil } from '@/components/workpaper/reviewWpResolve'
+import { useProjectStore } from '@/stores/project'
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -689,10 +702,32 @@ const activeCategory = ref('')
 const selectedIds = ref<string[]>([])
 const expandedRowKeys = ref<string[]>([])
 const tableRef = ref<any>(null)
+// B30 等仅限合并审计的底稿：从 API 获取 applicable_when 标记
+const applicableWhen = ref<string | null>(null)
 
 // Sprint 4 Task 17.7: 审计逻辑图展开状态
 const flowGraphExpanded = ref(false)
 const projectId = computed(() => (route.params.projectId as string) || '')
+const projectStore = useProjectStore()
+const projectInfo = ref<Record<string, any>>({})
+
+/** 加载项目基本信息（含 business_category） */
+async function loadProjectInfo() {
+  if (!projectId.value) return
+  try {
+    const res = await api.get(`/api/projects/${projectId.value}`)
+    projectInfo.value = res?.data ?? res ?? {}
+  } catch { /* ignore */ }
+}
+
+/** B30 等底稿 applicable_when="consolidated" 但项目为 standalone 时显示不适用覆盖 */
+const isNotApplicable = computed<boolean>(() => {
+  if (!applicableWhen.value) return false
+  if (applicableWhen.value === 'consolidated' && projectStore.auditScope !== 'consolidated') {
+    return true
+  }
+  return false
+})
 
 // 子底稿弹窗状态
 const showPopup = ref(false)
@@ -907,10 +942,13 @@ function checkCompletion(wpCode: string, responses: Record<string, any>): 'compl
       return 'none'
     }
     case 'A1-11': {
-      const ids = ['A1-11-sign-pm', 'A1-11-sign-partner', 'A1-11-sign-qc']
-      const done = ids.filter(id => responses[id]?.conclusion).length
-      if (done === ids.length) return 'completed'
-      if (done > 0) return 'in_progress'
+      // 必填：项目经理+合伙人；A类额外：独立复核合伙人+EQCR
+      const requiredIds = ['A1-11-sign-pm', 'A1-11-sign-partner']
+      const allIds = [...requiredIds, 'A1-11-sign-irp', 'A1-11-sign-eqcr']
+      const allDone = allIds.filter(id => responses[id]?.conclusion).length
+      const requiredDone = requiredIds.filter(id => responses[id]?.conclusion).length
+      if (requiredDone === requiredIds.length) return 'completed'
+      if (allDone > 0) return 'in_progress'
       return 'none'
     }
     case 'A1-18': {
@@ -949,6 +987,7 @@ onMounted(() => {
   fetchA16RecommendedVersion()
   fetchA17ApplicableVersions()
   fetchReviewTemplates()
+  loadProjectInfo()
 })
 
 // Sprint 4 Task 14.1: 首次使用引导
@@ -1026,6 +1065,10 @@ async function fetchProcedureTableData() {
         status: item.step_status || ((item.applicable === 'na' || item.applicable === 'no') ? 'not_applicable' : 'pending'),
         phase: item.phase || undefined,
       }))
+    }
+    // 存储 applicable_when（B30 等仅限合并审计的底稿）
+    if (data?.applicable_when) {
+      applicableWhen.value = data.applicable_when
     }
   } catch {
     // 静默——api 可能未实现或无数据

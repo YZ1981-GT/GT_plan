@@ -1,0 +1,85 @@
+# backend/data/wp_render_schema/K10-1.yaml
+# 其他收益审定表 — d-form-table 渲染 schema
+# Requirements: §5.10（K10 其他收益）
+# Design: §3 审定表标准字段 + §4 K7↔K10 联动
+# Template: K10 其他收益.xlsx
+
+wp_code: K10-1
+wp_name: 其他收益审定表
+component_type: d-form-table
+template_path: backend/wp_templates/K/K10 其他收益.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '6117'
+    name: 其他收益
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 损益类取发生额
+# ═══════════════════════════════════════════════════════════════════════════════
+
+income_statement_type: true
+amount_source: occurrence_amount
+
+sections:
+  - name: 政府补助收益
+    group_key: government_grant_income
+    row_type: category_row
+    account_code_prefix: '611701'
+    fields: &audit_determination_fields
+      - { field: category_name, label: 收益类别, type: text, readonly: true }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: unadjusted_amount, label: 未审金额（发生额）, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 其他收益合计
+    row_type: total
+    formula_source: "SUM(政府补助收益)"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用 — 含 K7↔K10 联动
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-K10-1-001
+    target_wp: K10-4
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → K10-4 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-K10-1-002
+    target_wp: K10-3
+    target_field: 政府补助验证
+    description: '审定金额 ← K10-3 政府补助验证'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-K10-1-003
+    target_wp: K7-1
+    target_field: 递延收益审定表
+    description: '其他收益 ↔ K7-1 递延收益（政府补助分摊联动）'
+    severity: required
+    direction: bidirectional

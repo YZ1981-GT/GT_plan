@@ -1,0 +1,89 @@
+# backend/data/wp_render_schema/K7-1.yaml
+# 递延收益审定表 — d-form-table 渲染 schema
+# Requirements: §5.7（K7 递延收益）
+# Design: §3 审定表标准字段 + §4 K7↔K10 联动
+# Template: K7 递延收益.xlsx
+
+wp_code: K7-1
+wp_name: 递延收益审定表
+component_type: d-form-table
+template_path: backend/wp_templates/K/K7 递延收益.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2401'
+    name: 递延收益
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 按政府补助项目分行
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 与资产相关的政府补助
+    group_key: asset_related_grants
+    row_type: category_row
+    account_code_prefix: '240101'
+    fields: &audit_determination_fields
+      - { field: category_name, label: 项目名称, type: text, readonly: true }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 与收益相关的政府补助
+    group_key: income_related_grants
+    row_type: category_row
+    account_code_prefix: '240102'
+    fields: *audit_determination_fields
+
+  - name: 递延收益合计
+    row_type: total
+    formula_source: "SUM(与资产相关的政府补助, 与收益相关的政府补助)"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用 — 含 K7↔K10 联动
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-K7-1-001
+    target_wp: K7-4
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → K7-4 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-K7-1-002
+    target_wp: K7-3
+    target_field: 政府补助分摊
+    description: '审定金额 ← K7-3 政府补助分摊验证'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-K7-1-003
+    target_wp: K10-1
+    target_field: 其他收益审定表
+    description: '递延收益当期摊销 ↔ K10-1 其他收益（政府补助收益联动）'
+    severity: required
+    direction: bidirectional

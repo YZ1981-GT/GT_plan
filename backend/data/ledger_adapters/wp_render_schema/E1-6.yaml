@@ -1,0 +1,44 @@
+# backend/data/wp_render_schema/E1-6.yaml
+# 受限货币资金明细 — d-form-table 渲染 schema
+# Requirements: Task 25（E1-6 受限货币资金明细）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+
+wp_code: E1-6
+wp_name: 受限货币资金明细
+component_type: d-form-table
+template_path: backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1001'
+    name: 库存现金
+  - code: '1002'
+    name: 银行存款
+  - code: '1012'
+    name: 其他货币资金
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 受限货币资金：记录因质押/冻结/保证金等原因受限的资金
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 受限货币资金
+    account_code_prefix: '100'
+    fields:
+      - { field: account_code, label: 科目编码, type: text }
+      - { field: account_name, label: 科目名称, type: text }
+      - { field: restricted_amount, label: 受限金额, type: number }
+      - { field: restriction_reason, label: 受限原因, type: text }
+      - { field: expected_release_date, label: 预计解除日期, type: date }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-E1-6-001
+    target_wp: E1-1
+    target_field: 受限货币资金总额
+    description: '受限资金合计 → E1-1 审定表附注披露参考'
+    severity: info
+    direction: outbound

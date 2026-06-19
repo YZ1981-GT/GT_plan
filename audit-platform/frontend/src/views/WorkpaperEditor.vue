@@ -26,38 +26,42 @@
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
-  <!-- 底稿导入导出（HTML 渲染器路径；Univer 路径见下方工具栏） -->
-  <div v-if="useHtmlRenderer && wpDetail" class="gt-wp-io-toolbar">
-    <el-button text @click="goBack">← 返回</el-button>
-    <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
-    <span class="gt-wp-editor-name">{{ wpDetail.wp_name }}</span>
-    <div class="gt-wp-io-toolbar__actions">
-      <WpExportButton
-        :project-id="projectId"
+  <!-- 主内容区 + 编制指导面板（flex 并列布局） -->
+  <div class="gt-wp-editor-with-guidance">
+    <!-- 主内容区（flex: 1） -->
+    <div class="gt-wp-editor-main">
+      <!-- 底稿导入导出（HTML 渲染器路径） -->
+      <div v-if="useHtmlRenderer && wpDetail" class="gt-wp-io-toolbar">
+        <el-button text @click="goBack">← 返回</el-button>
+        <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
+        <span class="gt-wp-editor-name">{{ wpDetail.wp_name }}</span>
+        <div class="gt-wp-io-toolbar__actions">
+          <WpExportButton
+            :project-id="projectId"
+            :wp-id="wpId"
+            size="small"
+            button-type="primary"
+            label="导出"
+          />
+          <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
+        </div>
+      </div>
+
+      <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
+      <GtWpRenderer
+        v-if="useHtmlRenderer"
         :wp-id="wpId"
-        size="small"
-        button-type="primary"
-        label="导出"
+        @save-success="onChildSaved"
+        @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
+        @cross-ref-update="onHtmlCrossRefUpdate"
+        @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
+        @jump-to-reference="onHtmlJumpToReference"
+        @open-formula="onHtmlOpenFormula"
+        @open-attachment="onOpenAttachment"
       />
-      <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
-    </div>
-  </div>
 
-  <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
-  <GtWpRenderer
-    v-if="useHtmlRenderer"
-    :wp-id="wpId"
-    @save-success="onChildSaved"
-    @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
-    @cross-ref-update="onHtmlCrossRefUpdate"
-    @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"
-    @jump-to-reference="onHtmlJumpToReference"
-    @open-formula="onHtmlOpenFormula"
-    @open-attachment="onOpenAttachment"
-  />
-
-  <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
-  <div v-else class="gt-wp-editor gt-fade-in">
+      <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
+      <div v-else class="gt-wp-editor gt-fade-in">
     <!-- 顶部工具栏 -->
     <div class="gt-wp-editor-toolbar">
       <div class="gt-wp-editor-toolbar-left">
@@ -240,6 +244,19 @@
       />
     </el-drawer>
   </div>
+    </div><!-- /gt-wp-editor-main -->
+
+    <!-- 编制指导面板（右侧并列） -->
+    <WpGuidancePanel
+      v-if="wpDetail"
+      :wp-id="wpId"
+      :wp-code="wpDetail.wp_code || ''"
+      :wp-name="wpDetail.wp_name || ''"
+      :component-type="componentType || ''"
+      :project-id="projectId"
+      :year="projectYear || new Date().getFullYear() - 1"
+    />
+  </div><!-- /gt-wp-editor-with-guidance -->
 
   <!-- 弹窗/抽屉（条件渲染，不占主布局） -->
   <CycleDialogHost
@@ -330,6 +347,7 @@
  */
 import { ref, computed, provide, onMounted, onUnmounted, nextTick } from 'vue'
 import { useProjectStore } from '@/stores/project'
+import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { confirmLeave } from '@/utils/confirm'
@@ -369,6 +387,7 @@ import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
 import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
+import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -379,6 +398,7 @@ const wpId = computed(() => route.params.wpId as string)
 
 // ─── P0-6.1: ProjectContext + PermissionMatrix facade ────────────────────────
 const projectStore = useProjectStore()
+const guidancePanelStore = useGuidancePanelStore()
 const projectContext = computed(() => projectStore.currentProjectContext)
 const { can: canOp, whyCannot } = usePermissionMatrix()
 // DEPRECATED: 旧 canEdit 仍保留，后续逐步替换为 canOp('wp:edit')
@@ -939,6 +959,20 @@ function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef:
 </script>
 
 <style scoped>
+.gt-wp-editor-with-guidance {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.gt-wp-editor-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: margin-right 0.3s ease;
+}
 .gt-wp-io-toolbar {
   display: flex; align-items: center; gap: 10px;
   padding: 8px 16px; background: var(--gt-color-bg-light, #f8f7fc);

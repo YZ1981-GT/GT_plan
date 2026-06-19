@@ -2,6 +2,7 @@
 
 从 backend/data/wp_render_schema/{wp_code}.yaml 加载渲染 schema，
 支持模板级 fallback（如 B-template.yaml 覆盖所有 B 类底稿）和项目级覆盖合并。
+支持 pattern-based 匹配（如 B23-1~14 共用 B23-generic.yaml）。
 
 Requirements: 2.2 原则 2（配置驱动）
 """
@@ -10,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 from pathlib import Path
 from uuid import UUID
 
@@ -19,6 +21,28 @@ logger = logging.getLogger(__name__)
 
 # schema 文件根目录（2026-06-07 迁移至 ledger_adapters/ 子目录）
 _SCHEMA_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "ledger_adapters" / "wp_render_schema"
+
+# 样本量自动推荐映射（基于控制频率）
+# 前端从 C-generic.yaml 的 sample_size_recommendation 获取相同数据
+SAMPLE_SIZE_BY_FREQUENCY: dict[str, int] = {
+    "每次发生": 25,
+    "每日": 25,
+    "每周": 5,
+    "每月": 2,
+    "每季": 1,
+    "每年": 1,
+}
+
+
+# ─── Pattern-based schema 匹配规则 ─────────────────────────────────────────
+# 当 wp_code 匹配某个正则时，映射到对应的 generic schema 文件。
+# 例如 B23-1 ~ B23-14 共用 B23-generic.yaml。
+_PATTERN_SCHEMA_MAP: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"^B23-(\d{1,2})$"), "B23-generic.yaml"),
+    # C 类通用 schema
+    (re.compile(r"^C(\d{1,2})$"), "C-generic.yaml"),              # C2~C15
+    (re.compile(r"^C(\d{1,2})-2$"), "C-deviation-generic.yaml"),  # C2-2~C15-2
+]
 
 
 class WpRenderSchemaService:
@@ -66,6 +90,12 @@ class WpRenderSchemaService:
 
         if schema is None:
             schema = {}
+
+        # B23-x 参数化注入：为 cycle_name 字段设置默认值
+        schema = self._inject_b23_cycle_name(wp_code, schema)
+
+        # C 类参数化注入：为 cycle_name 字段设置默认值
+        schema = self._inject_c_cycle_name(wp_code, schema)
 
         self._cache[cache_key] = schema
         logger.debug("Loaded render schema: %s (from %s)", wp_code, schema_path)
@@ -119,7 +149,28 @@ class WpRenderSchemaService:
         if exact.is_file():
             return exact
 
-        # 2. 附注披露专属 schema（C-{wp_code}-disclosure.yaml）
+        # 2. Pattern-based 匹配（如 B23-1~14 → B23-generic.yaml）
+        for pattern, schema_file in _PATTERN_SCHEMA_MAP:
+            m = pattern.match(wp_code)
+            if m:
+                # 验证匹配的数字范围
+                try:
+                    n = int(m.group(1))
+                    valid = False
+                    if schema_file == "B23-generic.yaml" and 1 <= n <= 14:
+                        valid = True
+                    elif schema_file == "C-generic.yaml" and 2 <= n <= 15:
+                        valid = True
+                    elif schema_file == "C-deviation-generic.yaml" and 2 <= n <= 15:
+                        valid = True
+                    if valid:
+                        generic_path = _SCHEMA_DIR / schema_file
+                        if generic_path.is_file():
+                            return generic_path
+                except (IndexError, ValueError):
+                    pass
+
+        # 3. 附注披露专属 schema（C-{wp_code}-disclosure.yaml）
         #    附注披露 sheet 的 wp_code 与主底稿相同（如 D1 的「附注披露信息（上市公司）」
         #    其 wp_code 仍是 D1），但需要一套独立于审定表/程序表的 C 类嵌套表 schema。
         #    命名约定 C-{wp_code}-disclosure.yaml（如 C-D1-disclosure / C-D2-disclosure），
@@ -129,7 +180,7 @@ class WpRenderSchemaService:
         if disclosure.is_file():
             return disclosure
 
-        # 3. 前缀 fallback（如 B-template.yaml）
+        # 4. 前缀 fallback（如 B-template.yaml）
         prefix = self._extract_prefix(wp_code)
         if prefix:
             fallback = _SCHEMA_DIR / f"{prefix}-template.yaml"
@@ -154,6 +205,93 @@ class WpRenderSchemaService:
         """构建缓存键"""
         version_part = str(template_version_id) if template_version_id else "default"
         return f"{wp_code}:{version_part}"
+
+    # ─── B23 cycle_name 参数化注入 ──────────────────────────────────────
+
+    _B23_CYCLE_NAMES: dict[str, str] = {
+        "B23-1": "销售与收款",
+        "B23-2": "采购与付款",
+        "B23-3": "存货与仓储",
+        "B23-4": "固定资产",
+        "B23-5": "无形资产",
+        "B23-6": "投资",
+        "B23-7": "筹资",
+        "B23-8": "货币资金",
+        "B23-9": "职工薪酬",
+        "B23-10": "税费",
+        "B23-11": "关联交易",
+        "B23-12": "或有事项",
+        "B23-13": "期后事项",
+        "B23-14": "持续经营",
+    }
+
+    def _inject_b23_cycle_name(self, wp_code: str, schema: dict) -> dict:
+        """B23-x schema 加载后注入 cycle_name 默认值到首 sheet 的 fields。
+
+        前端 GtDFormTable 初始化 context 字段时，cycle_name 字段标记 readonly
+        且有默认值，用户看到的是自动填入的循环名称（如"销售与收款"）。
+        """
+        cycle_name = self._B23_CYCLE_NAMES.get(wp_code)
+        if not cycle_name:
+            return schema
+
+        # 深拷贝避免污染缓存（注意：此处在缓存写入前调用，schema 是新建的）
+        schema = copy.deepcopy(schema)
+
+        # 在所有 sheets 的 fields 中找 cycle_name 字段并设置 default
+        sheets = schema.get("sheets")
+        if isinstance(sheets, dict):
+            for _sheet_name, sheet_data in sheets.items():
+                fields = sheet_data.get("fields")
+                if isinstance(fields, list):
+                    for field_def in fields:
+                        if isinstance(field_def, dict) and field_def.get("field") == "cycle_name":
+                            field_def["default"] = cycle_name
+                            break
+                    break  # 只处理第一个有 fields 的 sheet
+
+        return schema
+
+    # ─── C 类 cycle_name 参数化注入 ────────────────────────────────────────
+
+    _C_CYCLE_NAMES: dict[str, str] = {
+        "C2": "销售收入", "C3": "货币资金", "C4": "采购存货",
+        "C5": "投资", "C6": "固定资产", "C7": "在建工程",
+        "C8": "无形资产", "C9": "研发", "C10": "职工薪酬",
+        "C11": "管理", "C12": "税费", "C13": "债务",
+        "C14": "租赁", "C15": "关联方",
+        # 偏差评价底稿使用相同的循环名称
+        "C2-2": "销售收入", "C3-2": "货币资金", "C4-2": "采购存货",
+        "C5-2": "投资", "C6-2": "固定资产", "C7-2": "在建工程",
+        "C8-2": "无形资产", "C9-2": "研发", "C10-2": "职工薪酬",
+        "C11-2": "管理", "C12-2": "税费", "C13-2": "债务",
+        "C14-2": "租赁", "C15-2": "关联方",
+    }
+
+    def _inject_c_cycle_name(self, wp_code: str, schema: dict) -> dict:
+        """C 类 schema 加载后注入 cycle_name 默认值到首 sheet 的 fields。
+
+        C2~C15 和 C2-2~C15-2 使用相同逻辑：在第一个包含 cycle_name 字段的
+        sheet 中设置对应循环名称的 default 值。
+        """
+        cycle_name = self._C_CYCLE_NAMES.get(wp_code)
+        if not cycle_name:
+            return schema
+
+        schema = copy.deepcopy(schema)
+
+        sheets = schema.get("sheets")
+        if isinstance(sheets, dict):
+            for _sheet_name, sheet_data in sheets.items():
+                fields = sheet_data.get("fields")
+                if isinstance(fields, list):
+                    for field_def in fields:
+                        if isinstance(field_def, dict) and field_def.get("field") == "cycle_name":
+                            field_def["default"] = cycle_name
+                            break
+                    break  # 只处理第一个有 fields 的 sheet
+
+        return schema
 
 
 def _deep_merge(base: dict, override: dict) -> None:

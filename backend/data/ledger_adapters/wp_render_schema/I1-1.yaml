@@ -1,0 +1,132 @@
+# backend/data/wp_render_schema/I1-1.yaml
+# 无形资产审定表 — d-form-table 渲染 schema
+# Design: §3 审定表标准字段 + §2.3 I1-1 特殊：按无形资产类别分行+累计摊销/减值扣减+净额行
+# Template: I1 无形资产.xlsx
+#
+# 特殊结构：按无形资产类别（土地使用权/软件/专利/特许经营权/其他）分行，
+#          累计摊销扣减行 + 减值准备扣减行 + 净额行
+
+wp_code: I1-1
+wp_name: 无形资产审定表
+component_type: d-form-table
+template_path: backend/wp_templates/I/I1 无形资产.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1701'
+    name: 无形资产
+  - code: '1702'
+    name: 累计摊销
+  - code: '1703B'
+    name: 无形资产减值准备
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 按无形资产类别分行 + 累计摊销/减值准备扣减 + 净额行
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 土地使用权
+    group_key: land_use_rights
+    row_type: category_row
+    account_code_prefix: '170101'
+    fields: &audit_determination_fields
+      - { field: category_name, label: 资产类别, type: text, readonly: true }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 软件
+    group_key: software
+    row_type: category_row
+    account_code_prefix: '170102'
+    fields: *audit_determination_fields
+
+  - name: 专利权
+    group_key: patents
+    row_type: category_row
+    account_code_prefix: '170103'
+    fields: *audit_determination_fields
+
+  - name: 特许经营权
+    group_key: franchise
+    row_type: category_row
+    account_code_prefix: '170104'
+    fields: *audit_determination_fields
+
+  - name: 其他无形资产
+    group_key: others
+    row_type: category_row
+    account_code_prefix: '170105'
+    fields: *audit_determination_fields
+
+  # ─── 无形资产原值合计 ───────────────────────────────────────────────────────
+  - name: 无形资产原值合计
+    row_type: total
+    formula_source: "SUM(土地使用权, 软件, 专利权, 特许经营权, 其他无形资产)"
+    fields: *audit_determination_fields
+
+  # ─── 累计摊销扣减行 ─────────────────────────────────────────────────────────
+  - name: 减：累计摊销
+    account_code_prefix: '1702'
+    row_type: deduction
+    fields: *audit_determination_fields
+
+  # ─── 减值准备扣减行 ─────────────────────────────────────────────────────────
+  - name: 减：无形资产减值准备
+    account_code_prefix: '1703B'
+    row_type: deduction
+    fields: *audit_determination_fields
+
+  # ─── 净额行 ─────────────────────────────────────────────────────────────────
+  - name: 无形资产净额
+    row_type: net
+    formula_source: "无形资产原值合计 - 减：累计摊销 - 减：无形资产减值准备"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-I1-1-001
+    target_wp: I1-8
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → I1-8 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-I1-1-002
+    target_wp: I1-3
+    target_field: 摊销测算
+    description: '累计摊销扣减 ← I1-3 摊销测算结论'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-I1-1-003
+    target_wp: I1-4
+    target_field: 减值测试
+    description: '减值准备扣减 ← I1-4 减值测试结论'
+    severity: info
+    direction: inbound

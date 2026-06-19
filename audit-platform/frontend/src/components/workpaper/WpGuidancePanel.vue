@@ -1,212 +1,343 @@
 <script setup lang="ts">
 /**
- * WpGuidancePanel — 底稿编制说明面板
+ * WpGuidancePanel — 底稿编制指导浮动面板（全量覆盖版）
  *
- * 展示底稿对应的编制说明数据（公式、规则、参数定义）。
- * 数据来源：render-config 响应中的 guidance 字段。
- * 用于 A3-8 商誉减值、A4-1 经营分部、A5 现金流等需要准则/公式参考的底稿。
+ * 右侧固定面板，包含「编制说明」+「AI 对话」双 Tab。
+ * 编制说明从后端 GET /api/workpapers/{wpId}/guidance 提取。
+ * AI 对话为 P1 预留，当 aiEnabled=false 时隐藏。
+ * 面板展开/折叠带 CSS transition，主编辑区宽度自适应收缩。
+ *
+ * 性能优化：
+ * - 懒加载子组件（defineAsyncComponent）
+ * - Vue onErrorCaptured 隔离面板异常（不影响底稿主体）
+ * - sessionStorage 缓存 guidance（按 wp_code）
+ * - 超 3s skeleton 占位
+ *
+ * Requirements: 1.1~1.8, 8.4, 8.5, 8.6, 10.1~10.4
  */
-import { ref, computed, onMounted } from 'vue'
-import { api } from '@/services/apiProxy'
+import { computed, watch, onMounted, ref, defineAsyncComponent, onErrorCaptured } from 'vue'
+import { useGuidancePanelStore, type WpContext } from '@/stores/guidancePanelStore'
 
-interface GuidanceParameter {
-  symbol: string
-  name: string
-  description: string
-}
+// ─── Lazy-loaded components ─────────────────────────────────────────────────
 
-interface GuidanceItem {
-  seq: number
-  text: string
-}
+const GuidanceTabContent = defineAsyncComponent(() =>
+  import('./guidance/GuidanceTabContent.vue'),
+)
+const AiChatTab = defineAsyncComponent(() =>
+  import('./guidance/AiChatTab.vue'),
+)
 
-interface SubFormula {
-  label: string
-  formula: string
-}
-
-interface GuidanceSection {
-  id: string
-  title: string
-  collapsed: boolean
-  formula?: string
-  sub_formulas?: SubFormula[]
-  parameters?: GuidanceParameter[]
-  items?: GuidanceItem[]
-}
-
-interface GuidanceData {
-  wp_codes: string[]
-  title: string
-  sections: GuidanceSection[]
-}
+// ─── Props ──────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
-  projectId: string
   wpId: string
+  wpCode: string
+  wpName: string
+  componentType: string
+  projectId: string
+  year: number
 }>()
 
-const guidanceData = ref<GuidanceData | null>(null)
-const loading = ref(false)
-const activeSections = ref<string[]>([])
+// ─── Store ──────────────────────────────────────────────────────────────────
 
-const hasGuidance = computed(() => !!guidanceData.value?.sections?.length)
+const store = useGuidancePanelStore()
 
-async function loadGuidance() {
-  if (!props.wpId) return
-  loading.value = true
-  try {
-    const data = await api.get(`/api/workpapers/${props.wpId}/render-config`)
-    if (data?.guidance) {
-      guidanceData.value = data.guidance
-      // 默认展开第一个非折叠的 section
-      activeSections.value = data.guidance.sections
-        .filter((s: GuidanceSection) => !s.collapsed)
-        .map((s: GuidanceSection) => s.id)
-    }
-  } catch {
-    // render-config 可能已加载过，此处静默降级
-  } finally {
-    loading.value = false
+// ─── Error boundary ─────────────────────────────────────────────────────────
+
+const panelError = ref<Error | null>(null)
+
+onErrorCaptured((err) => {
+  panelError.value = err instanceof Error ? err : new Error(String(err))
+  return false // prevent propagation to main editor
+})
+
+// ─── Skeleton delay ─────────────────────────────────────────────────────────
+
+const showSkeleton = ref(false)
+let skeletonTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => store.guidanceLoading, (loading) => {
+  if (loading) {
+    // 超过 3s 才显示 skeleton
+    skeletonTimer = setTimeout(() => { showSkeleton.value = true }, 3000)
+  } else {
+    if (skeletonTimer) { clearTimeout(skeletonTimer); skeletonTimer = null }
+    showSkeleton.value = false
+  }
+})
+
+// ─── Context sync ───────────────────────────────────────────────────────────
+
+function syncContext() {
+  const ctx: WpContext = {
+    wpId: props.wpId,
+    wpCode: props.wpCode,
+    wpName: props.wpName,
+    componentType: props.componentType,
+    projectId: props.projectId,
+    year: props.year,
+  }
+  store.setWpContext(ctx)
+  // 如果没有缓存数据，发起请求
+  if (!store.guidanceData) {
+    store.fetchGuidance()
   }
 }
 
-onMounted(loadGuidance)
+// 监听 props 变化（底稿切换）
+watch(
+  () => props.wpId,
+  () => {
+    panelError.value = null // 切换底稿时清除错误
+    syncContext()
+  },
+  { immediate: false },
+)
+
+onMounted(() => syncContext())
+
+// ─── Tab ────────────────────────────────────────────────────────────────────
+
+const tabValue = computed({
+  get: () => store.activeTab,
+  set: (v) => store.setActiveTab(v as 'guidance' | 'ai'),
+})
 </script>
 
 <template>
-  <div class="gt-wp-guidance-panel">
-    <div v-if="loading" v-loading="true" style="min-height: 120px" />
-    <div v-else-if="!hasGuidance" class="gt-wp-side-placeholder">
-      当前底稿无编制说明
-    </div>
-    <template v-else>
-      <div class="gt-wp-guidance-title">{{ guidanceData!.title }}</div>
-      <el-collapse v-model="activeSections" class="gt-wp-guidance-collapse">
-        <el-collapse-item
-          v-for="section in guidanceData!.sections"
-          :key="section.id"
-          :name="section.id"
-          :title="section.title"
-        >
-          <!-- 公式展示 -->
-          <div v-if="section.formula" class="gt-wp-guidance-formula">
-            <code>{{ section.formula }}</code>
-          </div>
-
-          <!-- 子公式 -->
-          <div v-if="section.sub_formulas?.length" class="gt-wp-guidance-sub-formulas">
-            <div v-for="sf in section.sub_formulas" :key="sf.label" class="gt-wp-guidance-sub-formula">
-              <span class="gt-wp-guidance-sf-label">{{ sf.label }}：</span>
-              <code>{{ sf.formula }}</code>
-            </div>
-          </div>
-
-          <!-- 参数表 -->
-          <div v-if="section.parameters?.length" class="gt-wp-guidance-params">
-            <table class="gt-wp-guidance-param-table">
-              <thead>
-                <tr><th>符号</th><th>名称</th><th>说明</th></tr>
-              </thead>
-              <tbody>
-                <tr v-for="p in section.parameters" :key="p.symbol">
-                  <td class="gt-wp-guidance-symbol">{{ p.symbol }}</td>
-                  <td>{{ p.name }}</td>
-                  <td class="gt-wp-guidance-desc">{{ p.description }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          <!-- 规则条目 -->
-          <div v-if="section.items?.length" class="gt-wp-guidance-items">
-            <div v-for="item in section.items" :key="item.seq" class="gt-wp-guidance-item">
-              <span class="gt-wp-guidance-item-seq">{{ item.seq }}.</span>
-              <span>{{ item.text }}</span>
-            </div>
-          </div>
-        </el-collapse-item>
-      </el-collapse>
-    </template>
+  <!-- 折叠态：右侧触发按钮 -->
+  <div
+    v-if="!store.isOpen"
+    class="gt-guidance-trigger"
+    @click="store.open()"
+    title="展开编制指导面板"
+  >
+    <el-icon :size="16"><Document /></el-icon>
+    <span class="gt-guidance-trigger__text">编制指导</span>
   </div>
+
+  <!-- 展开态：面板主体 -->
+  <transition name="gt-panel-slide">
+    <div v-if="store.isOpen" class="gt-guidance-panel">
+      <!-- Header -->
+      <div class="gt-guidance-panel__header">
+        <span class="gt-guidance-panel__title">编制指导</span>
+        <el-icon
+          class="gt-guidance-panel__fold-btn"
+          :size="18"
+          @click="store.close()"
+          title="折叠面板"
+        >
+          <ArrowRight />
+        </el-icon>
+      </div>
+
+      <!-- Error boundary fallback -->
+      <div v-if="panelError" class="gt-guidance-panel__error">
+        <p class="gt-guidance-panel__error-title">面板加载异常</p>
+        <p class="gt-guidance-panel__error-msg">{{ panelError.message }}</p>
+        <el-button size="small" @click="panelError = null">重试</el-button>
+      </div>
+
+      <!-- Tabs -->
+      <el-tabs v-else v-model="tabValue" class="gt-guidance-panel__tabs">
+        <el-tab-pane label="编制说明" name="guidance">
+          <!-- Loading skeleton -->
+          <div v-if="store.guidanceLoading && showSkeleton" class="gt-guidance-panel__skeleton">
+            <el-skeleton :rows="6" animated />
+          </div>
+          <!-- Loading but < 3s: 空白占位 -->
+          <div v-else-if="store.guidanceLoading" class="gt-guidance-panel__loading-placeholder">
+            <el-icon class="is-loading" :size="20"><Loading /></el-icon>
+            <span>加载编制说明…</span>
+          </div>
+          <!-- Content -->
+          <GuidanceTabContent
+            v-else-if="store.guidanceData"
+            :guidance-data="store.guidanceData"
+          />
+          <!-- No data fallback -->
+          <div v-else class="gt-guidance-panel__empty">
+            <p>暂无编制说明数据</p>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane
+          v-if="store.aiEnabled"
+          label="AI 对话"
+          name="ai"
+        >
+          <AiChatTab
+            :wp-id="props.wpId"
+            :wp-code="props.wpCode"
+            :wp-name="props.wpName"
+            :project-id="props.projectId"
+            :recommended-questions="store.guidanceData?.recommended_questions || []"
+            :ai-available="store.aiEnabled"
+          />
+        </el-tab-pane>
+      </el-tabs>
+    </div>
+  </transition>
 </template>
 
+<script lang="ts">
+import { Document, ArrowRight, Loading } from '@element-plus/icons-vue'
+
+export default {
+  components: { Document, ArrowRight, Loading },
+}
+</script>
+
 <style scoped>
-.gt-wp-guidance-panel {
-  padding: 8px;
-}
-.gt-wp-guidance-title {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: var(--gt-primary, #4b2d77);
-}
-.gt-wp-guidance-collapse {
-  border: none;
-}
-.gt-wp-guidance-formula {
+.gt-guidance-trigger {
+  position: fixed;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  writing-mode: vertical-rl;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
   background: var(--gt-bg-light, #f4f0fa);
   border: 1px solid var(--gt-border-light, #d8b8ee);
-  border-radius: 4px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  font-family: 'Consolas', 'Monaco', monospace;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  cursor: pointer;
+  z-index: 100;
+  transition: background 0.2s;
+  color: var(--gt-primary, #4b2d77);
+  font-size: 12px;
+  font-weight: 500;
+}
+.gt-guidance-trigger:hover {
+  background: var(--gt-border-light, #d8b8ee);
+}
+.gt-guidance-trigger__text {
+  letter-spacing: 2px;
+}
+
+.gt-guidance-panel {
+  width: 380px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-left: 1px solid var(--gt-border-light, #d8b8ee);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.gt-guidance-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--gt-bg-light, #f4f0fa);
+  border-bottom: 1px solid var(--gt-border-light, #d8b8ee);
+  flex-shrink: 0;
+}
+
+.gt-guidance-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-primary, #4b2d77);
+}
+
+.gt-guidance-panel__fold-btn {
+  cursor: pointer;
+  color: var(--gt-primary, #4b2d77);
+  transition: transform 0.2s;
+}
+.gt-guidance-panel__fold-btn:hover {
+  transform: translateX(2px);
+}
+
+.gt-guidance-panel__tabs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.gt-guidance-panel__tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--gt-border-light, #d8b8ee);
+}
+
+.gt-guidance-panel__tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.gt-guidance-panel__tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.gt-guidance-panel__tabs :deep(#pane-ai) {
+  overflow: hidden;
+  padding: 0;
+}
+
+.gt-guidance-panel__tabs :deep(.el-tabs__item.is-active) {
+  color: var(--gt-primary, #4b2d77);
+}
+
+.gt-guidance-panel__tabs :deep(.el-tabs__active-bar) {
+  background-color: var(--gt-primary, #4b2d77);
+}
+
+.gt-guidance-panel__skeleton {
+  padding: 8px 0;
+}
+
+.gt-guidance-panel__loading-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 0;
+  color: var(--gt-primary, #4b2d77);
   font-size: 13px;
-  color: var(--gt-primary, #4b2d77);
 }
-.gt-wp-guidance-sub-formulas {
+
+.gt-guidance-panel__empty {
+  padding: 24px 0;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+}
+
+/* Error boundary */
+.gt-guidance-panel__error {
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.gt-guidance-panel__error-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #f56c6c;
   margin-bottom: 8px;
 }
-.gt-wp-guidance-sub-formula {
-  padding: 2px 0;
+
+.gt-guidance-panel__error-msg {
   font-size: 12px;
+  color: #999;
+  margin-bottom: 12px;
+  word-break: break-all;
 }
-.gt-wp-guidance-sf-label {
-  font-weight: 500;
-  color: #666;
+
+/* Slide transition */
+.gt-panel-slide-enter-active,
+.gt-panel-slide-leave-active {
+  transition: all 0.3s ease;
 }
-.gt-wp-guidance-sub-formula code {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 12px;
-  color: var(--gt-primary, #4b2d77);
-}
-.gt-wp-guidance-param-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-.gt-wp-guidance-param-table th {
-  background: #f5f5f5;
-  padding: 4px 8px;
-  text-align: left;
-  font-weight: 500;
-  border-bottom: 1px solid #e0e0e0;
-}
-.gt-wp-guidance-param-table td {
-  padding: 4px 8px;
-  border-bottom: 1px solid #f0f0f0;
-}
-.gt-wp-guidance-symbol {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-weight: 600;
-  color: var(--gt-primary, #4b2d77);
-}
-.gt-wp-guidance-desc {
-  color: #666;
-  font-size: 11px;
-}
-.gt-wp-guidance-items {
-  padding-left: 4px;
-}
-.gt-wp-guidance-item {
-  padding: 4px 0;
-  font-size: 12px;
-  line-height: 1.6;
-}
-.gt-wp-guidance-item-seq {
-  font-weight: 600;
-  margin-right: 4px;
-  color: var(--gt-primary, #4b2d77);
+.gt-panel-slide-enter-from,
+.gt-panel-slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
 }
 </style>

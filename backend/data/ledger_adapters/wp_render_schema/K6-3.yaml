@@ -1,0 +1,86 @@
+# backend/data/wp_render_schema/K6-3.yaml
+# 持有待售分类条件检查表 — d-form-table 渲染 schema
+# Requirements: §5.6（K6 持有待售资产和负债）
+# Design: §2 componentType=d-form-table（CAS42 五条件逐项检查）
+# Template: K6 持有待售资产和负债.xlsx
+#
+# CAS42 《持有待售的非流动资产、处置组和终止经营》五条件：
+# 1. 管理层已批准出售计划
+# 2. 已签订不可撤销转让协议 / 积极寻找买家
+# 3. 能在一年内完成出售
+# 4. 积极寻找买家且出售可能性很大
+# 5. 出售计划不太可能被撤销或重大修改
+
+wp_code: K6-3
+wp_name: 持有待售分类条件检查表
+component_type: d-form-table
+template_path: backend/wp_templates/K/K6 持有待售资产和负债.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1481'
+    name: 持有待售资产
+  - code: '2245'
+    name: 持有待售负债
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CAS42 持有待售五条件检查
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 待售资产/处置组清单
+    group_key: disposal_groups
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: asset_description, label: 资产/处置组描述, type: textarea }
+      - { field: asset_category, label: 资产类别, type: select, options: ["固定资产", "无形资产", "投资性房地产", "长期股权投资", "处置组", "其他非流动资产"] }
+      - { field: carrying_amount, label: 账面金额, type: number }
+      - { field: fair_value_less_costs, label: 公允价值减处置费用, type: number }
+      - { field: planned_buyer, label: 拟出售对象, type: text }
+
+  - name: CAS42 五条件检查
+    group_key: cas42_conditions
+    row_type: checklist
+    fields:
+      - { field: condition_1_approved, label: "条件一：管理层已批准出售计划", type: select, options: ["满足", "不满足", "不适用"] }
+      - { field: condition_1_evidence, label: 条件一审计证据, type: textarea }
+      - { field: condition_2_agreement, label: "条件二：已签订不可撤销转让协议", type: select, options: ["满足", "不满足", "不适用"] }
+      - { field: condition_2_evidence, label: 条件二审计证据, type: textarea }
+      - { field: condition_3_one_year, label: "条件三：能在一年内完成出售", type: select, options: ["满足", "不满足", "不适用"] }
+      - { field: condition_3_evidence, label: 条件三审计证据, type: textarea }
+      - { field: condition_4_actively_seeking, label: "条件四：积极寻找买家且出售可能性很大", type: select, options: ["满足", "不满足", "不适用"] }
+      - { field: condition_4_evidence, label: 条件四审计证据, type: textarea }
+      - { field: condition_5_irrevocable, label: "条件五：出售计划不太可能被撤销或重大修改", type: select, options: ["满足", "不满足", "不适用"] }
+      - { field: condition_5_evidence, label: 条件五审计证据, type: textarea }
+
+  - name: 分类结论
+    group_key: classification_conclusion
+    row_type: conclusion
+    fields:
+      - { field: all_conditions_met, label: 五条件是否全部满足, type: select, options: ["是", "否"] }
+      - { field: classification_appropriate, label: 持有待售分类是否恰当, type: select, options: ["恰当", "不恰当"] }
+      - { field: measurement_note, label: 计量说明（账面vs公允-处置费用孰低）, type: textarea }
+      - { field: impairment_recognized, label: 是否确认减值, type: select, options: ["是", "否", "不适用"] }
+      - { field: impairment_amount, label: 减值金额, type: number }
+      - { field: audit_conclusion, label: 审计结论, type: textarea }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-K6-3-001
+    target_wp: K6-1
+    target_field: 持有待售审定表
+    description: '分类条件满足 → K6-1 审定表确认金额'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-K6-3-002
+    target_wp: K6-2
+    target_field: 持有待售明细
+    description: '待售资产清单 ← K6-2 明细表核对'
+    severity: info
+    direction: inbound

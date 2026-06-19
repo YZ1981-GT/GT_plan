@@ -1,0 +1,62 @@
+# C21.yaml — IT专业人员资质
+# componentType: d-form-table
+# Requirements: G4-2 IT 人员资质
+
+wp_code: C21
+template_version: v2025-R5
+description: |
+  记录具有信息技术专业技能的项目组成员信息，
+  证明 IT 审计由胜任人员执行。
+
+sheets:
+  IT专业人员资质:
+    component_type: d-form-table
+    form_type: table
+    title: 具有信息技术专业技能的项目组成员
+    description: 记录 IT 审计人员的资质、负责领域和参与时间。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 20
+      columns:
+        name:
+          field: name
+          type: text
+          label: 姓名
+          width: 100
+          source: staff_members
+        qualification:
+          field: qualification
+          type: textarea
+          label: 专业资质/认证
+          width: 200
+          hint: "如 CISA、CISSP、CISP 等"
+        responsible_area:
+          field: responsible_area
+          type: enum
+          label: 负责领域
+          width: 150
+          dict_source: it_domain_dict
+          multiple: true
+        participation_period:
+          field: participation_period
+          type: text
+          label: 参与时间
+          width: 120
+          hint: "如 2025.01-2025.03"
+        work_description:
+          field: work_description
+          type: textarea
+          label: 工作说明
+          width: 250
+
+    dictionaries:
+      it_domain_dict:
+        - value: SA
+          label: 安全管理
+        - value: PE
+          label: 程序变更
+        - value: PM
+          label: 程序开发
+        - value: NS
+          label: 网络安全

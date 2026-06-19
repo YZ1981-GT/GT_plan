@@ -1,0 +1,163 @@
+# backend/data/wp_render_schema/F2-1.yaml
+# 存货审定表 — d-form-table 渲染 schema
+# Requirements: G2-2（F2-1 审定表）
+# Design: §3 审定表标准字段 + §4.1 审定表→trial_balance 回写
+# Template: F2-1至F2-14 存货及跌价准备-审定明细表类.xlsx
+#
+# 特殊结构：多类别行 + 跌价准备扣减行 + 净额行
+# 各存货类别独立审定，最终合计减去跌价准备得到存货净额
+
+wp_code: F2-1
+wp_name: 存货审定表
+component_type: d-form-table
+template_path: backend/wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1401'
+    name: 材料采购
+  - code: '1402'
+    name: 在途物资
+  - code: '1403'
+    name: 原材料
+  - code: '1404'
+    name: 材料成本差异
+  - code: '1405'
+    name: 库存商品
+  - code: '1406'
+    name: 发出商品
+  - code: '1407'
+    name: 商品进销差价
+  - code: '1408'
+    name: 委托加工物资
+  - code: '1411'
+    name: 周转材料
+  - code: '1421'
+    name: 消耗性生物资产
+  - code: '1461'
+    name: 存货跌价准备
+  - code: '1471'
+    name: 合同履约成本
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表分多类别行 + 跌价准备扣减 + 净额
+# 结构：原材料 / 在产品 / 产成品 / 周转材料 / 委托加工物资 / 发出商品
+#        / 消耗性生物资产 / 合同履约成本 → 存货合计 → 跌价准备(扣减) → 存货净额
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 原材料
+    account_code_prefix: '1403'
+    row_type: category
+    fields: &audit_determination_fields
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 在产品
+    account_code_prefix: '1412'
+    row_type: category
+    fields: *audit_determination_fields
+
+  - name: 产成品（库存商品）
+    account_code_prefix: '1405'
+    row_type: category
+    fields: *audit_determination_fields
+
+  - name: 周转材料
+    account_code_prefix: '1411'
+    row_type: category
+    fields: *audit_determination_fields
+
+  - name: 委托加工物资
+    account_code_prefix: '1408'
+    row_type: category
+    fields: *audit_determination_fields
+
+  - name: 发出商品
+    account_code_prefix: '1406'
+    row_type: category
+    fields: *audit_determination_fields
+
+  - name: 消耗性生物资产
+    account_code_prefix: '1421'
+    row_type: category
+    fields: *audit_determination_fields
+
+  - name: 合同履约成本
+    account_code_prefix: '1471'
+    row_type: category
+    fields: *audit_determination_fields
+
+  # ─── 合计行 ─────────────────────────────────────────────────────────────────
+  - name: 存货合计
+    row_type: subtotal
+    formula_source: "SUM(原材料, 在产品, 产成品（库存商品）, 周转材料, 委托加工物资, 发出商品, 消耗性生物资产, 合同履约成本)"
+    fields: *audit_determination_fields
+
+  # ─── 跌价准备扣减行 ─────────────────────────────────────────────────────────
+  - name: 减：存货跌价准备
+    account_code_prefix: '1461'
+    row_type: deduction
+    fields: *audit_determination_fields
+
+  # ─── 净额行 ─────────────────────────────────────────────────────────────────
+  - name: 存货净额
+    row_type: net
+    formula_source: "存货合计 - 减：存货跌价准备"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-F2-1-001
+    target_wp: F2-13
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → F2-13 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-F2-1-002
+    target_wp: F2-2
+    target_field: 存货分类明细合计
+    description: '存货各类审定 ← F2-2 分类明细合计'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-F2-1-003
+    target_wp: F2-11
+    target_field: 跌价准备明细合计
+    description: '跌价准备扣减 ← F2-11 跌价准备明细表'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-F2-1-004
+    target_wp: F5-1
+    target_field: 营业成本审定金额
+    description: '存货审定 → F5 营业成本成本结转验证'
+    severity: info
+    direction: outbound

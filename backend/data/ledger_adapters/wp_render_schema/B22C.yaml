@@ -1,0 +1,102 @@
+# B22C.yaml — 评价设计有效性（企业层面）
+# componentType: d-form-table
+# Requirements: G5 企业层面控制 — 评价设计有效性
+# Design: §1.1 B22C → d-form-table
+
+wp_code: B22C
+template_path: backend/wp_templates/B/B22C 评价设计有效性 - 企业层面.xlsx
+template_version: v2025-R5
+
+sheets:
+  评价设计有效性:
+    component_type: d-form-table
+    form_type: table
+    title: 评价设计有效性—企业层面
+    description: 对企业层面内部控制设计的有效性进行评价
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_period
+        label: 评估期间
+        type: text
+        source: project.audit_year
+        readonly: true
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 40
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_objective:
+          field: control_objective
+          type: text
+          label: 控制目标
+          width: 180
+        control_activity:
+          field: control_activity
+          type: textarea
+          label: 控制活动
+          width: 250
+        design_effectiveness:
+          field: design_effectiveness
+          type: enum
+          label: 设计有效性
+          width: 100
+          dict_source: effectiveness_dict
+        implementation_status:
+          field: implementation_status
+          type: enum
+          label: 执行情况
+          width: 100
+          dict_source: implementation_dict
+        deficiency_description:
+          field: deficiency_description
+          type: textarea
+          label: 缺陷描述（如有）
+          width: 200
+        reference:
+          field: reference
+          type: text
+          label: 参考索引
+          width: 100
+          render: index_chip
+
+    dictionaries:
+      effectiveness_dict:
+        - value: effective
+          label: 有效
+        - value: ineffective
+          label: 无效
+      implementation_dict:
+        - value: implemented
+          label: 已执行
+        - value: not_implemented
+          label: 未执行
+        - value: partially_implemented
+          label: 部分执行
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 设计有效性整体结论
+        type: enum
+        enum:
+          - { value: effective, label: 设计整体有效 }
+          - { value: partially_effective, label: 设计部分有效—存在缺陷需关注 }
+          - { value: ineffective, label: 设计无效—存在重大设计缺陷 }

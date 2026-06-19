@@ -1,0 +1,123 @@
+# C-deviation-generic.yaml — 评价控制偏差通用 schema（C2-2~C15-2 共用）
+# componentType: d-form-table
+# Requirements: G2 评价控制偏差 — 14 组结构高度相似，设计一套通用 schema
+# Design: §4 C-deviation-generic.yaml — wp_code_pattern 参数化
+
+wp_code_pattern: "C{n}-2"
+template_version: v2025-R5
+description: |
+  C2-2~C15-2 评价控制偏差底稿共用此 schema。
+  各组仅通过 wp_code 区分所属循环。
+  当 C{n} 控制测试发现偏差时，在 C{n}-2 中逐项评价。
+
+# 评价流程：7 步骤逐项评价 + 最终结论
+# 步骤 1: 孤立事件判断
+# 步骤 2: 偏差原因分析
+# 步骤 3: 设计缺陷判断
+# 步骤 4: 补充审计程序
+# 步骤 5: 信赖程度影响
+# 步骤 6: 实质性程序影响
+# 步骤 7: 缺陷上报判断
+# 结论: 综合评价
+
+sheets:
+  评价控制偏差:
+    component_type: d-form-table
+    form_type: table
+    title: 评价控制偏差
+    description: |
+      对控制测试中发现的偏差逐项进行 7 步评价。
+      每行一个偏差事项，从对应 C{n} 控制测试自动关联。
+
+    fields:
+      - field: cycle_name
+        label: 业务循环
+        type: text
+        readonly: true
+        hint: 由 wp_code 自动确定
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 50
+      columns:
+        control_id:
+          field: control_id
+          type: text
+          label: 控制编号
+          width: 100
+          readonly: true
+        exception_description:
+          field: exception_description
+          type: textarea
+          label: 例外事项描述
+          width: 250
+        step1_isolated:
+          field: step1_isolated
+          type: enum
+          label: 步骤1：是否孤立事件
+          width: 120
+          dict_source: yes_no_dict
+        step2_cause:
+          field: step2_cause
+          type: textarea
+          label: 步骤2：偏差原因
+          width: 200
+        step3_design_defect:
+          field: step3_design_defect
+          type: enum
+          label: 步骤3：是否设计缺陷
+          width: 120
+          dict_source: yes_no_dict
+        step4_supplementary_procedures:
+          field: step4_supplementary_procedures
+          type: textarea
+          label: 步骤4：补充审计程序
+          width: 200
+        step5_reliance_impact:
+          field: step5_reliance_impact
+          type: enum
+          label: 步骤5：信赖程度影响
+          width: 130
+          dict_source: reliance_impact_dict
+        step6_substantive_impact:
+          field: step6_substantive_impact
+          type: textarea
+          label: 步骤6：实质性程序影响
+          width: 200
+        step7_report_deficiency:
+          field: step7_report_deficiency
+          type: enum
+          label: 步骤7：是否需上报
+          width: 120
+          dict_source: yes_no_dict
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 结论
+          width: 150
+          dict_source: deviation_conclusion_dict
+          render_hint: risk_badge
+
+    dictionaries:
+      yes_no_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+      reliance_impact_dict:
+        - value: no_impact
+          label: 无影响
+        - value: reduce_reliance
+          label: 降低信赖
+        - value: no_reliance
+          label: 不信赖
+      deviation_conclusion_dict:
+        - value: effective_with_deviation
+          label: 有效但存在偏差
+          color: yellow
+        - value: ineffective_expand
+          label: 无效需扩大测试
+          color: red
+        - value: ineffective_abandon
+          label: 无效且已放弃信赖
+          color: red

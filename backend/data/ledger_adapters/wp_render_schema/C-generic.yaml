@@ -1,0 +1,216 @@
+# C-generic.yaml — 循环控制测试通用 schema（C2~C15 共用）
+# componentType: d-form-table（多 sheet）
+# Requirements: G1 循环控制测试 — 14 组结构高度相似，设计一套通用 schema
+# Design: §3 C-generic.yaml — wp_code_pattern 参数化
+
+wp_code_pattern: "C{n}"
+template_version: v2025-R5
+description: |
+  C2~C15 循环控制测试底稿共用此 schema。
+  各组仅通过 wp_code 区分所属循环（C2 销售收入 ~ C15 关联方）。
+  前端通过 wp_code 参数传入确定当前循环。
+
+# C-n 循环对照：
+#   C2: 销售收入   C3: 货币资金   C4: 采购存货   C5: 投资
+#   C6: 固定资产   C7: 在建工程   C8: 无形资产   C9: 研发
+#   C10: 职工薪酬  C11: 管理      C12: 税费      C13: 债务
+#   C14: 租赁      C15: 关联方
+
+# 样本量自动推荐映射（前端根据 frequency 字段值使用）
+sample_size_recommendation:
+  每次发生: 25
+  每日: 25
+  每周: 5
+  每月: 2
+  每季: 1
+  每年: 1
+
+sheets:
+  控制测试汇总表:
+    component_type: d-form-table
+    form_type: table
+    title: 控制测试汇总表
+    description: |
+      汇总本循环全部控制点的测试结论。
+      每行一个控制点，包含控制描述、测试方法、样本量和测试结论。
+
+    fields:
+      - field: cycle_name
+        label: 业务循环
+        type: text
+        readonly: true
+        hint: 由 wp_code 自动确定
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 100
+      columns:
+        sub_process:
+          field: sub_process
+          type: text
+          label: 子流程
+          width: 120
+        control_id:
+          field: control_id
+          type: text
+          label: 控制编号
+          width: 100
+        control_name:
+          field: control_name
+          type: text
+          label: 控制名称
+          width: 150
+        control_description:
+          field: control_description
+          type: textarea
+          label: 控制描述
+          width: 250
+        affected_accounts:
+          field: affected_accounts
+          type: text
+          label: 受影响科目
+          width: 120
+        assertion:
+          field: assertion
+          type: enum
+          label: 认定
+          width: 100
+          dict_source: assertion_dict
+        control_attribute:
+          field: control_attribute
+          type: enum
+          label: 控制属性
+          width: 90
+          dict_source: control_attribute_dict
+        frequency:
+          field: frequency
+          type: enum
+          label: 频率
+          width: 90
+          dict_source: frequency_dict
+        test_method:
+          field: test_method
+          type: enum
+          label: 测试方法
+          width: 100
+          dict_source: test_method_dict
+        sample_size:
+          field: sample_size
+          type: number
+          label: 样本量
+          width: 80
+          auto_recommend: true
+        test_conclusion:
+          field: test_conclusion
+          type: enum
+          label: 测试结论
+          width: 100
+          dict_source: test_conclusion_dict
+          render_hint: risk_badge
+
+    dictionaries:
+      assertion_dict:
+        - value: existence
+          label: 存在
+        - value: completeness
+          label: 完整性
+        - value: accuracy
+          label: 准确性
+        - value: cutoff
+          label: 截止
+        - value: classification
+          label: 分类
+        - value: presentation
+          label: 列报
+        - value: rights_obligations
+          label: 权利和义务
+        - value: valuation
+          label: 计价和分摊
+      control_attribute_dict:
+        - value: preventive
+          label: 预防性
+        - value: detective
+          label: 检查性
+      frequency_dict:
+        - value: per_occurrence
+          label: 每次发生
+        - value: daily
+          label: 每日
+        - value: weekly
+          label: 每周
+        - value: monthly
+          label: 每月
+        - value: quarterly
+          label: 每季
+        - value: annually
+          label: 每年
+      test_method_dict:
+        - value: inspection
+          label: 检查
+        - value: observation
+          label: 观察
+        - value: reperformance
+          label: 重新执行
+        - value: inquiry
+          label: 询问
+      test_conclusion_dict:
+        - value: effective
+          label: 有效
+          color: green
+        - value: ineffective
+          label: 无效
+          color: red
+        - value: not_applicable
+          label: 不适用
+          color: gray
+
+  控制测试过程记录:
+    component_type: d-form-table
+    form_type: table
+    title: 控制测试过程记录
+    description: |
+      逐控制点记录测试样本及结果。
+      按 control_id 分组，每个控制点展开多条测试样本记录。
+
+    dynamic_table:
+      add_row_button: true
+      group_by: control_id
+      max_rows: 500
+      columns:
+        sample_no:
+          field: sample_no
+          type: text
+          label: 样本编号
+          width: 100
+        sample_description:
+          field: sample_description
+          type: textarea
+          label: 样本描述
+          width: 250
+        test_steps:
+          field: test_steps
+          type: textarea
+          label: 测试步骤
+          width: 250
+        test_result:
+          field: test_result
+          type: enum
+          label: 测试结果
+          width: 90
+          dict_source: test_result_dict
+          render_hint: risk_badge
+        deviation_note:
+          field: deviation_note
+          type: textarea
+          label: 偏差说明
+          width: 200
+          visible_when: "test_result=='deviation'"
+
+    dictionaries:
+      test_result_dict:
+        - value: pass
+          label: 通过
+          color: green
+        - value: deviation
+          label: 偏差
+          color: red

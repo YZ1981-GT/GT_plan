@@ -283,3 +283,7 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §133. zero-downtime-deployment: DB-backed Feature Flags V2 (灰度) ═══
     from app.api.feature_flags import router as feature_flags_v2_router
     app.include_router(feature_flags_v2_router, tags=["Feature Flags V2"])
+
+    # ═══ §134. 底稿编制指导面板 ═══
+    from app.routers.wp_guidance_chat import router as wp_guidance_chat_router
+    app.include_router(wp_guidance_chat_router, tags=["底稿编制指导"])

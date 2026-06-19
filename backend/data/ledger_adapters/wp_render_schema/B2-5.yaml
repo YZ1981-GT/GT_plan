@@ -1,0 +1,94 @@
+# B2-5.yaml — 前任沟通评价表
+# componentType: d-form-table
+# Requirements: G2 与前任注册会计师沟通 — 评价表含结论字段+关联 ref_index 跳转
+# Design: §1.1 B2-5 → d-form-table
+
+wp_code: B2-5
+template_path: backend/wp_templates/B/B2-5 与前任注册会计师沟通后的评价.xlsx
+template_version: v2025-R5
+
+sheets:
+  前任沟通评价:
+    component_type: d-form-table
+    form_type: table
+    title: 与前任注册会计师沟通后的评价
+    description: 对前任注册会计师沟通结果进行评价，关联 B2 程序表
+
+    fields:
+      - field: communication_date
+        label: 沟通日期
+        type: date
+        format: 'YYYY-MM-DD'
+      - field: predecessor_firm
+        label: 前任事务所
+        type: text
+        max_length: 200
+      - field: predecessor_cpa
+        label: 前任签字注册会计师
+        type: text
+        max_length: 100
+      - field: ref_index
+        label: 关联索引
+        type: text
+        render: index_chip
+        default: B2
+        hint: 关联 B2 沟通程序表
+
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      add_row_button: true
+      max_rows: 20
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        evaluation_item:
+          field: evaluation_item
+          type: text
+          label: 评价项目
+          width: 200
+        evaluation_content:
+          field: evaluation_content
+          type: textarea
+          label: 评价内容
+          width: 300
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 结论
+          width: 100
+          dict_source: conclusion_dict
+        ref_index:
+          field: ref_index
+          type: text
+          label: 参考索引
+          width: 100
+          render: index_chip
+
+    dictionaries:
+      conclusion_dict:
+        - value: satisfactory
+          label: 满意
+        - value: attention
+          label: 需关注
+        - value: unsatisfactory
+          label: 不满意
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 沟通评价总结
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 总体评价结论
+        type: enum
+        enum:
+          - { value: accept, label: 沟通结果满意—可继续承接 }
+          - { value: caution, label: 需关注—存在需进一步了解事项 }
+          - { value: reject, label: 沟通结果不满意—建议拒绝承接 }

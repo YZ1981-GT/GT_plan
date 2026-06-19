@@ -1,0 +1,485 @@
+# B23-generic.yaml — 业务层面控制通用 schema（B23-1 ~ B23-14 共用）
+# componentType: d-form-table（多 sheet）
+# Requirements: G5 业务层面控制 — 14 组结构高度相似，设计一套通用 schema
+# Design: §3 B23 通用 schema — wp_code_pattern 参数化
+
+wp_code_pattern: "B23-{n}"
+template_version: v2025-R5
+description: |
+  B23 系列 14 组业务层面控制底稿共用此 schema。
+  各组仅通过 wp_code 区分所属循环（B23-1 销售收入 ~ B23-14 税费）。
+  前端通过 wp_code 参数传入确定当前循环。
+
+# B23-n 循环对照：
+#   B23-1: 销售与收款  B23-2: 采购与付款  B23-3: 存货与仓储
+#   B23-4: 固定资产    B23-5: 无形资产    B23-6: 投资
+#   B23-7: 筹资        B23-8: 货币资金    B23-9: 职工薪酬
+#   B23-10: 税费       B23-11: 关联交易   B23-12: 或有事项
+#   B23-13: 期后事项   B23-14: 持续经营
+#
+# 实物 xlsm 每份含 8-9 sheet（从底稿目录 sheet 读取）：
+#   1. 底稿目录（不渲染，仅供导航）
+#   2. 程序表（序号/程序/是否适用/索引号/执行人）→ a-program-console 模式
+#   3. 了解{循环}整体控制汇总表（B23-x-1）→ 自由文本+结构化表格混合
+#   4. 控制矩阵表（B23-x-3）→ 行=控制点，列=认定/控制类型/频率/关键/结论
+#   5. 穿行测试（B23-x-4）→ 逐控制点测试记录
+#   6~8. 示例/选项清单（不归档，VBA 下拉数据源→已用 enum 替代）
+
+sheets:
+  程序表:
+    component_type: a-program-console
+    form_type: procedure
+    title: 业务层面控制程序表
+    description: 记录了解、评价并测试业务层面控制的审计程序执行情况
+
+    fields:
+      - field: cycle_name
+        label: 业务循环
+        type: text
+        readonly: true
+        hint: 由 wp_code 自动确定
+
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        procedure:
+          field: procedure
+          type: text
+          label: 程序
+          width: 300
+        applicable:
+          field: applicable
+          type: enum
+          label: 是否适用
+          width: 90
+          dict_source: applicable_dict
+        ref_index:
+          field: ref_index
+          type: text
+          label: 索引号
+          width: 100
+          render_hint: ref_chip
+        executor:
+          field: executor
+          type: text
+          label: 执行人
+          width: 80
+
+    dictionaries:
+      applicable_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+        - value: not_applicable
+          label: 不适用
+
+  了解整体控制汇总表:
+    component_type: d-form-table
+    form_type: mixed
+    title: 了解整体控制汇总表
+    description: |
+      汇总对本循环业务流程和控制活动了解的主要内容和结论。
+      包括：业务流程描述、关键控制活动识别、控制目标与风险对应关系。
+
+    fields:
+      - field: cycle_name
+        label: 业务循环
+        type: text
+        readonly: true
+      - field: risk_assessment_note
+        label: 风险评估结论说明
+        type: textarea
+        hint: "结合风险评估结果，说明本循环控制了解的范围和深度"
+      - field: business_process_desc
+        label: 业务流程概述
+        type: textarea
+        hint: "描述本循环主要业务流程（如：销售订单→发货→开票→收款）"
+
+    dynamic_table:
+      start_row: 8
+      end_row: dynamic
+      header_row: 7
+      add_row_button: true
+      max_rows: 40
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_objective:
+          field: control_objective
+          type: text
+          label: 控制目标
+          width: 160
+        risk_point:
+          field: risk_point
+          type: text
+          label: 可能出错的环节
+          width: 160
+        control_activity:
+          field: control_activity
+          type: textarea
+          label: 控制活动描述
+          width: 200
+        control_type:
+          field: control_type
+          type: enum
+          label: 控制类型
+          width: 100
+          dict_source: control_type_dict
+        frequency:
+          field: frequency
+          type: enum
+          label: 频率
+          width: 80
+          dict_source: frequency_dict
+        is_key_control:
+          field: is_key_control
+          type: enum
+          label: 关键控制
+          width: 80
+          dict_source: yes_no_dict
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 初步结论
+          width: 100
+          dict_source: control_conclusion_dict
+
+    dictionaries:
+      control_type_dict:
+        - value: preventive
+          label: 预防性
+        - value: detective
+          label: 检查性
+        - value: corrective
+          label: 纠正性
+      frequency_dict:
+        - value: per_transaction
+          label: 每笔交易
+        - value: daily
+          label: 每日
+        - value: weekly
+          label: 每周
+        - value: monthly
+          label: 每月
+        - value: quarterly
+          label: 每季
+        - value: annually
+          label: 每年
+      yes_no_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+      control_conclusion_dict:
+        - value: design_effective
+          label: 设计有效
+        - value: design_ineffective
+          label: 设计无效
+        - value: further_test_needed
+          label: 需进一步测试
+        - value: not_applicable
+          label: 不适用
+
+  控制矩阵表:
+    component_type: d-form-table
+    form_type: table
+    title: 控制矩阵表
+    description: |
+      控制点与认定的对应矩阵。行=已识别的控制活动，列=财务报表认定。
+      交叉单元格标记该控制是否能应对对应认定的风险。
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 40
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_activity:
+          field: control_activity
+          type: text
+          label: 控制活动
+          width: 200
+        assertion_existence:
+          field: assertion_existence
+          type: enum
+          label: 存在/发生
+          width: 80
+          dict_source: assertion_coverage_dict
+          render_hint: risk_badge
+        assertion_completeness:
+          field: assertion_completeness
+          type: enum
+          label: 完整性
+          width: 80
+          dict_source: assertion_coverage_dict
+          render_hint: risk_badge
+        assertion_accuracy:
+          field: assertion_accuracy
+          type: enum
+          label: 准确性
+          width: 80
+          dict_source: assertion_coverage_dict
+          render_hint: risk_badge
+        assertion_cutoff:
+          field: assertion_cutoff
+          type: enum
+          label: 截止
+          width: 80
+          dict_source: assertion_coverage_dict
+          render_hint: risk_badge
+        assertion_classification:
+          field: assertion_classification
+          type: enum
+          label: 分类
+          width: 80
+          dict_source: assertion_coverage_dict
+          render_hint: risk_badge
+        control_nature:
+          field: control_nature
+          type: enum
+          label: 控制性质
+          width: 90
+          dict_source: control_nature_dict
+        is_key:
+          field: is_key
+          type: enum
+          label: 关键控制
+          width: 80
+          dict_source: yes_no_dict
+        design_conclusion:
+          field: design_conclusion
+          type: enum
+          label: 设计结论
+          width: 100
+          dict_source: design_conclusion_dict
+          render_hint: risk_badge
+
+    dictionaries:
+      assertion_coverage_dict:
+        - value: covered
+          label: "√"
+          color: green
+        - value: not_covered
+          label: "—"
+          color: gray
+        - value: partial
+          label: "△"
+          color: yellow
+      control_nature_dict:
+        - value: manual
+          label: 人工
+        - value: it_dependent
+          label: IT依赖
+        - value: automated
+          label: 自动化
+      yes_no_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+      design_conclusion_dict:
+        - value: effective
+          label: 有效
+          color: green
+        - value: ineffective
+          label: 无效
+          color: red
+        - value: not_assessed
+          label: 未评估
+          color: gray
+
+  穿行测试记录:
+    component_type: d-form-table
+    form_type: table
+    title: 穿行测试记录
+    description: 记录各控制活动的穿行测试过程和结果
+
+    fields:
+      - field: cycle_name
+        label: 业务循环
+        type: text
+        readonly: true
+        hint: 由 wp_code 自动确定
+      - field: test_date
+        label: 测试日期
+        type: date
+        format: 'YYYY-MM-DD'
+      - field: tester
+        label: 测试人
+        type: text
+        source: user_profile.display_name
+
+    dynamic_table:
+      start_row: 6
+      end_row: dynamic
+      header_row: 5
+      add_row_button: true
+      max_rows: 50
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_objective:
+          field: control_objective
+          type: text
+          label: 控制目标
+          width: 160
+          readonly: true
+        control_activity:
+          field: control_activity
+          type: textarea
+          label: 控制活动
+          width: 200
+        test_procedure:
+          field: test_procedure
+          type: textarea
+          label: 测试程序
+          width: 200
+        test_result:
+          field: test_result
+          type: enum
+          label: 测试结果
+          width: 100
+          dict_source: test_result_dict
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 结论
+          width: 120
+          dict_source: walkthrough_conclusion_dict
+
+    dictionaries:
+      test_result_dict:
+        - value: effective
+          label: 有效
+        - value: ineffective
+          label: 无效
+        - value: not_applicable
+          label: 不适用
+      walkthrough_conclusion_dict:
+        - value: design_effective
+          label: 设计有效
+        - value: design_ineffective
+          label: 设计无效
+        - value: cannot_assess
+          label: 无法评估
+
+  评价设计有效性:
+    component_type: d-form-table
+    form_type: table
+    title: 评价设计有效性
+    description: 基于穿行测试结果评价控制设计的有效性
+
+    dynamic_table:
+      start_row: 4
+      end_row: dynamic
+      header_row: 3
+      add_row_button: true
+      max_rows: 50
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_point:
+          field: control_point
+          type: text
+          label: 控制点
+          width: 200
+        design_effectiveness:
+          field: design_effectiveness
+          type: enum
+          label: 设计有效性
+          width: 110
+          dict_source: design_effectiveness_dict
+        implementation_status:
+          field: implementation_status
+          type: enum
+          label: 执行情况
+          width: 100
+          dict_source: implementation_status_dict
+
+    dictionaries:
+      design_effectiveness_dict:
+        - value: effective
+          label: 有效
+        - value: ineffective
+          label: 无效
+      implementation_status_dict:
+        - value: implemented
+          label: 已执行
+        - value: not_implemented
+          label: 未执行
+
+  控制偏差记录:
+    component_type: d-form-table
+    form_type: table
+    title: 控制偏差记录
+    description: 记录穿行测试中发现的控制偏差及影响评估
+
+    dynamic_table:
+      start_row: 4
+      end_row: dynamic
+      header_row: 3
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        deviation_desc:
+          field: deviation_desc
+          type: textarea
+          label: 偏差描述
+          width: 250
+        cause:
+          field: cause
+          type: textarea
+          label: 原因
+          width: 200
+        impact:
+          field: impact
+          type: enum
+          label: 影响评估
+          width: 100
+          dict_source: impact_dict
+          render_hint: risk_badge
+        remediation:
+          field: remediation
+          type: textarea
+          label: 改进措施
+          width: 200
+
+    dictionaries:
+      impact_dict:
+        - value: major
+          label: 重大
+          color: red
+        - value: moderate
+          label: 一般
+          color: yellow
+        - value: minor
+          label: 轻微
+          color: green

@@ -1,0 +1,86 @@
+# backend/data/wp_render_schema/J2-1.yaml
+# 设定受益计划审定表 — d-form-table 渲染 schema
+# Requirements: §5.2（J2 设定受益计划净资产）
+# Design: §3 审定表标准字段
+# Template: J2 设定受益计划.xlsx
+#
+# 结构：单行（长期应付职工薪酬 - 设定受益计划净负债/净资产）
+
+wp_code: J2-1
+wp_name: 设定受益计划审定表
+component_type: d-form-table
+template_path: backend/wp_templates/J/J2 设定受益计划.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2611'
+    name: 长期应付职工薪酬
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 单行结构（设定受益计划净负债）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 设定受益计划净负债
+    group_key: defined_benefit_obligation
+    row_type: category_row
+    account_code_prefix: '2611'
+    fields: &audit_determination_fields
+      - { field: category_name, label: 项目名称, type: text, readonly: true }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  # ─── 合计行（与类别行相同，单行时合计即自身）───────────────────────────────
+  - name: 设定受益计划合计
+    row_type: total
+    formula_source: "SUM(设定受益计划净负债)"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-J2-1-001
+    target_wp: J2-6
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → J2-6 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-J2-1-002
+    target_wp: J2-5
+    target_field: 精算重新计算结论
+    description: '审定金额 ← J2-5 精算重算验证'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-J2-1-003
+    target_wp: J2-3
+    target_field: 精算假设评估
+    description: '审定依据 ← J2-3 精算假设合理性评估'
+    severity: info
+    direction: inbound

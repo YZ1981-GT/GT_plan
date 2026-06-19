@@ -2,8 +2,13 @@
 /**
  * WpPopupSigning — A1-11 业务报告签发流转控制表
  *
- * 签字审批链（7行角色 × 签字人姓名 + 日期）
- * 数据保存到 checklist_responses
+ * 签字审批链（按 business_category 区分）：
+ * - 所有项目(B/C类): 项目经理 → 合伙人 (2 levels)
+ * - A类项目: + 独立复核合伙人 + EQCR技术复核人 (4 levels)
+ *
+ * 每行: name(el-input) + signature(el-checkbox) + date(el-date-picker)
+ * Data: checklist_responses item_id "A1-11-sign-pm", "A1-11-sign-partner",
+ *       "A1-11-sign-irp", "A1-11-sign-eqcr"
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -13,6 +18,7 @@ const props = defineProps<{
   wpCode: string
   wpId?: string
   projectId?: string
+  projectInfo?: Record<string, any>
 }>()
 
 const emit = defineEmits<{
@@ -20,29 +26,42 @@ const emit = defineEmits<{
   (e: 'completed'): void
 }>()
 
-const SIGNERS = [
-  { id: 'A1-11-sign-pm', role: '项目负责经理', required: true },
-  { id: 'A1-11-sign-partner', role: '项目合伙人', required: true },
-  { id: 'A1-11-sign-qc-partner', role: '项目质量复核合伙人（如适用）', required: false },
-  { id: 'A1-11-sign-qc', role: '质量控制复核人', required: true },
-  { id: 'A1-11-sign-it', role: 'IT专家', required: false },
-  { id: 'A1-11-sign-tax', role: '税务专家', required: false },
-  { id: 'A1-11-sign-translator', role: '报告翻译复核人', required: false },
+interface SignRow {
+  id: string
+  role: string
+  label: string
+  onlyA: boolean
+}
+
+const ALL_SIGN_ROWS: SignRow[] = [
+  { id: 'A1-11-sign-pm', role: 'pm', label: '项目经理', onlyA: false },
+  { id: 'A1-11-sign-partner', role: 'partner', label: '合伙人', onlyA: false },
+  { id: 'A1-11-sign-irp', role: 'irp', label: '独立复核合伙人', onlyA: true },
+  { id: 'A1-11-sign-eqcr', role: 'eqcr', label: 'EQCR技术复核人', onlyA: true },
 ]
 
-interface SignerState { name: string; date: string }
-const signerStates = ref<Record<string, SignerState>>({})
+interface SignState {
+  name: string
+  signed: boolean
+  date: string
+}
+
+const signStates = ref<Record<string, SignState>>({})
 const loading = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-const isCompleted = computed(() =>
-  SIGNERS.filter(s => s.required).every(s => signerStates.value[s.id]?.name)
-)
+const businessCategory = computed(() => props.projectInfo?.business_category || '')
+const isTypeA = computed(() => businessCategory.value === 'A')
+
+const visibleRows = computed(() => {
+  if (isTypeA.value) return ALL_SIGN_ROWS
+  return ALL_SIGN_ROWS.filter(r => !r.onlyA)
+})
 
 function initStates() {
-  for (const s of SIGNERS) {
-    if (!signerStates.value[s.id]) {
-      signerStates.value[s.id] = { name: '', date: '' }
+  for (const row of ALL_SIGN_ROWS) {
+    if (!signStates.value[row.id]) {
+      signStates.value[row.id] = { name: '', signed: false, date: '' }
     }
   }
 }
@@ -52,10 +71,14 @@ async function loadData() {
   loading.value = true
   try {
     const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const list = Array.isArray(res) ? res : (res?.data ?? [])
-    for (const r of list) {
+    const responses = Array.isArray(res) ? res : (res?.data ?? [])
+    for (const r of responses) {
       if (r.item_id?.startsWith('A1-11-sign-')) {
-        signerStates.value[r.item_id] = { name: r.conclusion || '', date: r.remark || '' }
+        signStates.value[r.item_id] = {
+          name: r.remark || '',
+          signed: r.conclusion === 'Y',
+          date: r.wp_ref || '',
+        }
       }
     }
   } catch { /* ignore */ }
@@ -69,103 +92,133 @@ function scheduleSave() {
 
 async function doSave() {
   if (!props.wpId || !props.projectId) return
-  const items = SIGNERS.map(s => ({
-    item_id: s.id,
-    conclusion: signerStates.value[s.id]?.name || null,
-    remark: signerStates.value[s.id]?.date || null,
-    wp_ref: null,
+  const items = ALL_SIGN_ROWS.map(row => ({
+    item_id: row.id,
+    conclusion: signStates.value[row.id]?.signed ? 'Y' : null,
+    remark: signStates.value[row.id]?.name || null,
+    wp_ref: signStates.value[row.id]?.date || null,
   }))
   try {
-    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, { project_id: props.projectId, items })
+    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items,
+    })
     emit('save')
-    if (isCompleted.value) emit('completed')
+    // Check completion: required rows all signed
+    const requiredRows = visibleRows.value
+    const allDone = requiredRows.every(r => signStates.value[r.id]?.signed)
+    if (allDone) emit('completed')
   } catch (err: any) {
-    if (err?.message !== 'canceled' && err?.code !== 'ERR_CANCELED') ElMessage.error('保存失败')
+    const msg = err?.message || ''
+    if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
+      ElMessage.error('保存失败')
+    }
   }
 }
 
-function updateName(id: string, val: string) { signerStates.value[id].name = val; scheduleSave() }
-function updateDate(id: string, val: string) { signerStates.value[id].date = val; scheduleSave() }
+function updateName(id: string, val: string) {
+  signStates.value[id].name = val
+  scheduleSave()
+}
 
-onMounted(() => { initStates(); loadData() })
-onBeforeUnmount(() => { if (saveTimer.value) { clearTimeout(saveTimer.value); doSave() } })
+function updateSigned(id: string, val: boolean) {
+  signStates.value[id].signed = val
+  scheduleSave()
+}
+
+function updateDate(id: string, val: string) {
+  signStates.value[id].date = val || ''
+  scheduleSave()
+}
+
+onMounted(() => {
+  initStates()
+  loadData()
+})
+
+onBeforeUnmount(() => {
+  if (saveTimer.value) {
+    clearTimeout(saveTimer.value)
+    doSave()
+  }
+})
 </script>
 
 <template>
   <div class="wp-popup-signing" v-loading="loading">
-    <div class="signing-table">
-      <div class="signing-table__header">
-        <span class="col-role">审批角色</span>
-        <span class="col-name">签字人</span>
-        <span class="col-date">日期</span>
-      </div>
-      <div
-        v-for="signer in SIGNERS"
-        :key="signer.id"
-        class="signing-row"
-        :class="{ 'is-signed': signerStates[signer.id]?.name, 'is-required': signer.required }"
-      >
-        <span class="col-role">
-          {{ signer.role }}
-          <span v-if="signer.required" class="required-mark">*</span>
-        </span>
-        <span class="col-name">
+    <!-- 非A类提示 -->
+    <el-alert
+      v-if="!isTypeA"
+      type="info"
+      :closable="false"
+      show-icon
+      class="signing-alert"
+    >
+      <template #title>
+        本项目为{{ businessCategory || 'B/C' }}类，仅需项目经理和合伙人签字
+      </template>
+    </el-alert>
+
+    <!-- 签字表格 -->
+    <el-table :data="visibleRows" border size="small" class="signing-table">
+      <el-table-column label="审批人" width="140" align="center">
+        <template #default="{ row }">
+          <span class="role-label">{{ row.label }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="姓名" min-width="140">
+        <template #default="{ row }">
           <el-input
-            :model-value="signerStates[signer.id]?.name || ''"
+            :model-value="signStates[row.id]?.name || ''"
             size="small"
-            placeholder="签字人姓名"
-            @input="(val: string) => updateName(signer.id, val)"
+            placeholder="请输入姓名"
+            @input="(val: string) => updateName(row.id, val)"
           />
-        </span>
-        <span class="col-date">
-          <el-input
-            :model-value="signerStates[signer.id]?.date || ''"
+        </template>
+      </el-table-column>
+      <el-table-column label="签字" width="80" align="center">
+        <template #default="{ row }">
+          <el-checkbox
+            :model-value="signStates[row.id]?.signed || false"
+            @change="(val: boolean) => updateSigned(row.id, val)"
+          >
+            已签字
+          </el-checkbox>
+        </template>
+      </el-table-column>
+      <el-table-column label="日期" width="160" align="center">
+        <template #default="{ row }">
+          <el-date-picker
+            :model-value="signStates[row.id]?.date || ''"
+            type="date"
             size="small"
-            placeholder="年 月 日"
-            @input="(val: string) => updateDate(signer.id, val)"
+            placeholder="选择日期"
+            value-format="YYYY-MM-DD"
+            style="width: 130px"
+            @update:model-value="(val: string) => updateDate(row.id, val)"
           />
-        </span>
-      </div>
-    </div>
-    <div class="signing-hint">
-      <p>* 为必填审批人，全部必填人员签字后视为完成。</p>
-    </div>
+        </template>
+      </el-table-column>
+    </el-table>
   </div>
 </template>
 
 <style scoped>
-.wp-popup-signing { padding: 8px 0; }
-
-.signing-table__header {
-  display: flex;
-  align-items: center;
+.wp-popup-signing {
   padding: 8px 0;
-  border-bottom: 2px solid #4b2d77;
+}
+
+.signing-alert {
+  margin-bottom: 12px;
+}
+
+.signing-table {
+  width: 100%;
+}
+
+.role-label {
+  font-size: 13px;
   font-weight: 500;
-  font-size: 12px;
   color: #4b2d77;
-}
-
-.signing-row {
-  display: flex;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #ebeef5;
-  transition: background 0.2s;
-}
-
-.signing-row.is-signed { background: #f4f0fa; }
-
-.col-role { width: 200px; min-width: 200px; font-size: 13px; color: #303133; }
-.col-name { width: 160px; min-width: 160px; padding: 0 8px; }
-.col-date { flex: 1; padding: 0 8px; }
-
-.required-mark { color: #e6424a; font-weight: 700; margin-left: 2px; }
-
-.signing-hint {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
-  font-style: italic;
 }
 </style>

@@ -1,0 +1,74 @@
+# backend/data/wp_render_schema/J2-3.yaml
+# 精算假设评估 — d-form-table 渲染 schema
+# Requirements: §5.2（J2 设定受益计划 - 精算假设评估）
+# Design: §1 componentType 路由表 → J2-3 = d-form-table（结构化检查）
+# Template: J2 设定受益计划净资产.xlsx
+#
+# 结构：精算师使用的关键假设逐项评估
+# 折现率 / 工资增长率 / 离职率 / 死亡率 → 管理层假设 vs 审计师评价 + 同行业对比
+
+wp_code: J2-3
+wp_name: 精算假设评估
+component_type: d-form-table
+template_path: backend/wp_templates/J/J2 设定受益计划净资产.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2211'
+    name: 长期应付职工薪酬-设定受益计划
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 精算假设评估 — 逐项检查结构
+# 审计师对精算师使用的关键假设进行独立评估
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 折现率
+    group_key: discount_rate
+    row_type: assumption_row
+    fields: &actuarial_assumption_fields
+      - { field: assumption_name, label: 假设名称, type: text, readonly: true }
+      - { field: management_assumption, label: 管理层假设值, type: text }
+      - { field: auditor_evaluation, label: 审计师评价, type: select, options: [合理, 不合理] }
+      - { field: industry_benchmark, label: 同行业对比, type: text }
+      - { field: data_source, label: 数据来源, type: text }
+      - { field: conclusion, label: 合理性结论, type: textarea }
+
+  - name: 工资增长率
+    group_key: salary_growth_rate
+    row_type: assumption_row
+    fields: *actuarial_assumption_fields
+
+  - name: 离职率
+    group_key: turnover_rate
+    row_type: assumption_row
+    fields: *actuarial_assumption_fields
+
+  - name: 死亡率
+    group_key: mortality_rate
+    row_type: assumption_row
+    fields: *actuarial_assumption_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-J2-3-001
+    target_wp: J2-5
+    target_field: 精算重新计算
+    description: '精算假设 → J2-5 精算重新计算使用的假设参数'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-J2-3-002
+    target_wp: B51
+    target_field: 会计估计风险
+    description: '精算假设评估结果 → B51 舞弊三因素（会计估计风险）'
+    severity: info
+    direction: outbound
+
+auto_data_source:
+  - source: accounting_estimate_b51
+    description: '从 B51 读取会计估计风险评估结论'
+    fields: [risk_level, fraud_risk_indicators]

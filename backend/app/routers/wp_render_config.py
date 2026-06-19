@@ -1105,6 +1105,23 @@ async def get_render_config(
             "sheets": [],
         }
 
+    # ─── Step 5b: B15 重定向到 Materiality 模块 ──────────────────────────
+    from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+
+    if _WP_CODE_OVERRIDE.get(wp_code) == "redirect-materiality":
+        return {
+            "wp_id": str(wp_id),
+            "wp_code": wp_code,
+            "project_id": str(project_id),
+            "scope": scope,
+            "is_real_workpaper": False,
+            "template_version": template_version_str,
+            "redirect": True,
+            "delegated_module": "materiality",
+            "target_path": "/materiality",
+            "sheets": [],
+        }
+
     # ─── Step 6: 加载 schema + html_data + cross_refs per sheet ──────────
     parsed_data = working_paper.parsed_data or {}
     html_data_all = parsed_data.get("html_data", {})

@@ -1,0 +1,127 @@
+# B22B.yaml — 控制矩阵
+# componentType: d-form-table + render_hint: risk_badge
+# Requirements: G5 企业层面控制 — 行=控制目标，列=5要素评价，交叉单元格=评价结论
+# Design: §1.2 控制矩阵=d-form-table+risk_badge 列配置（红/黄/绿着色）
+
+wp_code: B22B
+template_path: backend/wp_templates/B/B22B 控制矩阵.xlsx
+template_version: v2025-R5
+
+sheets:
+  控制矩阵:
+    component_type: d-form-table
+    form_type: table
+    title: 企业层面控制矩阵
+    description: 汇总 B22A-1~5 五个维度的控制评价结果，形成整体控制矩阵
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_period
+        label: 评估期间
+        type: text
+        source: project.audit_year
+        readonly: true
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        control_objective:
+          field: control_objective
+          type: text
+          label: 控制目标
+          width: 180
+        env_assessment:
+          field: env_assessment
+          type: enum
+          label: 控制环境
+          width: 100
+          dict_source: element_assessment_dict
+          render_hint: risk_badge
+        override_assessment:
+          field: override_assessment
+          type: enum
+          label: 管理层凌驾
+          width: 100
+          dict_source: element_assessment_dict
+          render_hint: risk_badge
+        risk_assessment:
+          field: risk_assessment
+          type: enum
+          label: 风险评估
+          width: 100
+          dict_source: element_assessment_dict
+          render_hint: risk_badge
+        info_assessment:
+          field: info_assessment
+          type: enum
+          label: 信息与沟通
+          width: 100
+          dict_source: element_assessment_dict
+          render_hint: risk_badge
+        supervision_assessment:
+          field: supervision_assessment
+          type: enum
+          label: 监督
+          width: 100
+          dict_source: element_assessment_dict
+          render_hint: risk_badge
+        overall:
+          field: overall
+          type: enum
+          label: 综合评价
+          width: 100
+          dict_source: overall_dict
+          render_hint: risk_badge
+
+    dictionaries:
+      element_assessment_dict:
+        - value: effective
+          label: 有效
+          color: green
+        - value: partially_effective
+          label: 部分有效
+          color: yellow
+        - value: ineffective
+          label: 无效
+          color: red
+        - value: not_applicable
+          label: 不适用
+          color: gray
+      overall_dict:
+        - value: effective
+          label: 有效
+          color: green
+        - value: partially_effective
+          label: 部分有效
+          color: yellow
+        - value: ineffective
+          label: 无效
+          color: red
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 控制矩阵整体说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 企业层面控制整体结论
+        type: enum
+        enum:
+          - { value: effective, label: 企业层面控制整体有效 }
+          - { value: partially_effective, label: 企业层面控制部分有效—需关注薄弱环节 }
+          - { value: ineffective, label: 企业层面控制整体无效—重大缺陷 }

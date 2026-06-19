@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-18  
+**最后更新**：2026-06-19  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**149**（active 17 + archived 140）  
+**Spec 总数**：**149**（active 17 + archived 140）+ 全局交叉索引 1  
 **最高迁移**：V088  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -145,9 +145,34 @@ _archive/
 
 ---
 
-## 三、待建 Spec
+## 三、实质性程序循环 Spec（D~N + S，全部就绪）
 
-无。所有规划中的 spec 已完成实施或确认不需要（2026-06-12）。
+> 🔗 **全局交叉索引**：`.kiro/specs/CYCLE-CROSS-REFERENCE.md`（联动矩阵/执行顺序/resolver清单/用户提示）
+
+| Spec | 循环 | 任务数 | wp_code 估算 | 特殊性 | 状态 |
+|------|------|--------|-------------|--------|------|
+| d-cycle-workpapers | D 销售收入 | 47 | 55 | 已实施参照 | **38/47 ✅** |
+| e-cycle-workpapers | E 货币资金 | 39 | 35 | 单科目+IPO | P0 待执行 |
+| f-cycle-workpapers | F 采购存货 | 58 | 80 | 最复杂（存货72子底稿） | P0 待执行 |
+| g-cycle-workpapers | G 投资 | 50 | 90 | 科目最多（14+函证） | P0 待执行 |
+| h-cycle-workpapers | H 固定资产 | 46 | 65 | CAS21 租赁配对 | P0 待执行 |
+| i-cycle-workpapers | I 无形资产 | 38 | 40 | DCF/商誉减值 | P0 待执行 |
+| j-cycle-workpapers | J 职工薪酬 | 32 | 24 | 精算/期权模型 | P0 待执行 |
+| k-cycle-workpapers | K 管理 | 49 | 75 | 含函证+"其他"类 | P0 待执行 |
+| l-cycle-workpapers | L 筹资 | 43 | 50 | 实际利率法 | P0 待执行 |
+| m-cycle-workpapers | M 股东权益 | 46 | 50 | 无函证/用C1控制 | P0 待执行 |
+| n-cycle-workpapers | N 税费 | 40 | 32 | 所得税计算终点 | P0 待执行 |
+| s-cycle-workpapers | S 专项 | 47 | 90 | 纯消费者/无审定表 | P0 待执行 |
+| **合计** | **12 循环** | **535** | **~686** | | D 已实施 |
+
+### 执行优先级建议
+
+1. **P0 注册全部可并行**——12 循环的 wp_code + _WP_CODE_OVERRIDE 互不依赖
+2. **P1 程序表可并行**——各循环程序表互不依赖
+3. **P2 审定表回写零新增代码**——D 类已实现的统一 handler 正则 `^[D-N]\d+-1$` 自动覆盖
+4. **P5 联动有依赖链**：M6 ← D~N 全部 | N5 ← I6 + 全损益 | S ← D~N 审定数据 | A17 ← 全部
+
+---
 
 ---
 

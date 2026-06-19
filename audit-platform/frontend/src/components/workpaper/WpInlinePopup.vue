@@ -10,7 +10,7 @@
  * - docx 子底稿 → WpPopupDocxEditor（配置驱动，见 wpPopupDocxConfigs.ts）
  */
 import { computed, defineAsyncComponent } from 'vue'
-import { DOCX_POPUP_CONFIGS, DOCX_POPUP_WP_CODES } from './wpPopupDocxConfigs'
+import { ALL_DOCX_POPUP_CONFIGS, DOCX_POPUP_WP_CODES } from './wpPopupDocxConfigs'
 
 const WpPopupDocxEditor = defineAsyncComponent(() => import('./WpPopupDocxEditor.vue'))
 
@@ -19,6 +19,7 @@ const props = defineProps<{
   wpCode: string
   wpId?: string
   projectId?: string
+  projectInfo?: Record<string, any>
 }>()
 
 const emit = defineEmits<{
@@ -42,7 +43,7 @@ const POPUP_TITLES: Record<string, string> = {
   'A1-17': '对应数据程序表',
   'A1-18': '采用新金融工具准则衔接影响数核对',
   ...Object.fromEntries(
-    Object.entries(DOCX_POPUP_CONFIGS).map(([code, cfg]) => [code, cfg.title]),
+    Object.entries(ALL_DOCX_POPUP_CONFIGS).map(([code, cfg]) => [code, cfg.title]),
   ),
 }
 
@@ -99,6 +100,7 @@ function handleClose() {
       :wp-code="wpCode"
       :wp-id="wpId"
       :project-id="projectId"
+      :project-info="projectInfo"
       @save="handleSave"
       @completed="emit('completed', wpCode)"
     />

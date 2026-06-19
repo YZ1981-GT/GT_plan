@@ -5,6 +5,9 @@
  * GtAProgramConsole.INLINE_POPUP_WP_CODES 自动消费。
  */
 
+import { B_DOCX_POPUP_CONFIGS } from './wpPopupDocxConfigsB'
+import { S_DOCX_POPUP_CONFIGS } from './wpPopupDocxConfigsS'
+
 export interface DocxPopupLink {
   label: string
   routeName?: string
@@ -337,8 +340,15 @@ export const DOCX_POPUP_CONFIGS: Record<string, DocxPopupConfig> = {
   },
 }
 
+/** 合并 A + B + S 类的完整 DOCX 弹窗配置 */
+export const ALL_DOCX_POPUP_CONFIGS: Record<string, DocxPopupConfig> = {
+  ...DOCX_POPUP_CONFIGS,
+  ...B_DOCX_POPUP_CONFIGS,
+  ...S_DOCX_POPUP_CONFIGS,
+}
+
 /** 所有 docx 弹窗 wp_code 集合（供 INLINE_POPUP 判定） */
-export const DOCX_POPUP_WP_CODES = new Set(Object.keys(DOCX_POPUP_CONFIGS))
+export const DOCX_POPUP_WP_CODES = new Set(Object.keys(ALL_DOCX_POPUP_CONFIGS))
 
 /** 非 docx 专用弹窗 + docx 弹窗的完整 INLINE_POPUP 集合 */
 export const INLINE_POPUP_WP_CODES = new Set([

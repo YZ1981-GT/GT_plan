@@ -1,0 +1,80 @@
+# C26.yaml — 信息处理控制测试
+# componentType: d-form-table
+# Requirements: G4-4 信息处理控制测试
+
+wp_code: C26
+template_version: v2025-R5
+description: |
+  测试信息处理（自动化）控制，评估系统自动控制的有效性。
+  依赖 C22 IT一般控制测试结论。
+
+sheets:
+  信息处理控制测试:
+    component_type: d-form-table
+    form_type: table
+    title: 信息处理控制测试
+    description: 测试应用系统中的自动化控制及手动+IT控制。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 50
+      columns:
+        system_name:
+          field: system_name
+          type: text
+          label: 应用系统名称
+          width: 130
+        control_id:
+          field: control_id
+          type: text
+          label: 控制编号
+          width: 100
+        control_description:
+          field: control_description
+          type: textarea
+          label: 控制描述
+          width: 250
+        control_type:
+          field: control_type
+          type: enum
+          label: 控制类型
+          width: 100
+          dict_source: control_type_dict
+        itgc_dependency:
+          field: itgc_dependency
+          type: text
+          label: 依赖ITGC
+          width: 100
+          render_hint: ref_chip
+          hint: "关联 C22 对应步骤（如 SA-3）"
+        test_method:
+          field: test_method
+          type: textarea
+          label: 测试方法
+          width: 200
+        test_result:
+          field: test_result
+          type: textarea
+          label: 测试结果
+          width: 200
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 结论
+          width: 90
+          dict_source: conclusion_dict
+          render_hint: risk_badge
+
+    dictionaries:
+      control_type_dict:
+        - value: automated
+          label: 自动
+        - value: manual_it
+          label: 手动+IT
+      conclusion_dict:
+        - value: effective
+          label: 有效
+          color: green
+        - value: ineffective
+          label: 无效
+          color: red

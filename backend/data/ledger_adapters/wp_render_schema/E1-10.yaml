@@ -1,0 +1,52 @@
+# backend/data/wp_render_schema/E1-10.yaml
+# 调整分录汇总 — d-form-table 渲染 schema
+# Requirements: Task 25（E1-10 调整分录汇总）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+
+wp_code: E1-10
+wp_name: 调整分录汇总
+component_type: d-form-table
+template_path: backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1001'
+    name: 库存现金
+  - code: '1002'
+    name: 银行存款
+  - code: '1012'
+    name: 其他货币资金
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 调整分录汇总：汇总 E 类货币资金循环的全部调整分录
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 调整分录
+    account_code_prefix: '100'
+    fields:
+      - { field: entry_no, label: 分录编号, type: text }
+      - { field: account_code, label: 科目编码, type: text }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: debit_amount, label: 借方金额, type: number }
+      - { field: credit_amount, label: 贷方金额, type: number }
+      - { field: description, label: 调整说明, type: textarea }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-E1-10-001
+    target_wp: E1-1
+    target_field: 审计调整金额
+    description: '调整分录汇总 → E1-1 审定表 aje_debit/aje_credit'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-E1-10-002
+    target_wp: A2
+    target_field: 调整分录总表
+    description: '调整分录 → A2 调整分录总表同步'
+    severity: info
+    direction: outbound

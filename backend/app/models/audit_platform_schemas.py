@@ -842,6 +842,9 @@ class EventType(str, enum.Enum):
     # payload: {project_id (placeholder), extra: {standard, report_type, row_code, config_id}}
     REPORT_CONFIG_MASTER_UPDATED = "report_config.master_updated"
 
+    # B 类底稿联动: B3 独立性核对表完成 → A17-7 声明书状态更新
+    CHECKLIST_COMPLETED = "checklist.completed"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

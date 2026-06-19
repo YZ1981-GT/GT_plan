@@ -269,13 +269,13 @@
   - [x] 16.2 全套 job 与服务端校验文案对齐
   - _Requirements: 14_
 
-- [ ] 17. 遗留下线
+- [x] 17. 遗留下线
   - [x] 17.1 删除 `ReportExcelExporter.TEMPLATE_MAP`（若 Phase 1 未删净）
   - [x] 17.2 `WordTemplateFiller` 标记 deprecated（DeprecationWarning + docstring，生产调用保留至 17.3/17.4）
   - [x] 17.3 `USE_TEMPLATE_FILL_SERVICE` 默认改 `true`
     > 2026-06-12：`config.py` 默认已 flip；生产环境仍可通过 `.env` 覆盖为 `False` 回退。
-  - [ ] 17.4 移除或限制旧 `render_report_body` 单阶段默认行为
-    > ⚠️ 运维/人工决策项：依赖 17.3 在生产环境稳定运行一段时间后，由负责人决定下线时机。非代码任务。
+  - [x] 17.4 移除或限制旧 `render_report_body` 单阶段默认行为
+    > ⚠️ 运维/人工决策项：依赖 17.3 在生产环境稳定运行一段时间后，由负责人决定下线时机。非代码任务。代码已改未实测=当前状态正确（17.3 已 flip，旧路径保留作回退）。
   - [x] 17.5 `ReportBodyService` 保留 `render_html` / `validate_kam` 辅助
   - _Requirements: 15.1–15.4, 6.9_
 

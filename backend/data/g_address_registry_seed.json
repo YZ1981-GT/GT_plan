@@ -1,0 +1,158 @@
+{
+  "description": "G 类投资循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "G",
+  "entries": [
+    {
+      "wp_code": "G1-2",
+      "sheet_name": "交易性金融资产明细表",
+      "coordinates": [
+        {"cell_address": "F50", "description": "合计行-期末公允价值合计", "purpose": "balance_verification"},
+        {"cell_address": "G50", "description": "合计行-期初公允价值合计", "purpose": "balance_verification"},
+        {"cell_address": "H50", "description": "合计行-公允价值变动合计", "purpose": "fair_value_change"}
+      ]
+    },
+    {
+      "wp_code": "G1-3",
+      "sheet_name": "交易性金融资产公允价值测试",
+      "coordinates": [
+        {"cell_address": "E30", "description": "公允价值测试差额合计", "purpose": "fair_value_test"},
+        {"cell_address": "B35", "description": "公允价值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G4-3",
+      "sheet_name": "债权投资摊余成本测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "期末摊余成本合计", "purpose": "amortized_cost"},
+        {"cell_address": "G30", "description": "实际利率法利息收入合计", "purpose": "interest_income"},
+        {"cell_address": "B35", "description": "摊余成本测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G4-4",
+      "sheet_name": "债权投资实际利率法测算",
+      "coordinates": [
+        {"cell_address": "C5", "description": "实际利率(IRR)", "purpose": "irr_rate"},
+        {"cell_address": "F30", "description": "各期利息收入合计", "purpose": "interest_income"},
+        {"cell_address": "G30", "description": "各期摊销金额合计", "purpose": "amortization"},
+        {"cell_address": "B35", "description": "实际利率法测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G4-5",
+      "sheet_name": "债权投资ECL三阶段",
+      "coordinates": [
+        {"cell_address": "E15", "description": "阶段1-12个月ECL", "purpose": "ecl_stage1"},
+        {"cell_address": "E25", "description": "阶段2-整个存续期ECL", "purpose": "ecl_stage2"},
+        {"cell_address": "E35", "description": "阶段3-已减值ECL", "purpose": "ecl_stage3"},
+        {"cell_address": "E40", "description": "ECL合计", "purpose": "ecl_total"},
+        {"cell_address": "B45", "description": "ECL三阶段测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G7-3",
+      "sheet_name": "长期股权投资权益法核算",
+      "coordinates": [
+        {"cell_address": "F50", "description": "权益法调整合计-损益调整", "purpose": "equity_method_pl"},
+        {"cell_address": "G50", "description": "权益法调整合计-OCI份额", "purpose": "equity_method_oci"},
+        {"cell_address": "H50", "description": "权益法核算期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "B55", "description": "权益法核算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G7-4",
+      "sheet_name": "长期股权投资减值测试",
+      "coordinates": [
+        {"cell_address": "E20", "description": "可收回金额合计", "purpose": "recoverable_amount"},
+        {"cell_address": "F20", "description": "账面价值合计", "purpose": "carrying_amount"},
+        {"cell_address": "G20", "description": "减值损失合计", "purpose": "impairment_loss"},
+        {"cell_address": "B30", "description": "减值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G7-5",
+      "sheet_name": "长期股权投资投资收益测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "权益法确认投资收益合计", "purpose": "investment_income"},
+        {"cell_address": "G30", "description": "成本法确认股利收入合计", "purpose": "dividend_income"},
+        {"cell_address": "H30", "description": "处置收益合计", "purpose": "disposal_gain"},
+        {"cell_address": "B35", "description": "投资收益测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G2-3",
+      "sheet_name": "应收利息测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "利息测算合计", "purpose": "interest_calc"},
+        {"cell_address": "G30", "description": "利息测算差额", "purpose": "interest_variance"},
+        {"cell_address": "B35", "description": "利息测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G5-3",
+      "sheet_name": "长期应收款现值测算",
+      "coordinates": [
+        {"cell_address": "F20", "description": "现值合计", "purpose": "present_value"},
+        {"cell_address": "G20", "description": "未实现融资收益", "purpose": "unearned_finance_income"},
+        {"cell_address": "B25", "description": "现值测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G6-3",
+      "sheet_name": "其他债权投资公允价值测试",
+      "coordinates": [
+        {"cell_address": "E30", "description": "公允价值差额合计", "purpose": "fair_value_test"},
+        {"cell_address": "B35", "description": "公允价值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G6-4",
+      "sheet_name": "其他债权投资ECL测试",
+      "coordinates": [
+        {"cell_address": "E15", "description": "阶段1-12个月ECL", "purpose": "ecl_stage1"},
+        {"cell_address": "E25", "description": "阶段2-整个存续期ECL", "purpose": "ecl_stage2"},
+        {"cell_address": "E35", "description": "阶段3-已减值ECL", "purpose": "ecl_stage3"},
+        {"cell_address": "E40", "description": "ECL合计", "purpose": "ecl_total"},
+        {"cell_address": "B45", "description": "ECL测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G8-3",
+      "sheet_name": "其他权益工具投资公允价值测试",
+      "coordinates": [
+        {"cell_address": "E30", "description": "公允价值差额合计", "purpose": "fair_value_test"},
+        {"cell_address": "B35", "description": "公允价值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G8-4",
+      "sheet_name": "其他权益工具投资OCI变动",
+      "coordinates": [
+        {"cell_address": "F30", "description": "OCI变动合计", "purpose": "oci_change"},
+        {"cell_address": "B35", "description": "OCI变动结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G14-2",
+      "sheet_name": "信用减值损失ECL计算明细",
+      "coordinates": [
+        {"cell_address": "E15", "description": "阶段1-12个月ECL", "purpose": "ecl_stage1"},
+        {"cell_address": "E25", "description": "阶段2-整个存续期ECL", "purpose": "ecl_stage2"},
+        {"cell_address": "E35", "description": "阶段3-已减值ECL", "purpose": "ecl_stage3"},
+        {"cell_address": "E40", "description": "ECL合计", "purpose": "ecl_total"},
+        {"cell_address": "F40", "description": "本期计提减值金额", "purpose": "impairment_provision"},
+        {"cell_address": "B50", "description": "ECL计算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "G10-3",
+      "sheet_name": "交易性金融负债公允价值测试",
+      "coordinates": [
+        {"cell_address": "E30", "description": "公允价值差额合计", "purpose": "fair_value_test"},
+        {"cell_address": "B35", "description": "公允价值测试结论", "purpose": "conclusion"}
+      ]
+    }
+  ]
+}
+

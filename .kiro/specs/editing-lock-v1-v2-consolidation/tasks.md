@@ -22,7 +22,7 @@
 
 ### 阶段 1：双端点并存 + 迁移 + 灰度（可独立交付，不影响现网）
 
-- [ ] 1. 数据迁移 V073 / R073（存量活跃锁迁入 editing_locks）
+- [x] 1. 数据迁移 V073 / R073（存量活跃锁迁入 editing_locks）
   - [x] 1.1 编写 `backend/migrations/V073__migrate_workpaper_locks_to_editing_locks.sql`
     - 源 `workpaper_editing_locks` 仅迁 `released_at IS NULL` 活跃锁；`INSERT INTO editing_locks(...)` 字段映射：`resource_type='workpaper'`、`resource_id=wp_id::text`、`holder_id=staff_id`、保留 `acquired_at`/`heartbeat_at`
     - `holder_name` 经 `LEFT JOIN users ON staff_id=users.id` 回填（COALESCE full_name/username），无则 NULL
@@ -51,7 +51,7 @@
     - **Property 14: 迁移时区规整后过期判定一致** — **Validates: 1.2**
     - 生成 naive heartbeat_at 跨过期窗口（窗口内/外）源锁→迁移→断言迁后 v2 `heartbeat_at>now-5min` 活跃判定与源语义一致；标 Property 14 / `pg_only` / `max_examples=5`
 
-- [ ] 1b. v2 acquire_lock 补"同人重复 acquire 自动续期"（对齐 v1）
+- [x] 1b. v2 acquire_lock 补"同人重复 acquire 自动续期"（对齐 v1）
   - [x] 1b.1 改 `editing_lock_service_v2.py` `acquire_lock`（L101 冲突 return 之前插同人分支）
     - 在 L101 `if active_lock is not None:` 块内、`return {"locked":True,...}` **之前**插入：`if active_lock.holder_id == holder_id:` → `active_lock.heartbeat_at = _now(); await db.flush(); return {"locked": False, "lock_id": str(active_lock.id), "acquired_at": active_lock.acquired_at.isoformat() if active_lock.acquired_at else ""}`
     - 仅他人持锁才走原 `return {"locked":True,...}`（router L69 转 409）
@@ -61,7 +61,7 @@
     - **Property 13: 底稿锁同人重复 acquire 续期** — **Validates: 3.2a**
     - 新建 `backend/tests/services/test_editing_lock_v2_renewal.py`（SQLite 可跑）；持锁后同人再 acquire → 断言 locked=False + 活跃锁=1 + heartbeat 刷新；他人 acquire → 409；标 Property 13 / `max_examples=5`
 
-- [ ] 2. v2 force 端点补 emit `editing_lock.force_acquired` SSE
+- [x] 2. v2 force 端点补 emit `editing_lock.force_acquired` SSE
   - [x] 2.1 `editing_locks.py` `force_acquire`（L138 `await db.commit()` 之后）插 broadcast_raw
     - `db.commit()` 后：`from app.services.event_bus import event_bus`（**实证统一路径，非 app.utils**）
     - **project_id 解析**：broadcast_raw 的 SSE 队列路由依赖 `extra["project_id"]`（与现有 `report.stale`/`note.synced` 等惯例一致）。force 端点按 resource_id 解析——`resource_type=='workpaper'` 时查 `WorkingPaper.project_id`（resource_id=WorkingPaper.id，`WorkingPaper` 有 project_id 列）；非 workpaper（disclosure_note/audit_report）按对应资源查 project_id（解析失败则置 None，best-effort）
@@ -76,7 +76,7 @@
     - in-process ASGI httpx 直调 `POST /api/editing-locks/workpaper/{id}/force`，assert broadcast_raw 参数精确（含 project_id 来自 WorkingPaper）；非 workpaper resource_type 断言无 wp_id 键
     - _Requirements: 5.1, 5.2_
 
-- [ ] 3. v2 service 承载 workpaper 锁等价测试（替换待下线 v1 测试覆盖）
+- [x] 3. v2 service 承载 workpaper 锁等价测试（替换待下线 v1 测试覆盖）
   - [x]* 3.1 底稿锁 acquire 创建属性测试
     - **Property 4** — **Validates: 3.1**；in-process httpx `POST /api/editing-locks/workpaper/{id}`，无锁→活跃锁=1 且 locked=False；标 Property 4 / `max_examples=5`
   - [x]* 3.2 底稿锁 acquire 冲突属性测试
@@ -94,7 +94,7 @@
     - 边界：空 holder_name（可 SQLite）；service 只 flush 由 router 统一 commit
     - _Requirements: 3.7, 8.1_
 
-- [ ] 4. 前端 useEditingLock workpaper 分支按 feature flag 分流 v1/v2
+- [x] 4. 前端 useEditingLock workpaper 分支按 feature flag 分流 v1/v2
   - [x] 4.1 改 `useEditingLock.ts`（L70-74 分支判定 + L75/114/135 三函数 workpaper 端点）
     - 顶部从 `useFeatureFlags()` 取 `isEnabled('editing_lock_v2_workpaper')` → `v2Enabled`（本地兜底 false）；**注意实证铁律**：`useFeatureFlags.isEnabled` 实测只读全局 `enabled` 布尔，不消费 rollout_percentage/whitelist（百分比灰度需后端下沉，不在本任务范围）
     - 新增 workpaper 端点构造：`isWorkpaper && v2Enabled` → `/api/editing-locks/workpaper/{id}`（+`/heartbeat`、`/force`、DELETE）；否则原 `/api/workpapers/{id}/editing-lock` 系列
@@ -109,12 +109,12 @@
     - **Property 12: 前端强抢状态更新** — **Validates: 5.3**
     - 随机持锁状态 + 匹配/不匹配 `editing_lock.force_acquired` 事件，断言 isMine/lockedBy 更新；非匹配/非持锁不变；标 Property 12 / `numRuns=5`
 
-- [ ] 5. 阶段 1 双端点并存可用性验证
+- [x] 5. 阶段 1 双端点并存可用性验证
   - [x]* 5.1 双端点并存测试
     - in-process httpx 断言 v1 `/api/workpapers/{id}/editing-lock` 与 v2 `/api/editing-locks/workpaper/{id}` 两路由均非 404
     - _Requirements: 6.1, 6.2_
 
-- [ ] 6. 阶段 1 检查点
+- [x] 6. 阶段 1 检查点
   - 跑 `python -m pytest backend/tests/services/test_editing_lock_v2_renewal.py backend/tests/routers/test_editing_locks_force_sse.py` + 前端 vitest；非 pg_only 全绿、pg_only 在真实 PG 跑过再继续。有问题问用户。
 
 ### 阶段 2：前端全量切 v2 + 实测（门控阶段 3）
@@ -139,7 +139,7 @@
   - codegraph `codegraph_callers`/grep 确认无残留 import（含 router_registry 外的引用）
   - _Requirements: 7.2_
 
-- [ ] 11. V075 / R075 下线 v1 表（⚠️ V074 已被 note-guidance-text-separation 占用 `V074__disclosure_notes_guidance_text.sql`，本特性下线表改用 V075/R075，避免同号静默丢失）
+- [x] 11. V075 / R075 下线 v1 表（⚠️ V074 已被 note-guidance-text-separation 占用 `V074__disclosure_notes_guidance_text.sql`，本特性下线表改用 V075/R075，避免同号静默丢失）
   - [x] 11.1 `backend/migrations/V075__drop_workpaper_editing_locks.sql`：`DROP TABLE IF EXISTS workpaper_editing_locks`
     - _Requirements: 7.3_
   - [x] 11.2 `backend/migrations/R075__drop_workpaper_editing_locks.sql`：`CREATE TABLE IF NOT EXISTS workpaper_editing_locks(...)` 重建（含 wp_id/staff_id/acquired_at/heartbeat_at/released_at + `created_at`/`updated_at TIMESTAMPTZ NOT NULL DEFAULT now()`）

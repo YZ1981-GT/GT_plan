@@ -1,0 +1,63 @@
+{
+  "description": "C22 IT一般控制测试 地址坐标注册（34 sheet 结论单元格坐标）",
+  "version": "v2025-R5",
+  "wp_code": "C22",
+  "component_type": "audit-sheet",
+  "domains": {
+    "SA": {
+      "label": "安全管理 (Security Administration)",
+      "steps": ["SA-3", "SA-4c", "SA-4d", "SA-5"],
+      "summary_conclusion_cell": "主程序表!E8"
+    },
+    "PE": {
+      "label": "程序变更 (Program Change)",
+      "steps": ["PE-3", "PE-4", "PE-5"],
+      "summary_conclusion_cell": "主程序表!E12"
+    },
+    "PM": {
+      "label": "程序开发 (Program Development)",
+      "steps": ["PM-3", "PM-4", "PM-5"],
+      "summary_conclusion_cell": "主程序表!E16"
+    },
+    "NS": {
+      "label": "网络安全/计算机运行 (Network Security)",
+      "steps": ["NS-3", "NS-4", "NS-5", "NS-6", "NS-6.1", "NS-6.2"],
+      "summary_conclusion_cell": "主程序表!E20"
+    }
+  },
+  "main_program_sheet": {
+    "sheet_name": "主程序表",
+    "conclusion_column": "E",
+    "domain_rows": {
+      "SA": {"start_row": 6, "end_row": 9, "conclusion_row": 8},
+      "PE": {"start_row": 10, "end_row": 13, "conclusion_row": 12},
+      "PM": {"start_row": 14, "end_row": 17, "conclusion_row": 16},
+      "NS": {"start_row": 18, "end_row": 23, "conclusion_row": 20}
+    },
+    "overall_conclusion_cell": "E25"
+  },
+  "step_sheets": {
+    "SA-3": {"sheet_name": "SA-3", "conclusion_cell": "E28", "domain": "SA"},
+    "SA-4c": {"sheet_name": "SA-4c", "conclusion_cell": "E28", "domain": "SA"},
+    "SA-4d": {"sheet_name": "SA-4d", "conclusion_cell": "E28", "domain": "SA"},
+    "SA-5": {"sheet_name": "SA-5", "conclusion_cell": "E28", "domain": "SA"},
+    "PE-3": {"sheet_name": "PE-3", "conclusion_cell": "E28", "domain": "PE"},
+    "PE-4": {"sheet_name": "PE-4", "conclusion_cell": "E28", "domain": "PE"},
+    "PE-5": {"sheet_name": "PE-5", "conclusion_cell": "E28", "domain": "PE"},
+    "PM-3": {"sheet_name": "PM-3", "conclusion_cell": "E28", "domain": "PM"},
+    "PM-4": {"sheet_name": "PM-4", "conclusion_cell": "E28", "domain": "PM"},
+    "PM-5": {"sheet_name": "PM-5", "conclusion_cell": "E28", "domain": "PM"},
+    "NS-3": {"sheet_name": "NS-3", "conclusion_cell": "E28", "domain": "NS"},
+    "NS-4": {"sheet_name": "NS-4", "conclusion_cell": "E28", "domain": "NS"},
+    "NS-5": {"sheet_name": "NS-5", "conclusion_cell": "E28", "domain": "NS"},
+    "NS-6": {"sheet_name": "NS-6", "conclusion_cell": "E28", "domain": "NS"},
+    "NS-6.1": {"sheet_name": "NS-6.1", "conclusion_cell": "E28", "domain": "NS"},
+    "NS-6.2": {"sheet_name": "NS-6.2", "conclusion_cell": "E28", "domain": "NS"}
+  },
+  "notes": [
+    "结论单元格的精确坐标需在 OnlyOffice 中确认实际 sheet 布局后调整",
+    "E28 为默认估计值（步骤sheet通常在25-30行结论区域）",
+    "主程序表行号为估计值，需与实际 C22 模板 sheet 布局对齐",
+    "该 JSON 供 address_registry 服务按需加载，不直接在启动时注册"
+  ]
+}

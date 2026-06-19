@@ -160,6 +160,7 @@ class _SampleVoucherRequest(_BaseModel):
     account_code: str | None = None
     sampling_record_id: UUID | None = None
     working_paper_id: UUID | None = None
+    source: str | None = None  # 来源标识（如 "C24"），用于追溯抽样来源
     note: str | None = None
 
 
@@ -205,7 +206,7 @@ async def sample_voucher(
         account_code=body.account_code,
         sampling_record_id=body.sampling_record_id,
         working_paper_id=body.working_paper_id,
-        note=body.note,
+        note=body.note or (f"source:{body.source}" if body.source else None),
         sampled_by=current_user.id,
     )
     db.add(new_row)

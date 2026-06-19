@@ -1,0 +1,106 @@
+{
+  "description": "I 类无形资产循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "I",
+  "entries": [
+    {
+      "wp_code": "I1-3",
+      "sheet_name": "无形资产摊销测算",
+      "coordinates": [
+        {"cell_address": "F50", "description": "摊销测算合计-本期应计摊销", "purpose": "amortization_calc"},
+        {"cell_address": "G50", "description": "摊销测算合计-账面已计摊销", "purpose": "amortization_booked"},
+        {"cell_address": "H50", "description": "摊销测算差异合计", "purpose": "amortization_variance"},
+        {"cell_address": "B55", "description": "摊销测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I1-4",
+      "sheet_name": "无形资产减值测试",
+      "coordinates": [
+        {"cell_address": "E20", "description": "可收回金额合计", "purpose": "recoverable_amount"},
+        {"cell_address": "F20", "description": "账面价值合计", "purpose": "carrying_amount"},
+        {"cell_address": "G20", "description": "减值损失合计", "purpose": "impairment_loss"},
+        {"cell_address": "B30", "description": "减值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I1-5",
+      "sheet_name": "无形资产增减变动",
+      "coordinates": [
+        {"cell_address": "E30", "description": "本期增加合计", "purpose": "additions_total"},
+        {"cell_address": "F30", "description": "本期减少合计", "purpose": "disposals_total"},
+        {"cell_address": "G30", "description": "期末原值合计", "purpose": "ending_cost_total"},
+        {"cell_address": "B35", "description": "增减变动结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I2-4",
+      "sheet_name": "开发支出转无形资产",
+      "coordinates": [
+        {"cell_address": "E20", "description": "本期转入无形资产合计", "purpose": "transfer_to_intangible"},
+        {"cell_address": "F20", "description": "转入金额核对差异", "purpose": "transfer_variance"},
+        {"cell_address": "B25", "description": "转无形资产结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I3-4",
+      "sheet_name": "商誉DCF计算",
+      "coordinates": [
+        {"cell_address": "C5", "description": "加权平均资本成本WACC", "purpose": "wacc"},
+        {"cell_address": "C6", "description": "无风险利率Rf", "purpose": "risk_free_rate"},
+        {"cell_address": "C7", "description": "市场风险溢价MRP", "purpose": "market_risk_premium"},
+        {"cell_address": "C8", "description": "Beta系数", "purpose": "beta"},
+        {"cell_address": "C9", "description": "永续增长率g", "purpose": "terminal_growth_rate"},
+        {"cell_address": "F30", "description": "自由现金流现值合计", "purpose": "pv_fcf_total"},
+        {"cell_address": "G30", "description": "终值TV现值", "purpose": "pv_terminal_value"},
+        {"cell_address": "H30", "description": "企业价值NPV", "purpose": "npv_enterprise_value"},
+        {"cell_address": "I30", "description": "可收回金额", "purpose": "recoverable_amount"},
+        {"cell_address": "J30", "description": "账面含商誉净资产", "purpose": "carrying_with_goodwill"},
+        {"cell_address": "K30", "description": "减值金额", "purpose": "impairment_amount"},
+        {"cell_address": "B35", "description": "DCF结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I3-5",
+      "sheet_name": "商誉敏感性分析",
+      "coordinates": [
+        {"cell_address": "C3", "description": "基准折现率", "purpose": "base_discount_rate"},
+        {"cell_address": "D3", "description": "基准增长率", "purpose": "base_growth_rate"},
+        {"cell_address": "C10", "description": "矩阵左上角（折现率+1%/增长率-1%）", "purpose": "matrix_top_left"},
+        {"cell_address": "E10", "description": "矩阵中心（基准情景NPV）", "purpose": "matrix_center"},
+        {"cell_address": "G10", "description": "矩阵右下角（折现率-1%/增长率+1%）", "purpose": "matrix_bottom_right"},
+        {"cell_address": "B20", "description": "敏感性分析结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I4-2",
+      "sheet_name": "长期待摊费用明细表",
+      "coordinates": [
+        {"cell_address": "F30", "description": "本期摊销合计", "purpose": "amortization_total"},
+        {"cell_address": "G30", "description": "摊销差异", "purpose": "amortization_variance"},
+        {"cell_address": "B35", "description": "长期待摊费用结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I6-2",
+      "sheet_name": "研发费用明细表",
+      "coordinates": [
+        {"cell_address": "E50", "description": "研发费用总额", "purpose": "rd_expense_total"},
+        {"cell_address": "F50", "description": "资本化金额", "purpose": "capitalized_amount"},
+        {"cell_address": "G50", "description": "费用化金额", "purpose": "expensed_amount"},
+        {"cell_address": "B55", "description": "研发明细结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "I6-7",
+      "sheet_name": "研发加计扣除测算",
+      "coordinates": [
+        {"cell_address": "C5", "description": "加计扣除比例", "purpose": "super_deduction_rate"},
+        {"cell_address": "E20", "description": "符合条件的研发费用合计", "purpose": "qualifying_rd_expense"},
+        {"cell_address": "F20", "description": "加计扣除金额", "purpose": "super_deduction_amount"},
+        {"cell_address": "G20", "description": "所得税影响金额", "purpose": "tax_impact"},
+        {"cell_address": "B25", "description": "加计扣除结论", "purpose": "conclusion"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+# backend/data/wp_render_schema/E1-2.yaml
+# 库存现金明细表 — d-form-table 渲染 schema
+# Requirements: Task 25（E1-2 库存现金明细表）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+
+wp_code: E1-2
+wp_name: 库存现金明细表
+component_type: d-form-table
+template_path: backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1001'
+    name: 库存现金
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 库存现金明细：按日期记录现金收支
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 库存现金明细
+    account_code_prefix: '1001'
+    fields:
+      - { field: date, label: 日期, type: date }
+      - { field: summary, label: 摘要, type: text }
+      - { field: income_amount, label: 收入, type: number }
+      - { field: expense_amount, label: 支出, type: number }
+      - { field: balance, label: 余额, type: number, formula: "balance_prev + income_amount - expense_amount" }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-E1-2-001
+    target_wp: E1-1
+    target_field: 库存现金审定金额
+    description: '库存现金明细合计 → E1-1 审定表库存现金组'
+    severity: required
+    direction: outbound

@@ -1,0 +1,484 @@
+{
+  "description": "F 类采购存货循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "F",
+  "entries": [
+    {
+      "wp_code": "F1-2",
+      "sheet_name": "预付账款明细表",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F1-3",
+      "sheet_name": "预付账款账龄分析",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-1年以内合计", "purpose": "aging_analysis"},
+        {"cell_address": "G50", "description": "合计行-1-2年合计", "purpose": "aging_analysis"},
+        {"cell_address": "H50", "description": "合计行-2-3年合计", "purpose": "aging_analysis"}
+      ]
+    },
+    {
+      "wp_code": "F2-2",
+      "sheet_name": "存货分类明细",
+      "coordinates": [
+        {"cell_address": "F30", "description": "合计行-存货分类期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "G30", "description": "合计行-存货分类期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-3",
+      "sheet_name": "存货增减变动",
+      "coordinates": [
+        {"cell_address": "F50", "description": "合计行-本期增加合计", "purpose": "balance_verification"},
+        {"cell_address": "G50", "description": "合计行-本期减少合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-4",
+      "sheet_name": "原材料明细",
+      "coordinates": [
+        {"cell_address": "E100", "description": "合计行-原材料期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F100", "description": "合计行-原材料期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-5",
+      "sheet_name": "在产品明细",
+      "coordinates": [
+        {"cell_address": "E80", "description": "合计行-在产品期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F80", "description": "合计行-在产品期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-6",
+      "sheet_name": "库存商品明细",
+      "coordinates": [
+        {"cell_address": "E100", "description": "合计行-库存商品期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F100", "description": "合计行-库存商品期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-7",
+      "sheet_name": "在途物资明细",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-在途物资期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-在途物资期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-8",
+      "sheet_name": "委托加工物资明细",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-委托加工物资期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-委托加工物资期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-9",
+      "sheet_name": "工程施工明细",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-工程施工期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-工程施工期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-10",
+      "sheet_name": "开发产品明细",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-开发产品期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-开发产品期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-18",
+      "sheet_name": "存货分析程序（一）",
+      "coordinates": [
+        {"cell_address": "B30", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C10", "description": "存货周转率", "purpose": "ratio_analysis"},
+        {"cell_address": "C15", "description": "存货占总资产比例", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "F2-19",
+      "sheet_name": "存货分析程序（二）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C8", "description": "各类存货结构变动分析", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "F2-20",
+      "sheet_name": "存货分析程序（三）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C8", "description": "毛利率与存货变动匹配分析", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "F2-21",
+      "sheet_name": "存货监盘计划",
+      "coordinates": [
+        {"cell_address": "C5", "description": "盘点日期", "purpose": "inventory_count"},
+        {"cell_address": "C8", "description": "盘点仓库/地点", "purpose": "inventory_count"},
+        {"cell_address": "C12", "description": "盘点范围", "purpose": "inventory_count"}
+      ]
+    },
+    {
+      "wp_code": "F2-22",
+      "sheet_name": "盘点观察记录",
+      "coordinates": [
+        {"cell_address": "C5", "description": "盘点日期", "purpose": "inventory_count"},
+        {"cell_address": "C8", "description": "仓库名称", "purpose": "inventory_count"},
+        {"cell_address": "B30", "description": "观察记录结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-23",
+      "sheet_name": "盘点抽盘测试",
+      "coordinates": [
+        {"cell_address": "G50", "description": "差异金额合计", "purpose": "inventory_count"},
+        {"cell_address": "B55", "description": "抽盘测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-24",
+      "sheet_name": "存货截止测试",
+      "coordinates": [
+        {"cell_address": "B20", "description": "截止测试结论", "purpose": "conclusion"},
+        {"cell_address": "C5", "description": "最后入库单号", "purpose": "inventory_count"},
+        {"cell_address": "C8", "description": "最后出库单号", "purpose": "inventory_count"}
+      ]
+    },
+    {
+      "wp_code": "F2-25",
+      "sheet_name": "盘点差异汇总",
+      "coordinates": [
+        {"cell_address": "F20", "description": "盘盈金额合计", "purpose": "inventory_count"},
+        {"cell_address": "G20", "description": "盘亏金额合计", "purpose": "inventory_count"},
+        {"cell_address": "H20", "description": "差异净额", "purpose": "inventory_count"}
+      ]
+    },
+    {
+      "wp_code": "F2-26",
+      "sheet_name": "监盘结论",
+      "coordinates": [
+        {"cell_address": "B15", "description": "监盘总体结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-29",
+      "sheet_name": "存货检查（一）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-采购入库单核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-30",
+      "sheet_name": "存货检查（二）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-出库/领料单核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-31",
+      "sheet_name": "存货检查（三）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-验收入库流程核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-32",
+      "sheet_name": "存货检查（四）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-存货暂估核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-33",
+      "sheet_name": "存货检查（五）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-存货结转成本核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-34",
+      "sheet_name": "存货检查（六）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-委外加工核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-35",
+      "sheet_name": "存货检查（七）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-存货报废/处置核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-38",
+      "sheet_name": "计价测试（一）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-加权平均法验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-39",
+      "sheet_name": "计价测试（二）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-先进先出法验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-40",
+      "sheet_name": "计价测试（三）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-个别计价法验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-41",
+      "sheet_name": "计价测试（四）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-制造费用分摊验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-42",
+      "sheet_name": "计价测试（五）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-人工成本归集验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-43",
+      "sheet_name": "计价测试（六）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-在产品完工程度验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-44",
+      "sheet_name": "计价测试（七）",
+      "coordinates": [
+        {"cell_address": "B20", "description": "计价测试结论-成本还原验证", "purpose": "conclusion"},
+        {"cell_address": "G30", "description": "计价差异金额合计", "purpose": "valuation_test"}
+      ]
+    },
+    {
+      "wp_code": "F2-47",
+      "sheet_name": "跌价准备测试（一）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "跌价准备测试结论-可变现净值测算", "purpose": "conclusion"},
+        {"cell_address": "F20", "description": "跌价准备差异金额", "purpose": "impairment_calc"}
+      ]
+    },
+    {
+      "wp_code": "F2-48",
+      "sheet_name": "跌价准备测试（二）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "跌价准备测试结论-库龄分析减值", "purpose": "conclusion"},
+        {"cell_address": "F20", "description": "跌价准备差异金额", "purpose": "impairment_calc"}
+      ]
+    },
+    {
+      "wp_code": "F2-49",
+      "sheet_name": "跌价准备测试（三）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "跌价准备测试结论-管理层估计合理性", "purpose": "conclusion"},
+        {"cell_address": "F20", "description": "跌价准备差异金额", "purpose": "impairment_calc"}
+      ]
+    },
+    {
+      "wp_code": "F2-55",
+      "sheet_name": "合同履约成本（一）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "合同履约成本结论-资本化判定", "purpose": "conclusion"},
+        {"cell_address": "E20", "description": "合同履约成本期末余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-56",
+      "sheet_name": "合同履约成本（二）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "合同履约成本结论-摊销测试", "purpose": "conclusion"},
+        {"cell_address": "F20", "description": "摊销差异金额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F2-57",
+      "sheet_name": "合同履约成本（三）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "合同履约成本结论-减值测试", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-58",
+      "sheet_name": "合同履约成本（四）",
+      "coordinates": [
+        {"cell_address": "B25", "description": "合同履约成本结论-披露完整性", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-61",
+      "sheet_name": "存货IPO舞弊应对（一）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货真实性检查结论", "purpose": "conclusion"},
+        {"cell_address": "B30", "description": "舞弊风险应对结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-62",
+      "sheet_name": "存货IPO舞弊应对（二）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货完整性核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-63",
+      "sheet_name": "存货IPO舞弊应对（三）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货计价准确性核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-64",
+      "sheet_name": "存货IPO舞弊应对（四）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货跌价准备充分性核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-65",
+      "sheet_name": "存货IPO舞弊应对（五）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货盘点覆盖率核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-66",
+      "sheet_name": "存货IPO舞弊应对（六）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货异常变动核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-67",
+      "sheet_name": "存货IPO舞弊应对（七）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货关联交易核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-68",
+      "sheet_name": "存货IPO舞弊应对（八）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货毛利率异常核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-69",
+      "sheet_name": "存货IPO舞弊应对（九）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货期后异常变动核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-70",
+      "sheet_name": "存货IPO舞弊应对（十）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货跨期截止核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-71",
+      "sheet_name": "存货IPO舞弊应对（十一）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货成本结构分析核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F2-72",
+      "sheet_name": "存货IPO舞弊应对（十二）",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO存货供应商集中度核查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "F3-2",
+      "sheet_name": "应付票据明细表",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-应付票据期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-应付票据期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F3-5",
+      "sheet_name": "应付票据分析程序",
+      "coordinates": [
+        {"cell_address": "B25", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C10", "description": "应付票据余额变动分析", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "F3-6",
+      "sheet_name": "应付票据到期日分析",
+      "coordinates": [
+        {"cell_address": "B25", "description": "到期日分析结论", "purpose": "conclusion"},
+        {"cell_address": "E30", "description": "合计行-未到期票据余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F4-2",
+      "sheet_name": "应付账款明细表",
+      "coordinates": [
+        {"cell_address": "E100", "description": "合计行-应付账款期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F100", "description": "合计行-应付账款期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F4-3",
+      "sheet_name": "应付账款账龄分析",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-应付账款期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-1年以内合计", "purpose": "aging_analysis"},
+        {"cell_address": "G50", "description": "合计行-1-2年合计", "purpose": "aging_analysis"},
+        {"cell_address": "H50", "description": "合计行-2-3年合计", "purpose": "aging_analysis"}
+      ]
+    },
+    {
+      "wp_code": "F5-2",
+      "sheet_name": "营业成本明细表",
+      "coordinates": [
+        {"cell_address": "E30", "description": "合计行-营业成本本期发生额合计", "purpose": "balance_verification"},
+        {"cell_address": "F30", "description": "合计行-营业成本上期发生额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F5-3",
+      "sheet_name": "成本结转测试",
+      "coordinates": [
+        {"cell_address": "B25", "description": "成本结转测试结论", "purpose": "conclusion"},
+        {"cell_address": "F20", "description": "结转差异金额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "F5-4",
+      "sheet_name": "毛利率分析",
+      "coordinates": [
+        {"cell_address": "B25", "description": "毛利率分析结论", "purpose": "conclusion"},
+        {"cell_address": "C10", "description": "综合毛利率", "purpose": "ratio_analysis"},
+        {"cell_address": "C15", "description": "毛利率变动率", "purpose": "ratio_analysis"}
+      ]
+    }
+  ]
+}

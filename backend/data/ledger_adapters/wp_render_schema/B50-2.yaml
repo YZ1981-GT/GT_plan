@@ -1,0 +1,100 @@
+# B50-2.yaml — 风险汇总表：固有风险评估（认定层次—报表项目）
+# componentType: d-form-table + render_hint: risk_level
+# Requirements: G7 风险评估汇总
+# Design: §1.2 风险汇总=d-form-table+risk_level+条件着色
+
+wp_code: B50-2
+template_path: backend/wp_templates/B/B50-2 风险汇总表（认定层次-报表项目）.xlsx
+template_version: v2025-R5
+
+sheets:
+  认定层次风险_报表项目:
+    component_type: d-form-table
+    form_type: table
+    title: 固有风险评估—认定层次（报表项目）
+    description: 针对各报表项目在认定层次进行固有风险评估
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_date
+        label: 评估日期
+        type: date
+        format: 'YYYY-MM-DD'
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 50
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        report_item:
+          field: report_item
+          type: text
+          label: 报表项目
+          width: 150
+        assertion:
+          field: assertion
+          type: text
+          label: 相关认定
+          width: 120
+        risk_description:
+          field: risk_description
+          type: textarea
+          label: 风险描述
+          width: 200
+        risk_level:
+          field: risk_level
+          type: enum
+          label: 风险等级
+          width: 90
+          dict_source: risk_level_dict
+          render_hint: risk_level
+        significant_risk:
+          field: significant_risk
+          type: enum
+          label: 是否重大风险
+          width: 100
+          dict_source: yes_no_dict
+        risk_response:
+          field: risk_response
+          type: textarea
+          label: 进一步审计程序
+          width: 200
+
+    dictionaries:
+      risk_level_dict:
+        - value: high
+          label: 高
+          color: red
+        - value: medium
+          label: 中
+          color: yellow
+        - value: low
+          label: 低
+          color: green
+      yes_no_dict:
+        - value: "yes"
+          label: 是
+        - value: "no"
+          label: 否
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 审计说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 认定层次风险汇总结论
+        type: textarea

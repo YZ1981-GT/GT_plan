@@ -1,0 +1,126 @@
+{
+  "description": "D 类 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "entries": [
+    {
+      "wp_code": "D1-2",
+      "sheet_name": "原值明细（按类）D1-2",
+      "coordinates": [
+        {"cell_address": "F50", "description": "合计行-票面金额合计", "purpose": "balance_verification"},
+        {"cell_address": "G50", "description": "合计行-期末余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D1-3",
+      "sheet_name": "原值明细（按客户）D1-3",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-期末余额合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-期初余额合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D2-2",
+      "sheet_name": "明细表D2-2",
+      "coordinates": [
+        {"cell_address": "E100", "description": "合计行-期末余额", "purpose": "balance_verification"},
+        {"cell_address": "F100", "description": "合计行-期初余额", "purpose": "balance_verification"},
+        {"cell_address": "G100", "description": "合计行-账龄1年内", "purpose": "aging_analysis"}
+      ]
+    },
+    {
+      "wp_code": "D2-5",
+      "sheet_name": "分析程序D2-5",
+      "coordinates": [
+        {"cell_address": "B30", "description": "分析程序结论", "purpose": "conclusion"},
+        {"cell_address": "C15", "description": "应收账款周转率", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "D2-6",
+      "sheet_name": "检查D2-6",
+      "coordinates": [
+        {"cell_address": "B20", "description": "检查结论-发票核实", "purpose": "conclusion"},
+        {"cell_address": "B40", "description": "检查结论-合同核实", "purpose": "conclusion"},
+        {"cell_address": "B60", "description": "检查结论-签收核实", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "D4-2",
+      "sheet_name": "收入明细（按类别）D4-2",
+      "coordinates": [
+        {"cell_address": "E50", "description": "合计行-本期收入合计", "purpose": "balance_verification"},
+        {"cell_address": "F50", "description": "合计行-上期收入合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D4-3",
+      "sheet_name": "收入明细（按客户）D4-3",
+      "coordinates": [
+        {"cell_address": "D100", "description": "合计行-客户收入合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D4-4",
+      "sheet_name": "收入明细（按月份）D4-4",
+      "coordinates": [
+        {"cell_address": "N20", "description": "合计行-各月收入合计", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D4-6",
+      "sheet_name": "分析程序D4-6",
+      "coordinates": [
+        {"cell_address": "B25", "description": "收入分析结论", "purpose": "conclusion"},
+        {"cell_address": "C10", "description": "毛利率变动分析", "purpose": "ratio_analysis"}
+      ]
+    },
+    {
+      "wp_code": "D4-13",
+      "sheet_name": "检查D4-13",
+      "coordinates": [
+        {"cell_address": "B20", "description": "收入截止测试结论", "purpose": "conclusion"},
+        {"cell_address": "B40", "description": "收入确认检查结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "D4-22",
+      "sheet_name": "IPO舞弊应对D4-22",
+      "coordinates": [
+        {"cell_address": "B15", "description": "IPO收入真实性检查结论", "purpose": "conclusion"},
+        {"cell_address": "B30", "description": "舞弊风险应对结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "D5-2",
+      "sheet_name": "明细D5-2",
+      "coordinates": [
+        {"cell_address": "E30", "description": "合计行-应收款项融资余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D6-2",
+      "sheet_name": "明细表D6-2",
+      "coordinates": [
+        {"cell_address": "F50", "description": "合计行-合同资产期末余额", "purpose": "balance_verification"},
+        {"cell_address": "G50", "description": "合计行-合同资产期初余额", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D6-3",
+      "sheet_name": "减值准备明细D6-3",
+      "coordinates": [
+        {"cell_address": "E30", "description": "合计行-减值准备余额", "purpose": "balance_verification"},
+        {"cell_address": "F30", "description": "合计行-本期计提", "purpose": "balance_verification"}
+      ]
+    },
+    {
+      "wp_code": "D6-8",
+      "sheet_name": "减值测算D6-8",
+      "coordinates": [
+        {"cell_address": "E20", "description": "DCF测算结果-可收回金额", "purpose": "impairment_calc"},
+        {"cell_address": "E22", "description": "DCF测算结果-减值金额", "purpose": "impairment_calc"},
+        {"cell_address": "C5", "description": "折现率WACC", "purpose": "assumption"}
+      ]
+    }
+  ]
+}

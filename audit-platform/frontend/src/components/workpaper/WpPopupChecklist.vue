@@ -2,9 +2,11 @@
 /**
  * WpPopupChecklist — A1-12 重大事项决定程序的履行情况核查表
  *
- * 14 条需提交专业技术委员会讨论的情形（是否适用+索引号）
- * + 第二部分自由文本区（重大业务咨询/分歧事项）
- * 数据保存到 checklist_responses（item_id: A1-12-001~014 + A1-12-section2）
+ * - 14 条适用性判断列表：每条有 description(只读) + 是否适用(el-select) + 索引号(el-input)
+ * - 头部：业务分类标记 + 是否首次承接
+ * - 底部：重大业务咨询/分歧事项 自由文本区
+ * - 根据 business_category 自动提示适用性
+ * - Debounce 2s 自动保存
  */
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -14,6 +16,7 @@ const props = defineProps<{
   wpCode: string
   wpId?: string
   projectId?: string
+  projectInfo?: Record<string, any>
 }>()
 
 const emit = defineEmits<{
@@ -21,35 +24,46 @@ const emit = defineEmits<{
   (e: 'completed'): void
 }>()
 
-const ITEMS = [
-  { id: 'A1-12-001', seq: 1, content: '首次承接后的境内上市公司、H股上市公司、境外上市公司的首份业务报告（A1）；' },
-  { id: 'A1-12-002', seq: 2, content: '首次承接的新三板已挂牌公司、非上市公众公司的首份业务报告（A2）；' },
-  { id: 'A1-12-003', seq: 3, content: '首次申请新三板挂牌的业务报告，股转公司终止审核后重新申请新三板挂牌的业务报告（A2）；' },
-  { id: 'A1-12-004', seq: 4, content: '需经中国证监会核准或交易场所审核的重大资产重组、非本所上市公司客户涉及重大资产重组业绩承诺完成情况或承诺期届满减值测试的审核报告（A3）；' },
-  { id: 'A1-12-005', seq: 5, content: '首次承接的未上市银行和未上市保险公司的首份业务报告（A5）；' },
-  { id: 'A1-12-006', seq: 6, content: 'IPO公司的首次申报业务报告，证监会、交易所终止审核后重新申报的业务报告（A6）；' },
-  { id: 'A1-12-007', seq: 7, content: '首次承接发行企业债券、公司债券及非金融企业债务融资工具的相关业务报告（A7，包括以前年度分类为C类业务）；' },
-  { id: 'A1-12-008', seq: 8, content: '首次承接的证券交易所、期货交易所、证券公司的首份业务报告（A8）；' },
-  { id: 'A1-12-009', seq: 9, content: '拟出具或消除以前出具的非无保留意见（包括保留意见、否定意见或无法表示意见）的A类、B类业务报告；' },
-  { id: 'A1-12-010', seq: 10, content: '拟出具或消除以前出具的带有解释性说明段落（包括与持续经营的重大不确定性段、强调事项段和其他事项段）的A类、B类业务报告；' },
-  { id: 'A1-12-011', seq: 11, content: '拟出具的包括其他信息段且其他信息存在未更正重大错报的A类、B类业务报告；' },
-  { id: 'A1-12-012', seq: 12, content: '存在专业分歧的业务报告，包括：项目合伙人与专业咨询意见之间、项目合伙人与质量控制复核人之间、项目合伙人与项目质量复核合伙人之间；' },
-  { id: 'A1-12-013', seq: 13, content: '评价为高风险的保持业务并经业务质量控制委员会或质量管理主管合伙人、项目质量复核合伙人认定审核的业务报告；' },
-  { id: 'A1-12-014', seq: 14, content: '项目合伙人、质量管理主管合伙人认为必要的C类业务报告。' },
+// 14 条需提交专业技术委员会讨论的情形
+const CHECKLIST_ITEMS = [
+  { id: 'A1-12-001', seq: 1, description: '首次承接后的境内上市公司审计' },
+  { id: 'A1-12-002', seq: 2, description: '首次承接的新三板挂牌公司审计' },
+  { id: 'A1-12-003', seq: 3, description: '首次承接的大型国有企业审计' },
+  { id: 'A1-12-004', seq: 4, description: '预计出具非标准审计报告' },
+  { id: 'A1-12-005', seq: 5, description: '涉及重大关联方交易' },
+  { id: 'A1-12-006', seq: 6, description: '持续经营重大不确定性' },
+  { id: 'A1-12-007', seq: 7, description: '前后任注册会计师存在分歧' },
+  { id: 'A1-12-008', seq: 8, description: '审计过程中发现重大舞弊' },
+  { id: 'A1-12-009', seq: 9, description: '审计范围受到重大限制' },
+  { id: 'A1-12-010', seq: 10, description: '需使用专家工作' },
+  { id: 'A1-12-011', seq: 11, description: '会计政策重大变更' },
+  { id: 'A1-12-012', seq: 12, description: '涉及重大法律诉讼' },
+  { id: 'A1-12-013', seq: 13, description: '集团审计涉及组成部分重大事项' },
+  { id: 'A1-12-014', seq: 14, description: '其他需提交讨论的重大事项' },
 ]
 
-interface ItemState { applicable: string | null; wpRef: string }
+interface ItemState {
+  conclusion: string | null  // 'Y' / 'N' / 'NA'
+  wpRef: string             // 索引号
+}
+
 const itemStates = ref<Record<string, ItemState>>({})
-const section2Text = ref('')
+const freeText = ref('')
+const isFirstEngagement = ref(false)
 const loading = ref(false)
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
-const allMarked = computed(() => ITEMS.every(i => itemStates.value[i.id]?.applicable))
+const businessCategory = computed(() => props.projectInfo?.business_category || '')
+
+// C类非特定情形显示提示
+const showNotApplicableHint = computed(() => {
+  return businessCategory.value === 'C'
+})
 
 function initStates() {
-  for (const item of ITEMS) {
+  for (const item of CHECKLIST_ITEMS) {
     if (!itemStates.value[item.id]) {
-      itemStates.value[item.id] = { applicable: null, wpRef: '' }
+      itemStates.value[item.id] = { conclusion: null, wpRef: '' }
     }
   }
 }
@@ -59,16 +73,22 @@ async function loadData() {
   loading.value = true
   try {
     const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const list = Array.isArray(res) ? res : (res?.data ?? [])
-    for (const r of list) {
-      if (r.item_id?.startsWith('A1-12-') && r.item_id !== 'A1-12-section2') {
-        itemStates.value[r.item_id] = { applicable: r.conclusion, wpRef: r.wp_ref || '' }
+    const responses = Array.isArray(res) ? res : (res?.data ?? [])
+    for (const r of responses) {
+      if (r.item_id?.startsWith('A1-12-') && r.item_id !== 'A1-12-text') {
+        itemStates.value[r.item_id] = {
+          conclusion: r.conclusion || null,
+          wpRef: r.wp_ref || '',
+        }
       }
-      if (r.item_id === 'A1-12-section2') {
-        section2Text.value = r.remark || ''
+      if (r.item_id === 'A1-12-text') {
+        freeText.value = r.remark || ''
+      }
+      if (r.item_id === 'A1-12-header') {
+        isFirstEngagement.value = r.conclusion === 'Y'
       }
     }
-  } catch { /* ignore */ }
+  } catch { /* ignore load errors */ }
   finally { loading.value = false }
 }
 
@@ -79,148 +99,216 @@ function scheduleSave() {
 
 async function doSave() {
   if (!props.wpId || !props.projectId) return
-  const items = ITEMS.map(item => ({
+  const items: any[] = CHECKLIST_ITEMS.map(item => ({
     item_id: item.id,
-    conclusion: itemStates.value[item.id]?.applicable || null,
+    conclusion: itemStates.value[item.id]?.conclusion || null,
     remark: null,
     wp_ref: itemStates.value[item.id]?.wpRef || null,
   }))
-  items.push({ item_id: 'A1-12-section2', conclusion: null, remark: section2Text.value || null, wp_ref: null })
+  // Free text area
+  items.push({
+    item_id: 'A1-12-text',
+    conclusion: null,
+    remark: freeText.value || null,
+    wp_ref: null,
+  })
+  // Header info (first engagement)
+  items.push({
+    item_id: 'A1-12-header',
+    conclusion: isFirstEngagement.value ? 'Y' : 'N',
+    remark: null,
+    wp_ref: null,
+  })
   try {
-    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, { project_id: props.projectId, items })
+    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items,
+    })
     emit('save')
-    if (allMarked.value) emit('completed')
+    // Check if all completed
+    const allDone = CHECKLIST_ITEMS.every(item => itemStates.value[item.id]?.conclusion)
+    if (allDone) emit('completed')
   } catch (err: any) {
-    if (err?.message !== 'canceled' && err?.code !== 'ERR_CANCELED') ElMessage.error('保存失败')
+    const msg = err?.message || ''
+    if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
+      ElMessage.error('保存失败')
+    }
   }
 }
 
-function updateApplicable(id: string, val: string) { itemStates.value[id].applicable = val || null; scheduleSave() }
-function updateWpRef(id: string, val: string) { itemStates.value[id].wpRef = val; scheduleSave() }
-function updateSection2(val: string) { section2Text.value = val; scheduleSave() }
+function updateConclusion(id: string, val: string) {
+  itemStates.value[id].conclusion = val || null
+  scheduleSave()
+}
 
-onMounted(() => { initStates(); loadData() })
-onBeforeUnmount(() => { if (saveTimer.value) { clearTimeout(saveTimer.value); doSave() } })
+function updateWpRef(id: string, val: string) {
+  itemStates.value[id].wpRef = val
+  scheduleSave()
+}
+
+function updateFreeText(val: string) {
+  freeText.value = val
+  scheduleSave()
+}
+
+function updateFirstEngagement(val: boolean) {
+  isFirstEngagement.value = val
+  scheduleSave()
+}
+
+onMounted(() => {
+  initStates()
+  loadData()
+})
+
+onBeforeUnmount(() => {
+  if (saveTimer.value) {
+    clearTimeout(saveTimer.value)
+    doSave()
+  }
+})
 </script>
 
 <template>
   <div class="wp-popup-checklist" v-loading="loading">
-    <!-- 标题区 -->
+    <!-- 头部：业务分类 + 是否首次承接 -->
     <div class="checklist-header">
-      <div class="checklist-header__title">一、需提交专业技术委员会会议讨论、决策后出具报告的情形</div>
+      <div class="header-field">
+        <span class="header-label">业务分类：</span>
+        <el-tag
+          :type="businessCategory === 'A' ? 'danger' : businessCategory === 'B' ? 'warning' : 'info'"
+          size="small"
+        >
+          {{ businessCategory || '未设定' }}类
+        </el-tag>
+      </div>
+      <div class="header-field">
+        <span class="header-label">是否首次承接：</span>
+        <el-switch
+          :model-value="isFirstEngagement"
+          active-text="是"
+          inactive-text="否"
+          @change="(val: boolean) => updateFirstEngagement(val)"
+        />
+      </div>
     </div>
 
-    <!-- 14条列表 -->
-    <div class="checklist-items">
-      <div class="checklist-items__header">
-        <span class="col-seq">序号</span>
-        <span class="col-desc">情形描述</span>
-        <span class="col-applicable">是否适用</span>
-        <span class="col-wpref">如适用，索引号</span>
-      </div>
-      <div
-        v-for="item in ITEMS"
-        :key="item.id"
-        class="checklist-item"
-        :class="{ 'is-marked': itemStates[item.id]?.applicable }"
-      >
-        <span class="col-seq">{{ item.seq }}</span>
-        <span class="col-desc">{{ item.content }}</span>
-        <span class="col-applicable">
+    <!-- C类提示 -->
+    <el-alert
+      v-if="showNotApplicableHint"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="checklist-alert"
+    >
+      <template #title>
+        本项目为C类业务，如不存在需提交专业技术委员会讨论的特定情形，本表不适用
+      </template>
+    </el-alert>
+
+    <!-- 14 条核查列表 -->
+    <div class="checklist-section-title">一、需提交专业技术委员会讨论的情形</div>
+    <el-table :data="CHECKLIST_ITEMS" border size="small" class="checklist-table">
+      <el-table-column label="序号" width="50" align="center">
+        <template #default="{ row }">{{ row.seq }}</template>
+      </el-table-column>
+      <el-table-column label="情形描述" min-width="280">
+        <template #default="{ row }">{{ row.description }}</template>
+      </el-table-column>
+      <el-table-column label="是否适用" width="120" align="center">
+        <template #default="{ row }">
           <el-select
-            :model-value="itemStates[item.id]?.applicable || ''"
+            :model-value="itemStates[row.id]?.conclusion || ''"
             size="small"
-            placeholder="—"
-            style="width: 80px"
-            @change="(val: string) => updateApplicable(item.id, val)"
+            placeholder="请选择"
+            style="width: 90px"
+            @change="(val: string) => updateConclusion(row.id, val)"
           >
             <el-option label="是" value="Y" />
             <el-option label="否" value="N" />
+            <el-option label="不适用" value="NA" />
           </el-select>
-        </span>
-        <span class="col-wpref">
+        </template>
+      </el-table-column>
+      <el-table-column label="索引号" width="120" align="center">
+        <template #default="{ row }">
           <el-input
-            :model-value="itemStates[item.id]?.wpRef || ''"
+            :model-value="itemStates[row.id]?.wpRef || ''"
             size="small"
             placeholder="索引号"
-            style="width: 100px"
-            @input="(val: string) => updateWpRef(item.id, val)"
+            @input="(val: string) => updateWpRef(row.id, val)"
           />
-        </span>
-      </div>
-    </div>
+        </template>
+      </el-table-column>
+    </el-table>
 
-    <!-- 第二部分 -->
-    <div class="checklist-section2">
-      <div class="checklist-section2__title">二、提交专业技术委员会讨论、决策的重大业务咨询或业务分歧事项</div>
-      <el-input
-        type="textarea"
-        :rows="4"
-        :model-value="section2Text"
-        placeholder="填写重大业务咨询或业务分歧事项..."
-        @input="updateSection2"
-      />
+    <!-- 底部自由文本区 -->
+    <div class="checklist-section-title" style="margin-top: 16px">
+      二、提交讨论的重大业务咨询或分歧事项
     </div>
+    <el-input
+      :model-value="freeText"
+      type="textarea"
+      :rows="4"
+      placeholder="如有重大业务咨询或分歧事项，请在此填写..."
+      @input="updateFreeText"
+    />
 
-    <!-- 底部注释 -->
-    <div class="checklist-notes">
-      <p>注1: 本表仅适用于审计业务。</p>
-      <p>注2: 本表适用于A、B类业务；执行A、B类复核流程的C类业务或存在专业分歧需经专业技术委员会审核的C类业务。</p>
+    <!-- 底部注释说明 -->
+    <div class="checklist-footer-note">
+      注：本表仅适用于审计业务。适用于A、B类业务以及执行A、B类复核流程的C类业务，以及存在专业分歧需专委会审核的C类业务。
     </div>
   </div>
 </template>
 
 <style scoped>
-.wp-popup-checklist { padding: 8px 0; }
+.wp-popup-checklist {
+  padding: 8px 0;
+}
 
-.checklist-header__title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
+.checklist-header {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 16px;
+  background-color: #f4f0fa;
+  border-radius: 6px;
   margin-bottom: 12px;
 }
 
-.checklist-items__header {
+.header-field {
   display: flex;
   align-items: center;
-  padding: 6px 0;
-  border-bottom: 2px solid #4b2d77;
-  font-weight: 500;
-  font-size: 12px;
-  color: #4b2d77;
+  gap: 8px;
 }
 
-.checklist-item {
-  display: flex;
-  align-items: flex-start;
-  padding: 8px 0;
-  border-bottom: 1px solid #ebeef5;
-  transition: background 0.2s;
+.header-label {
+  font-size: 13px;
+  color: #606266;
 }
 
-.checklist-item.is-marked { background: #f4f0fa; }
+.checklist-alert {
+  margin-bottom: 12px;
+}
 
-.col-seq { width: 40px; min-width: 40px; text-align: center; font-weight: 600; color: #4b2d77; padding-top: 4px; }
-.col-desc { flex: 1; font-size: 13px; line-height: 1.6; color: #303133; padding: 0 8px; }
-.col-applicable { width: 90px; min-width: 90px; }
-.col-wpref { width: 110px; min-width: 110px; }
-
-.checklist-section2 { margin-top: 20px; }
-.checklist-section2__title {
+.checklist-section-title {
   font-size: 14px;
   font-weight: 600;
-  color: #303133;
+  color: #4b2d77;
   margin-bottom: 8px;
 }
 
-.checklist-notes {
-  margin-top: 16px;
-  padding: 10px 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
+.checklist-table {
+  margin-bottom: 0;
+}
+
+.checklist-footer-note {
+  margin-top: 12px;
+  padding: 8px 12px;
   font-size: 12px;
   color: #909399;
-  font-style: italic;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  line-height: 1.6;
 }
-.checklist-notes p { margin: 4px 0; }
 </style>

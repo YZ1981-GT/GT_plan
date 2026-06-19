@@ -29,7 +29,21 @@
 
     <!-- Ready: dispatch by componentType -->
     <template v-if="!loading && !error && renderConfig">
-      <!-- Sprint 4 Task 10.2: schema 缺失智能提示 banner -->
+      <!-- B15/合并类: 重定向到委托模块 -->
+      <div v-if="renderConfig.redirect" class="gt-wp-renderer__redirect">
+        <el-result icon="info" title="此底稿由独立模块承载">
+          <template #sub-title>
+            <span>{{ redirectHint }}</span>
+          </template>
+          <template #extra>
+            <el-button type="primary" @click="handleRedirectNavigation">
+              前往{{ redirectModuleLabel }}
+            </el-button>
+          </template>
+        </el-result>
+      </div>
+
+      <template v-else>
       <el-alert
         v-if="schemaFallbackBanner"
         type="info"
@@ -132,13 +146,14 @@
         </el-result>
       </div>
       </div><!-- /.gt-wp-renderer__content -->
+      </template><!-- v-else (non-redirect) -->
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
@@ -198,6 +213,7 @@ const emit = defineEmits<{
 
 // ─── Refs ───
 const route = useRoute()
+const router = useRouter()
 const containerRef = ref<HTMLElement | null>(null)
 const loadingHint = ref('')
 // 内部维护 activeSheetName（支持 sheet 切换）
@@ -216,6 +232,34 @@ const schemaFallbackBanner = computed(() => {
   }
   return null
 })
+
+// ─── B15/合并类重定向 ─────────────────────────────────────────────────────
+const MODULE_LABELS: Record<string, string> = {
+  materiality: '重要性水平',
+  consolidation_hub: '合并模块',
+}
+const redirectModuleLabel = computed(() => {
+  const mod = renderConfig.value?.delegated_module || ''
+  return MODULE_LABELS[mod] || mod || '目标模块'
+})
+const redirectHint = computed(() => {
+  const mod = renderConfig.value?.delegated_module
+  if (mod === 'materiality') return '重要性水平（B15）由独立的 Materiality 模块管理，点击下方按钮前往。'
+  if (mod === 'consolidation_hub') return '此底稿由合并模块承载，请前往合并模块查看。'
+  return '此底稿由其他模块承载。'
+})
+function handleRedirectNavigation() {
+  const targetPath = renderConfig.value?.target_path
+  const projectId = renderConfig.value?.project_id
+  if (targetPath && projectId) {
+    router.push(`/projects/${projectId}${targetPath}`)
+  } else if (targetPath) {
+    router.push(targetPath)
+  } else {
+    // fallback: go back
+    router.back()
+  }
+}
 
 // ─── Computed ───
 /** 可见 sheet 列表（过滤掉 skip 类，但 skip 仍可在唯一 sheet 时显示） */

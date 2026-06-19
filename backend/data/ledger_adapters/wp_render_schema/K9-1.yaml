@@ -1,0 +1,133 @@
+# backend/data/wp_render_schema/K9-1.yaml
+# 管理费用审定表 — d-form-table 渲染 schema
+# Requirements: §5.9（K9 管理费用）
+# Design: §3 审定表标准字段 + §7 损益类方向：取发生额（非期末余额）
+# Template: K9 管理费用.xlsx
+#
+# 特殊结构：损益类科目取发生额，按费用明细科目分行
+# （工资/折旧/办公费/差旅/业务招待/研发摊销/咨询/其他）
+
+wp_code: K9-1
+wp_name: 管理费用审定表
+component_type: d-form-table
+template_path: backend/wp_templates/K/K9 管理费用.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '6602'
+    name: 管理费用
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 损益类取发生额，按费用明细科目分行
+# 结构：工资 / 折旧 / 办公费 / 差旅费 / 业务招待费 / 研发费摊销 / 咨询费 / 其他
+#        → 管理费用合计
+# ═══════════════════════════════════════════════════════════════════════════════
+
+income_statement_type: true
+amount_source: occurrence_amount  # 取发生额（非期末余额）
+
+sections:
+  - name: 工资及福利
+    group_key: salary_benefits
+    row_type: category_row
+    account_code_prefix: '660201'
+    fields: &audit_determination_fields
+      - { field: category_name, label: 费用类别, type: text, readonly: true }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: unadjusted_amount, label: 未审金额（发生额）, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 折旧费
+    group_key: depreciation
+    row_type: category_row
+    account_code_prefix: '660202'
+    fields: *audit_determination_fields
+
+  - name: 办公费
+    group_key: office_expense
+    row_type: category_row
+    account_code_prefix: '660203'
+    fields: *audit_determination_fields
+
+  - name: 差旅费
+    group_key: travel_expense
+    row_type: category_row
+    account_code_prefix: '660204'
+    fields: *audit_determination_fields
+
+  - name: 业务招待费
+    group_key: entertainment
+    row_type: category_row
+    account_code_prefix: '660205'
+    fields: *audit_determination_fields
+
+  - name: 研发费摊销
+    group_key: rd_amortization
+    row_type: category_row
+    account_code_prefix: '660206'
+    fields: *audit_determination_fields
+
+  - name: 咨询费
+    group_key: consulting
+    row_type: category_row
+    account_code_prefix: '660207'
+    fields: *audit_determination_fields
+
+  - name: 其他
+    group_key: others
+    row_type: category_row
+    account_code_prefix: '660299'
+    fields: *audit_determination_fields
+
+  # ─── 合计行 ─────────────────────────────────────────────────────────────────
+  - name: 管理费用合计
+    row_type: total
+    formula_source: "SUM(工资及福利, 折旧费, 办公费, 差旅费, 业务招待费, 研发费摊销, 咨询费, 其他)"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-K9-1-001
+    target_wp: K9-6
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → K9-6 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-K9-1-002
+    target_wp: K9-2
+    target_field: 费用明细合计
+    description: '审定金额 ← K9-2 费用明细（tb_ledger 取发生额）验证'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-K9-1-003
+    target_wp: K9-3
+    target_field: 费用分析趋势
+    description: '审定依据 ← K9-3 费用分析（同比/环比趋势）'
+    severity: info
+    direction: inbound

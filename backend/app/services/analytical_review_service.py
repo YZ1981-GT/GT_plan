@@ -107,65 +107,190 @@ async def _get_is_listed(db: AsyncSession, project_id: UUID) -> bool:
     return result.scalar_one_or_none() == "listed"
 
 
-def _empty_metric_grid(years: list[int], metrics: list[tuple[str, str]]) -> dict:
-    """构建指标 × 年份 × 公司 的空数据网格。"""
-    return {
-        key: {
-            str(y): {label: None for label in _COMPANY_LABELS}
-            for y in years
-        }
-        for key, _ in metrics
-    }
+async def build_industry_comparison(
+    db: AsyncSession, project_id: UUID, wp_code: str, year: int
+) -> dict:
+    """构建同行业对比分析 sheet 结构（A1-14-6，用户填写数据）。
 
+    从 field_overrides 读取用户持久化的可比公司数据，合并到空模板结构上。
+    scope = "analytical_review:industry_comparison:{project_id}"
+    """
+    from app.services.field_override_service import FieldOverrideService
 
-def build_industry_comparison(wp_code: str, year: int) -> dict:
-    """构建同行业对比分析 sheet 结构（A1-14-6，用户填写数据）。"""
     years = [year - 2, year - 1, year]
+    scope = f"analytical_review:industry_comparison:{project_id}"
+    override_svc = FieldOverrideService(db)
+    overrides = await override_svc.get_batch(project_id, year, scope)
+
+    # 构建公司列表（从 overrides 读取用户填写的名称/代码）
+    companies = []
+    for label in ["A", "B", "C", "D", "E"]:
+        co_data = overrides.get(f"company:{label}", {})
+        companies.append({
+            "key": label,
+            "name": co_data.get("name", "") or "",
+            "stock_code": co_data.get("stock_code", "") or "",
+        })
+
+    # 构建指标网格（从 overrides 读取用户填写的数值）
+    financial_data = {}
+    for key, _ in _INDUSTRY_FINANCIAL_METRICS:
+        financial_data[key] = {}
+        for y in years:
+            financial_data[key][str(y)] = {}
+            for co_label in _COMPANY_LABELS:
+                override_key = f"financial:{key}:{y}:{co_label}"
+                val = overrides.get(override_key, {}).get("value")
+                financial_data[key][str(y)][co_label] = val
+
+    comparison_table = {}
+    for key, _ in _INDUSTRY_COMPARISON_METRICS:
+        comparison_table[key] = {}
+        for y in years:
+            comparison_table[key][str(y)] = {}
+            for co_label in _COMPANY_LABELS:
+                override_key = f"comparison:{key}:{y}:{co_label}"
+                val = overrides.get(override_key, {}).get("value")
+                comparison_table[key][str(y)][co_label] = val
+
+    # 数据来源标注
+    data_source_note = overrides.get("data_source_note", {}).get("value", "") or ""
+
     return {
         "title": "同行业对比分析",
         "index": f"{wp_code}-6",
         "years": years,
-        "companies": [
-            {"key": label, "name": "", "stock_code": ""}
-            for label in ["A", "B", "C", "D", "E"]
-        ],
-        "financial_data": _empty_metric_grid(years, _INDUSTRY_FINANCIAL_METRICS),
-        "comparison_table": _empty_metric_grid(years, _INDUSTRY_COMPARISON_METRICS),
+        "companies": companies,
+        "financial_data": financial_data,
+        "comparison_table": comparison_table,
         "financial_metric_labels": {k: v for k, v in _INDUSTRY_FINANCIAL_METRICS},
         "comparison_metric_labels": {k: v for k, v in _INDUSTRY_COMPARISON_METRICS},
-        "data_source_note": "",
+        "data_source_note": data_source_note,
     }
 
 
+async def save_industry_comparison(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    payload: dict,
+    user_id: UUID | None = None,
+) -> None:
+    """保存同行业对比分析用户填写数据到 field_overrides。
+
+    payload 结构:
+    {
+      "companies": [{"key": "A", "name": "...", "stock_code": "..."}],
+      "financial_data": {metric_key: {year_str: {co_label: value}}},
+      "comparison_table": {metric_key: {year_str: {co_label: value}}},
+      "data_source_note": "..."
+    }
+    """
+    from app.services.field_override_service import FieldOverrideService
+
+    scope = f"analytical_review:industry_comparison:{project_id}"
+    override_svc = FieldOverrideService(db)
+
+    # 保存公司信息
+    companies = payload.get("companies", [])
+    for co in companies:
+        label = co.get("key", "")
+        if label:
+            await override_svc.set(
+                project_id, year, scope, f"company:{label}", "name",
+                co.get("name", ""), user_id
+            )
+            await override_svc.set(
+                project_id, year, scope, f"company:{label}", "stock_code",
+                co.get("stock_code", ""), user_id
+            )
+
+    # 保存财务数据
+    financial_data = payload.get("financial_data", {})
+    for metric_key, year_data in financial_data.items():
+        if not isinstance(year_data, dict):
+            continue
+        for year_str, co_data in year_data.items():
+            if not isinstance(co_data, dict):
+                continue
+            for co_label, value in co_data.items():
+                await override_svc.set(
+                    project_id, year, scope,
+                    f"financial:{metric_key}:{year_str}:{co_label}",
+                    "value", value, user_id
+                )
+
+    # 保存对比分析表
+    comparison_table = payload.get("comparison_table", {})
+    for metric_key, year_data in comparison_table.items():
+        if not isinstance(year_data, dict):
+            continue
+        for year_str, co_data in year_data.items():
+            if not isinstance(co_data, dict):
+                continue
+            for co_label, value in co_data.items():
+                await override_svc.set(
+                    project_id, year, scope,
+                    f"comparison:{metric_key}:{year_str}:{co_label}",
+                    "value", value, user_id
+                )
+
+    # 保存数据来源标注
+    data_source_note = payload.get("data_source_note", "")
+    await override_svc.set(
+        project_id, year, scope, "data_source_note", "value",
+        data_source_note, user_id
+    )
+
+
 def compute_eps_roe_values(inputs: dict) -> dict:
-    """根据用户填写参数计算 EPS/ROE 指标。"""
+    """根据用户填写参数计算 EPS/ROE 指标。
+
+    支持 CAS34 加权平均 ROE 和基本/稀释每股收益完整计算。
+    """
     net_profit = inputs.get("net_profit")
     equity_end = inputs.get("equity_end")
     equity_begin = inputs.get("equity_begin")
     weighted_shares = inputs.get("weighted_avg_shares")
-    diluted_shares = inputs.get("diluted_shares")
+    preferred_dividend = inputs.get("preferred_dividend") or 0
 
+    # 稀释因素
+    convertible_bond_interest = inputs.get("convertible_bond_interest") or 0
+    dilution_extra_shares = inputs.get("dilution_extra_shares") or 0
+
+    # 归属于普通股股东的净利润
+    p = None
+    if net_profit is not None:
+        p = float(net_profit) - float(preferred_dividend)
+
+    # 加权平均净资产（CAS34: (期初+期末)/2，简化）
     avg_equity = None
     if equity_end is not None and equity_begin is not None:
         avg_equity = (float(equity_end) + float(equity_begin)) / 2
     elif equity_end is not None:
         avg_equity = float(equity_end)
 
+    # 全面摊薄 ROE = P / 期末净资产
     roe_diluted = None
-    if net_profit is not None and equity_end not in (None, 0):
-        roe_diluted = round(float(net_profit) / float(equity_end) * 100, 4)
+    if p is not None and equity_end not in (None, 0):
+        roe_diluted = round(p / float(equity_end) * 100, 4)
 
+    # 加权平均 ROE = P / 加权平均净资产
     roe_weighted = None
-    if net_profit is not None and avg_equity not in (None, 0):
-        roe_weighted = round(float(net_profit) / avg_equity * 100, 4)
+    if p is not None and avg_equity not in (None, 0):
+        roe_weighted = round(p / avg_equity * 100, 4)
 
+    # 基本每股收益 = P / 加权平均普通股数
     basic_eps = None
-    if net_profit is not None and weighted_shares not in (None, 0):
-        basic_eps = round(float(net_profit) / float(weighted_shares), 4)
+    if p is not None and weighted_shares not in (None, 0):
+        basic_eps = round(p / float(weighted_shares), 4)
 
+    # 稀释每股收益 = (P + 可转债税后利息) / (加权平均股数 + 稀释增加股数)
     diluted_eps = None
-    if net_profit is not None and diluted_shares not in (None, 0):
-        diluted_eps = round(float(net_profit) / float(diluted_shares), 4)
+    diluted_numerator = (p or 0) + float(convertible_bond_interest)
+    diluted_denominator = (float(weighted_shares) if weighted_shares else 0) + float(dilution_extra_shares)
+    if diluted_numerator != 0 and diluted_denominator != 0 and p is not None:
+        diluted_eps = round(diluted_numerator / diluted_denominator, 4)
 
     return {
         "roe_diluted": roe_diluted,
@@ -175,7 +300,25 @@ def compute_eps_roe_values(inputs: dict) -> dict:
     }
 
 
-def build_eps_roe(
+def compute_weighted_avg_shares(share_changes: list[dict]) -> float:
+    """根据股本变动明细计算加权平均普通股数。
+
+    加权平均股份数 = Σ(Si × Mi/12)
+    其中 Si 是第 i 段的累计股份数，Mi 是该段的月份数(时间权重)。
+    """
+    if not share_changes:
+        return 0
+    total = 0.0
+    for item in share_changes:
+        shares = float(item.get("cum_shares") or item.get("shares") or 0)
+        months = float(item.get("time_weight_months") or item.get("months") or 0)
+        total += shares * months / 12.0
+    return round(total, 2)
+
+
+async def build_eps_roe(
+    db: AsyncSession,
+    project_id: UUID,
     wp_code: str,
     year: int,
     *,
@@ -184,44 +327,169 @@ def build_eps_roe(
     equity_begin: float | None = None,
     share_capital: float | None = None,
 ) -> dict:
-    """构建 EPS-ROE 计算表 sheet 结构（A1-14-7，含公式自动计算）。"""
+    """构建 EPS-ROE 计算表 sheet 结构（A1-14-7，含公式自动计算）。
+
+    从 field_overrides 读取用户持久化的参数（股本变动/稀释因素/优先股股利等），
+    合并报表自动取数后计算。
+    """
+    from app.services.field_override_service import FieldOverrideService
+
+    scope = f"analytical_review:eps_roe:{project_id}"
+    override_svc = FieldOverrideService(db)
+    overrides = await override_svc.get_batch(project_id, year, scope)
+
+    # 从 overrides 读取用户参数（覆盖自动取数值）
+    params_override = overrides.get("params", {})
+    preferred_dividend = params_override.get("preferred_dividend") or 0
+    user_net_profit = params_override.get("net_profit")
+    user_equity_end = params_override.get("equity_end")
+    user_equity_begin = params_override.get("equity_begin")
+
+    # 最终参数：用户覆盖 > 报表自动取数
+    final_net_profit = user_net_profit if user_net_profit is not None else net_profit
+    final_equity_end = user_equity_end if user_equity_end is not None else equity_end
+    final_equity_begin = user_equity_begin if user_equity_begin is not None else equity_begin
+
+    # 股本变动明细（从 overrides 读取）
+    share_changes_data = overrides.get("share_changes", {})
+    share_changes_json = share_changes_data.get("value")
+    if share_changes_json and isinstance(share_changes_json, list):
+        share_changes = share_changes_json
+    else:
+        # 默认：仅期初股份
+        share_changes = [
+            {
+                "id": "s0",
+                "date": "",
+                "event_type": "期初股份",
+                "shares_changed": 0,
+                "cum_shares": share_capital or 0,
+                "time_weight_months": 12,
+            },
+        ]
+
+    # 从股本变动明细计算加权平均股数
+    weighted_avg_shares = compute_weighted_avg_shares(share_changes)
+    if weighted_avg_shares == 0 and share_capital:
+        weighted_avg_shares = float(share_capital)
+
+    # 稀释因素（从 overrides 读取）
+    dilution_override = overrides.get("dilution_factors", {})
+    convertible_bond_face_value = dilution_override.get("convertible_bond_face_value") or 0
+    convertible_bond_rate = dilution_override.get("convertible_bond_rate") or 0
+    convertible_bond_shares = dilution_override.get("convertible_bond_shares") or 0
+    option_exercise_price = dilution_override.get("option_exercise_price") or 0
+    option_shares = dilution_override.get("option_shares") or 0
+
+    # 可转债税后利息 = 面值 × 利率 × (1 - 25%)（假设税率25%）
+    convertible_bond_interest = float(convertible_bond_face_value) * float(convertible_bond_rate) / 100 * 0.75
+    # 稀释增加股数 = 可转债转股数 + 期权增量股数
+    dilution_extra_shares = float(convertible_bond_shares) + float(option_shares)
+
     inputs = {
-        "net_profit": net_profit,
-        "equity_end": equity_end,
-        "equity_begin": equity_begin,
-        "weighted_avg_shares": share_capital,
-        "diluted_shares": share_capital,
+        "net_profit": final_net_profit,
+        "equity_end": final_equity_end,
+        "equity_begin": final_equity_begin,
+        "weighted_avg_shares": weighted_avg_shares,
+        "preferred_dividend": preferred_dividend,
+        "convertible_bond_interest": convertible_bond_interest,
+        "dilution_extra_shares": dilution_extra_shares,
     }
+
     return {
         "title": "EPS-ROE计算表（参考）",
         "index": f"{wp_code}-7",
         "year": year,
         "inputs": {
-            "net_profit": net_profit,
-            "equity_end": equity_end,
-            "equity_begin": equity_begin,
-            "share_capital": share_capital,
-            "weighted_avg_shares": share_capital,
-            "diluted_shares": share_capital,
+            "net_profit": final_net_profit,
+            "equity_end": final_equity_end,
+            "equity_begin": final_equity_begin,
+            "preferred_dividend": preferred_dividend,
+            "weighted_avg_shares": weighted_avg_shares,
         },
-        "share_changes": [
-            {
-                "id": "s0",
-                "label": "期初股份数 S0",
-                "shares": share_capital,
-                "months": 12,
-                "weight": 1.0,
-            },
-        ],
+        "share_changes": share_changes,
+        "dilution_factors": {
+            "convertible_bond_face_value": convertible_bond_face_value,
+            "convertible_bond_rate": convertible_bond_rate,
+            "convertible_bond_shares": convertible_bond_shares,
+            "option_exercise_price": option_exercise_price,
+            "option_shares": option_shares,
+        },
         "computed": compute_eps_roe_values(inputs),
         "notes": [
             "净资产收益率（全面摊薄）= 归属于普通股股东的净利润 / 期末净资产",
-            "净资产收益率（加权平均）= 归属于普通股股东的净利润 / 平均净资产",
-            "基本每股收益 = 归属于普通股股东的净利润 / 加权平均普通股股数",
-            "稀释每股收益需考虑可转债、期权、认股权证等潜在普通股的影响",
+            "净资产收益率（加权平均）= P / 加权平均净资产（CAS 34）",
+            "基本每股收益 = (净利润 - 优先股股利) / 加权平均普通股股数",
+            "稀释每股收益 = (净利润 - 优先股股利 + 可转债税后利息) / (加权平均股数 + 稀释增加股数)",
+            "加权平均股数 = Σ(各段累计股份数 × 该段月份数 / 12)",
             "配股/公积金转增/拆股等股本变动按 CAS 34 规定调整加权平均股数",
         ],
     }
+
+
+async def save_eps_roe(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    payload: dict,
+    user_id: UUID | None = None,
+) -> dict:
+    """保存 EPS-ROE 用户参数并重新计算。
+
+    payload 结构:
+    {
+      "params": {"net_profit": ..., "equity_end": ..., "equity_begin": ..., "preferred_dividend": ...},
+      "share_changes": [{id, date, event_type, shares_changed, cum_shares, time_weight_months}],
+      "dilution_factors": {convertible_bond_face_value, convertible_bond_rate, convertible_bond_shares, option_exercise_price, option_shares}
+    }
+    """
+    from app.services.field_override_service import FieldOverrideService
+
+    scope = f"analytical_review:eps_roe:{project_id}"
+    override_svc = FieldOverrideService(db)
+
+    # 保存用户参数
+    params = payload.get("params", {})
+    if params:
+        for field, value in params.items():
+            await override_svc.set(
+                project_id, year, scope, "params", field, value, user_id
+            )
+
+    # 保存股本变动明细（整体作为 JSON list 存储）
+    share_changes = payload.get("share_changes")
+    if share_changes is not None:
+        await override_svc.set(
+            project_id, year, scope, "share_changes", "value", share_changes, user_id
+        )
+
+    # 保存稀释因素
+    dilution_factors = payload.get("dilution_factors", {})
+    if dilution_factors:
+        for field, value in dilution_factors.items():
+            await override_svc.set(
+                project_id, year, scope, "dilution_factors", field, value, user_id
+            )
+
+    # 重新计算并返回
+    weighted_avg_shares = compute_weighted_avg_shares(share_changes or [])
+    convertible_bond_face_value = dilution_factors.get("convertible_bond_face_value") or 0
+    convertible_bond_rate = dilution_factors.get("convertible_bond_rate") or 0
+    convertible_bond_shares = dilution_factors.get("convertible_bond_shares") or 0
+    option_shares = dilution_factors.get("option_shares") or 0
+    convertible_bond_interest = float(convertible_bond_face_value) * float(convertible_bond_rate) / 100 * 0.75
+    dilution_extra_shares = float(convertible_bond_shares) + float(option_shares)
+
+    inputs = {
+        "net_profit": params.get("net_profit"),
+        "equity_end": params.get("equity_end"),
+        "equity_begin": params.get("equity_begin"),
+        "weighted_avg_shares": weighted_avg_shares,
+        "preferred_dividend": params.get("preferred_dividend") or 0,
+        "convertible_bond_interest": convertible_bond_interest,
+        "dilution_extra_shares": dilution_extra_shares,
+    }
+    return compute_eps_roe_values(inputs)
 
 
 # ---------------------------------------------------------------------------
@@ -570,12 +838,14 @@ async def get_analytical_review_data(
     eps_roe = None
     is_listed = await _get_is_listed(db, project_id) if wp_code == "A1-14" else False
     if wp_code == "A1-14" and is_listed:
-        industry_comparison = build_industry_comparison(wp_code, year)
+        industry_comparison = await build_industry_comparison(db, project_id, wp_code, year)
         cur_np = is_current.get(IS_NET_PROFIT_CODE, {}).get("amount")
         cur_equity = bs_current.get(BS_EQUITY_TOTAL_CODE, {}).get("amount")
         pri_equity = bs_prior.get(BS_EQUITY_TOTAL_CODE, {}).get("amount")
         share_capital = bs_current.get(BS_SHARE_CAPITAL_CODE, {}).get("amount")
-        eps_roe = build_eps_roe(
+        eps_roe = await build_eps_roe(
+            db,
+            project_id,
             wp_code,
             year,
             net_profit=float(cur_np) if cur_np is not None else None,

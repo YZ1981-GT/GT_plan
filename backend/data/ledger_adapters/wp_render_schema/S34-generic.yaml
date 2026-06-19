@@ -1,0 +1,36 @@
+# S34 证监会核查事项 — 通用 d-form-table 渲染 schema
+# 适用：S34-1 ~ S34-41（41 个底稿共用同一结构）
+# S34-0 为清单/总控表，另有独立结构
+#
+# 匹配规则：wp_code LIKE 'S34-%' AND wp_code != 'S34-0' AND wp_code != 'S34-1-1'
+
+wp_code_pattern: "S34-[1-9]*"
+wp_name_template: "证监会核查-{topic}"
+component_type: d-form-table
+applicable_when:
+  business_category: [ipo, listed, neeq, refinancing]
+
+sections:
+  - name: 核查程序与结果
+    group_key: csrc_verification
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: csrc_requirement, label: 证监会关注事项, type: textarea, readonly: true }
+      - { field: verification_procedure, label: 已执行核查程序, type: textarea }
+      - { field: sample_scope, label: 抽样范围/方法, type: text }
+      - { field: verification_evidence, label: 获取的审计证据, type: textarea }
+      - { field: verification_result, label: 核查结果, type: textarea }
+      - { field: is_issue_found, label: 是否发现问题, type: select, options: ["未发现问题", "发现问题已整改", "发现问题需披露", "不适用"] }
+      - { field: issue_description, label: 问题描述, type: textarea }
+      - { field: conclusion, label: 核查结论, type: select, options: ["符合要求", "基本符合", "不符合", "不适用"] }
+
+  - name: 总体意见
+    group_key: overall_opinion
+    row_type: conclusion
+    fields:
+      - { field: overall_conclusion, label: 总体核查意见, type: select, options: ["符合发行上市条件", "存在瑕疵已整改", "存在重大问题", "不适用"] }
+      - { field: opinion_note, label: 意见说明, type: textarea }
+      - { field: auditor_signature, label: 签字会计师, type: text }
+      - { field: report_date, label: 报告日期, type: date }

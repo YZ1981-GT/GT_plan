@@ -192,6 +192,25 @@ async def download_template_prefilled(
         "201X": str(int(audit_year) - 1) if audit_year.isdigit() else "201X",
     }
 
+    # B3-1 独立性声明书：预填项目组成员名单
+    if wp_code.upper() == "B3-1":
+        try:
+            member_rows = (
+                await db.execute(
+                    text(
+                        "SELECT sm.name FROM staff_members sm "
+                        "JOIN project_assignments pa ON pa.staff_id = sm.id "
+                        "WHERE pa.project_id = :pid ORDER BY pa.role_type, sm.name"
+                    ),
+                    {"pid": project_id},
+                )
+            ).scalars().all()
+            team_names = "、".join(member_rows) if member_rows else ""
+            if team_names:
+                replacements["{{团队成员名单}}"] = team_names
+        except Exception as exc:
+            logger.warning("B3-1 prefill team members failed: %s", exc)
+
     replaced = False
     for para in doc.paragraphs:
         for key, val in replacements.items():

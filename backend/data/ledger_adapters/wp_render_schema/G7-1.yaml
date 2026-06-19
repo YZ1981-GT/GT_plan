@@ -1,0 +1,119 @@
+# backend/data/wp_render_schema/G7-1.yaml
+# 长期股权投资审定表 — d-form-table 渲染 schema
+# Design: §3 审定表标准字段 + §2.3 G7-1 特殊：按被投资单位分行+权益法/成本法分组
+# Template: G7 长期股权投资.xlsx
+#
+# 特殊结构：按被投资单位分行，权益法/成本法两组分别小计
+
+wp_code: G7-1
+wp_name: 长期股权投资审定表
+component_type: d-form-table
+template_path: backend/wp_templates/G/G7 长期股权投资.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1511'
+    name: 长期股权投资
+  - code: '1512'
+    name: 长期股权投资减值准备
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 按被投资单位分行 + 权益法/成本法分组
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 权益法核算
+    group_key: equity_method
+    row_type: group_header
+    dynamic_rows: true
+    row_source: investee_list
+    row_filter: "method == 'equity'"
+    fields: &audit_determination_fields
+      - { field: investee_name, label: 被投资单位, type: text }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 权益法小计
+    row_type: subtotal
+    formula_source: "SUM(权益法核算)"
+    fields: *audit_determination_fields
+
+  - name: 成本法核算
+    group_key: cost_method
+    row_type: group_header
+    dynamic_rows: true
+    row_source: investee_list
+    row_filter: "method == 'cost'"
+    fields: *audit_determination_fields
+
+  - name: 成本法小计
+    row_type: subtotal
+    formula_source: "SUM(成本法核算)"
+    fields: *audit_determination_fields
+
+  # ─── 合计行 ─────────────────────────────────────────────────────────────────
+  - name: 长期股权投资合计
+    row_type: total
+    formula_source: "权益法小计 + 成本法小计"
+    fields: *audit_determination_fields
+
+  # ─── 减值准备扣减行 ─────────────────────────────────────────────────────────
+  - name: 减：长期股权投资减值准备
+    account_code_prefix: '1512'
+    row_type: deduction
+    fields: *audit_determination_fields
+
+  # ─── 净额行 ─────────────────────────────────────────────────────────────────
+  - name: 长期股权投资净额
+    row_type: net
+    formula_source: "长期股权投资合计 - 减：长期股权投资减值准备"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-G7-1-001
+    target_wp: G7-8
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → G7-8 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-G7-1-002
+    target_wp: G7-3
+    target_field: 权益法核算
+    description: '权益法审定 ← G7-3 权益法核算结果'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-G7-1-003
+    target_wp: G7-4
+    target_field: 减值测试
+    description: '减值准备扣减 ← G7-4 减值测试结论'
+    severity: info
+    direction: inbound

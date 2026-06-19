@@ -13,7 +13,8 @@
  *  - 变动原因列可编辑（debounce 2s 自动保存）
  *  - 科目行点击跳转对应循环底稿（预留 console.log）
  */
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, reactive, watch, onBeforeUnmount } from 'vue'
+import { api } from '@/services/apiProxy'
 
 // ─── Types ───
 interface SheetRow {
@@ -154,10 +155,11 @@ const availableTabs = computed<TabDef[]>(() => {
   if (data.value?.sheets?.ratio_analysis) {
     tabs.push({ key: 'ratio_analysis', label: '比率分析', sheetKey: 'ratio_analysis' })
   }
-  if (data.value?.sheets?.industry_comparison) {
+  // 上市公司专用 tab：按 is_listed 判断显示
+  if (data.value?.is_listed && data.value?.sheets?.industry_comparison) {
     tabs.push({ key: 'industry_comparison', label: '同行业对比', sheetKey: 'industry_comparison' })
   }
-  if (data.value?.sheets?.eps_roe) {
+  if (data.value?.is_listed && data.value?.sheets?.eps_roe) {
     tabs.push({ key: 'eps_roe', label: 'EPS/ROE', sheetKey: 'eps_roe' })
   }
   return tabs
@@ -257,6 +259,209 @@ function doSave() {
   emit('save')
 }
 
+// ─── Industry Comparison Editing ───
+const industryCompanies = ref<Array<{ key: string; name: string; stock_code: string }>>([])
+const industryFinancialData = reactive<Record<string, Record<string, Record<string, string | null>>>>({})
+const industryComparisonData = reactive<Record<string, Record<string, Record<string, string | null>>>>({})
+const industryDataSourceNote = ref('')
+const industrySaveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+function initIndustryData() {
+  const ind = data.value?.sheets?.industry_comparison
+  if (!ind) return
+  industryCompanies.value = (ind.companies || []).map(c => ({ ...c }))
+  industryDataSourceNote.value = ind.data_source_note || ''
+  // Copy financial_data
+  for (const [metric, yearData] of Object.entries(ind.financial_data || {})) {
+    if (!industryFinancialData[metric]) industryFinancialData[metric] = {}
+    for (const [yr, coData] of Object.entries(yearData as Record<string, any>)) {
+      if (!industryFinancialData[metric][yr]) industryFinancialData[metric][yr] = {}
+      for (const [co, val] of Object.entries(coData as Record<string, any>)) {
+        industryFinancialData[metric][yr][co] = val != null ? String(val) : null
+      }
+    }
+  }
+  // Copy comparison_table
+  for (const [metric, yearData] of Object.entries(ind.comparison_table || {})) {
+    if (!industryComparisonData[metric]) industryComparisonData[metric] = {}
+    for (const [yr, coData] of Object.entries(yearData as Record<string, any>)) {
+      if (!industryComparisonData[metric][yr]) industryComparisonData[metric][yr] = {}
+      for (const [co, val] of Object.entries(coData as Record<string, any>)) {
+        industryComparisonData[metric][yr][co] = val != null ? String(val) : null
+      }
+    }
+  }
+}
+
+function getIndustryValue(table: 'financial' | 'comparison', metric: string, year: number, co: string): string {
+  const store = table === 'financial' ? industryFinancialData : industryComparisonData
+  return store[metric]?.[String(year)]?.[co] ?? ''
+}
+
+function setIndustryValue(table: 'financial' | 'comparison', metric: string, year: number, co: string, val: string) {
+  const store = table === 'financial' ? industryFinancialData : industryComparisonData
+  if (!store[metric]) store[metric] = {}
+  if (!store[metric][String(year)]) store[metric][String(year)] = {}
+  store[metric][String(year)][co] = val || null
+  scheduleIndustrySave()
+}
+
+function scheduleIndustrySave() {
+  if (industrySaveTimer.value) clearTimeout(industrySaveTimer.value)
+  industrySaveTimer.value = setTimeout(() => doIndustrySave(), 2000)
+}
+
+async function doIndustrySave() {
+  if (!data.value) return
+  const projectId = extractProjectId()
+  if (!projectId) return
+  const yr = data.value.year
+  // Build payload with numeric conversion
+  const financialPayload: Record<string, Record<string, Record<string, number | null>>> = {}
+  for (const [metric, yearData] of Object.entries(industryFinancialData)) {
+    financialPayload[metric] = {}
+    for (const [y, coData] of Object.entries(yearData)) {
+      financialPayload[metric][y] = {}
+      for (const [co, val] of Object.entries(coData)) {
+        financialPayload[metric][y][co] = val ? parseFloat(val) || null : null
+      }
+    }
+  }
+  const comparisonPayload: Record<string, Record<string, Record<string, number | null>>> = {}
+  for (const [metric, yearData] of Object.entries(industryComparisonData)) {
+    comparisonPayload[metric] = {}
+    for (const [y, coData] of Object.entries(yearData)) {
+      comparisonPayload[metric][y] = {}
+      for (const [co, val] of Object.entries(coData)) {
+        comparisonPayload[metric][y][co] = val ? parseFloat(val) || null : null
+      }
+    }
+  }
+  try {
+    await api.post(
+      `/api/projects/${projectId}/analytical-review/industry-comparison?year=${yr}`,
+      {
+        companies: industryCompanies.value,
+        financial_data: financialPayload,
+        comparison_table: comparisonPayload,
+        data_source_note: industryDataSourceNote.value,
+      }
+    )
+  } catch (e) {
+    console.warn('[GtAnalyticalReview] 同行业对比保存失败:', e)
+  }
+}
+
+// ─── EPS-ROE Editing ───
+const epsParams = reactive<Record<string, any>>({
+  net_profit: null,
+  equity_end: null,
+  equity_begin: null,
+  preferred_dividend: 0,
+})
+const epsShareChanges = ref<Array<Record<string, any>>>([])
+const epsDilution = reactive<Record<string, any>>({
+  convertible_bond_face_value: 0,
+  convertible_bond_rate: 0,
+  convertible_bond_shares: 0,
+  option_exercise_price: 0,
+  option_shares: 0,
+})
+const epsComputed = reactive<Record<string, number | null>>({
+  roe_diluted: null,
+  roe_weighted: null,
+  basic_eps: null,
+  diluted_eps: null,
+})
+const epsRoeSaveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+
+function initEpsRoeData() {
+  const eps = data.value?.sheets?.eps_roe
+  if (!eps) return
+  epsParams.net_profit = eps.inputs?.net_profit
+  epsParams.equity_end = eps.inputs?.equity_end
+  epsParams.equity_begin = eps.inputs?.equity_begin
+  epsParams.preferred_dividend = eps.inputs?.preferred_dividend || 0
+  epsShareChanges.value = (eps.share_changes || []).map((item: any) => ({ ...item }))
+  if (eps.dilution_factors) {
+    Object.assign(epsDilution, eps.dilution_factors)
+  }
+  if (eps.computed) {
+    Object.assign(epsComputed, eps.computed)
+  }
+}
+
+function addShareChange() {
+  const id = `s${Date.now()}`
+  epsShareChanges.value.push({
+    id,
+    date: '',
+    event_type: '',
+    shares_changed: 0,
+    cum_shares: 0,
+    time_weight_months: 0,
+  })
+}
+
+function removeShareChange(idx: number) {
+  epsShareChanges.value.splice(idx, 1)
+  scheduleEpsRoeSave()
+}
+
+function scheduleEpsRoeSave() {
+  if (epsRoeSaveTimer.value) clearTimeout(epsRoeSaveTimer.value)
+  epsRoeSaveTimer.value = setTimeout(() => doEpsRoeSave(), 2000)
+}
+
+async function doEpsRoeSave() {
+  if (!data.value) return
+  const projectId = extractProjectId()
+  if (!projectId) return
+  const yr = data.value.year
+  try {
+    const resp = await api.post(
+      `/api/projects/${projectId}/analytical-review/eps-roe?year=${yr}`,
+      {
+        params: {
+          net_profit: parseFloat(epsParams.net_profit) || null,
+          equity_end: parseFloat(epsParams.equity_end) || null,
+          equity_begin: parseFloat(epsParams.equity_begin) || null,
+          preferred_dividend: parseFloat(epsParams.preferred_dividend) || 0,
+        },
+        share_changes: epsShareChanges.value.map(item => ({
+          ...item,
+          shares_changed: parseFloat(item.shares_changed) || 0,
+          cum_shares: parseFloat(item.cum_shares) || 0,
+          time_weight_months: parseFloat(item.time_weight_months) || 0,
+        })),
+        dilution_factors: {
+          convertible_bond_face_value: parseFloat(epsDilution.convertible_bond_face_value) || 0,
+          convertible_bond_rate: parseFloat(epsDilution.convertible_bond_rate) || 0,
+          convertible_bond_shares: parseFloat(epsDilution.convertible_bond_shares) || 0,
+          option_exercise_price: parseFloat(epsDilution.option_exercise_price) || 0,
+          option_shares: parseFloat(epsDilution.option_shares) || 0,
+        },
+      }
+    )
+    // Update computed results from server response
+    if (resp?.computed) {
+      Object.assign(epsComputed, resp.computed)
+    }
+  } catch (e) {
+    console.warn('[GtAnalyticalReview] EPS-ROE 保存失败:', e)
+  }
+}
+
+// ─── Utility: Extract project ID from wpId ───
+function extractProjectId(): string | null {
+  // wpId is passed from parent; the API route uses project_id
+  // We need to find the project_id — it's available in the data response or the URL
+  // The render-config response includes project_id context
+  // For now, extract from current window location
+  const match = window.location.pathname.match(/\/projects\/([^/]+)/)
+  return match ? match[1] : null
+}
+
 // ─── Methods: Direction arrow ───
 function getDirectionArrow(direction: 'up' | 'down' | 'flat' | null): string {
   switch (direction) {
@@ -279,16 +484,25 @@ function getDirectionClass(direction: 'up' | 'down' | 'flat' | null): string {
 watch(() => props.htmlData, () => {
   // Reset edits on data change
   reasonEdits.value = {}
-})
+  initIndustryData()
+  initEpsRoeData()
+}, { immediate: true })
 
 onBeforeUnmount(() => {
   if (saveTimer.value) {
     clearTimeout(saveTimer.value)
     saveTimer.value = null
-    // Force save on unmount if there are pending edits
     if (Object.keys(reasonEdits.value).length > 0) {
       doSave()
     }
+  }
+  if (industrySaveTimer.value) {
+    clearTimeout(industrySaveTimer.value)
+    industrySaveTimer.value = null
+  }
+  if (epsRoeSaveTimer.value) {
+    clearTimeout(epsRoeSaveTimer.value)
+    epsRoeSaveTimer.value = null
   }
 })
 </script>
@@ -484,7 +698,7 @@ onBeforeUnmount(() => {
         </div>
       </template>
 
-      <!-- 同行业对比（A1-14 上市公司专用） -->
+      <!-- 同行业对比（A1-14 上市公司专用 — 可编辑） -->
       <template v-if="activeTab === 'industry_comparison' && currentIndustry">
         <div class="gt-analytical-review__sheet-title">
           {{ currentIndustry.title }}
@@ -505,10 +719,26 @@ onBeforeUnmount(() => {
                 <td>本公司</td>
                 <td colspan="2">—</td>
               </tr>
-              <tr v-for="co in currentIndustry.companies" :key="co.key">
+              <tr v-for="co in industryCompanies" :key="co.key">
                 <td>{{ co.key }}</td>
-                <td>{{ co.name || '—' }}</td>
-                <td>{{ co.stock_code || '—' }}</td>
+                <td>
+                  <el-input
+                    v-model="co.name"
+                    size="small"
+                    placeholder="证券简称"
+                    :disabled="readonly"
+                    @input="scheduleIndustrySave"
+                  />
+                </td>
+                <td>
+                  <el-input
+                    v-model="co.stock_code"
+                    size="small"
+                    placeholder="证券代码"
+                    :disabled="readonly"
+                    @input="scheduleIndustrySave"
+                  />
+                </td>
               </tr>
             </tbody>
           </table>
@@ -517,16 +747,37 @@ onBeforeUnmount(() => {
           <table class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
-                <th>指标</th>
-                <th v-for="y in currentIndustry.years" :key="y">{{ y }}年</th>
+                <th rowspan="2">指标</th>
+                <th v-for="y in currentIndustry.years" :key="y" :colspan="industryCompanies.length + 1">{{ y }}年</th>
+              </tr>
+              <tr>
+                <template v-for="y in currentIndustry.years" :key="`hdr-${y}`">
+                  <th>本公司</th>
+                  <th v-for="co in industryCompanies" :key="`${y}-${co.key}`">{{ co.key }}</th>
+                </template>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(label, key) in currentIndustry.financial_metric_labels" :key="key">
                 <td>{{ label }}</td>
-                <td v-for="y in currentIndustry.years" :key="`${key}-${y}`">
-                  {{ formatAmount(currentIndustry.financial_data[key]?.[String(y)]?.self) }}
-                </td>
+                <template v-for="y in currentIndustry.years" :key="`${key}-${y}`">
+                  <td>
+                    <el-input
+                      :model-value="getIndustryValue('financial', key, y, 'self')"
+                      size="small"
+                      :disabled="readonly"
+                      @input="(val: string) => setIndustryValue('financial', key, y, 'self', val)"
+                    />
+                  </td>
+                  <td v-for="co in industryCompanies" :key="`${key}-${y}-${co.key}`">
+                    <el-input
+                      :model-value="getIndustryValue('financial', key, y, co.key)"
+                      size="small"
+                      :disabled="readonly"
+                      @input="(val: string) => setIndustryValue('financial', key, y, co.key, val)"
+                    />
+                  </td>
+                </template>
               </tr>
             </tbody>
           </table>
@@ -535,77 +786,254 @@ onBeforeUnmount(() => {
           <table class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
-                <th>指标</th>
-                <th v-for="y in currentIndustry.years" :key="`cmp-${y}`">{{ y }}年（本公司）</th>
+                <th rowspan="2">指标</th>
+                <th v-for="y in currentIndustry.years" :key="`cmp-${y}`" :colspan="industryCompanies.length + 1">{{ y }}年</th>
+              </tr>
+              <tr>
+                <template v-for="y in currentIndustry.years" :key="`cmp-hdr-${y}`">
+                  <th>本公司</th>
+                  <th v-for="co in industryCompanies" :key="`cmp-${y}-${co.key}`">{{ co.key }}</th>
+                </template>
               </tr>
             </thead>
             <tbody>
               <tr v-for="(label, key) in currentIndustry.comparison_metric_labels" :key="`cmp-${key}`">
                 <td>{{ label }}</td>
-                <td v-for="y in currentIndustry.years" :key="`${key}-${y}-cmp`">
-                  {{ formatRatioValue(currentIndustry.comparison_table[key]?.[String(y)]?.self) }}
-                </td>
+                <template v-for="y in currentIndustry.years" :key="`cmp-${key}-${y}`">
+                  <td>
+                    <el-input
+                      :model-value="getIndustryValue('comparison', key, y, 'self')"
+                      size="small"
+                      :disabled="readonly"
+                      @input="(val: string) => setIndustryValue('comparison', key, y, 'self', val)"
+                    />
+                  </td>
+                  <td v-for="co in industryCompanies" :key="`cmp-${key}-${y}-${co.key}`">
+                    <el-input
+                      :model-value="getIndustryValue('comparison', key, y, co.key)"
+                      size="small"
+                      :disabled="readonly"
+                      @input="(val: string) => setIndustryValue('comparison', key, y, co.key, val)"
+                    />
+                  </td>
+                </template>
               </tr>
             </tbody>
           </table>
-          <p v-if="currentIndustry.data_source_note" class="gt-ar-data-source">
-            数据来源：{{ currentIndustry.data_source_note }}
-          </p>
+
+          <div class="gt-ar-subsection-title">数据来源标注</div>
+          <el-input
+            v-model="industryDataSourceNote"
+            placeholder="请填写数据来源（如：Wind资讯、巨潮资讯网等）"
+            :disabled="readonly"
+            @input="scheduleIndustrySave"
+          />
         </div>
       </template>
 
-      <!-- EPS-ROE 计算表（A1-14 上市公司专用） -->
+      <!-- EPS-ROE 计算表（A1-14 上市公司专用 — 可编辑） -->
       <template v-if="activeTab === 'eps_roe' && currentEpsRoe">
         <div class="gt-analytical-review__sheet-title">
           {{ currentEpsRoe.title }}
           <span class="sheet-index">{{ currentEpsRoe.index }}</span>
         </div>
         <div class="gt-analytical-review__table-wrap">
+          <!-- 参数区 -->
+          <div class="gt-ar-subsection-title">基本参数</div>
           <table class="gt-ar-table gt-compact-table">
             <thead>
               <tr>
-                <th>指标</th>
+                <th>参数</th>
                 <th>数值</th>
+                <th>说明</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>归属于普通股股东的净利润</td>
-                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.net_profit) }}</td>
+                <td>
+                  <el-input
+                    v-model="epsParams.net_profit"
+                    size="small"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td class="gt-ar-hint">自动从利润表取数，可手动覆盖</td>
               </tr>
               <tr>
                 <td>期末净资产</td>
-                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.equity_end) }}</td>
+                <td>
+                  <el-input
+                    v-model="epsParams.equity_end"
+                    size="small"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td class="gt-ar-hint">自动从资产负债表取数</td>
               </tr>
               <tr>
                 <td>期初净资产</td>
-                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.equity_begin) }}</td>
+                <td>
+                  <el-input
+                    v-model="epsParams.equity_begin"
+                    size="small"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td class="gt-ar-hint">自动从上年资产负债表取数</td>
               </tr>
               <tr>
-                <td>加权平均普通股股数</td>
-                <td class="col-amount">{{ formatAmount(currentEpsRoe.inputs.weighted_avg_shares) }}</td>
+                <td>优先股股利</td>
+                <td>
+                  <el-input
+                    v-model="epsParams.preferred_dividend"
+                    size="small"
+                    placeholder="0"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td class="gt-ar-hint">无优先股填 0</td>
               </tr>
             </tbody>
           </table>
 
+          <!-- 股本变动明细 -->
+          <div class="gt-ar-subsection-title">
+            股本变动明细
+            <el-button v-if="!readonly" size="small" type="primary" link @click="addShareChange">
+              + 新增行
+            </el-button>
+          </div>
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>事件类型</th>
+                <th>股份变动数</th>
+                <th>累计股份数</th>
+                <th>时间权重(月)</th>
+                <th v-if="!readonly">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, idx) in epsShareChanges" :key="item.id">
+                <td>
+                  <el-input
+                    v-model="item.date"
+                    size="small"
+                    placeholder="YYYY-MM-DD"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td>
+                  <el-input
+                    v-model="item.event_type"
+                    size="small"
+                    placeholder="如：期初/增发/回购"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td>
+                  <el-input
+                    v-model="item.shares_changed"
+                    size="small"
+                    placeholder="0"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td>
+                  <el-input
+                    v-model="item.cum_shares"
+                    size="small"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td>
+                  <el-input
+                    v-model="item.time_weight_months"
+                    size="small"
+                    placeholder="12"
+                    :disabled="readonly"
+                    @input="scheduleEpsRoeSave"
+                  />
+                </td>
+                <td v-if="!readonly">
+                  <el-button size="small" type="danger" link @click="removeShareChange(idx)">删除</el-button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 稀释因素 -->
+          <div class="gt-ar-subsection-title">稀释因素</div>
+          <table class="gt-ar-table gt-compact-table">
+            <thead>
+              <tr>
+                <th>项目</th>
+                <th>数值</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>可转债面值</td>
+                <td>
+                  <el-input v-model="epsDilution.convertible_bond_face_value" size="small" placeholder="0" :disabled="readonly" @input="scheduleEpsRoeSave" />
+                </td>
+              </tr>
+              <tr>
+                <td>可转债票面利率(%)</td>
+                <td>
+                  <el-input v-model="epsDilution.convertible_bond_rate" size="small" placeholder="0" :disabled="readonly" @input="scheduleEpsRoeSave" />
+                </td>
+              </tr>
+              <tr>
+                <td>可转债假定转股数</td>
+                <td>
+                  <el-input v-model="epsDilution.convertible_bond_shares" size="small" placeholder="0" :disabled="readonly" @input="scheduleEpsRoeSave" />
+                </td>
+              </tr>
+              <tr>
+                <td>期权行权价</td>
+                <td>
+                  <el-input v-model="epsDilution.option_exercise_price" size="small" placeholder="0" :disabled="readonly" @input="scheduleEpsRoeSave" />
+                </td>
+              </tr>
+              <tr>
+                <td>期权假定行权增加股数</td>
+                <td>
+                  <el-input v-model="epsDilution.option_shares" size="small" placeholder="0" :disabled="readonly" @input="scheduleEpsRoeSave" />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <!-- 计算结果 -->
           <div class="gt-ar-subsection-title">计算结果</div>
           <table class="gt-ar-table gt-compact-table">
             <tbody>
               <tr>
                 <td>净资产收益率（全面摊薄）</td>
-                <td>{{ formatRatioValue(currentEpsRoe.computed.roe_diluted) }}%</td>
+                <td class="col-amount">{{ formatRatioValue(epsComputed.roe_diluted) }}%</td>
               </tr>
               <tr>
                 <td>净资产收益率（加权平均）</td>
-                <td>{{ formatRatioValue(currentEpsRoe.computed.roe_weighted) }}%</td>
+                <td class="col-amount">{{ formatRatioValue(epsComputed.roe_weighted) }}%</td>
               </tr>
               <tr>
                 <td>基本每股收益</td>
-                <td>{{ formatRatioValue(currentEpsRoe.computed.basic_eps) }}</td>
+                <td class="col-amount">{{ formatRatioValue(epsComputed.basic_eps) }}</td>
               </tr>
               <tr>
                 <td>稀释每股收益</td>
-                <td>{{ formatRatioValue(currentEpsRoe.computed.diluted_eps) }}</td>
+                <td class="col-amount">{{ formatRatioValue(epsComputed.diluted_eps) }}</td>
               </tr>
             </tbody>
           </table>
@@ -869,6 +1297,12 @@ onBeforeUnmount(() => {
 
 .gt-ar-data-source {
   margin-top: 12px;
+}
+
+.gt-ar-hint {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary);
+  font-style: italic;
 }
 
 /* ─── Empty state ─── */

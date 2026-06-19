@@ -1,0 +1,68 @@
+# backend/data/wp_render_schema/N2-1.yaml
+# 应交税费审定表 — d-form-table 渲染 schema
+# Requirements: §5（N2 应交税费，按税种分行）
+# Design: §3 审定表标准字段（增值税/企业所得税/个税/城建/教育附加/房产/土地等）
+# Template: N2 应交税费.xlsx
+
+wp_code: N2-1
+wp_name: 应交税费审定表
+component_type: d-form-table
+template_path: backend/wp_templates/N/N2 应交税费.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2221'
+    name: 应交税费
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 按税种分行（动态行）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dynamic_rows: true
+
+row_template:
+  fields:
+    - { field: tax_type, label: 税种, type: select, options: ["增值税", "企业所得税", "个人所得税", "城市维护建设税", "教育费附加", "地方教育附加", "房产税", "土地使用税", "印花税", "其他"] }
+    - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+    - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+    - { field: aje_debit, label: 审计调整借方, type: number }
+    - { field: aje_credit, label: 审计调整贷方, type: number }
+    - { field: rje_debit, label: 重分类调整借方, type: number }
+    - { field: rje_credit, label: 重分类调整贷方, type: number }
+    - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+    - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+    - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+    - { field: variance_note, label: 差异说明, type: textarea }
+
+# ─── 合计行 ─────────────────────────────────────────────────────────────────
+totals:
+  - field: opening_balance
+    formula: "SUM(opening_balance)"
+  - field: unadjusted_amount
+    formula: "SUM(unadjusted_amount)"
+  - field: audited_amount
+    formula: "SUM(audited_amount)"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-N2-1-001
+    target_wp: N2-3
+    target_field: 增值税核对
+    description: '审定表 → N2-3 增值税核对'
+    severity: required
+    direction: outbound

@@ -15,7 +15,7 @@ import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { downloadFile } from '@/utils/http'
 import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
-import { DOCX_POPUP_CONFIGS, type DocxPopupConfig } from './wpPopupDocxConfigs'
+import { ALL_DOCX_POPUP_CONFIGS, type DocxPopupConfig } from './wpPopupDocxConfigs'
 import { useWorkpaperNavigation } from '@/composables/useWorkpaperNavigation'
 
 const props = defineProps<{
@@ -37,7 +37,7 @@ const onlyofficeAvailable = ref(false)
 const documentUrl = ref('')
 const documentKey = ref('')
 
-const config = computed((): DocxPopupConfig | null => DOCX_POPUP_CONFIGS[props.wpCode] || null)
+const config = computed((): DocxPopupConfig | null => ALL_DOCX_POPUP_CONFIGS[props.wpCode] || null)
 
 async function checkOnlyoffice() {
   try {
@@ -101,6 +101,8 @@ function navigateToLink(_link: { label: string; routeName?: string; wpCode?: str
 const signStatus = ref<'pending' | 'sent' | 'signed'>('pending')
 const isA16Popup = computed(() => /^A16-\d/.test(props.wpCode))
 const isA18_1Popup = computed(() => props.wpCode === 'A18-1')
+const isB5Popup = computed(() => /^B5(-\d+)?$/.test(props.wpCode))
+const b5Recommendation = ref<{ code: string; label: string; reason: string; confidence: string } | null>(null)
 const summaryLoading = ref(false)
 const summaryPreview = ref('')
 const summaryCompleteness = ref(0)
@@ -163,9 +165,22 @@ async function updateSignStatus(status: 'pending' | 'sent' | 'signed') {
   if (status === 'signed') emit('completed')
 }
 
+async function loadB5Recommendation() {
+  if (!isB5Popup.value) return
+  try {
+    const pid = props.projectId || (route.params.projectId as string)
+    const res = await api.get(`/api/projects/${pid}/b5/recommended-version`)
+    const data = (res as any)?.data ?? res
+    if (data?.code) {
+      b5Recommendation.value = data
+    }
+  } catch { /* ignore — endpoint may not exist yet */ }
+}
+
 onMounted(() => {
   checkOnlyoffice()
   loadSignStatus()
+  loadB5Recommendation()
 })
 </script>
 
@@ -189,6 +204,9 @@ onMounted(() => {
         {{ onlyofficeAvailable ? '📝 在线编辑' : '📄 预览文档' }}
       </el-button>
       <el-button size="small" @click="downloadTemplate">⬇️ 下载模板</el-button>
+      <el-tag v-if="isB5Popup && b5Recommendation" type="success" size="small" effect="light">
+        推荐: {{ b5Recommendation.label }}（{{ b5Recommendation.code }}）
+      </el-tag>
       <el-tag v-if="isA18_1Popup" size="small" type="info" effect="plain">
         下载含 A17 小结（如有）
       </el-tag>

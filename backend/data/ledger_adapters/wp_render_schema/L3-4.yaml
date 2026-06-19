@@ -1,0 +1,63 @@
+# backend/data/wp_render_schema/L3-4.yaml
+# 一年内到期长期借款重分类 — d-form-table 渲染 schema
+# Requirements: §5.3（L3 长期借款 - 重分类）
+# Design: §1 路由表
+#
+# 结构：借款清单动态行 + 重分类判断 + 结论
+
+wp_code: L3-4
+wp_name: 一年内到期长期借款重分类
+component_type: d-form-table
+template_path: backend/wp_templates/L/L3 长期借款.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2501'
+    name: 长期借款
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 借款清单（动态行）+ 重分类判断
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dynamic_rows: true
+row_template:
+  group_key: loan_item
+  row_type: loan_row
+  fields: &loan_fields
+    - { field: bank_name, label: 借款银行, type: text }
+    - { field: loan_amount, label: 借款金额, type: number }
+    - { field: interest_rate, label: 利率, type: percent }
+    - { field: maturity_date, label: 到期日, type: date }
+    - { field: remaining_term_days, label: 剩余期限（天）, type: number, formula: "maturity_date - report_date" }
+    - { field: is_within_one_year, label: 是否一年内到期, type: boolean, formula: "remaining_term_days <= 365" }
+    - { field: reclassify_amount, label: 重分类金额, type: number, formula: "IF(is_within_one_year, loan_amount, 0)" }
+
+sections:
+  - name: 借款清单
+    row_type: dynamic
+    fields: *loan_fields
+
+  - name: 重分类汇总
+    row_type: total
+    fields:
+      - { field: total_reclassify, label: 重分类总额, type: number, formula: "SUM(reclassify_amount)" }
+      - { field: conclusion, label: 审计结论, type: textarea }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-L3-4-001
+    target_wp: L3-1
+    target_field: 长期借款审定金额
+    description: '借款清单 ← L3-1 审定表各借款余额'
+    severity: required
+    direction: inbound
+
+  - ref_id: CW-L3-4-002
+    target_wp: L1-1
+    target_field: 短期借款审定金额
+    description: '重分类金额 → L1-1 短期借款（一年内到期部分）'
+    severity: info
+    direction: outbound

@@ -1,0 +1,70 @@
+# C25.yaml — 利用内审工作
+# componentType: d-form-table
+# Requirements: G5-4 利用内审工作
+
+wp_code: C25
+template_version: v2025-R5
+description: |
+  评价内部审计工作的可利用程度，决定是否减少外部审计程序。
+  评价维度：客观性、胜任能力、系统性方法、职业谨慎。
+
+sheets:
+  利用内审工作评价:
+    component_type: d-form-table
+    form_type: table
+    title: 利用内审工作评价
+    description: 按4个维度评价内审工作可利用程度并确定利用范围。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 10
+      columns:
+        dimension:
+          field: dimension
+          type: enum
+          label: 评价维度
+          width: 120
+          dict_source: dimension_dict
+        content:
+          field: content
+          type: textarea
+          label: 评价内容
+          width: 250
+        conclusion:
+          field: conclusion
+          type: enum
+          label: 结论
+          width: 120
+          dict_source: conclusion_dict
+          render_hint: risk_badge
+        scope:
+          field: scope
+          type: textarea
+          label: 利用范围说明
+          width: 200
+        planned_procedures:
+          field: planned_procedures
+          type: textarea
+          label: 拟实施的审计程序
+          width: 250
+
+    dictionaries:
+      dimension_dict:
+        - value: objectivity
+          label: 客观性
+        - value: competence
+          label: 胜任能力
+        - value: systematic
+          label: 系统性方法
+        - value: due_care
+          label: 职业谨慎
+      conclusion_dict:
+        - value: usable
+          label: 可利用
+          color: green
+        - value: partial
+          label: 部分可利用
+          color: yellow
+        - value: not_usable
+          label: 不可利用
+          color: red

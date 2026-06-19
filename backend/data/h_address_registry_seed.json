@@ -1,0 +1,116 @@
+{
+  "description": "H 类固定资产循环 audit-sheet 底稿关键坐标注册（OnlyOffice 地址名称落位）",
+  "version": "1.0.0",
+  "cycle": "H",
+  "entries": [
+    {
+      "wp_code": "H1-3",
+      "sheet_name": "固定资产折旧测算",
+      "coordinates": [
+        {"cell_address": "F50", "description": "折旧测算合计-本期应计折旧", "purpose": "depreciation_calc"},
+        {"cell_address": "G50", "description": "折旧测算合计-账面已计折旧", "purpose": "depreciation_booked"},
+        {"cell_address": "H50", "description": "折旧测算差异合计", "purpose": "depreciation_variance"},
+        {"cell_address": "B55", "description": "折旧测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H1-5",
+      "sheet_name": "固定资产减值测试",
+      "coordinates": [
+        {"cell_address": "E20", "description": "可收回金额合计", "purpose": "recoverable_amount"},
+        {"cell_address": "F20", "description": "账面价值合计", "purpose": "carrying_amount"},
+        {"cell_address": "G20", "description": "减值损失合计", "purpose": "impairment_loss"},
+        {"cell_address": "B30", "description": "减值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H2-3",
+      "sheet_name": "在建工程利息资本化测算",
+      "coordinates": [
+        {"cell_address": "C5", "description": "加权平均资本化率", "purpose": "capitalization_rate"},
+        {"cell_address": "F30", "description": "累计资产支出加权金额", "purpose": "weighted_expenditure"},
+        {"cell_address": "G30", "description": "应予资本化利息金额", "purpose": "capitalized_interest"},
+        {"cell_address": "H30", "description": "实际资本化利息金额", "purpose": "actual_capitalized"},
+        {"cell_address": "I30", "description": "资本化差异", "purpose": "capitalization_variance"},
+        {"cell_address": "B35", "description": "利息资本化结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H3-3",
+      "sheet_name": "投资性房地产公允价值测试",
+      "coordinates": [
+        {"cell_address": "E30", "description": "公允价值差额合计", "purpose": "fair_value_variance"},
+        {"cell_address": "F30", "description": "评估报告公允价值", "purpose": "appraised_value"},
+        {"cell_address": "B35", "description": "公允价值测试结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H3-4",
+      "sheet_name": "投资性房地产折旧摊销",
+      "coordinates": [
+        {"cell_address": "F30", "description": "本期应计折旧/摊销合计", "purpose": "depreciation_amort"},
+        {"cell_address": "G30", "description": "折旧摊销差异", "purpose": "variance"},
+        {"cell_address": "B35", "description": "折旧摊销结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H5-3",
+      "sheet_name": "油气资产折耗测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "本期应计折耗合计", "purpose": "depletion_calc"},
+        {"cell_address": "G30", "description": "折耗差异", "purpose": "depletion_variance"},
+        {"cell_address": "B35", "description": "折耗测算结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H7-3",
+      "sheet_name": "生产性生物资产折旧测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "本期应计折旧合计", "purpose": "bio_depreciation"},
+        {"cell_address": "G30", "description": "折旧差异", "purpose": "variance"},
+        {"cell_address": "B35", "description": "生物资产折旧结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H8-3",
+      "sheet_name": "使用权资产折旧测算",
+      "coordinates": [
+        {"cell_address": "F30", "description": "本期应计折旧合计", "purpose": "rou_depreciation"},
+        {"cell_address": "G30", "description": "折旧差异", "purpose": "variance"},
+        {"cell_address": "B35", "description": "使用权资产折旧结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H8-4",
+      "sheet_name": "使用权资产租赁还原",
+      "coordinates": [
+        {"cell_address": "E10", "description": "租赁负债初始计量", "purpose": "lease_liability_initial"},
+        {"cell_address": "E11", "description": "预付租金", "purpose": "prepaid_rent"},
+        {"cell_address": "E12", "description": "初始直接费用", "purpose": "initial_direct_cost"},
+        {"cell_address": "E15", "description": "使用权资产原值合计", "purpose": "rou_cost_total"},
+        {"cell_address": "B20", "description": "CAS21还原结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H9-3",
+      "sheet_name": "租赁负债现值测算",
+      "coordinates": [
+        {"cell_address": "C5", "description": "增量借款利率", "purpose": "incremental_borrowing_rate"},
+        {"cell_address": "F30", "description": "未来租金支付现值合计", "purpose": "present_value_total"},
+        {"cell_address": "G30", "description": "账面租赁负债余额", "purpose": "book_lease_liability"},
+        {"cell_address": "H30", "description": "现值差异", "purpose": "pv_variance"},
+        {"cell_address": "B35", "description": "租赁负债现值结论", "purpose": "conclusion"}
+      ]
+    },
+    {
+      "wp_code": "H9-4",
+      "sheet_name": "租赁负债摊销表",
+      "coordinates": [
+        {"cell_address": "E50", "description": "各期利息费用合计", "purpose": "total_interest_expense"},
+        {"cell_address": "F50", "description": "各期本金偿还合计", "purpose": "total_principal_repaid"},
+        {"cell_address": "G50", "description": "期末租赁负债余额", "purpose": "ending_balance"},
+        {"cell_address": "B55", "description": "摊销表结论", "purpose": "conclusion"}
+      ]
+    }
+  ]
+}

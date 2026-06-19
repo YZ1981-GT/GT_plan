@@ -1,0 +1,132 @@
+# backend/data/wp_render_schema/H1-1.yaml
+# 固定资产审定表 — d-form-table 渲染 schema
+# Design: §3 审定表标准字段 + §2.3 H1-1 特殊：按资产类别分行+累计折旧/减值扣减+净额行
+# Template: H1 固定资产.xlsx
+#
+# 特殊结构：按资产类别（房屋/设备/运输/电子/其他）分行，
+#          累计折旧扣减行 + 减值准备扣减行 + 净额行
+
+wp_code: H1-1
+wp_name: 固定资产审定表
+component_type: d-form-table
+template_path: backend/wp_templates/H/H1 固定资产.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1601'
+    name: 固定资产
+  - code: '1602'
+    name: 累计折旧
+  - code: '1603'
+    name: 固定资产减值准备
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 按资产类别分行 + 累计折旧/减值准备扣减 + 净额行
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 房屋及建筑物
+    group_key: buildings
+    row_type: category_row
+    account_code_prefix: '160101'
+    fields: &audit_determination_fields
+      - { field: category_name, label: 资产类别, type: text, readonly: true }
+      - { field: account_code, label: 科目编码, type: text, readonly: true }
+      - { field: account_name, label: 科目名称, type: text, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
+      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_debit, label: 审计调整借方, type: number }
+      - { field: aje_credit, label: 审计调整贷方, type: number }
+      - { field: rje_debit, label: 重分类调整借方, type: number }
+      - { field: rje_credit, label: 重分类调整贷方, type: number }
+      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+      - { field: variance_note, label: 差异说明, type: textarea }
+
+  - name: 机器设备
+    group_key: machinery
+    row_type: category_row
+    account_code_prefix: '160102'
+    fields: *audit_determination_fields
+
+  - name: 运输工具
+    group_key: vehicles
+    row_type: category_row
+    account_code_prefix: '160103'
+    fields: *audit_determination_fields
+
+  - name: 电子设备
+    group_key: electronics
+    row_type: category_row
+    account_code_prefix: '160104'
+    fields: *audit_determination_fields
+
+  - name: 其他设备
+    group_key: others
+    row_type: category_row
+    account_code_prefix: '160105'
+    fields: *audit_determination_fields
+
+  # ─── 固定资产原值合计 ───────────────────────────────────────────────────────
+  - name: 固定资产原值合计
+    row_type: total
+    formula_source: "SUM(房屋及建筑物, 机器设备, 运输工具, 电子设备, 其他设备)"
+    fields: *audit_determination_fields
+
+  # ─── 累计折旧扣减行 ─────────────────────────────────────────────────────────
+  - name: 减：累计折旧
+    account_code_prefix: '1602'
+    row_type: deduction
+    fields: *audit_determination_fields
+
+  # ─── 减值准备扣减行 ─────────────────────────────────────────────────────────
+  - name: 减：固定资产减值准备
+    account_code_prefix: '1603'
+    row_type: deduction
+    fields: *audit_determination_fields
+
+  # ─── 净额行 ─────────────────────────────────────────────────────────────────
+  - name: 固定资产净额
+    row_type: net
+    formula_source: "固定资产原值合计 - 减：累计折旧 - 减：固定资产减值准备"
+    fields: *audit_determination_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-H1-1-001
+    target_wp: H1-8
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → H1-8 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-H1-1-002
+    target_wp: H1-3
+    target_field: 折旧测算
+    description: '累计折旧扣减 ← H1-3 折旧测算结论'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-H1-1-003
+    target_wp: H1-5
+    target_field: 减值测试
+    description: '减值准备扣减 ← H1-5 减值测试结论'
+    severity: info
+    direction: inbound

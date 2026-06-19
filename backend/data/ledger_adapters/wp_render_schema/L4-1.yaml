@@ -1,0 +1,92 @@
+# backend/data/wp_render_schema/L4-1.yaml
+# 应付债券审定表 — d-form-table 渲染 schema
+# Requirements: §5.4（L4 应付债券）
+# Design: §3 审定表标准字段 + §4 联动
+# Template: L4 应付债券.xlsx
+#
+# 特殊结构：按债券品种分行（面值/票面利率/到期日/摊余成本）
+# 与 G4 债权投资对称但站在发行方角度
+
+wp_code: L4-1
+wp_name: 应付债券审定表
+component_type: d-form-table
+template_path: backend/wp_templates/L/L4 应付债券.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2502'
+    name: 应付债券
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 按债券品种分行
+# 结构：动态行（每种债券一行） → 合计
+# ═══════════════════════════════════════════════════════════════════════════════
+
+income_statement_type: false
+amount_source: closing_balance
+
+dynamic_rows: true
+row_template:
+  group_key: bond_item
+  row_type: bond_row
+  fields: &bond_fields
+    - { field: bond_name, label: 债券名称, type: text }
+    - { field: face_value, label: 面值, type: number }
+    - { field: coupon_rate, label: 票面利率, type: percent }
+    - { field: issue_date, label: 发行日, type: date }
+    - { field: maturity_date, label: 到期日, type: date }
+    - { field: issue_price, label: 发行价, type: number }
+    - { field: unadjusted_amount, label: 未审金额（摊余成本）, type: number, auto_source: trial_balance.unadjusted_amount }
+    - { field: aje_debit, label: 审计调整借方, type: number }
+    - { field: aje_credit, label: 审计调整贷方, type: number }
+    - { field: rje_debit, label: 重分类调整借方, type: number }
+    - { field: rje_credit, label: 重分类调整贷方, type: number }
+    - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
+    - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+    - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+    - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+    - { field: variance_note, label: 差异说明, type: textarea }
+
+sections:
+  - name: 应付债券合计
+    row_type: total
+    formula_source: "SUM(all bond_item rows)"
+    fields: *bond_fields
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-L4-1-001
+    target_wp: L4-8
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → L4-8 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-L4-1-002
+    target_wp: L4-4
+    target_field: 期末摊余成本
+    description: '审定金额 ← L4-4 摊余成本摊销表期末余额验证'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-L4-1-003
+    target_wp: G4-1
+    target_field: 债权投资审定金额
+    description: '应付债券 ↔ G4 债权投资对称关联（发行方 vs 持有方）'
+    severity: info
+    direction: bidirectional

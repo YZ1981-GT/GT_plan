@@ -36,7 +36,7 @@
 
 ## P1: A1-12 + A1-11
 
-- [ ] 6. 前端: WpPopupChecklist（A1-12 核查表）
+- [x] 6. 前端: WpPopupChecklist（A1-12 核查表）
   - 14 条适用性判断列表 + 索引号输入
   - 第二部分自由文本区
   - 头部：业务分类标记（从项目信息读取）
@@ -44,21 +44,21 @@
   - 根据 business_category 自动提示适用性
   - _Requirements: 2.2, 5.1_
 
-- [ ] 7. 前端: WpPopupSigning（A1-11 签字流转）
+- [x] 7. 前端: WpPopupSigning（A1-11 签字流转）
   - 签字审批链表格（6行审批人 × 签字+日期）
   - 签字状态持久化
   - _Requirements: 2.1_
 
 ## P2: A1-18 混合型
 
-- [ ] 8. 前端: WpPopupMixedForm（A1-18 混合型）
+- [x] 8. 前端: WpPopupMixedForm（A1-18 混合型）
   - Tab 式多面板：审计目标/过程 + 3个调节表 + 审计说明/结论
   - 调节表数据保存到 parsed_data（JSONB）
   - 程序步骤保存到 checklist_responses
   - 调节表金额预留取数接口
   - _Requirements: 2.4, 3.3_
 
-- [ ] 9. 全量集成验证
+- [x] 9. 全量集成验证
   - 4 个子底稿弹窗全部可用
   - 完成状态回显全部正常
   - Playwright E2E 全路径

@@ -1,0 +1,112 @@
+# B52.yaml — 管理层凌驾风险
+# componentType: d-form-table
+# Requirements: G7 舞弊分析 — 管理层凌驾内部控制的风险评估
+# Design: §1.1 B52 → d-form-table
+
+wp_code: B52
+template_path: backend/wp_templates/B/B52 管理层凌驾风险.xlsx
+template_version: v2025-R5
+
+sheets:
+  管理层凌驾风险:
+    component_type: d-form-table
+    form_type: table
+    title: 管理层凌驾内部控制的风险评估
+    description: |
+      评估管理层凌驾内部控制的风险，包括日记账分录测试、
+      会计估计评价、异常交易识别等必须执行的审计程序。
+
+    fields:
+      - field: entity_name
+        label: 被审计单位
+        type: text
+        source: project.client_name
+        readonly: true
+      - field: assessment_period
+        label: 评估期间
+        type: text
+        source: project.audit_year
+        readonly: true
+
+    dynamic_table:
+      start_row: 5
+      end_row: dynamic
+      header_row: 4
+      add_row_button: true
+      max_rows: 30
+      columns:
+        seq:
+          field: seq
+          type: number
+          label: 序号
+          width: 50
+        risk_area:
+          field: risk_area
+          type: text
+          label: 风险领域
+          width: 160
+        risk_indicator:
+          field: risk_indicator
+          type: textarea
+          label: 风险迹象/指标
+          width: 220
+        assessment:
+          field: assessment
+          type: enum
+          label: 评估结果
+          width: 100
+          dict_source: assessment_dict
+          render_hint: risk_badge
+        required_procedure:
+          field: required_procedure
+          type: textarea
+          label: 必须执行的审计程序
+          width: 220
+        execution_status:
+          field: execution_status
+          type: enum
+          label: 执行状态
+          width: 100
+          dict_source: status_dict
+        reference:
+          field: reference
+          type: text
+          label: 参考索引
+          width: 100
+          render: index_chip
+
+    dictionaries:
+      assessment_dict:
+        - value: high
+          label: 高风险
+          color: red
+        - value: medium
+          label: 中风险
+          color: yellow
+        - value: low
+          label: 低风险
+          color: green
+      status_dict:
+        - value: completed
+          label: 已完成
+        - value: in_progress
+          label: 进行中
+        - value: not_started
+          label: 未开始
+        - value: not_applicable
+          label: 不适用
+
+    conclusion:
+      mode: composite
+      audit_explanation_field:
+        name: audit_explanation
+        label: 管理层凌驾风险评估说明
+        type: textarea
+      overall_conclusion_field:
+        name: overall_conclusion
+        label: 管理层凌驾风险整体结论
+        type: enum
+        enum:
+          - { value: adequate, label: 已充分识别风险并设计有效应对程序 }
+          - { value: needs_attention, label: 需加强关注—部分程序待执行 }
+          - { value: high_risk, label: 管理层凌驾风险高—需特别关注 }

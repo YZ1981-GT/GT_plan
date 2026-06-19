@@ -1,0 +1,132 @@
+# C24.yaml — 会计分录细节测试
+# componentType: d-form-table（2 sheets）
+# Requirements: G5-2 会计分录细节测试
+
+wp_code: C24
+template_version: v2025-R5
+description: |
+  对筛选出的异常分录执行细节测试，识别管理层通过会计分录凌驾控制的风险。
+  包含：分录筛选标准及结果 + 细节测试记录。
+
+sheets:
+  分录筛选标准及结果:
+    component_type: d-form-table
+    form_type: table
+    title: 分录筛选标准及结果
+    description: 定义筛选条件并记录从序时账中筛选的候选分录统计。
+
+    fields:
+      - field: auto_filter_summary
+        label: 序时账筛选摘要
+        type: text
+        readonly: true
+        auto_data_source: je_filter_from_ledger
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 20
+      columns:
+        criteria_no:
+          field: criteria_no
+          type: text
+          label: 标准编号
+          width: 90
+        condition_description:
+          field: condition_description
+          type: textarea
+          label: 筛选条件描述
+          width: 250
+          hint: "如：金额超过100万、非工作时间录入、非常规科目组合等"
+        result_count:
+          field: result_count
+          type: number
+          label: 筛选结果数量
+          width: 100
+        sample_count:
+          field: sample_count
+          type: number
+          label: 抽样数量
+          width: 90
+        sample_method:
+          field: sample_method
+          type: text
+          label: 抽样方法
+          width: 120
+
+  细节测试记录:
+    component_type: d-form-table
+    form_type: table
+    title: 会计分录细节测试记录
+    description: 对抽取的分录样本逐笔检查，记录检查结果。
+
+    dynamic_table:
+      add_row_button: true
+      max_rows: 200
+      columns:
+        sample_no:
+          field: sample_no
+          type: text
+          label: 样本编号
+          width: 80
+        voucher_no:
+          field: voucher_no
+          type: text
+          label: 凭证号
+          width: 120
+        voucher_date:
+          field: voucher_date
+          type: date
+          label: 凭证日期
+          width: 100
+        summary:
+          field: summary
+          type: text
+          label: 摘要
+          width: 150
+        debit_amount:
+          field: debit_amount
+          type: number
+          label: 借方金额
+          width: 100
+        credit_amount:
+          field: credit_amount
+          type: number
+          label: 贷方金额
+          width: 100
+        entry_person:
+          field: entry_person
+          type: text
+          label: 录入人
+          width: 80
+        approver:
+          field: approver
+          type: text
+          label: 审批人
+          width: 80
+        anomaly_feature:
+          field: anomaly_feature
+          type: text
+          label: 异常特征
+          width: 150
+        result:
+          field: result
+          type: enum
+          label: 检查结果
+          width: 90
+          dict_source: check_result_dict
+          render_hint: risk_badge
+        note:
+          field: note
+          type: textarea
+          label: 说明
+          width: 200
+          visible_when: "result=='abnormal'"
+
+    dictionaries:
+      check_result_dict:
+        - value: normal
+          label: 正常
+          color: green
+        - value: abnormal
+          label: 异常
+          color: red

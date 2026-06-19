@@ -1,0 +1,88 @@
+# backend/data/wp_render_schema/K5-3.yaml
+# 或有事项评估表 — d-form-table 渲染 schema
+# Requirements: §5.5（K5 预计负债 — 或有事项判断）
+# Design: §2 componentType=d-form-table（三级可能性判断+金额区间）
+# Template: K5 预计负债.xlsx
+#
+# 特殊结构：或有事项逐项评估
+# 可能性分级：很可能(>50%) / 可能(5%~50%) / 极小可能(<5%)
+# 仅"很可能"才计提预计负债 → K5-4 最佳估计数计算
+
+wp_code: K5-3
+wp_name: 或有事项评估表
+component_type: d-form-table
+template_path: backend/wp_templates/K/K5 预计负债.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2801'
+    name: 预计负债
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 评估表 — 逐项或有事项评估
+# 字段：事项描述 / 诉讼金额 / 可能性 / 是否计提 / 计提金额
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sections:
+  - name: 或有事项清单
+    group_key: contingency_items
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: description, label: 事项描述, type: textarea }
+      - { field: litigation_type, label: 事项类型, type: select, options: ["未决诉讼", "未决仲裁", "债务担保", "产品质量保证", "亏损合同", "重组义务", "环境恢复义务", "其他"] }
+      - { field: counterparty, label: 对方当事人, type: text }
+      - { field: litigation_amount, label: 涉诉/涉案金额, type: number }
+      - { field: likelihood, label: 可能性判断, type: select, options: ["很可能", "可能", "极小可能"] }
+      - { field: likelihood_pct, label: 概率估计(%), type: percent }
+      - { field: amount_lower, label: 金额区间下限, type: number }
+      - { field: amount_upper, label: 金额区间上限, type: number }
+      - { field: should_accrue, label: 是否计提, type: select, options: ["是", "否"], formula_hint: "likelihood == '很可能' → 是" }
+      - { field: accrued_amount, label: 计提金额, type: number, formula_hint: "很可能且金额可合理估计时计提最佳估计数" }
+      - { field: legal_opinion, label: 律师意见, type: textarea }
+      - { field: audit_conclusion, label: 审计结论, type: select, options: ["同意管理层判断", "不同意-应计提", "不同意-应调整金额", "需进一步取证"] }
+      - { field: ref_k5_5, label: 律师函索引, type: text, ref_target: "K5-5" }
+
+  # ─── 汇总行 ─────────────────────────────────────────────────────────────────
+  - name: 或有事项汇总
+    row_type: summary
+    fields:
+      - { field: total_litigation_amount, label: 涉诉总金额, type: number, formula: "SUM(contingency_items.litigation_amount)" }
+      - { field: total_accrued, label: 计提总额, type: number, formula: "SUM(contingency_items.accrued_amount)" }
+      - { field: highly_probable_count, label: 很可能事项数, type: number }
+      - { field: probable_count, label: 可能事项数, type: number }
+      - { field: remote_count, label: 极小可能事项数, type: number }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-K5-3-001
+    target_wp: K5-4
+    target_field: 最佳估计数
+    description: '很可能事项 → K5-4 最佳估计数计算（上下限加权平均）'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-K5-3-002
+    target_wp: K5-5
+    target_field: 律师函回函
+    description: '法律意见 ← K5-5 律师函回函分析'
+    severity: required
+    direction: inbound
+
+  - ref_id: CW-K5-3-003
+    target_wp: A5-3
+    target_field: 或有事项附注
+    description: '或有事项 → A5-3 或有事项附注底稿（跨循环）'
+    severity: info
+    direction: outbound
+
+  - ref_id: CW-K5-3-004
+    target_wp: K5-1
+    target_field: 预计负债审定金额
+    description: '计提总额 → K5-1 预计负债审定表'
+    severity: required
+    direction: outbound

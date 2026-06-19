@@ -1,0 +1,33 @@
+# S33 综合核查 — 通用 d-form-table 渲染 schema
+# 适用：S33-1 ~ S33-9（9 个底稿共用同一结构）
+#
+# 匹配规则：wp_code LIKE 'S33-[1-9]'
+
+wp_code_pattern: "S33-[1-9]"
+wp_name_template: "综合核查-{topic}"
+component_type: d-form-table
+applicable_when:
+  business_category: [ipo, listed, neeq]
+
+sections:
+  - name: 核查内容
+    group_key: comprehensive_check
+    row_type: dynamic_rows
+    allow_add_rows: true
+    fields:
+      - { field: item_no, label: 序号, type: number, readonly: true }
+      - { field: check_item, label: 核查项目, type: textarea }
+      - { field: check_method, label: 核查方法, type: textarea }
+      - { field: period_scope, label: 核查期间, type: text }
+      - { field: data_obtained, label: 获取资料, type: textarea }
+      - { field: check_result, label: 核查结果, type: textarea }
+      - { field: is_abnormal, label: 是否异常, type: select, options: ["正常", "异常", "不适用"] }
+      - { field: abnormal_note, label: 异常说明, type: textarea }
+      - { field: conclusion, label: 结论, type: select, options: ["通过", "需关注", "存在问题", "不适用"] }
+
+  - name: 核查结论
+    group_key: check_conclusion
+    row_type: conclusion
+    fields:
+      - { field: overall_result, label: 综合核查结论, type: select, options: ["未发现异常", "存在异常已解释", "需进一步核查"] }
+      - { field: conclusion_note, label: 结论说明, type: textarea }
