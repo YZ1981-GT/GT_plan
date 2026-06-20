@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-19  
+**最后更新**：2026-06-21  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**149**（active 1 + archived 148）+ 全局交叉索引 1  
+**Spec 总数**：**155**（active 0 + archived 155）+ 全局交叉索引 1  
 **最高迁移**：V088  
 **测试总数**：16699 collected / 0 collection errors（2026-06-19 修复）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
@@ -49,15 +49,15 @@
 
 ---
 
-## 二、已归档 Spec（149 个，10 分类）
+## 二、已归档 Spec（155 个，10 分类）
 
-**当前 active = 1**（其余已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 0**（全部已归档）。新建 spec 放 `.kiro/specs/{name}/`。
 
 ### Active Specs
 
 | Spec | 状态 | 迁移 | 说明 |
 |------|------|------|------|
-| audit-report-template-integration | 185/190 | V066 | 审计报告模板集成（剩 3 项 `[ ]*` 人工可选） |
+| （无） | — | — | 全部 spec 已归档 |
 
 ```
 _archive/
@@ -67,7 +67,7 @@ _archive/
 ├── 04-infra-architecture/       27   基础设施/全局架构
 ├── 05-business-features/        36   业务专项（含ledger/wp系列）
 ├── 06-engineering-governance/    6   工程治理
-├── 07-workpaper-slimdown/        9   底稿瘦身
+├── 07-workpaper-slimdown/       15   底稿瘦身 + 模块治理
 ├── 08-disclosure-notes/          5   附注模块
 ├── 09-consolidation-phases/      4   合并模块
 ├── 10-A~S-workpaper-all-cycles-complete/ 31  A~S全循环底稿（568任务，2026-06-19完成）
@@ -109,9 +109,11 @@ _archive/
 
 `repo-frontend-layout-unification` · `repo-git-workflow-unification` · `pytest-residual-failures-cleanup` · `migration-runner-resilience` · `frontend-consistency-m1` · `dev-tooling-modernization`
 
-### 2.7 `07-workpaper-slimdown/`（9）
+### 2.7 `07-workpaper-slimdown/`（15）
 
-`workpaper-html-renderer` · `workpaper-editor-slimdown` · `workpaper-list-shrink` · `workpaper-editor-shrink-phase2` · `gt-c-note-table-shrink` · `gtdform-test-and-shrink` · `custom-workpaper-formula-binding` · `audit-sheet-editable` · `report-view-slimdown`
+**底稿瘦身（9）**：`workpaper-html-renderer` · `workpaper-editor-slimdown` · `workpaper-list-shrink` · `workpaper-editor-shrink-phase2` · `gt-c-note-table-shrink` · `gtdform-test-and-shrink` · `custom-workpaper-formula-binding` · `audit-sheet-editable` · `report-view-slimdown`
+
+**模块治理（6，2026-06-21 归档）**：`workpaper-render-config-refactor`（策略拆分，render_config 1474→747）· `workpaper-module-health-pass2`（9 项 P1/P2 治理）· `workpaper-silent-exception-cleanup`（70 处宽异常补留痕）· `workpaper-module-large-file-split`（pass3，3 文件拆 ≤800）· `workpaper-module-large-file-split-pass4`（3 服务文件拆 ≤800）· `workpaper-frontend-large-component-split`（前端 Top3 抽 composable）
 
 ### 2.8 `08-disclosure-notes/`（5）
 

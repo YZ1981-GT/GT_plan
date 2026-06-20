@@ -34,11 +34,11 @@
 
 ## 验收门槛
 
-- [ ] V1 wp_render_config.py ≤800 行（当前 1474）
-- [ ] V2 get_render_config 函数体 ≤120 行（当前 475）
-- [ ] V3 1096 + 2457 + 25 = 3578 测试全绿
-- [ ] V4 `_resolve_legacy_source` 不存在
-- [ ] V5 `class_code_to_component` 单一真源
+- [x] V1 wp_render_config.py ≤800 行（实测 747，达标）
+- [x] V2 get_render_config 函数体 ≤120 行（dispatch 模式 119 行，达标）
+- [x] V3 守卫测试全绿（test_workpaper_render_strategies + 冒烟零回归）
+- [x] V4 `_resolve_legacy_source` 不存在（grep 0 匹配）
+- [x] V5 `class_code_to_component` 单一真源（wp_component_type_mapping.py）
 
 ## 已知限制
 

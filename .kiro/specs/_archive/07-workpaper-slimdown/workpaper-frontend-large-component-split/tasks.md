@@ -6,7 +6,7 @@
 
 ## Tasks
 
-- [ ] 1. 先扩前端大文件守卫（红灯起步）
+- [x] 1. 先扩前端大文件守卫（红灯起步）
   - [x] 1.1 新建 `audit-platform/frontend/src/components/workpaper/__tests__/large_component_guard.spec.ts`
     - 断言 GtAProgramConsole/GtChecklistTable/GtAuditSheet 三个 .vue 行数 ≤800
     - 此时预期红灯（3 组件超标），确认守卫准确

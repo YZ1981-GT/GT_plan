@@ -69,7 +69,9 @@ inclusion: always
 
 ### git 状态（2026-06-21）
 - 分支 `work/2026-05-30-wp-specs`，HEAD `0ccdd520`（A~N+S 全循环底稿渲染体检修复 9 真bug+空白页，16文件，已推送），最高迁移 V088
-- **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
+- **active spec=0（2026-06-21 归档完成）**：6 个底稿治理 spec 全部归档到 `_archive/07-workpaper-slimdown/`（render-config-refactor/health-pass2/silent-exception-cleanup/large-file-split/-pass4/frontend-large-component-split）；INDEX.md 总数 149→155、active 1→0、07 分类 9→15 已同步；render-config V1-V5 验收已勾、frontend 守卫父任务已勾
+- **底稿关联调整闭环（2026-06-21 全 6 条链运行时实测通过）**：6 条联动链全部有运行时集成测试实证。`test_cycle_linkage_handlers_integration.py`(19) 覆盖 C控制→D~N/F→F2A/D~N审定表→TB→A13级联；**新增 `test_cycle_linkage_remaining_chains.py`(10)** 补齐此前缺测的 3 条：C偏差→IssueTicket+控制结论覆写(_on_c_deviation_saved，真 session.add(IssueTicket))/C22→C21-1 findings(_on_c22_itgc_saved，list+dict 两种 step 形态)/B50-3→risk_assessment override(_on_b50_saved 闭包，经 event_bus._handlers 取出直调，既验注册又验写入)。读取端 resolver 契约 test_auto_data_resolvers 80 passed。合计 130 passed 零回归。**坑**：B50 handler 内 `invalidate_auto_cache` 是 register 函数内局部 import 无法 monkeypatch→让其真实执行(仅清进程缓存无副作用)；`async_session_factory` 是 event_handlers 模块级可 patch
+- **铁律提醒**：勿凭静态阅读下"全链可追溯"乐观结论，须区分"代码存在"vs"运行时实测通过"
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
 ### wp_render_config 策略拆分（2026-06-19 完成，spec: workpaper-render-config-refactor）
