@@ -49,6 +49,7 @@ _SHEET_TYPE_TO_CLASS: dict[str, str] = {
     "disclosure": "C-附注披露",        # → c-note-table
     "conclusion": "D-政策检查",        # → d-form-paragraph
     "confirmation_summary": "A-实质性程序",  # → a-program-console（函证汇总卡）
+    "grid_table": "C-附注披露",        # → c-note-table（只读网格兜底，用于检查表/测算表等无 schema 的表格型 sheet）
 }
 
 # HTML 可渲染白名单（排除 univer / skip）——聚合 sheet 的 componentType 必须落在此集合。

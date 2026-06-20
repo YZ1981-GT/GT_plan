@@ -79,9 +79,15 @@ inclusion: always
 
 ### 🔵 进行中 spec：bad-debt-sheet-enhancement（2026-06-21，requirements-first）
 - **目标**：坏账准备明细表(GtBadDebtSheet)功能增强=导出模板+导出数据+Excel导入(预览弹窗)+账龄段枚举字典弹窗(三年/五年/自定义+自动更新信用风险组合子行)
-- **状态**：三件套已完成(requirements 5需求/design 含架构图+7端点+V091迁移+6 PBT property/tasks 5 Sprint 10任务)，待执行
+- **状态**：✅ 全部必做任务完成(5 Sprint/29测试全绿)，已 commit+push(`a22c3b8b`)
 - **关键设计**：复用 BadDebtExportService(加 template_only)+新建 BadDebtImportService(parse→preview→commit 两阶段)+新建 AgingSegmentService(V091 aging_segments 表 wp_index_id 级唯一+JSONB 段列表+子行同步)+前端 ImportPreviewDialog+AgingDictionaryDialog
-- **注意点**：导入跳过表头行需按分组表头检测数据起始行(勿硬编码R12)；拖拽排序需确认 vuedraggable 依赖；静态路径在 /{row_id} 之前### ✅ 编制指导面板修复（2026-06-21，3 项，30 guidance 测试全绿）
+- **注意点**：导入跳过表头行需按分组表头检测数据起始行(勿硬编码R12)；拖拽排序需确认 vuedraggable 依赖；静态路径在 /{row_id} 之前
+
+### 🔴 D2 聚合底稿 12 个空白 tab 待修复（2026-06-21 Playwright 扫描）
+- **空白 a-program-console(9个)**：D0-2/D0-3/D0-4/D0-6/D0-8 + D2-6/D2-7/D2-8/D2-11/D2-12 — 这些底稿无 procedure_table 模板(`get_template`返回 None)，且 `extract_program_rows` 从 xlsx 提取也失败（sheet_name 找不到/结构不适合 program 行提取）
+- **空白 audit-sheet(3个)**：D2-9/D2-10/D2-13 — analysis 类型映射到 audit-sheet，但 `extract_audit_rows_with_values_from_file` 在 xlsx 中用 registry sheet_name 找不到对应 sheet 或结构不匹配
+- **根因分析**：这些底稿是**表格型检查表/测算表**，不适合用程序中控台(a-program-console)渲染——它们没有"序号/程序描述/认定/索引号"的程序行结构，而是**固定列头+数据行**的网格。正确做法=改 sheet_type 为 `audit_sheet`(表格型→audit-sheet) 或用 `c-note-table`(只读网格兜底)；同时需确认 xlsx 中的实际 sheet tab 名与 registry 一致
+- **工作量**：逐个确认 12 个 xlsx sheet 的实际结构（程序行/网格/段落），调整 registry sheet_type + 验证提取成功。建议独立 spec 或调研后批量修复### ✅ 编制指导面板修复（2026-06-21，3 项，30 guidance 测试全绿）
 - **ai_enabled 缺失**：后端 `wp_guidance_chat.py` GET guidance 端点无 `ai_enabled` 字段 → 前端 undefined→false→AI 对话 Tab 隐藏。修=注入 `guidance_response["ai_enabled"] = settings.WP_AI_SERVICE_ENABLED`
 - **矛盾提示文案**：`GuidanceTabContent.vue:260` 写死"有疑问？切换到 AI 对话 Tab"不受开关控制。修=加 `v-if="guidanceStore.aiEnabled"`
 - **A1 排版丑**：A1 不在 `_complexity.json` high/medium 列表→落 low→只显示 100 字截断纯文本。修=加入 high 列表；同时去掉 `_load_complexity_config` 的 lru_cache（文件极小每次读可忽略，避免改 JSON 后必须重启）

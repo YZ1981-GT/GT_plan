@@ -48,6 +48,7 @@ VALID_SHEET_TYPES = [
     "disclosure",
     "conclusion",
     "confirmation_summary",
+    "grid_table",
 ]
 
 # 必填字段（包级别）
