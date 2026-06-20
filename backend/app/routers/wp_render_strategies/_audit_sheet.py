@@ -44,6 +44,11 @@ async def render(ctx: RenderContext) -> dict | None:
     """
     existing = ctx.sheet_html_data if isinstance(ctx.sheet_html_data, dict) else None
 
+    # 多文件聚合：优先用该 sheet 的来源模板（source_files[0]），否则回退全局模板路径。
+    # 审定表/明细表为结构化提取（registry 中单源），取首个来源即可。
+    _src_files = [f for f in (ctx.source_files or []) if f]
+    _template_path = _src_files[0] if _src_files else ctx.template_file_path
+
     # ─── 1. 行结构：持久化优先（Req 4.3），否则从模板提取 ─────────────────
     # 多列明细表（如 D1-2 有 10 数据列）也需要列定义供前端动态渲染。
     column_defs: list[dict] | None = existing.get("column_defs") if existing else None
@@ -55,17 +60,17 @@ async def render(ctx: RenderContext) -> dict | None:
         )
 
         audit_rows = []
-        if ctx.template_file_path:
+        if _template_path:
             try:
                 audit_rows, col_defs = extract_audit_rows_with_values_from_file(
-                    ctx.template_file_path, ctx.classification.sheet_name
+                    _template_path, ctx.classification.sheet_name
                 )
                 if col_defs and not column_defs:
                     column_defs = col_defs
             except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
                 logger.warning(
                     "审定表行提取失败 %s/%s: %s",
-                    ctx.template_file_path, ctx.classification.sheet_name, e,
+                    _template_path, ctx.classification.sheet_name, e,
                 )
                 audit_rows = []
 
@@ -83,15 +88,15 @@ async def render(ctx: RenderContext) -> dict | None:
             "notes": "", "conclusion": "",
             "notes_label": "审计说明", "conclusion_label": "审计结论",
         }
-        if ctx.template_file_path:
+        if _template_path:
             try:
                 audit_sections = extract_audit_sections(
-                    ctx.template_file_path, ctx.classification.sheet_name
+                    _template_path, ctx.classification.sheet_name
                 )
             except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
                 logger.warning(
                     "审定表说明区提取失败 %s/%s: %s",
-                    ctx.template_file_path, ctx.classification.sheet_name, e,
+                    _template_path, ctx.classification.sheet_name, e,
                 )
 
     # ─── 2. TB 取数：实时查 trial_balance（Req 3.1~3.3），不持久化 ─────────

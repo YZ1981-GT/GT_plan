@@ -26,8 +26,11 @@ async def render(ctx: RenderContext) -> dict | None:
     - navigation_rows：当前底稿内各 sheet 索引导航
     - cycle_workpapers：同审计循环全部底稿跨底稿跳转目录
     """
-    # 已有持久化数据则不重新生成
-    if ctx.sheet_html_data:
+    # 持久化数据校验：仅当已是有效 b-index 格式（含非空 navigation_rows）才直接复用。
+    # 历史脏数据（如 override 压平时期按 d-form-table 保存的 {rows, context, conclusion}）
+    # 缺 navigation_rows，必须重新生成架构导航，否则前端架构树空白。
+    _existing = ctx.sheet_html_data if isinstance(ctx.sheet_html_data, dict) else None
+    if _existing and _existing.get("navigation_rows"):
         return None
 
     from app.services.wp_classification_service import derive_component_type
@@ -41,15 +44,22 @@ async def render(ctx: RenderContext) -> dict | None:
     preparation_info = ctx.prep_info
 
     # ─── 索引导航行（同底稿其他 sheet → 行） ─────────────────────────────
+    # 多 sheet 底稿：按 class_code 独立派生 component_type（跳过 wp_code override 压平），
+    # 否则所有 sheet 的 component_type 都会变成同一个值，导致架构树阶段分类/图标错误。
+    _real = [c for c in ctx.classifications
+             if not (c.sheet_name and "GT_Custom" in c.sheet_name)]
+    _multi = len(_real) > 1
     navigation_rows: list[dict] = []
     seq = 1
     for cls in ctx.classifications:
         # 跳过 B-Index 自身
         try:
-            ct = derive_component_type(cls)
+            ct = derive_component_type(cls, ignore_wp_code_override=_multi)
         except Exception:
             ct = "skip"
         if ct == "b-index":
+            continue
+        if cls.sheet_name and "GT_Custom" in cls.sheet_name:
             continue
 
         # 从 sheet_name 末尾提取该 sheet 的真实索引号；提取不到则回退父 wp_code
@@ -79,8 +89,15 @@ async def render(ctx: RenderContext) -> dict | None:
         current_wp_id=ctx.wp_id,
     )
 
-    return {
+    result = {
         "preparation_info": preparation_info,
         "navigation_rows": navigation_rows,
         "cycle_workpapers": cycle_workpapers,
     }
+    # 保留历史持久化数据中用户可能编辑过的字段（如 conclusion / context），
+    # 避免重新生成架构导航时丢失已填写内容。
+    if _existing:
+        for k, v in _existing.items():
+            if k not in result and v:
+                result[k] = v
+    return result

@@ -263,3 +263,82 @@ async def update_program_status(
         return ProgramStatusResponse.model_validate(result)
     except ProgramStatusValidationError as e:
         raise HTTPException(status_code=422, detail=e.message)
+
+
+# ─── 自定义模板导出/导入（spec workpaper-account-multifile-aggregation 需求 6）──
+
+
+class ImportTemplateRequest(BaseModel):
+    """导入自定义科目模板请求体。"""
+    content: str = Field(..., description="YAML/JSON 模板文本（export-template 导出后编辑）")
+    scope: str = Field("project", description="作用域: project | firm")
+
+
+class ImportTemplateResponse(BaseModel):
+    success: bool
+    wp_code: str | None = None
+    scope: str | None = None
+    errors: list[str] = Field(default_factory=list)
+
+
+@router.get("/{wp_code}/export-template")
+async def export_account_package_template(
+    project_id: uuid.UUID,
+    wp_code: str,
+    _user=Depends(get_current_user),
+):
+    """导出科目工作包结构为可编辑 YAML（含 sheet_type + 字段定义）。
+
+    用户编辑后通过 import-template 端点导入形成自定义工作包。
+    """
+    from fastapi.responses import PlainTextResponse
+
+    from app.services.custom_account_package_service import export_package_template
+
+    yaml_text = export_package_template(wp_code)
+    if yaml_text is None:
+        raise HTTPException(status_code=404, detail=f"科目工作包不存在: {wp_code}")
+    filename = f"account_package_{wp_code}_template.yaml"
+    return PlainTextResponse(
+        content=yaml_text,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/import-template", response_model=ImportTemplateResponse)
+async def import_account_package_template(
+    project_id: uuid.UUID,
+    body: ImportTemplateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+) -> ImportTemplateResponse:
+    """导入自定义科目模板：解析 + 校验 + 登记为项目级/事务所级工作包。
+
+    校验失败返回明确错误清单（不静默失败，需求 6.6）。
+    """
+    from app.services.custom_account_package_service import (
+        CustomPackageValidationError,
+        import_custom_package,
+        parse_and_validate,
+    )
+
+    try:
+        package_json = parse_and_validate(body.content)
+    except CustomPackageValidationError as e:
+        return ImportTemplateResponse(success=False, errors=e.errors)
+
+    try:
+        result = await import_custom_package(
+            db,
+            scope=body.scope,
+            scope_id=project_id,
+            package_json=package_json,
+            created_by=getattr(current_user, "id", None),
+        )
+    except CustomPackageValidationError as e:
+        return ImportTemplateResponse(success=False, errors=e.errors)
+
+    return ImportTemplateResponse(
+        success=True, wp_code=result["wp_code"], scope=result["scope"]
+    )

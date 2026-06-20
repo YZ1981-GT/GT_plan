@@ -7,7 +7,7 @@ Requirements: 1.2（9 类全覆盖）+ 3.9（决策树禁止 Univer 兜底）
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -97,6 +97,9 @@ class ClassificationResult:
     template_version_id: UUID | None
     # 项目级覆盖来源标记
     has_override: bool = False
+    # 多文件聚合：该 sheet 内容来源模板文件路径（str）。空列表=走全局 template_path。
+    # 由 wp_account_package_resolver 填充（spec workpaper-account-multifile-aggregation）。
+    source_files: list[str] = field(default_factory=list)
 
 
 class WpClassificationService:
@@ -291,7 +294,10 @@ class WpClassificationService:
         )
 
 
-def derive_component_type(classification: ClassificationResult) -> str:
+def derive_component_type(
+    classification: ClassificationResult,
+    ignore_wp_code_override: bool = False,
+) -> str:
     """将归类结果映射到 componentType 白名单值
 
     映射规则（design §7.2 + task 1.6）：
@@ -315,6 +321,11 @@ def derive_component_type(classification: ClassificationResult) -> str:
     sheet 名级专用路由（优先于 class_code 派生）：
     - 坏账准备明细表* → 'bad-debt-sheet'（两层嵌套结构专用组件）
 
+    Args:
+        ignore_wp_code_override: True 时跳过 wp_code 级 override 检查，强制按 class_code 派生。
+            用于多 sheet 底稿（如 D2 含目录/程序表/审定表/附注），避免 wp_code override
+            把所有 sheet 压平成同一 componentType。
+
     CRITICAL: 禁止 Univer 兜底！无归类时抛异常而非返回 'univer'。
     """
     class_code = classification.class_code
@@ -331,9 +342,11 @@ def derive_component_type(classification: ClassificationResult) -> str:
         return sheet_override
 
     # wp_code 级专用路由覆盖（A5-1→cf-verification, A2-1→report-analysis）
-    wp_code_override = _WP_CODE_OVERRIDE.get(classification.wp_code)
-    if wp_code_override:
-        return wp_code_override
+    # 多 sheet 底稿（ignore_wp_code_override=True）跳过此检查，按 class_code 各自派生
+    if not ignore_wp_code_override:
+        wp_code_override = _WP_CODE_OVERRIDE.get(classification.wp_code)
+        if wp_code_override:
+            return wp_code_override
 
     if not class_code:
         raise ClassificationNotFoundError(

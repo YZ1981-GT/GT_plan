@@ -50,7 +50,8 @@ class TestRegistryReadingService:
         """按循环过滤"""
         registry = AccountPackageRegistryService()
         d_packages = registry.get_packages_by_cycle("D")
-        assert len(d_packages) == 2
+        # D1 应收票据 / D2 应收账款 / D4 营业收入
+        assert len(d_packages) == 3
         assert all(p["cycle"] == "D" for p in d_packages)
 
     def test_registry_nonexistent_package_returns_none(self):

@@ -35,6 +35,7 @@ from app.services.wp_classification_service import (
     derive_component_type,
 )
 from app.services.wp_auto_fill_service import _resolve_auto_fill_values
+from app.services.wp_account_package_resolver import resolve_package_sheets
 from app.services.wp_render_schema_service import WpRenderSchemaService
 from app.services.wp_template_version_service import WpTemplateVersionService
 
@@ -659,6 +660,19 @@ async def get_render_config(
     classifications = await _maybe_custom_classifications(
         db, project_id, wp_code, wp_index.wp_name, classifications, working_paper)
 
+    # Step 4b: 科目工作包多文件聚合（spec workpaper-account-multifile-aggregation）
+    # 父码科目（如 D2 应收账款）若在 account_package_registry 中有条目，则消费注册表
+    # 声明的全部 sheet（聚合 3 个 Excel 文件的 14 sheet），替换单文件回退的
+    # classifications。无条目返回 None → 走原 classification，零回归。
+    # 忽略 registry 的 mapping_status，只要 package 存在即直接消费其 sheets。
+    try:
+        pkg_sheets = await resolve_package_sheets(db, wp_code, project_id)
+    except Exception as e:  # noqa: BLE001 — 聚合失败按"无聚合"降级，零回归
+        logger.warning("科目工作包聚合失败 wp_code=%s: %s", wp_code, e)
+        pkg_sheets = None
+    if pkg_sheets:
+        classifications = pkg_sheets
+
     # Step 5: scope + redirect
     scope, is_real = (classifications[0].scope, classifications[0].is_real_workpaper) if classifications else ("standalone", True)
     _base = {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
@@ -688,6 +702,12 @@ async def get_render_config(
     _tpl = _resolve_template_path(working_paper, wp_code)
 
     # Per-sheet dispatch loop
+    # 多 sheet 底稿（如 D2 含 底稿目录/程序表/审定表/附注 等）：每个 sheet 按自己的
+    # class_code 独立派生 componentType，不能用 wp_code 级 override 压平所有 sheet。
+    # wp_code override 仅对单 sheet 底稿生效（如 D1 应收票据审定表整张走 d-form-table）。
+    _real_sheets = [c for c in classifications
+                    if not (c.sheet_name and "GT_Custom" in c.sheet_name)]
+    _is_multi_sheet = len(_real_sheets) > 1
     sheets: list[dict] = []
     for cls in classifications:
         if sheet_name and cls.sheet_name != sheet_name:
@@ -696,7 +716,16 @@ async def get_render_config(
             continue
         ovr = _WP_CODE_OVERRIDE.get(wp_code)
         try:
-            component_type = ovr if ovr else derive_component_type(cls)
+            if _is_multi_sheet:
+                # 多 sheet：优先按 class_code 派生（跳过 wp_code override 避免压平）；
+                # 派生失败再回退 wp_code override
+                try:
+                    component_type = derive_component_type(cls, ignore_wp_code_override=True)
+                except ClassificationNotFoundError:
+                    component_type = ovr if ovr else "skip"
+            else:
+                # 单 sheet：wp_code override 优先（保留原行为）
+                component_type = ovr if ovr else derive_component_type(cls)
         except ClassificationNotFoundError:
             component_type = "skip"
         schema_data: dict | None = None
@@ -715,7 +744,8 @@ async def get_render_config(
                 sheet_schema=sheet_schema, template_file_path=_tpl,
                 year=_prog_year, business_category=_prog_biz,
                 cross_ref_items=[_CRI(wp_code=ci.wp_code, cell=ci.cell) for ci in cross_ref_items],
-                prep_info=None, classifications=classifications, audit_cycle=wp_index.audit_cycle)
+                prep_info=None, classifications=classifications, audit_cycle=wp_index.audit_cycle,
+                source_files=list(getattr(cls, "source_files", []) or []))
             result = await renderer(ctx)
             if result is not None:
                 sheet_html_data = result

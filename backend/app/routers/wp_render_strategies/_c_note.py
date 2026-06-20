@@ -47,14 +47,31 @@ async def render(ctx: RenderContext) -> dict | None:
         from app.services.wp_grid_extract import extract_grid
 
         grid: dict = {"cells": {}, "merged_cells": [], "col_widths": {}, "max_row": 0, "max_col": 0}
-        if ctx.template_file_path:
+        # 多文件聚合：source_files 多源 → 合并各源同名 sheet 内容（含来源标识行）；
+        # 单源 → 用该源路径；无 source_files → 回退全局 template_file_path。
+        src_files = [f for f in (ctx.source_files or []) if f]
+        if len(src_files) > 1:
+            from app.services.wp_multifile_sheet_merge import merge_sheet_content
+
             try:
-                grid = extract_grid(ctx.template_file_path, ctx.classification.sheet_name)
-            except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
-                logger.warning(
-                    "c-note 网格提取失败 %s/%s: %s",
-                    ctx.template_file_path, ctx.classification.sheet_name, e,
+                grid = merge_sheet_content(
+                    src_files, ctx.classification.sheet_name, ctx.component_type
                 )
+            except Exception as e:  # noqa: BLE001 — 合并失败降级到单源/全局
+                logger.warning(
+                    "c-note 多源合并失败 %s: %s", ctx.classification.sheet_name, e
+                )
+                src_files = src_files[:1]
+        if not (isinstance(grid, dict) and grid.get("cells")):
+            extract_path = src_files[0] if src_files else ctx.template_file_path
+            if extract_path:
+                try:
+                    grid = extract_grid(extract_path, ctx.classification.sheet_name)
+                except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
+                    logger.warning(
+                        "c-note 网格提取失败 %s/%s: %s",
+                        extract_path, ctx.classification.sheet_name, e,
+                    )
 
         # 合并已有持久化数据（若用户曾编辑过部分单元格）
         existing = sheet_html_data if isinstance(sheet_html_data, dict) else None

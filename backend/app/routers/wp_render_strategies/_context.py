@@ -64,3 +64,6 @@ class RenderContext:
     classifications: list[ClassificationResult] = field(default_factory=list)
     # 审计循环代号（如 "D"），B-Index 跨底稿目录需要
     audit_cycle: str | None = field(default=None)
+    # 多文件聚合：该 sheet 内容来源模板文件路径列表（空=用 template_file_path）。
+    # 由 wp_account_package_resolver 解析，供合并策略读多源内容。
+    source_files: list[str] = field(default_factory=list)

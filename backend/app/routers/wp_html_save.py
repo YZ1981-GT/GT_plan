@@ -255,11 +255,124 @@ async def save_html_data(
             # stale 标记失败不阻断保存主流程
             logger.warning("report_stale_service.mark_if_mapped failed: %s", exc)
 
+    # ─── Step 10: 聚合审定表 sheet 保存 → 审定数回写 trial_balance ──────────
+    # 多文件聚合：父码底稿（如 D2）保存「审定表D2-1」sheet 时，发布 WORKPAPER_SAVED
+    # 携带 sheet 级子码（D2-1）+ 计算后的审定行，触发既有 _on_d_audit_determination_saved
+    # 回写 trial_balance.audited_amount（需求 4.4）。非审定表 sheet 不触发。
+    await _maybe_publish_determination_writeback(
+        db=db,
+        project_id=working_paper.project_id,
+        sheet_name=body.sheet_name,
+        html_data=body.html_data,
+    )
+
     return SaveHtmlDataResponse(
         saved_at=now.isoformat(),
         data_version=new_version,
         stale_impact=stale_impact,
     )
+
+
+async def _maybe_publish_determination_writeback(
+    *,
+    db: AsyncSession,
+    project_id: UUID,
+    sheet_name: str,
+    html_data: dict,
+) -> None:
+    """聚合审定表 sheet 保存后，计算各行审定数并发布 WORKPAPER_SAVED 触发 TB 回写。
+
+    审定数公式（与前端 useAuditSheetTable.auditedAmount 一致）：
+        audited = current_unadjusted + (adj_amount ?? sys_aje ?? 0)
+                                     + (reclass_amount ?? sys_rje ?? 0)
+    其中 current_unadjusted/sys_aje/sys_rje 实时查 trial_balance（不持久化）。
+
+    仅当 sheet 名含审定表子码（[D-N]\\d+-1）且含 audit_rows 时触发；否则静默跳过。
+    任何异常均降级（保存主流程已 commit，不受影响）。
+    """
+    try:
+        from app.services.wp_account_package_resolver import (
+            extract_determination_wp_code,
+        )
+
+        det_code = extract_determination_wp_code(sheet_name)
+        if not det_code:
+            return
+        audit_rows = html_data.get("audit_rows") if isinstance(html_data, dict) else None
+        if not isinstance(audit_rows, list) or not audit_rows:
+            return
+
+        from app.services.wp_audit_sheet_tb_service import fetch_audit_sheet_tb_values
+
+        tb_values = await fetch_audit_sheet_tb_values(
+            audit_rows, db=db, project_id=project_id
+        )
+
+        def _num(v: Any) -> float:
+            try:
+                return float(v) if v is not None else 0.0
+            except (TypeError, ValueError):
+                return 0.0
+
+        writeback_rows: list[dict] = []
+        for row in audit_rows:
+            if not isinstance(row, dict):
+                continue
+            account_code = row.get("account_code")
+            if not account_code or row.get("isComputed") or row.get("isSection"):
+                continue
+            tb = tb_values.get(row.get("id"), {}) if isinstance(tb_values, dict) else {}
+            current_unadj = row.get("current_unadjusted")
+            if current_unadj is None:
+                current_unadj = tb.get("current_unadjusted")
+            adj = row.get("adj_amount")
+            if adj is None:
+                adj = row.get("sys_aje")
+            if adj is None:
+                adj = tb.get("sys_aje")
+            reclass = row.get("reclass_amount")
+            if reclass is None:
+                reclass = row.get("sys_rje")
+            if reclass is None:
+                reclass = tb.get("sys_rje")
+            audited = _num(current_unadj) + _num(adj) + _num(reclass)
+            writeback_rows.append(
+                {"account_code": account_code, "audited_amount": audited}
+            )
+
+        if not writeback_rows:
+            return
+
+        # 推导年度
+        year = None
+        try:
+            yr = (await db.execute(sa.text(
+                "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
+            ), {"pid": str(project_id)})).first()
+            if yr and yr[0]:
+                year = yr[0]
+        except Exception:
+            year = None
+        if not year:
+            return
+
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        await event_bus.publish(EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=project_id,
+            year=year,
+            extra={
+                "wp_code": det_code,
+                "trigger": "aggregated_audit_sheet_save",
+                "parsed_data": {"rows": writeback_rows},
+            },
+        ))
+    except Exception as e:  # noqa: BLE001 — 回写联动失败不影响保存
+        logger.warning(
+            "聚合审定表回写联动失败 sheet=%s pid=%s: %s", sheet_name, project_id, e
+        )
 
 
 # ─── SSE 发布辅助 ────────────────────────────────────────────────────────────
