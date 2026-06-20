@@ -135,7 +135,7 @@
       :expand-row-keys="expandedRowKeys"
       @expand-change="handleExpandChange"
       @selection-change="handleSelectionChange"
-      class="gt-a-program-console__table gt-compact-table gt-tb-font-md"
+      class="gt-a-program-console__table gt-tb-font-md"
     >
       <!-- 多选列 -->
       <el-table-column
@@ -145,11 +145,21 @@
         :selectable="isRowSelectable"
       />
 
-      <!-- 展开列：仅当有历史决策数据时显示（A1 等程序表展开内容与描述重复，无额外价值） -->
+      <!-- 展开列：子步骤明细 + 历史决策（默认折叠，点击展开） -->
       <el-table-column v-if="hasExpandContent" type="expand">
         <template #default="{ row }">
           <div class="gt-a-program-console__expand-content">
-            <div class="gt-a-program-console__expand-desc">
+            <!-- 子步骤（二级明细）：从 content 解析的 （N）... 编号子程序 -->
+            <div v-if="row.sub_steps && row.sub_steps.length > 0" class="gt-a-program-console__sub-steps">
+              <h4>子程序步骤（{{ row.sub_steps.length }}项）</h4>
+              <ol class="gt-a-program-console__sub-list">
+                <li v-for="step in row.sub_steps" :key="step.no" class="gt-a-program-console__sub-item">
+                  {{ step.text }}
+                </li>
+              </ol>
+            </div>
+            <!-- 原始完整描述（无子步骤时显示，或作为补充） -->
+            <div v-if="!row.sub_steps || row.sub_steps.length === 0" class="gt-a-program-console__expand-desc">
               <h4>程序描述</h4>
               <p>{{ row.program_desc }}</p>
             </div>
@@ -531,6 +541,7 @@ interface ProgramRow {
   history?: ProgramHistoryItem[]
   attachment_count?: number
   phase?: string
+  sub_steps?: { no: number; text: string }[]
 }
 
 interface TrimDecision {
@@ -786,9 +797,9 @@ const phaseGroups = computed(() => {
     })
 })
 
-/** 当任意程序行有历史决策记录时显示展开列，否则隐藏（避免展开内容与描述重复） */
+/** 当任意程序行有历史决策记录或子步骤时显示展开列（sub_steps 为二级明细） */
 const hasExpandContent = computed(() =>
-  programs.value.some(p => p.history && p.history.length > 0)
+  programs.value.some(p => (p.history && p.history.length > 0) || (p.sub_steps && p.sub_steps.length > 0))
 )
 
 /** 当任意程序行有非空类别时显示类别列 */
@@ -1099,6 +1110,48 @@ function debounceSave() {
   width: 100%;
 }
 
+/* 程序表专属行高——非密集数据表，需要舒适阅读体验 */
+.gt-a-program-console__table :deep(th.el-table__cell) {
+  background: #f3eef8;
+  color: #4b2d77;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 0 !important;
+  height: 38px !important;
+}
+
+.gt-a-program-console__table :deep(td.el-table__cell) {
+  padding: 6px 0 !important;
+  height: 36px !important;
+}
+
+.gt-a-program-console__table :deep(.cell) {
+  padding: 4px 10px !important;
+  line-height: 1.5 !important;
+  font-size: 13px;
+}
+
+/* 序号列居中 */
+.gt-a-program-console__table :deep(.el-table__body td:nth-child(1) .cell),
+.gt-a-program-console__table :deep(.el-table__body td:nth-child(2) .cell) {
+  text-align: center;
+}
+
+/* 状态列下拉样式优化 */
+.gt-a-program-console__table :deep(.el-dropdown) {
+  width: 100%;
+}
+
+/* 斑马纹（偶数行微灰底） */
+.gt-a-program-console__table :deep(.el-table__row:nth-child(even) td) {
+  background: #fafafa;
+}
+
+/* hover 行高亮 */
+.gt-a-program-console__table :deep(.el-table__body tr:hover > td) {
+  background-color: #f5f0fa !important;
+}
+
 .gt-a-program-console__check {
   color: var(--el-color-success);
   font-weight: bold;
@@ -1116,6 +1169,34 @@ function debounceSave() {
 
 .gt-a-program-console__expand-content {
   padding: 12px 24px;
+}
+
+.gt-a-program-console__sub-steps {
+  margin-bottom: 12px;
+}
+
+.gt-a-program-console__sub-steps h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.gt-a-program-console__sub-list {
+  margin: 0;
+  padding-left: 20px;
+  list-style: decimal;
+}
+
+.gt-a-program-console__sub-item {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--el-text-color-regular);
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--el-border-color-lighter);
+}
+
+.gt-a-program-console__sub-item:last-child {
+  border-bottom: none;
 }
 
 .gt-a-program-console__expand-content h4 {
