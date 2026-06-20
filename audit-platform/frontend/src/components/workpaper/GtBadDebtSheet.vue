@@ -48,6 +48,13 @@
               >{{ isExpanded(parent.id) ? '▼' : '▶' }}</span>
               <strong>{{ parent.row_label }}</strong>
               <span class="gbds-method-tag">{{ parent.provision_method_label }}</span>
+              <el-button
+                link
+                size="small"
+                class="gbds-inline-btn gbds-add-child-btn"
+                @click.stop="onAddChild(parent)"
+                title="新增子行"
+              >+ 子行</el-button>
             </td>
             <td
               v-for="c in AMOUNT_COLS"
@@ -75,7 +82,17 @@
             class="gbds-row gbds-child"
             @contextmenu.prevent="openMenu($event, parent, child)"
           >
-            <td class="gbds-col-label gbds-indent">其中：{{ child.row_label }}</td>
+            <td class="gbds-col-label gbds-indent">
+              其中：{{ child.row_label }}
+              <el-button
+                link
+                size="small"
+                type="danger"
+                class="gbds-inline-btn gbds-del-child-btn"
+                @click.stop="onDeleteChild(child)"
+                title="删除子行"
+              >✕</el-button>
+            </td>
             <td
               v-for="c in AMOUNT_COLS"
               :key="c.key"
@@ -448,5 +465,40 @@ defineExpose({ loadTree, tree })
 }
 .gbds-menu-danger {
   color: #c0392b;
+}
+
+/* ─── 行内操作按钮（hover 显示） ─── */
+.gbds-inline-btn {
+  opacity: 0;
+  transition: opacity 0.15s;
+  margin-left: 8px;
+  font-size: 12px;
+}
+.gbds-row:hover .gbds-inline-btn {
+  opacity: 1;
+}
+.gbds-add-child-btn {
+  color: var(--gbds-purple);
+}
+.gbds-del-child-btn {
+  font-size: 11px;
+}
+
+/* ─── 行间距美化 ─── */
+.gbds-table td {
+  padding: 6px 8px;
+  line-height: 1.6;
+}
+.gbds-parent td {
+  padding: 8px 8px;
+  font-size: 13px;
+}
+.gbds-child td {
+  padding: 5px 8px;
+}
+.gbds-col-label {
+  text-align: left;
+  min-width: 220px;
+  white-space: nowrap;
 }
 </style>
