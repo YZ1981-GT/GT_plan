@@ -35,19 +35,22 @@ async def _resolve_b2_comm(db: AsyncSession, project_id: UUID, year: int, **kw) 
 async def _resolve_b3_indep(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """B3 独立性确认状态。
 
-    数据来源: checklist_response 表（wp_code='B3'）
+    数据来源: checklist_responses 表（无 ORM 模型，裸 SQL）。该表按 wp_id 存储，
+    经 working_paper→wp_index 关联到 wp_code='B3'。统计条目总数与已填结论数。
     返回结构: {"summary": str, "progress": int}
     """
-    from app.models.audit_platform_models import ChecklistResponse
-    total = (await db.execute(sa.select(sa.func.count()).select_from(ChecklistResponse).where(
-        ChecklistResponse.project_id == project_id,
-        ChecklistResponse.wp_code == "B3",
-    ))).scalar() or 0
-    confirmed = (await db.execute(sa.select(sa.func.count()).select_from(ChecklistResponse).where(
-        ChecklistResponse.project_id == project_id,
-        ChecklistResponse.wp_code == "B3",
-        ChecklistResponse.conclusion.isnot(None),
-    ))).scalar() or 0
+    row = (await db.execute(sa.text("""
+        SELECT
+            COUNT(*) AS total,
+            COUNT(cr.conclusion) AS confirmed
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE cr.project_id = :pid
+          AND wi.wp_code = 'B3'
+    """), {"pid": str(project_id)})).first()
+    total = (row.total if row else 0) or 0
+    confirmed = (row.confirmed if row else 0) or 0
     if total == 0:
         return {"summary": "未开始", "progress": 0}
     pct = round(confirmed / total * 100)

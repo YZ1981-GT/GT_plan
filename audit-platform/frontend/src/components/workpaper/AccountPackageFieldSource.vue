@@ -44,6 +44,10 @@ const props = defineProps<{
   primaryWpCode: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'navigate-sheet', sheetName: string): void
+}>()
+
 // D1 审定表关键字段来源（静态配置，真实环境从后端获取）
 const D1_FIELDS: AuditFieldSource[] = [
   { fieldId: 'period_end_balance', label: '期末余额', sourceSheet: '应收票据明细表D1-2', sourceType: '明细表汇总', tagType: 'success' },
@@ -67,8 +71,8 @@ const auditSheetFields = computed<AuditFieldSource[]>(() => {
 })
 
 function handleSourceClick(sheetName: string) {
-  // 后续可跳转到对应 sheet
-  console.log('[AccountPackageFieldSource] navigate to:', sheetName)
+  // 向父组件冒泡，由父级跳转到对应 sheet
+  emit('navigate-sheet', sheetName)
 }
 </script>
 

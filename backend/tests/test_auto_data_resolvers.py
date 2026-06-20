@@ -540,3 +540,90 @@ class TestControlTestResultForCycle:
         assert result["conclusion"] == "无效"
         assert "无效" in result["summary"]
         assert "放弃信赖" in result["summary"]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 全量 resolver 成功契约守卫（A 增强版）
+#
+# 背景：resolver 返回结构被前端按 `summary` 渲染；调度器 resolve_auto_data_source
+# 仅在 resolver 抛异常时兜底为 {"_error": True}。若某 resolver 漏 summary 键、
+# 返回非 dict、或因导入/查询写错直接裸抛，调度器会把它降级成 _error，前端永远
+# 显示"数据获取失败"——属静默契约破裂。本守卫遍历全部已注册 resolver，用"任意
+# 查询都返回空结果"的 AsyncMock db 驱动它们走"无数据降级"分支，断言：
+#   1. resolver 不裸抛异常（导入路径/查询结构正确）
+#   2. 返回值为 dict 且必含 `summary` 键（即便降级分支也要给 summary）
+#
+# 注：本守卫不验证 summary 的具体业务文案（那需真实 DB 数据，见 test_auto_data_
+# resolvers.py 中针对 b15/b22/b23/control_test 等的功能测试）。它只锁死"成功路径
+# 契约形状"，防止新增 resolver 漏 summary 或写坏导入。
+# 曾用本守卫的探针抓出 2 个真 bug：b3_independence_status（导入不存在的 ORM 类
+# ChecklistResponse + 查不存在的 wp_code 列）、related_party_disclosure_check
+# （导入不存在的 app.models.disclosure_models）。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _make_empty_result_db() -> AsyncMock:
+    """构造一个对任意查询都返回"空结果"的 AsyncMock db。
+
+    覆盖 resolver 取数的全部惯用形态：scalar / scalar_one_or_none / first /
+    one / fetchall / fetchone / all，统一给空值，迫使 resolver 走无数据降级分支。
+    """
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalar.return_value = 0
+    result.scalar_one_or_none.return_value = None
+    result.first.return_value = None
+    result.one.return_value = (0, 0)
+    result.fetchall.return_value = []
+    result.fetchone.return_value = None
+    result.all.return_value = []
+    db.execute = AsyncMock(return_value=result)
+    return db
+
+
+# resolver 可选 kwargs 的合理默认值（cycle/wp_code 等域参数）。
+# 给齐这些值，确保需要参数的 resolver 也能走进正常分支而非"未指定"早退
+# （早退分支同样返回含 summary 的 dict，所以给不给都满足契约，这里给齐更贴近真实调用）。
+_RESOLVER_KW_DEFAULTS = {
+    "cycle": "D",
+    "wp_code": "K8",
+    "account_prefix": "6601",
+    "filter_criteria": {},
+}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("source_name", sorted(_REGISTRY.keys()))
+async def test_resolver_success_contract(source_name):
+    """每个已注册 resolver：用空结果 db 驱动，必须不裸抛且返回含 summary 的 dict。"""
+    db = _make_empty_result_db()
+    fn = _REGISTRY[source_name]
+
+    try:
+        result = await fn(db, uuid.uuid4(), 2025, **_RESOLVER_KW_DEFAULTS)
+    except Exception as e:  # noqa: BLE001 — 守卫本身就是要抓裸抛
+        pytest.fail(
+            f"resolver '{source_name}' 直接裸抛 {type(e).__name__}: {e}\n"
+            f"（调度器会把它兜成 _error，前端永远显示'数据获取失败'。"
+            f"常见根因：导入路径写错 / 查询了不存在的列。）"
+        )
+
+    # resolver 允许返回 None（仅调度器对"未注册 source"用），但已注册 resolver
+    # 的成功/降级路径都必须返回 dict 且含 summary。
+    assert isinstance(result, dict), (
+        f"resolver '{source_name}' 返回了 {type(result).__name__} 而非 dict"
+    )
+    assert "summary" in result, (
+        f"resolver '{source_name}' 返回的 dict 缺少 'summary' 键：keys={list(result.keys())}\n"
+        f"（前端按 summary 渲染，缺失会导致空白/报错。）"
+    )
+    assert isinstance(result["summary"], str) and result["summary"], (
+        f"resolver '{source_name}' 的 summary 必须是非空字符串，实际：{result['summary']!r}"
+    )
+
+
+@pytest.mark.anyio
+async def test_resolver_contract_covers_all_registered():
+    """元测试：确认契约守卫确实覆盖了全部已注册 resolver（防参数化漏项）。"""
+    # 参数化用的是 _REGISTRY 快照；此测试确认 registry 非空且数量合理。
+    assert len(_REGISTRY) >= 40, f"resolver 数量异常偏少：{len(_REGISTRY)}"

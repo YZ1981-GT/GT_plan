@@ -216,7 +216,7 @@ async def _resolve_related_party_disclosure(db: AsyncSession, project_id: UUID, 
     返回结构: {"summary": str}（含交易笔数和披露章节数量对比）
     """
     from app.models.related_party_models import RelatedPartyTransaction
-    from app.models.disclosure_models import DisclosureNote
+    from app.models.report_models import DisclosureNote
     txn_count = (await db.execute(sa.select(sa.func.count()).select_from(RelatedPartyTransaction).where(
         RelatedPartyTransaction.project_id == project_id, RelatedPartyTransaction.is_deleted == sa.false(),
     ))).scalar() or 0

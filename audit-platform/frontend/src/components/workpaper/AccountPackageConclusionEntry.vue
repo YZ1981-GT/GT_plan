@@ -50,6 +50,10 @@ const props = defineProps<{
   hasAiDraft?: boolean
 }>()
 
+const emit = defineEmits<{
+  (e: 'enter-conclusion', conclusionCode: string): void
+}>()
+
 const conclusionCode = computed(() => `${props.primaryWpCode}-C`)
 
 // 结论状态：当有 AI 草稿时显示"AI 草稿待确认"
@@ -63,8 +67,8 @@ const conclusionStatusLabel = computed(() => {
 })
 
 function handleEnterConclusion() {
-  // 后续跳转到结论 sheet
-  console.log('[AccountPackageConclusionEntry] navigate to conclusion:', conclusionCode.value)
+  // 向父组件冒泡，由父级跳转到结论 sheet
+  emit('enter-conclusion', conclusionCode.value)
 }
 </script>
 

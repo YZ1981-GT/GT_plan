@@ -11,7 +11,7 @@
  *  - 比率分析：按 6 大类分组，公式 + 分子分母 + 指标值 + 增减箭头
  *  - 颜色编码：significant=红底，attention=黄底
  *  - 变动原因列可编辑（debounce 2s 自动保存）
- *  - 科目行点击跳转对应循环底稿（预留 console.log）
+ *  - 科目行点击跳转对应循环底稿（emit navigate-row，由父级处理跳转）
  */
 import { ref, computed, reactive, watch, onBeforeUnmount } from 'vue'
 import { api } from '@/services/apiProxy'
@@ -127,6 +127,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   (e: 'save'): void
+  (e: 'navigate-row', payload: { rowCode: string; name: string }): void
 }>()
 
 // ─── State ───
@@ -225,10 +226,9 @@ function getIndentStyle(row: SheetRow): Record<string, string> {
   return { paddingLeft: `${(row.indent_level || 0) * 16}px` }
 }
 
-// ─── Methods: Row click (跳转预留) ───
+// ─── Methods: Row click（向父组件冒泡，由父级决定跳转目标循环底稿）───
 function handleRowClick(row: SheetRow) {
-  // TODO: 跳转对应循环底稿（预留，当前 console.log）
-  console.log('[GtAnalyticalReview] 科目行点击跳转预留:', row.row_code, row.name)
+  emit('navigate-row', { rowCode: row.row_code, name: row.name })
 }
 
 // ─── Methods: Reason editing (debounce 2s) ───

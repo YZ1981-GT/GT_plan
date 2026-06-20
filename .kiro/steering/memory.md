@@ -67,8 +67,8 @@ inclusion: always
 - 全局 7 模块改进 ✅；LLM vLLM 跑通（embedding 404 降级 ilike）；知识库收口完成
 - A7-A15/A16/A17/A18 完成阶段底稿 ✅；a21-a25 复核底稿 ✅；核对表/弹窗/分析复核 ✅
 
-### git 状态（2026-06-19）
-- 分支 `work/2026-05-30-wp-specs`，HEAD `6828160b`（+6 PBT 测试），最高迁移 V088
+### git 状态（2026-06-21）
+- 分支 `work/2026-05-30-wp-specs`，HEAD `53f0a497`（大文件拆分 pass3+silent治理+spec归档，87文件 +6377/-5122，已推送），最高迁移 V088
 - **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
@@ -105,6 +105,17 @@ inclusion: always
   - Sprint B `workpaper_fill_service` 1819→30行 Mixin 组合（`wp_fill/` 5 mixin，45 方法仍挂实例供 `service._x()` 测试）；⚠`_review_prompt.load_review_prompt` 因深一层加 1 次 `os.path.dirname` 保 TSJ 路径不变（唯一非逐字改）；顺手删孤儿测试 `TestAIChatService`（引用已删模块 ai_chat_service）
   - Sprint C `working_paper` 1937→400行，共享请求模型抽到 `schemas/workpaper_requests.py`，拆 4 子 router：`wp_editor_router`(727)/`wp_review_router`(405)/`wp_batch_router`(261)/`wp_relation_router`(312)，全部同前缀注册到 router_registry「生命周期/复核」组；helper 随唯一调用方迁移 + working_paper re-export 保向后兼容（test_a16/test_reassignment 依赖）
   - 守卫 `test_wp_large_file_size_guard.py` 转绿；1193+18 测试零回归；app 1522 路由不变；无循环导入
+- **底稿改进调研（2026-06-21，pass3 后）**：silent-exception 清零、override 契约已守卫、3 P0 大文件已拆。剩余项：
+  - **①pass4 大文件(P1，2026-06-21 完成，spec workpaper-module-large-file-split-pass4)**：3 服务文件拆 ≤800，零行为变更，1222 测试零回归，app 1522 路由不变
+    - Sprint A `wp_template_init_service` 1208→769：平级子模块 `wp_template_finder.py`(283)+`wp_template_xlsx_ops.py`(223)，主文件 re-export 保导入路径
+    - Sprint B `wp_standard_conversion_service` 934→584：`wp_conversion/_generate.py` WpConversionGenerateMixin(生成6方法)，mixin 组合保方法挂实例
+    - Sprint C `wp_fine_rule_engine` 892→569：`wp_fine_rule_checks.py`(315)+`wp_fine_rule_util.py`(24,_safe_num)，单向链 engine→checks→util 避循环
+    - 守卫扩 pass4 三目标转绿；`workpaper_models`(826) 本轮未拆(ORM 循环导入风险，后续单独评估)
+  - **②skip 测试盲区(P2)**：~~已实测推翻~~ 真实 D1 模板在仓库内(`wp_templates/D/D1 应收票据.xlsx`)，3 文件 31 测试全 PASSED；skipif 仅精简环境降级且各有合成模板兜底，非盲区，**撤销此建议**
+  - **③凭证 OCR(P2)**：`wp_evidence_ocr_service.py:224` TODO LLM 链路待接入(stub,外部依赖 vLLM/MinerU)
+  - **④resolver 契约(P3,2026-06-21 完成 A 增强版)**：新增全量 resolver 成功契约守卫 PBT(`test_auto_data_resolvers.py`,参数化遍历 51 resolver 喂空结果 mock 断言①不裸抛②返回含非空 summary 的 dict)；**当场抓出 2 个真 bug 并修**：`b3_independence_status`(导入不存在的 ORM 类 ChecklistResponse + 查不存在的 wp_code 列→改裸 SQL JOIN checklist_responses→working_paper→wp_index 按 wp_code='B3')、`related_party_disclosure_check`(导入不存在的 app.models.disclosure_models→改 report_models)；resolver 测试 80 passed,1214 测试零回归,app 1522 路由不变
+  - **⚠ 预存失败(非本次范围)**：`test_checklist_responses_crud` 422(PUT body 校验失败,checklist 路由 schema 问题)，依赖真实 DB、与 resolver 改动无关，先于本次存在，待单独修
+  - **⑤前端底稿组件健康度（2026-06-21 扫描+清理）**：`components/workpaper/` 反模式债≈0（无空 catch）；**已清 3 处预留 console.log→emit 事件**：GtAnalyticalReview(navigate-row)/AccountPackageFieldSource(navigate-sheet)/AccountPackageConclusionEntry(enter-conclusion)，非破坏(父组件原未监听)，GtAnalyticalReview spec 6 passed。剩唯一债=大文件 8 个>800(GtAProgramConsole 1625/GtChecklistTable 1437/GtAuditSheet 1405/GtAnalyticalReview 1336 等，.vue 含 template+script+style 三段)。**前端拆分风险/成本远高于后端**(抽 composable+拆子组件易破坏响应式/事件流，且每个拆完必 Playwright 实测)，建议单独立 spec 逐组件验证、非紧急。views 层更大(LedgerPenetration 3977/TrialBalance 2945)但非底稿核心组件
 - 外部依赖：LLM embedding / 合并 UAT 数据 / GitHub 默认分支改 main
 - A 循环 docx 弹窗（30个待加 WpPopupDocxEditor）
 - A3-8 商誉减值 / A4 经营分部 / A5 现金流（spec 已建未实施）

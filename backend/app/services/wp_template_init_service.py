@@ -8,85 +8,56 @@
 2. 复制到项目底稿存储目录（backend/{project_id}/{wp_id}.xlsx）
 3. 可选：执行 prefill 写入 =TB/=WP 计算值
 4. 返回底稿文件路径供 Univer 前端加载
+
+pass4 拆分（spec workpaper-module-large-file-split-pass4 Req 1）：
+- 模板查找域 → ``wp_template_finder.py``（find_*/_load_index/_normalize_sheet_name 等）
+- xlsx 单元格 helper 域 → ``wp_template_xlsx_ops.py``（_find_*/_mark_*/_extract_*/_is_* 等）
+- 主文件保留 init/prefill/IPO 加载/多文件合并/场景过滤主流程，并 re-export 子模块
+  对外符号，使 ``from app.services.wp_template_init_service import ...`` 导入路径全部不变。
 """
 from __future__ import annotations
 
 import json
 import logging
-import re
 import shutil
 from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
+# pass4: 模板查找域子模块（re-export 保导入路径不变）
+from app.services.wp_template_finder import (  # noqa: F401
+    BACKEND_DIR,
+    INDEX_FILE,
+    TEMPLATES_DIR,
+    _find_docx_by_index_or_disk,
+    _find_docx_on_disk,
+    _load_index,
+    _match_filename_prefix,
+    _normalize_sheet_name,
+    _should_skip_historical_sheet,
+    find_all_template_files,
+    find_template_file,
+    find_template_file_any,
+    list_available_templates,
+)
+
+# pass4: xlsx 单元格 helper 域子模块（prefill 依赖 + re-export 保导入路径不变）
+from app.services.wp_template_xlsx_ops import (  # noqa: F401
+    _extract_adj_type,
+    _extract_tb_column,
+    _find_column_by_keyword,
+    _find_data_column,
+    _find_first_data_row,
+    _find_semantic_row,
+    _is_cell_coordinate,
+    _is_formula_cell,
+    _mark_prefilled_cell,
+    _mark_user_formula_cell,
+)
+
 logger = logging.getLogger(__name__)
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
-TEMPLATES_DIR = BACKEND_DIR / "wp_templates"
-INDEX_FILE = TEMPLATES_DIR / "_index.json"
 STORAGE_DIR = BACKEND_DIR / "wp_storage"
-
-# 缓存模板索引
-_index_cache: list[dict] | None = None
-
-
-# ---------------------------------------------------------------------------
-# F2 / F3 多文件 sheet 合并去重工具（spec workpaper-d-sales-cycle, ADR D2 + D3）
-# ---------------------------------------------------------------------------
-
-
-def _normalize_sheet_name(name: str) -> str:
-    """归一化 sheet 名（spec D2 ADR）。
-
-    规则（按顺序）:
-      1. 中文圆括号 `（…）` → 英文 `(…)`，并 strip 首尾空白
-      2. 含 `GT_Custom` → 归一为 `"GT_Custom"`（多文件 GT 内部 sheet 视为同名）
-      3. 含 `底稿目录` → 归一为 `"底稿目录"`（多文件底稿目录视为同名）
-      4. 其他：剔除全部空白字符（含中间空格、tab、全角空格）后返回
-
-    幂等：normalize(normalize(x)) == normalize(x)（PBT P2 验证）
-    """
-    if name is None:
-        return ""
-    n = str(name).replace("（", "(").replace("）", ")").strip()
-    if "GT_Custom" in n:
-        return "GT_Custom"
-    if "底稿目录" in n:
-        return "底稿目录"
-    # 剔除内部所有空白（中英文、全角、tab、换行）以避免空格差异导致漏去重
-    return re.sub(r"\s+", "", n)
-
-
-def _should_skip_historical_sheet(name: str) -> bool:
-    """判断是否为历史遗留 sheet（spec D3 ADR + F-F2 ADR-F3 + J-F1 — 应在归一化前过滤）。
-
-    匹配规则（任一命中即跳过）:
-      - 含 "修订前"（如 "主营业务收入审计程序表 D4A（修订前）"、"G1A-修订前"）
-      - 含 "（原）" 或 "(原)"（如 "D7A（原）"、"D8A(原)"）
-      - 含 G+数字 编号且含 "删除" 或 "移至"（F 循环新模式：F2-38/F2-47/F2-52
-        含 "存货计价测试程序G2-8-删除"、"G2-8-4-移至分析类" 等历史遗留 sheet）
-      - 以 "-删除" 结尾（J 循环通用模式：如 "股份支付检查表J1-10-删除"、
-        "IPO企业股权激励工具关注的审计重点-删除"、"首发业务解答二-删除"）
-      - 含 "（示例）"/"(示例)"，或以 "示例"/"示例）"/"示例)" 结尾（F 循环示例 sheet：
-        "函证差异检查表（示例）"、"合同履约成本测试（示例）"、"访谈记录与核对示例"）
-    """
-    if name is None:
-        return False
-    s = str(name)
-    if "修订前" in s or "（原）" in s or "(原)" in s:
-        return True
-    # F-F2 ADR-F3: G+数字编号 + 删除/移至（注意 G 不限于开头位置）
-    if re.search(r"G\d+", s) and ("删除" in s or "移至" in s):
-        return True
-    # J-F1: 以 "-删除" 结尾的通用历史遗留模式（J 循环 5 个 sheet）
-    if s.endswith("-删除"):
-        return True
-    # F-F2 ADR-F3: 示例 sheet（括号包裹或末尾）
-    if "（示例）" in s or "(示例)" in s:
-        return True
-    if s.endswith("示例") or s.endswith("示例）") or s.endswith("示例)"):
-        return True
-    return False
 
 
 # ---------------------------------------------------------------------------
@@ -484,187 +455,6 @@ def _merge_sheets_dedup(
     return stats
 
 
-def _load_index() -> list[dict]:
-    """加载模板索引（带缓存）"""
-    global _index_cache
-    if _index_cache is not None:
-        return _index_cache
-    if not INDEX_FILE.exists():
-        logger.warning("模板索引文件不存在: %s", INDEX_FILE)
-        return []
-    with open(INDEX_FILE, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    _index_cache = data.get("files", [])
-    return _index_cache
-
-
-def find_template_file(wp_code: str) -> Path | None:
-    """根据 wp_code 查找主模板文件
-
-    优先匹配：含"审定表"或"常规程序"的文件 > 文件名最短的。
-    对于多文件底稿（如 D2 有 D2-1至D2-4），返回审定表文件。
-    对于子表（如 D2-2/E1-3），如果独立文件不存在，回退到主表文件
-    （主表 xlsx 通常包含所有子表 sheet，如 "D2-1至D2-4 应收账款-审定表明细表"）。
-    """
-    index = _load_index()
-    # 精确匹配
-    candidates = [
-        e for e in index
-        if e["wp_code"] == wp_code and e["format"] in ("xlsx", "xlsm")
-    ]
-    if candidates:
-        # 优先选择含"审定表"或"常规程序"的文件
-        for c in candidates:
-            if "审定表" in c["filename"] or "常规程序" in c["filename"]:
-                full_path = TEMPLATES_DIR / c["relative_path"]
-                if full_path.exists():
-                    return full_path
-        # 其次选择文件名最短的
-        candidates.sort(key=lambda e: len(e["filename"]))
-        rel_path = candidates[0]["relative_path"]
-        full_path = TEMPLATES_DIR / rel_path
-        if full_path.exists():
-            return full_path
-
-    # 模糊匹配：文件名以 wp_code 开头
-    prefix = wp_code[0]
-    template_subdir = TEMPLATES_DIR / prefix
-    if template_subdir.exists():
-        # 优先含"审定表"
-        for f in sorted(template_subdir.iterdir()):
-            if f.name.startswith(wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
-                if "审定表" in f.name or "常规程序" in f.name:
-                    return f
-        # 其次最短文件名
-        for f in sorted(template_subdir.iterdir(), key=lambda x: len(x.name)):
-            if f.name.startswith(wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
-                return f
-
-        # 子表回退：如 D2-2 找不到，尝试包含范围式命名的文件（D2-1至D2-4）
-        if "-" in wp_code:
-            primary = wp_code.split("-")[0]
-            sub_num = wp_code.split("-")[1]
-            for f in sorted(template_subdir.iterdir()):
-                if f.suffix.lower() not in (".xlsx", ".xlsm"):
-                    continue
-                # 匹配模式: 文件名含 "{primary}-N至{primary}-M" 且 sub_num 在范围内
-                if f.name.startswith(primary + "-") and "至" in f.name:
-                    # 简单包含检查
-                    return f
-            # 终极回退：用主表
-            for f in sorted(template_subdir.iterdir()):
-                if f.name.startswith(primary + " ") and f.suffix.lower() in (".xlsx", ".xlsm"):
-                    return f
-
-    return None
-
-
-def find_all_template_files(wp_code: str) -> list[Path]:
-    """查找 wp_code 对应的所有模板文件（多文件底稿）"""
-    is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
-    if is_sub_code:
-        single = find_template_file_any(wp_code)
-        return [single] if single else []
-
-    index = _load_index()
-    candidates = [
-        e for e in index
-        if e["wp_code"] == wp_code and e["format"] in ("xlsx", "xlsm", "docx")
-    ]
-    results = []
-    for c in candidates:
-        full_path = TEMPLATES_DIR / c["relative_path"]
-        if full_path.exists():
-            results.append(full_path)
-    return results
-
-
-def _match_filename_prefix(filename: str, wp_code: str) -> bool:
-    """True if filename belongs to sub-code wp_code (A9-1向… or A10-1 …)."""
-    if filename.startswith(f"{wp_code} "):
-        return True
-    if filename.startswith(wp_code) and re.match(rf"^{re.escape(wp_code)}(\s|[^-\d])", filename):
-        return True
-    return False
-
-
-def _find_docx_on_disk(wp_code: str) -> Path | None:
-    prefix = wp_code[0] if wp_code else ""
-    subdir = TEMPLATES_DIR / prefix
-    if not subdir.exists():
-        return None
-    matches = sorted(
-        f for f in subdir.iterdir()
-        if f.suffix.lower() in (".docx", ".doc") and _match_filename_prefix(f.name, wp_code)
-    )
-    return matches[0] if matches else None
-
-
-def _find_docx_by_index_or_disk(wp_code: str) -> Path | None:
-    index = _load_index()
-    prefix_matches = [
-        e for e in index
-        if e["format"] in ("docx", "doc") and _match_filename_prefix(e["filename"], wp_code)
-    ]
-    if prefix_matches:
-        prefix_matches.sort(key=lambda e: len(e["filename"]))
-        full_path = TEMPLATES_DIR / prefix_matches[0]["relative_path"]
-        if full_path.exists():
-            return full_path
-    return _find_docx_on_disk(wp_code)
-
-
-def find_template_file_any(wp_code: str) -> Path | None:
-    """Find template file of any format (xlsx/xlsm/docx/doc)
-
-    P2-2: 扩展模板查找支持 docx/doc 格式。
-    优先返回 xlsx/xlsm，其次 docx/doc。
-    PRE-1: 子码 docx（索引挂父 wp_code）按文件名前缀 fallback；
-    子码（A9-1 等）**禁止**回退到父程序表 xlsx。
-    """
-    is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
-
-    if is_sub_code:
-        # docx 子码优先（A9-1、A10-1…）
-        docx = _find_docx_by_index_or_disk(wp_code)
-        if docx:
-            return docx
-        # xlsx 子码（A7-1、A10-2…）：仅匹配同名前缀文件
-        index = _load_index()
-        xlsx_matches = [
-            e for e in index
-            if e["format"] in ("xlsx", "xlsm") and _match_filename_prefix(e["filename"], wp_code)
-        ]
-        if xlsx_matches:
-            xlsx_matches.sort(key=lambda e: len(e["filename"]))
-            full_path = TEMPLATES_DIR / xlsx_matches[0]["relative_path"]
-            if full_path.exists():
-                return full_path
-        prefix = wp_code[0]
-        subdir = TEMPLATES_DIR / prefix
-        if subdir.exists():
-            for f in sorted(subdir.iterdir()):
-                if f.suffix.lower() in (".xlsx", ".xlsm") and _match_filename_prefix(f.name, wp_code):
-                    return f
-        return None
-
-    # 主程序表：xlsx 优先
-    result = find_template_file(wp_code)
-    if result:
-        return result
-    index = _load_index()
-    candidates = [
-        e for e in index
-        if e["wp_code"] == wp_code and e["format"] in ("docx", "doc")
-    ]
-    if candidates:
-        rel_path = candidates[0]["relative_path"]
-        full_path = TEMPLATES_DIR / rel_path
-        if full_path.exists():
-            return full_path
-    return _find_docx_by_index_or_disk(wp_code)
-
-
 def get_workpaper_storage_path(project_id: UUID, wp_id: UUID) -> Path:
     """获取底稿文件存储路径"""
     storage = STORAGE_DIR / str(project_id)
@@ -973,236 +763,7 @@ def prefill_workpaper_xlsx(
     return filled_count
 
 
-def _extract_tb_column(formula: str) -> str:
-    """从 =TB('1122','期末余额') 提取列名"""
-    import re
-    m = re.search(r"'([^']+)'\s*\)$", formula)
-    return m.group(1) if m else "期末余额"
-
-
-def _extract_adj_type(formula: str) -> str:
-    """从 =ADJ('1122','aje_net') 提取类型"""
-    import re
-    m = re.search(r"'(aje_net|rje_net)'", formula)
-    return m.group(1) if m else "aje_net"
-
-
-def _is_cell_coordinate(ref: str) -> bool:
-    """判断 cell_ref 是否为实际单元格坐标（如 E8, AA12）"""
-    import re
-    return bool(re.match(r'^[A-Z]{1,3}\d{1,5}$', ref, re.IGNORECASE))
-
-
-def _is_formula_cell(cell) -> bool:
-    """E1 spec Task 1.1: 判断单元格是否含 Excel 公式
-
-    用于 prefill 写入前检查 — 凡 cell.value 以 "=" 开头的均视为公式 cell,
-    prefill 必须跳过避免覆盖（如 E1-2!B22 = SUM(B15:B21) 合计公式）。
-    """
-    val = getattr(cell, "value", None)
-    if val is None:
-        return False
-    if not isinstance(val, str):
-        return False
-    return val.lstrip().startswith("=")
-
-
-def _find_column_by_keyword(ws, keyword: str) -> int | None:
-    """双维度策略：在前 10 行中查找包含关键词的列号
-
-    致同模板标准结构：第 5-6 行是列头（期初数/未审数/账项调整/重分类调整/审定数）。
-    找到关键词所在列后，数据写入该列的数据行。
-    """
-    col_keywords = {
-        "期初余额": ["期初", "年初", "期初数", "年初数"],
-        "未审数": ["未审", "未审数", "期末数"],
-        "AJE调整": ["AJE", "账项调整", "审计调整"],
-        "RJE调整": ["RJE", "重分类调整", "重分类"],
-        "上年审定数": ["上年", "审定数"],
-        # 子科目分项：在 A 列找科目名称行
-        "库存现金_期初": ["库存现金", "现金"],
-        "银行存款_期初": ["银行存款"],
-        "其他货币资金_期初": ["其他货币资金"],
-        "原材料_期初": ["原材料"],
-        "在产品_期初": ["在产品"],
-        "库存商品_期初": ["库存商品"],
-        "工程物资_期初": ["工程物资"],
-        "委托加工物资_期初": ["委托加工"],
-        "存货跌价准备_期初": ["跌价准备"],
-        "其他业务成本_期初": ["其他业务成本"],
-        "累计折旧_期初": ["累计折旧"],
-        "累计摊销_期初": ["累计摊销"],
-        "折旧": ["折旧"],
-        "薪酬": ["薪酬", "工资"],
-        "摊销": ["摊销"],
-    }
-    # 也处理 _未审数 后缀（与 _期初 共享科目关键词）
-    base_keyword = keyword.replace("_未审数", "_期初").replace("_期初", "_期初")
-    terms = col_keywords.get(keyword) or col_keywords.get(base_keyword, [keyword])
-
-    for row in ws.iter_rows(min_row=1, max_row=10, max_col=20):
-        for cell in row:
-            if cell.value and isinstance(cell.value, str):
-                if any(t in cell.value for t in terms):
-                    return cell.column
-    return None
-
-
-def _find_first_data_row(ws, col_idx: int) -> int | None:
-    """找到指定列的第一个数据行（列头下方，跳过标题行）
-
-    从第 7 行开始找（致同模板前 6 行通常是标题+列头），
-    返回第一个空单元格或数字单元格的行号。
-    """
-    for row_num in range(7, 50):
-        cell = ws.cell(row=row_num, column=col_idx)
-        # 空单元格或已有数字（可覆盖）
-        if cell.value is None or isinstance(cell.value, (int, float)):
-            return row_num
-        # 如果是公式（以=开头），也可以覆盖
-        if isinstance(cell.value, str) and cell.value.startswith("="):
-            return row_num
-    return None
-
-
-def _mark_prefilled_cell(ws, cell) -> None:
-    """P2-1: 为预填充的单元格设置浅蓝色背景标记
-
-    用户可通过背景色识别哪些单元格是系统自动填入的。
-    同时在单元格 comment 中记录来源信息。
-    """
-    from openpyxl.styles import PatternFill
-    from openpyxl.comments import Comment
-
-    # 浅蓝色背景（与 AI 内容标记一致）
-    prefill_fill = PatternFill(start_color="E8F4FD", end_color="E8F4FD", fill_type="solid")
-    try:
-        cell.fill = prefill_fill
-        # 添加批注说明来源
-        if not cell.comment:
-            cell.comment = Comment("系统预填充：数据来自试算表", "系统")
-    except Exception as e:
-        logger.debug("设置预填充 cell 样式失败（只读单元格）: %s", e)
-
-
-def _mark_user_formula_cell(ws, cell) -> None:
-    """E1 spec Task 1.20: 为用户自定义公式 cell 设置浅绿色背景标记
-
-    用户公式与系统预设公式视觉区分:
-    - 系统预设(_mark_prefilled_cell): 浅蓝 #E8F4FD
-    - 用户自定义(_mark_user_formula_cell): 浅绿 #E6F4EA
-    """
-    from openpyxl.styles import PatternFill
-    from openpyxl.comments import Comment
-
-    user_fill = PatternFill(start_color="E6F4EA", end_color="E6F4EA", fill_type="solid")
-    try:
-        cell.fill = user_fill
-        if not cell.comment:
-            cell.comment = Comment("用户自定义公式", "用户")
-    except Exception as e:
-        logger.debug("设置用户公式 cell 样式失败（只读单元格）: %s", e)
-
-
-def _find_semantic_row(ws, keyword: str, wp_code: str = "", cell_ref: str = "") -> int | None:
-    """在 sheet 中查找包含关键词的位置
-
-    致同模板有两种布局：
-    1. 行标签模式：A 列有"期初余额"等标签，数据在同行的 E/F 列
-    2. 列头模式：第 5-6 行有"期初数"/"未审数"等列头，数据在该列的数据行
-
-    本函数优先在 A-D 列的行标签中找，其次在前 10 行的列头中找。
-    """
-    search_terms = {
-        "期初余额": ["期初", "年初", "上年末", "期初余额", "年初数", "上年期末", "期初数", "期初金额"],
-        "未审数": ["未审", "期末余额", "未审数", "账面余额", "账面数", "未审定", "期末数", "未审金额"],
-        "AJE调整": ["AJE", "审计调整", "调整分录", "审计调整数", "账项调整", "审计调整额", "调整数"],
-        "RJE调整": ["RJE", "重分类", "重分类调整", "重分类数", "重分类金额", "重分类"],
-        "上年审定数": ["上年", "上期", "上年审定", "上年审定数", "上期审定", "上年数", "上年末", "审定数"],
-        # 子科目分项（E1/F2 等多科目底稿）
-        "库存现金_期初": ["库存现金", "现金"],
-        "库存现金_未审数": ["库存现金", "现金"],
-        "银行存款_期初": ["银行存款", "银行"],
-        "银行存款_未审数": ["银行存款", "银行"],
-        "其他货币资金_期初": ["其他货币资金", "其他货币"],
-        "其他货币资金_未审数": ["其他货币资金", "其他货币"],
-        "原材料_期初": ["原材料"],
-        "原材料_未审数": ["原材料"],
-        "在产品_期初": ["在产品", "在制品"],
-        "在产品_未审数": ["在产品", "在制品"],
-        "库存商品_期初": ["库存商品", "产成品"],
-        "库存商品_未审数": ["库存商品", "产成品"],
-        "工程物资_期初": ["工程物资"],
-        "工程物资_未审数": ["工程物资"],
-        "委托加工物资_期初": ["委托加工", "委外加工"],
-        "委托加工物资_未审数": ["委托加工", "委外加工"],
-        "存货跌价准备_期初": ["跌价准备", "存货跌价"],
-        "存货跌价准备_未审数": ["跌价准备", "存货跌价"],
-        "其他业务成本_期初": ["其他业务成本", "其他成本"],
-        "其他业务成本_未审数": ["其他业务成本", "其他成本"],
-        "累计折旧_期初": ["累计折旧"],
-        "累计折旧_未审数": ["累计折旧"],
-        "累计摊销_期初": ["累计摊销"],
-        "累计摊销_未审数": ["累计摊销"],
-        "折旧": ["折旧", "折旧费", "折旧摊销"],
-        "薪酬": ["薪酬", "工资", "职工薪酬", "人工"],
-        "摊销": ["摊销", "摊销费", "无形资产摊销"],
-    }
-    terms = search_terms.get(keyword, [keyword])
-
-    # 策略 1：在 A-D 列的行标签中找（标准行标签模式）
-    for row in ws.iter_rows(min_row=1, max_row=80, max_col=4):
-        for cell in row:
-            if cell.value and isinstance(cell.value, str):
-                if any(t in cell.value for t in terms):
-                    return cell.row
-
-    # 策略 2：在前 10 行的所有列中找列头（致同列头模式）
-    # 如果找到列头，返回该列头所在行+1（数据起始行）
-    for row in ws.iter_rows(min_row=1, max_row=10, max_col=20):
-        for cell in row:
-            if cell.value and isinstance(cell.value, str):
-                if any(t in cell.value for t in terms):
-                    # 找到列头，返回下一行（数据行）或当前行
-                    return cell.row
-
-    logger.warning(
-        "prefill 语义行未匹配: wp_code=%s, keyword=%s, cell_ref=%s (请人工复查模板结构)",
-        wp_code, keyword, cell_ref,
-    )
-    return None
-
-
-def _find_data_column(ws, row_num: int) -> int:
-    """找到数据列（第一个数字列或 E 列）"""
-    for col in range(3, 20):  # C 列开始找
-        cell = ws.cell(row=row_num, column=col)
-        if cell.value is None or isinstance(cell.value, (int, float)):
-            return col
-    return 5  # 默认 E 列
-
-
 def get_workpaper_file(project_id: UUID, wp_id: UUID) -> Optional[Path]:
     """获取已存在的底稿文件路径（如果存在）"""
     path = get_workpaper_storage_path(project_id, wp_id)
     return path if path.exists() else None
-
-
-def list_available_templates() -> list[dict]:
-    """列出所有可用模板（供前端选择）"""
-    index = _load_index()
-    # 按 wp_code 去重，只返回主文件
-    seen = set()
-    result = []
-    for e in sorted(index, key=lambda x: (x["wp_code"], len(x["filename"]))):
-        code = e["wp_code"]
-        if code in seen or code == "_ref":
-            continue
-        seen.add(code)
-        result.append({
-            "wp_code": code,
-            "filename": e["filename"],
-            "format": e["format"],
-            "size_kb": e["size_kb"],
-        })
-    return result

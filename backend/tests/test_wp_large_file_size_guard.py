@@ -20,6 +20,13 @@ _TARGETS = [
     ["app/services/auto_data_resolvers.py", "app/services/auto_data_resolvers/__init__.py"],
 ]
 
+# pass4 拆分目标（服务层 3 文件）
+_TARGETS_PASS4 = [
+    "app/services/wp_template_init_service.py",
+    "app/services/wp_standard_conversion_service.py",
+    "app/services/wp_fine_rule_engine.py",
+]
+
 # pass2 已达标，绝不能因本次拆分回升超标
 _MUST_STAY_SMALL = [
     "app/routers/wp_render_config.py",
@@ -66,3 +73,14 @@ def test_pass2_files_not_regressed():
             if n > _LIMIT:
                 violations.append(f"{rel}: {n} 行 > {_LIMIT}")
     assert not violations, "pass2 已达标文件意外回升超标:\n" + "\n".join(f"  {v}" for v in violations)
+
+
+def test_pass4_target_files_within_limit():
+    """3 个 pass4 服务层目标文件行数 ≤800（拆分前红灯，拆分后全绿）。"""
+    violations = []
+    for rel in _TARGETS_PASS4:
+        assert os.path.isfile(os.path.join(_BACKEND, rel)), f"目标文件不存在: {rel}"
+        n = _line_count(rel)
+        if n > _LIMIT:
+            violations.append(f"{rel}: {n} 行 > {_LIMIT}")
+    assert not violations, "以下 pass4 目标文件仍超标:\n" + "\n".join(f"  {v}" for v in violations)
