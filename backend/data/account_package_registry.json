@@ -62,9 +62,9 @@
       "schema_refs": ["D2A.yaml", "D-D2-8.yaml", "D-D2-13.yaml", "C-D2-disclosure.yaml"],
       "generated_inventory_refs": ["generated/D2.yaml", "generated/D2-1.yaml", "generated/D2-5.yaml", "generated/D2-6.yaml"],
       "sheets": [
-        { "sheet_name": "D2A 应收账款实质性程序表", "sheet_type": "control_panel", "source_wp_code": "D2", "schema_ref": "D2A.yaml" },
+        { "sheet_name": "应收账款实质性程序表D2A", "sheet_type": "control_panel", "source_wp_code": "D2", "schema_ref": "D2A.yaml" },
         { "sheet_name": "审定表D2-1", "sheet_type": "audit_sheet", "source_wp_code": "D2" },
-        { "sheet_name": "应收账款明细表D2-2", "sheet_type": "detail_table", "source_wp_code": "D2" },
+        { "sheet_name": "明细表D2-2", "sheet_type": "detail_table", "source_wp_code": "D2" },
         { "sheet_name": "坏账准备明细表D2-3", "sheet_type": "analysis", "source_wp_code": "D2" },
         { "sheet_name": "调整分录汇总表D2-4", "sheet_type": "adjustment", "source_wp_code": "D2" },
         { "sheet_name": "应收账款分析表D2-5", "sheet_type": "analysis", "source_wp_code": "D2-5" },
@@ -80,10 +80,10 @@
         { "sheet_name": "坏账准备计提会计政策检查D2-8", "sheet_type": "procedure", "source_wp_code": "D2-6", "schema_ref": "D-D2-8.yaml" },
         { "sheet_name": "应收坏账准备测算D2-9", "sheet_type": "analysis", "source_wp_code": "D2-6" },
         { "sheet_name": "预期信用损失的计量测试D2-10", "sheet_type": "analysis", "source_wp_code": "D2-6" },
-        { "sheet_name": "坏账准备转回核销检查表D2-11", "sheet_type": "procedure", "source_wp_code": "D2-6" },
+        { "sheet_name": "坏账准备转回（收回）、核销检查表D2-11", "sheet_type": "procedure", "source_wp_code": "D2-6" },
         { "sheet_name": "应收账款质押出售情况检查表D2-12", "sheet_type": "procedure", "source_wp_code": "D2-6" },
         { "sheet_name": "应收账款业务模式分析D2-13", "sheet_type": "analysis", "source_wp_code": "D2-6", "schema_ref": "D-D2-13.yaml" },
-        { "sheet_name": "应收账款附注披露信息", "sheet_type": "disclosure", "source_wp_code": "D2", "schema_ref": "C-D2-disclosure.yaml" }
+        { "sheet_name": "附注披露信息(上市公司)", "sheet_type": "disclosure", "source_wp_code": "D2", "schema_ref": "C-D2-disclosure.yaml" }
       ],
       "external_cards": ["confirmation_summary", "adjustment_impact", "note_disclosure"],
       "downstream": ["report", "disclosure_note", "sign_off"],
