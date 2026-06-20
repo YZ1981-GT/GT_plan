@@ -71,10 +71,10 @@ class TestSheetTypeMapping:
 class TestResolveD2Package:
     @pytest.mark.asyncio
     async def test_d2_returns_all_sheets(self):
-        """D2 应收账款聚合返回注册表声明的全部 sheet（14）+ 合成底稿目录（≥15）。"""
+        """D2 应收账款聚合返回注册表声明的全部 sheet（23）+ 合成底稿目录（≥24）。"""
         results = await resolve_package_sheets(None, "D2", _DUMMY_PID)
         assert results is not None
-        assert len(results) >= 15
+        assert len(results) >= 24
 
     @pytest.mark.asyncio
     async def test_d2_has_synthetic_directory(self):
@@ -105,6 +105,25 @@ class TestResolveD2Package:
         assert any("分析表D2-5" in n for n in names), "遗漏 D2-5 分析表"
         assert any("D2-6" in n for n in names), "遗漏 D2-6 检查表"
         assert any("D2-13" in n for n in names), "遗漏 D2-13"
+
+    @pytest.mark.asyncio
+    async def test_d2_includes_d0_confirmation_sheets(self):
+        """聚合包含 D0 函证系列（D0-1~D0-8），支持跳转到函证底稿。"""
+        results = await resolve_package_sheets(None, "D2", _DUMMY_PID)
+        assert results is not None
+        names = [r.sheet_name for r in results]
+        assert any("D0-1" in n for n in names), "遗漏 D0-1 函证结果汇总表"
+        assert any("D0-4" in n for n in names), "遗漏 D0-4 函证差异调节表"
+        assert any("D0-8" in n for n in names), "遗漏 D0-8 舞弊风险评价表"
+
+    @pytest.mark.asyncio
+    async def test_d2_includes_d2_11_d2_12(self):
+        """聚合包含 D2-11 坏账转回 + D2-12 质押出售（之前遗漏）。"""
+        results = await resolve_package_sheets(None, "D2", _DUMMY_PID)
+        assert results is not None
+        names = [r.sheet_name for r in results]
+        assert any("D2-11" in n for n in names), "遗漏 D2-11 坏账转回"
+        assert any("D2-12" in n for n in names), "遗漏 D2-12 质押出售"
 
     @pytest.mark.asyncio
     async def test_d1_returns_sheets(self):
