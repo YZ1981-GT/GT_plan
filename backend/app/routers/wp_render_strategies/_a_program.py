@@ -126,13 +126,25 @@ async def render(ctx: RenderContext) -> dict | None:
     if isinstance(ctx.sheet_html_data, dict) and ctx.sheet_html_data.get("programs"):
         return None
 
+    # 多文件聚合：程序表 sheet（如 D2 父码下的 "D2A 应收账款实质性程序表"）的
+    # procedure_table 模板与模板文件应按 **sheet 级编码**（D2A）解析，而非父码 wp_code(D2)。
+    # 从 sheet 名提取程序表编码（如 D2A/D4A），提取不到回退父 wp_code。
+    import re as _re
+    _sheet_code = ctx.wp_code
+    _m = _re.search(r"([A-Z]\d+[A-Z](?:-\d+)*|[A-Z]\d+-\d+)", ctx.classification.sheet_name or "")
+    if _m:
+        _sheet_code = _m.group(1)
+    # 程序表内容来自 sheet 自己的来源模板（聚合 source_files），否则全局模板路径
+    _src_files = [f for f in (getattr(ctx, "source_files", None) or []) if f]
+    _file_path = _src_files[0] if _src_files else ctx.template_file_path
+
     sheet_html_data = await _generate_a_program_data(
-        file_path=ctx.template_file_path,
+        file_path=_file_path,
         sheet_name=ctx.classification.sheet_name,
         existing=ctx.sheet_html_data if isinstance(ctx.sheet_html_data, dict) else None,
         db=ctx.db,
         project_id=ctx.project_id,
-        wp_code=ctx.wp_code,
+        wp_code=_sheet_code,
         year=ctx.year,
         business_category=ctx.business_category,
     )

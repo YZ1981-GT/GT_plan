@@ -75,7 +75,8 @@
         >
           <template #reference>
             <el-button size="small" class="gt-wp-renderer__switch-btn">
-              🗂️ 切换底稿
+              <el-icon class="gt-wp-renderer__switch-icon"><Switch /></el-icon>
+              切换
             </el-button>
           </template>
           <div class="gt-wp-renderer__switch-tree">
@@ -176,6 +177,7 @@
 import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Switch } from '@element-plus/icons-vue'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
@@ -597,6 +599,11 @@ function onOpenFormula(payload: { sheetName: string }) {
   margin-top: 2px;
   border-color: var(--el-color-primary-light-5);
   color: var(--el-color-primary);
+}
+
+.gt-wp-renderer__switch-icon {
+  margin-right: 4px;
+  vertical-align: -2px;
 }
 
 .gt-wp-renderer__sheet-tabs-inner {
