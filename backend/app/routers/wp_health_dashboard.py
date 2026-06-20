@@ -84,7 +84,8 @@ async def get_workpaper_health(
         )
         stats["open_annotations"] = result.scalar() or 0
 
-    except Exception:
-        pass  # Return default stats on error
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("查询底稿健康度统计失败: %s", e)
 
     return stats

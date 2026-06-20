@@ -307,10 +307,8 @@ class TestTask36ExpenseDetailResolver:
 
     def test_ledger_detail_resolver_exists(self):
         """ledger_detail_for_account resolver 在 auto_data_resolvers 中注册。"""
-        from app.services import auto_data_resolvers
-        import inspect
-        src = inspect.getsource(auto_data_resolvers)
-        assert "ledger_detail_for_account" in src
+        from app.services.auto_data_resolvers import get_registered_sources
+        assert "ledger_detail_for_account" in get_registered_sources()
 
     def test_k8_3_analysis_is_audit_sheet(self):
         """K8-3 费用分析走 audit-sheet（同比/环比趋势分析）。"""

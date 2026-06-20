@@ -378,8 +378,8 @@ def get_workpaper_structure(
             else:
                 with open(structure_path, "r", encoding="utf-8") as f:
                     return json.load(f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("读取 structure.json 缓存失败，将重建 %s: %s", file_path, e)
 
     # 重新生成
     return generate_structure_for_workpaper(

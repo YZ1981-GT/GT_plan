@@ -98,8 +98,9 @@ async def search_workpapers(
                     "match_field": "filename",
                 })
 
-    except Exception:
-        pass  # Return partial results on error
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("底稿搜索失败，返回部分结果: %s", e)  # Return partial results on error
 
     return {
         "query": q,

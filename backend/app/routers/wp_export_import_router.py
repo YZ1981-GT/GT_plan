@@ -312,8 +312,8 @@ async def import_validate(
         if wp_code:
             _schema_svc = WpRenderSchemaService()
             render_schema = _schema_svc.load_schema(wp_code=wp_code)
-    except Exception:
-        pass  # render_schema 加载失败时仅做 MIME 校验
+    except Exception as e:
+        logger.warning("导出校验加载 render_schema 失败（仅做 MIME 校验）: %s", e)
 
     validator = FormatValidator()
     report = validator.validate(

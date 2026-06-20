@@ -128,11 +128,13 @@ async def get_prerequisite_status(
             result = await db.execute(query, {"pid": str(pid), "codes": codes})
             rows = result.mappings().all()
             row_map = {r["wp_code"]: r for r in rows}
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("查询前置底稿状态失败 pid=%s: %s", pid, e)
             try:
                 await db.rollback()
-            except Exception:
-                pass
+            except Exception as re:
+                logging.getLogger(__name__).debug("rollback 失败: %s", re)
             row_map = {}
 
         for p in prereq_list:

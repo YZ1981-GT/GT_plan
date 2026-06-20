@@ -101,8 +101,8 @@ async def _generate_a_program_data(
                         prog["execution_summary"] = saved["execution_summary"]
                     if "status" in saved and saved["status"]:
                         prog["status"] = saved["status"]
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as e:  # noqa: BLE001
+            logger.warning("加载程序表 override 失败 wp_code=%s: %s", wp_code, e)
 
     # 保留已有签字信息（若 sheet 之前存过部分数据）
     if existing and isinstance(existing.get("signatures"), list):

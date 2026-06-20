@@ -497,8 +497,8 @@ def _load_rules_for_wp(wp_code: str) -> dict | None:
             for rule in rules_list:
                 code = rule.get("wp_code", "")
                 _RULES_CACHE[code] = rule
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("加载底稿规则文件失败: %s", e)
 
     # 加载两个规则文件
     data_dir = Path(__file__).parent.parent.parent / "data"

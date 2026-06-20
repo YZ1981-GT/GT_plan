@@ -25,6 +25,10 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_template_version import router as wp_template_version
     from app.routers.wp_template_list import router as wp_template_list
     from app.routers.working_paper import router as working_paper
+    from app.routers.wp_editor_router import router as wp_editor
+    from app.routers.wp_batch_router import router as wp_batch_domain
+    from app.routers.wp_relation_router import router as wp_relation_domain
+    from app.routers.wp_review_router import router as wp_review_domain
     from app.routers.workpaper_batch_status import router as workpaper_batch_status
     from app.routers.wp_batch_ops import router as wp_batch_ops
     from app.routers.wp_progress import router as wp_progress
@@ -111,8 +115,8 @@ def register_workpaper_routers(app: FastAPI) -> None:
     groups = {
         # ── 6 大聚合组（design §7.1）──
         "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_xlsx, wp_template_docx, wp_template_download, wp_template_version, wp_template_list],
-        "生命周期": [working_paper, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
-        "复核": [wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
+        "生命周期": [working_paper, wp_editor, wp_batch_domain, wp_relation_domain, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
+        "复核": [wp_review_domain, wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync],
         "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],

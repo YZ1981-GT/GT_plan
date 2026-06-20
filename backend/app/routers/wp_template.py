@@ -339,8 +339,9 @@ async def generate_from_codes(
                 lib_data = json.load(f)
             for item in lib_data.get("templates", lib_data) if isinstance(lib_data, dict) else lib_data:
                 template_lib[item.get("code", item.get("wp_code", ""))] = item
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("加载模板库 JSON 失败: %s", e)
 
     project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
     created = 0

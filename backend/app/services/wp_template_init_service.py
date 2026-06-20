@@ -373,8 +373,8 @@ async def _ensure_ipo_loaded(
             result["errors"].append({"code": code, "error": str(e)})  # type: ignore[union-attr]
             try:
                 await db.rollback()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("模板初始化 rollback 失败 code=%s: %s", code, e)
 
     return result
 
@@ -923,8 +923,8 @@ def prefill_workpaper_xlsx(
                         _mark_prefilled_cell(ws, ws[cell_ref])
                         filled_count += 1
                     written = True
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("prefill 写入 cell 失败 wp_code=%s ref=%s: %s", wp_code, cell_ref, e)
 
             # 策略 2：双维度定位（列头+数据行）— 致同模板标准结构
             if not written:
@@ -1081,8 +1081,8 @@ def _mark_prefilled_cell(ws, cell) -> None:
         # 添加批注说明来源
         if not cell.comment:
             cell.comment = Comment("系统预填充：数据来自试算表", "系统")
-    except Exception:
-        pass  # 某些只读单元格无法设置样式
+    except Exception as e:
+        logger.debug("设置预填充 cell 样式失败（只读单元格）: %s", e)
 
 
 def _mark_user_formula_cell(ws, cell) -> None:
@@ -1100,8 +1100,8 @@ def _mark_user_formula_cell(ws, cell) -> None:
         cell.fill = user_fill
         if not cell.comment:
             cell.comment = Comment("用户自定义公式", "用户")
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("设置用户公式 cell 样式失败（只读单元格）: %s", e)
 
 
 def _find_semantic_row(ws, keyword: str, wp_code: str = "", cell_ref: str = "") -> int | None:

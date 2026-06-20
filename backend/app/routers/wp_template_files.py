@@ -200,8 +200,9 @@ async def _get_tb_data_for_prefill(
             LIMIT 5000
         """), {"pid": str(project_id)})
         rows = result.fetchall()
-    except Exception:
+    except Exception as e:
         # trial_balance table may not exist or have different schema
+        logger.warning("预填充查询试算表失败 pid=%s: %s", project_id, e)
         return {}
 
     if not rows:

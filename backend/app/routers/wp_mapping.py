@@ -346,8 +346,9 @@ async def generate_progress_report(
         ])
         if ai_text and len(ai_text) > 20:
             report_text = ai_text
-    except Exception:
-        pass  # LLM 不可用时用规则生成的文本
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).debug("LLM 生成进度简报失败，用规则文本: %s", e)  # LLM 不可用时用规则生成的文本
 
     return {
         "total": total,

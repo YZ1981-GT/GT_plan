@@ -95,7 +95,8 @@ def _resolve_fill(cell: Any, scheme: list[str]) -> str | None:
             if 0 <= scheme_idx < len(scheme):
                 base = scheme[scheme_idx]
                 return f"#{_apply_tint(base, float(fg.tint or 0.0))}"
-    except Exception:
+    except Exception as e:
+        logger.debug("解析填充色失败: %s", e)
         return None
     return None
 
@@ -110,8 +111,8 @@ def _resolve_font_color(cell: Any) -> str | None:
                 # 黑白用默认（避免暗色主题下不可见）
                 return None
             return f"#{rgb}"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("解析字体色失败: %s", e)
     return None
 
 
@@ -276,16 +277,16 @@ def extract_grid_from_sheet(ws: Any, scheme: list[str] | None = None, *, max_sca
                     style["bold"] = True
                 if cell.font and cell.font.sz:
                     style["font_size"] = float(cell.font.sz)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("提取 cell 字体样式失败: %s", e)
             fcolor = _resolve_font_color(cell)
             if fcolor:
                 style["font_color"] = fcolor
             try:
                 if cell.alignment and cell.alignment.horizontal:
                     style["align"] = cell.alignment.horizontal
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("提取 cell 对齐样式失败: %s", e)
             if _is_accounting_format(cell.number_format):
                 style["numeric"] = True
 

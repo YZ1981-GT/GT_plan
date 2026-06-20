@@ -446,8 +446,8 @@ async def refresh_audit_sheet_from_ledger(
             if m.get("wp_code") == wp_code:
                 account_codes = m.get("account_codes", [])
                 break
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("加载 wp_account_mapping 失败 wp_code=%s: %s", wp_code, e)
 
     if not account_codes:
         # D1 系列默认 1121（应收票据）
@@ -683,8 +683,8 @@ async def get_render_config(
             "FROM projects WHERE id = :pid"), {"pid": str(project_id)})).first()
         if pj:
             _prog_year, _prog_biz = pj[0], pj[1] or "C"
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("查询项目年度/业务类别失败 pid=%s: %s", project_id, e)
     _tpl = _resolve_template_path(working_paper, wp_code)
 
     # Per-sheet dispatch loop
@@ -736,10 +736,10 @@ async def get_render_config(
             combined = {"sheets": {s["sheet_name"]: s["schema"] for s in sheets if isinstance(s.get("schema"), dict)}}
             try:
                 fill_results = await _resolve_auto_fill_values(schema=combined, project_id=project_id, year=yr[0], db=db)
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as e:
+                logger.warning("auto-fill 取数失败 pid=%s: %s", project_id, e)
+    except Exception as e:
+        logger.warning("auto-fill 年度查询失败 pid=%s: %s", project_id, e)
     from app.services.wp_guidance_service import get_wp_guidance
     return {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
             "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,

@@ -99,8 +99,9 @@ async def save_structure(
     try:
         from app.services.address_registry import address_registry
         await address_registry.invalidate_async(str(project_id), domain="wp")
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("失效底稿地址缓存失败 pid=%s: %s", project_id, e)
 
     return {
         "wp_id": str(wp_id),

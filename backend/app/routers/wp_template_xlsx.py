@@ -145,8 +145,8 @@ def _has_style(cell) -> bool:
             or (align.indent and align.indent != 0)
         ):
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("判断单元格对齐样式失败: %s", e)
     return False
 
 
@@ -246,8 +246,8 @@ def _extract_cell_style(cell) -> dict | None:
             }
             style["n"] = {"pattern": nf_map.get(nf, nf)}
 
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("提取单元格样式失败: %s", e)
 
     return style if style else None
 
@@ -307,8 +307,8 @@ def _extract_conditional_formatting(ws) -> list[dict]:
                     }
 
                 rules.append(rule_obj)
-    except Exception:
-        pass  # 条件格式提取失败不阻断
+    except Exception as e:
+        logger.debug("条件格式提取失败不阻断: %s", e)
 
     return rules
 
@@ -374,8 +374,8 @@ def _extract_data_validations(ws) -> list[dict]:
             dv_obj["allowBlank"] = bool(dv.allow_blank)
 
             validations.append(dv_obj)
-    except Exception:
-        pass  # 数据验证提取失败不阻断
+    except Exception as e:
+        logger.debug("数据验证提取失败不阻断: %s", e)
 
     return validations
 
@@ -418,8 +418,8 @@ def _extract_images(ws) -> list[dict]:
                 drawing["ref"] = str(img.ref)
 
             drawings.append(drawing)
-    except Exception:
-        pass  # 图片提取失败不阻断
+    except Exception as e:
+        logger.debug("图片提取失败不阻断: %s", e)
 
     return drawings
 

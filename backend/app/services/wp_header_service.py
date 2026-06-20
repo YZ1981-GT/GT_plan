@@ -163,8 +163,8 @@ async def fill_workpaper_header(
         try:
             with open(mapping_path, "r", encoding="utf-8-sig") as f:
                 mapping_data = json.load(f).get("mappings", [])
-        except Exception:
-            pass
+        except Exception as e:
+            _logger.warning("加载 wp_account_mapping.json 失败: %s", e)
 
     xref_text = get_cross_ref_text(wp_code, mapping_data)
 

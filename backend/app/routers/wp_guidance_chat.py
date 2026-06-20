@@ -336,8 +336,8 @@ async def _stream_wp_chat(
                 yield f"data: {json.dumps({'type': 'error', 'data': 'AI 服务暂不可用（熔断器已开启）'}, ensure_ascii=False)}\n\n"
                 yield f"data: {json.dumps({'type': 'done', 'data': {}}, ensure_ascii=False)}\n\n"
                 return
-        except Exception:
-            pass  # 无法检查熔断器时继续正常流程
+        except Exception as e:
+            logger.debug("检查 LLM 熔断器状态失败，继续正常流程: %s", e)
 
         # ─── RAG 知识库检索（降级：失败时继续无 RAG） ───────────────────
         citations: list[dict] = []

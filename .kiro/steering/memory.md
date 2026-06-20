@@ -68,7 +68,7 @@ inclusion: always
 - A7-A15/A16/A17/A18 完成阶段底稿 ✅；a21-a25 复核底稿 ✅；核对表/弹窗/分析复核 ✅
 
 ### git 状态（2026-06-19）
-- 分支 `work/2026-05-30-wp-specs`，HEAD `5dccb86c`（后续治理：注册router+精简xlsx+skip stub+文档化+删孤儿），最高迁移 V088
+- 分支 `work/2026-05-30-wp-specs`，HEAD `6828160b`（+6 PBT 测试），最高迁移 V088
 - **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
@@ -87,11 +87,24 @@ inclusion: always
 - override `"univer"` → `"wp-popup-signing"`；前后端 4 文件改动；1096 冒烟全绿
 
 ### 待办
-- **✅ workpaper-module-health-pass2（2026-06-21 全部完成）**：9 项 P1/P2 治理，1152 测试零回归
-  - `wp_render_config.py` 1156→747；`wp_classification_service.py` 1319→366；`wp_template_files.py` 1160→301
-  - 新建 4 service + 2 router + 1 JSON（910 条热重载）+ 20 新测试；51 resolver docstring 全覆盖
-  - router_registry 启动校验 + CI 测试就位；`_EXCLUDED_ROUTERS` 含 3 个待正式注册模块
-- **✅ 5 项后续治理已完成（2026-06-21）**：3 个 router 正式注册 + xlsx 冗余精简(864→758) + 11 stub 测试标 skip + 联动链路 mermaid 文档化 + 8 个孤儿 service 已删除
+- **✅ workpaper-module-health-pass2（2026-06-21 全部完成，2026-06-20 复查健康）**：9 项 P1/P2 治理，1152 测试零回归
+  - `wp_render_config.py` 1156→747；`wp_classification_service.py` 1319→310；`wp_template_files.py` 1160→301
+  - 新建 5 service + 2 router（xlsx 652/docx 77）+ 1 JSON（910 条热重载）+ 20 新测试；51 resolver docstring 全覆盖
+  - router_registry 启动校验 + CI 测试就位；`_EXCLUDED_ROUTERS` 现仅剩 eqcr 子模块（父包聚合注册），3 个待注册模块已正式注册
+  - **复查验证**：app 正常加载 1522 路由、xlsx(4)/docx(1) 端点可达、启动校验无遗漏 WARNING；核心 26 + 冒烟/auto_data 1124 全绿
+- **✅ 5 项后续治理 + 6 PBT 已完成（2026-06-21）**：注册 router + 精简 xlsx(758) + skip stub + 联动文档化 + 删 8 孤儿 + 6 PBT(P2~P7) 全绿；workpaper_summaries 无需拆分(37+299行)
+- **✅ workpaper-silent-exception-cleanup（P1，2026-06-20 完成）**：底稿模块 70 处宽异常静默吞全部补分级日志留痕，零控制流变更
+  - A:working_paper(9) B:模板/网格(16) C+D:交叉核对/离线(8) E:18循环router UUID解析(18) F+G+H:render/其它router/填充(19)
+  - 分级:DB/IO/事务/取数失败→warning，样式/UUID入参/LLM降级→debug
+  - 新建 `test_wp_silent_exception_guard.py` AST 守卫(CI 阻断新增，白名单空)；守卫 70→0 全绿；1144 测试零回归；app 1522 路由不变
+- **底稿改进建议（2026-06-20 调研）**：~~①P0 大文件拆分~~ spec 已立项 `workpaper-module-large-file-split`（pass3）；~~②P1 吞异常~~ ✅；~~③P2 override key 契约~~ ✅；~~④P3 spec 收口~~ ✅
+- **✅ P2 override key 契约（2026-06-20）**：新建 `test_wp_code_override_key_contract.py`，聚合全部 data JSON 的 wp_code 全集，override key 须命中或去合法后缀(程序表 A/子表 -N)后命中；30 个孤儿全部通过后缀归一；3 passed
+- **✅ P3 spec 收口（2026-06-20）**：`audit-report-template-integration` 归档至 `_archive/05-business-features/`（185/190，剩 3 项 `[ ]*` 人工/外部依赖）；INDEX 更新 active=3（均底稿治理 spec：render-config-refactor/health-pass2/silent-exception-cleanup，待归档）
+- **✅ workpaper-module-large-file-split（P0/pass3，2026-06-21 全部完成）**：3 文件拆 ≤800，零行为变更
+  - Sprint A `auto_data_resolvers` 1626→域子包(__init__ 97行+6子模块)，51 source 不变；`test_k_cycle` inspect.getsource 改查 `get_registered_sources()`
+  - Sprint B `workpaper_fill_service` 1819→30行 Mixin 组合（`wp_fill/` 5 mixin，45 方法仍挂实例供 `service._x()` 测试）；⚠`_review_prompt.load_review_prompt` 因深一层加 1 次 `os.path.dirname` 保 TSJ 路径不变（唯一非逐字改）；顺手删孤儿测试 `TestAIChatService`（引用已删模块 ai_chat_service）
+  - Sprint C `working_paper` 1937→400行，共享请求模型抽到 `schemas/workpaper_requests.py`，拆 4 子 router：`wp_editor_router`(727)/`wp_review_router`(405)/`wp_batch_router`(261)/`wp_relation_router`(312)，全部同前缀注册到 router_registry「生命周期/复核」组；helper 随唯一调用方迁移 + working_paper re-export 保向后兼容（test_a16/test_reassignment 依赖）
+  - 守卫 `test_wp_large_file_size_guard.py` 转绿；1193+18 测试零回归；app 1522 路由不变；无循环导入
 - 外部依赖：LLM embedding / 合并 UAT 数据 / GitHub 默认分支改 main
 - A 循环 docx 弹窗（30个待加 WpPopupDocxEditor）
 - A3-8 商誉减值 / A4 经营分部 / A5 现金流（spec 已建未实施）

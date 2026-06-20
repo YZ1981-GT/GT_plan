@@ -361,8 +361,8 @@ class CrossCheckService:
         # 数字字面量
         try:
             return Decimal(token)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("[CROSS_CHECK] token 非数字字面量: %s (%s)", token, e)
 
         logger.warning(f"[CROSS_CHECK] Cannot eval token: {token}")
         return None
@@ -536,7 +536,8 @@ class CrossCheckService:
                 row[0]: Decimal(str(row[1])) for row in result.fetchall()
                 if row[0] and row[1] is not None
             }
-        except Exception:
+        except Exception as e:
+            logger.warning("[CROSS_CHECK] 查询试算表审定数失败 pid=%s year=%s: %s", project_id, year, e)
             return {}
 
     async def _get_trial_balance_full(
@@ -563,7 +564,8 @@ class CrossCheckService:
                     "rje_net": row[4] or 0,
                 }
             return data
-        except Exception:
+        except Exception as e:
+            logger.warning("[CROSS_CHECK] 查询试算表完整数据失败 pid=%s year=%s: %s", project_id, year, e)
             return {}
 
     async def _get_workpaper_audited_amounts(
@@ -594,7 +596,8 @@ class CrossCheckService:
                         rules.append(rule_def)
                         seen.add(rule_def["rule_id"])
             return rules
-        except Exception:
+        except Exception as e:
+            logger.warning("[CROSS_CHECK] 加载项目自定义规则失败 pid=%s: %s", project_id, e)
             return []
 
     # ─── 结果持久化 ───────────────────────────────────────────────────────────

@@ -196,8 +196,8 @@ class WpUploadService:
         except Exception as e:
             try:
                 update_task(parse_task_id, TaskStatus.failed, error=str(e))
-            except Exception:
-                pass
+            except Exception as ue:
+                logger.debug("更新 parse 任务状态失败 wp=%s: %s", wp_id, ue)
             logger.warning("parse after upload failed (non-blocking): %s", e)
 
         # ── Phase 16: 离线冲突细粒度检测 ──

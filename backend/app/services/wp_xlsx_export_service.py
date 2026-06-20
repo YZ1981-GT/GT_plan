@@ -258,8 +258,8 @@ def _sync_export_workpaper_xlsx(
         # 兜底：确保 worksheet 维度正确
         try:
             ws.calculate_dimension(force=True)
-        except Exception:
-            pass  # 某些 sheet 可能无法计算维度，忽略
+        except Exception as e:
+            logger.debug("worksheet 维度计算失败，忽略: %s", e)
 
     # 3. 保存到 BytesIO
     buf = BytesIO()
