@@ -68,8 +68,7 @@ inclusion: always
 - A7-A15/A16/A17/A18 完成阶段底稿 ✅；a21-a25 复核底稿 ✅；核对表/弹窗/分析复核 ✅
 
 ### git 状态（2026-06-19）
-- 分支 `work/2026-05-30-wp-specs`，HEAD `864b7a78`（spec 归档命名统一），最高迁移 V088
-- **🟡 待提交**：本次 `from backend.` 路径全量修复（源码7+测试19）+R083/R086/R084 迁移+文档更新 尚未 commit
+- 分支 `work/2026-05-30-wp-specs`，HEAD `1fc133da`（health-pass2+策略拆分+import修复+A1-11），最高迁移 V088
 - **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
@@ -81,7 +80,7 @@ inclusion: always
 - `wp_component_type_mapping.py` 单一真源；两处 derive_component_type 已改造
 - `_WP_CODE_OVERRIDE` 910 条按 15 循环分区注释
 - 新增 19 个 cycle_linkage_handlers 集成测试（D/C/F handler）
-- **🟡 待 commit**（21 文件变更 + A1-11 修复）
+- **🟡 待 commit**：无（已推送 1fc133da）
 
 ### A1-11 签字流转控制表（2026-06-20 修复）
 - **修复**：注册 `wp-popup-signing` componentType → `WpPopupSigning.vue`（已有组件，之前仅弹窗模式使用）
@@ -92,8 +91,7 @@ inclusion: always
   - `wp_render_config.py` 1156→747；`wp_classification_service.py` 1319→366；`wp_template_files.py` 1160→301
   - 新建 4 service + 2 router + 1 JSON（910 条热重载）+ 20 新测试；51 resolver docstring 全覆盖
   - router_registry 启动校验 + CI 测试就位；`_EXCLUDED_ROUTERS` 含 3 个待正式注册模块
-- **P3 event_handlers_cycle_linkage 联动链路文档化**：5 handler 有级联但无 mermaid/注释说明完整链路
-- **P3 孤儿 service 检测**：services/ 604 个文件，部分可能已无调用方，需定期 codegraph 扫描清理
+- **✅ 5 项后续治理已完成（2026-06-21）**：3 个 router 正式注册 + xlsx 冗余精简(864→758) + 11 stub 测试标 skip + 联动链路 mermaid 文档化 + 8 个孤儿 service 已删除
 - 外部依赖：LLM embedding / 合并 UAT 数据 / GitHub 默认分支改 main
 - A 循环 docx 弹窗（30个待加 WpPopupDocxEditor）
 - A3-8 商誉减值 / A4 经营分部 / A5 现金流（spec 已建未实施）

@@ -563,7 +563,6 @@ async def convert_xlsx_to_json(
 
     try:
         from openpyxl import load_workbook
-        from openpyxl.utils import get_column_letter
 
         wb = load_workbook(BytesIO(content), read_only=False, data_only=False)
         sheets: dict = {}
@@ -573,118 +572,14 @@ async def convert_xlsx_to_json(
             ws = wb[sheet_name]
             sheet_id = f"sheet{idx}"
             sheet_order.append(sheet_id)
-            cell_data: dict = {}
-            merge_data: list = []
-            column_data: dict = {}
-            row_data_map: dict = {}
 
-            # 合并单元格
-            for merged_range in ws.merged_cells.ranges:
-                merge_data.append({
-                    "startRow": merged_range.min_row - 1,
-                    "endRow": merged_range.max_row - 1,
-                    "startColumn": merged_range.min_col - 1,
-                    "endColumn": merged_range.max_col - 1,
-                })
+            sheet_obj = _build_sheet_obj_from_ws(ws, sheet_id, sheet_name)
 
-            # 列宽
-            for col_letter, dim in ws.column_dimensions.items():
-                if dim.width and dim.width != 8.43:
-                    col_idx = ord(col_letter.upper()) - 65 if len(col_letter) == 1 else (ord(col_letter[0].upper()) - 64) * 26 + ord(col_letter[1].upper()) - 65
-                    column_data[col_idx] = {"w": int(dim.width * 7.5)}
-
-            # 行高
-            for row_num, dim in ws.row_dimensions.items():
-                if dim.height and dim.height != 15:
-                    row_data_map[row_num - 1] = {"h": int(dim.height * 1.33)}
-
-            # 单元格数据 + 样式 + 公式
-            row_count = 0
-            col_count = 0
-            for row in ws.iter_rows():
-                for cell in row:
-                    row_idx = cell.row - 1
-                    col_idx = cell.column - 1
-                    row_count = max(row_count, row_idx + 1)
-                    col_count = max(col_count, col_idx + 1)
-
-                    if cell.value is None and not _has_style(cell):
-                        continue
-
-                    cell_obj: dict = {}
-
-                    # 值
-                    if cell.value is not None:
-                        val = cell.value
-                        if isinstance(val, str) and val.startswith("="):
-                            cell_obj["f"] = val
-                        elif isinstance(val, (int, float)):
-                            cell_obj["v"] = val
-                        else:
-                            cell_obj["v"] = str(val)
-
-                    # 样式
-                    style = _extract_cell_style(cell)
-                    if style:
-                        cell_obj["s"] = style
-
-                    if cell_obj:
-                        if row_idx not in cell_data:
-                            cell_data[row_idx] = {}
-                        cell_data[row_idx][col_idx] = cell_obj
-
-            sheet_obj: dict = {
-                "id": sheet_id,
-                "name": sheet_name,
-                "rowCount": max(row_count, 100),
-                "columnCount": max(col_count, 26),
-                "cellData": cell_data,
-            }
-            if merge_data:
-                sheet_obj["mergeData"] = merge_data
-            if column_data:
-                sheet_obj["columnData"] = column_data
-            if row_data_map:
-                sheet_obj["rowData"] = row_data_map
-
-            # 冻结窗格
-            if ws.freeze_panes:
-                freeze_cell = str(ws.freeze_panes)
-                m = _re.match(r"([A-Z]+)(\d+)", freeze_cell)
-                if m:
-                    freeze_col = 0
-                    for ch in m.group(1):
-                        freeze_col = freeze_col * 26 + (ord(ch) - 64)
-                    freeze_col -= 1
-                    freeze_row = int(m.group(2)) - 1
-                    if freeze_row > 0 or freeze_col > 0:
-                        sheet_obj["freeze"] = {
-                            "startRow": freeze_row,
-                            "startColumn": freeze_col,
-                            "xSplit": freeze_col,
-                            "ySplit": freeze_row,
-                        }
-
-            # 默认列宽
+            # 默认列宽/行高（_build_sheet_obj_from_ws 不处理）
             if ws.sheet_format and ws.sheet_format.defaultColWidth:
                 sheet_obj["defaultColumnWidth"] = int(ws.sheet_format.defaultColWidth * 7.5)
             if ws.sheet_format and ws.sheet_format.defaultRowHeight:
                 sheet_obj["defaultRowHeight"] = int(ws.sheet_format.defaultRowHeight * 1.33)
-
-            # 条件格式
-            cf_rules = _extract_conditional_formatting(ws)
-            if cf_rules:
-                sheet_obj["conditionalFormattingRules"] = cf_rules
-
-            # 数据验证/下拉列表
-            dv_rules = _extract_data_validations(ws)
-            if dv_rules:
-                sheet_obj["dataValidations"] = dv_rules
-
-            # 图片
-            images = _extract_images(ws)
-            if images:
-                sheet_obj["drawings"] = images
 
             sheets[sheet_id] = sheet_obj
 

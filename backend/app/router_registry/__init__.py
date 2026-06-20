@@ -49,10 +49,6 @@ _EXCLUDED_ROUTERS: set[str] = {
     "app.routers.eqcr.independence",
     "app.routers.eqcr.gate",
     "app.routers.eqcr.constants",
-    # 待注册模块（功能完整但尚未纳入主注册流程）
-    "app.routers.issue_hints",
-    "app.routers.workpaper_summaries",
-    "app.routers.wp_render_registry",
 }
 
 _ROUTER_PATTERN = re.compile(r"^router\s*=\s*APIRouter\(", re.MULTILINE)

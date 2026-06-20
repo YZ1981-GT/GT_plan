@@ -3,12 +3,83 @@
 从 event_handlers.py 拆出（#3 改进），保持主文件体积可控。
 由 register_event_handlers() 末尾调用 register_cycle_linkage_handlers() 完成注册。
 
-联动链路：
-- C2~C15 控制测试 → field_overrides scope=control_test_result:{cycle}
-- C{n}-2 偏差评价 → IssueTicket + control_test_result 联动更新
-- C22 ITGC → C21-1 findings
-- F2-21~58 子底稿结论 → f_procedure_status:{wp_code}
-- D~N {cycle}{n}-1 审定表 → trial_balance.audited_amount 回写
+所有 handler 均订阅 WORKPAPER_SAVED 事件，通过 wp_code 模式匹配各自过滤。
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+联动链路总览（Mermaid 流程图）
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+```mermaid
+flowchart TD
+    %% 触发源
+    WP_SAVE["WORKPAPER_SAVED 事件<br/>(底稿保存时由 router 发布)"]
+
+    %% Handler 节点
+    H1["_on_c_control_test_saved<br/>wp_code: C2~C15"]
+    H2["_on_c_deviation_saved<br/>wp_code: C{n}-2 (n=2~15)"]
+    H3["_on_c22_itgc_saved<br/>wp_code: C22"]
+    H4["_on_f_workpaper_conclusion_saved<br/>wp_code: F2-21~58"]
+    H5["_on_d_audit_determination_saved<br/>wp_code: [D-N]{n}-1"]
+
+    %% 数据写入目标
+    FO_CTR["field_overrides<br/>scope=control_test_result:{cycle}"]
+    FO_DEV["field_overrides<br/>scope=control_test_result:{cycle}<br/>(deviation_conclusion)"]
+    ISSUE["IssueTicket<br/>category=control_deficiency"]
+    FO_C21["field_overrides<br/>scope=c21_1_findings"]
+    FO_F["field_overrides<br/>scope=f_procedure_status:{wp_code}"]
+    TB["trial_balance<br/>.audited_amount"]
+
+    %% 下游事件
+    TB_EVT["TRIAL_BALANCE_UPDATED 事件"]
+
+    %% 连线：事件 → handler
+    WP_SAVE --> H1
+    WP_SAVE --> H2
+    WP_SAVE --> H3
+    WP_SAVE --> H4
+    WP_SAVE --> H5
+
+    %% 连线：handler → 写入目标
+    H1 -->|"conclusion/tested_controls/deviation_count"| FO_CTR
+    H2 -->|"step7='是' → 创建工单"| ISSUE
+    H2 -->|"deviation_conclusion 覆写"| FO_DEV
+    H3 -->|"步骤结论=无效 → findings"| FO_C21
+    H4 -->|"conclusion + status"| FO_F
+    H5 -->|"rows[].audited_amount"| TB
+
+    %% 连线：handler → 下游事件（级联）
+    H5 -->|"publish_immediate"| TB_EVT
+
+    %% 缓存失效
+    H1 -.->|invalidate_auto_cache| CACHE["auto_data_source 缓存"]
+    H2 -.->|invalidate_auto_cache| CACHE
+    H4 -.->|invalidate_auto_cache| CACHE
+```
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+级联关系说明
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. C 控制测试链路：
+   C2~C15 保存 → (_on_c_control_test_saved) → field_overrides 记结论
+     ↓ 供 D~N 程序表 auto_data_source 读取控制测试结论
+   C{n}-2 保存 → (_on_c_deviation_saved) → IssueTicket + 覆写结论
+     ↓ 若 conclusion 变为"无效/部分有效"，D~N 程序表范围自动扩大
+
+2. C22 ITGC 链路：
+   C22 保存 → (_on_c22_itgc_saved) → field_overrides(c21_1_findings)
+     ↓ C21-1 汇总底稿读取 findings 展示 IT 一般控制缺陷
+
+3. F 采购存货链路：
+   F2-21~58 保存 → (_on_f_workpaper_conclusion_saved) → field_overrides(f_procedure_status)
+     ↓ F2A 程序表 auto_data_source 读取步骤完成状态
+
+4. D~N 审定表链路（唯一有下游事件级联的 handler）：
+   [D-N]{n}-1 保存 → (_on_d_audit_determination_saved) → trial_balance.audited_amount
+     ↓ publish TRIAL_BALANCE_UPDATED → 触发下游（报表重算/A13汇总等）
+
+注意：前 4 个 handler 无下游事件发布，仅写 field_overrides + 失效缓存；
+      第 5 个 handler 是唯一会发布新事件（TRIAL_BALANCE_UPDATED）产生级联的。
 """
 from __future__ import annotations
 
@@ -37,7 +108,21 @@ _C_CYCLE_NAMES: dict[str, str] = {
 
 
 async def _on_c_control_test_saved(payload: EventPayload) -> None:
-    """C2~C15 控制测试保存 → 写入控制测试结论到 field_overrides。"""
+    """C2~C15 控制测试保存 → 写入控制测试结论到 field_overrides。
+
+    触发条件：
+        WORKPAPER_SAVED 事件，wp_code 匹配 C2~C15（控制测试底稿）。
+
+    执行逻辑：
+        1. 从 parsed_data 提取 conclusion / tested_controls / deviation_count
+        2. 写入 field_overrides，scope = "control_test_result:{cycle}"
+        3. 调用 invalidate_auto_cache 清除程序表缓存
+
+    级联效果：
+        - 无下游事件发布
+        - D~N 程序表的 auto_data_source 会读取 control_test_result:{cycle}
+          作为"已执行控制测试"的依据，决定实质性程序范围
+    """
     wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
     m = re.match(r"^C(\d{1,2})$", wp_code)
     if not m:
@@ -89,7 +174,25 @@ async def _on_c_control_test_saved(payload: EventPayload) -> None:
 
 
 async def _on_c_deviation_saved(payload: EventPayload) -> None:
-    """C{n}-2 偏差评价保存 → 自动创建问题工单 + 联动更新控制测试结论。"""
+    """C{n}-2 偏差评价保存 → 自动创建问题工单 + 联动更新控制测试结论。
+
+    触发条件：
+        WORKPAPER_SAVED 事件，wp_code 匹配 C{n}-2（n=2~15，偏差评价底稿）。
+
+    执行逻辑：
+        1. 遍历 parsed_data.rows，对 step7_report_deficiency="是" 的行创建 IssueTicket
+        2. 分析各行 deviation_conclusion：
+           - "无效且已放弃信赖" → conclusion_override = "无效"
+           - "无效需扩大测试" → conclusion_override = "部分有效"（优先级低于"无效"）
+        3. 若有 conclusion_override，覆写 field_overrides 中父底稿 C{n} 的结论
+
+    级联效果：
+        - 无下游事件发布
+        - IssueTicket 被创建后可在问题管理界面展示
+        - conclusion 覆写后，_on_c_control_test_saved 写入的原始结论被替换为
+          "无效/部分有效"，影响 D~N 程序表 auto_data_source 的控制信赖判断
+        - 调用 invalidate_auto_cache 清除程序表缓存（仅在 conclusion_override 时）
+    """
     wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
     m = re.match(r"^C(\d{1,2})-2$", wp_code)
     if not m:
@@ -167,7 +270,21 @@ async def _on_c_deviation_saved(payload: EventPayload) -> None:
 
 
 async def _on_c22_itgc_saved(payload: EventPayload) -> None:
-    """C22 ITGC 测试保存 → 当步骤结论"无效"时写入 C21-1 发现记录。"""
+    """C22 ITGC 测试保存 → 当步骤结论"无效"时写入 C21-1 发现记录。
+
+    触发条件：
+        WORKPAPER_SAVED 事件，wp_code == "C22"（IT 一般控制测试底稿）。
+
+    执行逻辑：
+        1. 从 parsed_data 提取 step_conclusions（dict）或 steps（list）
+        2. 筛选 conclusion == "无效" 的步骤，组装 findings 列表
+        3. 逐条写入 field_overrides，scope = "c21_1_findings"
+
+    级联效果：
+        - 无下游事件发布，无缓存失效
+        - C21-1 汇总底稿通过 auto_data_source 读取 c21_1_findings
+          展示 IT 一般控制缺陷列表
+    """
     wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
     if wp_code != "C22":
         return
@@ -240,7 +357,22 @@ def _is_f_conclusion_wp(wp_code: str) -> bool:
 
 
 async def _on_f_workpaper_conclusion_saved(payload: EventPayload) -> None:
-    """F 类子底稿保存 → 写入结论到 field_overrides，供 F2A 程序表展示步骤状态。"""
+    """F 类子底稿保存 → 写入结论到 field_overrides，供 F2A 程序表展示步骤状态。
+
+    触发条件：
+        WORKPAPER_SAVED 事件，wp_code 匹配 F2-{n}，
+        其中 n ∈ [21,26]∪[29,35]∪[38,44]∪[47,49]∪[55,58]。
+
+    执行逻辑：
+        1. 从 parsed_data 提取 conclusion 和 status
+        2. 写入 field_overrides，scope = "f_procedure_status:{wp_code}"
+        3. 调用 invalidate_auto_cache 清除程序表缓存
+
+    级联效果：
+        - 无下游事件发布
+        - F2A 程序表的 auto_data_source 读取各 f_procedure_status:{wp_code}
+          汇总所有子程序步骤的完成/结论状态
+    """
     wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
     if not _is_f_conclusion_wp(wp_code):
         return
@@ -287,7 +419,22 @@ async def _on_f_workpaper_conclusion_saved(payload: EventPayload) -> None:
 
 
 async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
-    """D~N 类审定表保存 → 回写 audited_amount 到 trial_balance。"""
+    """D~N 类审定表保存 → 回写 audited_amount 到 trial_balance。
+
+    触发条件：
+        WORKPAPER_SAVED 事件，wp_code 匹配 [D-N]{n}-1（各循环审定表）。
+
+    执行逻辑：
+        1. 遍历 parsed_data.rows，对每行提取 account_code + audited_amount
+        2. UPDATE trial_balance SET audited_amount = ? WHERE project/year/account_code 匹配
+        3. 若有行成功更新，发布 TRIAL_BALANCE_UPDATED 事件
+
+    级联效果（⚠️ 唯一有下游事件级联的 handler）：
+        - 发布 TRIAL_BALANCE_UPDATED 事件 → 触发余额表相关下游 handler：
+          · 报表自动重算（资产负债表/利润表）
+          · A13 错报评价汇总更新
+          · 其他订阅 TRIAL_BALANCE_UPDATED 的 handler
+    """
     wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
     if not re.match(r"^[D-N]\d+-1$", wp_code):
         return
