@@ -30,21 +30,12 @@
   <div class="gt-wp-editor-with-guidance">
     <!-- 主内容区（flex: 1） -->
     <div class="gt-wp-editor-main">
-      <!-- 底稿导入导出（HTML 渲染器路径） -->
+      <!-- 底稿标题栏（HTML 渲染器路径）。导出/导入移至各 sheet 内工具栏；
+           底稿切换由 GtWpRenderer 内「🗂️ 切换底稿」树形弹窗承载，此处不再冗余。 -->
       <div v-if="useHtmlRenderer && wpDetail" class="gt-wp-io-toolbar">
         <el-button text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
-        <span class="gt-wp-editor-name">{{ wpDetail.wp_name }}</span>
-        <div class="gt-wp-io-toolbar__actions">
-          <WpExportButton
-            :project-id="projectId"
-            :wp-id="wpId"
-            size="small"
-            button-type="primary"
-            label="导出"
-          />
-          <el-button size="small" @click="showWpImportEnhanced = true">导入</el-button>
-        </div>
+        <span class="gt-wp-editor-name">{{ displayWpName }}</span>
       </div>
 
       <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
@@ -68,7 +59,7 @@
       <div class="gt-wp-editor-toolbar-left">
         <el-button text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code" v-if="wpDetail">{{ wpDetail.wp_code }}</span>
-        <span class="gt-wp-editor-name" v-if="wpDetail">{{ wpDetail.wp_name }}</span>
+        <span class="gt-wp-editor-name" v-if="wpDetail">{{ displayWpName }}</span>
         <el-tag v-if="wpDetail" :type="(statusTagType(wpDetail.status)) || undefined" size="small">
           {{ statusLabel(wpDetail.status) }}
         </el-tag>
@@ -462,6 +453,21 @@ const {
 // ─── 循环类型 ────────────────────────────────────────────────────────────────
 const cycleType = useCycleType(wpDetail)
 const { isDCycle, isFCycle, isGCycle, isHCycle, isICycle, isKCycle, isLCycle, isMCycle, isNCycle } = cycleType
+
+// ─── 底稿标题规范化（多 sheet 科目底稿显示纯科目名） ─────────────────────────
+// D~N 多 sheet 底稿（如 D2 含 目录/程序表/审定表/明细/附注）是整个科目的工作底稿集合，
+// 标题应显示科目名（如"应收账款"）而非单个 sheet 名（"应收账款审定表"）。
+// 去掉常见的 sheet 级后缀，保留科目主体。
+const displayWpName = computed(() => {
+  const raw = wpDetail.value?.wp_name || ''
+  if (!raw) return ''
+  return raw
+    .replace(/审定表及明细表$/, '')
+    .replace(/及明细表$/, '')
+    .replace(/审定表$/, '')
+    .replace(/明细表$/, '')
+    .trim() || raw
+})
 
 // ─── Sheet 导航 facade ──────────────────────────────────────────────────────
 const univerAPIRef = ref<any>(null)

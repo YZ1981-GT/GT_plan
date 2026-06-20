@@ -637,6 +637,11 @@ async def get_render_config(
     if not working_paper:
         raise HTTPException(status_code=404, detail="底稿不存在")
     project_id = working_paper.project_id
+    # 已软删除项目的底稿不应可打开（根因修复：首汽租车_2025 已删但 D2 底稿仍可访问）
+    _proj_deleted = (await db.execute(sa.text(
+        "SELECT is_deleted FROM projects WHERE id = :pid"), {"pid": str(project_id)})).scalar()
+    if _proj_deleted:
+        raise HTTPException(status_code=404, detail="项目已删除")
     wp_index = (await db.execute(sa.select(WpIndex).where(
         WpIndex.id == working_paper.wp_index_id, WpIndex.is_deleted == False))).scalars().first()  # noqa: E712
     if not wp_index:

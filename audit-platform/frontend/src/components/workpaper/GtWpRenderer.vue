@@ -65,6 +65,27 @@
 
       <!-- Sheet 选择器（多 sheet 时显示） -->
       <div v-if="visibleSheets.length > 1" class="gt-wp-renderer__sheet-tabs">
+        <!-- 切换底稿：弹出本科目底稿树形结构（4 阶段），点节点跳转对应 sheet -->
+        <el-popover
+          v-model:visible="switchPopoverVisible"
+          placement="bottom-start"
+          :width="520"
+          trigger="click"
+          popper-class="gt-wp-renderer__switch-popover"
+        >
+          <template #reference>
+            <el-button size="small" class="gt-wp-renderer__switch-btn">
+              🗂️ 切换底稿
+            </el-button>
+          </template>
+          <div class="gt-wp-renderer__switch-tree">
+            <GtBArchitectureTree
+              :active-sheet="activeSheetName"
+              :html-data="switchTreeHtmlData"
+              @navigate="onSwitchNavigate"
+            />
+          </div>
+        </el-popover>
         <el-tabs
           v-model="activeSheetName"
           type="card"
@@ -170,6 +191,7 @@ import {
 import SkippedSheetPlaceholder from '@/components/workpaper/SkippedSheetPlaceholder.vue'
 import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
+import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
 // ─── Types ───
 export interface SavePayload {
@@ -220,6 +242,8 @@ const containerRef = ref<HTMLElement | null>(null)
 const loadingHint = ref('')
 // 内部维护 activeSheetName（支持 sheet 切换）
 const internalActiveSheetName = ref<string>('')
+// 「切换底稿」弹出树的可见状态
+const switchPopoverVisible = ref(false)
 
 // ─── Composables ───
 const wpIdRef = toRef(props, 'wpId')
@@ -507,6 +531,34 @@ function onJumpToSection(sheetName: string) {
   }
 }
 
+/**
+ * 「切换底稿」弹出树的数据源：从 visibleSheets 直接构造 navigation_rows
+ * （排除底稿目录 b-index 自身），供 GtBArchitectureTree 按 4 阶段分组。
+ * 不依赖 b-index sheet 的持久化 html_data，确保任意 sheet 下都可切换。
+ */
+const switchTreeHtmlData = computed(() => ({
+  navigation_rows: visibleSheets.value
+    .filter(s => s.componentType !== 'b-index')
+    .map((s, i) => {
+      const name = s.sheet_name || ''
+      const m = name.match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)
+      return {
+        seq: i + 1,
+        content: name,
+        sheet_name: name,
+        index_ref: m ? m[1] : (renderConfig.value?.wp_code ?? ''),
+        component_type: s.componentType || 'skip',
+        no_print: false,
+      }
+    }),
+}))
+
+/** 切换底稿树节点点击 → 跳转 sheet + 关闭弹窗 */
+function onSwitchNavigate(sheetName: string) {
+  onJumpToSection(sheetName)
+  switchPopoverVisible.value = false
+}
+
 function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: string }) {
   emit('open-attachment', payload)
 }
@@ -535,6 +587,26 @@ function onOpenFormula(payload: { sheetName: string }) {
   border-bottom: 1px solid var(--el-border-color-light);
   background: var(--el-bg-color-page);
   padding: 4px 12px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.gt-wp-renderer__switch-btn {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  border-color: var(--el-color-primary-light-5);
+  color: var(--el-color-primary);
+}
+
+.gt-wp-renderer__sheet-tabs-inner {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.gt-wp-renderer__switch-tree {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
 .gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__nav-wrap) {
