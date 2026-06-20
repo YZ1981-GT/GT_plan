@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -207,6 +207,250 @@ async def deserialize_tree(
         )
     await db.commit()
     return {"restored": True}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 导出模板 + 导出数据（spec bad-debt-sheet-enhancement Sprint 1）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/export-template")
+async def export_template(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """导出空模板 xlsx（坏账树结构 + 列标题，金额列留空供离线填写）。
+
+    Requirements: 1.1, 1.2, 1.3, 1.4, 1.5
+    """
+    from fastapi.responses import StreamingResponse
+
+    from app.services.bad_debt_export_service import BadDebtExportService
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+    svc = BadDebtExportService(db)
+    buf = await svc.export_bytes(wp_index_id, template_only=True)
+    filename = "bad_debt_template.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/export-data")
+async def export_data(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """导出含数据的完整坏账准备表 xlsx（父行汇总 + 子行明细 + 合计行）。
+
+    Requirements: 2.1, 2.2, 2.3, 2.4
+    """
+    from fastapi.responses import StreamingResponse
+
+    from app.services.bad_debt_export_service import BadDebtExportService
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+    svc = BadDebtExportService(db)
+    buf = await svc.export_bytes(wp_index_id, template_only=False)
+    filename = "bad_debt_data.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 导入解析 + 导入写入（spec bad-debt-sheet-enhancement Sprint 2）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.post("/import-parse")
+async def import_parse(
+    wp_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """上传 xlsx 文件，解析并与当前坏账树 row_label 行匹配。
+
+    - 文件大小限制 10MB
+    - 返回 ImportParseResult（匹配结果列表 + 统计）
+    - 格式错误返回 422
+
+    Requirements: 3.1, 3.2, 3.3, 3.8
+    """
+    from app.services.bad_debt_import_service import BadDebtImportService, ImportParseResult
+
+    # 文件大小限制 10MB
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "FILE_TOO_LARGE",
+                "detail": "文件大小超过 10MB 限制",
+            },
+        )
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+    svc = BadDebtImportService(db)
+    result: ImportParseResult = await svc.parse_and_match(content, wp_index_id)
+
+    if result.errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "IMPORT_PARSE_ERROR",
+                "detail": "; ".join(result.errors),
+                "errors": result.errors,
+            },
+        )
+
+    return result
+
+
+class ImportCommitRequest(BaseModel):
+    """导入写入请求体。"""
+
+    rows: list[dict] = Field(..., description="匹配结果行列表（来自 import-parse 响应）")
+
+
+@router.post("/import-commit")
+async def import_commit(
+    wp_id: UUID,
+    body: ImportCommitRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """将匹配到的行金额批量写入（仅 matched 行的非 None 值覆盖原值）。
+
+    Requirements: 3.6, 5.3
+    """
+    from app.services.bad_debt_import_service import BadDebtImportService, ImportRowMatch
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+
+    # 解析请求体中的行数据为 ImportRowMatch 列表
+    try:
+        parsed_rows = [ImportRowMatch(**r) for r in body.rows]
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "IMPORT_COMMIT_VALIDATION_ERROR",
+                "detail": f"行数据格式错误: {exc}",
+            },
+        ) from exc
+
+    svc = BadDebtImportService(db)
+    updated_count = await svc.commit_matched_rows(wp_index_id, parsed_rows)
+    await db.commit()
+    return {"updated_count": updated_count}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 账龄段配置（spec bad-debt-sheet-enhancement Sprint 3）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@router.get("/aging-segments")
+async def get_aging_segments(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """获取当前底稿的账龄段配置（不存在返回 null）。
+
+    Requirements: 4.1, 4.7
+    """
+    from app.services.aging_segment_service import AgingSegmentService
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+    svc = AgingSegmentService(db)
+    config = await svc.get_config(wp_index_id)
+    if config is None:
+        return None
+    return config
+
+
+@router.put("/aging-segments")
+async def save_aging_segments(
+    wp_id: UUID,
+    body: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """保存账龄段配置 + 同步 CREDIT_RISK_AGING 子行。
+
+    请求体：{"preset": "THREE_YEAR"|"FIVE_YEAR"|"CUSTOM", "segments": ["1年以内", ...]}
+    校验失败返回 422（error_code: EMPTY_SEGMENT_NAME / DUPLICATE_SEGMENT_NAME）
+
+    Requirements: 4.7, 4.10
+    """
+    from app.services.aging_segment_service import (
+        AgingPreset,
+        AgingSegmentConfig,
+        AgingSegmentService,
+    )
+
+    # 解析请求体为 AgingSegmentConfig
+    try:
+        config = AgingSegmentConfig(
+            preset=AgingPreset(body.get("preset", "CUSTOM")),
+            segments=body.get("segments", []),
+        )
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": "INVALID_AGING_CONFIG",
+                "detail": f"配置格式错误: {exc}",
+            },
+        ) from exc
+
+    # 段名校验
+    svc = AgingSegmentService(db)
+    errors = svc.validate_segments(config.segments)
+    if errors:
+        # 提取第一个错误的 error_code
+        first_error = errors[0]
+        error_code = first_error.split(":")[0] if ":" in first_error else first_error
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "error_code": error_code,
+                "detail": "; ".join(errors),
+                "errors": errors,
+            },
+        )
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+    await svc.save_config(wp_index_id, config)
+    await db.commit()
+    return {"saved": True}
+
+
+@router.get("/aging-segments/has-amounts")
+async def aging_segments_has_amounts(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """检查 CREDIT_RISK_AGING 子行是否有已填金额（用于前端保存前警告）。
+
+    Requirements: 4.10
+    """
+    from app.services.aging_segment_service import AgingSegmentService
+
+    wp_index_id = await resolve_wp_index_id(db, wp_id)
+    svc = AgingSegmentService(db)
+    has = await svc.check_has_amounts(wp_index_id)
+    return {"has_amounts": has}
 
 
 # ─────────────────────────────────────────────────────────────────────────────

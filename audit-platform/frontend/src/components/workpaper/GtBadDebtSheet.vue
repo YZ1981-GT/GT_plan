@@ -20,7 +20,37 @@
       <el-button size="small" class="gbds-btn-add" @click="onAddParent">
         ＋ 新增计提类别
       </el-button>
+      <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+      <el-button size="small" @click="onExportData">导出数据</el-button>
+      <el-button size="small" @click="onImportClick">导入</el-button>
+      <el-button size="small" @click="agingDialogVisible = true">账龄段设置</el-button>
     </div>
+
+    <!-- 隐藏文件选择 -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display:none"
+      @change="onFileSelected"
+    />
+
+    <!-- 导入预览弹窗 -->
+    <ImportPreviewDialog
+      :visible="importDialogVisible"
+      :parse-result="importParseResult"
+      @update:visible="importDialogVisible = $event"
+      @confirm="onImportConfirm"
+      @cancel="importDialogVisible = false"
+    />
+
+    <!-- 账龄段设置弹窗 -->
+    <AgingDictionaryDialog
+      :visible="agingDialogVisible"
+      :wp-id="props.wpId"
+      @update:visible="agingDialogVisible = $event"
+      @saved="onAgingSegmentsSaved"
+    />
 
     <table class="gbds-table">
       <thead>
@@ -148,6 +178,8 @@
 import { reactive, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import ImportPreviewDialog from './ImportPreviewDialog.vue'
+import AgingDictionaryDialog from './AgingDictionaryDialog.vue'
 
 interface RowAmounts {
   [key: string]: string | null
@@ -212,6 +244,12 @@ const tree = reactive<Tree>({
 })
 const expanded = reactive<Record<string, boolean>>({})
 const provisionMethods = ref<{ value: string; label: string }[]>([])
+
+// ─── 导入/导出/账龄段 状态 ───
+const importDialogVisible = ref(false)
+const importParseResult = ref<any>(null)
+const agingDialogVisible = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const menu = reactive<{
   visible: boolean
@@ -358,6 +396,82 @@ async function onEditAmount(
     }
     await loadTree()
   }
+}
+
+// ─── 导出/导入/账龄段 处理函数 ───
+
+async function onExportTemplate(): Promise<void> {
+  try {
+    const blob = await api.get(`${base()}/export-template`, { responseType: 'blob' })
+    triggerDownload(blob, '坏账准备明细表_模板.xlsx')
+  } catch {
+    ElMessage.error('导出模板失败')
+  }
+}
+
+async function onExportData(): Promise<void> {
+  try {
+    const blob = await api.get(`${base()}/export-data`, { responseType: 'blob' })
+    triggerDownload(blob, '坏账准备明细表_数据.xlsx')
+  } catch {
+    ElMessage.error('导出数据失败')
+  }
+}
+
+function triggerDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function onImportClick(): void {
+  fileInputRef.value?.click()
+}
+
+async function onFileSelected(ev: Event): Promise<void> {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  // 重置 input 以支持再次选择同一文件
+  input.value = ''
+  const formData = new FormData()
+  formData.append('file', file)
+  try {
+    const result = await api.post(`${base()}/import-parse`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    importParseResult.value = result
+    importDialogVisible.value = true
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail || '解析文件失败'
+    ElMessage.error(detail)
+  }
+}
+
+async function onImportConfirm(): Promise<void> {
+  if (!importParseResult.value) return
+  try {
+    const matched = importParseResult.value.rows.filter(
+      (r: any) => r.status === 'matched'
+    )
+    await api.post(`${base()}/import-commit`, matched)
+    ElMessage.success('导入成功')
+    importDialogVisible.value = false
+    importParseResult.value = null
+    await loadTree()
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail || '导入提交失败'
+    ElMessage.error(detail)
+  }
+}
+
+async function onAgingSegmentsSaved(): Promise<void> {
+  await loadTree()
 }
 
 function openMenu(ev: MouseEvent, parent: ParentRow, child: ChildRow | null): void {

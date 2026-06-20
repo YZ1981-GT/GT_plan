@@ -72,7 +72,16 @@ inclusion: always
 - **✅ 聚合 UI 两问修复（2026-06-21，Playwright 实测 0 error）**：①顶部冗余"导出/导入"移除→GtWpRenderer 多 sheet 区加「🗂️ 切换底稿」el-popover(弹 GtBArchitectureTree 4 阶段树,navigation_rows 从 visibleSheets 直接构造排除 b-index,点节点 onJumpToSection 跳转+关弹窗)；WorkpaperEditor HTML 路径顶栏仅留 返回+code+科目名(univer 路径导出/导入不动)②**根因修复**:已软删项目底稿仍可打开→`get_render_config` Step1.5 加 `SELECT is_deleted FROM projects` 守卫,删除项目 404。首汽租车_2025(df5b8403)是已删项目我误测;存活 D2=重药控股安徽(0ec33ac9)/重庆和平药房(2aa00f57)。实测重药控股:标题"应收账款"/被审计单位正确显示"重药控股安徽_2025"/切换底稿树 4 阶段14卡/点审定表D2-1 跳转渲染 0 error;smoke 1102+GtBIndex 19 全绿
 - **✅ 聚合 UI 二轮修复（2026-06-21，Playwright 实测）**：①切换按钮文字"切换底稿"→"切换"，emoji 图标 🗂️→element-plus `<Switch>` 矢量图标②**🔴程序控制台空白根因修复**：`_a_program.render` 用父码 wp_code(D2) 查 procedure_table 模板，但 `get_template("D2")=None`(只有 "D2A" 有模板 20 项)→程序表空。修=从 sheet 名正则提取**sheet 级编码**(D2A/D4A/D2-6)查模板+用 sheet 的 `source_files[0]` 读模板(非全局 template_path)。实测重药控股 D2A 从空白→20 条程序行(进度 0/20)，0 error
 - **✅ 程序表子步骤二级明细（2026-06-21）**：后端 `_parse_sub_steps` 从 content 解析 `（N）...` 编号子步骤为 `sub_steps:[{no,text}]`，父行 program_desc 只保留概要；前端 `hasExpandContent` 含 sub_steps，展开区 ol 有序列表+虚线分隔(默认折叠,20 行全有展开箭头)。实测 D2A 第 1 行:5 项子步骤完整渲染。**铁律**：聚合程序表必须用 sheet 级编码(D2A 非 D2)查 procedure_table 模板
-- **🔴 D2 registry 遗漏 9 sheet 已补（2026-06-21 核对模板目录）**：模板底稿目录声明但 registry 缺失=D0-1~D0-4/D0-6~D0-8(函证7个,source=D0)+D2-11(坏账转回)+D2-12(质押出售)(source=D2-6)。附注披露国企版与上市公司版共用一个 sheet 支持切换(不新增独立 sheet)。D0 函证 sheet 放入 D2 工作包展示+支持跳转到 D0 底稿### ✅ 编制指导面板修复（2026-06-21，3 项，30 guidance 测试全绿）
+- **🔴 D2 registry 遗漏 9 sheet 已补（2026-06-21 核对模板目录）**：模板底稿目录声明但 registry 缺失=D0-1~D0-4/D0-6~D0-8(函证7个,source=D0)+D2-11(坏账转回)+D2-12(质押出售)(source=D2-6)。附注披露国企版与上市公司版共用一个 sheet 支持切换(不新增独立 sheet)。D0 函证 sheet 放入 D2 工作包展示+支持跳转到 D0 底稿
+- **🔴 D2-C 科目结论删除+底稿目录分类修正（2026-06-21）**：①D2-C 是虚构 sheet(模板无独立结论tab，结论嵌审定表末尾 audit_sections)，已从 registry 删除 ②`classifyStage` 修正：仅 sheet 名含"程序表"的 a-program-console 归"审计计划"(D2A 1项)，函证(D0系列)/检查表(D2-6~D2-12)虽也是 a-program-console 但归"实质性程序"(19项)。**铁律**：函证是实质性测试手段≠审计计划
+- **✅ 循环底稿目录隐藏聚合子码（2026-06-21）**：`build_cycle_workpapers` 从 registry 收集各 package primary 的子码(仅 `startsWith(primary)` 才隐藏)，过滤掉 D2-2/D2-3/D2-4/D2-5~D2-13 等。D0/D5/D6/D7 等独立 primary 保留不隐藏。**铁律**：隐藏规则=子码以其 primary_wp_code 开头才隐藏，不同 primary 的底稿永远保留
+- **🔴 registry sheet_name 必须与 xlsx tab 名完全一致（2026-06-21 踩坑）**：不一致导致 extract_grid/extract_audit_rows 找不到 sheet→空白。修正4处(明细表D2-2/程序表D2A/D2-11/附注披露)。**铁律**：补 registry 条目前必先 `openpyxl.load_workbook().sheetnames` 核对真实 tab 名
+
+### 🔵 进行中 spec：bad-debt-sheet-enhancement（2026-06-21，requirements-first）
+- **目标**：坏账准备明细表(GtBadDebtSheet)功能增强=导出模板+导出数据+Excel导入(预览弹窗)+账龄段枚举字典弹窗(三年/五年/自定义+自动更新信用风险组合子行)
+- **状态**：三件套已完成(requirements 5需求/design 含架构图+7端点+V091迁移+6 PBT property/tasks 5 Sprint 10任务)，待执行
+- **关键设计**：复用 BadDebtExportService(加 template_only)+新建 BadDebtImportService(parse→preview→commit 两阶段)+新建 AgingSegmentService(V091 aging_segments 表 wp_index_id 级唯一+JSONB 段列表+子行同步)+前端 ImportPreviewDialog+AgingDictionaryDialog
+- **注意点**：导入跳过表头行需按分组表头检测数据起始行(勿硬编码R12)；拖拽排序需确认 vuedraggable 依赖；静态路径在 /{row_id} 之前### ✅ 编制指导面板修复（2026-06-21，3 项，30 guidance 测试全绿）
 - **ai_enabled 缺失**：后端 `wp_guidance_chat.py` GET guidance 端点无 `ai_enabled` 字段 → 前端 undefined→false→AI 对话 Tab 隐藏。修=注入 `guidance_response["ai_enabled"] = settings.WP_AI_SERVICE_ENABLED`
 - **矛盾提示文案**：`GuidanceTabContent.vue:260` 写死"有疑问？切换到 AI 对话 Tab"不受开关控制。修=加 `v-if="guidanceStore.aiEnabled"`
 - **A1 排版丑**：A1 不在 `_complexity.json` high/medium 列表→落 low→只显示 100 字截断纯文本。修=加入 high 列表；同时去掉 `_load_complexity_config` 的 lru_cache（文件极小每次读可忽略，避免改 JSON 后必须重启）

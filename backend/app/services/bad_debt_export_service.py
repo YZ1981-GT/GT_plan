@@ -96,11 +96,15 @@ class BadDebtExportService:
     # ─── 公开导出接口 ────────────────────────────────────────────────────────
 
     async def export_workbook(
-        self, wp_index_id: uuid.UUID, meta: BadDebtExportMeta | None = None
+        self, wp_index_id: uuid.UUID, meta: BadDebtExportMeta | None = None,
+        *, template_only: bool = False,
     ) -> Workbook:
         """构建并返回 openpyxl Workbook（不落盘）。
 
-        Requirements: 7.1, 7.2, 7.3, 7.4, 7.5
+        Args:
+            template_only: True 时输出空模板（金额列全部留空），仅保留树行结构供离线填写。
+
+        Requirements: 7.1, 7.2, 7.3, 7.4, 7.5 + 1.2(template_only)
         """
         tree = await NestedTableService(self.db).get_tree(wp_index_id)
         meta = meta or BadDebtExportMeta()
@@ -111,17 +115,22 @@ class BadDebtExportService:
 
         self._write_meta(ws, meta)
         self._write_header(ws)
-        next_row = self._write_data_rows(ws, tree)
-        self._write_summary_row(ws, tree, next_row)
+        next_row = self._write_data_rows(ws, tree, template_only=template_only)
+        self._write_summary_row(ws, tree, next_row, template_only=template_only)
         self._apply_column_widths(ws)
 
         return wb
 
     async def export_bytes(
-        self, wp_index_id: uuid.UUID, meta: BadDebtExportMeta | None = None
+        self, wp_index_id: uuid.UUID, meta: BadDebtExportMeta | None = None,
+        *, template_only: bool = False,
     ) -> io.BytesIO:
-        """导出为 BytesIO（供 HTTP 下载 / 流式响应）。"""
-        wb = await self.export_workbook(wp_index_id, meta)
+        """导出为 BytesIO（供 HTTP 下载 / 流式响应）。
+
+        Args:
+            template_only: True 时输出空模板（金额列全部留空）。
+        """
+        wb = await self.export_workbook(wp_index_id, meta, template_only=template_only)
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -196,17 +205,19 @@ class BadDebtExportService:
 
     # ─── 数据区 R12+ ─────────────────────────────────────────────────────────
 
-    def _write_data_rows(self, ws: Worksheet, tree) -> int:
+    def _write_data_rows(self, ws: Worksheet, tree, *, template_only: bool = False) -> int:
         """按模板行顺序写父行 + 子行，返回下一个可写行号（用于合计行）。
 
         行顺序：父行(加粗) → 其子行(缩进"  XXX") → 下一父行 → … （Req 7.2, 7.5）
         子行空金额列输出空单元格（None，非 0）（Req 7.3）。
+        template_only=True 时所有金额列留空（仅输出行标签结构）。
         """
         row_idx = _DATA_START_ROW
         for parent in tree.parents:
             # 父行：A 列 = row_label，加粗；13 金额列为子行汇总（已在 get_tree 算好）
             self._write_row(
-                ws, row_idx, label=parent.row_label, amounts=parent.amounts, bold=True
+                ws, row_idx, label=parent.row_label, amounts=parent.amounts, bold=True,
+                skip_amounts=template_only,
             )
             row_idx += 1
             # 子行：A 列缩进两空格，空金额列留空
@@ -217,14 +228,16 @@ class BadDebtExportService:
                     label=f"{_CHILD_INDENT}{child.row_label}",
                     amounts=child.amounts,
                     bold=False,
+                    skip_amounts=template_only,
                 )
                 row_idx += 1
         return row_idx
 
-    def _write_summary_row(self, ws: Worksheet, tree, row_idx: int) -> None:
+    def _write_summary_row(self, ws: Worksheet, tree, row_idx: int, *, template_only: bool = False) -> None:
         """写合计行（Req 7.2）：A 列 = "合计"，13 金额列 = Summary 汇总值。"""
         self._write_row(
-            ws, row_idx, label="合计", amounts=tree.summary.amounts, bold=True
+            ws, row_idx, label="合计", amounts=tree.summary.amounts, bold=True,
+            skip_amounts=template_only,
         )
 
     def _write_row(
@@ -235,14 +248,19 @@ class BadDebtExportService:
         label: str,
         amounts: RowAmounts,
         bold: bool,
+        skip_amounts: bool = False,
     ) -> None:
         """写单行：A 列标签 + B~N 13 金额列。
 
         金额列为 None 时输出空单元格（不写 0）（Req 7.3）。
+        skip_amounts=True 时跳过所有金额列（template_only 模式）。
         """
         label_cell = ws.cell(row=row_idx, column=1, value=label)
         if bold:
             label_cell.font = Font(bold=True)
+
+        if skip_amounts:
+            return  # template_only：仅写标签列，金额全留空
 
         # B~N 列：column 2..14 对应 amount_b..amount_n
         for offset, col_name in enumerate(_AMOUNT_COLUMNS):
