@@ -52,6 +52,7 @@
         v-if="useHtmlRenderer"
         :wp-id="wpId"
         @save-success="onChildSaved"
+        @saved-notify="onChildSaved"
         @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
         @cross-ref-update="onHtmlCrossRefUpdate"
         @sync-to-disclosure-notes="onHtmlSyncToDisclosureNotes"

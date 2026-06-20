@@ -133,7 +133,16 @@ class ProcedureTableService:
         """返回完整程序表数据（模板 + 自动值 + 用户覆盖）"""
         template = get_template(table_code)
         if template is None:
-            raise ValueError(f"未知程序表编码: {table_code}")
+            # 无程序表模板（如 docx 文档控制表 B5，或自定义底稿）→ 优雅降级为空表，
+            # 让前端 a-program-console 渲染空程序表 + 用户可手动新增行，绝不 500。
+            # 用户已新增的自定义行仍从 field_overrides 的 custom_items scope 读取。
+            _logger.warning("程序表模板缺失 table_code=%s，返回空表降级", table_code)
+            return {
+                "table_code": table_code,
+                "table_name": table_code,
+                "applicable_when": None,
+                "items": [],
+            }
 
         scope = f"procedure_table:{table_code}"
         overrides = await self.override_svc.get_batch(project_id, year, scope)

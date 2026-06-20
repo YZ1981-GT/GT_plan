@@ -68,7 +68,7 @@ inclusion: always
 - A7-A15/A16/A17/A18 完成阶段底稿 ✅；a21-a25 复核底稿 ✅；核对表/弹窗/分析复核 ✅
 
 ### git 状态（2026-06-21）
-- 分支 `work/2026-05-30-wp-specs`，HEAD `07ea9338`（前端 Top3 大组件拆分 composable+子组件，27文件，已推送），最高迁移 V088
+- 分支 `work/2026-05-30-wp-specs`，HEAD `edfbb74f`（前端 Top3 大组件拆分 + spec 任务状态收尾，已推送），最高迁移 V088
 - **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
@@ -156,3 +156,27 @@ inclusion: always
 - 架构/MCP/数据流 → `#architecture`
 - 编码规范/UI/PG运维 → `#conventions`
 - spec 状态 → `.kiro/specs/INDEX.md`
+
+- **✅ A 类底稿 Playwright 实操体检（2026-06-20，项目经理视角逐张测）**：项目 `0ec33ac9`(94 张 A 类)，发现并修复 **5 个真 bug**（均导致底稿打不开/报错/保存失败的硬故障）：
+  1. **10 张 docx 文档底稿空白页**(A18/A18-1/A26/A26-1~4/A27/A27-1)：根因 seed 脚本只从 xlsx 扫描的 `workpaper_template_analysis.json` 灌分类，docx 函件/清单/备忘录从未入 `workpaper_sheet_classification` → render-config 返回空 sheets。新建 `backend/scripts/seed/seed_docx_document_classification.py`(幂等补 10 行，class_code=`A-报告文档`)。componentType 走 class_code 派生=`a-program-console`(与同类 docx 函件 A9-1/A10-1/A12-1 一致)，**不要**用 word-template(那是 A16 声明书硬编码专用组件 WorkpaperWordEditor，误用会渲染成声明书界面)
+  2. **6 文件裸 SQL 表名错** `working_papers`(复数)→`working_paper`(单数,真实表名)：`review_checklist_service`/`a16_version_service`(+列 `wp.wp_code` 不存在改 JOIN wp_index + `pi.working_paper_id`→`pi.wp_id`)/`completion_phase`(3处)/`time_machine`(3处 table_map)/`status_machine`(1处 table_map)。导致复核签字状态/A16 推荐版本等多端点 500。`adjustments`/`disclosure_notes`/`procedure_instances` 是对的复数，勿动
+  3. **GtRegulatoryLetter.vue 导入路径错** `@/components/common/GtIndexChip.vue`→`@/components/workpaper/GtIndexChip.vue`(全仓唯一错处)：A18-2 监管沟通函永远打不开(Vite 500)
+  4. **AuditLegendPanel.vue field-overrides 契约错**：用了 `/api/workpapers/{wpId}/field-overrides?scope&key`(路径含 wpId+key 参数)，真实契约是 `/api/workpapers/field-overrides` POST body `{project_id,year,scope,item_key,field,value}` / GET query `{project_id,year,scope}` 返回 `{item_key:{field:value}}` 批量。补 year prop(GtWpRenderer 已传)，GET 读 `data.custom_items.value`。A31 审计标识 404 修复
+  5. **GtWpRenderer.onSave 缺防御 → /save 422**(memory 预存问题根因)：WpPopupSigning 等自持久化组件(PUT checklist-responses)`emit('save')` 无参，onSave 仍包装成 `{sheet_name, html_data:undefined}` emit save-success → 外层 POST /save 缺 html_data 触发 422。修复:onSave 判 data 为空(null/非 object/数组)时改 `emit('saved-notify')` 仅刷新不发 /save；新增 saved-notify emit 声明 + WorkpaperEditor `@saved-notify="onChildSaved"` wiring。A1-11 切 tab/签字自动保存 422 消除
+  6. **extractTableCode undefined 崩溃**(a11-bundle/a15-bundle 嵌套渲染 GtAProgramConsole，sheetName 为 undefined)：`useAProgramPopups.ts`+`useAProgramReview.ts` 两处 `sheetName.match(...)` 改 `sheetName?.match(...)`。A11/A15 bundle 从 8 error→0（拆分前同款无防御代码，bundle 场景才暴露）
+  7. **prefill-suggestions 500**(`review_checklist_service.get_prefill_suggestions`)：查 `WorkingPaper.status.in_(["completed","reviewed"])` 但 `wp_file_status` 枚举无这俩值（合法值 draft/edit_complete/under_review/revision_required/review_passed/archived）→ 改 `["edit_complete","review_passed","archived"]`。A21 复核表 500 修复
+  8. **review-definitions 父码 404**(A21/A22…父码)：`get_review_definition_for_wp` 对父码 A2[1-5] 先调 `resolve_review_wp_code` 解析为适用子码(A21-1/A21-2)再查定义。前端无需改，所有调用方受益
+  - **已 UI 实测 0 error 的 A 类 componentType（全覆盖）**：a1-dashboard(A1)/a-program-console(A18/A8/A9-1/A30/A17系列)/checklist-table(A1-12/A17-5-1)/analytical-review(A1-13)/misstatement-workpaper(A13)/audit-sheet(A4-1/A5-1)/a2-adjustment-console(A2)/a3-consolidation-console(A3)/audit-legend(A31)/regulatory-letter(A18-2)/wp-popup-signing(A1-11,含4tab+签字)/word-template(A16)/cf-verification(A5)/c-note-table(A5-4/A7-2)/b-index(A6-1)/d-form-confirmation(A10-2)/a11-bundle(A11)/a15-bundle(A15)/a14-3-workbook(A14-3)/e-control-test(A14-6)/review-checklist(A21)/a17-summary(A17-1)/d-form-table(A7-1)。**A 类 94 张全部体检通过，0 残留 error**
+  - **🟢 B/C 类底稿体检（2026-06-20 续）**：B 类 18 张 + C 类 21 张全部测完。C 类全绿（a-program-console/d-form-table/audit-sheet 三型）。B 类发现 **第 9 个 bug + 1 个同类 docx 缺失**：
+    - **B5 业务约定书控制表空白页**：同 A18 docx 模式（docx 未被 xlsx 扫描器收录 → 分类缺失）。扩展 `seed_docx_document_classification.py` 支持 per-entry class_code，补 B5(`B-报告文档`)+ override JSON `B5→a-program-console`。⚠ `find_template_file_any("B5")` 前缀模糊匹配误命中 `B50`（已知小瑕疵，未修）
+    - **9. procedure_table 未知 code 500 → 优雅空表降级**：`procedure_table_auto_service.get_procedure_table` 对无模板 code 原 `raise ValueError`→FastAPI 500。改为返回空表 `{items:[]}`（前端 a-program-console 渲染空表+可手动加行，绝不 500）。系统级健壮性，所有无模板/自定义底稿受益。B5 走 a-program-console 渲染空程序表（临时方案，理想是配真实控制表模板，记待办）
+    - B15 重要性计算表 `redirect:true→/materiality` 空 sheets 是**预期**（重定向重要性模块），非 bug
+    - **已 UI 实测 0 error**：B 类 univer/e-control-test/h-static-doc(B23)/d-form-table(B1)/checklist-table(B3)/audit-sheet(B60)/a-program-console(B10/B5)；C 类 a-program-console(C1)/d-form-table(C10)/audit-sheet(C22)
+    - **🟡 待 commit 追加**：`procedure_table_auto_service.py`(空表降级) + seed 脚本 per-entry class_code + override JSON(B5)+1 行 DB(B5 分类)
+  - **🟢 D~N+S 全循环体检（2026-06-20，后端 API 全扫 + 前端抽测）**：D/E/F/G/H/I/J/L/M/N 全绿 0 problems。componentType 分布:DEFGH=confirmation-hub/d-form-table/audit-sheet；I=d-form-table/audit-sheet；J=单底稿八合一(b-index/a-program-console/audit-sheet/c-note-table/univer/d-form-table/skip/h-static-doc)；KLMN=c-note-table/audit-sheet/confirmation-hub；S=a-program-console/d-form-table/audit-sheet/h-static-doc/skip
+    - **K14~K18 + S17 空白页修复**：本项目 wp_index 用了标准模板库无的编码(K14资产处置收益/K15其他收益/K16投资收益/K17公允价值变动收益/K18递延收益审定表，标准 K 模板仅到 K13)；S17 非经常性损益模板是旧版 `.xls`(analyze 脚本只扫 .xlsx 漏)。均分类缺失→空白。扩展 seed 补 6 行(class_code K-审定表/S-审定表)+override JSON K14~K18→audit-sheet(S17 已有)。audit-sheet 无模板优雅降空表(K14 UI 实测:工具栏齐全+空态提示「请等待模板初始化或手动新增行」+一键刷新 TB 取数)，0 error
+    - **已 UI 实测 0 error**：confirmation-hub(D0)/audit-sheet(D2-2/K14/S17)/八合一(J1)/c-note-table(K1/M1)
+    - **B15 同类**：重要性计算表 redirect→/materiality 空 sheets 是预期非 bug
+    - **🟡 遗留小瑕疵**：`find_template_file_any` 前缀模糊匹配(B5 误命中 B50、K14 命中 None 但实际无模板)+ analyze 脚本只扫 .xlsx 漏 .xls/.docx → 待单独修模板查找器；K14~K18 用非标准编码是该项目 wp_index seed 数据问题(其他项目同码 name 各异)，根治需规范 wp_index 编码
+    - **🟡 待 commit 追加**：seed 脚本(K14~K18/S17 共 6 entry) + override JSON(K14~K18) + 6 行 DB
+  - **render-config 体检法**：`GET /api/workpapers/{id}/render-config` 看 `sheets[].componentType`，sheets 空=分类缺失；override JSON 改后需 touch 一个 app/*.py 触发 uvicorn reload(JSON 改动不触发 reload，且 `_WP_CODE_OVERRIDE` 是模块级快照非热重载到消费方)

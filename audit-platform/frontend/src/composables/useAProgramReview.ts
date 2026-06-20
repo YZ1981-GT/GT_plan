@@ -38,8 +38,8 @@ export function useAProgramReview(options: {
 
   /** 从 sheetName 提取 table_code (如 "审计程序A8" → "A8") */
   function extractTableCode(sheetName: string): string {
-    // 匹配 A1~A17 格式
-    const m = sheetName.match(/[A-S]\d+/)
+    // 匹配 A1~A17 格式（防御：a11-bundle 等嵌套渲染场景 sheetName 可能为 undefined）
+    const m = sheetName?.match(/[A-S]\d+/)
     return m ? m[0] : ''
   }
 

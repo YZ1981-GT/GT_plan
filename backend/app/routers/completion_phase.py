@@ -109,7 +109,7 @@ async def _summary_misstatement(db: AsyncSession, project_id: UUID, key: str) ->
         r = await db.execute(
             sa.text(
                 "SELECT COUNT(*) FROM checklist_responses cr "
-                "JOIN working_papers wp ON wp.id = cr.wp_id "
+                "JOIN working_paper wp ON wp.id = cr.wp_id "
                 "WHERE wp.project_id = :pid AND cr.item_id LIKE 'A13%'"
             ),
             {"pid": str(project_id)},
@@ -130,7 +130,7 @@ async def _summary_going_concern(db: AsyncSession, project_id: UUID, key: str) -
     r = await db.execute(
         sa.text(
             "SELECT COUNT(*) FROM checklist_responses cr "
-            "JOIN working_papers wp ON wp.id = cr.wp_id "
+            "JOIN working_paper wp ON wp.id = cr.wp_id "
             "WHERE wp.project_id = :pid AND cr.item_id LIKE 'A15-1%'"
         ),
         {"pid": str(project_id)},
@@ -149,7 +149,7 @@ async def _summary_control_deficiency(db: AsyncSession, project_id: UUID, key: s
     r = await db.execute(
         sa.text(
             "SELECT COUNT(*) FROM checklist_responses cr "
-            "JOIN working_papers wp ON wp.id = cr.wp_id "
+            "JOIN working_paper wp ON wp.id = cr.wp_id "
             "WHERE wp.project_id = :pid AND cr.item_id LIKE 'A14-1%'"
         ),
         {"pid": str(project_id)},

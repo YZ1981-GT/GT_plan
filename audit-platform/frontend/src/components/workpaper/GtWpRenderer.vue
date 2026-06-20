@@ -198,6 +198,8 @@ const emit = defineEmits<{
   'sheet-change': [sheetName: string]
   'cell-focus': [payload: { sheet: string; cell: string }]
   'save-success': [payload: SavePayload]
+  /** 子组件自行持久化后的纯通知（无 html_data），外层仅刷新不再 POST /save */
+  'saved-notify': []
   'cross-ref-update': [payload: CrossRefPayload]
   'trigger-procedure-trimming-suggestion': [payload: Record<string, any>]
   'conclusion-change': [conclusion: string]
@@ -450,6 +452,14 @@ const errorSubTitle = computed(() => {
 
 // ─── Methods ───
 function onSave(data: Record<string, any>) {
+  // 防御：部分子组件（如 WpPopupSigning）自行持久化（PUT checklist-responses），
+  // 其 emit('save') 不带 payload，仅作"已保存"通知。此时 data 为 undefined/空，
+  // 不应构造缺 html_data 的 save-success（否则外层 POST /save 触发 422）。
+  // 仅当子组件确实传回 html_data 时才走外层 parsed_data 持久化通道。
+  if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+    emit('saved-notify')
+    return
+  }
   const payload: SavePayload = {
     sheet_name: activeSheetName.value,
     html_data: data,

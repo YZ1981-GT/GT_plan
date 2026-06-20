@@ -14,7 +14,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import GtIndexChip from '@/components/common/GtIndexChip.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 
 // ─── Types ───
 interface TopicDefinition {

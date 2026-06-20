@@ -139,6 +139,17 @@ def apply_auto_na(template: dict, context: dict[str, Any]) -> dict:
 async def get_review_definition_for_wp(
     db: AsyncSession, project_id: UUID, wp_code: str
 ) -> dict | None:
+    # 父码（A21/A22… 无 -N 后缀）解析为当前项目适用的子码（A21-1/A21-2）
+    import re as _re
+    if _re.match(r"^A2[1-5]$", (wp_code or "").strip().upper()):
+        from app.services.a21_a25_version_selector import (
+            get_applicable_review_templates,
+            resolve_review_wp_code,
+        )
+        templates = await get_applicable_review_templates(db, project_id)
+        resolved = resolve_review_wp_code(templates, wp_code)
+        wp_code = resolved.get("wp_code") or wp_code
+
     ctx = await get_review_context(db, project_id)
     tpl = get_template_definition(wp_code, ctx.get("is_large_soe", False))
     if not tpl:
@@ -193,10 +204,12 @@ async def get_prefill_suggestions(
         WorkingPaper.project_id == project_id,
         WorkingPaper.is_deleted == sa.false(),
     )
+    # wp_file_status 合法值：draft/edit_complete/under_review/revision_required/
+    # review_passed/archived（无 completed/reviewed）。"完成"口径取编制完成及以后状态。
     done_stmt = sa.select(sa.func.count()).select_from(WorkingPaper).where(
         WorkingPaper.project_id == project_id,
         WorkingPaper.is_deleted == sa.false(),
-        WorkingPaper.status.in_(["completed", "reviewed"]),
+        WorkingPaper.status.in_(["edit_complete", "review_passed", "archived"]),
     )
     total = (await db.execute(total_stmt)).scalar() or 0
     done = (await db.execute(done_stmt)).scalar() or 0
@@ -334,7 +347,7 @@ async def get_review_sign_status_batch(
             f"""
             SELECT wi.wp_code, cr.conclusion
             FROM checklist_responses cr
-            JOIN working_papers wp ON wp.id = cr.wp_id
+            JOIN working_paper wp ON wp.id = cr.wp_id
             JOIN wp_index wi ON wi.id = wp.wp_index_id
             WHERE wp.project_id = :pid
               AND wp.is_deleted = false

@@ -28,8 +28,9 @@ async def _integrated_audit_signal(db: AsyncSession, project_id) -> bool:
     r = await db.execute(
         sa.text(
             "SELECT 1 FROM procedure_instances pi "
-            "JOIN working_papers wp ON wp.id = pi.working_paper_id "
-            "WHERE wp.project_id = :pid AND wp.wp_code LIKE 'B60%' LIMIT 1"
+            "JOIN working_paper wp ON wp.id = pi.wp_id "
+            "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+            "WHERE wp.project_id = :pid AND wi.wp_code LIKE 'B60%' LIMIT 1"
         ),
         {"pid": str(project_id)},
     )
@@ -41,8 +42,9 @@ async def _related_party_count(db: AsyncSession, project_id) -> int:
         r = await db.execute(
             sa.text(
                 "SELECT COUNT(*) FROM checklist_responses cr "
-                "JOIN working_papers wp ON wp.id = cr.wp_id "
-                "WHERE wp.project_id = :pid AND wp.wp_code = 'A7-1'"
+                "JOIN working_paper wp ON wp.id = cr.wp_id "
+                "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                "WHERE wp.project_id = :pid AND wi.wp_code = 'A7-1'"
             ),
             {"pid": str(project_id)},
         )

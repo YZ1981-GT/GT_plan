@@ -79,14 +79,14 @@ async def _load_instance_status(
 
     # 模块 → 表名 + 状态字段映射
     table_map = {
-        "workpaper": ("working_papers", "status"),
+        "workpaper": ("working_paper", "status"),
         "adjustment": ("adjustments", "status"),
         "misstatement": ("misstatements", "status"),
         "report": ("reports", "status"),
         "disclosure": ("disclosure_notes", "status"),
     }
 
-    table_name, status_col = table_map.get(module, ("working_papers", "status"))
+    table_name, status_col = table_map.get(module, ("working_paper", "status"))
 
     try:
         # 查询实例状态和项目 ID

@@ -75,6 +75,7 @@ interface LegendItem {
 const props = defineProps<{
   wpId: string
   projectId: string
+  year?: number
   readonly?: boolean
 }>()
 
@@ -128,10 +129,12 @@ function removeCustom(idx: number) {
 
 async function onSave() {
   try {
-    await api.post(`/api/workpapers/${props.wpId}/field-overrides`, {
+    await api.post('/api/workpapers/field-overrides', {
       project_id: props.projectId,
+      year: props.year || new Date().getFullYear(),
       scope: 'audit_legend',
-      key: 'custom_items',
+      item_key: 'custom_items',
+      field: 'value',
       value: customItems.value.filter(i => i.symbol || i.meaning),
     })
   } catch { /* 静默 */ }
@@ -140,11 +143,16 @@ async function onSave() {
 
 async function loadCustom() {
   try {
-    const data: any = await api.get(`/api/workpapers/${props.wpId}/field-overrides`, {
-      params: { scope: 'audit_legend', key: 'custom_items' },
+    const data: any = await api.get('/api/workpapers/field-overrides', {
+      params: {
+        project_id: props.projectId,
+        year: props.year || new Date().getFullYear(),
+        scope: 'audit_legend',
+      },
     })
-    if (Array.isArray(data?.value)) {
-      customItems.value = data.value
+    const v = data?.custom_items?.value
+    if (Array.isArray(v)) {
+      customItems.value = v
     }
   } catch { /* 首次无数据正常 */ }
 }
