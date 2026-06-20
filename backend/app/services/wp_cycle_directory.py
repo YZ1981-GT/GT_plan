@@ -110,5 +110,40 @@ async def build_cycle_workpapers(
             "is_current": wp_id is not None and wp_id == current_wp_id,
         })
 
+    # ─── 多文件聚合：已被父码工作包聚合的子码从循环目录隐藏 ─────────────
+    # 如 D2 已聚合 D2-2/D2-3/D2-4 等为内部 sheet，
+    # 这些子码不应再作为独立底稿出现在跨底稿目录中（避免重复混淆）。
+    # 仅隐藏属于该 package primary_wp_code 的子码（D2-N for D2），
+    # 不隐藏其他 primary 的底稿（如 D0 函证仍保留为独立条目）。
+    aggregated_child_codes: set[str] = set()
+    try:
+        from app.services.account_package_registry_service import AccountPackageRegistryService
+        registry = AccountPackageRegistryService()
+        for pkg in registry.get_packages():
+            if pkg.get("cycle") != audit_cycle:
+                continue
+            primary = pkg.get("primary_wp_code", "")
+            if not primary:
+                continue
+            # 从 sheet_name 中提取子码，仅保留属于本 primary 的子码
+            # 如 D2 package: "审定表D2-1" → D2-1 (属于 D2), "函证结果汇总表D0-1" → D0-1 (属于 D0, 不隐藏)
+            for sheet in pkg.get("sheets", []):
+                name = sheet.get("sheet_name", "")
+                m = re.search(r"([A-Z]\d+(?:-\d+)+)", name)
+                if m:
+                    child_code = m.group(1)
+                    # 仅当子码以 primary 开头时才隐藏（D2-1 属于 D2，D0-1 不属于 D2）
+                    if child_code != primary and child_code.startswith(primary):
+                        aggregated_child_codes.add(child_code)
+            # source_wp_codes 中属于 primary 的子码也隐藏（如 D2-5/D2-6）
+            for src in pkg.get("source_wp_codes", []):
+                if src != primary and src.startswith(primary):
+                    aggregated_child_codes.add(src)
+    except Exception as e:  # noqa: BLE001 — registry 读取失败不影响目录显示
+        logger.debug("build_cycle_workpapers: 聚合子码收集失败: %s", e)
+
+    if aggregated_child_codes:
+        items = [it for it in items if it["wp_code"] not in aggregated_child_codes]
+
     items.sort(key=lambda x: _natural_key(x["wp_code"]))
     return items
