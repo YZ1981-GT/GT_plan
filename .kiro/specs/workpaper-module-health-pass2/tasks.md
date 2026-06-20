@@ -11,7 +11,8 @@
     - 将 `wp_render_config.py` L298-390 的 `_build_preparation_info` 函数迁入
     - 改为模块级异步函数 `build_preparation_info(db, project_id, wp_id) -> dict[str, str]`
     - 保留原有 SQL 逻辑和逐字段 try/except 降级
-    - 添加 docstring（用途 + 返回 7 字段说明）
+    - 添加 docstring（用途 + 返回 7 字段说明）继续修复
+    
     - _Requirements: 1.1, 1.2_
 
   - [x] 1.2 更新策略文件 import 路径

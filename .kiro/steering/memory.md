@@ -68,7 +68,7 @@ inclusion: always
 - A7-A15/A16/A17/A18 完成阶段底稿 ✅；a21-a25 复核底稿 ✅；核对表/弹窗/分析复核 ✅
 
 ### git 状态（2026-06-21）
-- 分支 `work/2026-05-30-wp-specs`，HEAD `d1262c80`（pass4 拆分+resolver 契约守卫+前端 stub 清理，20文件，已推送），最高迁移 V088
+- 分支 `work/2026-05-30-wp-specs`，HEAD `07ea9338`（前端 Top3 大组件拆分 composable+子组件，27文件，已推送），最高迁移 V088
 - **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
