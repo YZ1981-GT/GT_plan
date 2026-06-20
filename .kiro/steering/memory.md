@@ -68,7 +68,7 @@ inclusion: always
 - A7-A15/A16/A17/A18 完成阶段底稿 ✅；a21-a25 复核底稿 ✅；核对表/弹窗/分析复核 ✅
 
 ### git 状态（2026-06-21）
-- 分支 `work/2026-05-30-wp-specs`，HEAD `53f0a497`（大文件拆分 pass3+silent治理+spec归档，87文件 +6377/-5122，已推送），最高迁移 V088
+- 分支 `work/2026-05-30-wp-specs`，HEAD `d1262c80`（pass4 拆分+resolver 契约守卫+前端 stub 清理，20文件，已推送），最高迁移 V088
 - **active spec=1**：audit-report-template-integration 185/190；workpaper-module-health-pass2 ✅ 全部完成（2026-06-21）
 - **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit，需 GitHub 改
 
@@ -115,7 +115,14 @@ inclusion: always
   - **③凭证 OCR(P2)**：`wp_evidence_ocr_service.py:224` TODO LLM 链路待接入(stub,外部依赖 vLLM/MinerU)
   - **④resolver 契约(P3,2026-06-21 完成 A 增强版)**：新增全量 resolver 成功契约守卫 PBT(`test_auto_data_resolvers.py`,参数化遍历 51 resolver 喂空结果 mock 断言①不裸抛②返回含非空 summary 的 dict)；**当场抓出 2 个真 bug 并修**：`b3_independence_status`(导入不存在的 ORM 类 ChecklistResponse + 查不存在的 wp_code 列→改裸 SQL JOIN checklist_responses→working_paper→wp_index 按 wp_code='B3')、`related_party_disclosure_check`(导入不存在的 app.models.disclosure_models→改 report_models)；resolver 测试 80 passed,1214 测试零回归,app 1522 路由不变
   - **⚠ 预存失败(非本次范围)**：`test_checklist_responses_crud` 422(PUT body 校验失败,checklist 路由 schema 问题)，依赖真实 DB、与 resolver 改动无关，先于本次存在，待单独修
-  - **⑤前端底稿组件健康度（2026-06-21 扫描+清理）**：`components/workpaper/` 反模式债≈0（无空 catch）；**已清 3 处预留 console.log→emit 事件**：GtAnalyticalReview(navigate-row)/AccountPackageFieldSource(navigate-sheet)/AccountPackageConclusionEntry(enter-conclusion)，非破坏(父组件原未监听)，GtAnalyticalReview spec 6 passed。剩唯一债=大文件 8 个>800(GtAProgramConsole 1625/GtChecklistTable 1437/GtAuditSheet 1405/GtAnalyticalReview 1336 等，.vue 含 template+script+style 三段)。**前端拆分风险/成本远高于后端**(抽 composable+拆子组件易破坏响应式/事件流，且每个拆完必 Playwright 实测)，建议单独立 spec 逐组件验证、非紧急。views 层更大(LedgerPenetration 3977/TrialBalance 2945)但非底稿核心组件
+  - **⑤前端底稿组件健康度（2026-06-21 扫描+清理）**：`components/workpaper/` 反模式债≈0（无空 catch）；**已清 3 处预留 console.log→emit 事件**：GtAnalyticalReview(navigate-row)/AccountPackageFieldSource(navigate-sheet)/AccountPackageConclusionEntry(enter-conclusion)，非破坏(父组件原未监听)，GtAnalyticalReview spec 6 passed。剩唯一债=大文件 8 个>800(GtAProgramConsole 1625/GtChecklistTable 1437/GtAuditSheet 1405/GtAnalyticalReview 1336 等，.vue 含 template+script+style 三段)。**前端拆分风险/成本远高于后端**(抽 composable+拆子组件易破坏响应式/事件流，且每个拆完必 Playwright 实测)，建议单独立 spec 逐组件验证、非紧急。views 层更大(LedgerPenetration 3977/TrialBalance 2945)但非底稿核心组件。**已立 spec `workpaper-frontend-large-component-split`(2026-06-21,vitest/tsc 完成，Playwright 待实测)**：Top 3 抽 composable+子组件
+    - Sprint A `GtAProgramConsole` 1626→1144：3 composable(useAProgramReview/Data/Popups)+1 子组件(GtAProgramLinkedChips)。**800 红线结构性达不到**(模板465+样式109+必留script280含 emit-wiring 不能进 composable)，公认地板，30 测试绿零行为变更
+    - Sprint B `GtChecklistTable` 1438→752 ✅：3 composable(useChecklistResponses/Search/Applicability)+2 子组件(GtChecklistNav/Section)+checklistTypes.ts，4 测试绿
+    - Sprint C `GtAuditSheet` 1406→786 ✅：3 composable(useAuditSheetTable/Columns/Sections)+auditSheetTypes.ts，71 测试绿
+    - 守卫 `large_component_guard.spec.ts`：GtChecklistTable/GtAuditSheet 断言 ≤800，GtAProgramConsole 设上限 1200 防回升(不强求≤800)；2 个预存失败(htmlRendererRegistry/GtIndexChip)经 git stash 验证与拆分无关
+    - **结论：前端硬 800 红线不普适**，emit-wiring 不能进 composable；composable 不 emit(回调 wire)、保响应式、单向依赖
+    - **🟢 Playwright 实测通过(2026-06-21)**：GtAProgramConsole(A1程序表:21行渲染/4阶段/chip点击跳转A15成功/状态下拉)、GtChecklistTable(A15-1调查表:左导航+右条目+适用性弹窗+填 Y 进度 0→1/22 自动保存)均 0 组件级 error；GtAuditSheet 实时 bundle import 无错+71 vitest 覆盖(项目无 audit-sheet 数据未走 UI)。spec 全部任务收口
+    - **⚠ 预存非本次**：`/api/workpapers/{id}/save` 422(缺 html_data) 由 GtWpRenderer 父组件(未碰)构造 save body 引起，与拆分无关，同 test_checklist_responses_crud 422 同源，待单独修
 - 外部依赖：LLM embedding / 合并 UAT 数据 / GitHub 默认分支改 main
 - A 循环 docx 弹窗（30个待加 WpPopupDocxEditor）
 - A3-8 商誉减值 / A4 经营分部 / A5 现金流（spec 已建未实施）

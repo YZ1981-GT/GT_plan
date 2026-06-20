@@ -15,7 +15,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { setActivePinia, createPinia } from 'pinia'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
+
+// 组件经 useAProgramData → useProjectStore 依赖 Pinia，挂载前安装测试 Pinia
+beforeEach(() => {
+  setActivePinia(createPinia())
+})
 
 // Mock vue-router useRoute（组件用 route.params.projectId 派生 projectId）
 vi.mock('vue-router', () => ({

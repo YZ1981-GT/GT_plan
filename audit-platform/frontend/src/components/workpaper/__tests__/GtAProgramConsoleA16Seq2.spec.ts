@@ -12,6 +12,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { setActivePinia, createPinia } from 'pinia'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 
 // Mock vue-router useRoute — A16 程序表
@@ -143,6 +144,7 @@ function createWrapper(sheetName = '管理层声明书程序表A16') {
 
 describe('GtAProgramConsole — A16 seq2 推荐版本折叠', () => {
   beforeEach(() => {
+    setActivePinia(createPinia())
     vi.clearAllMocks()
     // 默认 API 返回推荐版本 A16-3
     mockApiGet.mockImplementation((url: string) => {

@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { nextTick } from 'vue'
+import { setActivePinia, createPinia } from 'pinia'
 import GtAProgramConsole from '../GtAProgramConsole.vue'
 
 vi.mock('vue-router', () => ({
@@ -105,7 +106,10 @@ function mountConsole(status: string) {
 }
 
 describe('GtAProgramConsole chip disabled', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
 
   it('disables ref chips when row status is not_applicable', async () => {
     const wrapper = mountConsole('not_applicable')
