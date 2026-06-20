@@ -83,8 +83,7 @@
         { "sheet_name": "坏账准备转回核销检查表D2-11", "sheet_type": "procedure", "source_wp_code": "D2-6" },
         { "sheet_name": "应收账款质押出售情况检查表D2-12", "sheet_type": "procedure", "source_wp_code": "D2-6" },
         { "sheet_name": "应收账款业务模式分析D2-13", "sheet_type": "analysis", "source_wp_code": "D2-6", "schema_ref": "D-D2-13.yaml" },
-        { "sheet_name": "应收账款附注披露信息", "sheet_type": "disclosure", "source_wp_code": "D2", "schema_ref": "C-D2-disclosure.yaml" },
-        { "sheet_name": "D2-C 科目结论", "sheet_type": "conclusion", "source_wp_code": "D2" }
+        { "sheet_name": "应收账款附注披露信息", "sheet_type": "disclosure", "source_wp_code": "D2", "schema_ref": "C-D2-disclosure.yaml" }
       ],
       "external_cards": ["confirmation_summary", "adjustment_impact", "note_disclosure"],
       "downstream": ["report", "disclosure_note", "sign_off"],

@@ -152,13 +152,15 @@ const allNodes = computed<ArchNode[]>(() => {
 })
 
 // ─── 按审计阶段分组（4 泳道） ───
-//   ① 程序计划：a-program-console
+//   ① 审计计划：仅程序表（sheet 名含「程序表」的 a-program-console）
 //   ② 科目审定：sheet 名含「审定表」
-//   ③ 实质性程序：明细表/检查表/分析（univer + d-form-* 等，排除审定/调整）
+//   ③ 实质性程序：函证/检查表/分析/明细表等（含非程序表的 a-program-console）
 //   ④ 披露与调整：c-note-table（附注）+ sheet 名含「调整分录」
 function classifyStage(node: ArchNode): 'plan' | 'finalize' | 'substantive' | 'disclosure' {
   const name = node.name
-  if (node.componentType === 'a-program-console') return 'plan'
+  // 仅含「程序表」的 a-program-console 归审计计划（如 D2A 应收账款实质性程序表）
+  // 函证/检查表虽也是 a-program-console，但属于实质性程序
+  if (node.componentType === 'a-program-console' && name.includes('程序表')) return 'plan'
   if (name.includes('审定表')) return 'finalize'
   if (node.componentType === 'c-note-table' || name.includes('附注') || name.includes('披露')) {
     return 'disclosure'

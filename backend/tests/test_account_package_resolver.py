@@ -71,10 +71,10 @@ class TestSheetTypeMapping:
 class TestResolveD2Package:
     @pytest.mark.asyncio
     async def test_d2_returns_all_sheets(self):
-        """D2 应收账款聚合返回注册表声明的全部 sheet（23）+ 合成底稿目录（≥24）。"""
+        """D2 应收账款聚合返回注册表声明的全部 sheet（22）+ 合成底稿目录（≥23）。"""
         results = await resolve_package_sheets(None, "D2", _DUMMY_PID)
         assert results is not None
-        assert len(results) >= 24
+        assert len(results) >= 23
 
     @pytest.mark.asyncio
     async def test_d2_has_synthetic_directory(self):
