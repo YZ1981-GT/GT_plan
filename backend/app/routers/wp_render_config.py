@@ -756,11 +756,22 @@ async def get_render_config(
                 cross_ref_items=[_CRI(wp_code=ci.wp_code, cell=ci.cell) for ci in cross_ref_items],
                 prep_info=None, classifications=classifications, audit_cycle=wp_index.audit_cycle,
                 source_files=list(getattr(cls, "source_files", []) or []))
-            result = await renderer(ctx)
-            if result is not None:
-                sheet_html_data = result
-            if ctx.sheet_schema is not None and ctx.sheet_schema != sheet_schema:
-                sheet_schema = ctx.sheet_schema
+            try:
+                result = await renderer(ctx)
+                if result is not None:
+                    sheet_html_data = result
+                if ctx.sheet_schema is not None and ctx.sheet_schema != sheet_schema:
+                    sheet_schema = ctx.sheet_schema
+            except Exception as e:  # noqa: BLE001 — 单 sheet 渲染失败不影响其他 sheet
+                logger.warning(
+                    "sheet '%s' 渲染失败 (componentType=%s): %s",
+                    cls.sheet_name, component_type, e,
+                )
+                # 事务可能已 aborted → rollback 恢复，避免后续 sheet 级联失败
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
         sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,
                        "schema": sheet_schema, "html_data": sheet_html_data,
                        "cross_refs": [i.model_dump() for i in cross_ref_items],

@@ -120,6 +120,12 @@ async def _generate_a_program_data(
         except Exception as e:  # noqa: BLE001 — 降级到 xlsx 提取，不阻塞渲染
             logger.warning("A-程序表模板自动汇总失败 %s: %s", wp_code, e)
             programs = []
+            # 事务可能已 aborted → rollback 恢复
+            if db is not None:
+                try:
+                    await db.rollback()
+                except Exception:
+                    pass
 
     # ─── 兜底：从模板 xlsx 提取 ─────────────────────────────────────────
     if not programs and file_path:
