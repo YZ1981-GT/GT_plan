@@ -36,6 +36,7 @@
         { "sheet_name": "应收票据贴现背书明细表D1-8", "sheet_type": "detail_table", "source_wp_code": "D1" },
         { "sheet_name": "应收票据质押检查表D1-12", "sheet_type": "procedure", "source_wp_code": "D1" },
         { "sheet_name": "调整分录汇总表D1-15", "sheet_type": "adjustment", "source_wp_code": "D1" },
+        { "sheet_name": "应收及销售替代程序D0-6", "sheet_type": "grid_table", "source_wp_code": "D0" },
         { "sheet_name": "附注披露信息（上市公司）", "sheet_type": "disclosure", "source_wp_code": "D1", "schema_ref": "C-D1-disclosure.yaml" },
         { "sheet_name": "附注披露信息（国企）", "sheet_type": "disclosure", "source_wp_code": "D1", "schema_ref": "C-D1-disclosure.yaml" },
         { "sheet_name": "D1-16 科目结论表", "sheet_type": "conclusion", "source_wp_code": "D1" }
@@ -130,6 +131,7 @@
         { "sheet_name": "其他业务收入合同测算表D4-34", "sheet_type": "grid_table", "source_wp_code": "D4-33" },
         { "sheet_name": "其他业务收入检查表D4-35", "sheet_type": "grid_table", "source_wp_code": "D4-33" },
         { "sheet_name": "其他业务收入截止性测试D4-36", "sheet_type": "grid_table", "source_wp_code": "D4-33" },
+        { "sheet_name": "合同负债及销售替代程序D0-5", "sheet_type": "grid_table", "source_wp_code": "D0" },
         { "sheet_name": "附注披露信息（上市公司）", "sheet_type": "disclosure", "source_wp_code": "D4" }
       ],
       "external_cards": ["adjustment_impact", "note_disclosure"],
