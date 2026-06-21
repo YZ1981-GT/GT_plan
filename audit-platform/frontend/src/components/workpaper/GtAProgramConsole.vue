@@ -32,6 +32,16 @@
     </div>
 
     <template v-else>
+    <!-- 程序行为空但有网格兜底数据 → 显示只读模板原样（替代程序检查表等非程序行结构） -->
+    <div v-if="gridFallback" class="gt-a-program-console__grid-fallback">
+      <GtGridSheet
+        :wp-id="wpId"
+        :sheet-name="sheetName"
+        :html-data="gridFallback"
+        :readonly="true"
+      />
+    </div>
+    <template v-else>
     <!-- ─── 顶部：进度条 + 工具栏 ─── -->
     <div class="gt-a-program-console__header">
       <!-- 进度条 -->
@@ -492,7 +502,8 @@
       :project-info="projectInfo"
       @save="onPopupSave"
     />
-    </template>
+    </template><!-- end: inner v-else (program table) -->
+    </template><!-- end: outer v-else (not isNotApplicable) -->
   </div>
 </template>
 
@@ -502,6 +513,7 @@ import { useRoute } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import GtAProgramLinkedChips from '@/components/workpaper/GtAProgramLinkedChips.vue'
 import GtAuditFlowGraph from '@/components/workpaper/GtAuditFlowGraph.vue'
+import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
 import WpInlinePopup from '@/components/workpaper/WpInlinePopup.vue'
 import { api } from '@/services/apiProxy'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
@@ -801,6 +813,12 @@ const phaseGroups = computed(() => {
 const hasExpandContent = computed(() =>
   programs.value.some(p => (p.history && p.history.length > 0) || (p.sub_steps && p.sub_steps.length > 0))
 )
+
+/** 程序行为空时的网格兜底数据（替代程序检查表等非标准程序行结构，后端 grid_fallback 字段） */
+const gridFallback = computed(() => {
+  if (programs.value.length > 0) return null
+  return props.htmlData?.grid_fallback ?? null
+})
 
 /** 当任意程序行有非空类别时显示类别列 */
 const hasCategory = computed(() =>

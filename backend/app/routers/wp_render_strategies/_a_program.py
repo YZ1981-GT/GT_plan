@@ -129,10 +129,28 @@ async def _generate_a_program_data(
             logger.warning("A-程序表提取失败 %s/%s: %s", file_path, sheet_name, e)
             programs = []
 
+    # ─── 终极兜底：程序行仍为空 → 从 xlsx 提取只读网格（至少显示模板原样） ──
+    # 适用于：替代程序检查表(D0-5/D0-6)等非标准程序行结构的 sheet，
+    # class_code 被标为 A- 但内容实际是表格型。
+    grid_fallback: dict | None = None
+    if not programs and file_path:
+        try:
+            from app.services.wp_grid_extract import extract_grid
+
+            grid = extract_grid(file_path, sheet_name)
+            if isinstance(grid, dict) and grid.get("cells"):
+                grid_fallback = grid
+        except Exception as e:  # noqa: BLE001
+            logger.debug("A-程序表 grid 兜底提取失败 %s/%s: %s", file_path, sheet_name, e)
+
     result: dict = {
         "programs": programs,
         "trim_decisions": [],
     }
+
+    # 如果有 grid 兜底数据，标记供前端切换到只读网格模式渲染
+    if grid_fallback:
+        result["grid_fallback"] = grid_fallback
 
     # ─── 合并已保存的用户覆盖值（execution_summary / status） ─────────────
     if db is not None and project_id is not None and wp_code and programs:
