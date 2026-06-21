@@ -273,6 +273,70 @@ function applySignHint(itemId: string, hint: ReviewSignHint) {
   ElMessage.success('已应用复核签字建议')
 }
 
+// ─── Custom items (allow_custom_items = true 时支持用户自定义添加条目) ───
+function addCustomItem(sectionId: string) {
+  if (props.readonly) return
+  const section = sections.value.find(s => s.id === sectionId)
+  if (!section) return
+  const newItem: ChecklistItem = {
+    id: `CUSTOM-${sectionId}-${Date.now().toString(36)}`,
+    type: 'actionable',
+    standard_ref: '',
+    content: '',
+    children: [],
+  }
+  section.items.push(newItem)
+  ElMessage.info('已添加新条目，请点击编辑内容')
+}
+
+function updateItemContent(itemId: string, content: string) {
+  // 找到对应条目并更新 content
+  for (const sec of sections.value) {
+    const item = sec.items.find(i => i.id === itemId)
+    if (item) {
+      item.content = content
+      // 标记待保存
+      responsesApi.pendingChanges.value.add(itemId)
+      responsesApi.scheduleSave()
+      break
+    }
+  }
+}
+
+async function polishWithLLM(itemId: string, selectedText: string) {
+  if (!selectedText.trim()) return
+  try {
+    const resp = await api.post<{ text: string }>(`/api/workpapers/${props.wpId}/ai-suggest`, {
+      field_name: 'checklist_custom_item',
+      existing_content: selectedText,
+      context: `核查表自定义事项润色，要求：保持审计专业措辞、简洁准确、不改变原意`,
+    })
+    if (resp?.text) {
+      // 替换条目内容中选中部分（如果是全文则直接替换）
+      for (const sec of sections.value) {
+        const item = sec.items.find(i => i.id === itemId)
+        if (item) {
+          if (selectedText === item.content) {
+            item.content = resp.text
+          } else {
+            item.content = item.content.replace(selectedText, resp.text)
+          }
+          responsesApi.pendingChanges.value.add(itemId)
+          responsesApi.scheduleSave()
+          ElMessage.success('AI 润色完成')
+          break
+        }
+      }
+    }
+  } catch (e: any) {
+    if (e?.response?.status === 403) {
+      ElMessage.warning('AI 服务未启用')
+    } else {
+      ElMessage.error('AI 润色失败，请重试')
+    }
+  }
+}
+
 // ─── Initialization ───
 function initFromProps() {
   // Load responses from htmlData
@@ -480,6 +544,8 @@ onBeforeUnmount(() => {
         :filtered-current-items="filteredCurrentItems"
         :section-applicable="currentSection ? isSectionApplicable(currentSection.id) : true"
         :readonly="readonly"
+        :has-standard-ref="template?.has_standard_ref !== false"
+        :allow-custom-items="!!template?.allow_custom_items"
         :get-response="getResponse"
         :get-conclusion-class="getConclusionClass"
         :sign-hint-for-item="signHintForItem"
@@ -489,6 +555,9 @@ onBeforeUnmount(() => {
         :update-remark="updateRemark"
         :update-wp-ref="updateWpRef"
         :apply-sign-hint="applySignHint"
+        :add-custom-item="addCustomItem"
+        :update-item-content="updateItemContent"
+        :polish-with-l-l-m="polishWithLLM"
       />
     </div>
 

@@ -289,10 +289,11 @@ function colStyle(c: number): Record<string, string> {
 }
 .gt-grid-sheet__table {
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: 13px;
   background: #fff;
   table-layout: fixed;
   width: 100%;
+  line-height: 1.5;
 }
 
 /* ─── 表头 ─── */
@@ -302,8 +303,9 @@ function colStyle(c: number): Record<string, string> {
   z-index: 2;
 }
 .gt-grid-sheet__th {
-  background: #f7f5fa;
+  background: #f3eef8;
   border: 1px solid #d4d0dc;
+  color: #4b2d77;
   padding: 6px 8px;
   font-weight: 600;
   font-size: 11px;

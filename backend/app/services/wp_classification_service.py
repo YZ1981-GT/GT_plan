@@ -79,6 +79,9 @@ def _match_sheet_name_override(sheet_name: str | None) -> str | None:
     # 坏账准备明细表（各循环的坏账准备嵌套明细表，如 D2-3/D1-4/G2-3 等）
     if sheet_name.startswith("坏账准备明细表"):
         return "bad-debt-sheet"
+    # 示例/参考类底稿 → 静态文档（只读 HTML 展示，不走函证/程序表渲染）
+    if "（示例）" in sheet_name or "（参考）" in sheet_name:
+        return "h-static-doc"
     return None
 
 
@@ -133,7 +136,7 @@ class WpClassificationService:
         for candidate in candidates:
             base_query = sa.select(WorkpaperSheetClassification).where(
                 WorkpaperSheetClassification.wp_code == candidate,
-            )
+            ).order_by(WorkpaperSheetClassification.created_at)
             if template_version_id is not None:
                 base_query = base_query.where(
                     WorkpaperSheetClassification.template_version_id == template_version_id

@@ -130,6 +130,34 @@ async def batch_save_checklist_responses(
         RETURNING id, item_id, conclusion, remark, wp_ref, updated_by, updated_at
     """)
 
+    try:
+        results = await _do_batch_save(db, wp_id, body, current_user, upsert_sql, now)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("checklist_responses batch_save 未预期异常: wp_id=%s error=%s", wp_id, e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"保存异常: {type(e).__name__}: {str(e)[:200]}")
+
+    await db.commit()
+    return results
+
+
+async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now):
+    """实际执行批量保存逻辑（从主函数抽出以支持全局 try/except）。"""
+
+    # UPSERT: INSERT ... ON CONFLICT (wp_id, item_id) DO UPDATE
+    upsert_sql = text("""
+        INSERT INTO checklist_responses (project_id, wp_id, item_id, conclusion, remark, wp_ref, updated_by, created_at, updated_at)
+        VALUES (:project_id, :wp_id, :item_id, :conclusion, :remark, :wp_ref, :updated_by, :now, :now)
+        ON CONFLICT (wp_id, item_id) DO UPDATE SET
+            conclusion = EXCLUDED.conclusion,
+            remark = EXCLUDED.remark,
+            wp_ref = EXCLUDED.wp_ref,
+            updated_by = EXCLUDED.updated_by,
+            updated_at = EXCLUDED.updated_at
+        RETURNING id, item_id, conclusion, remark, wp_ref, updated_by, updated_at
+    """)
+
     results = []
     for item in body.items:
         # Validate conclusion value
@@ -159,19 +187,26 @@ async def batch_save_checklist_responses(
                         detail=f"conclusion 值无效，收到: '{item.conclusion}'",
                     )
 
-        row = await db.execute(
-            upsert_sql,
-            {
-                "project_id": str(body.project_id),
-                "wp_id": str(wp_id),
-                "item_id": item.item_id,
-                "conclusion": item.conclusion,
-                "remark": item.remark,
-                "wp_ref": item.wp_ref,
-                "updated_by": str(current_user.id),
-                "now": now,
-            },
-        )
+        try:
+            row = await db.execute(
+                upsert_sql,
+                {
+                    "project_id": str(body.project_id),
+                    "wp_id": str(wp_id),
+                    "item_id": item.item_id,
+                    "conclusion": item.conclusion,
+                    "remark": item.remark,
+                    "wp_ref": item.wp_ref,
+                    "updated_by": str(current_user.id),
+                    "now": now,
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "checklist_responses UPSERT 失败 wp_id=%s item_id=%s: %s",
+                wp_id, item.item_id, e,
+            )
+            raise HTTPException(status_code=500, detail=f"保存失败: {item.item_id}: {str(e)[:200]}")
         r = row.fetchone()
         results.append(
             ChecklistResponseOut(

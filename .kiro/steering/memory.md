@@ -23,6 +23,8 @@ inclusion: always
 - **风险导向审计**：B50风险→D~N程序表→A13评价错报，全链可追溯
 - **componentType 选型**：结构化联动=d-form-table / 复杂Excel=OnlyOffice / 文档=word-template / 程序表=a-program-console
 - **三表HTML渲染**：底稿目录+审定表+附注全走HTML，仅复杂公式/DCF/图表保留OnlyOffice
+- **🔴 渲染策略已调整（2026-06-21）**：`grid_table` sheet_type(替代程序表/检查表/测算表)从 c-note-table 只读网格改走 OnlyOffice 编辑。dispatch 拦截条件=`class_code.startswith("G-")`（覆盖聚合 G-OnlyOffice 和独立底稿 G-替代程序）。DB 中 D0 的 `A-替代程序` classification 已改为 `G-替代程序`。**坑**：①`univer` 在 RENDERER_DISPATCH 有注册(render_univer_grid)，`not renderer` 分支到不了→必须在 renderer 查找前拦截 ②D0 走独立底稿路径非聚合(resolve_package_sheets)，class_code 来自 workpaper_sheet_classification 表而非 registry ③**`GtOnlyOfficeSheet.vue` 调 onlyoffice-config 必须传 `project_id` query 参数**(端点 require_project_access 校验)，否则 422→前端降级 GtGridSheet 空态。已加 projectId prop + GtWpRenderer 传 `:project-id="renderConfig?.project_id"` ④**containerId 禁用 `computed(()=>...Date.now())`**(每次求值返回不同ID→DocEditor找不到容器→onError降级)，改 `ref()` 一次性生成
+- **✅ 双轨制完整Excel页签已实现（2026-06-21）**：所有多 sheet 底稿在「底稿目录」右侧注入合成页签「📊完整Excel」用 OnlyOffice 打开整本 xlsx(whole_workbook=true 不加 actionLink,原生全部 tab)供组员直接编辑;其余 HTML 页签保持现状慢慢精细打磨。共用同一物理文件+doc_key+席位(编辑互通)。改动:GtWpRenderer(tabSheets/isWholeExcelTab/wholeWorkbookSheetName computed + 页签 label + `:key="activeSheetName"` 重新挂载) + GtOnlyOfficeSheet(wholeWorkbook prop) + config 端点(whole_workbook 参数,true 时不加 actionLink)。59+8+1101 测试全绿
 - **联动是核心价值**：ref_index chip跳转/弹窗+auto_data_source实时取数；孤立底稿=无价值
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **开发前必先逐sheet读取源xlsx/docx模板**：从 `backend/wp_templates/{cycle}/` 实物提取
@@ -38,7 +40,7 @@ inclusion: always
 - **DB_DISABLE_SSL=True**；连接池 150 但 PG max_connections=200（已提）
 - **前端唯一路径**：`audit-platform/frontend/`
 - **codegraph v0.9.8**：`npx -y @colbymchenry/codegraph`，双机免改配置；hook 自动 sync
-- **OnlyOffice 9.4.0**：JWT secret=`onlyoffice-dev-2026`（config.py+docker-compose+local.json 三处一致）
+- **OnlyOffice 9.4.0**：JWT secret=`onlyoffice-dev-secret-2026`（运行中容器实际值，交付模块共享；config.py+docker-compose+.env 对齐此值）。**🔴 踩坑**：曾误改为 `onlyoffice-dev-2026` 导致 errorCode -20「文档安全令牌格式不正确」→ 必须与运行中容器一致，改 .env 后需重启后端(uvicorn 不监听 .env)
 - **scripts 规约**：`_` 前缀=临时用完即删；`backend/scripts/` 分 8 子目录
 - **部署v2.0**：瘦客户端(Electron)+内网全栈服务器(FastAPI+PG+Redis+vLLM+MinIO)
 - **MinerU 装服务器端**；OCR 走异步任务队列
@@ -83,13 +85,26 @@ inclusion: always
 - **关键设计**：复用 BadDebtExportService(加 template_only)+新建 BadDebtImportService(parse→preview→commit 两阶段)+新建 AgingSegmentService(V091 aging_segments 表 wp_index_id 级唯一+JSONB 段列表+子行同步)+前端 ImportPreviewDialog+AgingDictionaryDialog
 - **注意点**：导入跳过表头行需按分组表头检测数据起始行(勿硬编码R12)；拖拽排序需确认 vuedraggable 依赖；静态路径在 /{row_id} 之前
 
+### ✅ 完成 spec：onlyoffice-integration-hardening（2026-06-21，design-first）
+- **目标**：OnlyOffice 集成优化=7 缺陷修复(P0 席位死代码/释放/per-sheet 复制/doc_key/WOPI 零鉴权/软删守卫/前端 events)+4 工程优化(type:embedded/preload/健康预检/降级语义)+2 插件骨架(audit-legend 审计标注+tb-fetch 取数联动)
+- **状态**：✅ 17/17 必做任务全部完成(Sprint 4 插件为可选`*`跳过)；97 OnlyOffice 测试+4 PBT+1101 冒烟+13 前端 vitest 全绿；Playwright 待手动实测
+- **已实施**：`_load_wp_or_404`(三端点统一软删守卫)+`_resolve_wp_file`(单文件共享)+`_generate_doc_key(wp_code+mtime)`+席位acquire/release+WOPI JWT鉴权+health端点+actionLink+type:embedded+preload+DocEditor events降级+Sprint 4 插件骨架；新增5测试文件(97+4PBT)
+- **后续优化已落地**：①session_limiter SCAN→原子计数器(INCR/DECR O(1)，key=`onlyoffice:session_count`) ②download_url嵌短时效签名token(`?token=jwt(exp=5min)`)确保WOPI鉴权不依赖容器outbox JWT
+
 ### 🔴 D2 聚合底稿 12 个空白 tab 待修复（2026-06-21 Playwright 扫描）
 - **空白 a-program-console(9个)**：D0-2/D0-3/D0-4/D0-6/D0-8 + D2-6/D2-7/D2-8/D2-11/D2-12 — 这些底稿无 procedure_table 模板(`get_template`返回 None)，且 `extract_program_rows` 从 xlsx 提取也失败（sheet_name 找不到/结构不适合 program 行提取）
 - **空白 audit-sheet(3个)**：D2-9/D2-10/D2-13 — analysis 类型映射到 audit-sheet，但 `extract_audit_rows_with_values_from_file` 在 xlsx 中用 registry sheet_name 找不到对应 sheet 或结构不匹配
 - **根因分析**：这些底稿是**表格型检查表/测算表**，不适合用程序中控台(a-program-console)渲染——它们没有"序号/程序描述/认定/索引号"的程序行结构，而是**固定列头+数据行**的网格。正确做法=改 sheet_type 为 `audit_sheet`(表格型→audit-sheet) 或用 `c-note-table`(只读网格兜底)；同时需确认 xlsx 中的实际 sheet tab 名与 registry 一致
-- **🔴 OnlyOffice 选型纠偏（2026-06-21 用户指出）**：grid_table→c-note-table 只读网格**不可编辑+格式丢失**（合并单元格/数据验证/公式全丢），用户不满意。铁律重新解读=**仅目录/审定表/附注** HTML 渲染，**检查表/测算表/函证表（含公式/复杂结构/需可编辑）应用 Univer(@univerjs 纯前端电子表格)**。注意：`univer` componentType 对应 Univer(@univerjs)纯前端方案，OnlyOffice 是独立容器用于交付物编辑(docx/报告)，两者不同。下一步=12 个 grid_table sheet 改回 univer（`G-测算表` class_code→univer 或新增 `editable_grid` sheet_type 映射到 G-/F- 前缀→univer）
-- **🔴 Univer 社区版功能不全问题（2026-06-21 用户提出）**：当前项目用 Univer OSS(@univerjs Apache-2.0 免费版)，Pro 版未授权有水印+导入≤1MB+导出≤10k cells+协作≤5文档等限制。Pro 价格未公开(需联系 sales@univer.ai)。**替代方案**：OnlyOffice Docker(9.4.0 AGPL自部署免费 JWT=onlyoffice-dev-2026) 功能完整度高于 Univer OSS，已有 WOPI 接入(wopi_service.py)。**待决策**：检查表/测算表走 Univer Pro(需付费) 还是 OnlyOffice WOPI(现有基建可复用)
-- **工作量**：逐个确认 12 个 xlsx sheet 的实际结构（程序行/网格/段落），调整 registry sheet_type + 验证提取成功。建议独立 spec 或调研后批量修复### ✅ 编制指导面板修复（2026-06-21，3 项，30 guidance 测试全绿）
+- **✅ d0-onlyoffice-migration spec 完成（2026-06-21，3 Sprint/10 任务/V1-V5 验收全勾）**：`wp_onlyoffice_router.py`(3端点:config/wopi-contents/callback)+`GtOnlyOfficeSheet.vue`(iframe嵌入+降级)+`wp_render_config.py`白名单dispatch(非白名单→onlyoffice-sheet)。24+3 测试+1101 冒烟零回归+Playwright 实测通过
+- **🔴 d0-onlyoffice P0 待修（2026-06-21 复核确认仍未修+新增 4 项）**：①`acquire_session`/`release_session` 是死代码全仓零调用(并发爆炸,6000人目标必崩)②`_generate_doc_key`不含sheet_name(同模板多sheet doc_key冲突)③callback status=4 未调 release(僵尸会话)④`_resolve_sheet_file` per-sheet 整本复制(D0 4 sheet=4 份完整工作簿且 OnlyOffice 内显示全部 tab,单 sheet 提取从未落实)⑤WOPI contents 端点实际零鉴权(注释称靠 doc_key 但根本不校验,知 wp_id+sheet_name 即可下载底稿)⑥三端点缺项目软删守卫(只查 WorkingPaper.is_deleted 漏 projects.is_deleted,应复用 render-config Step1.5)⑦前端 GtOnlyOfficeSheet 未接 DocEditor `events.onError/onWarning`(JWT/文档加载失败在 iframe 内部,Vue catch 不到→不降级,用户见 OO 报错页)。建议按 wp_code 单文件共享(actionLink 定位 sheet)
+- **OnlyOffice 插件现状**：底稿模块**无任何 OO Plugin**(纯 iframe DocEditor 嵌入,未用 Plugin SDK)。值得做插件的唯一方向=审计标识/勾稽标注插件(单元格叠加 √/ⓒ/➜,移植 audit-legend HTML 逻辑)+取数联动插件(右键从 TB 取数调 auto_data_resolvers),建议独立 spec
+- **OnlyOffice 底稿架构**：白名单(b-index/a-program-console/audit-sheet/c-note-table/d-form-table/d-form-confirmation/d-form-paragraph/bad-debt-sheet/h-static-doc)保持HTML；非白名单多sheet走OnlyOffice WOPI；降级=GtGridSheet只读
+- **OnlyOffice 优化项**：①preload 放底稿列表页(非 GtWpRenderer)②只读用 `type:"embedded"`③编辑模式保留公式/数据 Tab(勿 toolbarNoTabs)④审计标注插件(P3 远期 spec)
+- **工作量**：逐个确认 12 个 xlsx sheet 的实际结构（程序行/网格/段落），调整 registry sheet_type + 验证提取成功。建议独立 spec 或调研后批量修复
+- **✅ D0 函证底稿独立渲染修复（2026-06-21）**：根因=`wp_code_overrides.json` 硬编码 `"D0":"confirmation-hub"`，该模块加载失败→canceled。移除 override 后 D0 走多 sheet HTML 渲染(11 tab: b-index+a-program-console+d-form-confirmation)，Playwright 实测 0 error。**铁律**：改 JSON override 后必须 touch app/*.py 触发 uvicorn reload（JSON 改动不触发）
+- **✅ D0 替代程序分拆到对应科目（2026-06-21）**：D0 共享 sheet(D0A/D0-1~D0-4/D0-7/D0-8)保留独立底稿；专属替代程序复制到对应科目 registry=D0-6→D1应收票据+D2应收账款；D0-5→D4营业收入。**铁律**：函证跨科目共享程序保持独立底稿，仅专属替代程序按科目分拆引用
+- **✅ a-program-console 空白终极兜底=grid_fallback（2026-06-21）**：当 procedure_table 模板+xlsx extract_program_rows 都返回空时，`_a_program` 策略调 `extract_grid` 提取只读网格作 `grid_fallback` 字段；前端 GtAProgramConsole 检测 `htmlData.grid_fallback && programs.length===0` → 渲染 `GtGridSheet`(只读) 替代空程序表。**通用降级**：任何被错标为 a-program-console 但非程序行结构的 sheet 都能至少显示模板原样
+- **✅ per-sheet renderer 隔离（2026-06-21 InFailedSQLTransaction 根因修复）**：dispatch 循环中 `await renderer(ctx)` 原无 try/except，一个 sheet 的 DB 查询失败导致 asyncpg 事务 aborted → 后续所有 sheet 级联报错。修=renderer 调用包 try/except+rollback，单 sheet 失败不影响其他 sheet 渲染。**铁律**：per-sheet dispatch 必须隔离异常+rollback，不能让一个 sheet 崩掉整个底稿### ✅ 编制指导面板修复（2026-06-21，3 项，30 guidance 测试全绿）
 - **ai_enabled 缺失**：后端 `wp_guidance_chat.py` GET guidance 端点无 `ai_enabled` 字段 → 前端 undefined→false→AI 对话 Tab 隐藏。修=注入 `guidance_response["ai_enabled"] = settings.WP_AI_SERVICE_ENABLED`
 - **矛盾提示文案**：`GuidanceTabContent.vue:260` 写死"有疑问？切换到 AI 对话 Tab"不受开关控制。修=加 `v-if="guidanceStore.aiEnabled"`
 - **A1 排版丑**：A1 不在 `_complexity.json` high/medium 列表→落 low→只显示 100 字截断纯文本。修=加入 high 列表；同时去掉 `_load_complexity_config` 的 lru_cache（文件极小每次读可忽略，避免改 JSON 后必须重启）
@@ -204,6 +219,12 @@ inclusion: always
 - **数据管理删除后重导入唯一约束冲突**：需 `hard_delete:true` 或 recalc 改 DELETE+INSERT
 - **OnlyOffice 调试**：先确认 git HEAD 正确→只改 .env 对齐 secret+重启；禁 docker exec 手改容器
 - **PowerShell 写中文用 fsWrite**；fsWrite ≥100 行会截断→分批 append；长 commit msg 用 `git commit --% -m`
+- **🔴 resolver 内部禁吞 DB 异常后 return 正常 dict**：必须 re-raise 让 `resolve_auto_data_source` 统一标记 `_error`+rollback（否则事务 aborted 泄漏→后续 SQL 全挂 InFailedSQLTransaction）
+- **🔴 `extract_program_rows` 返回空描述行≠有效 programs**：`A-替代程序` class_code 的 sheet（D0-5/F0-5 等）非程序表结构，提取行全空描述→清空走 grid_fallback 兜底
+- **🔴 多 sheet 底稿 renderer=None 兜底**：dispatch 循环中无后端 renderer+无持久化数据的 sheet→自动 `extract_grid` 兜底；前端 `noRendererGridFallback` computed 保证 GtGridSheet 渲染
+- **🔴 grid 兜底必调 `strip_standard_header`**：致同标准表头(致同/被审计单位/编制人/截止日)已由 GtWpPreparationHeader 显示，grid 中重复→裁剪前 N 行+重编坐标+修 merged_cells
+- **🔴 多 sheet 底稿 tab 排序**：`get_render_config` 多 sheet 时按模板 xlsx sheetnames 顺序 sort classifications（openpyxl read_only 取 sheetnames→排序 key）
+- **GtWpToolbar 统一功能区**：新建 `GtWpToolbar.vue` 集成在 `GtWpRenderer` 层（导出模板/导出数据/导入/增行/全屏），所有底稿类型自动继承，子组件无需关心。按钮当前 placeholder，完整实现待独立 spec
 
 ## 关键引用指南
 

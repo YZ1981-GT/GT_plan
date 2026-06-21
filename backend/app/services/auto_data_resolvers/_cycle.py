@@ -94,7 +94,14 @@ async def _resolve_je_filter_from_ledger(db: AsyncSession, project_id: UUID, yea
     try:
         active_filter = await get_active_filter(db, tb, project_id, year)
     except Exception:
-        return {"summary": "序时账未导入", "candidate_count": 0, "filter_criteria": filter_criteria}
+        # get_active_filter 内部已有 rollback，若仍抛异常说明事务/连接不可用。
+        # re-raise 让上层 resolve_auto_data_source 统一 catch + 标记 _error + rollback，
+        # 避免吞掉异常导致事务 aborted 状态泄漏到后续 SQL（InFailedSQLTransaction 根因之一）。
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        raise
 
     count_stmt = sa.select(sa.func.count()).select_from(tb).where(active_filter)
     total = (await db.execute(count_stmt)).scalar() or 0

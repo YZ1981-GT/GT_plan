@@ -641,6 +641,20 @@ const statusOptions = computed(() => {
 watch([filterCycle, filterStatus, filterAssignee], () => fetchWpIndex())
 
 onMounted(async () => {
+  // 预热 OnlyOffice api.js（仅 preload 不初始化 DocsAPI）
+  const baseUrl = import.meta.env.VITE_ONLYOFFICE_URL || ''
+  if (baseUrl) {
+    const preloadHref = `${baseUrl.replace(/\/$/, '')}/web-apps/apps/api/documents/api.js`
+    // 避免重复插入
+    if (!document.head.querySelector(`link[rel="preload"][href="${preloadHref}"]`)) {
+      const link = document.createElement('link')
+      link.rel = 'preload'
+      link.setAttribute('as', 'script')
+      link.href = preloadHref
+      document.head.appendChild(link)
+    }
+  }
+
   // 从 URL query 读取视图模式
   const queryView = route.query.view as string
   if (queryView && VIEW_MODE_WHITELIST.has(queryView)) {

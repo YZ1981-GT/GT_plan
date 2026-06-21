@@ -58,9 +58,8 @@ def list_available_guidance() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-@lru_cache(maxsize=1)
 def _load_complexity_config() -> dict[str, list[str]]:
-    """加载 _complexity.json 配置"""
+    """加载 _complexity.json 配置（无缓存，文件极小每次读取开销可忽略）"""
     config_path = _GUIDANCE_DIR / "_complexity.json"
     if not config_path.exists():
         return {"high": [], "medium": [], "low": []}

@@ -17,6 +17,8 @@ const props = defineProps<{
   filteredCurrentItems: ChecklistItem[]
   sectionApplicable: boolean
   readonly: boolean
+  hasStandardRef?: boolean
+  allowCustomItems?: boolean
   getResponse: (itemId: string) => ResponseData
   getConclusionClass: (conclusion: string | null) => string
   signHintForItem: (item: ChecklistItem) => ReviewSignHint | null | undefined
@@ -26,8 +28,50 @@ const props = defineProps<{
   updateRemark: (itemId: string, value: string) => void
   updateWpRef: (itemId: string, value: string) => void
   applySignHint: (itemId: string, hint: ReviewSignHint) => void
+  addCustomItem?: (sectionId: string) => void
+  updateItemContent?: (itemId: string, content: string) => void
+  polishWithLLM?: (itemId: string, selectedText: string) => void
 }>()
 
+// 默认显示准则索引号列（A1-15/A1-16 有该列）
+const showRefCol = props.hasStandardRef !== false
+
+// 判断条目是否为自定义条目（可编辑）
+function isCustomItem(item: ChecklistItem): boolean {
+  return item.id.startsWith('CUSTOM-')
+}
+
+// 编辑中的自定义条目
+const editingItemId = ref('')
+
+function startEditContent(itemId: string) {
+  if (props.readonly) return
+  editingItemId.value = itemId
+}
+
+function finishEditContent(itemId: string, content: string) {
+  editingItemId.value = ''
+  props.updateItemContent?.(itemId, content)
+}
+
+// LLM 润色：取选中文字调用
+const polishLoading = ref(false)
+async function handlePolish(itemId: string) {
+  const selection = window.getSelection()?.toString()?.trim()
+  if (!selection) {
+    // 没选中文字则对整条内容润色
+    const item = props.filteredCurrentItems.find(i => i.id === itemId)
+    if (item?.content) {
+      polishLoading.value = true
+      props.polishWithLLM?.(itemId, item.content)
+      polishLoading.value = false
+    }
+    return
+  }
+  polishLoading.value = true
+  props.polishWithLLM?.(itemId, selection)
+  polishLoading.value = false
+}
 // ─── Active cell state (click-to-activate editing) ───
 const activeCell = ref('')
 
@@ -55,10 +99,10 @@ function activateCell(itemId: string, field: string) {
 
       <!-- 表头 -->
       <div class="gt-checklist-table__table-header">
-        <div class="col-ref">准则索引号</div>
+        <div v-if="showRefCol" class="col-ref">准则索引号</div>
         <div class="col-content">核对条目</div>
         <div class="col-conclusion">适用</div>
-        <div class="col-remark">备注</div>
+        <div v-if="!allowCustomItems" class="col-remark">备注</div>
         <div class="col-wpref">底稿索引</div>
       </div>
 
@@ -79,7 +123,7 @@ function activateCell(itemId: string, field: string) {
             class="gt-checklist-table__item-row"
             :class="getConclusionClass(getResponse(item.id).conclusion)"
           >
-            <div class="col-ref">
+            <div v-if="showRefCol" class="col-ref">
               <span class="item-ref__text">{{ item.standard_ref }}</span>
             </div>
             <div class="col-content">
@@ -91,7 +135,34 @@ function activateCell(itemId: string, field: string) {
                 >
                   {{ isExpanded(item.id) ? '▼' : '▶' }}
                 </span>
-                <span class="item-content__text">{{ item.content }}</span>
+                <!-- 自定义条目：可编辑 textarea + AI 润色 -->
+                <template v-if="isCustomItem(item) && allowCustomItems">
+                  <el-input
+                    v-if="editingItemId === item.id"
+                    type="textarea"
+                    :autosize="{ minRows: 2, maxRows: 6 }"
+                    :model-value="item.content"
+                    placeholder="请输入具体事项描述…"
+                    @change="(val: string) => finishEditContent(item.id, val)"
+                    @blur="finishEditContent(item.id, (($event.target as HTMLTextAreaElement)?.value) || item.content)"
+                  />
+                  <div v-else class="item-content__editable" @click="startEditContent(item.id)">
+                    <span class="item-content__text">{{ item.content || '点击编辑事项内容…' }}</span>
+                    <el-button
+                      v-if="item.content && !readonly"
+                      class="item-content__polish-btn"
+                      link
+                      type="primary"
+                      size="small"
+                      :loading="polishLoading"
+                      @click.stop="handlePolish(item.id)"
+                    >
+                      🤖 AI润色
+                    </el-button>
+                  </div>
+                </template>
+                <!-- 普通条目：只读 -->
+                <span v-else class="item-content__text">{{ item.content }}</span>
                 <div
                   v-if="signHintForItem(item)?.reason"
                   class="item-sign-hint"
@@ -145,7 +216,7 @@ function activateCell(itemId: string, field: string) {
                 {{ getResponse(item.id).conclusion || '—' }}
               </span>
             </div>
-            <div class="col-remark" @click.stop="activateCell(item.id, 'remark')">
+            <div v-if="!allowCustomItems" class="col-remark" @click.stop="activateCell(item.id, 'remark')">
               <el-input
                 v-if="activeCell === `${item.id}:remark`"
                 :model-value="getResponse(item.id).remark || ''"
@@ -188,11 +259,37 @@ function activateCell(itemId: string, field: string) {
               <div class="col-ref child-ref">{{ child.standard_ref }}</div>
               <div class="col-content child-content">{{ child.content }}</div>
               <div class="col-conclusion" />
-              <div class="col-remark" />
+              <div v-if="!allowCustomItems" class="col-remark" />
               <div class="col-wpref" />
             </div>
           </div>
         </template>
+      </div>
+
+      <!-- 空条目 + 自定义添加（allowCustomItems 时） -->
+      <div
+        v-if="allowCustomItems && filteredCurrentItems.length === 0 && !readonly"
+        class="gt-checklist-table__custom-add"
+      >
+        <p class="gt-checklist-table__custom-hint">此章节允许自定义添加条目</p>
+        <el-button
+          type="primary"
+          size="small"
+          @click="addCustomItem?.(currentSection!.id)"
+        >
+          + 添加事项
+        </el-button>
+      </div>
+      <div
+        v-else-if="allowCustomItems && !readonly"
+        class="gt-checklist-table__custom-add gt-checklist-table__custom-add--bottom"
+      >
+        <el-button
+          size="small"
+          @click="addCustomItem?.(currentSection!.id)"
+        >
+          + 添加事项
+        </el-button>
       </div>
     </template>
 
@@ -409,5 +506,64 @@ function activateCell(itemId: string, field: string) {
 .cell-conclusion {
   text-align: center;
   font-weight: 500;
+}
+
+/* ─── Custom add area ─── */
+.gt-checklist-table__custom-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  border: 1px dashed var(--gt-color-border-purple-light, #d4c5e6);
+  border-radius: 6px;
+  margin-top: 12px;
+  background: #faf8fc;
+}
+
+.gt-checklist-table__custom-add--bottom {
+  padding: 12px 16px;
+  margin-top: 8px;
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+.gt-checklist-table__custom-hint {
+  margin: 0 0 12px;
+  color: var(--gt-color-text-tertiary, #999);
+  font-size: 13px;
+}
+
+/* ─── Editable custom item content ─── */
+.item-content__editable {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: text;
+  padding: 4px 6px;
+  border: 1px dashed var(--gt-color-border-purple-light, #d4c5e6);
+  border-radius: 4px;
+  min-height: 32px;
+  transition: border-color 0.2s;
+}
+
+.item-content__editable:hover {
+  border-color: var(--gt-purple, #4b2d77);
+}
+
+.item-content__editable .item-content__text {
+  flex: 1;
+  color: var(--gt-color-text);
+  white-space: pre-wrap;
+}
+
+.item-content__editable .item-content__text:empty::before {
+  content: '点击编辑事项内容…';
+  color: var(--gt-color-text-tertiary, #999);
+}
+
+.item-content__polish-btn {
+  flex-shrink: 0;
+  font-size: 12px;
 }
 </style>

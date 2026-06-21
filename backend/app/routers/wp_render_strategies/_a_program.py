@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import logging
 
+import sqlalchemy as sa
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -135,17 +137,22 @@ async def _generate_a_program_data(
             logger.warning("A-程序表提取失败 %s/%s: %s", file_path, sheet_name, e)
             programs = []
 
+    # 有效性检测：如果 extract_program_rows 提取的行全是空描述（无实质内容），
+    # 说明该 sheet 不是程序表结构（如 D0-5/D0-6 替代程序检查表），清空让 grid_fallback 接管。
+    if programs and not any(p.get("program_desc", "").strip() for p in programs):
+        programs = []
+
     # ─── 终极兜底：程序行仍为空 → 从 xlsx 提取只读网格（至少显示模板原样） ──
     # 适用于：替代程序检查表(D0-5/D0-6)等非标准程序行结构的 sheet，
     # class_code 被标为 A- 但内容实际是表格型。
     grid_fallback: dict | None = None
     if not programs and file_path:
         try:
-            from app.services.wp_grid_extract import extract_grid
+            from app.services.wp_grid_extract import extract_grid, strip_standard_header
 
             grid = extract_grid(file_path, sheet_name)
             if isinstance(grid, dict) and grid.get("cells"):
-                grid_fallback = grid
+                grid_fallback = strip_standard_header(grid)
         except Exception as e:  # noqa: BLE001
             logger.debug("A-程序表 grid 兜底提取失败 %s/%s: %s", file_path, sheet_name, e)
 
@@ -160,6 +167,16 @@ async def _generate_a_program_data(
 
     # ─── 合并已保存的用户覆盖值（execution_summary / status） ─────────────
     if db is not None and project_id is not None and wp_code and programs:
+        # 防御：前面 get_procedure_table 中 resolver 失败可能让事务 abort 且 rollback 被吞，
+        # 需确保事务可用后再查询（InFailedSQLTransaction 根因修复）。
+        # SQLAlchemy AsyncSession 中检测方式：尝试一个轻量 SQL，失败则 rollback。
+        try:
+            await db.execute(sa.text("SELECT 1"))
+        except Exception:
+            try:
+                await db.rollback()
+            except Exception:
+                pass
         try:
             from app.services.field_override_service import FieldOverrideService
             override_svc = FieldOverrideService(db)
@@ -174,7 +191,6 @@ async def _generate_a_program_data(
                         prog["status"] = saved["status"]
         except Exception as e:  # noqa: BLE001
             logger.warning("加载程序表 override 失败 wp_code=%s: %s", wp_code, e)
-            # 事务可能已 aborted → rollback 恢复以免影响后续查询
             try:
                 await db.rollback()
             except Exception:
@@ -198,9 +214,19 @@ async def render(ctx: RenderContext) -> dict | None:
     1. procedure_table_templates 自动汇总（A1~A17）
     2. 模板 xlsx 兜底提取
     """
-    # 已有持久化 programs 数据则不重新生成
+    # 已有持久化 programs 数据则不重新生成——但若全是空描述且无用户编辑痕迹视同无效
     if isinstance(ctx.sheet_html_data, dict) and ctx.sheet_html_data.get("programs"):
-        return None
+        _persisted = ctx.sheet_html_data["programs"]
+        # 有效性判定：有描述内容 OR 有用户编辑痕迹（status 非默认 pending/execution_summary 非空）
+        _has_substance = any(
+            p.get("program_desc", "").strip()
+            or p.get("execution_summary", "").strip()
+            or p.get("status") not in (None, "", "pending")
+            for p in _persisted
+        )
+        if _has_substance:
+            return None
+        # 全空描述且无编辑 → 继续重新生成（grid_fallback 接管）
 
     # 多文件聚合：程序表 sheet（如 D2 父码下的 "D2A 应收账款实质性程序表"）的
     # procedure_table 模板与模板文件应按 **sheet 级编码**（D2A）解析，而非父码 wp_code(D2)。

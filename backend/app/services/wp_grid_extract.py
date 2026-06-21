@@ -368,3 +368,76 @@ def extract_grid(file_path: str | Path, sheet_name: str) -> dict:
         return empty
     finally:
         wb.close()
+
+
+def strip_standard_header(grid: dict) -> dict:
+    """裁剪致同标准表头行（事务所名/表名/编制信息行）。
+
+    审计底稿模板前几行通常是：
+      Row 1: "致同会计师事务所"
+      Row 2: 表名（如"合同负债及销售替代程序检查表"）
+      Row 3: 被审计单位: xxx | 编制人: | 编制日: | 索引号:
+      Row 4: 截止日: | 复核人: | 复核日:
+      (可能还有空行)
+
+    这些信息已由平台 GtWpPreparationHeader 组件显示，grid 中无需重复。
+    自动检测含特征关键词的最大行号，删除其及之前的所有行并重编坐标。
+    """
+    import re
+
+    cells = grid.get("cells", {})
+    if not cells:
+        return grid
+
+    max_col = grid.get("max_col", 0)
+    max_row = grid.get("max_row", 0)
+
+    # 检测表头结束行——只有明确的编制信息行才裁剪
+    # "索引号"可能是数据列标题，不作为表头判据
+    _HEADER_KEYWORDS = ("致同", "被审计单位", "编制人", "编制日", "截止日", "复核人")
+    skip = 0
+    for r in range(1, min(8, max_row + 1)):
+        row_text = " ".join(
+            str(cells.get(f"{chr(64 + c)}{r}", {}).get("v", ""))
+            for c in range(1, min(15, max_col + 1))
+        ).lower()
+        if any(kw in row_text for kw in _HEADER_KEYWORDS):
+            skip = r
+
+    if skip == 0:
+        return grid
+
+    # 重建 cells（行号减 skip）
+    new_cells = {}
+    for key, val in cells.items():
+        m = re.match(r"([A-Z]+)(\d+)", key)
+        if m:
+            row_num = int(m.group(2))
+            if row_num > skip:
+                new_key = f"{m.group(1)}{row_num - skip}"
+                new_val = dict(val)
+                new_val["r"] = row_num - skip
+                new_cells[new_key] = new_val
+
+    # 重建 merged_cells
+    new_merged = []
+    for mc in grid.get("merged_cells", []):
+        sr, er = mc["s"]["r"], mc["e"]["r"]
+        if sr > skip:
+            new_merged.append({
+                "s": {"r": sr - skip, "c": mc["s"]["c"]},
+                "e": {"r": er - skip, "c": mc["e"]["c"]},
+            })
+        elif er > skip:
+            new_merged.append({
+                "s": {"r": 1, "c": mc["s"]["c"]},
+                "e": {"r": er - skip, "c": mc["e"]["c"]},
+            })
+
+    return {
+        **grid,
+        "cells": new_cells,
+        "merged_cells": new_merged,
+        "max_row": max_row - skip,
+        "header_rows": 1,
+    }

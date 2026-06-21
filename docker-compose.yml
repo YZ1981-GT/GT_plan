@@ -539,6 +539,9 @@ services:
       - office_data:/var/lib/onlyoffice
       - office_logs:/var/log/onlyoffice
       - office_data_certs:/var/www/onlyoffice/Data
+      # 自定义插件挂载（审计标注 + 取数联动，仅 cell 编辑器可见，不影响交付模块 Word）
+      - ./backend/onlyoffice_plugins/audit-legend:/var/www/onlyoffice/documentserver/sdkjs-plugins/audit-legend:ro
+      - ./backend/onlyoffice_plugins/tb-fetch:/var/www/onlyoffice/documentserver/sdkjs-plugins/tb-fetch:ro
 
     depends_on:
 

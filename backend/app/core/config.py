@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     LOGIN_LOCK_MINUTES: int = 30
     # ONLYOFFICE（向后兼容，底稿编辑已迁移至 Univer）
     ONLYOFFICE_URL: str = "http://onlyoffice:80"
-    # JWT secret 默认值必须与 docker-compose.yml 的 JWT_SECRET 默认值一致，
-    # 否则后端签名的 token 容器验证不通过（"文档安全令牌格式不正确"）
+    # JWT secret 默认值必须与运行中的 OnlyOffice 容器 JWT_SECRET 一致（交付模块共享），
+    # 否则后端签名的 token 容器验证不通过（errorCode -20 "文档安全令牌格式不正确"）
     ONLYOFFICE_JWT_SECRET: str = "onlyoffice-dev-secret-2026"
     ONLYOFFICE_CALLBACK_BASE: str = ""
     ONLYOFFICE_MAX_SESSIONS: int = 10  # 最大并发编辑人数

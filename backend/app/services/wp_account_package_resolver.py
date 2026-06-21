@@ -49,7 +49,7 @@ _SHEET_TYPE_TO_CLASS: dict[str, str] = {
     "disclosure": "C-附注披露",        # → c-note-table
     "conclusion": "D-政策检查",        # → d-form-paragraph
     "confirmation_summary": "A-实质性程序",  # → a-program-console（函证汇总卡）
-    "grid_table": "C-附注披露",        # → c-note-table（只读网格兜底，用于检查表/测算表等无 schema 的表格型 sheet）
+    "grid_table": "G-OnlyOffice",      # → univer → 不在白名单 → dispatch 重写为 onlyoffice-sheet（可编辑 Excel 原样）
 }
 
 # HTML 可渲染白名单（排除 univer / skip）——聚合 sheet 的 componentType 必须落在此集合。
@@ -96,13 +96,22 @@ def extract_determination_wp_code(sheet_name: str | None) -> str | None:
 
 
 def _sheet_type_to_component(sheet_type: str) -> str | None:
-    """sheet_type → componentType（经 class_code 链）。None 表示无法映射到 HTML 类。"""
+    """sheet_type → componentType（经 class_code 链）。None 表示无法映射到可渲染类型。
+
+    grid_table 特殊处理：映射到 univer（非白名单），render-config dispatch 会自动
+    重写为 onlyoffice-sheet（可编辑 Excel 原样）。
+    """
     class_code = _SHEET_TYPE_TO_CLASS.get(sheet_type)
     if class_code is None:
         return None
     component = class_code_to_component(class_code)
-    if component is None or component not in HTML_RENDERABLE_COMPONENTS:
-        # 不允许 fallback 到 univer/未知类型导致空白
+    if component is None:
+        return None
+    # grid_table → univer → 不在 HTML 白名单是预期行为（dispatch 会重写为 onlyoffice-sheet）
+    if sheet_type == "grid_table":
+        return component  # "univer" — 允许通过，dispatch 会处理
+    if component not in HTML_RENDERABLE_COMPONENTS:
+        # 不允许非 grid_table 类型 fallback 到 univer/未知类型导致空白
         return None
     return component
 

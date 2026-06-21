@@ -107,6 +107,10 @@ async def get_workpaper_guidance(
         template_path=template_path,
     )
 
+    # 注入 ai_enabled 字段供前端 Tab 显隐（读 feature flag）
+    from app.core.config import settings
+    guidance_response["ai_enabled"] = settings.WP_AI_SERVICE_ENABLED
+
     return guidance_response
 
 

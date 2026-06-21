@@ -38,21 +38,29 @@ _DUMMY_PID = uuid4()
 class TestSheetTypeMapping:
     def test_all_mapped_class_codes_resolve_to_html(self):
         """_SHEET_TYPE_TO_CLASS 每个 class_code 经 class_code_to_component
-        返回非 None 且落在 HTML 白名单（杜绝 univer 空白）。"""
+        返回非 None。HTML 类在白名单，grid_table 特殊走 univer→onlyoffice-sheet。"""
         for sheet_type, class_code in _SHEET_TYPE_TO_CLASS.items():
             component = class_code_to_component(class_code)
             assert component is not None, f"{sheet_type}→{class_code} 映射到 None"
-            assert component in HTML_RENDERABLE_COMPONENTS, (
-                f"{sheet_type}→{class_code}→{component} 不在 HTML 白名单"
-            )
-            assert component != "univer", f"{sheet_type} 不得映射到 univer"
+            if sheet_type == "grid_table":
+                # grid_table 走 univer → dispatch 重写为 onlyoffice-sheet（可编辑 Excel）
+                assert component == "univer", f"grid_table 应映射到 univer，实际 {component}"
+            else:
+                assert component in HTML_RENDERABLE_COMPONENTS, (
+                    f"{sheet_type}→{class_code}→{component} 不在 HTML 白名单"
+                )
+                assert component != "univer", f"{sheet_type} 不得映射到 univer"
 
     def test_every_registry_sheet_type_is_mappable(self):
-        """注册表所有合法 sheet_type 都能映射到 HTML 组件（无遗漏）。"""
+        """注册表所有合法 sheet_type 都能映射到组件（无遗漏）。
+        grid_table → univer（非白名单，dispatch 重写为 onlyoffice-sheet）。"""
         for sheet_type in VALID_SHEET_TYPES:
             component = _sheet_type_to_component(sheet_type)
-            assert component is not None, f"sheet_type={sheet_type} 无法映射到 HTML"
-            assert component in HTML_RENDERABLE_COMPONENTS
+            assert component is not None, f"sheet_type={sheet_type} 无法映射"
+            if sheet_type == "grid_table":
+                assert component == "univer"
+            else:
+                assert component in HTML_RENDERABLE_COMPONENTS
 
     def test_analysis_maps_to_audit_sheet_not_univer(self):
         """关键修正点：analysis → audit-sheet（非 univer）。"""
@@ -85,15 +93,17 @@ class TestResolveD2Package:
         assert class_code_to_component(results[0].class_code) == "b-index"
 
     @pytest.mark.asyncio
-    async def test_d2_every_component_is_html(self):
-        """D2 每个 sheet 的 class_code 派生的 componentType 都是 HTML 类（无 univer）。"""
+    async def test_d2_every_component_is_html_or_onlyoffice(self):
+        """D2 每个 sheet 的 class_code 派生的 componentType 是 HTML 类或 univer（→onlyoffice-sheet）。"""
         results = await resolve_package_sheets(None, "D2", _DUMMY_PID)
         assert results is not None
+        # 允许的 componentType：HTML 白名单 + univer（grid_table 走 OnlyOffice）
+        allowed = HTML_RENDERABLE_COMPONENTS | {"univer"}
         for r in results:
             assert r.class_code is not None
             component = class_code_to_component(r.class_code)
-            assert component in HTML_RENDERABLE_COMPONENTS, (
-                f"sheet '{r.sheet_name}' class_code={r.class_code}→{component} 非 HTML"
+            assert component in allowed, (
+                f"sheet '{r.sheet_name}' class_code={r.class_code}→{component} 不在允许范围"
             )
 
     @pytest.mark.asyncio

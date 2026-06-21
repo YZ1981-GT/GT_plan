@@ -91,8 +91,118 @@ def parse_checklist_docx(file_path: Path | str, wp_code: str) -> dict:
         return _parse_a1_15(doc, wp_code)
     elif wp_code == "A1-16":
         return _parse_a1_16(doc, wp_code)
+    elif wp_code == "A1-12":
+        return _parse_a1_12(doc, wp_code)
     else:
         raise ValueError(f"不支持的核对表 wp_code: {wp_code}")
+
+
+# ─── A1-12 解析 ──────────────────────────────────────────────────────────────
+
+
+def _parse_a1_12(doc: "Document", wp_code: str) -> dict:
+    """A1-12 重大事项决定程序履行情况核查表: 单表格 17 行 × 3 列.
+
+    结构：
+      Row 0: 表头 [条目描述, 是否适用, 如适用索引号]
+      Row 1-14: 第一分组条目（"一、需提交专业技术委员会…"）
+      Row 15: 第二分组标题（"二、…"）
+      Row 16: 第二分组空填写行
+
+    分组规则: 以"一、"/"二、"/"三、"等开头的行为 section 标题，其余为条目。
+    """
+    tables = doc.tables
+    if not tables:
+        raise ValueError("A1-12 预期至少 1 个表格，实际 0 个")
+
+    tbl = tables[0]
+    sections: list[dict] = []
+    current_section: dict | None = None
+    section_idx = 0
+    item_idx = 0
+
+    _SECTION_RE = re.compile(r"^[一二三四五六七八九十]+、")
+
+    for ri in range(len(tbl.rows)):
+        cell0 = tbl.cell(ri, 0).text.strip().replace("\xa0", " ")
+        # 跳过纯空行
+        if not cell0:
+            continue
+        # Row 0 的后续列是"是否适用"/"索引号"表头标记——
+        # 但 cell0 本身可能含 section 标题（如"一、…"），仍需判断
+        if ri == 0:
+            # 检测 Row 0 的 cell0 是否本身就是 section 标题
+            if _SECTION_RE.match(cell0):
+                section_idx += 1
+                current_section = {
+                    "id": f"S{section_idx:02d}",
+                    "title": cell0,
+                    "items": [],
+                }
+                sections.append(current_section)
+            continue
+
+        # 检测是否为分组标题
+        if _SECTION_RE.match(cell0):
+            section_idx += 1
+            current_section = {
+                "id": f"S{section_idx:02d}",
+                "title": cell0,
+                "items": [],
+            }
+            sections.append(current_section)
+        else:
+            # 核查条目行
+            if current_section is None:
+                # 首行条目出现在第一个标题之前（Row 0 是标题，Row 1 已有 section）
+                # 但 A1-12 实际上 Row 0 是表头，Row 1-14 属于第一个 section
+                # 第一个 section 标题在 Row 0 col0 末尾已含"一、"…实际是嵌在表头里的
+                # 兜底：创建默认 section
+                section_idx += 1
+                current_section = {
+                    "id": f"S{section_idx:02d}",
+                    "title": "核查事项",
+                    "items": [],
+                }
+                sections.append(current_section)
+
+            item_idx += 1
+            current_section["items"].append({
+                "id": f"Q{item_idx:03d}",
+                "type": "actionable",
+                "standard_ref": "",
+                "content": cell0,
+                "text": cell0,
+                "children": [],
+            })
+
+    # 如果第一行实际包含 section 标题（如"一、…"在 Row 0 第一列）
+    # 上面逻辑已处理。但 A1-12 的 Row 0 是三列表头，真正 section 标题
+    # 嵌在条目描述列里（Row 1 的 cell0 以数字开头而非"一、"）。
+    # 分析实际数据：Row 0 的 cell0 是"一、 需提交…的情形"→匹配 _SECTION_RE。
+    # Row 1-14 以"1、"开头→不匹配 _SECTION_RE→归入条目。✓
+
+    # 统计
+    total_actionable = sum(
+        1 for sec in sections for item in sec["items"] if item["type"] == "actionable"
+    )
+
+    title = _extract_title_from_filename(wp_code)
+
+    return {
+        "wp_code": wp_code,
+        "title": title or "重大事项决定程序的履行情况核查表",
+        "sections": sections,
+        "toc": [{"id": s["id"], "title": s["title"], "applicable": None} for s in sections],
+        "stats": {
+            "total_actionable": total_actionable,
+            "total_guidance": 0,
+            "total_sections": len(sections),
+        },
+        "has_standard_ref": False,
+        "allow_custom_items": True,
+        "parsed_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 # ─── A1-15 解析 ──────────────────────────────────────────────────────────────

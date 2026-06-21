@@ -9,7 +9,7 @@
   Validates: Requirements 1.2（9 类路由分发）
 -->
 <template>
-  <div class="gt-wp-renderer" ref="containerRef">
+  <div class="gt-wp-renderer" :class="{ 'gt-wp-renderer--fullscreen': isWpFullscreen }" ref="containerRef">
     <!-- Loading overlay -->
     <GtLoadingOverlay
       :visible="loading"
@@ -93,12 +93,20 @@
           class="gt-wp-renderer__sheet-tabs-inner"
         >
           <el-tab-pane
-            v-for="sheet in visibleSheets"
+            v-for="sheet in tabSheets"
             :key="sheet.sheet_name"
             :name="sheet.sheet_name"
           >
             <template #label>
-              <span class="gt-wp-renderer__tab-label" :title="sheet.sheet_name">
+              <span
+                v-if="sheet.sheet_name === WHOLE_EXCEL_TAB"
+                class="gt-wp-renderer__tab-label gt-wp-renderer__tab-label--excel"
+                title="完整 Excel（OnlyOffice 编辑整本底稿）"
+              >
+                <span class="gt-wp-renderer__tab-icon">📊</span>
+                <span class="gt-wp-renderer__tab-name">完整Excel</span>
+              </span>
+              <span v-else class="gt-wp-renderer__tab-label" :title="sheet.sheet_name">
                 <span class="gt-wp-renderer__tab-icon">{{ getSheetIcon(sheet.componentType) }}</span>
                 <span class="gt-wp-renderer__tab-name">{{ sheet.sheet_name }}</span>
               </span>
@@ -106,6 +114,17 @@
           </el-tab-pane>
         </el-tabs>
       </div>
+
+      <!-- 统一功能工具栏（所有底稿类型共享） -->
+      <GtWpToolbar
+        :fullscreen="isWpFullscreen"
+        :wp-id="wpId"
+        @export-template="onExportTemplate"
+        @export-data="onExportData"
+        @import-data="onImportData"
+        @add-row="onAddRow"
+        @toggle-fullscreen="isWpFullscreen = !isWpFullscreen"
+      />
 
       <!-- 内容区域 -->
       <div class="gt-wp-renderer__content">
@@ -134,14 +153,27 @@
         @restore="reload"
       />
 
-      <!-- Univer 类（F/G）有模板网格数据时只读展示；C-附注披露无 schema 时也走只读网格兜底 -->
+      <!-- Univer 类（F/G）有模板网格数据时只读展示；C-附注披露无 schema 时也走只读网格兜底；无注册表 renderer 但有 grid cells 时兜底 -->
+      <!-- OnlyOffice 渲染（非 HTML 白名单 sheet，后端标记 onlyoffice:true） -->
+      <GtOnlyOfficeSheet
+        v-else-if="isOnlyOfficeSheet && !onlyOfficeFallback"
+        :key="activeSheetName"
+        :wp-id="wpId"
+        :sheet-name="isWholeExcelTab ? wholeWorkbookSheetName : activeSheetName"
+        :project-id="renderConfig?.project_id ?? ''"
+        :whole-workbook="isWholeExcelTab"
+        :readonly="readonly"
+        @fallback="onOnlyOfficeFallback"
+      />
+
+      <!-- Grid 兜底（Univer 有网格 / C-附注无 schema / OnlyOffice 降级 / 无注册表 renderer 但有 grid cells） -->
       <GtGridSheet
-        v-else-if="(componentType === 'univer' && hasGridCells) || cNoteGridFallback"
+        v-else-if="(componentType === 'univer' && hasGridCells) || cNoteGridFallback || noRendererGridFallback || onlyOfficeFallback"
         :wp-id="wpId"
         :sheet-name="activeSheetName"
         :schema="activeSheetSchema"
         :html-data="activeSheetHtmlData"
-        :readonly="readonly"
+        :readonly="true"
       />
 
       <!-- Univer 占位（无模板网格数据时） -->
@@ -192,6 +224,8 @@ import {
 // 仅 SkippedSheetPlaceholder 不在 registry 内（特殊占位）
 import SkippedSheetPlaceholder from '@/components/workpaper/SkippedSheetPlaceholder.vue'
 import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
+import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtWpToolbar from '@/components/workpaper/GtWpToolbar.vue'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
@@ -246,6 +280,12 @@ const loadingHint = ref('')
 const internalActiveSheetName = ref<string>('')
 // 「切换底稿」弹出树的可见状态
 const switchPopoverVisible = ref(false)
+// 完整 Excel 合成页签标识（OnlyOffice 整本编辑，放在底稿目录右侧）
+const WHOLE_EXCEL_TAB = '__whole_excel__'
+// 统一工具栏状态
+const isWpFullscreen = ref(false)
+// OnlyOffice 降级状态（当 GtOnlyOfficeSheet emit fallback 时切换到 GtGridSheet）
+const onlyOfficeFallback = ref(false)
 
 // ─── Composables ───
 const wpIdRef = toRef(props, 'wpId')
@@ -303,6 +343,8 @@ const activeSheetName = computed<string>({
     if (!renderConfig.value?.sheets?.length) return ''
     // 优先用内部 ref（用户切换过）
     if (internalActiveSheetName.value) {
+      // 完整Excel 合成页签：直接放行（不在 renderConfig.sheets 中）
+      if (internalActiveSheetName.value === WHOLE_EXCEL_TAB) return WHOLE_EXCEL_TAB
       const exists = renderConfig.value.sheets.find(s => s.sheet_name === internalActiveSheetName.value)
       if (exists) return internalActiveSheetName.value
     }
@@ -316,6 +358,7 @@ const activeSheetName = computed<string>({
   },
   set(name: string) {
     internalActiveSheetName.value = name
+    onlyOfficeFallback.value = false  // 切换 sheet 时重置 OnlyOffice 降级状态
     emit('sheet-change', name)
   },
 })
@@ -323,6 +366,40 @@ const activeSheetName = computed<string>({
 const activeSheet = computed(() => {
   if (!renderConfig.value?.sheets?.length) return null
   return renderConfig.value.sheets.find(s => s.sheet_name === activeSheetName.value) ?? null
+})
+
+// ─── 完整 Excel 页签（OnlyOffice 整本编辑，放在底稿目录右侧）───
+// 合成页签：所有多 sheet 底稿在「底稿目录」右侧注入一个「完整Excel」页签，
+// 用 OnlyOffice 打开整本 xlsx 供组员直接编辑（原生显示全部 sheet tab）。
+// 其余 HTML 页签保持现状，后续精细打磨。
+
+/** 页签列表：在第一个页签（通常是底稿目录）右侧插入「完整Excel」合成页签 */
+const tabSheets = computed(() => {
+  const sheets = visibleSheets.value
+  if (sheets.length <= 1) return sheets
+  const wholeExcelTab = {
+    sheet_name: WHOLE_EXCEL_TAB,
+    componentType: 'onlyoffice-sheet' as WpComponentType,
+    schema: null,
+    html_data: { onlyoffice: true, whole_workbook: true, sheet_name: WHOLE_EXCEL_TAB },
+    cross_refs: [],
+  }
+  // 底稿目录(b-index)通常是第一个 → 插在其右侧；否则插在最前
+  const firstIsIndex = sheets[0]?.componentType === 'b-index'
+  if (firstIsIndex) {
+    return [sheets[0], wholeExcelTab, ...sheets.slice(1)]
+  }
+  return [wholeExcelTab, ...sheets]
+})
+
+/** 当前是否为「完整Excel」合成页签 */
+const isWholeExcelTab = computed<boolean>(() => activeSheetName.value === WHOLE_EXCEL_TAB)
+
+/** 完整Excel 模式下传给 config 端点的 sheet_name（用首个真实 sheet，仅用于满足 URL 路径，
+ *  实际 OnlyOffice 打开整本 xlsx 显示全部 tab；whole_workbook=true 时后端不加 actionLink） */
+const wholeWorkbookSheetName = computed<string>(() => {
+  const real = visibleSheets.value.find(s => s.sheet_name !== WHOLE_EXCEL_TAB && s.componentType !== 'b-index')
+  return real?.sheet_name ?? visibleSheets.value[0]?.sheet_name ?? ''
 })
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
@@ -347,6 +424,7 @@ const hasGridCells = computed<boolean>(() => {
 })
 /** 当前 sheet 的 componentType（每个 sheet 独立路由） */
 const componentType = computed<WpComponentType>(() => {
+  if (isWholeExcelTab.value) return 'onlyoffice-sheet' as WpComponentType
   return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'
 })
 
@@ -363,10 +441,46 @@ const cNoteGridFallback = computed<boolean>(() => {
   return !hasSubTables && hasGridCells.value
 })
 
+/**
+ * OnlyOffice sheet 判定：html_data.onlyoffice === true 时路由到 GtOnlyOfficeSheet。
+ * 后端 dispatch 循环对非 HTML 白名单 sheet 设 componentType="onlyoffice-sheet" +
+ * html_data={onlyoffice: true, sheet_name}，前端据此分发到 iframe 嵌入组件。
+ */
+const isOnlyOfficeSheet = computed<boolean>(() => {
+  if (isWholeExcelTab.value) return true
+  const hd = activeSheetHtmlData.value as any
+  return hd?.onlyoffice === true
+})
+
+/**
+ * 有注册表组件但 html_data 是 grid 格式（非组件期望结构）时的兜底判定。
+ * 后端 grid 兜底路径（多 sheet 底稿无 renderer 时从模板提取 cells）产出 grid 数据，
+ * 但前端组件（如 GtDForm）期望结构化数据（rows/context 等）。
+ * 当 html_data 含 cells 字段 → 直接用 GtGridSheet 渲染，跳过注册表组件。
+ */
+const noRendererGridFallback = computed<boolean>(() => {
+  if (componentType.value === 'univer' || componentType.value === 'c-note-table') return false
+  if (componentType.value === 'skip') return false
+  // html_data 含 cells（grid 格式）→ 优先走 GtGridSheet，无论注册表有无组件
+  if (hasGridCells.value) {
+    const hd = activeSheetHtmlData.value as any
+    // 确认是纯 grid 数据（不含组件期望的结构化字段）
+    const isGridOnly = hd && hd.cells && !hd.rows && !hd.programs && !hd.audit_rows
+    if (isGridOnly) return true
+  }
+  // 无注册表组件 → 走兜底
+  const entry = getRendererEntry(componentType.value)
+  if (entry) return false
+  return hasGridCells.value
+})
+
 /** 注册表查找：HTML 类型 → component + emit 列表（lazy import）。
- *  C-附注披露走网格兜底时不用注册表组件（GtCNoteTable），改由 GtGridSheet 渲染。 */
+ *  C-附注披露走网格兜底时不用注册表组件（GtCNoteTable），改由 GtGridSheet 渲染。
+ *  OnlyOffice sheet 不走注册表（走 GtOnlyOfficeSheet）。 */
 const rendererEntry = computed(() =>
-  cNoteGridFallback.value ? undefined : getRendererEntry(componentType.value),
+  cNoteGridFallback.value || noRendererGridFallback.value || (isOnlyOfficeSheet.value && !onlyOfficeFallback.value)
+    ? undefined
+    : getRendererEntry(componentType.value),
 )
 
 /** D 子模式需要 form-type prop；custom 需要项目上下文 */
@@ -477,6 +591,27 @@ const errorSubTitle = computed(() => {
 })
 
 // ─── Methods ───
+
+// OnlyOffice 降级回调：GtOnlyOfficeSheet emit('fallback') 时切换到 GtGridSheet
+function onOnlyOfficeFallback() {
+  onlyOfficeFallback.value = true
+}
+
+// 统一工具栏操作
+function onExportTemplate() {
+  if (!props.wpId) return
+  window.open(`/api/workpapers/${props.wpId}/export-template`, '_blank')
+}
+function onExportData() {
+  ElMessage.info('导出数据功能开发中')
+}
+function onImportData() {
+  ElMessage.info('导入功能开发中')
+}
+function onAddRow() {
+  ElMessage.info('增行功能开发中')
+}
+
 function onSave(data: Record<string, any>) {
   // 防御：部分子组件（如 WpPopupSigning）自行持久化（PUT checklist-responses），
   // 其 emit('save') 不带 payload，仅作"已保存"通知。此时 data 为 undefined/空，
@@ -582,6 +717,16 @@ function onOpenFormula(payload: { sheetName: string }) {
   min-height: 400px;
   display: flex;
   flex-direction: column;
+}
+.gt-wp-renderer--fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  background: #fff;
+  min-height: unset;
 }
 
 .gt-wp-renderer__sheet-tabs {

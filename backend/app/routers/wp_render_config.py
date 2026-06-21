@@ -49,6 +49,20 @@ router = APIRouter(
 # ─── Singleton schema service (stateless + cache) ────────────────────────────
 _schema_service = WpRenderSchemaService()
 
+# ─── OnlyOffice HTML 白名单：这些 componentType 即使无 renderer 也继续走 grid 兜底，
+# 不切换到 OnlyOffice 渲染。（design §1.1）
+_ONLYOFFICE_HTML_WHITELIST: set[str] = {
+    "b-index",
+    "a-program-console",
+    "audit-sheet",
+    "c-note-table",
+    "d-form-table",
+    "d-form-confirmation",
+    "d-form-paragraph",
+    "bad-debt-sheet",
+    "h-static-doc",
+}
+
 # 标准底稿编号：A~I + 数字（D1-1、E11）；CUST-01 等字母后非数字则视为自建
 _STANDARD_WP_CODE = re.compile(r"^[A-I]\d", re.IGNORECASE)
 
@@ -618,6 +632,34 @@ def _resolve_template_path(working_paper, wp_code: str) -> str | None:
         return fp
 
 
+@router.get("/{wp_id}/export-template")
+async def export_template(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """导出底稿对应的原始 xlsx 模板文件"""
+    from fastapi.responses import FileResponse
+    from urllib.parse import quote
+
+    working_paper = (await db.execute(sa.select(WorkingPaper).where(
+        WorkingPaper.id == wp_id, WorkingPaper.is_deleted == False))).scalars().first()  # noqa: E712
+    if not working_paper:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+    wp_index = (await db.execute(sa.select(WpIndex).where(
+        WpIndex.id == working_paper.wp_index_id))).scalars().first()
+    wp_code = wp_index.wp_code if wp_index else "unknown"
+    tpl_path = _resolve_template_path(working_paper, wp_code)
+    if not tpl_path or not Path(tpl_path).is_file():
+        raise HTTPException(status_code=404, detail="模板文件不存在")
+    filename = Path(tpl_path).name
+    return FileResponse(
+        path=str(tpl_path),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}"},
+    )
+
+
 @router.get("/{wp_id}/render-config")
 async def get_render_config(
     wp_id: UUID,
@@ -626,6 +668,24 @@ async def get_render_config(
     current_user: User = Depends(get_current_user),
 ):
     """获取底稿渲染 schema + 项目数据 + 跨底稿引用（dispatch 模式）。"""
+    try:
+        return await _get_render_config_impl(wp_id, sheet_name, db, current_user)
+    except Exception as _fatal:
+        # 临时：把完整堆栈写到文件方便排查 500
+        import traceback
+        with open("_render_config_500.log", "a", encoding="utf-8") as _f:
+            _f.write(f"\n{'='*60}\nwp_id={wp_id}\n")
+            traceback.print_exc(file=_f)
+        raise
+
+
+async def _get_render_config_impl(
+    wp_id: UUID,
+    sheet_name: str | None,
+    db: AsyncSession,
+    current_user,
+):
+    """实际实现（从原 get_render_config 提取）。"""
     from app.routers.wp_render_strategies import RENDERER_DISPATCH
     from app.routers.wp_render_strategies._context import RenderContext
     from app.routers.wp_render_strategies._context import CrossRefItem as _CRI
@@ -718,6 +778,10 @@ async def get_render_config(
     _real_sheets = [c for c in classifications
                     if not (c.sheet_name and "GT_Custom" in c.sheet_name)]
     _is_multi_sheet = len(_real_sheets) > 1
+
+    # 多 sheet 底稿 tab 排序：按 DB 记录 created_at 排序（seed 脚本按模板顺序插入）
+    # （zipfile 排序方案因 uvicorn reload 不稳定暂弃）
+
     sheets: list[dict] = []
     for cls in classifications:
         if sheet_name and cls.sheet_name != sheet_name:
@@ -745,6 +809,19 @@ async def get_render_config(
             pass
         sheet_schema = _unpack_sheet_schema(schema_data, cls.sheet_name)
         sheet_html_data = html_data_all.get(cls.sheet_name)
+
+        # 聚合工作包或独立底稿中 G- 前缀 class_code 强制走 OnlyOffice 编辑（不走 univer grid）
+        # G-OnlyOffice = 聚合 grid_table；G-替代程序 = 独立底稿替代程序检查表等
+        _cls_code = getattr(cls, "class_code", "") or ""
+        if _is_multi_sheet and _cls_code.startswith("G-"):
+            component_type = "onlyoffice-sheet"
+            sheet_html_data = {"onlyoffice": True, "sheet_name": cls.sheet_name}
+            sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,
+                           "schema": sheet_schema, "html_data": sheet_html_data,
+                           "cross_refs": [i.model_dump() for i in cross_ref_items],
+                           })
+            continue
+
         renderer = RENDERER_DISPATCH.get(component_type)
         if renderer:
             ctx = RenderContext(
@@ -772,6 +849,20 @@ async def get_render_config(
                     await db.rollback()
                 except Exception:
                     pass
+        elif not renderer and _is_multi_sheet and component_type not in _ONLYOFFICE_HTML_WHITELIST:
+            # 非白名单 + 无 renderer + 多 sheet → 走 OnlyOffice WOPI 渲染（design §1.1）
+            component_type = "onlyoffice-sheet"
+            sheet_html_data = {"onlyoffice": True, "sheet_name": cls.sheet_name}
+        elif not sheet_html_data and _tpl and _is_multi_sheet:
+            # 白名单内无后端 renderer 且无持久化数据的 sheet（如 d-form-confirmation/d-form-table
+            # 在多 sheet 底稿中）：从模板提取只读网格兜底，至少显示模板原样。
+            try:
+                from app.services.wp_grid_extract import extract_grid, strip_standard_header
+                _grid = extract_grid(_tpl, cls.sheet_name)
+                if isinstance(_grid, dict) and _grid.get("cells"):
+                    sheet_html_data = strip_standard_header(_grid)
+            except Exception:  # noqa: BLE001
+                pass
         sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,
                        "schema": sheet_schema, "html_data": sheet_html_data,
                        "cross_refs": [i.model_dump() for i in cross_ref_items],

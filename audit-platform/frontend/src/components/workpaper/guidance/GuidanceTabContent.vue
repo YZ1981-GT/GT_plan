@@ -16,11 +16,14 @@
  */
 import { computed, ref } from 'vue'
 import type { GuidanceResponse } from '@/stores/guidancePanelStore'
+import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 
 const props = defineProps<{
   guidanceData: GuidanceResponse
   fieldOverrides?: Record<string, string>
 }>()
+
+const guidanceStore = useGuidancePanelStore()
 
 // ─── Complexity ─────────────────────────────────────────────────────────────
 
@@ -257,7 +260,7 @@ const customGuidance = computed(() => {
     <template v-else>
       <div class="gt-guidance-tab--low">
         <p class="gt-guidance-tab__low-hint">{{ shortText }}</p>
-        <p class="gt-guidance-tab__low-cta">有疑问？切换到 AI 对话 Tab 提问</p>
+        <p v-if="guidanceStore.aiEnabled" class="gt-guidance-tab__low-cta">有疑问？切换到 AI 对话 Tab 提问</p>
       </div>
     </template>
 

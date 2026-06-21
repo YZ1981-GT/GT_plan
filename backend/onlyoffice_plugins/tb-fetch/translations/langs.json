@@ -1,0 +1,6 @@
+{
+  "zh-CN": {
+    "name": "TB 取数",
+    "description": "选中单元格右键从 TB 取数，调用后端 auto_data_resolvers API 回填值"
+  }
+}
