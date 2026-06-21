@@ -202,6 +202,11 @@ class ProcedureTableService:
             result["summary"] = resolved.get("summary")
             if resolved.get("_error"):
                 result["_error"] = True
+                # resolver 内部查询失败可能导致事务 aborted → rollback 恢复
+                try:
+                    await self.db.rollback()
+                except Exception:
+                    pass
         else:
             _logger.debug("auto_data_source '%s' 未注册，跳过", source)
 
