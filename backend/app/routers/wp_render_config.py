@@ -675,6 +675,11 @@ async def get_render_config(
     except Exception as e:  # noqa: BLE001 — 聚合失败按"无聚合"降级，零回归
         logger.warning("科目工作包聚合失败 wp_code=%s: %s", wp_code, e)
         pkg_sheets = None
+        # 查询失败可能导致事务 aborted → rollback 恢复
+        try:
+            await db.rollback()
+        except Exception:
+            pass
     if pkg_sheets:
         classifications = pkg_sheets
 
@@ -775,6 +780,11 @@ async def get_render_config(
                 logger.warning("auto-fill 取数失败 pid=%s: %s", project_id, e)
     except Exception as e:
         logger.warning("auto-fill 年度查询失败 pid=%s: %s", project_id, e)
+        # 事务可能已 aborted → rollback 恢复
+        try:
+            await db.rollback()
+        except Exception:
+            pass
     from app.services.wp_guidance_service import get_wp_guidance
     return {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
             "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,

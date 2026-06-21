@@ -152,6 +152,11 @@ async def resolve_package_sheets(
         except Exception as e:  # noqa: BLE001 — 自定义查询失败降级到内置 registry
             logger.warning("查询自定义科目工作包失败 wp_code=%s: %s", wp_code, e)
             custom_pkg = None
+            # 查询失败可能导致事务 aborted → rollback 恢复以免级联影响后续查询
+            try:
+                await db.rollback()
+            except Exception:
+                pass
 
     if custom_pkg is not None:
         sheets = custom_pkg.get("sheets") or []

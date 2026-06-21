@@ -168,6 +168,11 @@ async def _generate_a_program_data(
                         prog["status"] = saved["status"]
         except Exception as e:  # noqa: BLE001
             logger.warning("加载程序表 override 失败 wp_code=%s: %s", wp_code, e)
+            # 事务可能已 aborted → rollback 恢复以免影响后续查询
+            try:
+                await db.rollback()
+            except Exception:
+                pass
 
     # 保留已有签字信息（若 sheet 之前存过部分数据）
     if existing and isinstance(existing.get("signatures"), list):
