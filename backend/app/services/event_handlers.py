@@ -409,7 +409,7 @@ def register_event_handlers() -> None:
         """调整分录变更 → 失效涉及科目的公式缓存"""
         try:
             if not payload.year:
-                logger.warning("Skip formula cache invalidation: missing year for event %s", payload.event_type)
+                logger.debug("Skip formula cache invalidation: missing year for event %s", payload.event_type)
                 return
             from app.core.redis import redis_client
             engine = FormulaEngine(redis_client=redis_client)
@@ -426,7 +426,7 @@ def register_event_handlers() -> None:
         """数据导入 → 失效全部公式缓存"""
         try:
             if not payload.year:
-                logger.warning("Skip formula cache invalidation: missing year for event %s", payload.event_type)
+                logger.debug("Skip formula cache invalidation: missing year for event %s", payload.event_type)
                 return
             from app.core.redis import redis_client
             engine = FormulaEngine(redis_client=redis_client)
@@ -664,6 +664,45 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.LEDGER_DATASET_ROLLED_BACK, _invalidate_addr_all)
 
     logger.debug("Address registry cache invalidation handlers registered")
+
+    # ── 报表 Redis 缓存失效（事件驱动统一治理） ──
+    # ReportEngine 的 report:{pid}:* Redis 缓存此前仅在 generate_all_reports 写路径
+    # 手动失效，调整分录/导入/回滚等旁路写入时报表可能读到陈旧值。
+    # 公式缓存已由上方 _invalidate_formula_cache_on_adjustment/_all 精确处理（支持
+    # account_codes 粒度），此处不重复订阅。
+
+    async def _invalidate_report_redis(payload):
+        """试算表/调整/报表/导入变更 → 失效报表 Redis 缓存（report:{pid}:*）"""
+        pid = getattr(payload, 'project_id', '')
+        if not pid:
+            return
+        try:
+            from app.core.redis import get_redis
+            redis = await get_redis()
+            if redis is None:
+                return
+            cursor = 0
+            while True:
+                cursor, keys = await redis.scan(
+                    cursor=cursor, match=f"report:{pid}:*", count=200
+                )
+                if keys:
+                    await redis.delete(*keys)
+                if cursor == 0:
+                    break
+        except Exception as e:  # 缓存失效失败不阻断事件链
+            logger.warning("report Redis cache invalidation failed (pid=%s): %s", pid, e)
+
+    # 报表缓存：影响报表取数的写事件
+    for _evt in (
+        EventType.ADJUSTMENT_CREATED, EventType.ADJUSTMENT_UPDATED,
+        EventType.ADJUSTMENT_DELETED, EventType.TRIAL_BALANCE_UPDATED,
+        EventType.REPORTS_UPDATED, EventType.DATA_IMPORTED,
+        EventType.LEDGER_DATASET_ACTIVATED, EventType.LEDGER_DATASET_ROLLED_BACK,
+    ):
+        event_bus.subscribe(_evt, _invalidate_report_redis)
+
+    logger.debug("Report Redis cache invalidation handlers registered")
 
     # ------------------------------------------------------------------
     # Enterprise Linkage: 调整分录事件 → SSE 推送给项目组在线成员

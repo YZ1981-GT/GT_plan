@@ -90,3 +90,36 @@ async def test_note_handler_calls_invalidate_with_note_domain(monkeypatch):
 
     assert captured.get("domain") == "note"
     assert captured.get("project_id") == pid
+
+
+# ─── P1-4: 报表 / 公式 Redis 缓存失效事件挂接（统一缓存治理）────────────────────
+
+
+def test_report_redis_invalidation_registered_on_tb_events():
+    """报表 Redis 缓存失效 handler 必须挂接到试算表/调整/报表/导入事件。"""
+    for evt in (
+        EventType.ADJUSTMENT_CREATED,
+        EventType.TRIAL_BALANCE_UPDATED,
+        EventType.REPORTS_UPDATED,
+        EventType.DATA_IMPORTED,
+    ):
+        names = _handler_names(evt)
+        assert any("_invalidate_report_redis" in n for n in names), (
+            f"{evt} 缺少报表 Redis 缓存失效 handler，实际: {names}"
+        )
+
+
+def test_formula_redis_invalidation_registered_on_config_events():
+    """公式 Redis 缓存失效 handler 必须挂接到调整/导入等数据变更事件。
+    注：精确版 handler (_invalidate_formula_cache_on_adjustment/_all) 由远程实现，
+    验证其注册即可。"""
+    for evt in (
+        EventType.ADJUSTMENT_CREATED,
+        EventType.ADJUSTMENT_UPDATED,
+        EventType.DATA_IMPORTED,
+        EventType.LEDGER_DATASET_ACTIVATED,
+    ):
+        names = _handler_names(evt)
+        assert any("_invalidate_formula_cache" in n for n in names), (
+            f"{evt} 缺少公式 Redis 缓存失效 handler，实际: {names}"
+        )

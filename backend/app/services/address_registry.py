@@ -274,7 +274,7 @@ async def build_report_entries(db, project_id: str, year: int) -> list[AddressEn
                     tags=[rt_label, cfg.row_name or ''],
                 ))
     except Exception as e:
-        logger.warning(f"build_report_entries error: {e}")
+        logger.error(f"build_report_entries error: {e}", exc_info=True)
     return entries
 
 
@@ -313,7 +313,7 @@ async def build_trial_balance_entries(db, project_id: str, year: int) -> list[Ad
                     tags=['试算表', name, row.account_category or ''],
                 ))
     except Exception as e:
-        logger.warning(f"build_trial_balance_entries error: {e}")
+        logger.error(f"build_trial_balance_entries error: {e}", exc_info=True)
     return entries
 
 
@@ -361,7 +361,7 @@ async def build_note_entries(db, project_id: str, year: int,
                             tags=['附注', title],
                         ))
     except Exception as e:
-        logger.warning(f"build_note_entries error: {e}")
+        logger.error(f"build_note_entries error: {e}", exc_info=True)
     return entries
 
 
@@ -680,6 +680,95 @@ async def build_workpaper_entries(db, project_id: str, year: int) -> list[Addres
     return entries
 
 
+async def build_aux_entries(db, project_id: str, year: int) -> list[AddressEntry]:
+    """从辅助余额表构建 aux 域地址条目。
+
+    URI 格式：``aux://{account_code}/{dimension}#{column}``，与
+    ``formula_ref_to_uri`` 对 ``AUX('科目','维度','列名')`` 的产出对齐。
+
+    维度（dimension）取 ``aux_name``（人类可读）优先，缺失降级 ``aux_code``。
+    按 (account_code, aux_type, aux_code) 去重（memory 铁律：辅助维度须按
+    aux_type 维度聚合，避免同一三元组重复注册）。
+    """
+    import uuid as _uuid
+
+    import sqlalchemy as sa
+
+    from app.models.audit_platform_models import TbAuxBalance
+
+    entries: list[AddressEntry] = []
+    # 列维度：aux 余额表为原始维度数据，仅含期初/期末（opening/closing），
+    # 无 trial_balance 的 审定/未审/AJE/RJE 审计调整列；且 _handle_aux 取值
+    # 仅按 (account, dimension) 查 aux_data，列名为期间标签不参与取值。
+    # 故按 aux 真实数据性质生成期末/期初 + 其规范别名（COLUMN_ALIASES 中
+    # 映射到 期末余额/年初余额 的常用写法），避免 validate_formula_refs 对
+    # 合理列写法误报悬空，又不凭空注册 aux 不存在的审计调整列地址。
+    columns = ['期末', '期末余额', '期初', '期初余额']
+    try:
+        pid = _uuid.UUID(str(project_id))
+    except (ValueError, TypeError):
+        return entries
+
+    try:
+        result = await db.execute(
+            sa.select(
+                TbAuxBalance.account_code,
+                TbAuxBalance.account_name,
+                TbAuxBalance.aux_type,
+                TbAuxBalance.aux_type_name,
+                TbAuxBalance.aux_code,
+                TbAuxBalance.aux_name,
+            )
+            .where(
+                TbAuxBalance.project_id == pid,
+                TbAuxBalance.year == year,
+                TbAuxBalance.is_deleted == sa.false(),
+            )
+            .group_by(
+                TbAuxBalance.account_code,
+                TbAuxBalance.account_name,
+                TbAuxBalance.aux_type,
+                TbAuxBalance.aux_type_name,
+                TbAuxBalance.aux_code,
+                TbAuxBalance.aux_name,
+            )
+        )
+        rows = result.all()
+    except Exception as e:
+        logger.error("build_aux_entries query error: %s", e, exc_info=True)
+        return entries
+
+    seen: set[tuple[str, str]] = set()
+    for row in rows:
+        code = row.account_code or ''
+        if not code:
+            continue
+        acc_name = row.account_name or code
+        dimension = (row.aux_name or row.aux_code or '').strip()
+        if not dimension:
+            continue
+        key = (code, dimension)
+        if key in seen:
+            continue
+        seen.add(key)
+        aux_type_label = row.aux_type_name or row.aux_type or ''
+        for col in columns:
+            uri = build_uri('aux', code, dimension, col)
+            entries.append(AddressEntry(
+                uri=uri,
+                domain='aux',
+                source=code,
+                path=dimension,
+                cell=col,
+                label=f"辅助余额 > {code} {acc_name} > {dimension} > {col}",
+                account_code=code,
+                formula_ref=f"AUX('{code}','{dimension}','{col}')",
+                jump_route=build_jump_route(uri, project_id, year),
+                tags=['辅助余额', acc_name, aux_type_label] if aux_type_label else ['辅助余额', acc_name],
+            ))
+    return entries
+
+
 # ═══════════════════════════════════════════
 # 统一注册表服务
 # ═══════════════════════════════════════════
@@ -858,6 +947,8 @@ class AddressRegistryService:
             entries = await build_note_entries(db, project_id, year, template_type)
         elif domain == 'wp':
             entries = await build_workpaper_entries(db, project_id, year)
+        elif domain == 'aux':
+            entries = await build_aux_entries(db, project_id, year)
 
         # 回写 L1
         self._evict_if_needed()
@@ -874,7 +965,7 @@ class AddressRegistryService:
                       template_type: str = 'soe') -> list[AddressEntry]:
         """获取项目所有可引用地址（按域分别缓存）"""
         all_entries: list[AddressEntry] = []
-        for domain in ('report', 'tb', 'note', 'wp'):
+        for domain in ('report', 'tb', 'note', 'wp', 'aux'):
             all_entries.extend(
                 await self._get_domain(db, project_id, year, template_type, domain)
             )

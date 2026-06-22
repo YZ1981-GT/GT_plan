@@ -215,8 +215,40 @@ function formulaIcon(r: number, c: number): string {
 }
 
 // ─── 样式类 ───
-function thClass(_r: number, _c: number): string {
-  return 'gt-grid-sheet__th'
+// 分组表头着色调色板：顶层分组带（colspan>1）按出现顺序轮转配色，
+// 让超宽表的多个分组区视觉可分。
+const _GROUP_TINTS = [
+  'gt-grid-sheet__th--g0',
+  'gt-grid-sheet__th--g1',
+  'gt-grid-sheet__th--g2',
+  'gt-grid-sheet__th--g3',
+  'gt-grid-sheet__th--g4',
+]
+// 计算每个顶层分组单元格的配色 class（按列起点稳定分配，跨渲染一致）
+const groupTintMap = computed<Record<number, string>>(() => {
+  const map: Record<number, string> = {}
+  let idx = 0
+  // 顶层表头行（hr=1）中 colspan>1 的单元格视为分组带
+  for (let c = 1; c <= maxCol.value; c++) {
+    if (isCovered(1, c)) continue
+    const span = spanOf(1, c)
+    if (span.colspan > 1) {
+      map[c] = _GROUP_TINTS[idx % _GROUP_TINTS.length]
+      idx++
+    }
+  }
+  return map
+})
+
+function thClass(hr: number, c: number): string {
+  const classes = ['gt-grid-sheet__th']
+  // 顶层分组带着色（仅 hr=1 且 colspan>1）
+  if (hr === 1 && groupTintMap.value[c]) {
+    classes.push('gt-grid-sheet__th--group', groupTintMap.value[c])
+  }
+  // 第 1 列（序号）冻结标记——精确按列号，避免多级表头 :first-child 误命中
+  if (c === 1) classes.push('gt-grid-sheet__th--frozen')
+  return classes.join(' ')
 }
 
 function rowClass(r: number): string {
@@ -235,6 +267,9 @@ function tdClass(r: number, c: number): string {
   else if (hint?.startsWith('computed')) classes.push('gt-grid-sheet__td--computed')
   else if (hint === 'user_input') classes.push('gt-grid-sheet__td--input')
   if (c === 1) classes.push('gt-grid-sheet__td--label')
+  // 空值单元格淡化（降低超宽表的视觉噪音）
+  const txt = cellText(r, c)
+  if (!txt || txt === '-') classes.push('gt-grid-sheet__td--empty')
   return classes.join(' ')
 }
 
@@ -315,6 +350,20 @@ function colStyle(c: number): Record<string, string> {
   vertical-align: middle;
 }
 
+/* 顶层分组带：加粗 + 字号略大，分组色调由 --g0..g4 提供 */
+.gt-grid-sheet__th--group {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-bottom: 2px solid #c9b8e0;
+}
+/* 5 组轮转配色（淡雅、彼此可分，统一致同紫系基调微调色相） */
+.gt-grid-sheet__th--g0 { background: #ede5f7; color: #5b2d91; }
+.gt-grid-sheet__th--g1 { background: #e3eefb; color: #1f5fa8; }
+.gt-grid-sheet__th--g2 { background: #e6f6ec; color: #1d7a47; }
+.gt-grid-sheet__th--g3 { background: #fdf0e3; color: #a85f12; }
+.gt-grid-sheet__th--g4 { background: #fbe9ef; color: #a8295b; }
+
 /* ─── 数据单元格 ─── */
 .gt-grid-sheet__td {
   border: 1px solid #e8e8e8;
@@ -332,6 +381,31 @@ function colStyle(c: number): Record<string, string> {
   color: #1f2329;
   background: #fafafa;
   border-right: 2px solid #d4d0dc;
+}
+
+/* 空值单元格淡化：弱化 "-"/空白，让有数据的单元格更突出（超宽表降噪） */
+.gt-grid-sheet__td--empty {
+  color: #c5c8ce;
+}
+
+/* 冻结首列（序号/标签列）：横向滚动时保持可见，宽表不丢行标识。
+   表头按列号精确标记 --frozen（避免多级表头 :first-child 误命中第 2/3 行非首列） */
+.gt-grid-sheet__th--frozen,
+.gt-grid-sheet__td--label {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+.gt-grid-sheet__thead .gt-grid-sheet__th--frozen {
+  z-index: 3;  /* 表头首列在最上层（同时压住纵横两向滚动） */
+}
+
+/* 斑马纹：偶数数据行浅灰底，宽表跨列追踪更轻松 */
+.gt-grid-sheet__table tbody tr:nth-child(even) > td {
+  background: #fbfafc;
+}
+.gt-grid-sheet__table tbody tr:nth-child(even) > .gt-grid-sheet__td--label {
+  background: #f4f2f7;
 }
 
 /* 公式类型视觉标记 */

@@ -810,6 +810,31 @@ async def preview_query(
     }
 
 
+def _derive_formula_refs(table: str, rows: list[dict]) -> list[str | None]:
+    """为查询结果每行派生可用的公式引用语法（无法定位返回 None）。
+
+    打通高级查询（自由 SQL 探查）与结构化公式引用层：
+    - trial_balance → ``TB('{standard_account_code}','审定数')``
+    - tb_balance    → ``TB('{standard_account_code}','期末')``
+
+    与 ``address_registry.formula_ref_to_uri`` 的 ref 语法保持一致，
+    前端可直接把 ref 丢给 useAddressRegistry.resolve/validate 或复制进公式编辑器。
+    其余表（working_paper/report_config 等）暂无稳定单值定位语义，返回 None。
+    """
+    refs: list[str | None] = []
+    if table == "trial_balance":
+        for row in rows:
+            code = row.get("standard_account_code")
+            refs.append(f"TB('{code}','审定数')" if code else None)
+    elif table == "tb_balance":
+        for row in rows:
+            code = row.get("standard_account_code") or row.get("account_code")
+            refs.append(f"TB('{code}','期末')" if code else None)
+    else:
+        refs = [None] * len(rows)
+    return refs
+
+
 @router.post("/execute")
 async def execute_query(
     body: QueryDSL,
@@ -864,6 +889,9 @@ async def execute_query(
         "total": len(rows_serialized),
         "table": body.table,
         "sql": _stmt_to_sql(stmt),
+        # P2-6: 自由查询结果反哺结构化引用——每行（若可定位）给出对应公式 ref，
+        # 审计师可一键复制到公式编辑器，打通"探查→引用"链路。
+        "formula_refs": _derive_formula_refs(body.table, rows_serialized),
     }
 
     # 回写 Redis 缓存（短 TTL）

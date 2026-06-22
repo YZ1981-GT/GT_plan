@@ -126,10 +126,11 @@ async function initialize() {
       throw new Error('DocsAPI not available after script load')
     }
 
-    // 合并 config + token，token 设在根级别
+    // 合并 config + token（仅当 token 非空时才注入——容器 JWT_ENABLED=false 时
+    // 传入空/无效 token 会触发 errorCode -20 "文档安全令牌格式不正确"）
     const editorConfig: any = {
       ...config,
-      token,
+      ...(token ? { token } : {}),
     }
 
     // 只读模式用 type:embedded（更轻、无工具栏）；编辑模式保持 desktop 保留公式/数据 Tab

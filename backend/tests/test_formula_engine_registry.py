@@ -121,6 +121,14 @@ class TestFunctionRegistryCustom:
         with pytest.raises(ValueError, match="内置函数"):
             engine.register_custom_function("TB", description="hack")
 
+    @pytest.mark.parametrize("builtin", ["NOTE", "WP", "AUX", "SUM_TB", "ROW", "IF"])
+    def test_all_registry_builtins_protected(self, builtin):
+        """回归：冲突校验须覆盖 _REGISTRY 全部内置（此前 _BUILTIN_FUNCTIONS 缺
+        NOTE/WP → 用户可注册同名自定义函数覆盖内置，造成取数语义被劫持）。"""
+        engine = FormulaEngine()
+        with pytest.raises(ValueError, match="内置函数"):
+            engine.register_custom_function(builtin, description="hack", expression="0")
+
 
 class TestValidateFormulaUsesRegistry:
     """验证 validate_formula 使用 registry.known_function_names"""

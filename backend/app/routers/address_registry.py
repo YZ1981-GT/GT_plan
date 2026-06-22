@@ -20,7 +20,7 @@ from app.services.address_registry import (
     uri_to_formula_ref, build_jump_route,
 )
 
-router = APIRouter(prefix="/api/address-registry", tags=["地址坐标"])
+router = APIRouter(prefix="/api/address-registry", tags=["地址坐标-公式编辑选址(V1)"])
 
 
 @router.get("")

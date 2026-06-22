@@ -65,8 +65,28 @@ export type HtmlComponentType =
   | 'a14-3-workbook'
   | 'a11-bundle'
   | 'a15-bundle'
+  | 'confirmation-summary'
+  | 'confirmation-entity-verify'
+  | 'confirmation-followup'
+  | 'confirmation-diff-reconcile'
+  | 'confirmation-alternative-d05'
+  | 'confirmation-alternative-d06'
+  | 'confirmation-diff-checklist'
+  | 'confirmation-fraud-risk'
+  | 'confirmation-reliability'
 
-/** 注册表条目：包含 lazy component / 图标 / emits / 描述 */
+/**
+ * 上下文 props 策略：声明组件需要哪些上下文信息。
+ * GtWpRenderer 根据此声明自动透传，新增 componentType 无需修改 if 链。
+ *
+ * - 'standard'  → { wp-id, project-id, wp-code, year }（绝大多数 HTML 组件）
+ * - 'custom'    → { wp-generated, project-id, wp-code, year }（自定义/程序表）
+ * - 'form-type' → { form-type: componentType }（D 子模式）
+ * - 'none'      → {}（纯展示，无需额外上下文）
+ */
+export type ContextPropsStrategy = 'standard' | 'custom' | 'form-type' | 'none'
+
+/** 注册表条目：包含 lazy component / 图标 / emits / 描述 / 上下文 props 策略 */
 export interface HtmlRendererEntry {
   /** 组件类型唯一标识 */
   componentType: HtmlComponentType
@@ -78,6 +98,12 @@ export interface HtmlRendererEntry {
   label: string
   /** 子组件 emit 的事件列表（用于 GtWpRenderer 透传 + 测试断言） */
   emits: readonly string[]
+  /**
+   * 上下文 props 策略。GtWpRenderer 根据此字段自动构建 props，
+   * 新增 componentType 只需设置此字段，无需修改 GtWpRenderer 的 if 链。
+   * 默认 'none'（不传额外 props）。
+   */
+  contextProps?: ContextPropsStrategy
 }
 
 // ─── lazy components ────────────────────────────────────────────────────────
@@ -116,6 +142,15 @@ const GtMisstatementWorkpaper = defineAsyncComponent(() => import('./GtMisstatem
 const GtA14_3Workbook = defineAsyncComponent(() => import('./GtA14_3Workbook.vue'))
 const GtA11Bundle = defineAsyncComponent(() => import('./GtA11Bundle.vue'))
 const GtA15Bundle = defineAsyncComponent(() => import('./GtA15Bundle.vue'))
+const GtConfirmationSummary = defineAsyncComponent(() => import('./confirmation/GtConfirmationSummary.vue'))
+const GtConfirmationEntityVerify = defineAsyncComponent(() => import('./confirmation/entityVerify/GtConfirmationEntityVerify.vue'))
+const GtConfirmationFollowup = defineAsyncComponent(() => import('./confirmation/followup/GtConfirmationFollowup.vue'))
+const GtConfirmationDiffReconcile = defineAsyncComponent(() => import('./confirmation/diffReconcile/GtConfirmationDiffReconcile.vue'))
+const GtConfirmationAlternativeD05 = defineAsyncComponent(() => import('./confirmation/alternativeD05/GtConfirmationAlternativeD05.vue'))
+const GtConfirmationAlternativeD06 = defineAsyncComponent(() => import('./confirmation/alternativeD06/GtConfirmationAlternativeD06.vue'))
+const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
+const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
+const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -135,6 +170,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '🎯',
     label: 'A1 项目总控仪表盘',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a2-adjustment-console',
@@ -142,6 +178,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📝',
     label: 'A2 调整分录中控台',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a3-consolidation-console',
@@ -149,6 +186,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '🔗',
     label: 'A3 合并流程中控台',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a-program-console',
@@ -156,6 +194,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📋',
     label: 'A 程序表中控台',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'b-index',
@@ -193,6 +232,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
             : '📑',
     label: `D 检查表 (${subtype.replace('d-form-', '')})`,
     emits: ['save'],
+    contextProps: 'form-type' as const,
   })),
   {
     componentType: 'e-control-test',
@@ -205,6 +245,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
       'conclusion-change',
       'step-advance',
     ],
+    contextProps: 'standard',
   },
   {
     componentType: 'h-static-doc',
@@ -219,6 +260,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📎',
     label: '自定义底稿',
     emits: ['save'],
+    contextProps: 'custom',
   },
   {
     componentType: 'audit-sheet',
@@ -226,6 +268,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📊',
     label: '审定表',
     emits: ['save', 'field-change', 'open-formula', 'restore'],
+    contextProps: 'standard',
   },
   {
     componentType: 'bad-debt-sheet',
@@ -233,6 +276,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '💰',
     label: '坏账准备明细表',
     emits: [], // GtBadDebtSheet 自取数自落库，无 emit
+    contextProps: 'standard',
   },
   {
     componentType: 'cf-verification',
@@ -240,6 +284,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '💧',
     label: '现金流量表核查',
     emits: [],
+    contextProps: 'standard',
   },
   {
     componentType: 'procedure-table',
@@ -247,6 +292,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📋',
     label: '程序表',
     emits: ['save'],
+    contextProps: 'custom',
   },
   {
     componentType: 'report-analysis',
@@ -254,6 +300,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📈',
     label: '报表分析',
     emits: [],
+    contextProps: 'standard',
   },
   {
     componentType: 'misstatement-summary',
@@ -261,6 +308,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '⚠️',
     label: '错报汇总',
     emits: [],
+    contextProps: 'standard',
   },
   {
     componentType: 'review-checklist',
@@ -268,6 +316,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '✍️',
     label: '复核面板',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'word-template',
@@ -275,6 +324,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📄',
     label: 'Word 模板编辑',
     emits: [],
+    contextProps: 'standard',
   },
   {
     componentType: 'independence-signing',
@@ -282,6 +332,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '✍️',
     label: '独立性签署',
     emits: [],
+    contextProps: 'standard',
   },
   {
     componentType: 'wp-popup-signing',
@@ -289,6 +340,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '✍️',
     label: '签字流转控制表',
     emits: ['save', 'completed'],
+    contextProps: 'standard',
   },
   {
     componentType: 'audit-legend',
@@ -296,6 +348,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📋',
     label: '审计标识一览表',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'checklist-table',
@@ -303,6 +356,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '✅',
     label: '核对表',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'analytical-review',
@@ -310,6 +364,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📊',
     label: '分析性复核',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a17-summary',
@@ -317,6 +372,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📋',
     label: 'A17 重大事项概要',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'kam-workpaper',
@@ -324,6 +380,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '🔑',
     label: 'A17-2-1 关键审计事项',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'regulatory-letter',
@@ -331,6 +388,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📮',
     label: 'A18-2 监管沟通函',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'goodwill-impairment',
@@ -338,6 +396,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '💎',
     label: '商誉减值测试',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'segment-report',
@@ -345,6 +404,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '🏢',
     label: '经营分部',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'contingent-liability',
@@ -352,6 +412,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '⚖️',
     label: '或有事项',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'discontinued-operations',
@@ -359,6 +420,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📉',
     label: '终止经营',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'misstatement-workpaper',
@@ -366,6 +428,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '⚠️',
     label: 'A13 错报套件',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a14-3-workbook',
@@ -373,6 +436,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '🖥️',
     label: 'A14-3 IT缺陷',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a11-bundle',
@@ -380,6 +444,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📅',
     label: 'A11 期后事项套件',
     emits: ['save'],
+    contextProps: 'standard',
   },
   {
     componentType: 'a15-bundle',
@@ -387,6 +452,79 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '🔄',
     label: 'A15 持续经营套件',
     emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-summary',
+    component: GtConfirmationSummary,
+    icon: '✉️',
+    label: '函证结果汇总表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-entity-verify',
+    component: GtConfirmationEntityVerify,
+    icon: '🔍',
+    label: '核实被函证单位信息',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-followup',
+    component: GtConfirmationFollowup,
+    icon: '📋',
+    label: '跟函过程控制',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-diff-reconcile',
+    component: GtConfirmationDiffReconcile,
+    icon: '⚖️',
+    label: '函证差异调节表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-alternative-d05',
+    component: GtConfirmationAlternativeD05,
+    icon: '🔄',
+    label: '替代程序(合同负债及销售)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-alternative-d06',
+    component: GtConfirmationAlternativeD06,
+    icon: '🔄',
+    label: '替代程序(应收及销售)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-diff-checklist',
+    component: GtConfirmationDiffChecklist,
+    icon: '📊',
+    label: '函证差异检查表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-fraud-risk',
+    component: GtConfirmationFraudRisk,
+    icon: '🚨',
+    label: '舞弊风险评价表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-reliability',
+    component: GtConfirmationReliability,
+    icon: '🔐',
+    label: '回函可靠性验证',
+    emits: ['save'],
+    contextProps: 'standard',
   },
 ]
 
@@ -430,4 +568,13 @@ export function getRendererEntry(ct: string): HtmlRendererEntry | undefined {
 
 export function getSheetIcon(ct: string): string {
   return getRendererEntry(ct)?.icon ?? PLACEHOLDER_ICONS[ct] ?? '📄'
+}
+
+/**
+ * 获取 componentType 的上下文 props 策略。
+ * GtWpRenderer 使用此函数代替硬编码 if 链来构建子组件 props。
+ */
+export function getContextPropsStrategy(ct: string): ContextPropsStrategy {
+  const entry = getRendererEntry(ct)
+  return entry?.contextProps ?? 'none'
 }

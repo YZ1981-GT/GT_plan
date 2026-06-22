@@ -110,6 +110,41 @@ def _generate_doc_key(file_path: Path, wp_code: str) -> str:
     return hashlib.md5(raw.encode()).hexdigest()
 
 
+def _rewrite_onlyoffice_download_url(url: str) -> str:
+    """重写 OnlyOffice callback 下载 URL 的 scheme+host 为后端可达的 ONLYOFFICE_URL。
+
+    OnlyOffice 容器在 status=2/6 callback 里返回的 ``url`` 使用其自身视角地址
+    （容器内 ``http://localhost/cache/...`` 指向容器 80 端口，或用容器 hostname），
+    宿主机后端无法访问 → 下载失败 → 前端弹"无法保存文档"。
+
+    将 url 的 scheme+netloc 替换为 ``settings.ONLYOFFICE_URL`` 的 scheme+netloc
+    （如 ``http://localhost:8080``，宿主机可达），保留 path/query 不变。
+    ONLYOFFICE_URL 未配置时原样返回（不破坏 Docker 内部署场景）。
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    base = settings.ONLYOFFICE_URL
+    if not base:
+        return url
+    try:
+        base_parts = urlsplit(base)
+        url_parts = urlsplit(url)
+        if not base_parts.netloc:
+            return url
+        # 已经是同一 host:port 则无需重写
+        if url_parts.netloc == base_parts.netloc:
+            return url
+        return urlunsplit((
+            base_parts.scheme or url_parts.scheme,
+            base_parts.netloc,
+            url_parts.path,
+            url_parts.query,
+            url_parts.fragment,
+        ))
+    except Exception:
+        return url
+
+
 def _sign_jwt(payload: dict) -> str:
     """使用 OnlyOffice JWT secret 签名"""
     if not settings.ONLYOFFICE_JWT_SECRET:
@@ -275,6 +310,10 @@ async def get_sheet_onlyoffice_config(
             "customization": {
                 "forcesave": True,
                 "compactHeader": True,
+                # 紧凑工具栏：ribbon 默认折叠为单行，给单元格区腾空间。
+                # 用户仍可双击选项卡展开。toolbar:true 保留选项卡可用。
+                "compactToolbar": True,
+                "toolbar": True,
             },
         },
         "type": "desktop",
@@ -460,6 +499,13 @@ async def post_sheet_onlyoffice_callback(
                 sheet_name,
             )
             return {"error": 1}
+
+        # 重写下载 URL 的 host:port 为后端可达的 ONLYOFFICE_URL。
+        # OnlyOffice 容器在 callback 里给出的 url 用其自身视角的地址
+        # （容器内 http://localhost/cache/... = 容器 80 端口 / 或容器 hostname），
+        # host 上的后端访问不到 → 下载失败 → "无法保存文档"。
+        # 将其 scheme+netloc 替换为 ONLYOFFICE_URL（host 可达，如 localhost:8080）。
+        url = _rewrite_onlyoffice_download_url(url)
 
         # 查询底稿 + 项目软删守卫
         wp, wp_code = await _load_wp_or_404(db, wp_id)

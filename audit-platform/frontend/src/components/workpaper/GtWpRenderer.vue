@@ -217,6 +217,7 @@ import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
 import {
   getRendererEntry,
   getSheetIcon as registryGetSheetIcon,
+  getContextPropsStrategy,
 } from '@/components/workpaper/htmlRendererRegistry'
 
 // ─── Sub-components (placeholder fallback) ───
@@ -486,26 +487,29 @@ const rendererEntry = computed(() =>
 /** D 子模式需要 form-type prop；custom 需要项目上下文 */
 const extraComponentProps = computed<Record<string, unknown>>(() => {
   const ct = componentType.value
-  if (ct.startsWith('d-form-')) {
-    return { 'form-type': ct }
+  const strategy = getContextPropsStrategy(ct)
+
+  switch (strategy) {
+    case 'form-type':
+      return { 'form-type': ct }
+    case 'custom':
+      return {
+        'wp-generated': renderConfig.value?.is_real_workpaper ?? true,
+        'project-id': renderConfig.value?.project_id ?? '',
+        'wp-code': renderConfig.value?.wp_code ?? '',
+        year: preparationYear.value,
+      }
+    case 'standard':
+      return {
+        'wp-id': props.wpId ?? '',
+        'project-id': renderConfig.value?.project_id ?? '',
+        'wp-code': renderConfig.value?.wp_code ?? '',
+        year: preparationYear.value,
+      }
+    case 'none':
+    default:
+      return {}
   }
-  if (ct === 'custom' || ct === 'procedure-table') {
-    return {
-      'wp-generated': renderConfig.value?.is_real_workpaper ?? true,
-      'project-id': renderConfig.value?.project_id ?? '',
-      'wp-code': renderConfig.value?.wp_code ?? '',
-      year: preparationYear.value,
-    }
-  }
-  if (ct === 'cf-verification' || ct === 'report-analysis' || ct === 'misstatement-summary' || ct === 'review-checklist' || ct === 'independence-signing' || ct === 'wp-popup-signing' || ct === 'word-template' || ct === 'audit-legend' || ct === 'a1-dashboard' || ct === 'a2-adjustment-console' || ct === 'a3-consolidation-console') {
-    return {
-      'wp-id': props.wpId ?? '',
-      'project-id': renderConfig.value?.project_id ?? '',
-      'wp-code': renderConfig.value?.wp_code ?? '',
-      year: preparationYear.value,
-    }
-  }
-  return {}
 })
 
 /** 公式校验/注册表用年度（从 render-config 解析或 route query 取，缺省当前年） */

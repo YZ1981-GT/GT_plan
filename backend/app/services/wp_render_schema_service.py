@@ -50,6 +50,19 @@ class WpRenderSchemaService:
 
     def __init__(self) -> None:
         self._cache: dict[str, dict] = {}
+        self._hits: int = 0
+        self._misses: int = 0
+        self._load_errors: int = 0
+
+    def get_cache_stats(self) -> dict:
+        """返回 schema 缓存统计信息（供健康检查/监控端点使用）"""
+        return {
+            "cache_size": len(self._cache),
+            "hits": self._hits,
+            "misses": self._misses,
+            "load_errors": self._load_errors,
+            "hit_rate": f"{self._hits / max(self._hits + self._misses, 1) * 100:.1f}%",
+        }
 
     def load_schema(
         self,
@@ -75,10 +88,13 @@ class WpRenderSchemaService:
         cache_key = self._build_cache_key(wp_code, template_version_id)
 
         if cache_key in self._cache:
+            self._hits += 1
             return self._cache[cache_key]
 
+        self._misses += 1
         schema_path = self._resolve_schema_path(wp_code)
         if schema_path is None:
+            self._load_errors += 1
             raise FileNotFoundError(
                 f"Render schema not found for wp_code='{wp_code}'. "
                 f"Searched: {_SCHEMA_DIR / f'{wp_code}.yaml'} and "

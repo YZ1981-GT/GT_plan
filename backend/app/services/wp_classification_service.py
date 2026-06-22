@@ -58,6 +58,15 @@ VALID_COMPONENT_TYPES: set[str] = {
     "a2-adjustment-console",
     "a3-consolidation-console",
     "cf-verification",
+    "confirmation-summary",
+    "confirmation-entity-verify",
+    "confirmation-followup",
+    "confirmation-diff-reconcile",
+    "confirmation-diff-checklist",
+    "confirmation-alternative-d05",
+    "confirmation-alternative-d06",
+    "confirmation-reliability",
+    "confirmation-fraud-risk",
 }
 
 # wp_code 级专用路由覆盖（优先于 class_code 派生）

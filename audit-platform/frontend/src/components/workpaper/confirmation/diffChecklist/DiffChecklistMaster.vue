@@ -1,0 +1,255 @@
+<template>
+  <div class="diff-checklist-master">
+    <!-- 工具栏 -->
+    <div class="diff-checklist-master__toolbar">
+      <el-button-group>
+        <el-button size="small" type="primary" :icon="Plus" :disabled="readonly" @click="$emit('add')">
+          新增公司
+        </el-button>
+        <el-button size="small" type="danger" :icon="Delete" :disabled="readonly || !selectedIds.length" @click="$emit('delete', selectedIds)">
+          删除
+        </el-button>
+        <el-button size="small" :icon="Download" :disabled="readonly" @click="$emit('import-d04')">
+          从 D0-4 带入
+        </el-button>
+      </el-button-group>
+      <el-button-group>
+        <el-button size="small" :disabled="readonly" @click="$emit('import-excel')">
+          导入
+        </el-button>
+        <el-button size="small" @click="$emit('export-excel')">
+          导出
+        </el-button>
+      </el-button-group>
+      <div class="diff-checklist-master__toolbar-right">
+        <el-button size="small" type="success" :disabled="readonly || !isDirty" @click="$emit('save')">
+          保存
+        </el-button>
+      </div>
+    </div>
+
+    <!-- 公司列表 -->
+    <el-table
+      ref="tableRef"
+      :data="companies"
+      border
+      stripe
+      size="small"
+      highlight-current-row
+      max-height="400"
+      row-key="_row_id"
+      :row-class-name="getRowClassName"
+      @selection-change="handleSelectionChange"
+      @current-change="handleCurrentChange"
+    >
+      <el-table-column v-if="!readonly" type="selection" width="35" fixed="left" />
+      <el-table-column label="序号" prop="seq" width="50" align="center" fixed="left" />
+      <el-table-column label="函证索引号" prop="confirm_index" width="110" fixed="left">
+        <template #default="{ row }">
+          <span class="diff-checklist-master__link" @click="$emit('jump-d04', row.confirm_index)">
+            {{ row.confirm_index || '—' }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="被询证单位" prop="entity_name" width="150" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.entity_name"
+            size="small"
+            placeholder="单位名称"
+            @change="(val: string) => $emit('update', row._row_id, 'entity_name', val)"
+          />
+          <span v-else>{{ row.entity_name || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="科目" prop="subject" width="120">
+        <template #default="{ row }">
+          <el-select
+            v-if="!readonly"
+            :model-value="row.subject"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择科目"
+            @change="(val: string) => $emit('update', row._row_id, 'subject', val)"
+          >
+            <el-option
+              v-for="opt in subjectOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <span v-else>{{ row.subject || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="A 回函金额" prop="a_reply_amount" width="110" align="right">
+        <template #default="{ row }">
+          <span class="diff-checklist-master__amount">{{ formatAmount(row.a_reply_amount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="E 账面金额" prop="e_book_amount" width="110" align="right">
+        <template #default="{ row }">
+          <span class="diff-checklist-master__amount">{{ formatAmount(row.e_book_amount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="I 最终差异" prop="i_final_diff" width="110" align="right">
+        <template #default="{ row }">
+          <span
+            :class="[
+              'diff-checklist-master__amount',
+              { 'diff-checklist-master__amount--alert': row.status === 'over_materiality' },
+              { 'diff-checklist-master__amount--diff': row.status === 'diff' },
+            ]"
+          >
+            {{ formatAmount(row.i_final_diff) }}
+          </span>
+        </template>
+      </el-table-column>
+      <!-- 差异状态 -->
+      <el-table-column label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag
+            :type="statusTagType(row.status)"
+            size="small"
+            effect="dark"
+          >
+            {{ statusLabel(row.status) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <!-- 来源标识 -->
+      <el-table-column label="来源" width="60" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row._source === 'auto'" size="small" type="primary" effect="plain">
+            自动
+          </el-tag>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 空态提示 -->
+    <div v-if="!companies.length" class="diff-checklist-master__empty">
+      <el-empty description="暂无公司调节数据" :image-size="60">
+        <el-button v-if="!readonly" size="small" type="primary" @click="$emit('import-d04')">
+          从 D0-4 差异表带入
+        </el-button>
+      </el-empty>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+import { Plus, Delete, Download } from '@element-plus/icons-vue'
+import type { DiffChecklistCompany } from './diffChecklistTypes'
+
+const props = defineProps<{
+  companies: DiffChecklistCompany[]
+  readonly: boolean
+  isDirty: boolean
+  subjectOptions: { value: string; label: string }[]
+}>()
+
+const emit = defineEmits<{
+  (e: 'add'): void
+  (e: 'delete', ids: string[]): void
+  (e: 'save'): void
+  (e: 'update', companyId: string, field: string, value: any): void
+  (e: 'import-d04'): void
+  (e: 'import-excel'): void
+  (e: 'export-excel'): void
+  (e: 'jump-d04', confirmIndex: string): void
+  (e: 'select', company: DiffChecklistCompany | null): void
+}>()
+
+const tableRef = ref()
+const selectedIds = ref<string[]>([])
+
+function handleSelectionChange(selection: DiffChecklistCompany[]) {
+  selectedIds.value = selection.map((c) => c._row_id!).filter(Boolean)
+}
+
+function handleCurrentChange(row: DiffChecklistCompany | null) {
+  emit('select', row)
+}
+
+// ─── 格式化 ──────────────────────────────────────────────────────────────────
+
+function formatAmount(val?: number): string {
+  if (val == null) return '—'
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function statusTagType(status?: string): string {
+  if (status === 'balanced') return 'success'
+  if (status === 'over_materiality') return 'danger'
+  if (status === 'diff') return 'warning'
+  return 'info'
+}
+
+function statusLabel(status?: string): string {
+  if (status === 'balanced') return '已平衡'
+  if (status === 'over_materiality') return '超重要性'
+  if (status === 'diff') return '有差异'
+  return '待调节'
+}
+
+function getRowClassName({ row }: { row: DiffChecklistCompany }) {
+  if (row.status === 'over_materiality') return 'diff-checklist-master__row--alert'
+  if (row.status === 'balanced') return 'diff-checklist-master__row--balanced'
+  return ''
+}
+</script>
+
+<style scoped>
+.diff-checklist-master__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.diff-checklist-master__toolbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.diff-checklist-master__amount {
+  font-variant-numeric: tabular-nums;
+}
+
+.diff-checklist-master__amount--alert {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+
+.diff-checklist-master__amount--diff {
+  color: var(--el-color-warning-dark-2);
+  font-weight: 500;
+}
+
+.diff-checklist-master__link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.diff-checklist-master__empty {
+  padding: 20px;
+}
+
+:deep(.diff-checklist-master__row--alert) {
+  background-color: var(--el-color-danger-light-9) !important;
+}
+
+:deep(.diff-checklist-master__row--balanced) {
+  opacity: 0.7;
+}
+</style>

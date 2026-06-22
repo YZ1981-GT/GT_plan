@@ -160,6 +160,108 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "archived",        "label": "已归档",   "color": "success"},
         {"value": "archive_failed",  "label": "归档失败", "color": "danger"},
     ],
+    # ── 函证模块枚举（D0 系列底稿共用） ──
+    "confirmation_account_type": [
+        {"value": "accounts_receivable",    "label": "应收账款",     "color": ""},
+        {"value": "contract_liability",     "label": "合同负债",     "color": ""},
+        {"value": "other_receivable",       "label": "其他应收款",   "color": ""},
+        {"value": "prepayment",             "label": "预付账款",     "color": ""},
+        {"value": "accounts_payable",       "label": "应付账款",     "color": ""},
+        {"value": "other_payable",          "label": "其他应付款",   "color": ""},
+        {"value": "short_term_loan",        "label": "短期借款",     "color": ""},
+        {"value": "long_term_loan",         "label": "长期借款",     "color": ""},
+        {"value": "bank_deposit",           "label": "银行存款",     "color": ""},
+        {"value": "time_deposit",           "label": "定期存款",     "color": ""},
+        {"value": "financial_product",      "label": "理财产品",     "color": ""},
+        {"value": "other_monetary",         "label": "其他货币资金", "color": ""},
+        {"value": "other",                  "label": "其他",         "color": "info"},
+    ],
+    "confirmation_method": [
+        {"value": "positive",  "label": "积极式", "color": ""},
+        {"value": "negative",  "label": "消极式", "color": "info"},
+    ],
+    "confirmation_reply_method": [
+        {"value": "original_mail", "label": "原件寄回", "color": ""},
+        {"value": "fax",           "label": "传真",     "color": "info"},
+        {"value": "email",         "label": "电子邮件", "color": "info"},
+        {"value": "in_person",     "label": "当面确认", "color": ""},
+    ],
+    "yes_no": [
+        {"value": "yes", "label": "是", "color": "success"},
+        {"value": "no",  "label": "否", "color": "danger"},
+    ],
+    "confirmation_match": [
+        {"value": "matched",   "label": "相符",   "color": "success"},
+        {"value": "unmatched", "label": "不符",   "color": "danger"},
+        {"value": "no_reply",  "label": "未回函", "color": "warning"},
+    ],
+    "sampling_method": [
+        {"value": "statistical",     "label": "统计抽样",   "color": ""},
+        {"value": "non_statistical", "label": "非统计抽样", "color": ""},
+        {"value": "all",             "label": "全部发函",   "color": ""},
+        {"value": "other",           "label": "其他",       "color": "info"},
+    ],
+    # ── D0-2 核实被函证单位信息 额外枚举 ──
+    "confirmation_send_result": [
+        {"value": "delivered",  "label": "送抵", "color": "success"},
+        {"value": "returned",   "label": "退回", "color": "danger"},
+    ],
+    "consistency_status": [
+        {"value": "consistent",   "label": "一致",   "color": "success"},
+        {"value": "inconsistent", "label": "不一致", "color": "danger"},
+        {"value": "pending",      "label": "待核实", "color": "warning"},
+    ],
+    # ── D0-3 跟函函证过程控制 额外枚举 ──
+    "confirmation_followup_scenario": [
+        {"value": "immediate",    "label": "现场即时确认",       "color": "success"},
+        {"value": "later_follow", "label": "无法即时确认留函",   "color": "warning"},
+    ],
+    "yes_no_na": [
+        {"value": "yes", "label": "是",     "color": "success"},
+        {"value": "no",  "label": "否",     "color": "danger"},
+        {"value": "na",  "label": "不适用", "color": "info"},
+    ],
+    # ── D0-4 函证差异调节表 额外枚举 ──
+    "confirmation_subject": [
+        {"value": "应收账款",     "label": "应收账款",     "color": ""},
+        {"value": "合同负债",     "label": "合同负债",     "color": ""},
+        {"value": "销售收入",     "label": "销售收入",     "color": ""},
+        {"value": "应收票据",     "label": "应收票据",     "color": ""},
+        {"value": "合同资产",     "label": "合同资产",     "color": ""},
+        {"value": "预付账款",     "label": "预付账款",     "color": ""},
+        {"value": "应付账款",     "label": "应付账款",     "color": ""},
+        {"value": "预收账款",     "label": "预收账款",     "color": ""},
+        {"value": "其他应收款",   "label": "其他应收款",   "color": ""},
+        {"value": "其他应付款",   "label": "其他应付款",   "color": ""},
+        {"value": "银行存款",     "label": "银行存款",     "color": ""},
+        {"value": "短期借款",     "label": "短期借款",     "color": ""},
+        {"value": "长期借款",     "label": "长期借款",     "color": ""},
+    ],
+    "confirmation_diff_type": [
+        {"value": "time",       "label": "时间性差异", "color": "info"},
+        {"value": "accounting", "label": "记账差异",   "color": "warning"},
+        {"value": "unrecorded", "label": "未达账项",   "color": "danger"},
+        {"value": "other",      "label": "其他差异",   "color": ""},
+    ],
+    # ── D0-5 合同负债及销售替代程序 额外枚举 ──
+    "sampling_selection_method": [
+        {"value": "random",        "label": "随机选样",                    "color": ""},
+        {"value": "systematic",    "label": "系统选样",                    "color": ""},
+        {"value": "mus",           "label": "货币单元抽样",                "color": ""},
+        {"value": "judgmental",    "label": "随意选样（非统计抽样适用）",   "color": "info"},
+    ],
+    # ── D0-7 回函可靠性验证 额外枚举 ──
+    "reply_reliability_conclusion": [
+        {"value": "可靠",             "label": "可靠",             "color": "success"},
+        {"value": "部分可靠需补充",   "label": "部分可靠需补充",   "color": "warning"},
+        {"value": "不可靠",           "label": "不可靠",           "color": "danger"},
+    ],
+    "reliability_identity_method": [
+        {"value": "电话确认", "label": "电话确认", "color": ""},
+        {"value": "邮件确认", "label": "邮件确认", "color": ""},
+        {"value": "见面确认", "label": "见面确认", "color": ""},
+        {"value": "系统确认", "label": "系统确认", "color": ""},
+    ],
 }
 
 

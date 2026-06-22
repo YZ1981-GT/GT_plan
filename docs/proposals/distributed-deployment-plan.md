@@ -272,7 +272,35 @@ async def get_upload_url(project_id: UUID, filename: str):
   +- config.yaml（服务器地址配置）
 ```
 
-### 5.2 前端 API 基地址注入
+### 5.2 备选方案：Pake/Tauri 极轻客户端（纯 Web 场景）
+
+> 评估日期：2026-06-21 | 状态：备选观望
+
+如果未来 PaddleOCR 完全迁移到服务器端（客户端零本地计算），可考虑用 **Pake**（[github.com/tw93/Pake](https://github.com/tw93/Pake)，53K star）替代 Electron：
+
+| 维度 | Electron 方案（当前） | Pake/Tauri 方案（备选） |
+|------|---------------------|----------------------|
+| 安装包 | ~600MB | **3-8MB** |
+| 内存占用 | ~300MB | ~50MB |
+| 启动速度 | 3-5s | <1s |
+| 本地 OCR | ✅ 支持 | ❌ 不支持 |
+| 本地 Python | ✅ 嵌入式 | ❌ 无运行时 |
+| 渲染引擎 | 自带 Chromium | 系统 WebView2/WebKit |
+| 打包命令 | electron-builder | `pake https://server/` 一行 |
+
+**切换条件（AND 关系）：**
+1. PaddleOCR + 规则引擎完全跑在服务器（客户端只是 WebView 壳）
+2. 不需要本地离线能力（或 Service Worker PWA 可替代）
+3. 所有系统级集成（文件拖拽、系统通知、自动更新）Tauri 插件已覆盖
+4. 用户接受"安装 WebView2 Runtime"的前置依赖（Win10 自带，Win7 需装）
+
+**收益：** 安装包从 600MB→5MB（降 99%），分发速度极快，用户硬盘占用忽略不计。
+
+**风险：** 系统 WebView 版本碎片化（不同 Win10 版本 WebView2 有细微差异），调试困难度高于 Electron。
+
+**决策点：** v2.0 Phase 5 验证完成后，如果确认 OCR 全服务端可行（延迟可接受、并发够用），则启动 Pake/Tauri PoC 验证。
+
+### 5.3 前端 API 基地址注入
 
 Electron main 进程启动时读 config.yaml 注入全局变量：
 
@@ -291,7 +319,7 @@ const API_BASE = (window as any).__GT_CONFIG__?.server?.api_url || '/'
 const http = axios.create({ baseURL: API_BASE, timeout: 120000 })
 ```
 
-### 5.3 本地 OCR 调用方式
+### 5.4 本地 OCR 调用方式
 
 Electron 通过 child_process 调用嵌入式 Python：
 
@@ -323,7 +351,7 @@ pipeline_result = run_rule_pipeline(text)
 print(json.dumps(pipeline_result, ensure_ascii=False))
 ```
 
-### 5.4 自动更新
+### 5.5 自动更新
 
 ```yaml
 # 更新检查端点
@@ -341,7 +369,7 @@ Response: {
   - 增量补丁：只更新变更文件（非全量 600MB 重装）
 ```
 
-### 5.5 HTTPS 证书信任（Electron 内网自签）
+### 5.6 HTTPS 证书信任（Electron 内网自签）
 
 ```javascript
 // electron/main.js
@@ -516,6 +544,30 @@ session.defaultSession.setCertificateVerifyProc((request, callback) => {
 | Windows 安全策略 | exe 被拦截 | 代码签名 + IT 白名单 |
 | 用户忘记 VPN | 出差无法使用 | 离线 OCR + 回来后自动同步 |
 | MinIO 磁盘满 | 新附件上传失败 | Prometheus 告警 80% 阈值 + 自动归档旧项目 |
+
+### 10.1 向量搜索分层降级方案
+
+> 评估日期：2026-06-21 | 备选技术：alibaba/zvec（进程内向量数据库，Apache 2.0）
+
+```
+主方案：pgvector（服务端，在线）
+  │  PG 扩展，与业务数据同库 JOIN，当前规模（万~十万文档）完全满足
+  │
+  ├─ 降级 1（离线补充，共存）：zvec 客户端本地向量搜索
+  │    触发条件：规则引擎 OCR 分类准确率 < 85% + 确认需要离线语义分类
+  │    方案：客户端嵌入 zvec（~10MB）+ 预置票据分类 embedding 库
+  │    收益：离线时 OCR 文本 → 本地向量匹配 → 语义分类（毫秒级，零网络）
+  │    与主方案关系：互补（在线走 pgvector，离线走 zvec）
+  │
+  └─ 降级 2（规模替代，互斥）：zvec 服务端独立向量存储
+       触发条件：向量数据 > 10M 条 + pgvector QPS 不足 + 可接受丢 JOIN
+       方案：知识库/底稿 embedding 迁移到 zvec 独立存储
+       收益：十亿级毫秒搜索 + DiskANN 省内存
+       代价：丢失与 PG 业务表 JOIN 能力，需应用层关联
+       与主方案关系：替代（二选一）
+```
+
+**当前决策：不引入 zvec，pgvector 满足需求。** 痛点出现时按上述条件评估切换。
 
 ## 十一、与现有系统的兼容
 

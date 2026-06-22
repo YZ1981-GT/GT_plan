@@ -655,66 +655,9 @@ class TestBatchPrefill:
 # ---------------------------------------------------------------------------
 # Task 4: 报表导出优化
 # ---------------------------------------------------------------------------
-
-
-class TestReportExportEngine:
-    """Task 4.1-4.3: 报表导出引擎"""
-
-    def test_template_cache(self):
-        """模板缓存应命中"""
-        from app.services.report_export_engine import ReportExportEngine
-
-        engine = ReportExportEngine()
-        engine.clear_cache()
-
-        # First load = miss
-        tpl1 = engine._load_template("test_template")
-        assert engine.cache_size == 1
-
-        # Second load = hit
-        tpl2 = engine._load_template("test_template")
-        assert tpl1 is tpl2
-        assert engine.cache_size == 1
-
-    def test_template_cache_clear(self):
-        """清空缓存"""
-        from app.services.report_export_engine import ReportExportEngine
-
-        engine = ReportExportEngine()
-        engine.clear_cache()
-        engine._load_template("a")
-        engine._load_template("b")
-        assert engine.cache_size == 2
-        engine.clear_cache()
-        assert engine.cache_size == 0
-
-    @pytest.mark.asyncio
-    async def test_pdf_async_export(self):
-        """异步 PDF 导出"""
-        from app.services.report_export_engine import PDFExportEngineAsync
-
-        engine = PDFExportEngineAsync()
-        result = await engine.export_async(uuid.uuid4(), "balance_sheet")
-        assert result["status"] == "success"
-        assert result["format"] == "pdf"
-
-    def test_format_validator_spec(self):
-        """格式校验器应有致同规范"""
-        from app.services.report_export_engine import ExportFormatValidator
-
-        validator = ExportFormatValidator()
-        assert validator.GT_SPEC["font_cn"] == "仿宋_GB2312"
-        assert validator.GT_SPEC["font_en"] == "Arial Narrow"
-        assert validator.GT_SPEC["margins"]["top"] == 3.0
-
-    def test_format_validator_meta_check(self):
-        """基于元数据的快速校验"""
-        from app.services.report_export_engine import ExportFormatValidator
-
-        validator = ExportFormatValidator()
-        findings = validator.validate_spec_compliance({"font_cn": "宋体"})
-        assert len(findings) == 1
-        assert findings[0]["type"] == "font"
+# 注：原 TestReportExportEngine 已随 report_export_engine.py（桩实现，
+# _load_template 仅 "Simulate"、export_word/pdf 返回伪 dict）一并移除。
+# 真实报表导出由 report_excel_exporter / note_word_exporter / pdf_export_engine 承担。
 
 
 # ---------------------------------------------------------------------------

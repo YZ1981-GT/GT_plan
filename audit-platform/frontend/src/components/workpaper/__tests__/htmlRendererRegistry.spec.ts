@@ -62,6 +62,15 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'regulatory-letter',
       'a11-bundle',
       'a15-bundle',
+      'confirmation-summary',
+      'confirmation-entity-verify',
+      'confirmation-followup',
+      'confirmation-diff-reconcile',
+      'confirmation-alternative-d05',
+      'confirmation-alternative-d06',
+      'confirmation-diff-checklist',
+      'confirmation-fraud-risk',
+      'confirmation-reliability',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
     for (const ct of expected) {

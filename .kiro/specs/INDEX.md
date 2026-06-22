@@ -2,7 +2,7 @@
 
 **最后更新**：2026-06-21  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**155**（active 0 + archived 155）+ 全局交叉索引 1  
+**Spec 总数**：**169**（active 0 + archived 169）+ 全局交叉索引 1  
 **最高迁移**：V088  
 **测试总数**：16699 collected / 0 collection errors（2026-06-19 修复）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
@@ -57,20 +57,21 @@
 
 | Spec | 状态 | 迁移 | 说明 |
 |------|------|------|------|
-| （无） | — | — | 全部 spec 已归档 |
+| （无） | — | — | 全部已归档 |
 
 ```
 _archive/
 ├── 01-phase-foundation/         24   平台地基（Phase 0~16）
 ├── 02-workpaper-cycles/         16   审计循环（11循环+5基础，548 tasks）
 ├── 03-refinement-rounds/         9   五角色轮转（R1~R9）
-├── 04-infra-architecture/       27   基础设施/全局架构
-├── 05-business-features/        36   业务专项（含ledger/wp系列）
+├── 04-infra-architecture/       29   基础设施/全局架构
+├── 05-business-features/        38   业务专项（含ledger/wp系列）
 ├── 06-engineering-governance/    6   工程治理
 ├── 07-workpaper-slimdown/       15   底稿瘦身 + 模块治理
 ├── 08-disclosure-notes/          5   附注模块
 ├── 09-consolidation-phases/      4   合并模块
-├── 10-A~S-workpaper-all-cycles-complete/ 31  A~S全循环底稿（568任务，2026-06-19完成）
+├── 10-A~S-workpaper-all-cycles-complete/ 13  A~S全循环底稿（568任务，2026-06-19完成）
+├── 11-confirmation-d0-module/   10   D0函证模块（283任务，2026-06-22完成）
 └── 99-superseded/                4   已被取代
 ```
 

@@ -15,8 +15,10 @@ from starlette.responses import Response
 # 跳过包装的路径前缀
 _SKIP_PATHS = ("/docs", "/redoc", "/openapi.json", "/wopi/", "/api/events/", "/api/message/stream", "/livez", "/readyz")
 
-# OnlyOffice callback 路径包含 "onlyoffice/callback"，需精确跳过
-_SKIP_CONTAINS = ("onlyoffice/callback",)
+# OnlyOffice callback 路径需精确跳过（OnlyOffice 协议要求原始 {"error": 0} 顶层格式，
+# 不能被 ApiResponse 信封包装）。底稿编辑端点路由为 ".../onlyoffice-callback"（连字符），
+# 交付中心旧端点为 ".../onlyoffice/callback"（斜杠），两种写法都需覆盖。
+_SKIP_CONTAINS = ("onlyoffice/callback", "onlyoffice-callback")
 
 
 class ResponseWrapperMiddleware(BaseHTTPMiddleware):

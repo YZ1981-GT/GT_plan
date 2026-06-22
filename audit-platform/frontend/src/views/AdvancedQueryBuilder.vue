@@ -266,6 +266,25 @@
               show-overflow-tooltip
               min-width="140"
             />
+            <!-- P2-6: 公式引用列——当 formula_refs 有非 null 值时显示，支持一键复制到公式编辑器 -->
+            <el-table-column
+              v-if="hasFormulaRefs"
+              label="公式引用"
+              width="200"
+              fixed="right"
+            >
+              <template #default="{ $index }">
+                <span
+                  v-if="result!.formula_refs?.[$index]"
+                  class="gt-aqb-formula-ref"
+                  @click="copyFormulaRef($index)"
+                  title="点击复制公式引用"
+                >
+                  {{ result!.formula_refs![$index] }}
+                  <el-icon style="margin-left:4px;vertical-align:middle"><DocumentCopy /></el-icon>
+                </span>
+              </template>
+            </el-table-column>
           </el-table>
           <div v-else-if="result" class="gt-aqb-empty">查询返回 0 行</div>
           <div v-else class="gt-aqb-empty">尚未执行查询</div>
@@ -278,6 +297,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { DocumentCopy } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
@@ -319,6 +339,7 @@ interface QueryResult {
   total: number
   table: string
   sql: string
+  formula_refs?: (string | null)[]
 }
 
 const schema = ref<Schema | null>(null)
@@ -584,6 +605,24 @@ async function doExport() {
     loadingExport.value = false
   }
 }
+
+// ─── P2-6: 公式引用支持（查询结果 → 结构化引用桥接） ─────────────────────────
+
+/** 当前结果中是否有可用的 formula_refs（至少一个非 null） */
+const hasFormulaRefs = computed(() => {
+  return result.value?.formula_refs?.some(r => r != null) ?? false
+})
+
+/** 一键复制公式引用到剪贴板 */
+function copyFormulaRef(index: number) {
+  const ref = result.value?.formula_refs?.[index]
+  if (!ref) return
+  navigator.clipboard.writeText(ref).then(() => {
+    ElMessage.success(`已复制: ${ref}`)
+  }).catch(() => {
+    ElMessage.warning('复制失败，请手动复制')
+  })
+}
 </script>
 
 <style scoped>
@@ -698,5 +737,19 @@ async function doExport() {
   color: #666;
   font-weight: normal;
   margin-left: 8px;
+}
+.gt-aqb-formula-ref {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 11px;
+  color: var(--gt-color-primary, #5b3aa8);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #f3eef8;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.gt-aqb-formula-ref:hover {
+  background: #e8ddf4;
 }
 </style>

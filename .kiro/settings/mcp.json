@@ -58,7 +58,8 @@
         "browser_hover",
         "browser_file_upload",
         "browser_fill_form",
-        "browser_network_request"
+        "browser_network_request",
+        "browser_run_code_unsafe"
       ]
     }
   }

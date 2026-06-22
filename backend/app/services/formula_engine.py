@@ -1189,23 +1189,12 @@ class FormulaEngine:
 
     旧路由 formula.py 需要一个带 redis_client 的类实例，
     提供 execute/list_all_functions/register_custom_function 等方法。
-    """
 
-    # 内置函数列表
-    _BUILTIN_FUNCTIONS = [
-        {"name": "TB", "description": "取科目余额", "syntax": "TB('科目编码','列名')", "category": "取数"},
-        {"name": "SUM_TB", "description": "范围科目求和", "syntax": "SUM_TB('起始~结束','列名')", "category": "取数"},
-        {"name": "ROW", "description": "引用其他行次", "syntax": "ROW('行次编码')", "category": "引用"},
-        {"name": "SUM_ROW", "description": "范围行次求和", "syntax": "SUM_ROW('起始','结束')", "category": "引用"},
-        {"name": "PREV", "description": "上年同期值", "syntax": "PREV('科目编码','列名')", "category": "取数"},
-        {"name": "REPORT", "description": "跨报表引用", "syntax": "REPORT('行次编码','期间')", "category": "引用"},
-        {"name": "AUX", "description": "辅助核算取值", "syntax": "AUX('科目','维度','列名')", "category": "取数"},
-        {"name": "ABS", "description": "绝对值", "syntax": "ABS(值)", "category": "数学"},
-        {"name": "ROUND", "description": "四舍五入", "syntax": "ROUND(值, 位数)", "category": "数学"},
-        {"name": "MAX", "description": "最大值", "syntax": "MAX(值1, 值2)", "category": "数学"},
-        {"name": "MIN", "description": "最小值", "syntax": "MIN(值1, 值2)", "category": "数学"},
-        {"name": "IF", "description": "条件判断", "syntax": "IF(条件, 真值, 假值)", "category": "逻辑"},
-    ]
+    注：函数清单的**单一权威来源**是模块级 ``_REGISTRY``（FunctionRegistry）。
+    本类不再维护独立的内置函数静态表，``list_all_functions`` 与冲突校验均从
+    ``_REGISTRY`` 派生，避免清单漂移（此前 _BUILTIN_FUNCTIONS 缺 NOTE/WP，
+    导致用户可注册自定义函数覆盖内置 NOTE/WP）。
+    """
 
     def __init__(self, redis_client=None):
         self.redis = redis_client
@@ -1223,8 +1212,8 @@ class FormulaEngine:
         """注册自定义函数（底层委托 FunctionRegistry.register，Task 4）。"""
         if not name or not name.strip():
             raise ValueError("函数名不能为空")
-        # 检查是否与内置函数冲突
-        builtin_names = {f["name"] for f in self._BUILTIN_FUNCTIONS}
+        # 检查是否与内置函数冲突（权威来源 = _REGISTRY，含 NOTE/WP/AUX 等全部内置）
+        builtin_names = _REGISTRY.known_function_names() - set(self._custom_functions.keys())
         if name in builtin_names:
             raise ValueError(f"内置函数 {name} 不可覆盖")
         # 校验表达式

@@ -28,19 +28,9 @@ inclusion: always
 
 ## 使用模式
 
-```powershell
-# 在 executePwsh 中确保 PATH 包含 rtk
-$env:PATH = "$env:USERPROFILE\.local\bin;$env:PATH"
-
-# 然后正常使用
-rtk git status
-rtk python -m pytest tests/ -v --tb=short
-rtk npx vitest run src/utils/__tests__/wpFormulaPicker.spec.ts
-```
+直接在命令前加 `rtk` 前缀即可。rtk 已在 PATH（`$env:USERPROFILE\.local\bin`）。
 
 ## 注意事项
 
-- Windows 原生环境无 hook 自动重写，必须手动加前缀
-- rtk 对全 pass 测试输出压缩有限（正确行为——信息已够精简）
-- rtk 对失败测试输出压缩显著（只保留失败项 + 摘要）
-- 如果 rtk 命令失败或行为异常，去掉前缀回退到原始命令即可
+- rtk 对失败输出压缩效果好（只保留失败项+摘要），全 pass 压缩有限
+- 行为异常时去掉前缀回退原始命令

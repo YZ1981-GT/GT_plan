@@ -20,6 +20,7 @@ import logging
 import os
 import time
 from decimal import Decimal
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -27,9 +28,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.audit_platform_models import Materiality
+from app.models.audit_platform_models import Adjustment, Materiality
 from app.services.field_override_service import FieldOverrideService
-from app.services.wp_adjustment_helpers import count_adjustments, count_adjustments_with_pending
 
 _logger = logging.getLogger(__name__)
 
@@ -131,6 +131,8 @@ class ProcedureTableService:
         business_category: str = "C",
     ) -> dict[str, Any]:
         """返回完整程序表数据（模板 + 自动值 + 用户覆盖）"""
+        import asyncio
+
         template = get_template(table_code)
         if template is None:
             # 无程序表模板（如 docx 文档控制表 B5，或自定义底稿）→ 优雅降级为空表，
@@ -147,13 +149,19 @@ class ProcedureTableService:
         scope = f"procedure_table:{table_code}"
         overrides = await self.override_svc.get_batch(project_id, year, scope)
 
+        # 并行解析所有 item 的自动值（程序表通常 5~25 步，并行可减少 DB 往返等待）
+        auto_tasks = [
+            self._resolve_auto_values(project_id, year, item, business_category)
+            for item in template["items"]
+        ]
+        auto_results = await asyncio.gather(*auto_tasks, return_exceptions=True)
+
         items = []
-        for item in template["items"]:
+        for item, auto_values in zip(template["items"], auto_results):
             item_key = str(item["seq"])
-            # 自动填充
-            auto_values = await self._resolve_auto_values(
-                project_id, year, item, business_category
-            )
+            # gather 异常降级为空 auto_values
+            if isinstance(auto_values, BaseException):
+                auto_values = {"applicable": self._check_applicable(item, business_category), "executor": None, "summary": None}
             # 合并覆盖
             user_override = overrides.get(item_key, {})
             merged = FieldOverrideService.merge(auto_values, user_override)
@@ -170,7 +178,6 @@ class ProcedureTableService:
         return {
             "table_code": table_code,
             "table_name": template["name"],
-            "applicable_when": template.get("applicable_when"),
             "items": items,
         }
 
@@ -181,7 +188,7 @@ class ProcedureTableService:
         item: dict[str, Any],
         business_category: str,
     ) -> dict[str, Any]:
-        """按 auto_data_source 解析自动值——统一委派到 auto_data_resolvers registry"""
+        """按 auto_data_source 解析自动值"""
         source = item.get("auto_data_source")
         result: dict[str, Any] = {
             "applicable": self._check_applicable(item, business_category),
@@ -192,23 +199,42 @@ class ProcedureTableService:
         if not source:
             return result
 
-        # 统一走注册式 resolver（含异常捕获+可观测性）
-        from app.services.auto_data_resolvers import resolve_auto_data_source
-
-        resolved = await resolve_auto_data_source(
-            self.db, project_id, year, source,
-        )
-        if resolved is not None:
-            result["summary"] = resolved.get("summary")
-            if resolved.get("_error"):
-                result["_error"] = True
-                # resolver 内部查询失败可能导致事务 aborted → rollback 恢复
+        try:
+            if source == "adjustment_count_aje":
+                count, pending, amount = await self._count_adjustments_with_pending(project_id, year, "aje")
+                if count == 0:
+                    result["summary"] = "无"
+                elif pending > 0:
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（⚠️{pending}笔待审）"
+                else:
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
+            elif source == "adjustment_count_rje":
+                count, pending, amount = await self._count_adjustments_with_pending(project_id, year, "rje")
+                if count == 0:
+                    result["summary"] = "无"
+                elif pending > 0:
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（⚠️{pending}笔待审）"
+                else:
+                    result["summary"] = f"共{count}笔 ¥{amount:,.0f}（全部已批）"
+            elif source == "control_deficiency_count":
                 try:
-                    await self.db.rollback()
-                except Exception:
-                    pass
-        else:
-            _logger.debug("auto_data_source '%s' 未注册，跳过", source)
+                    from app.models.issue_ticket_models import IssueTicket
+                    deficiency_stmt = sa.select(sa.func.count()).select_from(IssueTicket).where(
+                        IssueTicket.project_id == project_id,
+                        IssueTicket.category == "internal_control",
+                        IssueTicket.is_deleted == sa.false(),
+                    )
+                    def_r = await self.db.execute(deficiency_stmt)
+                    def_count = def_r.scalar() or 0
+                    result["summary"] = f"已识别{def_count}项内控缺陷" if def_count else "暂无已识别缺陷"
+                except Exception as inner_e:
+                    _logger.error("auto_data_source %s inner error: %s", source, inner_e)
+                    result["summary"] = "见内控缺陷汇总"
+            else:
+                # 未实现的 data_source 保留空
+                _logger.debug("auto_data_source '%s' 未实现，跳过", source)
+        except Exception as e:
+            _logger.error("auto_data_source '%s' failed [project=%s year=%s]: %s", source, project_id, year, e, exc_info=True)
 
         return result
 
@@ -224,6 +250,63 @@ class ProcedureTableService:
         if prefix in categories:
             return item.get("applicable_default", "yes")
         return "na"
+
+    async def _count_adjustments(self, project_id: UUID, year: int, adj_type: str) -> int:
+        """按类型统计调整分录数"""
+        if adj_type == "passed":
+            # 未更正错报：review_status 枚举无 'passed' 值（draft/pending_review/
+            # approved/rejected）。"未更正"的语义标记是 V078 的 passed_reason 列
+            # （管理层不予更正原因）非空 → 该调整被 Passed（不予更正）。
+            stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+                Adjustment.project_id == project_id,
+                Adjustment.year == year,
+                Adjustment.passed_reason.isnot(None),
+                Adjustment.is_deleted == sa.false(),
+            )
+        else:
+            stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+                Adjustment.project_id == project_id,
+                Adjustment.year == year,
+                Adjustment.adjustment_type == adj_type,
+                Adjustment.is_deleted == sa.false(),
+            )
+        result = await self.db.execute(stmt)
+        return result.scalar() or 0
+
+    async def _count_adjustments_with_pending(
+        self, project_id: UUID, year: int, adj_type: str
+    ) -> tuple[int, int, float]:
+        """按类型统计调整分录数，同时返回待审批数 + 借方总金额（万元）"""
+        from app.models.audit_platform_models import AdjustmentEntry
+        total_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_type == adj_type,
+            Adjustment.is_deleted == sa.false(),
+        )
+        pending_stmt = sa.select(sa.func.count()).select_from(Adjustment).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_type == adj_type,
+            Adjustment.review_status != "approved",
+            Adjustment.passed_reason.is_(None),
+            Adjustment.is_deleted == sa.false(),
+        )
+        # 借方合计金额（衡量调整影响规模）
+        amount_stmt = sa.select(
+            sa.func.coalesce(sa.func.sum(AdjustmentEntry.debit_amount), 0)
+        ).join(
+            Adjustment, AdjustmentEntry.adjustment_id == Adjustment.id
+        ).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_type == adj_type,
+            Adjustment.is_deleted == sa.false(),
+        )
+        total_r = await self.db.execute(total_stmt)
+        pending_r = await self.db.execute(pending_stmt)
+        amount_r = await self.db.execute(amount_stmt)
+        return (total_r.scalar() or 0, pending_r.scalar() or 0, float(amount_r.scalar() or 0))
 
     async def _get_materiality(self, project_id: UUID) -> Decimal:
         stmt = sa.select(Materiality.overall_materiality).where(
