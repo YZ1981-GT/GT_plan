@@ -74,6 +74,8 @@ inclusion: always
 - **✅ Guidance 面板按 sheet 联动(2026-06-22)**：后端 guidance 端点加 `sheet_code` 可选参数(优先按子码查 JSON,fallback 回父码)+前端 store `WpContext.sheetCode`+`WpGuidancePanel` watch sheetCode+`WorkpaperEditor` 监听 `@sheet-change` 提取子码传递。切 tab 时右侧编制指导面板显示对应 sheet 的专属内容
 - **🔴 公式管理可编辑(待 spec)**：当前 D0-1「fx 公式」弹窗是只读展示(硬编码规则)。需：①公式规则数据模型(per-wp_code/per-sheet) ②与 formula_engine.py 对接 ③前端弹窗支持编辑/新增/删除规则行 ④持久化(field_overrides 或独立表)
 - D0 函证 Playwright E2E 实测 + 跨底稿引用 API 真实接入
+- **D0 函证统一性治理**：①抽取 `useConfirmationExcelIO` 通用 composable（消除 400+ 行重复）②统一 defineExpose 方法名为 exportTemplate/exportData/importExcel ③补齐 D0-1 导出模板+AI预填 ④导入增加预览确认弹窗
+- **LLM 接入路线**：Phase1=纯规则(当前) → Phase2=COUNTERMEASURE_PRESETS 静态库 → Phase3=POST /ai-generate 接 vLLM → Phase4=跨底稿上下文注入
 - D2 聚合 12 空白 tab（9 a-program-console 无模板 + 3 audit-sheet 名不匹配）
 - A 循环 docx 弹窗（30 个待加 WpPopupDocxEditor）
 - **✅ 导出模板 401 修复(2026-06-22)**：`GtWpRenderer.onExportTemplate` 从 `window.open`(无 auth)改为 `http.get(responseType:'blob')`+Blob 下载（带 token）。通用修复所有底稿导出都受益

@@ -55,7 +55,15 @@
       <el-table-column label="序号" prop="seq" width="55" align="center" fixed="left" />
       <el-table-column label="函证索引号" prop="confirm_index" width="110" fixed="left">
         <template #default="{ row }">
-          <span class="reliability-grid__link" @click="$emit('jump-d01', row.confirm_index)">
+          <template v-if="!readonly">
+            <el-input
+              :model-value="row.confirm_index"
+              size="small"
+              placeholder="D0-"
+              @change="(val: string) => $emit('update', row._row_id, 'confirm_index', val)"
+            />
+          </template>
+          <span v-else class="reliability-grid__link" @click="$emit('jump-d01', row.confirm_index)">
             {{ row.confirm_index || '—' }}
           </span>
         </template>
@@ -73,8 +81,20 @@
       </el-table-column>
       <el-table-column label="回函方式" prop="reply_method" width="100" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.reply_method" size="small" type="info">{{ row.reply_method }}</el-tag>
-          <span v-else>—</span>
+          <el-select
+            v-if="!readonly"
+            :model-value="row.reply_method"
+            size="small"
+            placeholder="选择"
+            @change="(val: string) => $emit('update', row._row_id, 'reply_method', val)"
+          >
+            <el-option value="传真" label="传真" />
+            <el-option value="电子邮件" label="电子邮件" />
+          </el-select>
+          <template v-else>
+            <el-tag v-if="row.reply_method" size="small" type="info">{{ row.reply_method }}</el-tag>
+            <span v-else>—</span>
+          </template>
         </template>
       </el-table-column>
       <el-table-column label="回函日期" prop="reply_date" width="100" align="center">
@@ -461,5 +481,18 @@ function conclusionTagType(status: string): string {
 
 :deep(.reliability-grid__row--warning) {
   background-color: var(--el-color-warning-light-9) !important;
+}
+
+/* 表头折行显示（列名过长时换行而非截断） */
+:deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 12px;
+  padding: 4px 2px;
+}
+
+:deep(.el-table__body td .cell) {
+  font-size: 12px;
 }
 </style>

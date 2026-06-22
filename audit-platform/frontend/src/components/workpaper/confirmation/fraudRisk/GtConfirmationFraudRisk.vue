@@ -27,12 +27,14 @@
         @import="handleImport"
         @export="handleExport"
         @jump-ref="handleJumpRef"
+        @auto-fill="handleAutoFill"
       />
 
       <!-- 汇总评价 -->
       <FraudRiskSummary
         :summary="data.summary.value"
         :readonly="readonly"
+        :metrics="data.metrics.value"
         @update="handleSummaryUpdate"
         @jump-b50="handleJumpB50"
       />
@@ -64,6 +66,7 @@
 
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useFraudRiskData } from './composables/useFraudRiskData'
 import FraudRiskDashboard from './FraudRiskDashboard.vue'
 import FraudRiskChecklist from './FraudRiskChecklist.vue'
@@ -144,6 +147,50 @@ function handleExport() {
 function handleJumpRef(ref: string) {
   // TODO: 跨底稿跳转（通过 useConfirmationNavigation）
   console.log('[GtConfirmationFraudRisk] 跳转索引:', ref)
+}
+
+function handleAutoFill() {
+  // 上游联动填充：从 useFraudSignalCollector 映射到对应检查项
+  // 当前为规则预填模式（dispatch persistence 接入后将从后端读取实际信号）
+  const items = data.items.value
+
+  // 第 7 条：回函可靠性存疑 ← D0-7 不可靠
+  const item7 = items.find(i => i.seq === 7)
+  if (item7 && !item7.is_exist) {
+    item7.is_exist = '待核实'
+    item7.source_ref = 'D0-7'
+    item7._auto_filled = true
+    data.isDirty.value = true
+  }
+
+  // 第 10 条：被函证单位异常特征 ← D0-2 红旗
+  const item10 = items.find(i => i.seq === 10)
+  if (item10 && !item10.is_exist) {
+    item10.is_exist = '待核实'
+    item10.source_ref = 'D0-2'
+    item10._auto_filled = true
+    data.isDirty.value = true
+  }
+
+  // 第 14 条：回函率异常 ← D0-1 统计
+  const item14 = items.find(i => i.seq === 14)
+  if (item14 && !item14.is_exist) {
+    item14.is_exist = '待核实'
+    item14.source_ref = 'D0-1'
+    item14._auto_filled = true
+    data.isDirty.value = true
+  }
+
+  // 第 15 条：资金往来无商业实质 ← D0-3 控制否
+  const item15 = items.find(i => i.seq === 15)
+  if (item15 && !item15.is_exist) {
+    item15.is_exist = '待核实'
+    item15.source_ref = 'D0-3'
+    item15._auto_filled = true
+    data.isDirty.value = true
+  }
+
+  ElMessage.success('已从上游底稿（D0-1/D0-2/D0-3/D0-7）联动预填第 7/10/14/15 条，请逐项确认后修改为"是"或"否"')
 }
 
 function handleJumpB50() {

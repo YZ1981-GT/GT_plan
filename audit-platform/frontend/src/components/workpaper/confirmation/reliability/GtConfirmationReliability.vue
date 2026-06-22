@@ -38,6 +38,12 @@
         :audit-note="data.auditNote.value"
         :conclusion="data.conclusion.value"
         :readonly="readonly"
+        :total-count="data.metrics.value.total_count"
+        :verified-count="data.metrics.value.verified_count"
+        :reliable-count="data.metrics.value.reliable_count"
+        :partial-count="data.metrics.value.partial_count"
+        :unreliable-count="data.metrics.value.unreliable_count"
+        :original-returned-count="data.metrics.value.original_returned_count"
         @update-note="handleAuditNoteUpdate"
         @update-conclusion="handleConclusionUpdate"
       />

@@ -1,6 +1,18 @@
 <template>
   <div class="fraud-risk-summary">
-    <h4 class="fraud-risk-summary__title">舞弊风险汇总评价</h4>
+    <div class="fraud-risk-summary__header">
+      <h4 class="fraud-risk-summary__title">舞弊风险汇总评价</h4>
+      <el-button
+        v-if="!readonly"
+        type="primary"
+        size="small"
+        plain
+        :loading="aiLoading"
+        @click="handleAiFill"
+      >
+        AI 智能填充
+      </el-button>
+    </div>
 
     <!-- 财务报表层次 -->
     <div class="fraud-risk-summary__section">
@@ -63,17 +75,71 @@
 </template>
 
 <script setup lang="ts">
-import type { FraudRiskSummary } from './fraudRiskTypes'
+import { ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { FraudRiskSummary, FraudRiskMetrics } from './fraudRiskTypes'
 
-defineProps<{
+const props = defineProps<{
   summary: FraudRiskSummary
   readonly: boolean
+  /** 从父组件传入的看板指标 */
+  metrics?: FraudRiskMetrics
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update', field: string, value: string): void
   (e: 'jump-b50'): void
 }>()
+
+const aiLoading = ref(false)
+
+function handleAiFill() {
+  aiLoading.value = true
+  try {
+    const m = props.metrics
+    const total = m?.total_count ?? 0
+    const existCount = m?.exist_count ?? 0
+    const withMeasure = m?.with_measure_count ?? 0
+    const withoutMeasure = m?.without_measure_count ?? 0
+
+    // 财务报表层次
+    let statementRisk = ''
+    if (existCount === 0) {
+      statementRisk = '经对函证程序全过程中的 19 项舞弊风险迹象逐项评估，未发现与财务报表层次舞弊相关的风险因素。管理层未表现出凌驾内部控制之上的迹象，函证程序执行过程中未受到不当干预。'
+    } else if (existCount <= 3) {
+      statementRisk = `经评估，共识别 ${existCount} 项舞弊风险迹象。目前尚未发现系统性的财务报表层次舞弊风险，已识别的迹象主要集中于个别交易或认定层次，需通过追加实质性程序予以应对。`
+    } else {
+      statementRisk = `经评估，共识别 ${existCount} 项舞弊风险迹象，数量较多。需警惕是否存在财务报表层次的系统性舞弊风险（如管理层串通、内控整体失效）。建议与合伙人沟通并考虑修改整体审计策略。`
+    }
+
+    // 认定层次
+    let assertionRisk = ''
+    if (existCount === 0) {
+      assertionRisk = '函证程序未揭示认定层次的舞弊风险。收入确认、应收/应付款项的存在性和完整性认定未发现异常。'
+    } else {
+      assertionRisk = `已识别的 ${existCount} 项风险迹象可能影响以下认定：收入确认的发生认定（虚构交易风险）、应收账款的存在性认定（虚假客户/空转贸易）。已对 ${withMeasure} 项制定了应对措施。`
+    }
+
+    // 初步应对
+    let response = ''
+    if (existCount === 0) {
+      response = '维持原有审计计划和样本量，无需追加程序。'
+    } else if (withoutMeasure > 0) {
+      response = `尚有 ${withoutMeasure} 项已识别风险未制定应对措施，请补充完善。初步建议：扩大函证范围或追加替代程序、与治理层/管理层沟通已识别的风险迹象、评估是否需要修改审计报告意见类型。`
+    } else {
+      response = `已对全部 ${existCount} 项风险迹象制定应对措施。主要措施包括：扩大检查范围、追加实质性分析程序、与管理层沟通确认相关事项。建议将评价结果同步更新至 B50 风险评估底稿。`
+    }
+
+    // 仅填充空白字段
+    if (!props.summary.statement_level_risk) emit('update', 'statement_level_risk', statementRisk)
+    if (!props.summary.assertion_level_risk) emit('update', 'assertion_level_risk', assertionRisk)
+    if (!props.summary.initial_response) emit('update', 'initial_response', response)
+
+    ElMessage.success('已根据检查清单统计数据生成汇总评价（仅供参考，请根据实际情况修改）')
+  } finally {
+    aiLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -85,9 +151,16 @@ defineEmits<{
 }
 
 .fraud-risk-summary__title {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 15px;
   font-weight: 600;
+}
+
+.fraud-risk-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
 }
 
 .fraud-risk-summary__section {

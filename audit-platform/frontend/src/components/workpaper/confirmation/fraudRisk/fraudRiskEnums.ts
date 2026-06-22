@@ -8,6 +8,7 @@
 export const FRAUD_RISK_EXIST_OPTIONS = [
   { value: '是', label: '是' },
   { value: '否', label: '否' },
+  { value: '待核实', label: '待核实' },
   { value: 'NA', label: 'N/A' },
 ] as const
 

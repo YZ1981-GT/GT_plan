@@ -31,8 +31,8 @@ export interface FraudRiskRow {
   seq: number
   /** 风险迹象描述（预置条目可编辑适配，自定义条目自由填写） */
   description: string
-  /** 是否存在该风险迹象（是/否/NA） */
-  is_exist?: '是' | '否' | 'NA' | ''
+  /** 是否存在该风险迹象（是/否/NA/待核实） */
+  is_exist?: '是' | '否' | 'NA' | '待核实' | ''
   /** 相关索引号（交叉引用，可跳转） */
   source_ref?: string
   /** 应对措施 */
@@ -43,6 +43,8 @@ export interface FraudRiskRow {
   tooltip_key?: string
   /** 数据来源标识 */
   _source?: 'preset' | 'manual' | 'auto'
+  /** 是否由上游联动自动填充 */
+  _auto_filled?: boolean
 }
 
 // ─── 汇总评价 ────────────────────────────────────────────────────────────────
