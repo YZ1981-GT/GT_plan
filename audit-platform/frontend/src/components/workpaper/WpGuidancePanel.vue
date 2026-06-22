@@ -36,6 +36,7 @@ const props = defineProps<{
   componentType: string
   projectId: string
   year: number
+  sheetCode?: string  // 多 sheet 底稿当前 sheet 子码
 }>()
 
 // ─── Store ──────────────────────────────────────────────────────────────────
@@ -76,17 +77,18 @@ function syncContext() {
     componentType: props.componentType,
     projectId: props.projectId,
     year: props.year,
+    sheetCode: props.sheetCode,
   }
   store.setWpContext(ctx)
-  // 如果没有缓存数据，发起请求
+  // 如果没有缓存数据 或 sheetCode 变了，发起请求
   if (!store.guidanceData) {
     store.fetchGuidance()
   }
 }
 
-// 监听 props 变化（底稿切换）
+// 监听 props 变化（底稿切换 或 sheet 切换）
 watch(
-  () => props.wpId,
+  () => [props.wpId, props.sheetCode],
   () => {
     panelError.value = null // 切换底稿时清除错误
     syncContext()
@@ -227,6 +229,7 @@ export default {
   border-left: 1px solid var(--gt-border-light, #d8b8ee);
   overflow: hidden;
   flex-shrink: 0;
+  min-width: 320px;
 }
 
 .gt-guidance-panel__header {
@@ -270,11 +273,13 @@ export default {
 .gt-guidance-panel__tabs :deep(.el-tabs__content) {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  overflow-x: hidden;
+  padding: 12px 14px;
 }
 
 .gt-guidance-panel__tabs :deep(.el-tab-pane) {
-  height: 100%;
+  height: auto;
+  min-height: 0;
 }
 
 .gt-guidance-panel__tabs :deep(#pane-ai) {

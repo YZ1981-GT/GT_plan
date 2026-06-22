@@ -158,7 +158,8 @@ const customGuidance = computed(() => {
           :title="section.title"
         >
           <div :id="`gt-guidance-section-${idx}`" class="gt-guidance-section">
-            <ol v-if="section.items.length" class="gt-guidance-section__list">
+            <!-- 多条列表项 -->
+            <ol v-if="section.items.length > 1" class="gt-guidance-section__list">
               <li
                 v-for="(item, itemIdx) in section.items"
                 :key="itemIdx"
@@ -166,6 +167,12 @@ const customGuidance = computed(() => {
                 v-html="renderTextWithWpCodes(item)"
               />
             </ol>
+            <!-- 单条内容直接段落显示（不用列表） -->
+            <p
+              v-else-if="section.items.length === 1"
+              class="gt-guidance-section__paragraph"
+              v-html="renderTextWithWpCodes(section.items[0])"
+            />
           </div>
         </el-collapse-item>
       </el-collapse>
@@ -357,22 +364,38 @@ const customGuidance = computed(() => {
   font-weight: 600;
   color: var(--gt-primary, #4b2d77);
   border-bottom: none;
-  height: 36px;
-  line-height: 36px;
+  height: 32px;
+  line-height: 32px;
+  padding-left: 0;
 }
 
 .gt-guidance-tab__collapse :deep(.el-collapse-item__wrap) {
   border-bottom: none;
+  padding-bottom: 4px;
+}
+
+.gt-guidance-tab__collapse :deep(.el-collapse-item__content) {
+  padding-bottom: 8px;
 }
 
 .gt-guidance-section__list {
   margin: 0;
-  padding-left: 20px;
+  padding-left: 18px;
 }
 
 .gt-guidance-section__item {
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: #333;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.gt-guidance-section__paragraph {
+  margin: 0;
+  color: #333;
+  line-height: 1.8;
+  word-break: break-word;
+  font-size: 13px;
 }
 
 .gt-guidance-section__item--more {
@@ -385,12 +408,17 @@ const customGuidance = computed(() => {
 /* Raw text */
 .gt-guidance-tab__raw {
   white-space: pre-wrap;
+  word-break: break-word;
   color: #333;
+  line-height: 1.8;
+  font-size: 13px;
+  padding: 8px 0;
 }
 
 .gt-guidance-tab__raw--medium {
   color: #666;
   font-size: 12px;
+  line-height: 1.7;
 }
 
 /* wp_code chip styling */

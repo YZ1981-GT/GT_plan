@@ -25,14 +25,15 @@
       size="small"
       :show-header="rows.length > 0"
       max-height="240"
-      :empty-text="readonly ? '无明细' : '点击"新增行"添加未达明细'"
+      table-layout="auto"
+      :empty-text="readonly ? '无明细' : '点击【新增行】添加未达明细'"
       class="detail-sub-table__grid"
     >
-      <el-table-column label="序号" width="50" align="center">
+      <el-table-column label="序号" min-width="40" align="center">
         <template #default="{ $index }">{{ $index + 1 }}</template>
       </el-table-column>
 
-      <el-table-column label="日期1" width="120">
+      <el-table-column :label="dateLabel" min-width="100">
         <template #default="{ row }">
           <el-date-picker
             v-if="!readonly"
@@ -48,7 +49,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="日期2" width="120">
+      <el-table-column :label="descLabel" min-width="100">
         <template #default="{ row }">
           <el-date-picker
             v-if="!readonly"
@@ -64,7 +65,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="凭证号" width="110">
+      <el-table-column label="凭证号" min-width="90">
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -90,7 +91,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="金额" width="120" align="right">
+      <el-table-column label="金额" min-width="90" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!readonly"
@@ -105,7 +106,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="索引号" width="100">
+      <el-table-column label="索引号" min-width="80">
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -118,7 +119,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="是否调整" width="80" align="center">
+      <el-table-column label="是否调整" min-width="70" align="center">
         <template #default="{ row }">
           <el-switch
             v-if="!readonly"
@@ -133,7 +134,7 @@
       </el-table-column>
 
       <!-- 操作列 -->
-      <el-table-column v-if="!readonly" label="" width="50" align="center" fixed="right">
+      <el-table-column v-if="!readonly" label="" width="40" align="center">
         <template #default="{ row }">
           <el-button
             size="small"
@@ -171,6 +172,19 @@ defineEmits<{
   (e: 'delete-row', rowId: string): void
   (e: 'update-row', rowId: string, field: string, value: any): void
 }>()
+
+// 根据 section 类型动态生成列标签（匹配模板格式）
+const dateLabel = computed(() => {
+  if (props.section === 'b' || props.section === 'f') return '货物验收日期'
+  return '付款/收款日期'
+})
+
+const descLabel = computed(() => {
+  if (props.section === 'b') return '确认应收减少日期'
+  if (props.section === 'c') return '确认应付减少日期'
+  if (props.section === 'f') return '确认应收增加日期'
+  return '确认应付增加日期'
+})
 
 function formatAmount(val?: number): string {
   if (val == null) return '—'

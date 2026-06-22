@@ -91,7 +91,7 @@ const htmlDataRef = computed(() => props.htmlData)
 const isNewFormat = computed(() => {
   // 新格式或空数据都走新组件
   const d = props.htmlData
-  return !d || d._format === 'fraud-risk-d08-v1' || Object.keys(d).length === 0
+  return !d || !!d._format || Object.keys(d).length === 0
 })
 
 // ─── 数据核心 ────────────────────────────────────────────────────────────────

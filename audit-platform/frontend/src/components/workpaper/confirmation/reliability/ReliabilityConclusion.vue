@@ -22,7 +22,7 @@
             type="textarea"
             :rows="3"
             :disabled="readonly"
-            placeholder="对被评定为"不可靠"的回函，说明原因及后续处理（替代程序/追加证据/调整建议）"
+            placeholder="对被评定为不可靠的回函，说明原因及后续处理（替代程序/追加证据/调整建议）"
             @input="(val: string) => $emit('update-note', 'note_unreliable', val)"
           />
         </el-form-item>

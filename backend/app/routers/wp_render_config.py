@@ -49,6 +49,49 @@ router = APIRouter(
 # ─── Singleton schema service (stateless + cache) ────────────────────────────
 _schema_service = WpRenderSchemaService()
 
+# sheet 名尾部的 sheet 级编码提取（如「合同负债及销售替代程序D0-5」→「D0-5」、
+# 「审定表D2-1」→「D2-1」、「应收票据审计程序表D1A」→「D1A」）。
+# 用于多 sheet 底稿按 sheet 级编码查 _WP_CODE_OVERRIDE（协作者 confirmation-* 精细组件）。
+_SHEET_CODE_RE = re.compile(r"([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$")
+
+# 协作者 D0 函证精细组件（纯前端 componentType，无后端 renderer）。
+# 这些不在 _ONLYOFFICE_HTML_WHITELIST 但必须保留(不被重写成 onlyoffice-sheet)，
+# 由前端 htmlRendererRegistry 渲染；后端从模板提取 grid 供其消费。
+_CONFIRMATION_COMPONENTS: set[str] = {
+    "confirmation-summary",
+    "confirmation-entity-verify",
+    "confirmation-followup",
+    "confirmation-diff-reconcile",
+    "confirmation-diff-checklist",
+    "confirmation-alternative-d05",
+    "confirmation-alternative-d06",
+    "confirmation-reliability",
+    "confirmation-fraud-risk",
+}
+
+# confirmation 组件首次打开时的空初始数据（_format 标记让前端识别为新格式，显示可编辑空表）
+_CONFIRMATION_FORMAT_MAP: dict[str, str] = {
+    "confirmation-summary": "confirmation-v1",
+    "confirmation-entity-verify": "entity-verify-v1",
+    "confirmation-followup": "followup-v1",
+    "confirmation-diff-reconcile": "diff-reconcile-v1",
+    "confirmation-diff-checklist": "diff-checklist-v1",
+    "confirmation-alternative-d05": "alternative-d05-v1",
+    "confirmation-alternative-d06": "alternative-d06-v1",
+    "confirmation-reliability": "reliability-v1",
+    "confirmation-fraud-risk": "fraud-risk-v1",
+}
+
+
+def _confirmation_initial_data(component_type: str) -> dict:
+    """为 confirmation 精细组件生成空的新格式初始数据。
+
+    前端组件检测 `_format` 字段 → 识别为新格式 → 显示可编辑空表。
+    无 `_format` 则前端降级为"旧格式只读"（设计意图：区分新旧数据）。
+    """
+    fmt = _CONFIRMATION_FORMAT_MAP.get(component_type, "confirmation-v1")
+    return {"_format": fmt, "rows": [], "sampling": {}, "notes": {}, "conclusion": {}}
+
 # ─── OnlyOffice HTML 白名单：这些 componentType 即使无 renderer 也继续走 grid 兜底，
 # 不切换到 OnlyOffice 渲染。（design §1.1）
 _ONLYOFFICE_HTML_WHITELIST: set[str] = {
@@ -779,8 +822,20 @@ async def _get_render_config_impl(
                     if not (c.sheet_name and "GT_Custom" in c.sheet_name)]
     _is_multi_sheet = len(_real_sheets) > 1
 
-    # 多 sheet 底稿 tab 排序：按 DB 记录 created_at 排序（seed 脚本按模板顺序插入）
-    # （zipfile 排序方案因 uvicorn reload 不稳定暂弃）
+    # 多 sheet 底稿 tab 排序：按模板 xlsx sheetnames 顺序排列
+    # （DB created_at 顺序不可靠；openpyxl read_only 取 sheetnames → 按 index 排序）
+    if _is_multi_sheet and _tpl and Path(_tpl).exists() and str(_tpl).endswith((".xlsx", ".xls")):
+        try:
+            import openpyxl
+            _wb = openpyxl.load_workbook(_tpl, read_only=True, data_only=True)
+            _template_order = {name: idx for idx, name in enumerate(_wb.sheetnames)}
+            _wb.close()
+            classifications = sorted(
+                classifications,
+                key=lambda c: _template_order.get(c.sheet_name, 999),
+            )
+        except Exception:  # noqa: BLE001 — 排序失败不影响渲染，保持原序
+            pass
 
     sheets: list[dict] = []
     for cls in classifications:
@@ -789,14 +844,27 @@ async def _get_render_config_impl(
         if cls.sheet_name and "GT_Custom" in cls.sheet_name:
             continue
         ovr = _WP_CODE_OVERRIDE.get(wp_code)
+        # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
+        # 如 D0-5→confirmation-alternative-d05）。sheet 级 override 优先于 class_code 派生。
+        _sheet_ovr = None
+        if _is_multi_sheet and cls.sheet_name:
+            _m = _SHEET_CODE_RE.search(cls.sheet_name)
+            if _m:
+                _sheet_ovr = _WP_CODE_OVERRIDE.get(_m.group(1))
+            # fallback: 按完整 sheet_name 查找（如「函证差异检查表（示例）」无尾部编码）
+            if not _sheet_ovr:
+                _sheet_ovr = _WP_CODE_OVERRIDE.get(cls.sheet_name)
         try:
             if _is_multi_sheet:
-                # 多 sheet：优先按 class_code 派生（跳过 wp_code override 避免压平）；
-                # 派生失败再回退 wp_code override
-                try:
-                    component_type = derive_component_type(cls, ignore_wp_code_override=True)
-                except ClassificationNotFoundError:
-                    component_type = ovr if ovr else "skip"
+                if _sheet_ovr:
+                    # sheet 级 override 命中（精细 confirmation-* 组件）→ 直接采用
+                    component_type = _sheet_ovr
+                else:
+                    # 否则按 class_code 派生（跳过父码 wp_code override 避免压平）
+                    try:
+                        component_type = derive_component_type(cls, ignore_wp_code_override=True)
+                    except ClassificationNotFoundError:
+                        component_type = ovr if ovr else "skip"
             else:
                 # 单 sheet：wp_code override 优先（保留原行为）
                 component_type = ovr if ovr else derive_component_type(cls)
@@ -849,13 +917,17 @@ async def _get_render_config_impl(
                     await db.rollback()
                 except Exception:
                     pass
-        elif not renderer and _is_multi_sheet and component_type not in _ONLYOFFICE_HTML_WHITELIST:
-            # 非白名单 + 无 renderer + 多 sheet → 走 OnlyOffice WOPI 渲染（design §1.1）
+        elif not renderer and _is_multi_sheet and component_type not in _ONLYOFFICE_HTML_WHITELIST and component_type not in _CONFIRMATION_COMPONENTS:
+            # 非白名单 + 非 confirmation 精细组件 + 无 renderer + 多 sheet → OnlyOffice WOPI（design §1.1）
             component_type = "onlyoffice-sheet"
             sheet_html_data = {"onlyoffice": True, "sheet_name": cls.sheet_name}
+        elif not sheet_html_data and _is_multi_sheet and component_type in _CONFIRMATION_COMPONENTS:
+            # confirmation 精细组件首次打开（无持久化数据）→ 返回空的新格式初始数据
+            # 前端组件检测 _format → 显示可编辑新表（而非"旧格式只读"降级）
+            sheet_html_data = _confirmation_initial_data(component_type)
         elif not sheet_html_data and _tpl and _is_multi_sheet:
-            # 白名单内无后端 renderer 且无持久化数据的 sheet（如 d-form-confirmation/d-form-table
-            # 在多 sheet 底稿中）：从模板提取只读网格兜底，至少显示模板原样。
+            # 白名单内无后端 renderer 且无持久化数据的 sheet（如 d-form-confirmation / d-form-table）：
+            # 从模板提取网格 cells 供前端组件消费。
             try:
                 from app.services.wp_grid_extract import extract_grid, strip_standard_header
                 _grid = extract_grid(_tpl, cls.sheet_name)

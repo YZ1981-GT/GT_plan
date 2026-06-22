@@ -646,8 +646,13 @@ class TestOnlyOfficeCallbackEndpoint:
 
     @pytest.mark.asyncio
     async def test_status_2_downloads_and_saves_file(self, tmp_path, monkeypatch):
-        """status=2: 下载 OnlyOffice 提供的 URL 并覆盖到项目存储"""
+        """status=2: 下载 OnlyOffice 提供的 URL 并覆盖到项目存储
+
+        注：callback 会用 _rewrite_onlyoffice_download_url 把 url 的 scheme+host
+        重写为 settings.ONLYOFFICE_URL（容器自身地址→后端可达地址）。
+        """
         monkeypatch.setattr(app_settings, "STORAGE_ROOT", str(tmp_path))
+        monkeypatch.setattr(app_settings, "ONLYOFFICE_URL", "http://onlyoffice-internal:8080")
         monkeypatch.setattr(app_settings, "ONLYOFFICE_JWT_SECRET", "")  # 跳过 JWT
 
         # 准备：先创建已有文件（模拟之前编辑过）

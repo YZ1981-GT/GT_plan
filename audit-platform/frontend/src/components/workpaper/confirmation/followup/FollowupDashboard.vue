@@ -65,7 +65,7 @@
     <div v-if="metrics.anomaly_count > 0" class="followup-dashboard__alert">
       <el-alert
         :title="`发现 ${metrics.anomaly_count} 项控制异常`"
-        description="存在控制检查项为"否"的记录，请关注并记录应对措施"
+        description="存在控制检查项为「否」的记录，请关注并记录应对措施"
         type="error"
         show-icon
         :closable="false"

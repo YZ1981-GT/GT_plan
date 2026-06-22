@@ -71,7 +71,7 @@ export function useReliabilityData(props: UseReliabilityDataProps): UseReliabili
   // ─── 从 htmlData 初始化 ────────────────────────────────────────────────────
 
   function initFromHtmlData(data: any) {
-    if (!data || data._format !== 'reliability-v1') {
+    if (!data || !data._format) {
       rows.value = []
       auditNote.value = {}
       conclusion.value = {}

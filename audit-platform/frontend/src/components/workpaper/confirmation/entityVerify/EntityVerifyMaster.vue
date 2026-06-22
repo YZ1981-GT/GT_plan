@@ -16,6 +16,9 @@
       <el-button size="small" @click="$emit('export')">
         导出模板
       </el-button>
+      <el-button size="small" @click="$emit('export-data')">
+        导出数据
+      </el-button>
     </div>
     <el-table
       :data="rows"
@@ -24,21 +27,23 @@
       highlight-current-row
       border
       size="small"
+      table-layout="auto"
+      :max-height="400"
       class="entity-verify-master__table"
     >
-      <el-table-column v-if="!readonly" type="selection" width="40" />
-      <el-table-column prop="seq" label="序号" width="60" align="center" />
-      <el-table-column prop="confirm_index" label="索引号" width="100" />
-      <el-table-column prop="entity_name" label="被询证单位" min-width="160" show-overflow-tooltip />
-      <el-table-column prop="account_type" label="科目" width="120" />
-      <el-table-column prop="first_result" label="发函结果" width="100" align="center">
+      <el-table-column v-if="!readonly" type="selection" width="36" align="center" />
+      <el-table-column prop="seq" label="序号" min-width="45" align="center" />
+      <el-table-column prop="confirm_index" label="索引号" min-width="70" />
+      <el-table-column prop="entity_name" label="被询证单位" min-width="130" show-overflow-tooltip />
+      <el-table-column prop="account_type" label="科目" min-width="75" />
+      <el-table-column prop="first_result" label="发函结果" min-width="65" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.first_result === '送抵'" type="success" size="small">送抵</el-tag>
           <el-tag v-else-if="row.first_result === '退回'" type="danger" size="small">退回</el-tag>
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column prop="row_status" label="状态" width="90" align="center">
+      <el-table-column prop="row_status" label="状态" min-width="55" align="center">
         <template #default="{ row }">
           <el-badge
             v-if="row.row_status === 'fraud_flag'"
@@ -77,6 +82,7 @@ const emit = defineEmits<{
   (e: 'save'): void
   (e: 'import'): void
   (e: 'export'): void
+  (e: 'export-data'): void
   (e: 'row-click', row: EntityVerifyRow): void
   (e: 'update:selectedIds', ids: string[]): void
 }>()
@@ -87,14 +93,36 @@ function onSelectionChange(selection: EntityVerifyRow[]) {
 </script>
 
 <style scoped>
+.entity-verify-master {
+  width: 100%;
+}
+
 .entity-verify-master__toolbar {
   display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .entity-verify-master__table {
   width: 100%;
+  font-size: 12px;
+}
+
+/* 表头折行 */
+.entity-verify-master__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 12px;
+}
+
+/* 勾选列居中 */
+.entity-verify-master__table :deep(.el-table-column--selection .cell) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
 }
 
 .entity-verify-master__status {

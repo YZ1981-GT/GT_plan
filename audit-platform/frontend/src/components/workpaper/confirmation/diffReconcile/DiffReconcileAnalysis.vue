@@ -2,11 +2,14 @@
   <div class="diff-reconcile-analysis">
     <h4 class="diff-reconcile-analysis__title">差异原因分析表</h4>
     <p class="diff-reconcile-analysis__desc">
-      按差异类型自动聚合笔数和金额，仅"原因说明"和"应对措施"可编辑。
+      按差异类型自动聚合笔数和金额。仅"原因说明"和"应对措施"可编辑。
+      <el-tooltip content="当上方明细表中修改差异类型后，此表自动重新汇总（实时联动）" placement="top">
+        <el-icon style="margin-left:4px;vertical-align:middle;color:#909399;cursor:help"><InfoFilled /></el-icon>
+      </el-tooltip>
     </p>
 
-    <el-table :data="analysisGroups" border size="small" show-summary :summary-method="getSummaries">
-      <el-table-column label="差异类型" width="120">
+    <el-table :data="analysisGroups" border size="small" show-summary :summary-method="getSummaries" table-layout="auto" class="diff-reconcile-analysis__table">
+      <el-table-column label="差异类型" min-width="90">
         <template #default="{ row }">
           <el-tag :type="typeColor(row.diff_type)" size="small">
             {{ typeLabel(row.diff_type) }}
@@ -14,9 +17,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="笔数" prop="count" width="70" align="center" />
+      <el-table-column label="笔数" prop="count" min-width="50" align="center" />
 
-      <el-table-column label="差异净额" prop="net_amount" width="130" align="right">
+      <el-table-column label="差异净额" prop="net_amount" min-width="90" align="right">
         <template #default="{ row }">
           <span :class="{ 'diff-reconcile-analysis__negative': row.net_amount < 0 }">
             {{ formatAmount(row.net_amount) }}
@@ -24,15 +27,15 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="差异绝对值" prop="abs_amount" width="130" align="right">
+      <el-table-column label="差异绝对值" prop="abs_amount" min-width="90" align="right">
         <template #default="{ row }">{{ formatAmount(row.abs_amount) }}</template>
       </el-table-column>
 
-      <el-table-column label="占比" prop="percentage" width="80" align="center">
+      <el-table-column label="占比" prop="percentage" min-width="55" align="center">
         <template #default="{ row }">{{ row.percentage }}%</template>
       </el-table-column>
 
-      <el-table-column label="原因说明" min-width="180">
+      <el-table-column label="原因说明" min-width="140">
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -48,7 +51,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="应对措施" min-width="180">
+      <el-table-column label="应对措施" min-width="140">
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -78,6 +81,7 @@
 </template>
 
 <script setup lang="ts">
+import { InfoFilled } from '@element-plus/icons-vue'
 import type { DiffAnalysisGroup } from './diffReconcileTypes'
 
 const props = defineProps<{
@@ -136,6 +140,25 @@ function formatAmount(val?: number): string {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   margin-bottom: 8px;
+}
+
+/* 表头折行 */
+.diff-reconcile-analysis__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 13px;
+}
+
+.diff-reconcile-analysis__table :deep(.el-table__body td .cell) {
+  font-size: 13px;
+}
+
+/* 合计行不折行 */
+.diff-reconcile-analysis__table :deep(.el-table__footer td .cell) {
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .diff-reconcile-analysis__negative {

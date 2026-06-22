@@ -72,17 +72,18 @@ defineProps<{
 
 <style scoped>
 .entity-verify-dashboard {
-  padding: 12px;
+  padding: 10px 12px;
   background: var(--el-fill-color-lighter);
   border-radius: 6px;
   margin-bottom: 12px;
+  border: 1px solid #ebeef5;
 }
 
 .entity-verify-dashboard__metrics {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 8px;
 }
 
 .entity-verify-dashboard__metric {

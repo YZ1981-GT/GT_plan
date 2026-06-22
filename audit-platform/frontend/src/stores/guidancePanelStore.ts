@@ -25,6 +25,7 @@ export interface WpContext {
   componentType: string
   projectId: string
   year: number
+  sheetCode?: string  // 多 sheet 底稿当前 sheet 的子码（如 D0-1），用于加载专属 guidance
 }
 
 export interface GuidanceSection {
@@ -125,13 +126,12 @@ export const useGuidancePanelStore = defineStore('guidancePanel', () => {
   }
 
   function setWpContext(ctx: WpContext) {
-    // 如果底稿切换了，重置数据+取消旧请求
-    const changed = wpContext.value?.wpId !== ctx.wpId
+    // 如果底稿或 sheet 切换了，重置数据+取消旧请求
+    const changed = wpContext.value?.wpId !== ctx.wpId || wpContext.value?.sheetCode !== ctx.sheetCode
     wpContext.value = ctx
 
     if (changed) {
-      // 竞态防护：递增 requestId，取消上一个请求
-      requestId.value++
+      // 取消进行中请求
       abortController.value?.abort()
       abortController.value = null
 
@@ -139,11 +139,15 @@ export const useGuidancePanelStore = defineStore('guidancePanel', () => {
       guidanceData.value = null
       guidanceLoading.value = false
 
-      // 尝试从 sessionStorage 加载缓存
-      const cached = loadCachedGuidance(ctx.wpCode)
+      // 尝试从 sessionStorage 加载缓存（key 含 sheetCode 以区分不同 sheet）
+      const cacheKey = ctx.sheetCode ? `${ctx.wpCode}_${ctx.sheetCode}` : ctx.wpCode
+      const cached = loadCachedGuidance(cacheKey)
       if (cached) {
         guidanceData.value = cached
         aiEnabled.value = cached.ai_enabled
+      } else {
+        // 无缓存 → 立即 fetch
+        fetchGuidance()
       }
     }
   }
@@ -162,8 +166,13 @@ export const useGuidancePanelStore = defineStore('guidancePanel', () => {
     guidanceLoading.value = true
 
     try {
+      const params: Record<string, string> = {}
+      if (ctx.sheetCode) params.sheet_code = ctx.sheetCode
+      const queryStr = Object.keys(params).length
+        ? '?' + new URLSearchParams(params).toString()
+        : ''
       const data = await api.get<GuidanceResponse>(
-        `/api/workpapers/${ctx.wpId}/guidance`,
+        `/api/workpapers/${ctx.wpId}/guidance${queryStr}`,
         { signal: controller.signal },
       )
 
@@ -173,8 +182,9 @@ export const useGuidancePanelStore = defineStore('guidancePanel', () => {
       guidanceData.value = data
       aiEnabled.value = data.ai_enabled ?? false
 
-      // 写入 sessionStorage 缓存
-      saveCachedGuidance(ctx.wpCode, data)
+      // 写入 sessionStorage 缓存（key 含 sheetCode 区分不同 sheet）
+      const cacheKey = ctx.sheetCode ? `${ctx.wpCode}_${ctx.sheetCode}` : ctx.wpCode
+      saveCachedGuidance(cacheKey, data)
     } catch (e: any) {
       // 被 abort 的请求静默忽略
       if (e?.name === 'AbortError' || e?.code === 'ERR_CANCELED') return

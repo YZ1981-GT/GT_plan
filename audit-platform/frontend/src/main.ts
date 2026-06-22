@@ -20,6 +20,7 @@ import { initWebVitals } from './utils/monitor'
 import { queryClient } from './utils/queryClient'
 import { vPermission } from './directives/permission'
 import { registerServiceWorker } from './composables/useOfflineCache'
+import vTabWheel from './directives/vTabWheel'
 
 const app = createApp(App)
 
@@ -29,6 +30,7 @@ app.use(router)
 
 // 注册全局指令
 app.directive('permission', vPermission)
+app.directive('tab-wheel', vTabWheel)
 
 // 图标由 unplugin-vue-components 自动按需注册，无需全量注册（P1.3 修复）
 

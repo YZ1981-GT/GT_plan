@@ -44,24 +44,24 @@
         <!-- 科目分组汇总 -->
         <div v-if="subjectSummary.length" class="diff-reconcile-dashboard__subject-table">
           <h4 class="diff-reconcile-dashboard__section-title">按科目汇总</h4>
-          <el-table :data="subjectSummary" size="small" border stripe>
-            <el-table-column label="科目" prop="subject" width="130" />
-            <el-table-column label="笔数" prop="count" width="60" align="center" />
-            <el-table-column label="发函合计" prop="sent_total" width="120" align="right">
+          <el-table :data="subjectSummary" size="small" border stripe table-layout="auto" class="diff-reconcile-dashboard__table">
+            <el-table-column label="科目" prop="subject" min-width="90" />
+            <el-table-column label="笔数" prop="count" min-width="50" align="center" />
+            <el-table-column label="发函合计" prop="sent_total" min-width="90" align="right">
               <template #default="{ row }">{{ formatAmount(row.sent_total) }}</template>
             </el-table-column>
-            <el-table-column label="回函合计" prop="reply_total" width="120" align="right">
+            <el-table-column label="回函合计" prop="reply_total" min-width="90" align="right">
               <template #default="{ row }">{{ formatAmount(row.reply_total) }}</template>
             </el-table-column>
-            <el-table-column label="差异净额" prop="difference_total" width="120" align="right">
+            <el-table-column label="差异净额" prop="difference_total" min-width="90" align="right">
               <template #default="{ row }">
                 <span :class="{ 'diff-reconcile-dashboard__negative': row.difference_total < 0 }">
                   {{ formatAmount(row.difference_total) }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="已分析" prop="analyzed_count" width="70" align="center" />
-            <el-table-column label="需调整" prop="adjustment_count" width="70" align="center" />
+            <el-table-column label="已分析" prop="analyzed_count" min-width="55" align="center" />
+            <el-table-column label="需调整" prop="adjustment_count" min-width="55" align="center" />
           </el-table>
         </div>
       </el-collapse-item>
@@ -189,6 +189,18 @@ function formatAmount(val?: number): string {
   font-size: 14px;
   font-weight: 500;
   margin: 12px 0 8px;
+}
+
+/* 表头折行 */
+.diff-reconcile-dashboard__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 12px;
+}
+
+.diff-reconcile-dashboard__table :deep(.el-table__body td .cell) {
+  font-size: 12px;
 }
 
 .diff-reconcile-dashboard__negative {

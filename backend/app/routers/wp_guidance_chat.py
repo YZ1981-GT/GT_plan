@@ -56,6 +56,7 @@ class CustomGuidanceRequest(BaseModel):
 @router.get("/{wp_id}/guidance")
 async def get_workpaper_guidance(
     wp_id: str,
+    sheet_code: str | None = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -63,6 +64,10 @@ async def get_workpaper_guidance(
 
     按优先级从模板 sheet / header / static JSON / fallback 提取，
     结合 LRU + mtime 缓存。
+
+    Args:
+        sheet_code: 可选的 sheet 级编码（如 D0-1/D0-5），多 sheet 底稿切 tab 时传入。
+            优先按 sheet_code 查找专属 guidance JSON，找不到回退到父码 wp_code。
 
     Returns:
         {wp_code, wp_name, source, complexity, guidance: {sections, raw_text}, recommended_questions}
@@ -94,6 +99,10 @@ async def get_workpaper_guidance(
     wp_code = row.wp_code
     wp_name = row.wp_name or ""
 
+    # 多 sheet 底稿：优先使用 sheet_code 获取专属 guidance（如 D0-1.json）
+    # 找不到时回退到父码 wp_code（如 D0）
+    effective_code = sheet_code if sheet_code else wp_code
+
     # 尝试定位模板路径（从 wp_templates 按 wp_code 推导）
     template_path = _resolve_template_path(wp_code)
 
@@ -102,10 +111,18 @@ async def get_workpaper_guidance(
 
     service = GuidanceService()
     guidance_response = await service.get_guidance(
-        wp_code=wp_code,
+        wp_code=effective_code,
         wp_name=wp_name,
         template_path=template_path,
     )
+
+    # 如果 sheet_code 级 guidance 提取结果是 fallback（通用提示），再试父码
+    if sheet_code and guidance_response.get("source") == "fallback":
+        guidance_response = await service.get_guidance(
+            wp_code=wp_code,
+            wp_name=wp_name,
+            template_path=template_path,
+        )
 
     # 注入 ai_enabled 字段供前端 Tab 显隐（读 feature flag）
     from app.core.config import settings
@@ -515,3 +532,137 @@ def _infer_component_type(wp_code: str) -> str:
     if wp_code.endswith("-1") and len(wp_code) > 2:
         return "d-form-table"
     return "univer"
+
+
+# ---------------------------------------------------------------------------
+# POST /api/workpapers/{wp_id}/ai-generate-notes — AI 预填充审计说明
+# ---------------------------------------------------------------------------
+
+
+class ConfirmationNotesGenRequest(BaseModel):
+    """AI 生成函证审计说明请求"""
+
+    project_id: str = Field(..., description="项目 ID")
+    wp_code: str | None = Field(None, description="底稿编码")
+    # 从前端传入的函证统计摘要（避免后端再查 parse_data）
+    total_count: int = Field(0, description="函证总笔数")
+    total_amount: float = Field(0, description="函证总金额")
+    replied_count: int = Field(0, description="已回函笔数")
+    matched_count: int = Field(0, description="相符笔数")
+    unreplied_count: int = Field(0, description="未回函笔数")
+    coverage_pct: float = Field(0, description="覆盖率%")
+    account_types: list[str] = Field(default_factory=list, description="涉及科目")
+    # 用户可选：已有的部分填写内容（AI 补充完善）
+    existing_notes: dict | None = Field(None, description="已有审计说明（可选）")
+
+
+@router.post("/{wp_id}/ai-generate-notes")
+async def generate_confirmation_notes(
+    wp_id: str,
+    req: ConfirmationNotesGenRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """根据函证统计数据，调用 LLM 生成审计说明初稿
+
+    LLM 不可用时降级为规则生成模板文本。
+    """
+    from app.core.config import settings
+
+    # 构建 prompt 上下文
+    stats_text = (
+        f"函证统计摘要：\n"
+        f"- 发函总数：{req.total_count} 笔\n"
+        f"- 发函总额：{req.total_amount:,.2f} 元\n"
+        f"- 已回函：{req.replied_count} 笔\n"
+        f"- 相符：{req.matched_count} 笔\n"
+        f"- 未回函：{req.unreplied_count} 笔\n"
+        f"- 覆盖率：{req.coverage_pct:.1f}%\n"
+        f"- 涉及科目：{', '.join(req.account_types) if req.account_types else '未分类'}\n"
+    )
+
+    system_prompt = (
+        "你是一位资深审计经理，正在编制函证程序的审计工作底稿。"
+        "请根据以下函证统计数据，生成5个维度的审计说明初稿。"
+        "返回 JSON 格式（不要 markdown code block），字段为：\n"
+        '{"note_general": "...", "note_exception": "...", "note_unreplied": "...", '
+        '"note_alternative": "...", "note_other": "..."}\n\n'
+        "要求：\n"
+        "1. note_general：函证总体情况概述（发函范围、方式、时间安排）\n"
+        '2. note_exception：异常情况说明（差异、退函等，无异常则写"本次函证未发现异常情况"）\n'
+        "3. note_unreplied：未回函处理方案\n"
+        "4. note_alternative：替代程序说明（检查期后收款/合同/出库单等）\n"
+        "5. note_other：其他事项（电子函证可靠性、舞弊考量等，可为空）\n\n"
+        "语言简洁专业，符合中国注册会计师审计准则用语习惯。每项 50-150 字。"
+    )
+
+    # 尝试 LLM
+    llm_enabled = getattr(settings, "WP_AI_SERVICE_ENABLED", False)
+    if llm_enabled:
+        try:
+            from app.services.llm_client import chat_completion
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": stats_text},
+            ]
+            raw = await chat_completion(messages, temperature=0.4, max_tokens=1000)
+            # 解析 JSON
+            import re
+            # 尝试提取 JSON（LLM 可能返回 markdown code block）
+            json_match = re.search(r'\{[^{}]*"note_general"[^{}]*\}', raw, re.DOTALL)
+            if json_match:
+                notes = json.loads(json_match.group())
+                return {
+                    "notes": notes,
+                    "source": "llm",
+                }
+            # JSON 解析失败，降级
+            logger.warning("LLM 返回内容无法解析为 JSON，降级为规则生成")
+        except Exception as e:
+            logger.warning(f"LLM 生成审计说明失败: {e}，降级为规则生成")
+
+    # 降级：规则生成模板文本
+    reply_rate = (
+        f"{req.replied_count}/{req.total_count}"
+        if req.total_count > 0
+        else "0/0"
+    )
+    coverage_str = f"{req.coverage_pct:.1f}%" if req.coverage_pct > 0 else "—"
+    acct_str = "、".join(req.account_types[:5]) if req.account_types else "相关科目"
+
+    notes = {
+        "note_general": (
+            f"本次审计共向 {req.total_count} 家单位发出函证，"
+            f"涉及{acct_str}等科目，"
+            f"函证金额合计 {req.total_amount:,.2f} 元。"
+            f"函证方式以积极式为主，发函覆盖率 {coverage_str}。"
+        ),
+        "note_exception": (
+            "本次函证未发现重大异常情况。"
+            if req.matched_count == req.replied_count
+            else f"函证过程中发现 {req.replied_count - req.matched_count} 笔不符项，"
+            f"差异原因待进一步核查（详见 D0-4 差异调节表）。"
+        ),
+        "note_unreplied": (
+            f"截至审计报告日，共有 {req.unreplied_count} 家单位未回函。"
+            f"对未回函单位已执行替代审计程序以获取充分适当的审计证据。"
+            if req.unreplied_count > 0
+            else "所有函证对象均已回函，无需执行替代程序。"
+        ),
+        "note_alternative": (
+            "对未回函单位，已执行以下替代程序：\n"
+            "1. 检查期后收款/付款记录\n"
+            "2. 核对销售合同/采购订单及出库/入库单\n"
+            "3. 检查相关发票及对账单"
+            if req.unreplied_count > 0
+            else "本次函证全部回函，未执行替代程序。"
+        ),
+        "note_other": (
+            "其他需关注事项：无。"
+        ),
+    }
+
+    return {
+        "notes": notes,
+        "source": "rule",
+    }

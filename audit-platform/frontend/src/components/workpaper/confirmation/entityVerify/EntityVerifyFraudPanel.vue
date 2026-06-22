@@ -1,12 +1,5 @@
 <template>
   <div class="entity-verify-fraud-panel">
-    <div class="entity-verify-fraud-panel__header">
-      <h4 class="entity-verify-fraud-panel__title">
-        反舞弊筛查结果
-        <el-badge :value="totalFlagCount" :hidden="totalFlagCount === 0" />
-      </h4>
-    </div>
-
     <!-- Row-level flags -->
     <div v-if="rowFlags.size > 0" class="entity-verify-fraud-panel__section">
       <h5 class="entity-verify-fraud-panel__subtitle">行内一致性异常</h5>
@@ -47,13 +40,13 @@
 
     <!-- Empty state -->
     <div v-if="rowFlags.size === 0 && crossFlags.length === 0" class="entity-verify-fraud-panel__empty">
-      <el-empty description="未检测到异常" :image-size="60" />
+      <span class="entity-verify-fraud-panel__empty-icon">✅</span>
+      <span class="entity-verify-fraud-panel__empty-text">未检测到可疑项</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
 import type { EntityVerifyRow } from './entityVerifyTypes'
 import { CONSISTENCY_RULES, type CrossRowFlag } from './composables/useFraudFlagDetect'
 
@@ -62,15 +55,6 @@ const props = defineProps<{
   crossFlags: CrossRowFlag[]
   rows: EntityVerifyRow[]
 }>()
-
-const totalFlagCount = computed(() => {
-  let count = 0
-  for (const flags of props.rowFlags.values()) {
-    count += flags.length
-  }
-  count += props.crossFlags.length
-  return count
-})
 
 function getEntityName(rowId: string): string {
   const row = props.rows.find((r) => r._row_id === rowId)
@@ -85,27 +69,13 @@ function getFlagLabel(flagId: string): string {
 
 <style scoped>
 .entity-verify-fraud-panel {
-  padding: 12px;
-  background: var(--el-fill-color-lighter);
+  padding: 8px 0 0 0;
   border-radius: 6px;
-  margin-bottom: 12px;
-}
-
-.entity-verify-fraud-panel__header {
-  margin-bottom: 12px;
-}
-
-.entity-verify-fraud-panel__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  margin-bottom: 0;
 }
 
 .entity-verify-fraud-panel__section {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .entity-verify-fraud-panel__subtitle {
@@ -138,7 +108,20 @@ function getFlagLabel(flagId: string): string {
 }
 
 .entity-verify-fraud-panel__empty {
-  text-align: center;
-  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 0;
+  color: var(--el-color-success);
+  font-size: 13px;
+}
+
+.entity-verify-fraud-panel__empty-icon {
+  font-size: 16px;
+}
+
+.entity-verify-fraud-panel__empty-text {
+  color: var(--el-text-color-secondary);
 }
 </style>

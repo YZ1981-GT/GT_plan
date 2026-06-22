@@ -11,8 +11,11 @@
       <el-button v-if="!readonly" size="small" plain @click="$emit('import-excel')">
         导入 Excel
       </el-button>
-      <el-button size="small" plain @click="$emit('export-excel')">
+      <el-button size="small" plain @click="$emit('export-template')">
         导出模板
+      </el-button>
+      <el-button size="small" plain @click="$emit('export-data')">
+        导出数据
       </el-button>
       <el-button v-if="isDirty && !readonly" size="small" type="success" @click="$emit('save')">
         <el-icon><Check /></el-icon> 保存
@@ -26,44 +29,63 @@
       stripe
       size="small"
       highlight-current-row
+      table-layout="auto"
       @current-change="handleSelect"
       :row-class-name="rowClassName"
       class="alternative-master__table"
     >
-      <el-table-column prop="seq" label="序号" width="50" align="center" />
-      <el-table-column prop="entity_name" label="供应商/客户名称" min-width="160">
+      <el-table-column prop="seq" label="序号" min-width="40" align="center" />
+      <el-table-column prop="entity_name" label="供应商/客户名称" min-width="130">
         <template #default="{ row }">
-          <span>{{ row.entity_name || '—' }}</span>
-          <el-tag v-if="row._source === 'auto'" size="small" type="info" class="ml-4">
-            自动带入
-          </el-tag>
+          <el-input
+            v-if="!readonly"
+            :model-value="row.entity_name"
+            size="small"
+            placeholder="单位名称"
+            @change="(val: string) => $emit('update-field', row._company_id, 'entity_name', val)"
+          />
+          <template v-else>
+            <span>{{ row.entity_name || '—' }}</span>
+            <el-tag v-if="row._source === 'auto'" size="small" type="info" class="ml-4">自动带入</el-tag>
+          </template>
         </template>
       </el-table-column>
-      <el-table-column prop="confirm_index" label="函证索引号" width="110" />
-      <el-table-column label="完成度" width="100" align="center">
+      <el-table-column prop="confirm_index" label="函证索引号" min-width="85">
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.confirm_index"
+            size="small"
+            placeholder="D0-"
+            @change="(val: string) => $emit('update-field', row._company_id, 'confirm_index', val)"
+          />
+          <span v-else>{{ row.confirm_index || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="完成度" min-width="65" align="center">
         <template #default="{ row }">
           <span :class="completionClass(row)">
             {{ getCompletionStatus(row).completed }}/4
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="异常" width="70" align="center">
+      <el-table-column label="异常" min-width="55" align="center">
         <template #default="{ row }">
           <el-tag v-if="hasAbnormal(row)" type="danger" size="small">是</el-tag>
           <span v-else class="text-secondary">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="收款比例" width="95" align="right">
+      <el-table-column label="收款比例" min-width="70" align="right">
         <template #default="{ row }">
           {{ formatRatio(getCheckRatio(row, 'receipt')) }}
         </template>
       </el-table-column>
-      <el-table-column label="出库比例" width="95" align="right">
+      <el-table-column label="出库比例" min-width="70" align="right">
         <template #default="{ row }">
           {{ formatRatio(getCheckRatio(row, 'shipment')) }}
         </template>
       </el-table-column>
-      <el-table-column label="结论" width="80" align="center">
+      <el-table-column label="结论" min-width="55" align="center">
         <template #default="{ row }">
           <el-tag
             v-if="row.conclusion?.conclusion_type"
@@ -75,7 +97,7 @@
           <span v-else class="text-secondary">—</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="!readonly" label="操作" width="70" align="center">
+      <el-table-column v-if="!readonly" label="操作" min-width="50" align="center">
         <template #default="{ row }">
           <el-button
             size="small"
@@ -91,7 +113,7 @@
 
     <!-- 空态 -->
     <div v-if="companies.length === 0" class="alternative-master__empty">
-      <el-empty description="暂无公司记录，请新增或从 D0-1 带入未回函公司" />
+      暂无公司记录，请新增或从 D0-1 带入未回函公司
     </div>
   </div>
 </template>
@@ -113,9 +135,11 @@ const emit = defineEmits<{
   (e: 'select', companyId: string): void
   (e: 'add-company'): void
   (e: 'delete-company', companyId: string): void
+  (e: 'update-field', companyId: string, field: string, value: any): void
   (e: 'import-d01'): void
   (e: 'import-excel'): void
-  (e: 'export-excel'): void
+  (e: 'export-template'): void
+  (e: 'export-data'): void
   (e: 'save'): void
 }>()
 
@@ -154,11 +178,26 @@ function formatRatio(val: number | null): string {
 }
 
 .alternative-master__table {
-  font-size: 12px;
+  font-size: 13px;
+}
+
+/* 表头折行 */
+.alternative-master__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 13px;
+}
+
+.alternative-master__table :deep(.el-table__body td .cell) {
+  font-size: 13px;
 }
 
 .alternative-master__empty {
-  padding: 20px 0;
+  padding: 12px 0;
+  text-align: center;
+  color: #909399;
+  font-size: 12px;
 }
 
 .ml-4 { margin-left: 4px; }

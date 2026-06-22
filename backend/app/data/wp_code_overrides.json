@@ -160,6 +160,7 @@
   "D0-3": "confirmation-followup",
   "D0-4": "confirmation-diff-reconcile",
   "D0-4b": "confirmation-diff-checklist",
+  "函证差异检查表（示例）": "confirmation-diff-checklist",
   "D0-5": "confirmation-alternative-d05",
   "D0-6": "confirmation-alternative-d06",
   "D0-7": "confirmation-reliability",

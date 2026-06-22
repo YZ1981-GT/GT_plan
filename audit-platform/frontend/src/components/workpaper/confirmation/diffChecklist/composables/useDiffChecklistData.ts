@@ -87,7 +87,7 @@ export function useDiffChecklistData(props: UseDiffChecklistDataProps): UseDiffC
   // ─── 从 htmlData 初始化 ────────────────────────────────────────────────────
 
   function initFromHtmlData(data: any) {
-    if (!data || data._format !== 'diff-checklist-v1') {
+    if (!data || !data._format) {
       companies.value = []
       globalNote.value = ''
       conclusion.value = {}

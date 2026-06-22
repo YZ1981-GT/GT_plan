@@ -72,7 +72,7 @@ export function useFollowupData(props: UseFollowupDataProps): UseFollowupDataRet
   // ─── 初始化 ─────────────────────────────────────────────────────────────────
 
   function initFromHtmlData(data: any) {
-    if (!data || data._format !== 'confirmation-followup-v1') {
+    if (!data || !data._format) {
       rows.value = []
       return
     }
@@ -180,7 +180,7 @@ export function useFollowupData(props: UseFollowupDataProps): UseFollowupDataRet
 
   function buildPayload(): FollowupPayload {
     return {
-      _format: 'confirmation-followup-v1',
+      _format: 'followup-v1',
       rows: rows.value,
       progress_summary: progressMetrics.value,
     }

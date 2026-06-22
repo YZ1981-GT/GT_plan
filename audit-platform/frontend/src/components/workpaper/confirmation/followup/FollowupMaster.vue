@@ -19,6 +19,12 @@
       <el-button size="small" :disabled="readonly" @click="$emit('import')">
         导入
       </el-button>
+      <el-button size="small" @click="$emit('export-template')">
+        导出模板
+      </el-button>
+      <el-button size="small" @click="$emit('export-data')">
+        导出数据
+      </el-button>
     </div>
 
     <!-- Table -->
@@ -28,17 +34,19 @@
       border
       stripe
       highlight-current-row
+      table-layout="auto"
+      :max-height="400"
       @selection-change="handleSelectionChange"
       @row-click="handleRowClick"
       class="followup-master__table"
     >
-      <el-table-column type="selection" width="40" :selectable="() => !readonly" />
-      <el-table-column prop="seq" label="序号" width="60" align="center" />
-      <el-table-column prop="confirm_index" label="函证索引号" width="120" show-overflow-tooltip />
-      <el-table-column prop="entity_name" label="被函证单位" min-width="140" show-overflow-tooltip />
-      <el-table-column prop="followup_person" label="跟函人员" width="100" />
-      <el-table-column prop="followup_date" label="跟函日期" width="110" />
-      <el-table-column label="确认场景" width="130" align="center">
+      <el-table-column type="selection" width="36" align="center" :selectable="() => !readonly" />
+      <el-table-column prop="seq" label="序号" min-width="45" align="center" />
+      <el-table-column prop="confirm_index" label="函证索引号" min-width="85" show-overflow-tooltip />
+      <el-table-column prop="entity_name" label="被函证单位" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="followup_person" label="跟函人员" min-width="75" />
+      <el-table-column prop="followup_date" label="跟函日期" min-width="85" />
+      <el-table-column label="确认场景" min-width="85" align="center">
         <template #default="{ row }">
           <el-tag
             v-if="row.scenario"
@@ -49,7 +57,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="控制结论" width="100" align="center">
+      <el-table-column label="控制结论" min-width="75" align="center">
         <template #default="{ row }">
           <el-tag
             v-if="row.control_conclusion"
@@ -61,7 +69,7 @@
           <span v-else class="followup-master__empty">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="签名状态" width="90" align="center">
+      <el-table-column label="签名状态" min-width="65" align="center">
         <template #default="{ row }">
           <el-tag
             :type="row.sign_status === 'signed' ? 'success' : 'info'"
@@ -90,6 +98,8 @@ const emit = defineEmits<{
   (e: 'delete'): void
   (e: 'save'): void
   (e: 'import'): void
+  (e: 'export-template'): void
+  (e: 'export-data'): void
   (e: 'row-click', row: FollowupRow): void
   (e: 'update:selected-ids', ids: string[]): void
 }>()
@@ -117,13 +127,34 @@ function conclusionLabel(conclusion: string): string {
 
 <style scoped>
 .followup-master__toolbar {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 .followup-master__table {
   width: 100%;
+}
+
+/* 表头折行 */
+.followup-master__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 12px;
+}
+
+.followup-master__table :deep(.el-table__body td .cell) {
+  font-size: 12px;
+}
+
+/* 勾选列居中 */
+.followup-master__table :deep(.el-table-column--selection .cell) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
 }
 
 .followup-master__empty {

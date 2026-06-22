@@ -89,6 +89,7 @@
         </el-popover>
         <el-tabs
           v-model="activeSheetName"
+          v-tab-wheel
           type="card"
           class="gt-wp-renderer__sheet-tabs-inner"
         >
@@ -131,6 +132,7 @@
       <!-- 注册表分发：HTML 类组件（A/B/C/D 5 种/E/H 共 10 种 componentType） -->
       <component
         v-if="rendererEntry"
+        ref="activeComponentRef"
         :is="rendererEntry.component"
         :wp-id="wpId"
         :sheet-name="activeSheetName"
@@ -210,6 +212,7 @@ import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Switch } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
@@ -285,6 +288,8 @@ const switchPopoverVisible = ref(false)
 const WHOLE_EXCEL_TAB = '__whole_excel__'
 // 统一工具栏状态
 const isWpFullscreen = ref(false)
+// 子组件引用（用于转发工具栏操作）
+const activeComponentRef = ref<any>(null)
 // OnlyOffice 降级状态（当 GtOnlyOfficeSheet emit fallback 时切换到 GtGridSheet）
 const onlyOfficeFallback = ref(false)
 
@@ -462,6 +467,8 @@ const isOnlyOfficeSheet = computed<boolean>(() => {
 const noRendererGridFallback = computed<boolean>(() => {
   if (componentType.value === 'univer' || componentType.value === 'c-note-table') return false
   if (componentType.value === 'skip') return false
+  // confirmation-* 精细组件（协作者 D0 函证模块）接收 grid cells 作为数据源，不走 grid 兜底
+  if (componentType.value.startsWith('confirmation-')) return false
   // html_data 含 cells（grid 格式）→ 优先走 GtGridSheet，无论注册表有无组件
   if (hasGridCells.value) {
     const hd = activeSheetHtmlData.value as any
@@ -602,15 +609,52 @@ function onOnlyOfficeFallback() {
 }
 
 // 统一工具栏操作
-function onExportTemplate() {
+async function onExportTemplate() {
   if (!props.wpId) return
-  window.open(`/api/workpapers/${props.wpId}/export-template`, '_blank')
+  try {
+    const resp = await http.get(`/api/workpapers/${props.wpId}/export-template`, {
+      responseType: 'blob',
+      _silent: true,
+    } as any)
+    // 从 response headers 或默认文件名
+    const contentDisposition = resp.headers?.['content-disposition'] || ''
+    const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i)
+    const filename = filenameMatch
+      ? decodeURIComponent(filenameMatch[1])
+      : `${renderConfig.value?.wp_code || 'workpaper'}_模板.xlsx`
+    // 创建下载链接
+    const blob = new Blob([resp.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  } catch (e: any) {
+    ElMessage.error('导出模板失败：' + (e?.response?.data?.message || e?.message || '请检查网络'))
+  }
 }
 function onExportData() {
-  ElMessage.info('导出数据功能开发中')
+  // 如果子组件暴露了 handleExportData 方法，委托给它
+  const child = activeComponentRef.value
+  if (child && typeof child.handleExportData === 'function') {
+    child.handleExportData()
+  } else {
+    ElMessage.info('当前底稿暂不支持导出数据')
+  }
 }
 function onImportData() {
-  ElMessage.info('导入功能开发中')
+  // 如果子组件暴露了 handleImportClick / handleImport 方法，委托给它
+  const child = activeComponentRef.value
+  if (child && typeof child.handleImportClick === 'function') {
+    child.handleImportClick()
+  } else if (child && typeof child.handleImport === 'function') {
+    child.handleImport()
+  } else {
+    ElMessage.info('当前底稿暂不支持导入')
+  }
 }
 function onAddRow() {
   ElMessage.info('增行功能开发中')

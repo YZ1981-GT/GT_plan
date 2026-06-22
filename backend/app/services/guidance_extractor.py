@@ -74,9 +74,9 @@ class GuidanceExtractor:
 
     async def extract(self, wp_code: str, template_path: Path | None) -> GuidanceResult:
         """主提取入口，按优先级尝试：
-        1. xlsx/docx 模板 sheet/段落
-        2. 模板首行/首列说明
-        3. 静态 JSON 配置
+        1. 静态 JSON 配置（有专属指引的优先，内容经审计专家编写）
+        2. xlsx/docx 模板 sheet/段落（无静态 JSON 时从模板提取）
+        3. 模板首行/首列说明
         4. 通用 fallback
 
         Args:
@@ -86,6 +86,13 @@ class GuidanceExtractor:
         Returns:
             GuidanceResult 提取结果（永不为 None/空）
         """
+        # 优先：静态 JSON（专属编制指引，内容精确）
+        result = await self._try_with_timeout(
+            self._extract_static_json, wp_code
+        )
+        if result:
+            return result
+
         # 尝试从模板文件提取
         if template_path and template_path.exists():
             suffix = template_path.suffix.lower()
@@ -111,13 +118,6 @@ class GuidanceExtractor:
                 )
                 if result:
                     return result
-
-        # 降级：静态 JSON
-        result = await self._try_with_timeout(
-            self._extract_static_json, wp_code
-        )
-        if result:
-            return result
 
         # 类型化 fallback（审定表/程序表比通用提示更有针对性）
         typed_fallback = self._typed_fallback(wp_code)
@@ -329,7 +329,7 @@ class GuidanceExtractor:
         raw_sections = data.get("sections", [])
         sections = [
             GuidanceSection(
-                heading=s.get("heading", ""),
+                heading=s.get("heading", "") or s.get("title", ""),
                 content=s.get("content", ""),
                 order=i,
             )

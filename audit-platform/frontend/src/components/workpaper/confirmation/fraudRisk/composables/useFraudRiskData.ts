@@ -72,7 +72,7 @@ export function useFraudRiskData(props: UseFraudRiskDataProps): UseFraudRiskData
   // ─── 从 htmlData 初始化（合并预置+已有） ──────────────────────────────────
 
   function initFromHtmlData(data: any) {
-    if (!data || data._format !== 'fraud-risk-d08-v1') {
+    if (!data || !data._format) {
       // 无数据或旧格式 → 纯预置初始化
       items.value = initFromPreset()
       summary.value = {}
@@ -238,7 +238,7 @@ export function useFraudRiskData(props: UseFraudRiskDataProps): UseFraudRiskData
 
   function buildPayload(): FraudRiskPayload {
     return {
-      _format: 'fraud-risk-d08-v1',
+      _format: 'fraud-risk-v1',
       items: items.value.map((item) => ({ ...item })),
       summary: { ...summary.value },
       conclusion: { ...conclusion.value },

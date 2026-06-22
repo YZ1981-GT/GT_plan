@@ -17,8 +17,11 @@
         <el-button size="small" :disabled="readonly" @click="$emit('import-excel')">
           导入
         </el-button>
+        <el-button size="small" @click="$emit('export-template')">
+          导出模板
+        </el-button>
         <el-button size="small" @click="$emit('export-excel')">
-          导出
+          导出数据
         </el-button>
       </el-button-group>
       <div class="diff-checklist-master__toolbar-right">
@@ -38,20 +41,22 @@
       highlight-current-row
       max-height="400"
       row-key="_row_id"
+      table-layout="auto"
       :row-class-name="getRowClassName"
       @selection-change="handleSelectionChange"
       @current-change="handleCurrentChange"
+      class="diff-checklist-master__table"
     >
-      <el-table-column v-if="!readonly" type="selection" width="35" fixed="left" />
-      <el-table-column label="序号" prop="seq" width="50" align="center" fixed="left" />
-      <el-table-column label="函证索引号" prop="confirm_index" width="110" fixed="left">
+      <el-table-column v-if="!readonly" type="selection" width="36" align="center" />
+      <el-table-column label="序号" prop="seq" min-width="45" align="center" />
+      <el-table-column label="函证索引号" prop="confirm_index" min-width="90">
         <template #default="{ row }">
           <span class="diff-checklist-master__link" @click="$emit('jump-d04', row.confirm_index)">
             {{ row.confirm_index || '—' }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="被询证单位" prop="entity_name" width="150" show-overflow-tooltip>
+      <el-table-column label="被询证单位" prop="entity_name" min-width="120">
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -63,7 +68,7 @@
           <span v-else>{{ row.entity_name || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="科目" prop="subject" width="120">
+      <el-table-column label="科目" prop="subject" min-width="90">
         <template #default="{ row }">
           <el-select
             v-if="!readonly"
@@ -85,17 +90,32 @@
           <span v-else>{{ row.subject || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="A 回函金额" prop="a_reply_amount" width="110" align="right">
+      <el-table-column label="A 回函金额" prop="a_reply_amount" min-width="90" align="right">
+        <template #header>
+          <el-tooltip content="取数来源：D0-1 函证汇总表中该公司的回函金额" placement="top">
+            <span style="cursor:help;border-bottom:1px dashed #909399">A 回函金额</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <span class="diff-checklist-master__amount">{{ formatAmount(row.a_reply_amount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="E 账面金额" prop="e_book_amount" width="110" align="right">
+      <el-table-column label="E 账面金额" prop="e_book_amount" min-width="90" align="right">
+        <template #header>
+          <el-tooltip content="取数来源：D0-1 函证汇总表中该公司的发函金额（即我方账面余额）" placement="top">
+            <span style="cursor:help;border-bottom:1px dashed #909399">E 账面金额</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <span class="diff-checklist-master__amount">{{ formatAmount(row.e_book_amount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="I 最终差异" prop="i_final_diff" width="110" align="right">
+      <el-table-column label="I 最终差异" prop="i_final_diff" min-width="90" align="right">
+        <template #header>
+          <el-tooltip content="自动计算：I = D - H = (A+B-C) - (E+F-G)，为0表示已平衡" placement="top">
+            <span style="cursor:help;border-bottom:1px dashed #909399">I 最终差异</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <span
             :class="[
@@ -108,24 +128,16 @@
           </span>
         </template>
       </el-table-column>
-      <!-- 差异状态 -->
-      <el-table-column label="状态" width="90" align="center">
+      <el-table-column label="状态" min-width="70" align="center">
         <template #default="{ row }">
-          <el-tag
-            :type="statusTagType(row.status)"
-            size="small"
-            effect="dark"
-          >
+          <el-tag :type="statusTagType(row.status)" size="small" effect="dark">
             {{ statusLabel(row.status) }}
           </el-tag>
         </template>
       </el-table-column>
-      <!-- 来源标识 -->
-      <el-table-column label="来源" width="60" align="center">
+      <el-table-column label="来源" min-width="50" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row._source === 'auto'" size="small" type="primary" effect="plain">
-            自动
-          </el-tag>
+          <el-tag v-if="row._source === 'auto'" size="small" type="primary" effect="plain">自动</el-tag>
           <span v-else>—</span>
         </template>
       </el-table-column>
@@ -133,11 +145,7 @@
 
     <!-- 空态提示 -->
     <div v-if="!companies.length" class="diff-checklist-master__empty">
-      <el-empty description="暂无公司调节数据" :image-size="60">
-        <el-button v-if="!readonly" size="small" type="primary" @click="$emit('import-d04')">
-          从 D0-4 差异表带入
-        </el-button>
-      </el-empty>
+      <span style="color:#909399;font-size:12px">暂无数据，请新增公司或从 D0-4 带入</span>
     </div>
   </div>
 </template>
@@ -162,6 +170,7 @@ const emit = defineEmits<{
   (e: 'import-d04'): void
   (e: 'import-excel'): void
   (e: 'export-excel'): void
+  (e: 'export-template'): void
   (e: 'jump-d04', confirmIndex: string): void
   (e: 'select', company: DiffChecklistCompany | null): void
 }>()
@@ -221,6 +230,26 @@ function getRowClassName({ row }: { row: DiffChecklistCompany }) {
   gap: 12px;
 }
 
+/* 表头折行 + 字号 */
+.diff-checklist-master__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 13px;
+}
+
+.diff-checklist-master__table :deep(.el-table__body td .cell) {
+  font-size: 13px;
+}
+
+/* 勾选列居中 */
+.diff-checklist-master__table :deep(.el-table-column--selection .cell) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+
 .diff-checklist-master__amount {
   font-variant-numeric: tabular-nums;
 }
@@ -242,7 +271,8 @@ function getRowClassName({ row }: { row: DiffChecklistCompany }) {
 }
 
 .diff-checklist-master__empty {
-  padding: 20px;
+  padding: 12px;
+  text-align: center;
 }
 
 :deep(.diff-checklist-master__row--alert) {

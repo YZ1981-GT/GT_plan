@@ -17,8 +17,11 @@
         <el-button size="small" :disabled="readonly" @click="$emit('import-excel')">
           导入
         </el-button>
+        <el-button size="small" @click="$emit('export-template')">
+          导出模板
+        </el-button>
         <el-button size="small" @click="$emit('export-excel')">
-          导出
+          导出数据
         </el-button>
       </el-button-group>
       <div class="diff-reconcile-master__toolbar-right">
@@ -45,22 +48,44 @@
       show-summary
       :summary-method="getSummaries"
       :row-class-name="getRowClassName"
+      table-layout="auto"
       max-height="560"
       @selection-change="handleSelectionChange"
+      class="diff-reconcile-master__table"
     >
-      <el-table-column v-if="!readonly" type="selection" width="35" fixed="left" />
-      <el-table-column label="序号" prop="seq" width="55" align="center" fixed="left" />
-      <el-table-column label="函证索引号" prop="confirm_index" width="110" fixed="left">
+      <el-table-column v-if="!readonly" type="selection" width="36" align="center" />
+      <el-table-column label="序号" prop="seq" min-width="45" align="center" />
+      <el-table-column label="函证索引号" prop="confirm_index" min-width="90">
         <template #default="{ row }">
-          <span class="diff-reconcile-master__link" @click="$emit('jump-d01', row.confirm_index)">
+          <div v-if="!readonly" style="display:flex;align-items:center;gap:4px">
+            <el-input
+              :model-value="row.confirm_index"
+              size="small"
+              placeholder="D0-"
+              @change="(val: string) => $emit('update', row._row_id, 'confirm_index', val)"
+            />
+            <el-icon v-if="row.confirm_index" style="cursor:pointer;color:var(--el-color-primary);flex-shrink:0" @click="$emit('jump-d01', row.confirm_index)"><Link /></el-icon>
+          </div>
+          <span v-else class="diff-reconcile-master__link" @click="$emit('jump-d01', row.confirm_index)">
             {{ row.confirm_index || '—' }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="被询证单位" prop="entity_name" width="150" show-overflow-tooltip />
+      <el-table-column label="被询证单位" prop="entity_name" min-width="120">
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.entity_name"
+            size="small"
+            placeholder="单位名称"
+            @change="(val: string) => $emit('update', row._row_id, 'entity_name', val)"
+          />
+          <span v-else>{{ row.entity_name || '—' }}</span>
+        </template>
+      </el-table-column>
 
       <!-- 科目列：下拉 + allow-create -->
-      <el-table-column label="科目" prop="subject" width="130">
+      <el-table-column label="科目" prop="subject" min-width="100">
         <template #default="{ row }">
           <el-select
             v-if="!readonly"
@@ -84,7 +109,7 @@
       </el-table-column>
 
       <!-- 金额列 -->
-      <el-table-column label="发函金额" prop="sent_amount" width="120" align="right">
+      <el-table-column label="发函金额" prop="sent_amount" min-width="95" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!readonly"
@@ -99,7 +124,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="回函金额" prop="reply_amount" width="120" align="right">
+      <el-table-column label="回函金额" prop="reply_amount" min-width="95" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!readonly"
@@ -115,7 +140,7 @@
       </el-table-column>
 
       <!-- 差异列：只读自动 -->
-      <el-table-column label="差异金额" prop="difference" width="110" align="right">
+      <el-table-column label="差异金额" prop="difference" min-width="90" align="right">
         <template #header>
           <span>差异金额</span>
           <el-tooltip content="自动计算：发函金额 − 回函金额" placement="top">
@@ -139,7 +164,7 @@
       </el-table-column>
 
       <!-- 差异类型 -->
-      <el-table-column label="差异类型" prop="diff_type" width="120">
+      <el-table-column label="差异类型" prop="diff_type" min-width="95">
         <template #default="{ row }">
           <el-select
             v-if="!readonly"
@@ -164,7 +189,7 @@
       </el-table-column>
 
       <!-- 是否调整 -->
-      <el-table-column label="是否调整" prop="needs_adjustment" width="90" align="center">
+      <el-table-column label="是否调整" prop="needs_adjustment" min-width="70" align="center">
         <template #header>
           <span>是否调整</span>
           <el-tooltip content="需调整→关联 AJE；未达账项→链接替代程序 D0-5/D0-6" placement="top">
@@ -199,7 +224,7 @@
       </el-table-column>
 
       <!-- 来源标识 -->
-      <el-table-column label="来源" width="60" align="center">
+      <el-table-column label="来源" min-width="50" align="center">
         <template #default="{ row }">
           <el-tag v-if="row._source === 'auto'" size="small" type="primary" effect="plain">
             自动
@@ -213,7 +238,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Plus, Delete, Download, InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import { Plus, Delete, Download, InfoFilled, WarningFilled, Link } from '@element-plus/icons-vue'
 import type { DiffReconcileRow, DiffSummaryBySubject } from './diffReconcileTypes'
 
 const props = defineProps<{
@@ -234,6 +259,7 @@ const emit = defineEmits<{
   (e: 'import-d01'): void
   (e: 'import-excel'): void
   (e: 'export-excel'): void
+  (e: 'export-template'): void
   (e: 'jump-d01', confirmIndex: string): void
 }>()
 
@@ -316,6 +342,33 @@ function diffTypeColor(type: string): string {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* 表头折行 + 紧凑 */
+.diff-reconcile-master__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 13px;
+}
+
+.diff-reconcile-master__table :deep(.el-table__body td .cell) {
+  font-size: 13px;
+}
+
+/* 合计行不折行 */
+.diff-reconcile-master__table :deep(.el-table__footer td .cell) {
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 勾选列居中 */
+.diff-reconcile-master__table :deep(.el-table-column--selection .cell) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
 }
 
 .diff-reconcile-master__amount {

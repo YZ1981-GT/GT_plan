@@ -4,6 +4,24 @@
 import type { FollowupRow } from '../followupTypes'
 import { getTemplate } from '../memoTemplates'
 
+/** 字段英文→中文标签映射 */
+const FIELD_LABELS: Record<string, string> = {
+  followup_date: '跟函日期',
+  entity_name: '被函证单位',
+  entity_address: '单位地址',
+  confirm_contact: '确认联系人',
+  confirm_identity_verified: '身份确认情况',
+  confirm_location: '确认地点',
+  leave_date: '留函日期',
+  leave_contact: '留函联系人',
+  follow_call_date: '跟踪致电日期',
+  follow_call_phone: '跟踪电话',
+  follow_call_result: '跟踪结果',
+  received_date: '回函收回日期',
+  received_office: '收回办公室',
+  received_confirm_index: '函证索引号',
+}
+
 export function useMemoCompose() {
   /** 根据行字段自动生成备忘录文本 */
   function compose(row: FollowupRow): { text: string; missingFields: string[] } {
@@ -15,8 +33,8 @@ export function useMemoCompose() {
     const text = template.replace(/〔(\w+)〕/g, (_match, field) => {
       const value = (row as any)[field]
       if (value != null && value !== '') return String(value)
-      missingFields.push(field)
-      return `〔${field}〕`  // Keep placeholder highlighted
+      missingFields.push(FIELD_LABELS[field] || field)
+      return `〔${FIELD_LABELS[field] || field}〕`
     })
 
     return { text, missingFields }

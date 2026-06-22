@@ -1,7 +1,7 @@
 <template>
   <div v-if="company" class="diff-checklist-detail">
     <div class="diff-checklist-detail__title">
-      <span>{{ company.entity_name || '(未命名)' }}</span>
+      <span>{{ company.entity_name || '请在左侧表格填写单位名称' }}</span>
       <el-tag :type="statusTagType(company.status)" size="small" effect="dark">
         {{ statusLabel(company.status) }}
       </el-tag>
@@ -166,14 +166,25 @@
 
       <!-- 审计说明（逐公司） -->
       <div class="diff-checklist-detail__note">
-        <span class="diff-checklist-detail__label">审计说明</span>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span class="diff-checklist-detail__label">审计说明</span>
+          <el-button
+            v-if="!readonly"
+            size="small"
+            type="primary"
+            plain
+            @click="handleAiNote"
+          >
+            AI 生成
+          </el-button>
+        </div>
         <el-input
           v-if="!readonly"
           :model-value="company.audit_note"
           type="textarea"
-          :rows="2"
+          :autosize="{ minRows: 2, maxRows: 5 }"
           size="small"
-          placeholder="记录差异原因分析及处理意见"
+          placeholder="记录差异原因分析及处理意见（点击 AI 生成可根据调节数据自动填写）"
           @change="(val: string) => $emit('update', company._row_id!, 'audit_note', val)"
         />
         <span v-else>{{ company.audit_note || '—' }}</span>
@@ -189,20 +200,57 @@
 
 <script setup lang="ts">
 import { InfoFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import type { DiffChecklistCompany } from './diffChecklistTypes'
 import DetailSubTable from './DetailSubTable.vue'
 
-defineProps<{
+const props = defineProps<{
   company: DiffChecklistCompany | null
   readonly: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'update', companyId: string, field: string, value: any): void
   (e: 'add-sub-row', companyId: string, section: 'b' | 'c' | 'f' | 'g'): void
   (e: 'delete-sub-row', companyId: string, section: 'b' | 'c' | 'f' | 'g', rowId: string): void
   (e: 'update-sub-row', companyId: string, section: 'b' | 'c' | 'f' | 'g', rowId: string, field: string, value: any): void
 }>()
+
+function handleAiNote() {
+  if (!props.company) return
+  const c = props.company
+  const entity = c.entity_name || '该公司'
+  const a = c.a_reply_amount ?? 0
+  const e = c.e_book_amount ?? 0
+  const d = c.d_adjusted_reply ?? 0
+  const h = c.h_adjusted_book ?? 0
+  const i = c.i_final_diff ?? 0
+  const bCount = (c.b_rows ?? []).length
+  const cCount = (c.c_rows ?? []).length
+  const fCount = (c.f_rows ?? []).length
+  const gCount = (c.g_rows ?? []).length
+
+  let note = ''
+  if (i === 0) {
+    note = `经双向调节，${entity}差异已完全消除。`
+    + `回函金额 ${a.toLocaleString()} 元，账面金额 ${e.toLocaleString()} 元。`
+    if (bCount + cCount + fCount + gCount > 0) {
+      note += `共识别未达账项 ${bCount + cCount + fCount + gCount} 笔`
+      + `（对方调节 ${bCount + cCount} 笔，我方调节 ${fCount + gCount} 笔），`
+      + `调节后双方余额一致（D=${d.toLocaleString()}，H=${h.toLocaleString()}），差异为零。`
+    } else {
+      note += `双方账面一致，无需调节。`
+    }
+  } else {
+    note = `${entity}经调节后仍存在差异 ${i.toLocaleString()} 元。`
+    + `回函金额 ${a.toLocaleString()} 元，账面金额 ${e.toLocaleString()} 元。`
+    + `调节后对方余额 D=${d.toLocaleString()} 元，我方余额 H=${h.toLocaleString()} 元。`
+    + `差异原因待进一步核查，建议关注是否存在未识别的未达账项或记账错误。`
+  }
+
+  emit('update', c._row_id!, 'audit_note', note)
+  ElMessage.success('已根据调节数据生成审计说明（仅供参考，请根据实际情况修改）')
+}
 
 function formatAmount(val?: number): string {
   if (val == null) return '—'
@@ -233,7 +281,10 @@ function statusLabel(status?: string): string {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  min-height: 100px;
+  padding: 16px;
+  color: #909399;
+  font-size: 13px;
 }
 
 .diff-checklist-detail__title {

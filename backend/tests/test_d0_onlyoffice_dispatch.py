@@ -59,6 +59,8 @@ def _build_d0_classifications() -> list[ClassificationResult]:
         _make_classification("审定表D0-1", "D-函证"),
         _make_classification("业务模式评估D0-5", "D-业务模式"),
         _make_classification("复核记录D0-7", "D-复核记录"),
+        # 无 sheet 级 override 的非白名单 sheet → 仍走 onlyoffice-sheet（验证降级路径未破坏）
+        _make_classification("自定义测算表", "D-业务模式"),
     ]
 
 
@@ -240,34 +242,29 @@ async def test_d0_non_whitelist_sheets_get_onlyoffice_component_type():
             )
 
         if "审定表D0-1" in sheet_map:
-            assert sheet_map["审定表D0-1"]["componentType"] == "d-form-confirmation", (
-                "白名单 sheet '审定表D0-1' 应保持 componentType='d-form-confirmation'"
+            # D0-1 命中 sheet-override → confirmation-summary（协作者精细组件）
+            assert sheet_map["审定表D0-1"]["componentType"] == "confirmation-summary", (
+                "D0-1 应按 sheet-override 路由到 'confirmation-summary'"
             )
 
-        # ─── 验证非白名单 sheet 被重写为 onlyoffice-sheet ─────────────────
+        # ─── 验证非白名单 sheet 路由 ─────────────────
+        # 注：D0-5/D0-7 等有 sheet 级 override(协作者 confirmation-* 精细组件)的，
+        # 现按 sheet-override 路由到 confirmation-*；无 override 的非白名单 sheet 才走 onlyoffice-sheet。
         if "业务模式评估D0-5" in sheet_map:
             s = sheet_map["业务模式评估D0-5"]
-            assert s["componentType"] == "onlyoffice-sheet", (
-                f"非白名单 sheet '业务模式评估D0-5' 应为 'onlyoffice-sheet'，"
+            # D0-5 命中 sheet-override → confirmation-alternative-d05（精细组件优先）
+            assert s["componentType"] == "confirmation-alternative-d05", (
+                f"D0-5 应按 sheet-override 路由到 'confirmation-alternative-d05'，"
                 f"实际为 '{s['componentType']}'"
-            )
-            assert s["html_data"] is not None
-            assert s["html_data"].get("onlyoffice") is True, (
-                "html_data.onlyoffice 应为 True"
-            )
-            assert s["html_data"].get("sheet_name") == "业务模式评估D0-5", (
-                "html_data.sheet_name 应与 sheet_name 一致"
             )
 
         if "复核记录D0-7" in sheet_map:
             s = sheet_map["复核记录D0-7"]
-            assert s["componentType"] == "onlyoffice-sheet", (
-                f"非白名单 sheet '复核记录D0-7' 应为 'onlyoffice-sheet'，"
+            # D0-7 命中 sheet-override → confirmation-reliability（精细组件优先）
+            assert s["componentType"] == "confirmation-reliability", (
+                f"D0-7 应按 sheet-override 路由到 'confirmation-reliability'，"
                 f"实际为 '{s['componentType']}'"
             )
-            assert s["html_data"] is not None
-            assert s["html_data"].get("onlyoffice") is True
-            assert s["html_data"].get("sheet_name") == "复核记录D0-7"
 
 
 @pytest.mark.anyio
@@ -405,8 +402,9 @@ async def test_onlyoffice_sheet_html_data_structure():
         sheets = result.get("sheets", [])
         onlyoffice_sheets = [s for s in sheets if s["componentType"] == "onlyoffice-sheet"]
 
-        assert len(onlyoffice_sheets) >= 2, (
-            f"预期至少 2 个 onlyoffice-sheet，实际 {len(onlyoffice_sheets)}"
+        # 「自定义测算表」无 sheet-override 的非白名单 sheet → onlyoffice-sheet（降级路径仍生效）
+        assert len(onlyoffice_sheets) >= 1, (
+            f"预期至少 1 个 onlyoffice-sheet，实际 {len(onlyoffice_sheets)}"
         )
 
         for s in onlyoffice_sheets:

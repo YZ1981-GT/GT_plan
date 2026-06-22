@@ -50,6 +50,7 @@
         @jump-to-reference="onHtmlJumpToReference"
         @open-formula="onHtmlOpenFormula"
         @open-attachment="onOpenAttachment"
+        @sheet-change="onHtmlSheetChange"
       />
 
       <!-- 默认 Univer 编辑器（component_type='univer' 或未配置时） -->
@@ -247,6 +248,7 @@
       :component-type="componentType || ''"
       :project-id="projectId"
       :year="projectYear || new Date().getFullYear() - 1"
+      :sheet-code="activeHtmlSheetCode"
     />
   </div><!-- /gt-wp-editor-with-guidance -->
 
@@ -746,6 +748,15 @@ function onHtmlCrossRefUpdate(payload: { source_wp_code: string; target_wp_code:
 
 function onHtmlSyncToDisclosureNotes(_payload: Record<string, any>) {
   // C 附注组件已直接调用 API，此处仅占位
+}
+
+// ─── HTML 渲染器 sheet 切换（guidance 联动）────────────────────────────────
+const activeHtmlSheetCode = ref<string>('')
+
+function onHtmlSheetChange(sheetName: string) {
+  // 从 sheet 名提取子码（如"函证结果汇总表D0-1" → "D0-1"）
+  const m = sheetName.match(/([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$/)
+  activeHtmlSheetCode.value = m ? m[1] : ''
 }
 
 function onHtmlJumpToReference(refCode: string) {

@@ -27,12 +27,11 @@ _GUIDANCE_DIR = Path(__file__).resolve().parent.parent.parent / "data" / "wp_gui
 # ---------------------------------------------------------------------------
 
 
-@lru_cache(maxsize=32)
 def get_wp_guidance(wp_code: str) -> dict | None:
-    """按 wp_code 加载准则说明 JSON。
+    """按 wp_code 加载准则说明 JSON（无缓存，文件极小每次读取开销可忽略，改 JSON 后无需重启）。
 
     Returns:
-        guidance dict with {wp_code, title, sections: [{title, items}]}
+        guidance dict with {wp_code, title, sections: [{title, content}]}
         或 None 如果不存在对应文件
     """
     path = _GUIDANCE_DIR / f"{wp_code}.json"

@@ -23,8 +23,11 @@
         <el-button size="small" :disabled="readonly" @click="$emit('import-excel')">
           导入
         </el-button>
-        <el-button size="small" @click="$emit('export-excel')">
-          导出
+        <el-button size="small" @click="$emit('export-template')">
+          导出模板
+        </el-button>
+        <el-button size="small" @click="$emit('export-data')">
+          导出数据
         </el-button>
       </el-button-group>
       <div class="reliability-grid__toolbar-right">
@@ -336,7 +339,8 @@ const emit = defineEmits<{
   (e: 'update', rowId: string, field: string, value: any): void
   (e: 'import-d01'): void
   (e: 'import-excel'): void
-  (e: 'export-excel'): void
+  (e: 'export-template'): void
+  (e: 'export-data'): void
   (e: 'jump-d01', confirmIndex: string): void
 }>()
 

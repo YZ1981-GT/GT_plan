@@ -1,15 +1,22 @@
 <template>
   <div class="confirmation-master">
     <div v-if="!readonly" class="confirmation-master__toolbar">
-      <el-button type="primary" size="small" @click="$emit('add')">
-        <el-icon><Plus /></el-icon> 新增
-      </el-button>
-      <el-button type="danger" size="small" :disabled="!selectedIds.length" @click="$emit('delete')">
-        删除选中
-      </el-button>
-      <el-button type="success" size="small" @click="$emit('save')">
-        保存
-      </el-button>
+      <div class="confirmation-master__toolbar-left">
+        <el-button type="primary" size="small" @click="$emit('add')">
+          <el-icon><Plus /></el-icon> 新增
+        </el-button>
+        <el-button type="danger" size="small" :disabled="!selectedIds.length" @click="$emit('delete')">
+          删除选中
+        </el-button>
+        <el-button type="success" size="small" @click="$emit('save')">
+          保存
+        </el-button>
+      </div>
+      <div class="confirmation-master__toolbar-right">
+        <el-button size="small" type="info" plain @click="$emit('show-formula')">fx 公式</el-button>
+        <el-button size="small" @click="$emit('download-template')">↓ 导入模板</el-button>
+        <el-button size="small" @click="$emit('import-data')">↑ 导入</el-button>
+      </div>
     </div>
     <el-table
       :data="rows"
@@ -18,19 +25,20 @@
       highlight-current-row
       border
       size="small"
+      table-layout="auto"
       class="confirmation-master__table"
     >
-      <el-table-column v-if="!readonly" type="selection" width="40" />
-      <el-table-column prop="seq" label="序号" width="60" align="center" />
-      <el-table-column prop="confirm_index" label="索引号" width="100" />
-      <el-table-column prop="entity_name" label="被询证单位" min-width="160" show-overflow-tooltip />
-      <el-table-column prop="account_type" label="科目" width="120" />
-      <el-table-column prop="amount" label="函证金额" width="120" align="right">
+      <el-table-column v-if="!readonly" type="selection" width="36" align="center" />
+      <el-table-column prop="seq" label="序号" min-width="45" align="center" />
+      <el-table-column prop="confirm_index" label="索引号" min-width="70" />
+      <el-table-column prop="entity_name" label="被询证单位" min-width="130" show-overflow-tooltip />
+      <el-table-column prop="account_type" label="科目" min-width="80" />
+      <el-table-column prop="amount" label="函证金额" min-width="90" align="right">
         <template #default="{ row }">
           {{ formatAmount(row.amount) }}
         </template>
       </el-table-column>
-      <el-table-column prop="match_status" label="相符情况" width="100" align="center">
+      <el-table-column prop="match_status" label="相符情况" min-width="70" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.match_status === '相符'" type="success" size="small">相符</el-tag>
           <el-tag v-else-if="row.match_status === '不符'" type="danger" size="small">不符</el-tag>
@@ -38,7 +46,7 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
-      <el-table-column prop="is_replied" label="回函" width="70" align="center">
+      <el-table-column prop="is_replied" label="回函" min-width="55" align="center">
         <template #default="{ row }">
           <el-tag v-if="row.is_replied" type="success" size="small">是</el-tag>
           <el-tag v-else type="info" size="small">否</el-tag>
@@ -62,6 +70,9 @@ const emit = defineEmits<{
   (e: 'add'): void
   (e: 'delete'): void
   (e: 'save'): void
+  (e: 'download-template'): void
+  (e: 'import-data'): void
+  (e: 'show-formula'): void
   (e: 'row-click', row: ConfirmationRow): void
   (e: 'update:selectedIds', ids: string[]): void
 }>()
@@ -79,11 +90,42 @@ function formatAmount(amount: number | undefined | null): string {
 <style scoped>
 .confirmation-master__toolbar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 12px;
+}
+.confirmation-master__toolbar-left {
+  display: flex;
+  gap: 6px;
+}
+.confirmation-master__toolbar-right {
+  display: flex;
+  gap: 6px;
 }
 
 .confirmation-master__table {
   width: 100%;
+}
+
+/* 表头折行显示 */
+.confirmation-master__table :deep(.el-table__header th .cell) {
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.3;
+  font-size: 12px;
+}
+
+/* 勾选列居中 */
+.confirmation-master__table :deep(.el-table-column--selection .cell) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0;
+}
+
+.confirmation-master__table :deep(.el-table__body td .cell) {
+  font-size: 12px;
 }
 </style>
