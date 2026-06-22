@@ -335,7 +335,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAlternativeData } from './composables/useAlternativeData'
 import type { AlternativeCompany, BlockType, CheckRow } from './alternativeD05Types'
@@ -398,6 +398,11 @@ function handleSelectCompany(companyId: string) {
 function handleAddCompany() {
   const company = data.addCompany()
   data.selectedCompanyId.value = company._company_id!
+  // 自动滚动到详情区
+  nextTick(() => {
+    const el = document.querySelector('.gt-confirmation-alternative-d05__detail')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 function handleDeleteCompany(companyId: string) {

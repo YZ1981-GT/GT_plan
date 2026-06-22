@@ -139,6 +139,16 @@
                   @change="(val: string) => handleUpdate(item._row_id!, 'countermeasure', val)"
                 />
                 <span v-else class="fraud-risk-checklist__field-value">{{ item.countermeasure || '—' }}</span>
+                <el-button
+                  v-if="!readonly && !item.countermeasure && getCountermeasurePreset(item.seq)"
+                  size="small"
+                  type="warning"
+                  text
+                  class="fraud-risk-checklist__preset-btn"
+                  @click="handleFillPreset(item)"
+                >
+                  推荐
+                </el-button>
                 <el-icon v-if="isHighlighted(item) && needsCountermeasure(item)" class="fraud-risk-checklist__warn-icon"><Warning /></el-icon>
               </div>
             </div>
@@ -150,11 +160,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Plus, Delete, InfoFilled, Warning, MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import type { FraudRiskRow } from './fraudRiskTypes'
 import { ITEM_TOOLTIPS_D08, GUIDANCE_NOTES_D08 } from './fraudRiskPresets'
 import { FRAUD_RISK_EXIST_OPTIONS } from './fraudRiskEnums'
+import { getCountermeasurePreset } from './countermeasurePresets'
 
 const props = defineProps<{
   items: FraudRiskRow[]
@@ -217,8 +229,39 @@ const groupedItems = computed<ItemGroup[]>(() => {
   return result
 })
 
-// 默认展开全部
-const activeGroups = ref<string[]>(RISK_GROUPS.map(g => g.key))
+// 默认折叠策略：只展开有"是"标记的组 + "其他"组
+const activeGroups = ref<string[]>(computeDefaultActiveGroups())
+
+function computeDefaultActiveGroups(): string[] {
+  // 初始全部展开（首次加载无数据时展示完整），后续由 watch 动态调整
+  return RISK_GROUPS.map(g => g.key)
+}
+
+// 数据加载后自动收起无风险组（仅在有数据时生效）
+watch(
+  () => props.items.length,
+  (len) => {
+    if (len === 0) return
+    const groupsWithRisk = new Set<string>()
+    for (const item of props.items) {
+      if (item.is_exist === '是' || item.is_exist === '待核实') {
+        const seq = item.seq ?? 0
+        for (const g of RISK_GROUPS) {
+          if (seq >= g.seqRange[0] && seq <= g.seqRange[1]) {
+            groupsWithRisk.add(g.key)
+            break
+          }
+        }
+      }
+    }
+    // 始终展开"其他"组（自定义条目 + 通用风险）
+    groupsWithRisk.add('other')
+    // 如果没有任何风险标记，全部展开（空态）
+    if (groupsWithRisk.size <= 1) return
+    activeGroups.value = [...groupsWithRisk]
+  },
+  { immediate: true }
+)
 
 function getGroupExistCount(groupKey: string): number {
   const group = groupedItems.value.find(g => g.key === groupKey)
@@ -238,6 +281,14 @@ function handleDelete(rowId: string) {
 
 function handleUpdate(rowId: string, field: string, value: any) {
   emit('update', rowId, field, value)
+}
+
+function handleFillPreset(item: FraudRiskRow) {
+  const preset = getCountermeasurePreset(item.seq)
+  if (preset && item._row_id) {
+    emit('update', item._row_id, 'countermeasure', preset)
+    ElMessage.success(`已填入第 ${item.seq} 条推荐应对措施（可修改）`)
+  }
 }
 </script>
 
@@ -423,5 +474,10 @@ function handleUpdate(rowId: string, field: string, value: any) {
   color: var(--el-color-warning);
   font-size: 15px;
   margin-left: 4px;
+}
+
+.fraud-risk-checklist__preset-btn {
+  flex-shrink: 0;
+  font-size: 11px;
 }
 </style>

@@ -313,7 +313,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAlternativeD06Data } from './composables/useAlternativeD06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
@@ -378,6 +378,10 @@ function handleSelectCompany(companyId: string) {
 function handleAddCompany() {
   const company = data.addCompany()
   data.selectedCompanyId.value = company._company_id!
+  nextTick(() => {
+    const el = document.querySelector('.gt-confirmation-alternative-d06__detail')
+    el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
 }
 
 function handleDeleteCompany(companyId: string) {
