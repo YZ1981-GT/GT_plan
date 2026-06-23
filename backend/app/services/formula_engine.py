@@ -385,10 +385,12 @@ class _RecursiveDescentParser:
         return ASTFuncCall(name=name_tok.value, args=args)
 
 
+@lru_cache(maxsize=2048)
 def parse_to_ast(formula: str) -> Any:
     """解析公式字符串为 AST（内核 parse 层入口）。
 
     解析结果可缓存（同公式不重复解析）。
+    AST 节点构造后从不修改字段，可安全共享。
     """
     tokens = _tokenize(formula)
     if not tokens:
@@ -773,17 +775,7 @@ _REGISTRY.register("IF", _handle_if, arity=3, description="条件判断", syntax
 # 公式 Token 解析（Regex）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_TOKEN_PATTERNS = [
-    ("SUM_ROW", re.compile(r"SUM_ROW\('([^']+)','([^']+)'\)")),
-    ("SUM_TB", re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")),
-    ("TB", re.compile(r"TB\('([^']+)','([^']+)'\)")),
-    ("ROW", re.compile(r"ROW\('([^']+)'\)")),
-    ("REPORT", re.compile(r"REPORT\('([^']+)','([^']+)'\)")),
-    ("PREV", re.compile(r"PREV\('([^']+)','([^']+)'\)")),
-    ("AUX", re.compile(r"AUX\('([^']+)','([^']*?)','([^']+)'\)")),
-    ("NOTE", re.compile(r"NOTE\('([^']+)','([^']+)','([^']+)'\)")),
-    ("WP", re.compile(r"WP\('([^']+)','([^']+)'\)")),
-]
+from app.services.formula_grammar import TOKEN_PATTERNS as _TOKEN_PATTERNS
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

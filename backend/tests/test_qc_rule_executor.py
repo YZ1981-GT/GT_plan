@@ -1,7 +1,7 @@
 """Tests for qc_rule_executor — Python + JSONPath + audit_log 执行器
 
 Validates: Requirements 1, 12 (R3)
-- Python 类型：加载 dotted path 类，沙箱 timeout=10s
+- Python 类型：加载 dotted path 类，timeout-only execution (NOT a security sandbox)
 - JSONPath 类型：只读 parsed_data，用 jsonpath-ng 库
 - audit_log 类型：查询 audit_log_entries 表，JSONPath 过滤 payload
 - SQL/Regex 类型：抛 NotImplementedError
@@ -60,7 +60,7 @@ class TestLoadClassFromDottedPath:
         assert cls.__name__ == "ConclusionNotEmptyRule"
 
     def test_load_nonexistent_module(self):
-        with pytest.raises(ImportError, match="not found"):
+        with pytest.raises(ImportError, match="Disallowed rule class path"):
             _load_class_from_dotted_path("nonexistent.module.SomeClass")
 
     def test_load_nonexistent_class(self):

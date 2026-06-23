@@ -3,7 +3,7 @@
  *
  * 复用 confirmation_subject（与 D0-4 共享科目列），yes_no 通用。
  */
-export { CONFIRMATION_DICT_KEYS } from '../confirmationEnums'
+export { CONFIRMATION_DICT_KEYS } from '../coordination/confirmationDicts'
 
 export const DIFF_CHECKLIST_DICT_KEYS = {
   /** 科目（应收账款/合同负债/…，allow-create 自定义） */

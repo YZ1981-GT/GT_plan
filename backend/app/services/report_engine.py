@@ -39,15 +39,17 @@ logger = logging.getLogger(__name__)
 REPORT_CACHE_TTL = 600
 
 # Regex patterns for formula tokens
-_TB_PATTERN = re.compile(r"TB\('([^']+)','([^']+)'\)")
-_SUM_TB_PATTERN = re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")
-_ROW_PATTERN = re.compile(r"ROW\('([^']+)'\)")
-_SUM_ROW_PATTERN = re.compile(r"SUM_ROW\('([^']+)','([^']+)'\)")
-_REPORT_PATTERN = re.compile(r"REPORT\('([^']+)','([^']+)'\)")
-_NOTE_PATTERN = re.compile(r"NOTE\('([^']+)','([^']+)','([^']+)'\)")
-_WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'\)")
-_PREV_PATTERN = re.compile(r"PREV\('([^']+)','([^']+)'\)")
-_AUX_PATTERN = re.compile(r"AUX\('([^']+)','([^']*?)','([^']+)'\)")
+from app.services.formula_grammar import (
+    TB_PATTERN as _TB_PATTERN,
+    SUM_TB_PATTERN as _SUM_TB_PATTERN,
+    ROW_PATTERN as _ROW_PATTERN,
+    SUM_ROW_PATTERN as _SUM_ROW_PATTERN,
+    REPORT_PATTERN as _REPORT_PATTERN,
+    NOTE_PATTERN as _NOTE_PATTERN,
+    WP_PATTERN as _WP_PATTERN,
+    PREV_PATTERN as _PREV_PATTERN,
+    AUX_PATTERN as _AUX_PATTERN,
+)
 
 # Column name mapping: Chinese → TrialBalance field
 _COLUMN_MAP = {
@@ -754,15 +756,15 @@ class ReportEngine:
     # Redis 缓存
     # ------------------------------------------------------------------
 
-    def _cache_key(self, project_id: UUID, report_type: str) -> str:
-        return f"report:{project_id}:{report_type}"
+    def _cache_key(self, project_id: UUID, year: int, report_type: str) -> str:
+        return f"report:{project_id}:{year}:{report_type}"
 
-    async def _get_cached_report(self, project_id: UUID, report_type: str) -> list[dict] | None:
+    async def _get_cached_report(self, project_id: UUID, year: int, report_type: str) -> list[dict] | None:
         """从 Redis 读取缓存的报表数据"""
         if not self.redis:
             return None
         try:
-            key = self._cache_key(project_id, report_type)
+            key = self._cache_key(project_id, year, report_type)
             cached = await self.redis.get(key)
             if cached:
                 return json.loads(cached)
@@ -770,29 +772,30 @@ class ReportEngine:
             pass
         return None
 
-    async def _set_cached_report(self, project_id: UUID, report_type: str, data: list[dict]) -> None:
+    async def _set_cached_report(self, project_id: UUID, year: int, report_type: str, data: list[dict]) -> None:
         """写入报表缓存"""
         if not self.redis:
             return
         try:
-            key = self._cache_key(project_id, report_type)
+            key = self._cache_key(project_id, year, report_type)
             await self.redis.setex(key, REPORT_CACHE_TTL, json.dumps(data, cls=_DecimalEncoder))
         except Exception:
             pass
 
     async def _invalidate_report_cache(self, project_id: UUID, report_type: str | None = None) -> int:
-        """失效报表缓存。report_type=None 时失效所有类型。"""
+        """失效报表缓存。使用 SCAN + DELETE 通配符 report:{pid}:* 清除所有年度缓存。"""
         if not self.redis:
             return 0
         count = 0
         try:
-            if report_type:
-                key = self._cache_key(project_id, report_type)
-                count = await self.redis.delete(key)
-            else:
-                for rt in ("balance_sheet", "income_statement", "cash_flow_statement", "equity_statement"):
-                    key = self._cache_key(project_id, rt)
-                    count += await self.redis.delete(key)
+            pattern = f"report:{project_id}:*"
+            cursor = 0
+            while True:
+                cursor, keys = await self.redis.scan(cursor=cursor, match=pattern, count=200)
+                if keys:
+                    count += await self.redis.delete(*keys)
+                if cursor == 0:
+                    break
         except Exception:
             pass
         return count
@@ -801,7 +804,7 @@ class ReportEngine:
         self, project_id: UUID, year: int, report_type: str,
     ) -> list[dict] | None:
         """获取报表数据（优先缓存）"""
-        cached = await self._get_cached_report(project_id, report_type)
+        cached = await self._get_cached_report(project_id, year, report_type)
         if cached is not None:
             return cached
 
@@ -830,7 +833,7 @@ class ReportEngine:
             }
             for r in rows
         ]
-        await self._set_cached_report(project_id, report_type, data)
+        await self._set_cached_report(project_id, year, report_type, data)
         return data
 
     # ------------------------------------------------------------------
@@ -918,7 +921,7 @@ class ReportEngine:
                 debug_info[report_type.value] = type_debug
 
             # 写入缓存
-            await self._set_cached_report(project_id, report_type.value, report_rows)
+            await self._set_cached_report(project_id, year, report_type.value, report_rows)
 
         # 权益 eq_matrix 由 API/导出路径 enrich_equity_statement_rows 内存回填（不写库），
         # 避免「生成写库 vs 导出 enrich」双路径导致 DB 矩阵 stale；手工编辑经 PUT /cell 落库。

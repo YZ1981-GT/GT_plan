@@ -1,7 +1,7 @@
 """QC 规则试运行（dry-run）服务单元测试
 
 Validates: Requirements 2 (Round 3)
-- 对采样底稿跑规则沙箱，不写 DB，返回命中率
+- 对采样底稿跑规则（只读执行），不写 DB，返回命中率
 - scope='project' 限定项目范围
 - scope='all' 全部项目
 - sample_size 控制采样大小

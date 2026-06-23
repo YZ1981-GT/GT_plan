@@ -21,7 +21,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, get_user_scope_cycles, check_consol_lock
+from app.deps import get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock
 from app.models.core import User
 from app.models.report_models import DisclosureNote, NoteStatus
 from app.models.report_schemas import (
@@ -260,7 +260,7 @@ async def update_note(
     note_id: UUID,
     data: DisclosureNoteUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_operation("note:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     """更新附注章节内容"""

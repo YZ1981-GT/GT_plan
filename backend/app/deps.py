@@ -1,4 +1,4 @@
-"""依赖注入 — get_current_user, require_role, require_project_access
+"""依赖注入 — get_current_user, require_role, require_project_access, require_operation
 
 Validates: Requirements 3.7, 3.8, 3.9, 3.10
 """
@@ -398,3 +398,66 @@ async def get_user_scope_cycles(
     if sc and isinstance(sc, str) and sc.strip():
         return [c.strip() for c in sc.split(",") if c.strip()]
     return None
+
+
+# ---------------------------------------------------------------------------
+# _resolve_project_role — 查询用户在项目中的角色
+# ---------------------------------------------------------------------------
+
+
+async def _resolve_project_role(
+    db: AsyncSession, user_id: UUID, project_id: UUID | None
+) -> str | None:
+    """从 ProjectUser 表查询用户在指定项目中的角色。
+
+    返回 project_role 字符串（如 "manager"/"preparer"），无记录返回 None。
+    project_id 为 None 时直接返回 None（全局端点仅依赖 system_role）。
+    """
+    if project_id is None:
+        return None
+
+    result = await db.execute(
+        select(ProjectUser.role).where(
+            ProjectUser.project_id == project_id,
+            ProjectUser.user_id == user_id,
+            ProjectUser.is_deleted == False,  # noqa: E712
+        )
+    )
+    role_enum = result.scalar_one_or_none()
+    return role_enum.value if role_enum else None
+
+
+# ---------------------------------------------------------------------------
+# require_operation — 权限矩阵操作级授权工厂
+# ---------------------------------------------------------------------------
+
+
+def require_operation(operation: str) -> Callable:
+    """操作级权限校验依赖工厂。
+
+    根据 permission_matrix_service.can(system_role, project_role, operation) 判断。
+    admin/partner 始终通过（矩阵中已定义全集）。
+    project_id 从路径参数/查询参数自动获取；无 project_id 的全局端点仅按 system_role 判断。
+    """
+
+    async def dependency(
+        current_user: User = Depends(get_current_user),
+        project_id: UUID | None = None,
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        from app.services.permission_matrix_service import can
+
+        system_role = current_user.role.value
+        project_role = await _resolve_project_role(db, current_user.id, project_id)
+
+        if not can(system_role, project_role, operation):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error_code": "OPERATION_NOT_ALLOWED",
+                    "operation": operation,
+                },
+            )
+        return current_user
+
+    return dependency

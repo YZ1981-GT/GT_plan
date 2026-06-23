@@ -144,5 +144,5 @@
 - 后端使用 Python (hypothesis for PBT)，前端使用 TypeScript (fast-check for PBT)
 - Service 层只 flush 不 commit，commit 在 router 层执行
 - EventBus publish 只传 EventPayload，遵循现有事件总线规范
-- 迁移为 V092，接续当前最高 V091
+- 迁移为 V093（V092 已被 multi-worker-readiness 使用），接续当前最高 V092
 - Property tests 使用 `@settings(max_examples=5)` 符合项目约定

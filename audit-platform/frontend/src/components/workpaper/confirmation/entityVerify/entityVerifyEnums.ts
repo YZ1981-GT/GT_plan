@@ -3,7 +3,7 @@
  *
  * 大部分复用 D0-1 的 confirmationEnums，仅新增 confirmation_send_result
  */
-export { CONFIRMATION_DICT_KEYS } from '../confirmationEnums'
+export { CONFIRMATION_DICT_KEYS } from '../coordination/confirmationDicts'
 
 /** D0-2 额外枚举 */
 export const ENTITY_VERIFY_DICT_KEYS = {

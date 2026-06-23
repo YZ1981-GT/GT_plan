@@ -6,17 +6,28 @@
 - PaddleOCR/Tesseract 失败 → MinerU（兜底，复杂文档解析）
 - 支持延迟初始化，按需加载引擎（PaddleOCR ~500MB）
 - 引擎不可用时自动回退到另一引擎
+
+v2: OCR 服务化 — 优先 HTTP 调用独立 OCR 容器（OCR_SERVICE_URL），
+    降低 web worker 内存占用。HTTP 超时/错误 → 503 + warning。
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
 from enum import Enum
 from pathlib import Path
 
+import httpx
+
 logger = logging.getLogger(__name__)
+
+# OCR 服务 URL（环境变量配置，为空则走 in-process fallback）
+OCR_SERVICE_URL = os.environ.get("OCR_SERVICE_URL", "").rstrip("/")
+# HTTP 超时配置
+OCR_HTTP_TIMEOUT = float(os.environ.get("OCR_HTTP_TIMEOUT", "30"))
 
 
 class OCREngine(str, Enum):
@@ -24,6 +35,11 @@ class OCREngine(str, Enum):
     TESSERACT = "tesseract"
     MINERU = "mineru"
     AUTO = "auto"
+
+
+class OCRServiceUnavailableError(RuntimeError):
+    """OCR 远程服务不可达（HTTP 超时/连接错误）→ 调用方应返回 503"""
+    pass
 
 
 class UnifiedOCRService:
@@ -54,8 +70,77 @@ class UnifiedOCRService:
     ) -> dict:
         """统一OCR接口
 
+        v2: 优先 HTTP 调用独立 OCR 服务容器（OCR_SERVICE_URL）。
+        HTTP 超时/连接失败 → 返回 503 错误（不 fallback 到 in-process，
+        避免 web worker 内存膨胀）。
+
         Returns:
             {"text": "...", "engine": "paddle|tesseract|mineru", "regions": [...]}
+
+        Raises:
+            OCRServiceUnavailableError: OCR 服务不可达（HTTP 超时/连接错误）
+        """
+        # 优先走 HTTP 远程 OCR 服务
+        if OCR_SERVICE_URL:
+            try:
+                return await self._http_recognize(image_path, mode)
+            except OCRServiceUnavailableError:
+                raise  # 不 fallback — 保护 web worker 内存
+            except Exception as exc:
+                logger.warning(
+                    "OCR HTTP call failed unexpectedly: %s, returning 503", exc
+                )
+                raise OCRServiceUnavailableError(
+                    f"OCR 服务异常: {exc}"
+                ) from exc
+
+        # Fallback: in-process OCR（仅在未配置 OCR_SERVICE_URL 时使用）
+        return await self._in_process_recognize(image_path, mode)
+
+    async def _http_recognize(
+        self, image_path: str, mode: OCREngine = OCREngine.AUTO
+    ) -> dict:
+        """HTTP 调用 OCR 服务容器
+
+        POST /recognize with file upload
+        """
+        engine_param = mode.value if mode != OCREngine.AUTO else "auto"
+        file_name = Path(image_path).name
+
+        async with httpx.AsyncClient(timeout=OCR_HTTP_TIMEOUT) as client:
+            try:
+                with open(image_path, "rb") as f:
+                    resp = await client.post(
+                        f"{OCR_SERVICE_URL}/recognize",
+                        params={"engine": engine_param},
+                        files={"file": (file_name, f)},
+                    )
+            except (httpx.TimeoutException, httpx.ConnectError) as exc:
+                logger.warning(
+                    "OCR service unreachable (url=%s): %s",
+                    OCR_SERVICE_URL, exc,
+                )
+                raise OCRServiceUnavailableError(
+                    f"OCR 服务超时/连接失败: {exc}"
+                ) from exc
+
+        if resp.status_code == 200:
+            return resp.json()
+        else:
+            logger.warning(
+                "OCR service returned HTTP %d: %s",
+                resp.status_code, resp.text[:200],
+            )
+            raise OCRServiceUnavailableError(
+                f"OCR 服务返回 HTTP {resp.status_code}"
+            )
+
+    async def _in_process_recognize(
+        self, image_path: str, mode: OCREngine = OCREngine.AUTO
+    ) -> dict:
+        """In-process OCR fallback（仅在未配置远程服务时使用）
+
+        注意：此路径会加载 PaddleOCR 模型（~500MB），不应在生产 web worker 中使用。
         """
         selected = await self._select_engine(image_path, mode)
 
@@ -166,6 +251,10 @@ class UnifiedOCRService:
     def _check_paddle_available(self) -> bool:
         if self._paddle_available is not None:
             return self._paddle_available
+        # OCR 服务化后，web worker 不应加载 PaddleOCR 模型
+        if OCR_SERVICE_URL:
+            self._paddle_available = False
+            return False
         try:
             from paddleocr import PaddleOCR  # noqa: F401
 
@@ -177,6 +266,10 @@ class UnifiedOCRService:
     def _check_tesseract_available(self) -> bool:
         if self._tesseract_available is not None:
             return self._tesseract_available
+        # OCR 服务化后，web worker 不应加载 tesseract
+        if OCR_SERVICE_URL:
+            self._tesseract_available = False
+            return False
         try:
             import pytesseract  # noqa: F401
 

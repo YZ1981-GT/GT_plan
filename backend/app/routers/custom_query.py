@@ -44,8 +44,8 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
-from app.models.core import Project, User
+from app.deps import get_current_user, get_visible_project_ids
+from app.models.core import Project, ProjectUser, User
 from app.models.custom_query_models import CustomQueryTemplate
 from app.services.wp_template_registry import wp_template_registry_service
 
@@ -981,6 +981,11 @@ async def execute_query(
     from app.services.gin_index_monitor import is_index_building
     if is_index_building():
         response.headers["X-Index-Status"] = "building"
+
+    # ─── 项目可见性校验（BEFORE cache read）§5.12 fix ────────────────────
+    visible_ids = await get_visible_project_ids(current_user, db)
+    if uuid.UUID(body.project_id) not in visible_ids:
+        raise HTTPException(status_code=403, detail={"error_code": "PROJECT_NOT_VISIBLE"})
 
     source = body.source
     pid = body.project_id
@@ -2036,6 +2041,11 @@ async def batch_execute(
     if is_index_building():
         response.headers["X-Index-Status"] = "building"
 
+    # ─── 项目可见性校验（BEFORE sub-query loop）§5.12 fix ────────────────
+    visible_ids = await get_visible_project_ids(current_user, db)
+    if uuid.UUID(body.project_id) not in visible_ids:
+        raise HTTPException(status_code=403, detail={"error_code": "PROJECT_NOT_VISIBLE"})
+
     results: dict[str, Any] = {}
     total_success = 0
     total_failed = 0
@@ -2111,6 +2121,7 @@ async def batch_execute(
 
 
 class CellWritebackRequest(BaseModel):
+    project_id: str
     wp_code: str
     sheet_name: str
     cell_ref: str  # e.g. "B7"
@@ -2149,25 +2160,38 @@ async def cell_writeback(
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="Invalid X-File-Opened-At format")
 
-    # 权限检查：非 workpaper 模块的写回需要额外验证
-    if body.module != "workpaper":
-        # 对于非 workpaper 模块，检查用户是否有写权限
-        user_role = getattr(current_user, "role", "")
-        if user_role not in ("admin", "manager", "partner", "senior", "assistant"):
+    # ─── 统一项目编辑权限校验（替代原角色白名单）§5.13 fix ────────────────
+    visible_ids = await get_visible_project_ids(current_user, db)
+    if uuid.UUID(body.project_id) not in visible_ids:
+        raise HTTPException(
+            status_code=403,
+            detail={"error_code": "PROJECT_NOT_VISIBLE"},
+        )
+    # 非 admin/partner 需验证项目级编辑权限
+    if current_user.role.value not in ("admin", "partner"):
+        pu_result = await db.execute(
+            select(ProjectUser).where(
+                ProjectUser.project_id == uuid.UUID(body.project_id),
+                ProjectUser.user_id == current_user.id,
+                ProjectUser.is_deleted == False,  # noqa: E712
+            )
+        )
+        member = pu_result.scalar_one_or_none()
+        if not member or member.permission_level.value not in ("edit",):
             raise HTTPException(
                 status_code=403,
-                detail={"error": "no_write_permission"},
+                detail={"error_code": "NO_EDIT_PERMISSION"},
             )
 
-    # 查找 wp_id（workpaper 模块通过 wp_code 查找）
+    # 查找 wp_id（workpaper 模块通过 wp_code + project_id 查找）
     if body.module == "workpaper":
         result = await db.execute(
-            text("SELECT id FROM working_paper WHERE wp_code = :code LIMIT 1"),
-            {"code": body.wp_code},
+            text("SELECT id FROM working_paper WHERE wp_code = :code AND project_id = :pid LIMIT 1"),
+            {"code": body.wp_code, "pid": body.project_id},
         )
         wp_row = result.first()
         if not wp_row:
-            raise HTTPException(status_code=404, detail=f"Working paper not found: {body.wp_code}")
+            raise HTTPException(status_code=404, detail="Working paper not found in this project")
         wp_id = str(wp_row[0])
     else:
         # 对于其他模块，wp_code 作为标识符传递
@@ -2183,6 +2207,7 @@ async def cell_writeback(
             new_value=body.new_value,
             opened_at=opened_at,
             module=body.module,
+            project_id=body.project_id,
         )
         await db.commit()
     except WritebackConflict as e:

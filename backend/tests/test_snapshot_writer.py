@@ -143,9 +143,9 @@ class TestProperty3WriteTransactionalConsistency:
 
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
                 return mock_result
-            elif "UPDATE working_papers" in stmt_str:
+            elif "UPDATE working_paper" in stmt_str:
                 if params:
                     written_parsed_data = params.get("new_pd")
                     written_prefill_stale = True
@@ -200,9 +200,9 @@ class TestProperty3WriteTransactionalConsistency:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
                 return mock_result
-            elif "UPDATE working_papers" in stmt_str:
+            elif "UPDATE working_paper" in stmt_str:
                 if params:
                     written_data["pd"] = params.get("new_pd")
                 return MagicMock()
@@ -261,7 +261,7 @@ class TestProperty4OptimisticLockConflict:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (updated_at, parsed_data, "D2", "")
+                mock_result.first.return_value = (updated_at, parsed_data, "D2", "", "test-project-id")
                 return mock_result
             return MagicMock(first=MagicMock(return_value=None))
 
@@ -295,7 +295,7 @@ class TestProperty4OptimisticLockConflict:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
                 return mock_result
             elif "UPDATE" in stmt_str:
                 return MagicMock()
@@ -332,7 +332,7 @@ class TestProperty4OptimisticLockConflict:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
                 return mock_result
             return MagicMock(first=MagicMock(return_value=None))
 
@@ -443,6 +443,7 @@ class TestProperty5WritePermissionEnforcement:
         # Valid modules
         for module in ("workpaper", "report", "note", "adj", "tb"):
             req = CellWritebackRequest(
+                project_id="test-project-id",
                 wp_code="D2",
                 sheet_name="Sheet1",
                 cell_ref="A1",
@@ -455,6 +456,7 @@ class TestProperty5WritePermissionEnforcement:
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             CellWritebackRequest(
+                project_id="test-project-id",
                 wp_code="D2",
                 sheet_name="Sheet1",
                 cell_ref="A1",
@@ -511,9 +513,9 @@ class TestProperty26CrossModuleWriteRouting:
         async def mock_execute(stmt, params=None):
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             written_sql.append(stmt_str)
-            if "SELECT" in stmt_str and "working_papers" in stmt_str:
+            if "SELECT" in stmt_str and "working_paper" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
                 return mock_result
             return MagicMock()
 
@@ -529,8 +531,8 @@ class TestProperty26CrossModuleWriteRouting:
                 opened_at=now, module="workpaper",
             )
 
-        # Verify UPDATE was on working_papers table
-        assert any("UPDATE working_papers" in s for s in written_sql)
+        # Verify UPDATE was on working_paper table
+        assert any("UPDATE working_paper" in s for s in written_sql)
 
     @pytest.mark.asyncio
     async def test_report_writes_to_report_snapshot(self):
@@ -681,7 +683,7 @@ class TestCellWritebackE2E:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "/path/to/file.xlsx")
+                mock_result.first.return_value = (now, parsed_data, "D2", "/path/to/file.xlsx", "test-project-id")
                 return mock_result
             return MagicMock()
 
@@ -690,8 +692,9 @@ class TestCellWritebackE2E:
 
         with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
-            with patch("app.services.custom_query.metrics.event_bus") as mock_bus:
-                mock_bus.emit = lambda name, payload: events_emitted.append((name, payload))
+            # 新版: snapshot_writer 使用 orchestrator，需 mock ORM 查询 + orchestrator
+            with patch("app.services.workpaper_save_orchestrator.orchestrator.after_save", new_callable=AsyncMock) as mock_orch:
+                mock_orch.return_value = 2  # new file_version
 
                 result = await snapshot_writer.write_cell(
                     db=mock_db,
@@ -707,14 +710,6 @@ class TestCellWritebackE2E:
         assert result["old_value"] == 12345.67
         assert result["updated_at"] is not None
 
-        # Verify event was emitted
-        assert len(events_emitted) == 1
-        event_name, payload = events_emitted[0]
-        assert event_name == "cross-ref:updated"
-        assert payload["wp_code"] == "D2"
-        assert payload["cell_ref"] == "B7"
-        assert payload["new_value"] == 99999.99
-
     @pytest.mark.asyncio
     async def test_conflict_flow(self):
         """Conflict scenario: opened_at is stale → WritebackConflict raised."""
@@ -727,7 +722,7 @@ class TestCellWritebackE2E:
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
             if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
                 mock_result = MagicMock()
-                mock_result.first.return_value = (now, parsed_data, "D2", "")
+                mock_result.first.return_value = (now, parsed_data, "D2", "", "test-project-id")
                 return mock_result
             return MagicMock()
 

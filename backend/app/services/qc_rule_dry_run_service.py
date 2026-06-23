@@ -1,7 +1,7 @@
 """QC 规则试运行（dry-run）服务
 
 Refinement Round 3 — 需求 2：
-- 对采样底稿跑规则沙箱，不写 DB，返回命中率
+- 对采样底稿跑规则（只读执行，不写 DB），返回命中率
 - 耗时超过 60s 走 BackgroundJob 异步化
 - dry-run 结果仅用于预览，不写入 wp_qc_results
 """
@@ -102,7 +102,7 @@ class QcRuleDryRunService:
                 sample_findings=[],
             )
 
-        # 对每张底稿执行规则（沙箱，不写 DB）
+        # 对每张底稿执行规则（只读执行，不写 DB）
         findings: list[dict] = []
         hits = 0
 
@@ -199,7 +199,7 @@ class QcRuleDryRunService:
         rule: QcRuleDefinition,
         wp: "_WorkpaperSample",
     ) -> RuleExecutionResult:
-        """对单张底稿执行规则（沙箱，不写 DB）。"""
+        """对单张底稿执行规则（只读执行，不写 DB）。"""
         try:
             if rule.expression_type == "jsonpath":
                 return await execute_rule(

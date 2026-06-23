@@ -23,7 +23,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import require_project_access, check_consol_lock
+from app.deps import require_project_access, require_operation, check_consol_lock
 from app.models.core import User
 from app.services.feature_flags import get_feature_maturity, is_enabled
 from app.services.wopi_service import WOPIHostService
@@ -126,7 +126,7 @@ async def save_univer_data(
     wp_id: UUID,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(require_operation("wp:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     """Univer 编辑器保存 — 完整保存链路
@@ -198,9 +198,6 @@ async def save_univer_data(
     # 5. DB 更新（同时把 Univer snapshot 落到 parsed_data 供高级查询零计算读取，
     #    snapshot 已含公式 + Univer 计算后的 v 值，按 sheet/row/col 精确索引）
     old_version = wp.file_version
-    wp.file_version += 1
-    wp.updated_at = datetime.now(timezone.utc)
-    wp.prefill_stale = True
     # 提取轻量化的 cellData（只保留 v 和 f，剥离样式 s 减小 JSONB 体积）
     try:
         from sqlalchemy.orm.attributes import flag_modified
@@ -226,41 +223,12 @@ async def save_univer_data(
         # snapshot 缓存失败不阻塞保存主流程，但要记录便于追查
         import logging as _logging
         _logging.getLogger(__name__).warning("univer_snapshot 落库失败 wp=%s: %s", wp_id, exc)
-    await db.flush()
 
-    # 6. 审计留痕
+    # 6. 统一后处理（orchestrator）— file_version++, prefill_stale, updated_at, audit log, event_bus.publish
     try:
-        from app.models.core import Log
-        log = Log(
-            user_id=current_user.id,
-            action_type="workpaper_univer_save",
-            object_type="working_paper",
-            object_id=wp_id,
-            new_value={
-                "old_version": old_version,
-                "new_version": wp.file_version,
-                "content_hash": content_hash,
-                "sheets": write_result.get("sheets", 0),
-                "cells": write_result.get("cells", 0),
-            },
-        )
-        db.add(log)
-        await db.flush()
-    except Exception as e:
-        import logging as _logging
-        _logging.getLogger(__name__).warning("保存审计日志失败 wp=%s: %s", wp_id, e)
+        from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
 
-    # 7. 事件发布（触发五环联动）
-    # 注意：event_bus.publish 只接受 EventPayload 位置参数；早期误传裸 dict →
-    # publish 内 _build_dedup_key 访问 .event_type 抛 AttributeError，且因包在
-    # asyncio.create_task 中异常无处捕获 → WORKPAPER_SAVED 事件从未真正分发，
-    # 一致性比对/B51高风险触发/底稿域地址失效/prefill stale 全部静默失联。
-    try:
-        import asyncio
-        from app.services.event_bus import event_bus
-        from app.models.audit_platform_schemas import EventPayload, EventType
-        # 推导项目年度（year-dependent handler 如 B514/B515 高风险触发、H/I 反向回填
-        # 依赖 payload.year，缺失则静默跳过）。WorkingPaper 无 year 列，从项目审计期末推导。
+        # 推导项目年度
         saved_year: int | None = None
         try:
             from app.models.core import Project
@@ -274,21 +242,33 @@ async def save_univer_data(
             saved_year = int(saved_year) if saved_year is not None else None
         except Exception:
             saved_year = None
-        payload = EventPayload(
-            event_type=EventType.WORKPAPER_SAVED,
-            project_id=project_id,
-            year=saved_year,
+
+        await save_orchestrator.after_save(
+            db, wp, current_user,
+            trigger="univer_save",
             extra={
-                "wp_id": str(wp_id),
-                "file_version": wp.file_version,
-                "trigger": "univer_save",
                 "content_hash": content_hash,
+                "sheets": write_result.get("sheets", 0),
+                "cells": write_result.get("cells", 0),
+                "year": saved_year,
             },
+            # expected_version 已在上面早期检查，此处不再重复校验
+            expected_version=None,
         )
-        asyncio.create_task(event_bus.publish(payload))
-    except Exception as e:
+    except Exception as exc:
+        from app.services.workpaper_save_orchestrator import OptimisticLockError
+        if isinstance(exc, OptimisticLockError):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error_code": "VERSION_CONFLICT",
+                    "message": "底稿已被他人修改，请刷新后重试",
+                    "server_version": wp.file_version,
+                    "expected_version": expected_version,
+                },
+            )
         import logging as _logging
-        _logging.getLogger(__name__).warning("WORKPAPER_SAVED 事件发布失败 wp=%s: %s", wp_id, e)
+        _logging.getLogger(__name__).warning("orchestrator.after_save failed in univer_save wp=%s: %s", wp_id, exc)
 
     # 8. 自动解析（非阻塞）
     try:

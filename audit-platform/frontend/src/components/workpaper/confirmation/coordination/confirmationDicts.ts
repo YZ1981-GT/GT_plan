@@ -43,6 +43,9 @@ export const CONFIRMATION_DICTS = {
 
   /** 11. 是/否/不适用 */
   YES_NO_NA: 'yes_no_na',
+
+  /** 12. 相符情况（相符/不符/未回函） */
+  MATCH_STATUS: 'confirmation_match',
 } as const
 
 export type ConfirmationDictKey = typeof CONFIRMATION_DICTS[keyof typeof CONFIRMATION_DICTS]
@@ -108,3 +111,8 @@ export const D08_DICT_KEYS = [
 // ─── 辅助：全量字典 key 数组（批量拉取用） ──────────────────────────────────
 
 export const ALL_CONFIRMATION_DICT_KEYS = Object.values(CONFIRMATION_DICTS)
+
+// ─── 向后兼容别名（原 confirmationEnums.ts 导出） ─────────────────────────────
+
+/** @deprecated 使用 CONFIRMATION_DICTS 代替 */
+export const CONFIRMATION_DICT_KEYS = CONFIRMATION_DICTS

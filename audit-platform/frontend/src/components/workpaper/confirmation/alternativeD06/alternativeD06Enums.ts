@@ -3,7 +3,7 @@
  *
  * 与 D0-5 完全复用同一组枚举。
  */
-export { CONFIRMATION_DICT_KEYS } from '../confirmationEnums'
+export { CONFIRMATION_DICT_KEYS } from '../coordination/confirmationDicts'
 
 export const ALTERNATIVE_D06_DICT_KEYS = {
   /** 抽样方法（随机选样/系统选样/货币单元抽样/随意选样） */

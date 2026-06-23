@@ -12,6 +12,7 @@
   - tb://1001#审定数               → 试算表科目
   - aux://1001.成本中心.001#期末   → 辅助余额
 """
+import asyncio
 import json
 import re
 import logging
@@ -79,17 +80,7 @@ def build_uri(domain: str, source: str, path: str = '', cell: str = '') -> str:
 # 公式引用语法 ↔ URI 互转
 # ═══════════════════════════════════════════
 
-_FORMULA_PATTERNS = {
-    'TB': re.compile(r"TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'SUM_TB': re.compile(r"SUM_TB\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'ROW': re.compile(r"ROW\(\s*'([^']+)'\s*\)"),
-    'SUM_ROW': re.compile(r"SUM_ROW\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'REPORT': re.compile(r"REPORT\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'NOTE': re.compile(r"NOTE\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
-    'WP': re.compile(r"WP\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-    'AUX': re.compile(r"AUX\(\s*'([^']+)'\s*,\s*'([^']+)'\s*(?:,\s*'([^']+)')?\s*\)"),
-    'PREV': re.compile(r"PREV\(\s*'([^']+)'\s*,\s*'([^']+)'\s*\)"),
-}
+from app.services.formula_grammar import RELAXED_FORMULA_PATTERNS as _FORMULA_PATTERNS
 
 
 def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
@@ -812,6 +803,8 @@ class AddressRegistryService:
     def __init__(self):
         # key = "project_id:year:template_type:domain"
         self._slots: dict[str, _CacheSlot] = {}
+        # single-flight: per-slot_key asyncio.Lock 防缓存踩踏
+        self._flight_locks: dict[str, asyncio.Lock] = {}
 
     # ------------------------------------------------------------------
     # Redis L2 helpers
@@ -919,15 +912,19 @@ class AddressRegistryService:
 
     async def _get_domain(self, db, project_id: str, year: int,
                           template_type: str, domain: str) -> list[AddressEntry]:
-        """获取单个域的地址条目（L1 内存 → L2 Redis → DB 构建）"""
+        """获取单个域的地址条目（L1 内存 → L2 Redis → single-flight DB 构建）
+
+        single-flight 模式：并发 cache miss 时仅 1 个请求执行 DB 构建，
+        其余请求等待完成后 double-check L1 命中。避免缓存踩踏。
+        """
         key = self._slot_key(project_id, year, template_type, domain)
 
-        # L1: 内存缓存
+        # L1: 内存缓存（无锁快路径）
         slot = self._slots.get(key)
         if slot and not self._is_expired(slot):
             return slot.entries
 
-        # L2: Redis 缓存
+        # L2: Redis 缓存（无锁快路径）
         redis_entries = await self._redis_get(key)
         if redis_entries is not None:
             # 回填 L1
@@ -937,29 +934,49 @@ class AddressRegistryService:
             )
             return redis_entries
 
-        # DB 构建
-        entries: list[AddressEntry] = []
-        if domain == 'report':
-            entries = await build_report_entries(db, project_id, year)
-        elif domain == 'tb':
-            entries = await build_trial_balance_entries(db, project_id, year)
-        elif domain == 'note':
-            entries = await build_note_entries(db, project_id, year, template_type)
-        elif domain == 'wp':
-            entries = await build_workpaper_entries(db, project_id, year)
-        elif domain == 'aux':
-            entries = await build_aux_entries(db, project_id, year)
+        # Single-flight: 获取 per-slot_key 锁
+        if key not in self._flight_locks:
+            self._flight_locks[key] = asyncio.Lock()
+        lock = self._flight_locks[key]
 
-        # 回写 L1
-        self._evict_if_needed()
-        self._slots[key] = _CacheSlot(
-            entries=entries, built_at=_time.time(), domain=domain
-        )
+        async with lock:
+            # Double-check: 另一个协程可能已完成构建
+            slot = self._slots.get(key)
+            if slot and not self._is_expired(slot):
+                return slot.entries
 
-        # 回写 L2 Redis
-        await self._redis_set(key, entries, domain)
+            # L2 double-check
+            redis_entries = await self._redis_get(key)
+            if redis_entries is not None:
+                self._evict_if_needed()
+                self._slots[key] = _CacheSlot(
+                    entries=redis_entries, built_at=_time.time(), domain=domain
+                )
+                return redis_entries
 
-        return entries
+            # DB 构建（仅此 1 个请求执行）
+            entries: list[AddressEntry] = []
+            if domain == 'report':
+                entries = await build_report_entries(db, project_id, year)
+            elif domain == 'tb':
+                entries = await build_trial_balance_entries(db, project_id, year)
+            elif domain == 'note':
+                entries = await build_note_entries(db, project_id, year, template_type)
+            elif domain == 'wp':
+                entries = await build_workpaper_entries(db, project_id, year)
+            elif domain == 'aux':
+                entries = await build_aux_entries(db, project_id, year)
+
+            # 回写 L1
+            self._evict_if_needed()
+            self._slots[key] = _CacheSlot(
+                entries=entries, built_at=_time.time(), domain=domain
+            )
+
+            # 回写 L2 Redis
+            await self._redis_set(key, entries, domain)
+
+            return entries
 
     async def get_all(self, db, project_id: str, year: int,
                       template_type: str = 'soe') -> list[AddressEntry]:
@@ -997,6 +1014,17 @@ class AddressRegistryService:
                        kw in e.row_code.lower()]
 
         return results[:limit]
+
+    async def exists(self, db, project_id: str, year: int,
+                     domain: str, uri: str,
+                     template_type: str = 'soe') -> bool:
+        """定点检查：指定域+URI 是否存在（不物化全域）
+
+        用于 validate_formula_refs 优化：wp 域只查目标 wp_code 的
+        cell 是否存在，避免全域 build。
+        """
+        entries = await self._get_domain(db, project_id, year, template_type, domain)
+        return any(e.uri == uri for e in entries)
 
     async def resolve(self, db, project_id: str, year: int,
                       uri: str, template_type: str = 'soe') -> Optional[AddressEntry]:
@@ -1097,12 +1125,54 @@ class AddressRegistryService:
                      f"(pid={project_id}, year={year}, domain={domain}, tpl={template_type})")
 
     async def invalidate_async(self, project_id: str, year: int = 0,
-                               domain: str = '', template_type: str = ''):
+                               domain: str = '', template_type: str = '',
+                               wp_id: str = ''):
         """精准失效缓存（L1 内存 + L2 Redis 同步删除）— async 版本
 
         与 invalidate 相同逻辑，但同步删除 Redis keys。
         推荐在 async 上下文中使用此方法。
+
+        新增 wp_id 参数：仅对 wp 域进行增量失效，只移除包含
+        该 wp_id 条目的缓存槽中受影响的条目，而非整域清空。
         """
+        # 增量失效：wp 域指定 wp_id → 仅清除该 wp_id 相关条目
+        if wp_id and domain == 'wp':
+            affected_keys = []
+            for key in list(self._slots.keys()):
+                parts = key.split(':')
+                if len(parts) != 4:
+                    continue
+                k_pid, k_year, k_tpl, k_dom = parts
+                if k_pid != project_id:
+                    continue
+                if year and k_year != str(year):
+                    continue
+                if template_type and k_tpl != template_type:
+                    continue
+                if k_dom != 'wp':
+                    continue
+
+                # 过滤掉该 wp_id 的条目（增量失效）
+                slot = self._slots[key]
+                filtered = [e for e in slot.entries
+                            if not (hasattr(e, 'source_id') and str(getattr(e, 'source_id', '')) == wp_id)
+                            and not (wp_id in e.uri)]
+                if len(filtered) < len(slot.entries):
+                    # 有条目被移除 → 标记需要重建
+                    affected_keys.append(key)
+                    del self._slots[key]
+
+            # 删除 Redis L2 受影响的 keys（让下次查询重建）
+            await self._redis_delete_many(affected_keys)
+
+            logger.debug(
+                "address_registry invalidate_async (incremental wp): "
+                "removed %d slots (pid=%s, wp_id=%s)",
+                len(affected_keys), project_id, wp_id,
+            )
+            return
+
+        # 全量失效（原逻辑）
         to_remove = []
         for key in list(self._slots.keys()):
             parts = key.split(':')

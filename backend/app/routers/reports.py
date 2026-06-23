@@ -22,7 +22,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, check_consol_lock
+from app.deps import get_current_user, require_project_access, require_operation, check_consol_lock
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import FinancialReport, FinancialReportType
@@ -49,7 +49,7 @@ async def _resolve_applicable_standard(db: AsyncSession, project_id: UUID) -> st
 async def generate_reports(
     data: ReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_operation("report:edit")),
 ):
     """生成/重新生成四张报表"""
     from app.services.prerequisite_checker import PrerequisiteChecker

@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_operation
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.cross_ref_service import cross_ref_service
@@ -74,7 +74,7 @@ async def save_html_data(
     wp_id: UUID,
     body: SaveHtmlDataRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_operation("wp:edit")),
 ) -> SaveHtmlDataResponse:
     """保存 HTML 数据到 parsed_data['html_data'][sheet_name]。
 
@@ -198,9 +198,28 @@ async def save_html_data(
         .values(
             parsed_data=parsed_data,
             updated_by=current_user.id,
-            updated_at=now,
         )
     )
+
+    # ─── Step 7b: 统一后处理（orchestrator）────────────────────────────────
+    # file_version++, prefill_stale, updated_at, audit log, event_bus.publish
+    try:
+        from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
+
+        await save_orchestrator.after_save(
+            db, working_paper, current_user,
+            trigger="html_save",
+            extra={
+                "sheet_name": body.sheet_name,
+                "schema_version": body.schema_version,
+                "data_version": new_version,
+            },
+            expected_version=body.data_version if (body.data_version is not None and not body.force_overwrite) else None,
+        )
+    except Exception as exc:
+        # OptimisticLockError 已在 Step 2b 处理，此处仅捕获意外异常
+        logger.warning("orchestrator.after_save failed in html_save: %s", exc)
+
     await db.commit()
 
     try:

@@ -9,9 +9,17 @@
  * 与下游"从 D0-1 带入"统一去重逻辑（双向等价）
  *
  * Sprint 4 Tasks 4.1, 4.2
+ * Feature: cross-workpaper-dispatch-persistence — 后端持久化接入
  */
-import { computed, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { ConfirmationRow } from '../confirmationTypes'
+import {
+  dispatchApi,
+  type DispatchEntry as ApiDispatchEntry,
+  type DispatchRecord,
+  type BatchDispatchResponse,
+} from '@/services/dispatchApi'
 
 // ─── 分发目标定义 ────────────────────────────────────────────────────────────
 
@@ -73,10 +81,47 @@ export interface UseConfirmationDispatchOptions {
   rows: Ref<ConfirmationRow[]>
   /** 已分发记录（confirm_index → target[] 映射） */
   dispatchedMap: Ref<Map<string, Set<DispatchTarget>>>
+  /** 当前项目 ID */
+  projectId: Ref<string>
 }
 
 export function useConfirmationDispatch(options: UseConfirmationDispatchOptions) {
-  const { rows, dispatchedMap } = options
+  const { rows, dispatchedMap, projectId } = options
+
+  /** 是否正在从后端加载分发记录 */
+  const loading = ref(false)
+  /** 是否正在执行分发操作 */
+  const dispatching = ref(false)
+
+  // ─── 从后端加载分发记录初始化 Map ─────────────────────────────────────────
+
+  /**
+   * 从后端加载分发记录填充 dispatchedMap
+   * 在组件 onMounted 时调用
+   */
+  async function loadDispatchRecords(): Promise<void> {
+    if (!projectId.value) return
+    loading.value = true
+    try {
+      const response = await dispatchApi.list(projectId.value)
+      // 重建 dispatchedMap
+      const newMap = new Map<string, Set<DispatchTarget>>()
+      for (const record of response.items) {
+        const existing = newMap.get(record.confirm_index)
+        if (existing) {
+          existing.add(record.target as DispatchTarget)
+        } else {
+          newMap.set(record.confirm_index, new Set([record.target as DispatchTarget]))
+        }
+      }
+      dispatchedMap.value = newMap
+    } catch (e: any) {
+      ElMessage.warning('加载分发记录失败，分发状态可能不完整')
+      // 保持 dispatchedMap 为空，不阻断使用
+    } finally {
+      loading.value = false
+    }
+  }
 
   // ─── 计算待分发行 ──────────────────────────────────────────────────────────
 
@@ -165,28 +210,101 @@ export function useConfirmationDispatch(options: UseConfirmationDispatchOptions)
   }
 
   /**
-   * 执行分发（标记已分发）
-   * 实际跨底稿写入由 EventBus 事件触发下游组件处理
+   * 执行分发 — 调用后端 API 持久化 + 更新本地 Map
    */
-  function executeDispatch(entries: DispatchEntry[]): DispatchResult {
+  async function executeDispatch(entries: DispatchEntry[]): Promise<DispatchResult> {
     const result: DispatchResult = { dispatched: [], skipped: [], errors: [] }
 
-    for (const entry of entries) {
-      const existing = dispatchedMap.value.get(entry.confirm_index)
-      if (existing?.has(entry.target)) {
-        result.skipped.push(entry)
-        continue
+    if (!entries.length || !projectId.value) return result
+
+    dispatching.value = true
+    try {
+      const apiEntries: ApiDispatchEntry[] = entries.map(e => ({
+        confirm_index: e.confirm_index,
+        target: e.target,
+        entity_name: e.entity_name,
+        account_type: e.account_type,
+        amount: e.amount,
+        reason: e.reason,
+      }))
+
+      const response: BatchDispatchResponse = await dispatchApi.batchCreate(
+        projectId.value,
+        apiEntries,
+      )
+
+      // 更新本地 dispatchedMap：dispatched + skipped 都标记为已分发
+      for (const record of response.dispatched) {
+        const existing = dispatchedMap.value.get(record.confirm_index)
+        if (existing) {
+          existing.add(record.target as DispatchTarget)
+        } else {
+          dispatchedMap.value.set(record.confirm_index, new Set([record.target as DispatchTarget]))
+        }
+        // 构建 DispatchEntry 返回
+        result.dispatched.push({
+          target: record.target as DispatchTarget,
+          confirm_index: record.confirm_index,
+          entity_name: record.entity_name ?? '',
+          account_type: record.account_type ?? '',
+          amount: record.amount ?? 0,
+          reason: record.reason ?? '',
+        })
       }
 
-      // 标记已分发
-      if (!dispatchedMap.value.has(entry.confirm_index)) {
-        dispatchedMap.value.set(entry.confirm_index, new Set())
+      for (const item of response.skipped) {
+        const target = item.target as DispatchTarget
+        const existing = dispatchedMap.value.get(item.confirm_index)
+        if (existing) {
+          existing.add(target)
+        } else {
+          dispatchedMap.value.set(item.confirm_index, new Set([target]))
+        }
+        result.skipped.push({
+          target,
+          confirm_index: item.confirm_index,
+          entity_name: '',
+          account_type: '',
+          amount: 0,
+          reason: item.reason,
+        })
       }
-      dispatchedMap.value.get(entry.confirm_index)!.add(entry.target)
-      result.dispatched.push(entry)
+    } catch (e: any) {
+      ElMessage.warning('分发操作失败，请稍后重试')
+      // dispatchedMap 保持不变
+    } finally {
+      dispatching.value = false
     }
 
     return result
+  }
+
+  /**
+   * 撤回分发记录 — 调用后端 API + 从本地 Map 移除
+   */
+  async function revokeDispatch(
+    recordId: string,
+    confirmIndex: string,
+    target: DispatchTarget,
+  ): Promise<boolean> {
+    if (!projectId.value) return false
+
+    try {
+      await dispatchApi.revoke(projectId.value, recordId)
+
+      // 从 dispatchedMap 移除
+      const existing = dispatchedMap.value.get(confirmIndex)
+      if (existing) {
+        existing.delete(target)
+        if (existing.size === 0) {
+          dispatchedMap.value.delete(confirmIndex)
+        }
+      }
+      return true
+    } catch (e: any) {
+      ElMessage.error('撤回失败：' + (e?.response?.data?.detail ?? '请稍后重试'))
+      return false
+    }
   }
 
   /**
@@ -208,11 +326,15 @@ export function useConfirmationDispatch(options: UseConfirmationDispatchOptions)
   }
 
   return {
+    loading,
+    dispatching,
     pendingDiffRows,
     pendingAltRows,
     pendingReliabilityRows,
     buildDispatchList,
     executeDispatch,
+    revokeDispatch,
+    loadDispatchRecords,
     isAlreadyDispatched,
     markDispatched,
     routeAlternative,

@@ -3,7 +3,7 @@
  *
  * 与后端 system_dicts.py 中 _DICTS 的 key 一一对应。
  */
-export { CONFIRMATION_DICT_KEYS } from '../confirmationEnums'
+export { CONFIRMATION_DICT_KEYS } from '../coordination/confirmationDicts'
 
 export const DIFF_RECONCILE_DICT_KEYS = {
   /** 科目（应收账款/合同负债/销售收入/…，allow-create 自定义） */

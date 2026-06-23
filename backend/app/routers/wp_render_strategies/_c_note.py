@@ -12,16 +12,9 @@ from __future__ import annotations
 import logging
 
 from ._context import RenderContext
+from ._utils import _has_grid_cells
 
 logger = logging.getLogger(__name__)
-
-
-def _has_grid_cells(html_data: dict | None) -> bool:
-    """判断 sheet html_data 是否已含可渲染的网格 cells。"""
-    if not isinstance(html_data, dict):
-        return False
-    cells = html_data.get("cells")
-    return isinstance(cells, dict) and len(cells) > 0
 
 
 async def render(ctx: RenderContext) -> dict | None:

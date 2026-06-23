@@ -1,0 +1,45 @@
+# OCR 服务容器 — PaddleOCR + Tesseract
+# 从 web worker 进程中抽离 OCR 模型，降低 worker 内存占用
+#
+# 启动: docker compose -f docker-compose.ocr.yml up -d
+# 健康检查: curl http://localhost:9990/health
+#
+# Web worker 通过 OCR_SERVICE_URL 环境变量连接此服务：
+#   OCR_SERVICE_URL=http://ocr-service:9990
+
+version: "3.8"
+
+services:
+  ocr-service:
+    build:
+      context: ./backend/ocr_service
+      dockerfile: Dockerfile
+    container_name: audit-ocr-service
+    ports:
+      - "9990:9990"
+    environment:
+      - OCR_PORT=9990
+      - OCR_PADDLE_ENABLED=true
+      - OCR_TESSERACT_ENABLED=true
+      - PADDLE_USE_GPU=false
+      # MinerU 兜底（可选）
+      - MINERU_API_URL=
+    volumes:
+      # PaddleOCR 模型缓存（避免每次重启重新下载）
+      - ocr-models:/root/.paddleocr
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9990/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+
+volumes:
+  ocr-models:

@@ -25,7 +25,7 @@ from app.core.bulk_operations import BulkRequest, bulk_execute
 from app.core.database import get_db
 from app.core.field_selection import parse_fields, BLOCKED_FIELDS
 from app.core.pagination import PaginationParams
-from app.deps import get_current_user, check_consol_lock, require_project_access, get_user_scope_cycles
+from app.deps import get_current_user, check_consol_lock, require_project_access, require_operation, get_user_scope_cycles
 from app.models.core import User
 from app.models.audit_platform_models import (
     Adjustment,
@@ -110,7 +110,7 @@ async def create_adjustment(
     data: AdjustmentCreate,
     batch_mode: bool = Query(False, description="批量模式：暂不触发重算事件"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_project_access("edit")),
+    user=Depends(require_operation("wp:edit")),
     _lock_check=Depends(check_consol_lock),
 ):
     """创建调整分录（合并锁定期间禁止，需编辑权限）"""

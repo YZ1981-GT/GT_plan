@@ -1,10 +1,15 @@
 """QC 规则执行器 — Python 类型 + JSONPath 类型 + audit_log 类型分派
 
 Refinement Round 3 — 需求 1, 12：
-- expression_type='python': 加载 dotted path 类，沙箱 timeout=10s
+- expression_type='python': 加载 dotted path 类，timeout-only execution (NOT a security sandbox)
 - expression_type='jsonpath': 只读 parsed_data，用 jsonpath-ng 库
 - scope='audit_log': 查询 audit_log_entries 表，JSONPath 过滤 payload
 - expression_type='sql' / 'regex': 预留，抛 NotImplementedError
+
+Security notes:
+- _load_class_from_dotted_path 仅加载 _ALLOWED_RULE_PREFIXES 白名单内的类
+- python 类型规则创建/编辑限 admin 角色（router 层校验）
+- asyncio.wait_for 仅提供超时保护，无进程隔离/权限降级
 
 执行器作为独立模块，由 QCEngine 委托调用。
 """
@@ -28,6 +33,9 @@ logger = logging.getLogger(__name__)
 
 # 默认 Python 类型规则执行超时（秒）
 PYTHON_RULE_TIMEOUT_SECONDS = 10
+
+# 允许加载的规则类路径前缀白名单 — 仅这些包下的类可被 python 类型规则引用
+_ALLOWED_RULE_PREFIXES = ("app.services.qc_engine.", "app.services.qc_rules.")
 
 
 class RuleExecutionError(Exception):
@@ -73,12 +81,19 @@ def _load_class_from_dotted_path(dotted_path: str) -> type:
 
     例如: 'app.services.qc_engine.ConclusionNotEmptyRule'
     -> 导入 app.services.qc_engine 模块，取 ConclusionNotEmptyRule 属性
+
+    Security: 仅允许 _ALLOWED_RULE_PREFIXES 中前缀的路径被加载。
     """
     parts = dotted_path.rsplit(".", 1)
     if len(parts) != 2:
         raise ImportError(
             f"Invalid dotted path '{dotted_path}': expected 'module.ClassName'"
         )
+
+    # 前缀白名单校验 — 非白名单路径禁止加载
+    if not any(dotted_path.startswith(p) for p in _ALLOWED_RULE_PREFIXES):
+        raise ImportError(f"Disallowed rule class path: {dotted_path}")
+
     module_path, class_name = parts
     try:
         module = importlib.import_module(module_path)
@@ -99,9 +114,9 @@ async def execute_python_rule(
 ) -> RuleExecutionResult:
     """执行 Python 类型规则。
 
-    1. 从 rule.expression (dotted path) 加载规则类
+    1. 从 rule.expression (dotted path) 加载规则类（受前缀白名单限制）
     2. 实例化规则对象
-    3. 调用 check(context) 方法，带 timeout 沙箱
+    3. 调用 check(context) 方法，带 timeout-only execution (NOT a security sandbox)
     4. 返回执行结果
     """
     rule_code = rule.rule_code
@@ -127,7 +142,7 @@ async def execute_python_rule(
             error=f"Failed to instantiate rule class: {e}",
         )
 
-    # 执行 check() 方法，带 timeout 沙箱
+    # 执行 check() 方法，带 timeout-only protection (NOT a security sandbox)
     try:
         findings = await asyncio.wait_for(
             rule_instance.check(context),

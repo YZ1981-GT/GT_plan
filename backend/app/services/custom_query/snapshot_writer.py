@@ -105,6 +105,7 @@ class SnapshotWriter:
         new_value: Any,
         opened_at: datetime,
         module: str = "workpaper",
+        project_id: str | None = None,
     ) -> dict:
         """单事务写 cell 到对应模块。
 
@@ -117,6 +118,7 @@ class SnapshotWriter:
             new_value: 新值
             opened_at: 前端打开时的 updated_at 时间戳
             module: 模块名 ('workpaper', 'report', 'note', 'adj', 'tb')
+            project_id: 项目 ID（belt+suspenders 校验用）
 
         Returns:
             {success: True, updated_at: str, old_value: Any}
@@ -127,7 +129,7 @@ class SnapshotWriter:
         """
         if module == "workpaper":
             return await self._write_workpaper_cell(
-                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at
+                db, user, wp_id, sheet_name, cell_ref, new_value, opened_at, project_id
             )
         elif module == "report":
             return await self._write_report_cell(
@@ -159,21 +161,23 @@ class SnapshotWriter:
         cell_ref: str,
         new_value: Any,
         opened_at: datetime,
+        project_id: str | None = None,
     ) -> dict:
         """写回 workpaper parsed_data['univer_snapshot']。
 
         Steps:
           1. SELECT FOR UPDATE
-          2. 乐观锁比对
-          3. 定位 cellData[row][col]
-          4. 更新 JSONB + prefill_stale
-          5. 同步 xlsx cache (run_in_executor)
-          6. emit cross-ref:updated
+          2. Belt+suspenders project_id validation
+          3. 乐观锁比对
+          4. 定位 cellData[row][col]
+          5. 更新 JSONB + prefill_stale
+          6. 同步 xlsx cache (run_in_executor)
+          7. emit cross-ref:updated
         """
         # Step 1: SELECT FOR UPDATE
         result = await db.execute(
             text("""
-                SELECT updated_at, parsed_data, wp_code, file_path
+                SELECT updated_at, parsed_data, wp_code, file_path, project_id
                 FROM working_paper
                 WHERE id = :wp_id
                 FOR UPDATE
@@ -188,6 +192,15 @@ class SnapshotWriter:
         parsed_data = row[1] or {}
         wp_code = row[2] or ""
         file_path = row[3] or ""
+        row_project_id = row[4]
+
+        # Step 2: Belt+suspenders — verify project_id matches
+        if project_id and row_project_id:
+            from uuid import UUID
+            expected_pid = UUID(project_id) if isinstance(project_id, str) else project_id
+            actual_pid = UUID(str(row_project_id)) if not isinstance(row_project_id, UUID) else row_project_id
+            if expected_pid != actual_pid:
+                raise WritebackPermissionDenied("Project mismatch")
 
         # Step 2: 乐观锁比对
         # 确保 opened_at 和 current_updated_at 都是 aware 或都是 naive 进行比较
@@ -236,17 +249,15 @@ class SnapshotWriter:
         old_value = cell_obj.get("v")
         cell_obj["v"] = new_value
 
-        # Step 5: 更新 JSONB + prefill_stale
+        # Step 5: 更新 JSONB（parsed_data 先写入，orchestrator 负责 prefill_stale/updated_at/version）
         now = datetime.now(timezone.utc)
         await db.execute(
             text("""
                 UPDATE working_paper
-                SET parsed_data = :new_pd,
-                    updated_at = :now,
-                    prefill_stale = true
+                SET parsed_data = :new_pd
                 WHERE id = :wp_id
             """),
-            {"new_pd": json.dumps(parsed_data, ensure_ascii=False), "wp_id": wp_id, "now": now},
+            {"new_pd": json.dumps(parsed_data, ensure_ascii=False), "wp_id": wp_id},
         )
 
         # Step 6: 同步更新 xlsx cache (run_in_executor)
@@ -260,17 +271,31 @@ class SnapshotWriter:
             except Exception as e:
                 logger.warning("xlsx cache update failed (non-fatal): %s", e)
 
-        # Step 7: emit cross-ref:updated event (best-effort)
+        # Step 7: 统一后处理 — 使用 orchestrator 替代孤立本地 EventBus
+        # orchestrator 负责: file_version++, prefill_stale, updated_at, audit log, event_bus.publish
         try:
-            from app.services.custom_query.metrics import event_bus
-            event_bus.emit("cross-ref:updated", {
-                "wp_code": wp_code,
-                "sheet_name": sheet_name,
-                "cell_ref": cell_ref,
-                "new_value": new_value,
-            })
-        except Exception:
-            pass  # event bus failure is non-fatal
+            from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
+
+            # 需要获取 ORM 实例来调 orchestrator（此处用 raw SQL 获取轻量对象）
+            from app.models.workpaper_models import WorkingPaper
+            import sqlalchemy as sa
+            wp_result = await db.execute(
+                sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
+            )
+            wp_obj = wp_result.scalar_one_or_none()
+            if wp_obj:
+                await save_orchestrator.after_save(
+                    db, wp_obj, user,
+                    trigger="custom_query_writeback",
+                    extra={
+                        "wp_code": wp_code,
+                        "sheet_name": sheet_name,
+                        "cell_ref": cell_ref,
+                    },
+                )
+                now = wp_obj.updated_at  # 使用 orchestrator 设置的 updated_at
+        except Exception as exc:
+            logger.warning("orchestrator.after_save failed (non-fatal): %s", exc)
 
         return {
             "success": True,

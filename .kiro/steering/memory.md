@@ -10,7 +10,7 @@ inclusion: always
 
 - 语言中文；本地优先轻量方案；启动 `start-dev.bat`（后端 9980 + 前端 3030）
 - **输出分步但连续做完**；**任务标记不能假绿**；**彻底解决不绕开**
-- **🔴 codegraph 优先于 grep**：77k 节点/157k 边；grep 仅用于非符号文本
+- **🔴 codegraph 优先于 grep**：79k 节点/160k 边/4449 文件；grep 仅用于非符号文本
 - **触类旁通**；**改动前先 spec 三件套**（>500行/3+组件/跨前后端）；**改动后必 Playwright 实测**
 - **UI 全中文化**；**报表金额默认"元"**；**中文场景全链路不能崩**
 - 功能收敛；git 单 commit；**push 前必先 fetch**；**协作走 PR 不直推 main**
@@ -42,7 +42,7 @@ inclusion: always
 
 ## 迁移与 PG schema
 
-- MigrationRunner（非 alembic）；V+R 配对；`IF NOT EXISTS`；**最高 V091**
+- MigrationRunner（非 alembic）；V+R 配对；`IF NOT EXISTS`；**最高 V093**
 - **真实列速查**：trial_balance=standard_account_code/unadjusted_amount/aje_adjustment/audited_amount；working_paper 无 wp_code（在 wp_index，JOIN）
 - **recalc 铁律**：`tb_balance` v1 口径（借正贷负），`trial_balance` v2 正数；只汇总叶子；损益取发生额
 - **报表引擎**：统一从 trial_balance 取数，TB()/SUM_TB() 公式路径
@@ -50,8 +50,9 @@ inclusion: always
 
 ## 任务状态
 
-### 🟢 里程碑（169 archived / 1 active）
-- **🔵 cross-workpaper-dispatch-persistence**（2026-06-22 开）：D0分发持久化，spec 三件套齐全，待执行（11任务/V092迁移）
+### 🟢 里程碑（169 archived / 8 active → 完成待归档）
+- **✅ 架构改进 7 spec + dispatch-persistence 全部执行完毕（2026-06-23）**：84 新测试全绿，codegraph 已 sync（71 文件 / 1727 节点）
+- **cross-workpaper-dispatch-persistence**（2026-06-23 完成）：V093 迁移 + ORM + Service + Router + EventBus(DISPATCH_CREATED/REVOKED) + 前端 API + composable 改造 + useDownstreamDispatch
 - **D0 函证模块**（2026-06-22）：10 spec / 283 任务 / 118 文件 / 9 componentType / 协同层 coordination/（状态机12态+枚举11类+UI Kit+分发+舞弊收集+跨表导航+交互基线）。待 Playwright E2E + 跨底稿引用真实接入。
 - **A~S 全循环底稿**（2026-06-19）：13循环 / 568 任务 / ~815 wp_code / 2457 测试
 - **OnlyOffice 端到端**（2026-06-21）：4层根因修 / Playwright 0 warning
@@ -59,8 +60,18 @@ inclusion: always
 - **底稿模块治理 6 spec + 底稿优化 4 项 + A1-12 核查表**
 
 ### git 状态
-- 分支 `work/2026-05-30-wp-specs`，最高迁移 V091
-- **远程默认分支隐患**：`origin/HEAD→origin/master` 落后 main 298 commit
+- 分支 `work/2026-05-30-wp-specs`，最高迁移 V093
+
+### ✅ 架构改进 8 spec 已完成（2026-06-23）
+- ①report-cache-year-isolation：_cache_key 加 year 维度，SCAN+DELETE 通配符
+- ②qc-python-rule-load-hardening：_ALLOWED_RULE_PREFIXES 白名单 + admin-only python 规则
+- ③single-source-cleanup：formula_grammar 单源 + _has_grid_cells 共享 + lru_cache parse_to_ast + 枚举合并 + 白名单去重 + build_preparation_info 去重
+- ④custom-query-authorization-hardening：execute/batch-execute 加 get_visible_project_ids 校验 + cell-writeback 统一项目编辑权限 + wp 查询加 project_id 过滤 + snapshot_writer belt+suspenders
+- ⑤authorization-enforcement-baseline：require_operation 工厂 + CI lint + 7 高风险端点接入（63 端点待后续覆盖）
+- ⑥workpaper-save-orchestrator：统一 after_save 编排器（4路径迁移）+ 孤立 _EventBus 已删除
+- ⑦multi-worker-readiness：Redis 分布式导入锁(V092) + 地址坐标库 single-flight + OCR 服务化(docker-compose.ocr.yml)
+- ⑧cross-workpaper-dispatch-persistence：dispatch_records 表(V093) + DispatchService + REST Router + EventBus 事件 + 前端 API + composable
+- **待归档**：8 个 spec 需移到 `_archive/` + 更新 INDEX.md
 
 ### ✅ D0 函证 confirmation 精细组件已启用（2026-06-21）
 - **方案**：采用协作者 9 个精细 confirmation-* 组件(D0-1~D0-8+D0-4b)，回退我的 DB classification 改动(G-替代程序→A-替代程序)
@@ -83,17 +94,20 @@ inclusion: always
 - A3-8 商誉减值 / A4 经营分部 / A5 现金流（spec 已建未实施）
 - 数据管理删除后重导入唯一约束冲突（hard_delete 或 DELETE+INSERT）
 - 外部依赖：LLM embedding / 合并 UAT / GitHub 默认分支改 main / MinerU+OCR
-
+- **🔴 已核实 bug（全部已修复 2026-06-23）**：~~custom-query IDOR~~ ~~cell-writeback 跨项目~~ ~~报表缓存串数据~~ ~~QC python RCE面~~ ~~权限矩阵未强制接入~~。剩余：账表导入并发(已加 Redis 锁待压测验证)
+- **架构优化**（剩余 2026-06-22 审查）：①拆 event_handlers.py 为 domain handlers ②前端 Top-5 巨型 Vue 拆分 ③services/ 按域建子包 ④commonApi.ts 拆分 ⑤smart_import_engine 拆 pipeline
 ## 踩坑铁律（高频）
 
 ### 后端
 - **🔴 大文件导入期间禁改后端代码**（含 git stash/pop）→ uvicorn reload 杀 worker
 - **🔴 event_bus publish 只传 EventPayload**；轻量通知用 broadcast_raw
+- **🔴 高级查询写回孤立 EventBus 已修复**：snapshot_writer 现通过 WorkpaperSaveOrchestrator 走主 event_bus，metrics.py 中 _EventBus 已删除
 - **🔴 测试掩盖 bug**：mock 不存在方法 = 把 bug 编进测试；禁 try/except:pass 包被测调用
 - **🔴 余额表 KEY_COLUMNS 勿加 account_name**；SELECT tb_balance 必含 direction
 - **🔴 同名项目陷阱**：先查 client_name LIKE 多个 + 比对 created_at
 - **🔴 PG ON CONFLICT DO NOTHING 不返回跳过行**：需先 INSERT 得 dispatched，再二次查询得 skipped
 - **router_registry 必查**；**后端双态返回必归一化**；**service 只 flush 不 commit**
+- **🔴 地址坐标库已加 single-flight + 增量失效**：per-slot asyncio.Lock 防踩踏；`invalidate_async(wp_id=)` 增量模式仅清目标 wp 的缓存条目；新增 `exists(domain, uri)` 定点检查
 
 ### 前端
 - **🔴 contenteditable v-model** 必加 isInternalChange/focus guard

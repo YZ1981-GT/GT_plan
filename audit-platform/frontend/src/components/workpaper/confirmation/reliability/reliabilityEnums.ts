@@ -3,7 +3,7 @@
  *
  * 与后端 system_dicts.py 中 _DICTS 的 key 一一对应。
  */
-export { CONFIRMATION_DICT_KEYS } from '../confirmationEnums'
+export { CONFIRMATION_DICT_KEYS } from '../coordination/confirmationDicts'
 
 export const RELIABILITY_DICT_KEYS = {
   /** 回函方式（原件寄回/传真/电子邮件/当面确认） */

@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_operation
 from app.models.core import User
 from app.routers.password_confirm import require_confirmation_token
 from app.services.archive_orchestrator import ArchiveOrchestrator
@@ -44,7 +44,7 @@ async def orchestrate_archive(
     project_id: UUID,
     body: OrchestrateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_operation("archive:manage")),
     _token: None = Depends(require_confirmation_token),
 ):
     """启动归档编排流程（需二次密码确认）。

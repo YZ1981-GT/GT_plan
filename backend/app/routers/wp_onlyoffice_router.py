@@ -554,6 +554,30 @@ async def post_sheet_onlyoffice_callback(
 
             await release_session(user_id, doc_key)
 
+        # 统一后处理 — orchestrator 负责 file_version++, prefill_stale, audit log, event_bus
+        try:
+            from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
+
+            # 创建虚拟 user 对象（callback 来自 OO 容器，非真实用户请求）
+            class _CallbackUser:
+                id = UUID(user_id) if user_id else None
+
+            await save_orchestrator.after_save(
+                db, wp, _CallbackUser(),
+                trigger="onlyoffice_callback",
+                extra={
+                    "sheet_name": sheet_name,
+                    "doc_key": doc_key or "",
+                    "file_size": len(file_bytes),
+                },
+            )
+            await db.commit()
+        except Exception as exc:
+            logger.warning(
+                "orchestrator.after_save failed in onlyoffice_callback wp=%s: %s",
+                wp_id, exc,
+            )
+
         return {"error": 0}
 
     # 4. status=3/4/7: 关闭（无修改/保存出错/强制保存出错）— 释放席位

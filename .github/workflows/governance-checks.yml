@@ -124,6 +124,20 @@ jobs:
             exit 0
           fi
 
+  endpoint-auth-check:
+    # P0-4: 端点授权声明覆盖检查
+    # 检测写端点是否声明了授权依赖（require_operation / require_project_access）
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check endpoint auth coverage
+        run: |
+          python scripts/check/check_endpoint_auth.py
+
   hotspot-baseline-check:
     # P2-1.3: 新增裸组件/重复能力/超大文件检查
     # 对比 baseline，只有新增超标文件才触发（历史债务不阻塞）

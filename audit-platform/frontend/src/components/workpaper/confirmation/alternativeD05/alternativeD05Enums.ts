@@ -3,7 +3,7 @@
  *
  * 与后端 system_dicts.py 中 _DICTS 的 key 一一对应。
  */
-export { CONFIRMATION_DICT_KEYS } from '../confirmationEnums'
+export { CONFIRMATION_DICT_KEYS } from '../coordination/confirmationDicts'
 
 export const ALTERNATIVE_D05_DICT_KEYS = {
   /** 抽样方法（随机选样/系统选样/货币单元抽样/随意选样） */

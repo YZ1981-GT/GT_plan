@@ -595,6 +595,7 @@ export const customQuery = {
   indicators: '/api/custom-query/indicators',
   execute: '/api/custom-query/execute',
   batchExecute: '/api/custom-query/batch-execute',
+  cellWriteback: '/api/custom-query/cell-writeback',
   templates: '/api/custom-query/templates',
   templateDetail: (id: string) => `/api/custom-query/templates/${id}`,
 } as const

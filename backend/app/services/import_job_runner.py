@@ -440,12 +440,22 @@ class ImportJobRunner:
 
         async def _monitor_cancel() -> None:
             while not cancel_event.is_set():
-                await asyncio.sleep(1)
+                await asyncio.sleep(5)
                 try:
                     async with async_session() as cancel_db:
                         current = await ImportJobService.get_job(cancel_db, job_id)
                         if current and current.status == JobStatus.canceled:
                             cancel_event.set()
+                            return
+                        # V092: 跨 worker 取消信号 — poll cancel_requested 列
+                        if current and getattr(current, 'cancel_requested', False):
+                            cancel_event.set()
+                            # 同步更新状态为 canceled
+                            await ImportJobService.transition(
+                                cancel_db, job_id, JobStatus.canceled,
+                                progress_message="收到跨 worker 取消信号",
+                            )
+                            await cancel_db.commit()
                             return
                 except Exception:
                     logger.debug("ImportJob cancel monitor failed: %s", job_id, exc_info=True)
@@ -701,7 +711,14 @@ class ImportJobRunner:
                     return True
                 async with async_session() as check_db:
                     current = await ImportJobService.get_job(check_db, job_id)
-                    return current is not None and current.status == JobStatus.canceled
+                    if current is None:
+                        return False
+                    if current.status == JobStatus.canceled:
+                        return True
+                    # V092: 跨 worker 取消信号
+                    if getattr(current, 'cancel_requested', False):
+                        return True
+                    return False
 
             # F14 / Sprint 4.2：checkpoint 持久化 — 每个关键 phase 结束后
             # 同步写入 ImportJob.current_phase，供 resume_from_checkpoint 使用。

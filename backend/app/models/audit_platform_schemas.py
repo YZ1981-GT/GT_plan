@@ -845,6 +845,10 @@ class EventType(str, enum.Enum):
     # B 类底稿联动: B3 独立性核对表完成 → A17-7 声明书状态更新
     CHECKLIST_COMPLETED = "checklist.completed"
 
+    # cross-workpaper-dispatch-persistence: D0-1 跨底稿分发事件
+    DISPATCH_CREATED = "dispatch.created"
+    DISPATCH_REVOKED = "dispatch.revoked"
+
 
 class EventPayload(BaseModel):
     """事件载荷"""

@@ -10,7 +10,7 @@
  * - 分发清单构建
  * - 执行分发
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
 import {
   useConfirmationDispatch,
@@ -19,6 +19,15 @@ import {
 } from '../useConfirmationDispatch'
 import type { ConfirmationRow } from '../../confirmationTypes'
 
+// Mock dispatchApi
+vi.mock('@/services/dispatchApi', () => ({
+  dispatchApi: {
+    batchCreate: vi.fn().mockResolvedValue({ dispatched: [], skipped: [] }),
+    list: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+    revoke: vi.fn().mockResolvedValue({ detail: 'ok', id: 'test' }),
+  },
+}))
+
 describe('useConfirmationDispatch — D0-1 枢纽分发', () => {
   function createInstance(
     rows: ConfirmationRow[] = [],
@@ -26,7 +35,8 @@ describe('useConfirmationDispatch — D0-1 枢纽分发', () => {
   ) {
     const rowsRef = ref<ConfirmationRow[]>(rows)
     const dispatchedRef = ref(dispatched)
-    return useConfirmationDispatch({ rows: rowsRef, dispatchedMap: dispatchedRef })
+    const projectIdRef = ref('test-project-id')
+    return useConfirmationDispatch({ rows: rowsRef, dispatchedMap: dispatchedRef, projectId: projectIdRef })
   }
 
   // ─── 科目路由 ──────────────────────────────────────────────────────────────
@@ -176,27 +186,56 @@ describe('useConfirmationDispatch — D0-1 枢纽分发', () => {
   // ─── 执行分发 + 去重 ──────────────────────────────────────────────────────
 
   describe('executeDispatch()', () => {
-    it('首次分发全部成功', () => {
+    it('首次分发调用 API', async () => {
+      const { dispatchApi } = await import('@/services/dispatchApi')
+      const mockBatchCreate = vi.mocked(dispatchApi.batchCreate)
+      mockBatchCreate.mockResolvedValueOnce({
+        dispatched: [{
+          id: 'rec-1',
+          project_id: 'test-project-id',
+          confirm_index: 'IDX-001',
+          target: 'D0-4',
+          entity_name: '某公司',
+          account_type: '应收账款',
+          amount: 10000,
+          reason: '差异金额 1000.00 元',
+          dispatched_by: 'user-1',
+          dispatched_at: '2026-06-22T10:00:00Z',
+        }],
+        skipped: [],
+      })
+
       const { buildDispatchList, executeDispatch } = createInstance([
         { _row_id: '1', confirm_index: 'IDX-001', amount: 10000, reply_amount: 9000, match_status: '不符', account_type: '应收账款' },
       ])
 
       const list = buildDispatchList()
-      const result = executeDispatch(list)
-      expect(result.dispatched).toHaveLength(list.length)
+      const result = await executeDispatch(list)
+      expect(result.dispatched).toHaveLength(1)
       expect(result.skipped).toHaveLength(0)
+      expect(mockBatchCreate).toHaveBeenCalledOnce()
     })
 
-    it('重复分发被跳过', () => {
-      const { buildDispatchList, executeDispatch } = createInstance([
+    it('API 返回 skipped 也标记到 Map', async () => {
+      const { dispatchApi } = await import('@/services/dispatchApi')
+      const mockBatchCreate = vi.mocked(dispatchApi.batchCreate)
+      mockBatchCreate.mockResolvedValueOnce({
+        dispatched: [],
+        skipped: [{ confirm_index: 'IDX-001', target: 'D0-4', reason: 'duplicate' }],
+      })
+
+      const dispatchedMap = ref(new Map<string, Set<DispatchTarget>>())
+      const rowsRef = ref<ConfirmationRow[]>([
         { _row_id: '1', confirm_index: 'IDX-001', amount: 10000, reply_amount: 9000, match_status: '不符', account_type: '应收账款' },
       ])
+      const projectIdRef = ref('test-project-id')
+      const instance = useConfirmationDispatch({ rows: rowsRef, dispatchedMap, projectId: projectIdRef })
 
-      const list = buildDispatchList()
-      executeDispatch(list) // 第一次
-      const result = executeDispatch(list) // 第二次
-      expect(result.dispatched).toHaveLength(0)
-      expect(result.skipped).toHaveLength(list.length)
+      const list = instance.buildDispatchList()
+      await instance.executeDispatch(list)
+
+      // skipped 条目也应被标记到 Map
+      expect(dispatchedMap.value.get('IDX-001')?.has('D0-4')).toBe(true)
     })
   })
 
