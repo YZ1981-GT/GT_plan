@@ -7887,6 +7887,60 @@
       ],
       "category": "control_test_linkage",
       "severity": "warning"
+    },
+    {
+      "ref_id": "CW-401",
+      "description": "A13 错报评价 <- D~N 循环源底稿（错报来源跳转）",
+      "source_wp": "A13",
+      "source_sheet": "错报明细A13-2",
+      "source_cell": "source_wp_code",
+      "targets": [
+        {
+          "wp_code": "D2",
+          "sheet": "审定表D2-1",
+          "cell": null,
+          "formula": null,
+          "cell_label": "错报来源",
+          "address": "D2:审定表D2-1:*"
+        }
+      ],
+      "category": "other",
+      "severity": "info",
+      "source_cell_label": "来源底稿引用",
+      "source_file": "A13 错报评价.xlsx",
+      "source_address": "A13:错报明细A13-2:source_wp_code",
+      "cycle_membership": [
+        "A"
+      ],
+      "direction": "bidirectional",
+      "note": "A13-2 错报条目的 source_wp_code 字段指向 D~N 循环源底稿，支持 ref_chip 双向跳转"
+    },
+    {
+      "ref_id": "CW-402",
+      "description": "A13 错报评价 <- B15 重要性水平（PM/TE/SAT 引用）",
+      "source_wp": "B15",
+      "source_sheet": "重要性水平",
+      "source_cell": "PM",
+      "targets": [
+        {
+          "wp_code": "A13",
+          "sheet": "汇总A13-1",
+          "cell": "materiality.pm",
+          "formula": "=WP(\"B15\",\"重要性水平\",\"PM\")",
+          "cell_label": "整体重要性水平",
+          "address": "A13:汇总A13-1:materiality.pm"
+        }
+      ],
+      "category": "other",
+      "severity": "warning",
+      "source_cell_label": "整体重要性水平",
+      "source_file": "B15 重要性水平.xlsx",
+      "source_address": "B15:重要性水平:PM",
+      "cycle_membership": [
+        "A",
+        "B"
+      ],
+      "direction": "source_to_target"
     }
   ],
   "stats": {

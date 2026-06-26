@@ -364,6 +364,7 @@ import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
 import { downloadWorkpaper } from '@/services/workpaperApi'
 import GtRowActions from '@/components/common/GtRowActions.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
+import { cycleColor } from '@/constants/cyclePalette'
 
 defineOptions({ name: 'WorkpaperWorkbenchView' })
 
@@ -497,11 +498,6 @@ const pagedWorkbenchData = computed(() => {
 })
 
 // ─── 按循环分组目录数据 ────────────────────────────────────────────────────────
-const CYCLE_COLORS: Record<string, string> = {
-  A: '#6750A4', B: '#4b2d77', C: '#0094B3', D: '#E8590C', E: '#2E7D32',
-  F: '#D84315', G: '#1565C0', H: '#6A1B9A', I: '#00838F', J: '#AD1457',
-  K: '#4E342E', L: '#37474F', M: '#1B5E20', N: '#E65100', S: '#880E4F',
-}
 const expandedCycleGroups = reactive<Record<string, boolean>>({})
 
 function toggleCycleGroup(code: string) {
@@ -524,7 +520,7 @@ const groupedWorkbenchData = computed(() => {
       return {
         code,
         name: cycleNameMap[code] || code,
-        color: CYCLE_COLORS[code] || '#909399',
+        color: cycleColor(code),
         items,
         doneCount,
         percent: items.length > 0 ? Math.round((doneCount / items.length) * 100) : 0,

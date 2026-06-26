@@ -2,32 +2,18 @@
  * 联动全景图颜色与样式映射常量（design v0.2）
  *
  * 节点 cycle 着色 / 边 severity 着色 / 边线宽，前后端共享逻辑。
+ * 循环色取自 constants/cyclePalette.ts 单一真源。
  */
 
-// 节点颜色 — 按循环
+import { CYCLE_PALETTE, cycleColor } from '@/constants/cyclePalette'
+
+// 节点颜色 — 按循环（从 cyclePalette 展开 + 全景图专有分类键）
 export const CYCLE_COLOR_MAP: Record<string, string> = {
-  // 业务循环
-  D: '#1976D2',   // 蓝
-  E: '#00ACC1',   // 青
-  F: '#43A047',   // 绿
-  G: '#FDD835',   // 金
-  H: '#FB8C00',   // 橙
-  I: '#3949AB',   // 靛
-  J: '#EC407A',   // 粉
-  K: '#78909C',   // 灰
-  L: '#8D6E63',   // 棕
-  M: '#AB47BC',   // 紫
-  N: '#E53935',   // 红
-  // 辅助类
-  A: '#26A69A',   // 蓝绿（A 类报表/调整）
-  B: '#7E57C2',   // 淡紫（B 类控制了解）
-  C: '#5C6BC0',   // 紫蓝（C 类控制测试）
-  S: '#FFA726',   // 浅橙（S 专项程序）
-  // 报表/附注/模块/兜底
+  ...CYCLE_PALETTE,
+  // 全景图专有分类
   report: '#0D47A1',   // 深蓝 (BS/IS/CFS/EQ)
   note: '#4A148C',     // 深紫 (附注)
   module: '#607D8B',   // 蓝灰 (cross_module 虚拟节点)
-  other: '#BDBDBD',    // 中灰 (兜底)
 }
 
 // 边颜色 — 按 severity（5 级）
@@ -87,8 +73,9 @@ export function nodeRadius(degree: number): number {
 }
 
 // 颜色映射安全访问（兜底为 other 灰）
+// 全景图有专有键(module/note/report)，用本地 map 查再 fallback 到统一 cycleColor
 export function cycleColor(cycle: string): string {
-  return CYCLE_COLOR_MAP[cycle] ?? CYCLE_COLOR_MAP.other
+  return CYCLE_COLOR_MAP[cycle] ?? CYCLE_PALETTE.other
 }
 
 export function severityColor(severity: string): string {

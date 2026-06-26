@@ -13,6 +13,22 @@
 
 <template>
   <div class="gt-a1-dashboard">
+    <!-- ═══ 顶层平级 Tab 栏（参照 D0 函证样式） ═══ -->
+    <el-tabs v-model="topTabActive" class="gt-a1-dashboard__top-tabs">
+      <!-- Tab: A1 程序表（默认） -->
+      <el-tab-pane label="A1 程序表" name="main">
+    <!-- 编制信息（从 GtWpRenderer 移入，跟随 Tab 切换） -->
+    <GtWpPreparationHeader
+      :wp-id="wpId"
+      :readonly="readonly"
+      :index-no-override="'A1'"
+    />
+    <!-- 工具栏 -->
+    <div class="gt-a1-dashboard__toolbar">
+      <el-button size="small" @click="$emit('export-template')"><img src="" style="display:none"/>导出模板</el-button>
+      <el-button size="small" @click="$emit('export-data')"><img src="" style="display:none"/>导出数据</el-button>
+      <el-button size="small" @click="$emit('import-data')"><img src="" style="display:none"/>导入</el-button>
+    </div>
     <!-- ═══ 顶部总览 ═══ -->
     <div class="gt-a1-dashboard__overview">
       <!-- 环形进度 -->
@@ -83,6 +99,9 @@
       :programs="programs"
       @scroll-to-program="scrollToCard"
     />
+
+    <!-- ═══ Task 8.2: 五级复核状态看板 ═══ -->
+    <ReviewDashboardCard :data="reviewDashboardData" />
 
     <!-- ═══ 阶段卡片主体 ═══ -->
     <div class="gt-a1-dashboard__phases">
@@ -192,6 +211,57 @@
       </div>
     </div>
 
+      </el-tab-pane>
+
+      <!-- 子底稿 Tab（A1-11~A1-16 平级） -->
+      <el-tab-pane
+        v-for="tab in subWps.visibleTabs.value"
+        :key="tab.id"
+        :label="tab.label"
+        :name="tab.id"
+        lazy
+      >
+        <!-- 锁定警告 -->
+        <el-alert
+          v-if="getSubTabLockReason(tab)"
+          type="warning"
+          :title="getSubTabLockReason(tab)"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px"
+        />
+        <!-- 组件分发 -->
+        <GtA111SigningForm
+          v-if="tab.componentType === 'signing-form'"
+          :wp-id="subWps.wpIdMap.value[tab.wpCode]"
+          :readonly="isSubTabReadonly(tab)"
+          :project-id="projectId"
+        />
+        <GtChecklistTable
+          v-else-if="tab.componentType === 'checklist'"
+          :wp-id="subWps.wpIdMap.value[tab.wpCode]"
+          :readonly="isSubTabReadonly(tab)"
+          :project-id="projectId"
+        />
+        <GtAnalyticalReview
+          v-else-if="tab.componentType === 'analytical-review'"
+          :wp-id="subWps.wpIdMap.value[tab.wpCode]"
+          :readonly="isSubTabReadonly(tab)"
+          :project-id="projectId"
+        />
+        <GtA112DualChecklist
+          v-else-if="tab.componentType === 'a1-12-dual-checklist'"
+          :wp-id="subWps.wpIdMap.value[tab.wpCode]"
+          :readonly="isSubTabReadonly(tab)"
+        />
+        <GtA115DisclosureChecklist
+          v-else-if="tab.componentType === 'a1-15-disclosure-checklist'"
+          :wp-id="subWps.wpIdMap.value[tab.wpCode]"
+          :readonly="isSubTabReadonly(tab)"
+        />
+      </el-tab-pane>
+    </el-tabs>
+
     <!-- ═══ 裁剪理由弹窗 ═══ -->
     <el-dialog v-model="trimVisible" title="裁剪理由" width="450px" :close-on-click-modal="false">
       <p style="margin-bottom:12px;color:#666">{{ trimTarget?.program_desc }}</p>
@@ -224,7 +294,22 @@
           </el-select>
         </el-form-item>
         <el-form-item label="索引号">
-          <el-input v-model="addRef" placeholder="关联底稿索引，如 B10~B60" />
+          <el-autocomplete
+            v-model="addRef"
+            :fetch-suggestions="queryWpCodes"
+            placeholder="输入底稿编码，如 B10、D2-1"
+            style="width: 100%"
+            :trigger-on-focus="true"
+            clearable
+          >
+            <template #default="{ item }">
+              <span style="font-weight: 600;">{{ item.value }}</span>
+              <span style="margin-left: 8px; color: #909399; font-size: 12px;">{{ item.label }}</span>
+            </template>
+          </el-autocomplete>
+          <div style="font-size: 11px; color: #909399; margin-top: 4px;">
+            支持多个索引，用逗号分隔（如 B10,D2-1）
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -236,13 +321,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, reactive } from 'vue'
+import { ref, computed, watch, reactive, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtAuditFlowGraph from '@/components/workpaper/GtAuditFlowGraph.vue'
+import ReviewDashboardCard from '@/components/workpaper/ReviewDashboardCard.vue'
 import { api } from '@/services/apiProxy'
+import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
+import { useA1SubWorkpapers, type A1SubTab } from './composables/useA1SubWorkpapers'
+import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
+
+// ─── Lazy sub-workpaper components ───
+const GtA111SigningForm = defineAsyncComponent(() => import('./GtA111SigningForm.vue'))
+const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.vue'))
+const GtAnalyticalReview = defineAsyncComponent(() => import('./GtAnalyticalReview.vue'))
+const GtA112DualChecklist = defineAsyncComponent(() => import('./GtA112DualChecklist.vue'))
+const GtA115DisclosureChecklist = defineAsyncComponent(() => import('./GtA115DisclosureChecklist.vue'))
 
 // ─── Types ───
 interface ProgramRow {
@@ -306,6 +402,28 @@ const cardRefs = reactive<Record<number, HTMLElement>>({})
 
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
 
+// ─── Sub-workpapers (A1-11~A1-16) ───
+const subWps = useA1SubWorkpapers({
+  projectId,
+  wpId: computed(() => props.wpId),
+})
+const subTabActive = ref('')
+const topTabActive = ref('main')
+const subTabsExpanded = ref(true)
+
+function isSubTabReadonly(tab: A1SubTab): boolean {
+  if (props.readonly) return true
+  if (tab.id === 'A1-11' && subWps.isA111Locked.value) return true
+  if (tab.id === 'A1-15' && subWps.isA115Locked.value) return true
+  return false
+}
+
+function getSubTabLockReason(tab: A1SubTab): string {
+  if (tab.id === 'A1-11') return subWps.a111LockReason.value
+  if (tab.id === 'A1-15') return subWps.a115LockReason.value
+  return ''
+}
+
 // Trim dialog
 const trimVisible = ref(false)
 const trimTarget = ref<ProgramRow | null>(null)
@@ -329,6 +447,39 @@ const addDesc = ref('')
 const addPhase = ref('completion')
 const addRef = ref('')
 
+// ─── wp_code 自动补全 ───
+const wpCodeSuggestions = ref<{ value: string; label: string }[]>([])
+let wpCodesFetched = false
+
+async function ensureWpCodes() {
+  if (wpCodesFetched || !projectId.value) return
+  try {
+    const items = await getWpIndex(projectId.value)
+    wpCodeSuggestions.value = items.map(i => ({
+      value: i.wp_code,
+      label: i.wp_name || '',
+    }))
+    wpCodesFetched = true
+  } catch {
+    // 降级：无建议列表，用户仍可手动输入
+  }
+}
+
+function queryWpCodes(queryString: string, cb: (results: { value: string; label: string }[]) => void) {
+  ensureWpCodes()
+  // 支持逗号分隔多索引：只对最后一段做匹配
+  const parts = queryString.split(/[,，]/)
+  const lastPart = (parts[parts.length - 1] || '').trim().toUpperCase()
+  if (!lastPart) {
+    cb(wpCodeSuggestions.value.slice(0, 30))
+    return
+  }
+  const filtered = wpCodeSuggestions.value.filter(
+    s => s.value.toUpperCase().includes(lastPart) || s.label.includes(lastPart),
+  )
+  cb(filtered.slice(0, 30))
+}
+
 // ─── Init ───
 function initData() {
   programs.value = props.htmlData?.programs
@@ -338,14 +489,65 @@ function initData() {
 initData()
 watch(() => props.htmlData, initData, { deep: true })
 
+// ─── Task 8.2: review_dashboard_status resolver 数据 ───
+const reviewDashboardData = ref<{ levels?: any[] }>({})
+
+async function loadReviewDashboard() {
+  if (!projectId.value) return
+  try {
+    const year = props.year || parseInt(route.query.year as string) || new Date().getFullYear()
+    const res = await api.get(
+      `/api/projects/${projectId.value}/procedure-tables/A1`,
+      { params: { year, resolver: 'review_dashboard_status' } },
+    )
+    // 优先从 resolver_results 取，否则尝试顶层
+    const data = res?.data ?? res
+    if (data?.resolver_results?.review_dashboard_status) {
+      reviewDashboardData.value = data.resolver_results.review_dashboard_status
+    } else if (data?.levels) {
+      reviewDashboardData.value = data
+    }
+  } catch {
+    // non-critical: dashboard card 显示空态
+  }
+}
+
+onMounted(() => {
+  loadReviewDashboard()
+  // Sub-workpapers initialization
+  subWps.loadWpIndex().then(() => {
+    subWps.refreshDependencyStatus()
+  })
+  subWps.setupEventListeners()
+})
+
+onBeforeUnmount(() => {
+  subWps.cleanup()
+})
+
+// ─── sheetName routing for sub-workpapers ───
+watch(() => props.sheetName, (v) => {
+  if (v && subWps.visibleTabs.value.some(t => t.id === v)) {
+    topTabActive.value = v
+    subTabsExpanded.value = true
+  }
+})
+
+watch(() => route.query.sheet as string | undefined, (v) => {
+  if (v && subWps.visibleTabs.value.some(t => t.id === v)) {
+    topTabActive.value = v
+    subTabsExpanded.value = true
+  }
+})
+
 // ─── Computed ───
 const completedCount = computed(() => programs.value.filter(p => p.status === 'completed').length)
 const trimmedCount = computed(() => programs.value.filter(p => p.status === 'not_applicable').length)
 const inProgressCount = computed(() => programs.value.filter(p => p.status === 'in_progress').length)
 const pendingCount = computed(() => programs.value.filter(p => !p.status || p.status === 'pending').length)
-const doneCount = computed(() => completedCount.value + trimmedCount.value)
+const doneCount = computed(() => completedCount.value + trimmedCount.value + subWps.subCompletedCount.value)
 const progressPercentage = computed(() => {
-  const total = programs.value.length
+  const total = programs.value.length + subWps.subTotalCount.value
   return total ? Math.round((doneCount.value / total) * 100) : 0
 })
 const progressColor = computed(() => {
@@ -460,6 +662,7 @@ function openAddDialog() {
   addPhase.value = 'completion'
   addRef.value = ''
   addVisible.value = true
+  ensureWpCodes()
 }
 
 function confirmAdd() {
@@ -800,5 +1003,23 @@ function debounceSave() {
   .gt-a1-dashboard__milestones { flex-wrap: wrap; }
   .gt-a1-dashboard__actions { margin-left: 0; }
   .program-card { flex-wrap: wrap; }
+}
+
+/* ═══ 顶层平级 Tab 栏（参照 D0 函证样式） ═══ */
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__header) {
+  margin: 0 0 16px;
+  background: #fafafa;
+  border-radius: 6px 6px 0 0;
+  border-bottom: 2px solid var(--gt-color-border-purple, #6750A4);
+}
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__item) {
+  font-size: 13px;
+  padding: 0 16px;
+  height: 38px;
+  line-height: 38px;
+}
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__item.is-active) {
+  font-weight: 600;
+  color: #6750A4;
 }
 </style>

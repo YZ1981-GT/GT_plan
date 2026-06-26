@@ -57,7 +57,7 @@
            b-index sheet 自带等价编制信息块（GtBIndex 内置），此处跳过避免重复
            index-no-override：传当前 sheet 级索引号（如 D1A），表头右上角随 sheet 切换更新 -->
       <GtWpPreparationHeader
-        v-if="componentType !== 'b-index'"
+        v-if="componentType !== 'b-index' && componentType !== 'a1-dashboard'"
         :wp-id="wpId"
         :readonly="readonly"
         :index-no-override="activeSheetIndexNo"
@@ -116,8 +116,9 @@
         </el-tabs>
       </div>
 
-      <!-- 统一功能工具栏（所有底稿类型共享） -->
+      <!-- 统一功能工具栏（所有底稿类型共享，a1-dashboard 自管工具栏跳过） -->
       <GtWpToolbar
+        v-if="componentType !== 'a1-dashboard'"
         :fullscreen="isWpFullscreen"
         :wp-id="wpId"
         @export-template="onExportTemplate"

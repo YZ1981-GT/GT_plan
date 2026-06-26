@@ -47,6 +47,9 @@ async def lifespan(app: FastAPI):
     migration_state.mark_complete()
 
     register_event_handlers()
+    # A13 错报评价自动聚合 EventBus handler
+    from app.services.a13_event_handler import register_a13_event_handlers
+    register_a13_event_handlers()
     _register_phase_handlers()
     await _replay_startup_events()
     await _check_gin_index_status()

@@ -38,23 +38,26 @@ async def list_wp_index(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """底稿索引列表（需项目成员权限）"""
+    from app.models.workpaper_models import WorkingPaper
     result = await db.execute(
-        sa.select(WpIndex)
+        sa.select(WpIndex, WorkingPaper.id.label("wp_id"))
+        .outerjoin(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
         .where(WpIndex.project_id == project_id, WpIndex.is_deleted == sa.false())
         .order_by(WpIndex.wp_code)
     )
-    items = result.scalars().all()
+    rows = result.all()
     return [
         {
-            "id": str(i.id),
-            "wp_code": i.wp_code,
-            "wp_name": i.wp_name,
-            "audit_cycle": i.audit_cycle,
-            "status": i.status.value if i.status else None,
-            "assigned_to": str(i.assigned_to) if i.assigned_to else None,
-            "reviewer": str(i.reviewer) if i.reviewer else None,
+            "id": str(row.WpIndex.id),
+            "wp_id": str(row.wp_id) if row.wp_id else None,
+            "wp_code": row.WpIndex.wp_code,
+            "wp_name": row.WpIndex.wp_name,
+            "audit_cycle": row.WpIndex.audit_cycle,
+            "status": row.WpIndex.status.value if row.WpIndex.status else None,
+            "assigned_to": str(row.WpIndex.assigned_to) if row.WpIndex.assigned_to else None,
+            "reviewer": str(row.WpIndex.reviewer) if row.WpIndex.reviewer else None,
         }
-        for i in items
+        for row in rows
     ]
 
 

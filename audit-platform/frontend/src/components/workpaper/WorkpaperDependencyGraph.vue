@@ -272,31 +272,8 @@ const cycleNames: Record<string, string> = {
   S: '特定项目',
 }
 
-// 配色（不使用 CSS token，因为是分类色谱）
-const CYCLE_PALETTE: Record<string, string> = {
-  D: '#52b788', // 绿
-  E: '#4392f1', // 蓝
-  F: '#f08c2e', // 橙
-  G: '#9b59b6', // 紫
-  H: '#e63946', // 红
-  I: '#06b6d4', // 青
-  J: '#ec407a', // 粉
-  K: '#fbc02d', // 黄
-  L: '#8d6e63', // 棕
-  M: '#90a4ae', // 灰
-  N: '#26a69a', // 蓝绿
-  B: '#7e57c2', // 紫罗兰
-  C: '#d81b60', // 洋红
-  A: '#ff7043', // 三文鱼
-  S: '#9ccc65', // 青柠
-  REPORT: '#5c6bc0',
-  NOTE: '#ab47bc',
-  '?': '#bdbdbd',
-}
-
-function cycleColor(cycle: string): string {
-  return CYCLE_PALETTE[cycle] || '#9e9e9e'
-}
+// 配色：使用统一真源 cyclePalette（全平台同色）
+import { cycleColor } from '@/constants/cyclePalette'
 
 function severityColor(severity: string): string {
   if (severity === 'blocking') return '#d32f2f'

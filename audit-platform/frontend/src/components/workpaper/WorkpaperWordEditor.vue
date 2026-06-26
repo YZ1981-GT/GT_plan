@@ -1,146 +1,208 @@
 <!--
-  WorkpaperWordEditor.vue — Word 模板底稿编辑器（A16 声明书等）
+  WorkpaperWordEditor.vue — Word 模板底稿编辑器（通用 + A16 专用双模式）
 
-  布局：
-  ┌─ 主声明书（A16-1~6 互斥 radio，推荐项置顶 + badge）──┐
-  │  [OnlyOffice] [下载] [上传]  签回: pending/sent/signed │
-  ├─ A13 错报 alert ─────────────────────────────────────┤
-  ├─ 补充声明 A16-7 [toggle] ────────────────────────────┤
-  │  （启用后）独立编辑/签回，scope word_template:A16:A16-7 │
-  └─ 编制信息（占位符预览）──────────────────────────────┘
+  模式判定：
+  - 通用模式（非 A16 wp_code）：直接加载 OnlyOffice editor，无版本选择 UI
+  - A16 模式（wp_code === 'A16'）：保留版本选择面板 + 推荐提示 + 补充声明
+
+  统一工具栏：
+  - 文档标题（wp_code + 模板名称）
+  - sign_status 颜色编码 badge (draft=灰, pending=橙, signed=绿)
+  - 保存状态指示器（已保存/保存中/未保存）
+  - 导出按钮
 -->
 <template>
   <div class="gt-wp-word-editor">
-    <!-- ═══ 主声明书区 A16-1~6 ═══ -->
-    <section class="gt-wp-word-editor__main-section">
-      <div class="gt-wp-word-editor__section-header">
-        <h4 class="gt-wp-word-editor__section-title">主声明书版本</h4>
-        <el-tag :type="mainSignStatusType" size="small">{{ mainSignStatusLabel }}</el-tag>
-      </div>
-
-      <!-- 版本选择器：推荐版本置顶 -->
-      <div class="gt-wp-word-editor__version-select">
-        <el-radio-group v-model="selectedVersion" size="small" @change="onVersionChange">
-          <el-radio-button
-            v-for="v in sortedMainVersions"
-            :key="v.code"
-            :value="v.code"
-            :class="{ 'is-recommended': v.recommended }"
-          >
-            {{ v.label }}
-            <el-tag v-if="v.recommended" type="success" size="small" effect="plain" style="margin-left: 4px">推荐</el-tag>
-          </el-radio-button>
-        </el-radio-group>
-      </div>
-
-      <!-- 主版本操作栏 -->
-      <div class="gt-wp-word-editor__toolbar">
-        <el-button type="primary" size="small" @click="openEditor('main')" :loading="loading">
-          {{ onlyofficeAvailable ? '📝 在线编辑' : '📝 编辑（降级）' }}
-        </el-button>
-        <el-button size="small" @click="downloadTemplate('main')">⬇️ 下载模板</el-button>
-        <el-button v-if="!onlyofficeAvailable" size="small" @click="showUpload = true; uploadTarget = 'main'">⬆️ 上传</el-button>
-        <el-divider direction="vertical" />
-        <el-button-group>
-          <el-button size="small" :type="signStatus === 'sent' ? 'warning' : 'default'" @click="updateSignStatus('sent')" :disabled="signStatus === 'signed'">
-            📤 标记已发送
-          </el-button>
-          <el-button size="small" :type="signStatus === 'signed' ? 'success' : 'default'" @click="updateSignStatus('signed')">
-            ✅ 标记已签回
-          </el-button>
-        </el-button-group>
-      </div>
-    </section>
-
-    <!-- ═══ A13 未更正错报联动提示 ═══ -->
+    <!-- ═══ 网络断连警告 ═══ -->
     <el-alert
-      v-if="misstatementSummary"
+      v-if="networkOffline"
       type="warning"
       :closable="false"
       show-icon
-      style="margin-bottom: 12px"
+      class="gt-wp-word-editor__network-warning"
     >
-      <template #title>声明书"未更正错报"段落内容（自动引用 A13）</template>
-      <p style="margin: 4px 0 0; font-size: 12px; white-space: pre-wrap">{{ misstatementSummary }}</p>
+      <template #title>网络连接已断开</template>
+      <span>正在尝试重新连接…编辑内容将在恢复连接后自动保存。</span>
     </el-alert>
-    <el-alert
-      v-else-if="misstatementLoaded"
-      type="success"
-      :closable="false"
-      show-icon
-      style="margin-bottom: 12px"
-      :title="`无未更正错报，声明书中\u201C未更正错报\u201D段落可填写\u201C无\u201D`"
-    />
 
-    <!-- ═══ 补充声明区 A16-7 ═══ -->
-    <section class="gt-wp-word-editor__supplement-section">
-      <div class="gt-wp-word-editor__section-header">
-        <h4 class="gt-wp-word-editor__section-title">补充声明（A16-7 关联交易声明书）</h4>
-        <el-switch
-          v-model="supplementEnabled"
-          active-text="需编制关联交易声明书"
-          @change="onSupplementToggle"
-        />
+    <!-- ═══ 统一工具栏 ═══ -->
+    <div class="gt-wp-word-editor__unified-toolbar">
+      <div class="gt-wp-word-editor__toolbar-left">
+        <span class="gt-wp-word-editor__doc-title">{{ documentTitle }}</span>
+        <el-tag :type="signStatusTagType" size="small" effect="plain">
+          {{ signStatusLabel }}
+        </el-tag>
       </div>
+      <div class="gt-wp-word-editor__toolbar-right">
+        <span class="gt-wp-word-editor__save-status" :class="saveStatusClass">
+          {{ saveStatusText }}
+        </span>
+        <el-button size="small" @click="onExportDocx" :disabled="!canExport">
+          ⬇️ 导出
+        </el-button>
+      </div>
+    </div>
 
-      <template v-if="supplementEnabled">
-        <div class="gt-wp-word-editor__supplement-status">
-          <el-tag :type="supplementSignStatusType" size="small">签回：{{ supplementSignLabel }}</el-tag>
+    <!-- ═══ A16 模式：版本选择面板 ═══ -->
+    <template v-if="isA16Mode">
+      <section class="gt-wp-word-editor__main-section">
+        <div class="gt-wp-word-editor__section-header">
+          <h4 class="gt-wp-word-editor__section-title">主声明书版本</h4>
+          <el-tag :type="mainSignStatusType" size="small">{{ mainSignStatusLabel }}</el-tag>
         </div>
 
-        <!-- A16-7 独立操作栏 -->
-        <div class="gt-wp-word-editor__toolbar">
-          <el-button type="primary" size="small" @click="openEditor('supplement')" :loading="supplementLoading">
-            {{ onlyofficeAvailable ? '📝 编辑 A16-7' : '📝 编辑（降级）' }}
+        <!-- 版本选择器：推荐版本置顶 -->
+        <div class="gt-wp-word-editor__version-select">
+          <el-radio-group v-model="selectedVersion" size="small" @change="onVersionChange">
+            <el-radio-button
+              v-for="v in sortedMainVersions"
+              :key="v.code"
+              :value="v.code"
+              :class="{ 'is-recommended': v.recommended }"
+            >
+              {{ v.label }}
+              <el-tag v-if="v.recommended" type="success" size="small" effect="plain" style="margin-left: 4px">推荐</el-tag>
+              <el-tag v-if="!v.exists_in_project" type="info" size="small" effect="plain" style="margin-left: 4px">未创建</el-tag>
+            </el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <!-- 推荐版本一键创建提示 -->
+        <el-alert
+          v-if="recommendedNotCreated"
+          type="info"
+          :closable="true"
+          show-icon
+          style="margin-bottom: 12px"
+        >
+          <template #title>
+            推荐使用「{{ recommendedVersionLabel }}」，该版本尚未在项目中创建。
+          </template>
+          <el-button size="small" type="primary" @click="createRecommendedVersion">
+            一键创建
           </el-button>
-          <el-button size="small" @click="downloadTemplate('supplement')">⬇️ 下载 A16-7</el-button>
-          <el-button v-if="!onlyofficeAvailable" size="small" @click="showUpload = true; uploadTarget = 'supplement'">⬆️ 上传</el-button>
+        </el-alert>
+
+        <!-- 主版本操作栏 -->
+        <div class="gt-wp-word-editor__toolbar">
+          <el-button type="primary" size="small" @click="openEditor('main')" :loading="loading">
+            {{ onlyofficeAvailable ? '📝 在线编辑' : '📝 编辑（降级）' }}
+          </el-button>
+          <el-button size="small" @click="downloadTemplate('main')">⬇️ 下载模板</el-button>
+          <el-button v-if="!onlyofficeAvailable" size="small" @click="showUpload = true; uploadTarget = 'main'">⬆️ 上传</el-button>
           <el-divider direction="vertical" />
           <el-button-group>
-            <el-button size="small" :type="supplementSignStatus === 'sent' ? 'warning' : 'default'" @click="updateSupplementSignStatus('sent')" :disabled="supplementSignStatus === 'signed'">
-              📤 已发送
+            <el-button size="small" :type="signStatus === 'pending' ? 'warning' : 'default'" @click="updateSignStatus('pending')" :disabled="signStatus === 'signed'">
+              📤 标记待签署
             </el-button>
-            <el-button size="small" :type="supplementSignStatus === 'signed' ? 'success' : 'default'" @click="updateSupplementSignStatus('signed')">
-              ✅ 已签回
+            <el-button size="small" :type="signStatus === 'signed' ? 'success' : 'default'" @click="updateSignStatus('signed')">
+              ✅ 标记已签回
             </el-button>
           </el-button-group>
         </div>
-      </template>
+      </section>
 
-      <p v-else class="gt-wp-word-editor__supplement-hint">
-        如有关联交易，请启用此项独立编制并签回。
-      </p>
-    </section>
+      <!-- ═══ A13 未更正错报联动提示 ═══ -->
+      <el-alert
+        v-if="misstatementSummary"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <template #title>声明书"未更正错报"段落内容（自动引用 A13）</template>
+        <p style="margin: 4px 0 0; font-size: 12px; white-space: pre-wrap">{{ misstatementSummary }}</p>
+      </el-alert>
+      <el-alert
+        v-else-if="misstatementLoaded"
+        type="success"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+        :title="`无未更正错报，声明书中\u201C未更正错报\u201D段落可填写\u201C无\u201D`"
+      />
 
-    <!-- ═══ 编制信息（占位符预览）═══ -->
-    <div class="gt-wp-word-editor__info">
-      <el-descriptions :column="2" border size="small" title="编制信息（自动预填占位符）">
-        <el-descriptions-item label="客户名称">{{ placeholders.client_name || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="审计期间">{{ placeholders.audit_period || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="签字合伙人">{{ placeholders.partner_name || '—' }}</el-descriptions-item>
-        <el-descriptions-item label="选用版本">{{ selectedVersionLabel }}</el-descriptions-item>
-      </el-descriptions>
-    </div>
+      <!-- ═══ 补充声明区 A16-7 ═══ -->
+      <section class="gt-wp-word-editor__supplement-section">
+        <div class="gt-wp-word-editor__section-header">
+          <h4 class="gt-wp-word-editor__section-title">补充声明（A16-7 关联交易声明书）</h4>
+          <el-switch
+            v-model="supplementEnabled"
+            active-text="需编制关联交易声明书"
+            @change="onSupplementToggle"
+          />
+        </div>
 
-    <!-- OnlyOffice 编辑弹窗 -->
-    <OnlyOfficeEditor
+        <template v-if="supplementEnabled">
+          <div class="gt-wp-word-editor__supplement-status">
+            <el-tag :type="supplementSignStatusType" size="small">签回：{{ supplementSignLabel }}</el-tag>
+          </div>
+
+          <div class="gt-wp-word-editor__toolbar">
+            <el-button type="primary" size="small" @click="openEditor('supplement')" :loading="supplementLoading">
+              {{ onlyofficeAvailable ? '📝 编辑 A16-7' : '📝 编辑（降级）' }}
+            </el-button>
+            <el-button size="small" @click="downloadTemplate('supplement')">⬇️ 下载 A16-7</el-button>
+            <el-button v-if="!onlyofficeAvailable" size="small" @click="showUpload = true; uploadTarget = 'supplement'">⬆️ 上传</el-button>
+            <el-divider direction="vertical" />
+            <el-button-group>
+              <el-button size="small" :type="supplementSignStatus === 'pending' ? 'warning' : 'default'" @click="updateSupplementSignStatus('pending')" :disabled="supplementSignStatus === 'signed'">
+                📤 已发送
+              </el-button>
+              <el-button size="small" :type="supplementSignStatus === 'signed' ? 'success' : 'default'" @click="updateSupplementSignStatus('signed')">
+                ✅ 已签回
+              </el-button>
+            </el-button-group>
+          </div>
+        </template>
+
+        <p v-else class="gt-wp-word-editor__supplement-hint">
+          如有关联交易，请启用此项独立编制并签回。
+        </p>
+      </section>
+
+      <!-- 编制信息 -->
+      <div class="gt-wp-word-editor__info">
+        <el-descriptions :column="2" border size="small" title="编制信息（自动预填占位符）">
+          <el-descriptions-item label="客户名称">{{ placeholders.client_name || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="审计期间">{{ placeholders.audit_period || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="签字合伙人">{{ placeholders.partner_name || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="选用版本">{{ selectedVersionLabel }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </template>
+
+    <!-- ═══ 通用模式：直接加载 OnlyOffice editor ═══ -->
+    <template v-else>
+      <section class="gt-wp-word-editor__generic-section">
+        <div v-if="onlyofficeAvailable" class="gt-wp-word-editor__editor-area">
+          <div :id="editorContainerId" class="gt-wp-word-editor__oo-container" />
+        </div>
+        <div v-else class="gt-wp-word-editor__degraded-generic">
+          <el-alert type="info" :closable="false" show-icon>
+            OnlyOffice 不可用，请下载模板到本地编辑后上传。
+          </el-alert>
+          <div class="gt-wp-word-editor__toolbar" style="margin-top: 12px">
+            <el-button size="small" @click="downloadTemplate('main')">⬇️ 下载模板</el-button>
+            <el-button size="small" @click="showUpload = true; uploadTarget = 'main'">⬆️ 上传</el-button>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <!-- OnlyOffice 编辑弹窗（A16 模式） -->
+    <OnlyOfficeWordDialog
       v-if="editorVisible"
       v-model:visible="editorVisible"
       :document-url="documentUrl"
       :document-key="documentKey"
       :title="editorTitle"
       :mode="readonly ? 'view' : 'edit'"
-      @saved="onSaved"
+      :callback-url="callbackUrl"
+      @saved="onDocumentSaved"
     />
 
-    <!-- 降级提示 -->
-    <div v-if="!onlyofficeAvailable" class="gt-wp-word-editor__degraded">
-      <el-alert type="info" :closable="false" show-icon>
-        OnlyOffice 不可用，请下载模板到本地编辑后上传。
-      </el-alert>
-    </div>
-
-    <!-- ═══ 签署日期对话框（CW-76：A16 主版本 signed 必填） ═══ -->
+    <!-- 签署日期对话框 -->
     <el-dialog v-model="showSignDateDialog" title="确认签署日期" width="400px" :close-on-click-modal="false">
       <p style="margin: 0 0 12px; color: var(--el-text-color-secondary); font-size: 13px">
         请确认管理层声明书签署日期。该日期将同步到审计报告。
@@ -169,7 +231,7 @@
         drag
       >
         <div style="padding: 20px; text-align: center">
-          <p>拖拽或点击上传编辑完成的声明书文件（.docx）</p>
+          <p>拖拽或点击上传编辑完成的文件（.docx）</p>
         </div>
       </el-upload>
     </el-dialog>
@@ -177,11 +239,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
+import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -189,12 +251,20 @@ const props = defineProps<{
   htmlData?: any
   schema?: any
   readonly?: boolean
+  // extraComponentProps via 'standard' strategy (Vue auto-converts kebab to camelCase)
+  wpCode?: string
+  projectId?: string
+  year?: number
 }>()
 
 const route = useRoute()
-const projectId = computed(() => (route.params.projectId as string) || '')
+const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
+const wpCode = computed(() => props.wpCode || '')
 
-// ─── State ───
+// ─── Mode Detection ───
+const isA16Mode = computed(() => wpCode.value === 'A16')
+
+// ─── Common State ───
 const loading = ref(false)
 const supplementLoading = ref(false)
 const editorVisible = ref(false)
@@ -203,48 +273,61 @@ const uploadTarget = ref<'main' | 'supplement'>('main')
 const onlyofficeAvailable = ref(false)
 const documentUrl = ref('')
 const documentKey = ref('')
-const editorTitle = ref('管理层声明书')
-const signStatus = ref<string>('pending')
-const supplementSignStatus = ref<string>('pending')
+const editorTitle = ref('')
+const callbackUrl = ref('')
+const signStatus = ref<'draft' | 'pending' | 'signed'>('draft')
+const supplementSignStatus = ref<'draft' | 'pending' | 'signed'>('draft')
 const supplementEnabled = ref(false)
 const misstatementSummary = ref('')
 const misstatementLoaded = ref(false)
 const selectedVersion = ref('A16-1')
-// CW-76: cached dates for sign_date default
-const cachedReportDate = ref<string>('')
-const cachedAuditPeriodEnd = ref<string>('')
 
-const SUPPLEMENT_CODE = 'A16-7'
+// ─── Save Status ───
+type SaveState = 'saved' | 'saving' | 'unsaved'
+const saveState = ref<SaveState>('saved')
 
-// ─── CW-76: sign date dialog state ───
+// ─── Network Status ───
+const networkOffline = ref(false)
+let reconnectTimer: ReturnType<typeof setInterval> | null = null
+
+// ─── Sign Date Dialog ───
 const showSignDateDialog = ref(false)
 const signDateValue = ref<string>('')
 const pendingSignTarget = ref<'main' | 'supplement'>('main')
+const cachedReportDate = ref<string>('')
+const cachedAuditPeriodEnd = ref<string>('')
+
+// ─── OnlyOffice inline editor (generic mode) ───
+const editorContainerId = `oo-wp-editor-${Date.now()}`
+let ooEditorInstance: any = null
+
+const SUPPLEMENT_CODE = 'A16-7'
 
 const placeholders = reactive({
   client_name: '',
   audit_period: '',
   partner_name: '',
-  uncorrected_misstatements: '',
+  entity_name: '',
+  period_end: '',
 })
 
-// ─── Template Versions (A16-1~6 only, A16-7 is separate) ───
+// ─── A16 Template Versions ───
 interface TemplateVersion {
   code: string
   label: string
   recommended: boolean
+  exists_in_project: boolean
 }
 
 const mainTemplateVersions = ref<TemplateVersion[]>([
-  { code: 'A16-1', label: '一般财报', recommended: false },
-  { code: 'A16-2', label: '整合审计', recommended: false },
-  { code: 'A16-3', label: 'IPO申报', recommended: false },
-  { code: 'A16-4', label: 'IPO季度', recommended: false },
-  { code: 'A16-5', label: '新三板', recommended: false },
-  { code: 'A16-6', label: '企业债', recommended: false },
+  { code: 'A16-1', label: '一般财报', recommended: false, exists_in_project: true },
+  { code: 'A16-2', label: '整合审计', recommended: false, exists_in_project: true },
+  { code: 'A16-3', label: 'IPO申报', recommended: false, exists_in_project: true },
+  { code: 'A16-4', label: 'IPO季度', recommended: false, exists_in_project: true },
+  { code: 'A16-5', label: '新三板', recommended: false, exists_in_project: true },
+  { code: 'A16-6', label: '企业债', recommended: false, exists_in_project: true },
 ])
 
-// Sorted: recommended version on top, then original order
 const sortedMainVersions = computed(() => {
   const versions = [...mainTemplateVersions.value]
   versions.sort((a, b) => {
@@ -259,33 +342,108 @@ const selectedVersionLabel = computed(() =>
   mainTemplateVersions.value.find(v => v.code === selectedVersion.value)?.label || selectedVersion.value
 )
 
-// ─── Sign status computed ───
-const mainSignStatusLabel = computed(() => {
-  const m: Record<string, string> = { pending: '待编辑', sent: '已发送', signed: '已签回' }
-  return m[signStatus.value] || '待编辑'
+// ─── Recommended version (Task 8.1) ───
+const recommendedCode = ref<string>('')
+const recommendedNotCreated = computed(() => {
+  if (!recommendedCode.value) return false
+  const v = mainTemplateVersions.value.find(t => t.code === recommendedCode.value)
+  return v ? !v.exists_in_project : false
+})
+const recommendedVersionLabel = computed(() =>
+  mainTemplateVersions.value.find(v => v.code === recommendedCode.value)?.label || recommendedCode.value
+)
+
+// ─── Unified Toolbar Computed (Task 7.2) ───
+const documentTitle = computed(() => {
+  if (isA16Mode.value) {
+    return `${wpCode.value} 管理层声明书`
+  }
+  // Generic mode: wp_code + template name from htmlData or schema
+  const templateName = props.htmlData?.template_name || props.schema?.template_name || ''
+  return templateName ? `${wpCode.value} ${templateName}` : wpCode.value || 'Word 模板'
 })
 
+const signStatusTagType = computed(() => {
+  if (signStatus.value === 'signed') return 'success'
+  if (signStatus.value === 'pending') return 'warning'
+  return 'info' // draft = gray
+})
+
+const signStatusLabel = computed(() => {
+  const m: Record<string, string> = { draft: '草稿', pending: '待签署', signed: '已签署' }
+  return m[signStatus.value] || '草稿'
+})
+
+const saveStatusText = computed(() => {
+  const m: Record<SaveState, string> = { saved: '已保存', saving: '保存中…', unsaved: '未保存' }
+  return m[saveState.value]
+})
+
+const saveStatusClass = computed(() => `save-status--${saveState.value}`)
+
+const canExport = computed(() => onlyofficeAvailable.value || true) // always allow export attempt
+
+// A16 specific sign status display
+const mainSignStatusLabel = computed(() => {
+  const m: Record<string, string> = { draft: '草稿', pending: '待签署', signed: '已签回' }
+  return m[signStatus.value] || '草稿'
+})
 const mainSignStatusType = computed(() => {
   if (signStatus.value === 'signed') return 'success'
-  if (signStatus.value === 'sent') return 'warning'
+  if (signStatus.value === 'pending') return 'warning'
   return 'info'
 })
-
 const supplementSignLabel = computed(() => {
-  const m: Record<string, string> = { pending: '待编辑', sent: '已发送', signed: '已签回' }
-  return m[supplementSignStatus.value] || '待编辑'
+  const m: Record<string, string> = { draft: '草稿', pending: '待签署', signed: '已签回' }
+  return m[supplementSignStatus.value] || '草稿'
 })
-
 const supplementSignStatusType = computed(() => {
   if (supplementSignStatus.value === 'signed') return 'success'
-  if (supplementSignStatus.value === 'sent') return 'warning'
+  if (supplementSignStatus.value === 'pending') return 'warning'
   return 'info'
 })
 
 const uploadHeaders = computed(() => {
-  const token = sessionStorage.getItem('token') || ''
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
   return { Authorization: `Bearer ${token}` }
 })
+
+// ─── Export filename helper (Task 7.2 / Property 12) ───
+function buildExportFilename(): string {
+  const code = wpCode.value || 'workpaper'
+  const entity = sanitizeFilename(placeholders.entity_name || placeholders.client_name || '')
+  const period = placeholders.period_end || ''
+  if (entity && period) return `${code}_${entity}_${period}.docx`
+  if (entity) return `${code}_${entity}.docx`
+  return `${code}.docx`
+}
+
+/** 清理文件名中不安全的字符 */
+function sanitizeFilename(name: string): string {
+  return name.replace(/[\\/:*?"<>|]/g, '_').trim()
+}
+
+// ─── Network disconnection detection (Task 7.3) ───
+function onOnline() {
+  networkOffline.value = false
+  if (reconnectTimer) {
+    clearInterval(reconnectTimer)
+    reconnectTimer = null
+  }
+  ElMessage.success('网络已恢复连接')
+}
+
+function onOffline() {
+  networkOffline.value = true
+  // Auto-reconnect attempt every 10s
+  if (!reconnectTimer) {
+    reconnectTimer = setInterval(() => {
+      if (navigator.onLine) {
+        onOnline()
+      }
+    }, 10000)
+  }
+}
 
 // ─── Methods ───
 async function loadProjectInfo() {
@@ -293,75 +451,108 @@ async function loadProjectInfo() {
     const info = await api.get<any>(`/api/projects/${projectId.value}`)
     const d = info?.data || info
     placeholders.client_name = d?.client_name || d?.name || ''
+    placeholders.entity_name = d?.client_name || d?.name || ''
     placeholders.audit_period = d?.audit_period_end ? `${d.audit_year || ''}年度` : ''
     placeholders.partner_name = d?.partner_name || ''
+    placeholders.period_end = d?.audit_period_end
+      ? (typeof d.audit_period_end === 'string' ? d.audit_period_end.slice(0, 10) : '')
+      : ''
 
-    // CW-76: cache audit_period_end for sign_date default
     if (d?.audit_period_end) {
       cachedAuditPeriodEnd.value = typeof d.audit_period_end === 'string'
-        ? d.audit_period_end.slice(0, 10)
-        : ''
+        ? d.audit_period_end.slice(0, 10) : ''
     }
 
-    // CW-76: try to get audit_report.report_date as preferred default
+    // Try to get audit report date for sign_date default
     try {
       const year = getAuditYear()
       const report = await api.get<any>(`/api/audit-report?project_id=${projectId.value}&year=${year}`)
       const rd = report?.report_date || report?.data?.report_date
-      if (rd) {
-        cachedReportDate.value = typeof rd === 'string' ? rd.slice(0, 10) : ''
-      }
+      if (rd) cachedReportDate.value = typeof rd === 'string' ? rd.slice(0, 10) : ''
     } catch { /* audit_report may not exist yet */ }
-
-    // ─── Version resolution priority: URL query > persisted > recommendation > default A16-1 ───
-    let resolvedVersion: string | null = null
-
-    // 1. URL query override (highest priority)
-    const qv = route.query.version as string
-    if (qv && mainTemplateVersions.value.some(v => v.code === qv)) {
-      resolvedVersion = qv
-    }
-
-    // 2. Persisted field_override (second priority)
-    if (!resolvedVersion) {
-      const persisted = await loadPersistedVersion()
-      if (persisted) {
-        resolvedVersion = persisted
-      }
-    }
-
-    // 3. API recommendation (third priority)
-    try {
-      const rec = await api.get<any>(`/api/projects/${projectId.value}/a16/recommended-version`)
-      const mainCode = rec?.main?.code
-      if (mainCode) {
-        for (const v of mainTemplateVersions.value) {
-          v.recommended = v.code === mainCode
-        }
-        // Only use recommendation if no higher-priority source resolved
-        if (!resolvedVersion) {
-          resolvedVersion = mainCode
-        }
-      }
-      // A16-7 supplement recommendation
-      if (rec?.supplement) {
-        supplementEnabled.value = true
-      }
-    } catch { /* fallback: no recommendation available */ }
-
-    // 4. Apply resolved version (or keep default A16-1)
-    if (resolvedVersion) {
-      selectedVersion.value = resolvedVersion
-    }
-
-    // If URL query was used, also persist it for consistency
-    if (qv && qv === resolvedVersion) {
-      persistSelectedVersion(qv)
-    }
   } catch { /* ignore */ }
 }
 
+/** Task 8.1: Load recommended version from API */
+async function loadRecommendedVersion() {
+  if (!isA16Mode.value) return
+  try {
+    const rec = await api.get<any>(`/api/projects/${projectId.value}/a16/recommended-version`)
+    const data = rec?.data || rec
+    // Support both API formats:
+    // Format 1 (design doc): { recommended_code, all_versions, always_required }
+    // Format 2 (legacy): { main: { code, label }, supplement: { code } }
+    const recCode = data?.recommended_code || data?.main?.code
+    if (recCode) {
+      recommendedCode.value = recCode
+      // Update version labels and exists_in_project from API response
+      if (data.all_versions && Array.isArray(data.all_versions)) {
+        for (const apiVer of data.all_versions) {
+          const local = mainTemplateVersions.value.find(v => v.code === apiVer.code)
+          if (local) {
+            if (apiVer.label) local.label = apiVer.label
+            local.exists_in_project = apiVer.exists_in_project !== false
+          }
+        }
+      }
+      // Mark recommended
+      for (const v of mainTemplateVersions.value) {
+        v.recommended = v.code === recCode
+      }
+    }
+    // Supplement: check if A16-7 should be enabled
+    if (data?.supplement || (data?.always_required && data.always_required.includes('A16-7'))) {
+      supplementEnabled.value = true
+    }
+  } catch { /* fallback: no recommendation available */ }
+}
+
+/** A16 version resolution (URL query > persisted > recommendation > default) */
+async function resolveA16Version() {
+  let resolvedVersion: string | null = null
+
+  // 1. URL query override
+  const qv = route.query.version as string
+  if (qv && mainTemplateVersions.value.some(v => v.code === qv)) {
+    resolvedVersion = qv
+  }
+
+  // 2. Persisted field_override
+  if (!resolvedVersion) {
+    const persisted = await loadPersistedVersion()
+    if (persisted) resolvedVersion = persisted
+  }
+
+  // 3. Recommendation fallback
+  if (!resolvedVersion && recommendedCode.value) {
+    resolvedVersion = recommendedCode.value
+  }
+
+  // 4. Apply
+  if (resolvedVersion) selectedVersion.value = resolvedVersion
+  if (qv && qv === resolvedVersion) persistSelectedVersion(qv)
+}
+
+/** Create recommended version workpaper (Task 8.1) */
+async function createRecommendedVersion() {
+  if (!recommendedCode.value) return
+  try {
+    await api.post(`/api/projects/${projectId.value}/workpapers/create-from-template`, {
+      wp_code: recommendedCode.value,
+    })
+    ElMessage.success(`已创建 ${recommendedVersionLabel.value}`)
+    // Refresh versions
+    const v = mainTemplateVersions.value.find(t => t.code === recommendedCode.value)
+    if (v) v.exists_in_project = true
+    selectedVersion.value = recommendedCode.value
+    persistSelectedVersion(recommendedCode.value)
+  } catch (e: any) {
+    ElMessage.error('创建失败：' + (e?.message || '请重试'))
+  }
+}
+
 async function loadMisstatementSummary() {
+  if (!isA16Mode.value) return
   try {
     const year = getAuditYear()
     const r = await api.get<any>(
@@ -371,7 +562,6 @@ async function loadMisstatementSummary() {
     const text = r?.summary || r?.data?.summary || ''
     misstatementSummary.value = (text === '无未更正错报。') ? '' : text
     misstatementLoaded.value = true
-    placeholders.uncorrected_misstatements = misstatementSummary.value || '无'
   } catch {
     misstatementLoaded.value = true
   }
@@ -387,12 +577,32 @@ async function checkHealth() {
 }
 
 async function loadSignStatus() {
+  // For generic mode, sign_status comes from render-config (htmlData)
+  if (!isA16Mode.value) {
+    // Try from htmlData (injected by render-config step 9)
+    const fromHtml = props.htmlData?.sign_status
+    if (fromHtml && ['draft', 'pending', 'signed'].includes(fromHtml)) {
+      signStatus.value = fromHtml
+      return
+    }
+    // Fallback: query field_overrides
+    try {
+      const year = getAuditYear()
+      const scope = `word_template:${wpCode.value}`
+      const overrides = await api.get<any>('/api/workpapers/field-overrides', {
+        params: { project_id: projectId.value, year, scope },
+      })
+      signStatus.value = overrides?.sign_status?.value || 'draft'
+    } catch { signStatus.value = 'draft' }
+    return
+  }
+  // A16 mode
   try {
     const info = await api.get<any>(
       `/api/workpapers/${props.wpId}/file-info?version=${encodeURIComponent(selectedVersion.value)}`,
     )
-    signStatus.value = info?.sign_status || 'pending'
-  } catch { /* ignore */ }
+    signStatus.value = info?.sign_status || 'draft'
+  } catch { signStatus.value = 'draft' }
 }
 
 async function loadSupplementSignStatus() {
@@ -401,15 +611,14 @@ async function loadSupplementSignStatus() {
     const info = await api.get<any>(
       `/api/workpapers/${props.wpId}/file-info?version=${encodeURIComponent(SUPPLEMENT_CODE)}`,
     )
-    supplementSignStatus.value = info?.sign_status || 'pending'
+    supplementSignStatus.value = info?.sign_status || 'draft'
   } catch { /* ignore */ }
 }
 
+// ─── Sign status update ───
 async function updateSignStatus(status: string) {
-  // CW-76: 主版本签回时必须弹窗获取签署日期
-  if (status === 'signed') {
+  if (isA16Mode.value && status === 'signed') {
     pendingSignTarget.value = 'main'
-    // Pre-fill sign_date with audit report date or audit_period_end
     signDateValue.value = getDefaultSignDate()
     showSignDateDialog.value = true
     return
@@ -417,40 +626,33 @@ async function updateSignStatus(status: string) {
   await _doUpdateSignStatus(status)
 }
 
-/** 实际执行签回状态更新（可能带 sign_date） */
 async function _doUpdateSignStatus(status: string, signDate?: string) {
   try {
-    const payload: Record<string, any> = {
-      status,
-      version: selectedVersion.value,
-    }
-    if (signDate) {
-      payload.sign_date = signDate
-    }
+    const payload: Record<string, any> = { status }
+    if (isA16Mode.value) payload.version = selectedVersion.value
+    if (signDate) payload.sign_date = signDate
     await api.post(`/api/workpapers/${props.wpId}/sign-status`, payload)
-    signStatus.value = status
-    ElMessage.success(status === 'signed' ? '已标记签回' : '已标记发送')
+    signStatus.value = status as any
+    ElMessage.success(status === 'signed' ? '已标记签回' : status === 'pending' ? '已标记待签署' : '已更新状态')
   } catch {
     // Fallback: field_overrides
     try {
       const year = getAuditYear()
+      const scope = isA16Mode.value
+        ? `word_template:A16:${selectedVersion.value}`
+        : `word_template:${wpCode.value}`
       await api.post('/api/workpapers/field-overrides', {
-        project_id: projectId.value,
-        year,
-        scope: `word_template:A16:${selectedVersion.value}`,
-        item_key: 'sign_status',
-        field: 'value',
-        value: status,
+        project_id: projectId.value, year, scope,
+        item_key: 'sign_status', field: 'value', value: status,
       })
-      signStatus.value = status
-      ElMessage.success(status === 'signed' ? '已标记签回' : '已标记发送')
+      signStatus.value = status as any
+      ElMessage.success('状态已更新')
     } catch {
       ElMessage.error('更新状态失败')
     }
   }
 }
 
-/** CW-76: 确认签署日期后执行签回 */
 async function confirmSignDate() {
   showSignDateDialog.value = false
   if (pendingSignTarget.value === 'main') {
@@ -460,23 +662,14 @@ async function confirmSignDate() {
   }
 }
 
-/** 获取默认签署日期：优先审计报告日期，降级审计期间截止日 */
 function getDefaultSignDate(): string {
-  // 从 placeholders 中获取审计报告日期（如果已从 project info / audit_report 取得）
-  if (cachedReportDate.value) {
-    return cachedReportDate.value
-  }
-  if (cachedAuditPeriodEnd.value) {
-    return cachedAuditPeriodEnd.value
-  }
-  // 降级：当天
+  if (cachedReportDate.value) return cachedReportDate.value
+  if (cachedAuditPeriodEnd.value) return cachedAuditPeriodEnd.value
   return new Date().toISOString().slice(0, 10)
 }
 
 async function updateSupplementSignStatus(status: string) {
-  // A16-7 签回: sign_date 可选，不 push 到审计报告
   if (status === 'signed') {
-    // 直接签回不弹日期框（A16-7 不需要）
     await _doUpdateSupplementSignStatus(status)
     return
   }
@@ -485,28 +678,20 @@ async function updateSupplementSignStatus(status: string) {
 
 async function _doUpdateSupplementSignStatus(status: string, _signDate?: string) {
   try {
-    const payload: Record<string, any> = {
-      status,
-      version: SUPPLEMENT_CODE,
-    }
-    // A16-7 不传 sign_date（不 push 到审计报告）
+    const payload: Record<string, any> = { status, version: SUPPLEMENT_CODE }
     await api.post(`/api/workpapers/${props.wpId}/sign-status`, payload)
-    supplementSignStatus.value = status
-    ElMessage.success(status === 'signed' ? 'A16-7 已签回' : 'A16-7 已发送')
+    supplementSignStatus.value = status as any
+    ElMessage.success(status === 'signed' ? 'A16-7 已签回' : 'A16-7 已标记待签署')
   } catch {
-    // Fallback: field_overrides
     try {
       const year = getAuditYear()
       await api.post('/api/workpapers/field-overrides', {
-        project_id: projectId.value,
-        year,
+        project_id: projectId.value, year,
         scope: `word_template:A16:${SUPPLEMENT_CODE}`,
-        item_key: 'sign_status',
-        field: 'value',
-        value: status,
+        item_key: 'sign_status', field: 'value', value: status,
       })
-      supplementSignStatus.value = status
-      ElMessage.success(status === 'signed' ? 'A16-7 已签回' : 'A16-7 已发送')
+      supplementSignStatus.value = status as any
+      ElMessage.success(status === 'signed' ? 'A16-7 已签回' : 'A16-7 已标记待签署')
     } catch {
       ElMessage.error('更新 A16-7 状态失败')
     }
@@ -514,54 +699,35 @@ async function _doUpdateSupplementSignStatus(status: string, _signDate?: string)
 }
 
 async function onSupplementToggle(enabled: boolean | string | number) {
-  // Persist the enabled state via field_overrides
   try {
     const year = getAuditYear()
     await api.post('/api/workpapers/field-overrides', {
-      project_id: projectId.value,
-      year,
+      project_id: projectId.value, year,
       scope: `word_template:A16:${SUPPLEMENT_CODE}`,
-      item_key: 'enabled',
-      field: 'value',
-      value: String(!!enabled),
+      item_key: 'enabled', field: 'value', value: String(!!enabled),
     })
-    if (enabled) {
-      loadSupplementSignStatus()
-    }
+    if (enabled) loadSupplementSignStatus()
   } catch { /* non-critical */ }
 }
 
+// ─── Version selection (A16) ───
 async function onVersionChange(code: string) {
   selectedVersion.value = code
-  editorTitle.value = `管理层声明书 (${selectedVersionLabel.value})`
-  // Persist selected_version via field_overrides
   persistSelectedVersion(code)
-  // Load sign_status for the new version (independent per version)
   await loadSignStatus()
 }
 
-/**
- * 持久化 selected_version 到 field_overrides (scope=word_template:A16)
- * 切换版本时调用，刷新后可恢复选择。
- */
 async function persistSelectedVersion(code: string) {
   try {
     const year = getAuditYear()
     await api.post('/api/workpapers/field-overrides', {
-      project_id: projectId.value,
-      year,
+      project_id: projectId.value, year,
       scope: 'word_template:A16',
-      item_key: 'selected_version',
-      field: 'value',
-      value: code,
+      item_key: 'selected_version', field: 'value', value: code,
     })
-  } catch { /* 非关键路径，静默失败 */ }
+  } catch { /* non-critical */ }
 }
 
-/**
- * 从 field_overrides 读取已持久化的 selected_version
- * 返回 null 表示无持久化记录。
- */
 async function loadPersistedVersion(): Promise<string | null> {
   try {
     const year = getAuditYear()
@@ -570,18 +736,16 @@ async function loadPersistedVersion(): Promise<string | null> {
       { params: { project_id: projectId.value, year, scope: 'word_template:A16' } },
     )
     const val = overrides?.selected_version?.value
-    if (val && mainTemplateVersions.value.some(v => v.code === val)) {
-      return val
-    }
+    if (val && mainTemplateVersions.value.some(v => v.code === val)) return val
   } catch { /* ignore */ }
   return null
 }
 
-/** 获取审计年度（优先 route query，否则当前年份） */
 function getAuditYear(): number {
-  return parseInt(route.query.year as string) || new Date().getFullYear()
+  return props.year || parseInt(route.query.year as string) || new Date().getFullYear()
 }
 
+// ─── OnlyOffice editor actions ───
 async function openEditor(target: 'main' | 'supplement') {
   const version = target === 'supplement' ? SUPPLEMENT_CODE : selectedVersion.value
   const loadingRef = target === 'supplement' ? supplementLoading : loading
@@ -597,9 +761,12 @@ async function openEditor(target: 'main' | 'supplement') {
     })
     documentUrl.value = config.document_url || ''
     documentKey.value = config.document_key || `wp-${props.wpId}-${version}-${Date.now()}`
+    callbackUrl.value = config.callback_url || ''
     editorTitle.value = target === 'supplement'
       ? '关联交易声明书 (A16-7)'
-      : `声明书 (${selectedVersionLabel.value})`
+      : isA16Mode.value
+        ? `声明书 (${selectedVersionLabel.value})`
+        : documentTitle.value
     editorVisible.value = true
   } catch (e: any) {
     ElMessage.error('打开编辑器失败：' + (e?.message || '未知错误'))
@@ -609,18 +776,17 @@ async function openEditor(target: 'main' | 'supplement') {
 }
 
 async function downloadTemplate(target: 'main' | 'supplement') {
-  const version = target === 'supplement' ? SUPPLEMENT_CODE : selectedVersion.value
-  const label = target === 'supplement' ? 'A16-7 关联交易声明书' : `${selectedVersion.value} 管理层声明书`
+  const version = target === 'supplement' ? SUPPLEMENT_CODE : (isA16Mode.value ? selectedVersion.value : wpCode.value)
   try {
     const url = `/api/projects/${projectId.value}/wp-templates/${version}/prefilled-download`
-    const token = sessionStorage.getItem('token') || ''
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
     const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
     if (!r.ok) throw new Error('下载失败')
     const blob = await r.blob()
     const obj = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = obj
-    a.download = `${label}.docx`
+    a.download = target === 'supplement' ? 'A16-7_关联交易声明书.docx' : buildExportFilename()
     a.click()
     URL.revokeObjectURL(obj)
   } catch (e: any) {
@@ -628,15 +794,116 @@ async function downloadTemplate(target: 'main' | 'supplement') {
   }
 }
 
-function onSaved() {
+// ─── Export (Task 7.2) ───
+async function onExportDocx() {
+  try {
+    const version = isA16Mode.value ? selectedVersion.value : wpCode.value
+    const url = `/api/projects/${projectId.value}/wp-templates/${version}/prefilled-download`
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!r.ok) throw new Error('导出失败')
+    const blob = await r.blob()
+    const obj = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = obj
+    a.download = buildExportFilename()
+    a.click()
+    URL.revokeObjectURL(obj)
+    ElMessage.success('导出成功')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导出失败')
+  }
+}
+
+// ─── OnlyOffice save callback (Task 7.3) ───
+function onDocumentSaved() {
+  saveState.value = 'saved'
   ElMessage.success('文件已保存')
   loadSignStatus()
-  if (supplementEnabled.value) loadSupplementSignStatus()
+  if (isA16Mode.value && supplementEnabled.value) loadSupplementSignStatus()
+}
+
+/** Initialize OnlyOffice inline editor for generic mode */
+async function initGenericEditor() {
+  if (isA16Mode.value || !onlyofficeAvailable.value) return
+
+  const version = wpCode.value
+  try {
+    const config = await api.get<any>(`/api/workpapers/${props.wpId}/onlyoffice-config`, {
+      params: { version },
+    })
+    if (!config?.document_url) return
+
+    // Load OnlyOffice JS API
+    const base = (import.meta as any).env?.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
+    await loadOnlyOfficeScript(base)
+    await nextTick()
+
+    const DocsAPI = (window as any).DocsAPI
+    if (!DocsAPI) {
+      onlyofficeAvailable.value = false
+      return
+    }
+
+    const editorConfig: any = {
+      document: {
+        fileType: 'docx',
+        key: config.document_key || `wp-${props.wpId}-${version}-${Date.now()}`,
+        title: documentTitle.value,
+        url: config.document_url,
+      },
+      documentType: 'word',
+      editorConfig: {
+        mode: props.readonly ? 'view' : 'edit',
+        callbackUrl: config.callback_url || '',
+        lang: 'zh',
+        customization: {
+          autosave: true,
+          forcesave: true,
+        },
+      },
+      events: {
+        onDocumentStateChange(event: any) {
+          // event.data === true means document has unsaved changes
+          if (event?.data) {
+            saveState.value = 'unsaved'
+          }
+        },
+        onSave() {
+          saveState.value = 'saving'
+        },
+        onDocumentReady() {
+          saveState.value = 'saved'
+        },
+      },
+    }
+
+    if (config.token) {
+      editorConfig.token = config.token
+    }
+
+    ooEditorInstance = new DocsAPI.DocEditor(editorContainerId, editorConfig)
+  } catch (e: any) {
+    console.warn('[WorkpaperWordEditor] OnlyOffice init failed:', e)
+    onlyofficeAvailable.value = false
+  }
+}
+
+function loadOnlyOfficeScript(baseUrl: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).DocsAPI) { resolve(); return }
+    const script = document.createElement('script')
+    script.src = `${baseUrl}/web-apps/apps/api/documents/api.js`
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load OnlyOffice API script'))
+    document.head.appendChild(script)
+  })
 }
 
 function onUploadSuccess() {
   showUpload.value = false
   ElMessage.success('上传成功')
+  saveState.value = 'saved'
   if (uploadTarget.value === 'supplement') {
     loadSupplementSignStatus()
   } else {
@@ -646,11 +913,42 @@ function onUploadSuccess() {
 
 // ─── Lifecycle ───
 onMounted(async () => {
-  checkHealth()
+  // Network listeners (Task 7.3)
+  window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
+  networkOffline.value = !navigator.onLine
+
+  await checkHealth()
   await loadProjectInfo()
-  loadMisstatementSummary()
+
+  if (isA16Mode.value) {
+    // A16 mode: load recommended version first, then resolve selection
+    await loadRecommendedVersion()
+    await resolveA16Version()
+    loadMisstatementSummary()
+  }
+
   await loadSignStatus()
-  if (supplementEnabled.value) loadSupplementSignStatus()
+
+  if (isA16Mode.value && supplementEnabled.value) {
+    loadSupplementSignStatus()
+  }
+
+  // Generic mode: init inline editor
+  if (!isA16Mode.value) {
+    await nextTick()
+    initGenericEditor()
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
+  if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null }
+  if (ooEditorInstance) {
+    try { ooEditorInstance.destroyEditor() } catch { /* ignore */ }
+    ooEditorInstance = null
+  }
 })
 </script>
 
@@ -659,9 +957,56 @@ onMounted(async () => {
   padding: 16px;
 }
 
+/* Network warning */
+.gt-wp-word-editor__network-warning {
+  margin-bottom: 12px;
+}
+
+/* Unified toolbar (Task 7.2) */
+.gt-wp-word-editor__unified-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 6px;
+  background: var(--el-bg-color, #fff);
+}
+.gt-wp-word-editor__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gt-wp-word-editor__toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.gt-wp-word-editor__doc-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-wp-word-editor__save-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.gt-wp-word-editor__save-status.save-status--saved {
+  color: var(--el-color-success, #67c23a);
+}
+.gt-wp-word-editor__save-status.save-status--saving {
+  color: var(--el-color-warning, #e6a23c);
+}
+.gt-wp-word-editor__save-status.save-status--unsaved {
+  color: var(--el-color-danger, #f56c6c);
+}
+
 /* Section styling */
 .gt-wp-word-editor__main-section,
-.gt-wp-word-editor__supplement-section {
+.gt-wp-word-editor__supplement-section,
+.gt-wp-word-editor__generic-section {
   border: 1px solid var(--el-border-color-lighter, #ebeef5);
   border-radius: 8px;
   padding: 16px;
@@ -673,6 +1018,10 @@ onMounted(async () => {
 }
 .gt-wp-word-editor__supplement-section {
   border-left: 3px solid var(--el-color-info, #909399);
+}
+.gt-wp-word-editor__generic-section {
+  border-left: 3px solid var(--gt-color-primary, #4b2d77);
+  min-height: 500px;
 }
 
 .gt-wp-word-editor__section-header {
@@ -695,8 +1044,6 @@ onMounted(async () => {
   margin-bottom: 12px;
   flex-wrap: wrap;
 }
-
-/* Recommended version highlight */
 .gt-wp-word-editor__version-select :deep(.is-recommended .el-radio-button__inner) {
   border-color: var(--gt-color-primary, #4b2d77);
   color: var(--gt-color-primary, #4b2d77);
@@ -719,10 +1066,21 @@ onMounted(async () => {
   margin: 0;
 }
 
-.gt-wp-word-editor__degraded {
-  margin-bottom: 12px;
-}
 .gt-wp-word-editor__info {
   margin-top: 16px;
+}
+
+/* Generic mode editor area */
+.gt-wp-word-editor__editor-area {
+  width: 100%;
+  height: 600px;
+}
+.gt-wp-word-editor__oo-container {
+  width: 100%;
+  height: 100%;
+}
+.gt-wp-word-editor__degraded-generic {
+  padding: 24px;
+  text-align: center;
 }
 </style>

@@ -85,17 +85,31 @@ def _resolve_wp_file(
     wp_code: str,
     template_path: Path | None,
 ) -> Path:
-    """解析 wp_code 对应的单一共享 xlsx 文件（不再 per-sheet 复制）。
+    """解析 wp_code 对应的单一共享文件（不再 per-sheet 复制）。
 
-    按 {wp_code}.xlsx 命名单一文件，同一 wp_code 的多个 sheet 共享此文件。
+    按 {wp_code}.{ext} 命名单一文件，扩展名取自模板实际类型。
+    同一 wp_code 的多个 sheet 共享此文件。
     首次从模板整本复制一次，后续复用。
     """
     storage_dir = _onlyoffice_storage_dir(project_id)
-    file_name = f"{wp_code}.xlsx"           # single file per wp_code
+
+    # 确定文件扩展名：优先从模板取实际后缀，回退 xlsx
+    ext = template_path.suffix.lower() if template_path else ".xlsx"
+    if not ext:
+        ext = ".xlsx"
+    file_name = f"{wp_code}{ext}"           # single file per wp_code, 保留原始扩展名
     target = storage_dir / file_name
 
     if target.exists():
         return target
+
+    # 兼容旧格式：检查是否存在旧的 .xlsx 命名（从 .xlsx 硬编码时代遗留）
+    legacy_target = storage_dir / f"{wp_code}.xlsx"
+    if legacy_target.exists() and ext != ".xlsx":
+        # 旧文件存在但扩展名不对 → 重命名为正确扩展名
+        legacy_target.rename(target)
+        return target
+
     if template_path and template_path.exists():
         storage_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(template_path, target)
@@ -280,12 +294,26 @@ async def get_sheet_onlyoffice_config(
                 detail="当前编辑人数已满，请稍后再试",
             )
 
-    # 7. 构建 OnlyOffice config
+    # 7. 根据实际文件扩展名确定 fileType / documentType
+    from pathlib import Path as _Path
+
+    _ext = _Path(file_path).suffix.lower().lstrip(".")
+    if _ext in ("doc", "docx", "odt", "rtf"):
+        file_type = _ext if _ext == "docx" else "docx"
+        document_type = "word"
+    elif _ext in ("ppt", "pptx", "odp"):
+        file_type = _ext if _ext == "pptx" else "pptx"
+        document_type = "slide"
+    else:
+        file_type = "xlsx"
+        document_type = "cell"
+
+    # 8. 构建 OnlyOffice config
     config = {
         "document": {
-            "fileType": "xlsx",
+            "fileType": file_type,
             "key": doc_key,
-            "title": f"{wp_code}_{sheet_name}.xlsx",
+            "title": f"{wp_code}_{sheet_name}.{file_type}",
             "url": download_url,
             "permissions": {
                 "edit": mode == "edit",
@@ -293,14 +321,14 @@ async def get_sheet_onlyoffice_config(
                 "print": True,
             },
         },
-        "documentType": "cell",
+        "documentType": document_type,
         "editorConfig": {
             "mode": mode,
             "lang": "zh-CN",
             "callbackUrl": callback_url,
             **(
                 {}
-                if whole_workbook
+                if whole_workbook or document_type != "cell"
                 else {"actionLink": {"action": {"type": "bookmark", "data": sheet_name}}}
             ),
             "user": {
@@ -319,14 +347,14 @@ async def get_sheet_onlyoffice_config(
         "type": "desktop",
     }
 
-    # 8. JWT 签名
+    # 9. JWT 签名
     token = _sign_jwt(config)
 
     return {
         "config": config,
         "token": token,
         "mode": mode,
-        "documentType": "cell",
+        "documentType": document_type,
         "onlyoffice_url": settings.ONLYOFFICE_URL,
     }
 
@@ -526,12 +554,22 @@ async def post_sheet_onlyoffice_callback(
             return {"error": 1}
 
         # 覆盖写入项目存储
-        storage_dir = _onlyoffice_storage_dir(project_id)
-        file_name = f"{wp_code}.xlsx"
-        target = storage_dir / file_name
+        # 判断是否为 word-template（docx）底稿
+        from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+
+        component_type = _WP_CODE_OVERRIDE.get(wp_code)
+        is_word_template = component_type == "word-template"
+
+        if is_word_template:
+            # word-template: 保存到 storage/{project_id}/workpapers/{wp_code}.docx
+            target = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
+        else:
+            # xlsx: 保存到原有 OnlyOffice 存储目录
+            storage_dir = _onlyoffice_storage_dir(project_id)
+            target = storage_dir / f"{wp_code}.xlsx"
 
         try:
-            storage_dir.mkdir(parents=True, exist_ok=True)
+            target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(file_bytes)
             logger.info(
                 "OnlyOffice callback: 文件已保存 wp_id=%s sheet=%s path=%s size=%d",
@@ -547,6 +585,20 @@ async def post_sheet_onlyoffice_callback(
                 exc,
             )
             return {"error": 1}
+
+        # 更新 workpaper.updated_at（last_modified）
+        from datetime import datetime, timezone
+
+        try:
+            wp.updated_at = datetime.now(timezone.utc)
+            await db.commit()
+        except Exception as exc:
+            logger.warning(
+                "OnlyOffice callback: 更新 updated_at 失败 wp_id=%s error=%s",
+                wp_id,
+                exc,
+            )
+            # 文件已写入成功，updated_at 更新失败不阻塞
 
         # 写回成功后释放席位
         if user_id and doc_key:

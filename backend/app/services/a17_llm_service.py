@@ -3,6 +3,7 @@
 提供:
 - generate_chapter_draft(db, project_id, chapter_id, context) → AI 建议稿
 - generate_kam_description(db, project_id, kam_title, context) → KAM 描述建议稿
+- build_cross_chapter_context(target_chapter, all_chapters, budget) → 跨章上下文
 
 设计: 生成结果为「建议稿」，用户编辑后采纳，不自动写入。
 RAG: 调用 KnowledgeIndexService.semantic_search 检索同行业知识库，
@@ -23,6 +24,86 @@ from app.core.config import settings
 from app.models.core import Project
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# 跨章节关联矩阵（静态配置）
+# 决定 AI 生成时，优先包含哪些关联章节作为上下文
+# ---------------------------------------------------------------------------
+
+CHAPTER_AFFINITY: dict[str, list[str]] = {
+    "A17-1-ch01": ["A17-1-ch02", "A17-1-ch05"],          # 项目概况 → 审计范围, 了解被审计单位
+    "A17-1-ch02": ["A17-1-ch01", "A17-1-ch03"],          # 审计范围 → 概况, 重要性
+    "A17-1-ch03": ["A17-1-ch02", "A17-1-ch06"],          # 重要性 → 范围, 风险
+    "A17-1-ch04": ["A17-1-ch03", "A17-1-ch06"],          # 审计策略 → 重要性, 风险
+    "A17-1-ch05": ["A17-1-ch01", "A17-1-ch09"],          # 了解被审计单位 → 概况, 会计政策
+    "A17-1-ch06": ["A17-1-ch14", "A17-1-ch03"],          # 重大错报风险 → 结论, 重要性
+    "A17-1-ch07": ["A17-1-ch02", "A17-1-ch14"],          # 集团审计 → 范围, 结论
+    "A17-1-ch08": ["A17-1-ch05", "A17-1-ch10"],          # 财报分析 → 了解单位, 持续经营
+    "A17-1-ch09": ["A17-1-ch05", "A17-1-ch08"],          # 会计政策 → 了解单位, 财报分析
+    "A17-1-ch10": ["A17-1-ch14", "A17-1-ch08"],          # 持续经营 → 结论, 财报分析
+    "A17-1-ch11": ["A17-1-ch05", "A17-1-ch15"],          # 关联方 → 了解单位, 舞弊
+    "A17-1-ch12": ["A17-1-ch06", "A17-1-ch14"],          # KAM → 风险, 结论
+    "A17-1-ch13": ["A17-1-ch14", "A17-1-ch10"],          # 期后事项 → 结论, 持续经营
+    "A17-1-ch14": ["A17-1-ch10", "A17-1-ch12", "A17-1-ch15", "A17-1-ch06"],  # 审计结论
+    "A17-1-ch15": ["A17-1-ch14", "A17-1-ch06"],          # 舞弊 → 结论, 风险
+    "A17-1-ch16": ["A17-1-ch14", "A17-1-ch13"],          # 其他事项 → 结论, 期后
+}
+
+
+def build_cross_chapter_context(
+    target_chapter: str,
+    all_chapters: dict[str, str],
+    budget: int = 4000,
+) -> str:
+    """构建跨章节上下文
+
+    优先包含 affinity 矩阵中的关联章节，再包含其余非空章节。
+    超 budget（字符数）时截断。
+
+    Args:
+        target_chapter: 目标章节 ID（不包含在上下文中）
+        all_chapters: 所有章节 {chapter_id: content}
+        budget: 上下文总字符数上限
+
+    Returns:
+        拼接后的跨章上下文字符串
+    """
+    # 确定优先级顺序：affinity 章节在前，其余按序号排
+    affinity_chapters = CHAPTER_AFFINITY.get(target_chapter, [])
+
+    # 收集非空、非目标章节
+    non_empty = {
+        ch_id: content
+        for ch_id, content in all_chapters.items()
+        if ch_id != target_chapter and content and content.strip()
+    }
+
+    # 按优先级排序
+    ordered_ids: list[str] = []
+    for ch_id in affinity_chapters:
+        if ch_id in non_empty and ch_id not in ordered_ids:
+            ordered_ids.append(ch_id)
+    # 其余非空章节按序号排
+    for ch_id in sorted(non_empty.keys()):
+        if ch_id not in ordered_ids:
+            ordered_ids.append(ch_id)
+
+    # 按 budget 截断拼接
+    parts: list[str] = []
+    used = 0
+    for ch_id in ordered_ids:
+        content = non_empty[ch_id]
+        segment = f"[{ch_id}]\n{content.strip()}"
+        if used + len(segment) > budget:
+            # 截断当前段以填满 budget
+            remaining = budget - used
+            if remaining > 50:  # 至少保留 50 字符有意义
+                parts.append(segment[:remaining])
+            break
+        parts.append(segment)
+        used += len(segment)
+
+    return "\n\n".join(parts)
 
 # ---------------------------------------------------------------------------
 # Prompt 模板目录
@@ -143,8 +224,16 @@ class A17LlmService:
         chapter_id: str,
         *,
         user_hint: str = "",
+        mode: str = "generate",
+        current_content: str = "",
+        all_chapters: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """为指定章节生成 AI 建议稿
+
+        Args:
+            mode: "generate"（从头生成）或 "polish"（润色改进已有内容）
+            current_content: 当前章节内容（polish 模式必需）
+            all_chapters: 所有章节内容（用于构建跨章上下文）
 
         Returns:
             {"draft": str, "model": str, "confidence": float}
@@ -159,14 +248,23 @@ class A17LlmService:
         if not chapter_def:
             return {"error": f"未找到章节定义: {chapter_id}"}
 
-        # 2. 构建项目上下文
+        # 2. 构建项目上下文（始终包含 industry + audit_period_end）
         project_context = await _get_project_context(db, project_id)
 
-        # 3. RAG 检索相关知识库内容（非阻塞）
+        # 3. 构建跨章上下文
+        cross_chapter_ctx = ""
+        if all_chapters:
+            cross_chapter_ctx = build_cross_chapter_context(
+                target_chapter=chapter_id,
+                all_chapters=all_chapters,
+                budget=4000,
+            )
+
+        # 4. RAG 检索相关知识库内容（非阻塞）
         rag_query = f"{chapter_def.get('title', '')} {project_context.split(chr(10))[2] if len(project_context.split(chr(10))) > 2 else ''}"
         evidence_context = await _retrieve_rag_context(db, project_id, rag_query.strip())
 
-        # 4. 构建 prompt
+        # 5. 构建 prompt（根据 mode 区分）
         user_prompt = _CHAPTER_USER.replace(
             "{{chapter_title}}", chapter_def.get("title", "")
         ).replace(
@@ -179,12 +277,25 @@ class A17LlmService:
             "{{user_hint}}", user_hint or "无"
         )
 
+        # 追加跨章上下文
+        if cross_chapter_ctx:
+            user_prompt += f"\n\n## 其他章节上下文（供参考，确保一致性）\n{cross_chapter_ctx}"
+
+        # mode=polish: 追加当前内容 + 润色指令
+        if mode == "polish" and current_content:
+            user_prompt += (
+                f"\n\n## 当前章节已有内容（请在此基础上润色改进）\n{current_content.strip()}"
+                "\n\n## 润色要求\n"
+                "请保留原有结构和核心判断，优化文字表述、改善逻辑连贯性、"
+                "确保与其他章节结论一致、补充遗漏要点。不要从头重写。"
+            )
+
         messages = [
             {"role": "system", "content": _CHAPTER_SYSTEM},
             {"role": "user", "content": user_prompt},
         ]
 
-        # 5. 调用 LLM
+        # 6. 调用 LLM
         try:
             from app.services.llm_client import chat_completion
 

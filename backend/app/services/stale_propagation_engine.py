@@ -1,5 +1,8 @@
 """Stale Propagation Engine — 统一联动总线 (Sprint 2)
 
+**唯一对外入口**：`on_change` 方法。所有 stale 传播事件通过 event_handlers 订阅本类。
+详细分层说明见 backend/docs/STALE-PROPAGATION-LAYERS.md
+
 统一入口：变更 → BFS → 写 DB → SSE 推送
 降级模式：依赖图加载失败 / Redis 断连 → 回退 event_handlers 粗粒度 mark_stale
 

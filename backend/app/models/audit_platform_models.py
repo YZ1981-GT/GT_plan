@@ -977,6 +977,12 @@ class UnadjustedMisstatement(Base):
     prior_year_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("unadjusted_misstatements.id"), nullable=True
     )
+    # V092: A13 聚合 - 上年结转状态
+    prior_year_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'new'"), nullable=False
+    )
+    # V092: A13 聚合 - 来源底稿编码
+    source_wp_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )

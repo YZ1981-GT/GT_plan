@@ -51,6 +51,7 @@ export type HtmlComponentType =
   | 'word-template'
   | 'independence-signing'
   | 'wp-popup-signing'
+  | 'a1-11-signing-form'
   | 'audit-legend'
   | 'checklist-table'
   | 'analytical-review'
@@ -63,8 +64,12 @@ export type HtmlComponentType =
   | 'discontinued-operations'
   | 'misstatement-workpaper'
   | 'a14-3-workbook'
+  | 'a10-bundle'
   | 'a11-bundle'
+  | 'a12-bundle'
   | 'a15-bundle'
+  | 'a17-bundle'
+  | 'a16-bundle'
   | 'confirmation-summary'
   | 'confirmation-entity-verify'
   | 'confirmation-followup'
@@ -74,6 +79,21 @@ export type HtmlComponentType =
   | 'confirmation-diff-checklist'
   | 'confirmation-fraud-risk'
   | 'confirmation-reliability'
+  | 'b50-risk-assessment'
+  | 'b22a-control-matrix'
+  | 'b22b-deficiency-evaluation'
+  | 'b23-process-control'
+  | 'b30-group-audit'
+  | 'b2-bundle'
+  | 'b13-bundle'
+  | 'b19-bundle'
+  | 'b51-bundle'
+  | 'c-control-test'
+  | 'd1-notes-receivable'
+  | 'd2-accounts-receivable'
+  | 'a1-12-dual-checklist'
+  | 'a1-15-disclosure-checklist'
+  | 'review-bundle'
 
 /**
  * 上下文 props 策略：声明组件需要哪些上下文信息。
@@ -128,6 +148,7 @@ const GtReviewChecklist = defineAsyncComponent(() => import('./GtReviewChecklist
 const GtWordTemplate = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 const GtIndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
 const GtWpPopupSigning = defineAsyncComponent(() => import('./WpPopupSigning.vue'))
+const GtA111SigningForm = defineAsyncComponent(() => import('./GtA111SigningForm.vue'))
 const GtAuditLegend = defineAsyncComponent(() => import('./AuditLegendPanel.vue'))
 const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.vue'))
 const GtAnalyticalReview = defineAsyncComponent(() => import('./GtAnalyticalReview.vue'))
@@ -140,8 +161,12 @@ const GtContingentLiability = defineAsyncComponent(() => import('./GtContingentL
 const GtDiscontinuedOperations = defineAsyncComponent(() => import('./GtDiscontinuedOperations.vue'))
 const GtMisstatementWorkpaper = defineAsyncComponent(() => import('./GtMisstatementWorkpaper.vue'))
 const GtA14_3Workbook = defineAsyncComponent(() => import('./GtA14_3Workbook.vue'))
+const GtA10Bundle = defineAsyncComponent(() => import('./GtA10Bundle.vue'))
 const GtA11Bundle = defineAsyncComponent(() => import('./GtA11Bundle.vue'))
+const GtA12Bundle = defineAsyncComponent(() => import('./GtA12Bundle.vue'))
 const GtA15Bundle = defineAsyncComponent(() => import('./GtA15Bundle.vue'))
+const GtA16Bundle = defineAsyncComponent(() => import('./GtA16Bundle.vue'))
+const GtA17Bundle = defineAsyncComponent(() => import('./GtA17Bundle.vue'))
 const GtConfirmationSummary = defineAsyncComponent(() => import('./confirmation/GtConfirmationSummary.vue'))
 const GtConfirmationEntityVerify = defineAsyncComponent(() => import('./confirmation/entityVerify/GtConfirmationEntityVerify.vue'))
 const GtConfirmationFollowup = defineAsyncComponent(() => import('./confirmation/followup/GtConfirmationFollowup.vue'))
@@ -151,6 +176,21 @@ const GtConfirmationAlternativeD06 = defineAsyncComponent(() => import('./confir
 const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
+const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB50RiskAssessment.vue'))
+const GtB22AControlMatrix = defineAsyncComponent(() => import('./GtB22AControlMatrix.vue'))
+const GtB22BDeficiencyEvaluation = defineAsyncComponent(() => import('./GtB22BDeficiencyEvaluation.vue'))
+const GtCControlTest = defineAsyncComponent(() => import('./GtCControlTest.vue'))
+const GtB23ProcessControl = defineAsyncComponent(() => import('./GtB23ProcessControl.vue'))
+const GtB30GroupAudit = defineAsyncComponent(() => import('./GtB30GroupAudit.vue'))
+const GtB2Bundle = defineAsyncComponent(() => import('./GtB2Bundle.vue'))
+const GtB13Bundle = defineAsyncComponent(() => import('./GtB13Bundle.vue'))
+const GtB19Bundle = defineAsyncComponent(() => import('./GtB19Bundle.vue'))
+const GtB51Bundle = defineAsyncComponent(() => import('./GtB51Bundle.vue'))
+const GtReviewBundle = defineAsyncComponent(() => import('./GtReviewBundle.vue'))
+const GtD1NotesReceivable = defineAsyncComponent(() => import('./GtD1NotesReceivable.vue'))
+const GtD2AccountsReceivable = defineAsyncComponent(() => import('./GtD2AccountsReceivable.vue'))
+const GtA112DualChecklist = defineAsyncComponent(() => import('./GtA112DualChecklist.vue'))
+const GtA115DisclosureChecklist = defineAsyncComponent(() => import('./GtA115DisclosureChecklist.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -343,6 +383,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     contextProps: 'standard',
   },
   {
+    componentType: 'a1-11-signing-form',
+    component: GtA111SigningForm,
+    icon: '✍️',
+    label: 'A1-11 签发流转控制表',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
     componentType: 'audit-legend',
     component: GtAuditLegend,
     icon: '📋',
@@ -439,6 +487,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     contextProps: 'standard',
   },
   {
+    componentType: 'a10-bundle',
+    component: GtA10Bundle,
+    icon: '📋',
+    label: 'A10 前期审计程序',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
     componentType: 'a11-bundle',
     component: GtA11Bundle,
     icon: '📅',
@@ -447,11 +503,35 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     contextProps: 'standard',
   },
   {
+    componentType: 'a12-bundle',
+    component: GtA12Bundle,
+    icon: '📋',
+    label: 'A12 期初余额审计',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
     componentType: 'a15-bundle',
     component: GtA15Bundle,
     icon: '🔄',
     label: 'A15 持续经营套件',
     emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a16-bundle',
+    component: GtA16Bundle,
+    icon: '📜',
+    label: 'A16 管理层声明书',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-bundle',
+    component: GtA17Bundle,
+    icon: '📋',
+    label: 'A17 审计总结聚合',
+    emits: [],
     contextProps: 'standard',
   },
   {
@@ -523,6 +603,126 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtConfirmationReliability,
     icon: '🔐',
     label: '回函可靠性验证',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c-control-test',
+    component: GtCControlTest,
+    icon: '🧪',
+    label: 'C 控制测试',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd1-notes-receivable',
+    component: GtD1NotesReceivable,
+    icon: '📄',
+    label: 'D1 应收票据',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd2-accounts-receivable',
+    component: GtD2AccountsReceivable,
+    icon: '💰',
+    label: 'D2 应收账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b50-risk-assessment',
+    component: GtB50RiskAssessment,
+    icon: '🎯',
+    label: 'B50 重大错报风险评估',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b22a-control-matrix',
+    component: GtB22AControlMatrix,
+    icon: '🛡️',
+    label: 'B22A 内部控制了解程序表',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b22b-deficiency-evaluation',
+    component: GtB22BDeficiencyEvaluation,
+    icon: '⚠️',
+    label: 'B22B 内部控制缺陷评价表',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b23-process-control',
+    component: GtB23ProcessControl,
+    icon: '🔄',
+    label: 'B23 业务流程与控制了解表',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b30-group-audit',
+    component: GtB30GroupAudit,
+    icon: '🏢',
+    label: 'B30 集团审计范围确定',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b2-bundle',
+    component: GtB2Bundle,
+    icon: '📋',
+    label: 'B2 业务承接程序',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b13-bundle',
+    component: GtB13Bundle,
+    icon: '📋',
+    label: 'B13 初步分析性程序',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b19-bundle',
+    component: GtB19Bundle,
+    icon: '📋',
+    label: 'B19 审计工作方案',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b51-bundle',
+    component: GtB51Bundle,
+    icon: '📋',
+    label: 'B51 舞弊风险识别',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a1-12-dual-checklist',
+    component: GtA112DualChecklist,
+    icon: '✅',
+    label: 'A1-12 重大事项决定程序核查表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a1-15-disclosure-checklist',
+    component: GtA115DisclosureChecklist,
+    icon: '📋',
+    label: 'A1-15 企业会计准则财务报表列报及披露核对表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'review-bundle',
+    component: GtReviewBundle,
+    icon: '✍️',
+    label: '角色复核聚合',
     emits: ['save'],
     contextProps: 'standard',
   },

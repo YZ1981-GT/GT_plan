@@ -67,3 +67,5 @@ class RenderContext:
     # 多文件聚合：该 sheet 内容来源模板文件路径列表（空=用 template_file_path）。
     # 由 wp_account_package_resolver 解析，供合并策略读多源内容。
     source_files: list[str] = field(default_factory=list)
+    # 当前用户 ID（review-checklist RBAC guard 等需要）
+    user_id: UUID | None = field(default=None)

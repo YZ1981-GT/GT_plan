@@ -962,6 +962,8 @@ async def parse_workpaper_real(
 
 # ---------------------------------------------------------------------------
 # mark_stale — 标记底稿预填数据为过期（从 prefill_service_v2 迁移）
+# 内部层：由 wp_auto_fill_service 独立调用，勿作为对外 stale 入口。
+# 详见 backend/docs/STALE-PROPAGATION-LAYERS.md
 # ---------------------------------------------------------------------------
 
 async def mark_stale(

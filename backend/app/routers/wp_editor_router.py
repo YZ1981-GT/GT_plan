@@ -15,9 +15,11 @@
 
 from __future__ import annotations
 
+from typing import Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
@@ -313,29 +315,43 @@ async def save_univer_data(
     }
 
 
+class SignStatusUpdateBody(BaseModel):
+    """签署状态更新请求体（通用化：支持所有 word-template wp_code）"""
+    status: Literal["draft", "pending", "signed"] = Field(
+        default="draft", description="签署状态: draft(草稿)/pending(待签署)/signed(已签署)"
+    )
+    wp_code: Optional[str] = Field(
+        default=None, description="目标 wp_code（如 A9-1/A16-1 等）；为空时从底稿索引获取"
+    )
+    # 向后兼容 A16 旧调用方（version 等效于 wp_code）
+    version: Optional[str] = Field(default=None, description="A16 子版本（向后兼容，优先使用 wp_code）")
+    sign_date: Optional[str] = Field(default=None, description="签署日期 ISO 格式: 2025-03-15")
+
+
 @router.post("/working-papers/{wp_id}/sign-status")
 async def update_sign_status(
     project_id: UUID,
     wp_id: UUID,
-    body: dict,
+    body: SignStatusUpdateBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("member")),
 ):
-    """更新声明书签发状态（待编辑/已发送/已签回）；body.version 可选，A16 按子码隔离。
+    """更新 word-template 底稿签署状态（通用化，支持所有 word-template wp_code）。
+
+    scope 格式:
+    - A16 子版本: word_template:A16:{wp_code}
+    - 独立底稿: word_template:{wp_code}
 
     CW-76: 当 status='signed' 且为 A16 主版本(A16-1~6)时，sign_date 为必填，
     将 push 到 audit_report.representation_letter_date。
     A16-7 补充声明 sign_date 为可选，不 push 到审计报告。
-    禁止从 docx 元数据读取签署日期。
     """
-    status = body.get("status", "pending")
-    version = body.get("version")
-    sign_date = body.get("sign_date")  # ISO date string: "2025-03-15"
-    if status not in ("pending", "sent", "signed"):
-        raise HTTPException(status_code=422, detail="状态值无效")
+    status = body.status
+    # wp_code 优先，向后兼容 version 字段
+    target_wp_code = body.wp_code or body.version
+    sign_date = body.sign_date
 
     from app.services.field_override_service import FieldOverrideService
-    from app.models.workpaper_models import WpIndex
 
     wp = (await db.execute(
         sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.project_id == project_id)
@@ -343,16 +359,21 @@ async def update_sign_status(
     if not wp:
         raise HTTPException(status_code=404, detail="底稿不存在")
 
-    wp_index = (await db.execute(
+    # 从 wp_index 获取底稿编码（当 body 中未指定 wp_code 时使用）
+    wp_index_code = (await db.execute(
         sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
     )).scalar_one_or_none()
-    wp_code = wp_index or "A16"
+
+    # 最终确定 wp_code：body 指定 > wp_index 查出 > fallback "A16"
+    effective_wp_code = target_wp_code or wp_index_code or "A16"
 
     # CW-76: A16 主版本 signed 时 sign_date 必填
-    is_a16_main = wp_code == "A16" and version and version.startswith("A16-") and version != "A16-7"
+    is_a16_sub = effective_wp_code.startswith("A16-")
+    is_a16_main = is_a16_sub and effective_wp_code != "A16-7"
     if status == "signed" and is_a16_main and not sign_date:
         raise HTTPException(status_code=422, detail="A16 主版本签回时必须提供签署日期(sign_date)")
 
+    # 获取项目年度
     year_val = 0
     try:
         year_q = await db.execute(sa.text(
@@ -363,11 +384,37 @@ async def update_sign_status(
         import logging as _logging
         _logging.getLogger(__name__).warning("查询项目年度失败(签字) pid=%s: %s", project_id, e)
 
+    # scope 确定：A16 子版本 → word_template:A16:{wp_code}，其他 → word_template:{wp_code}
     svc = FieldOverrideService(db)
-    if version and wp_code == "A16":
-        scope = f"word_template:A16:{version}"
+    if is_a16_sub:
+        scope = f"word_template:A16:{effective_wp_code}"
     else:
-        scope = f"word_template:{wp_code}"
+        scope = f"word_template:{effective_wp_code}"
+
+    # ── 签署状态回退权限控制 ──
+    # signed → draft/pending 需要 signing_partner/partner/qc/eqcr 角色
+    current_sign_status = await svc.get(
+        project_id, year_val or 2025, scope, "sign_status", "value"
+    )
+    if current_sign_status == "signed" and status in ("draft", "pending"):
+        from app.models.staff_models import ProjectAssignment, StaffMember
+        _SIGN_ROLLBACK_ROLES = {"signing_partner", "partner", "qc", "eqcr"}
+        role_result = await db.execute(
+            sa.select(ProjectAssignment.role).join(
+                StaffMember, ProjectAssignment.staff_id == StaffMember.id
+            ).where(
+                ProjectAssignment.project_id == project_id,
+                StaffMember.user_id == current_user.id,
+                ProjectAssignment.is_deleted == sa.false(),
+            )
+        )
+        user_role = role_result.scalar_one_or_none()
+        if user_role not in _SIGN_ROLLBACK_ROLES:
+            raise HTTPException(
+                status_code=403,
+                detail="仅业务合伙人及以上角色可撤回签署",
+            )
+
     await svc.set(project_id, year_val or 2025, scope, "sign_status", "value", status, current_user.id)
 
     # CW-76: push sign_date → audit_report.representation_letter_date
@@ -375,7 +422,7 @@ async def update_sign_status(
         await _push_representation_letter_date(db, project_id, year_val, sign_date)
 
     await db.commit()
-    return {"status": status, "version": version, "sign_date": sign_date}
+    return {"status": status, "wp_code": effective_wp_code, "version": body.version, "sign_date": sign_date}
 
 
 async def _push_representation_letter_date(
@@ -463,104 +510,211 @@ async def get_wp_onlyoffice_config(
     prefilled = False
     if wp.file_path and wp.file_path.endswith(('.docx', '.doc')):
         try:
-            prefilled = await _prefill_word_template(db, wp, project_id)
+            prefilled = await _prefill_word_template(db, wp, project_id, user=_user)
         except Exception as e:
             import logging
             logging.getLogger(__name__).warning("A16 占位符预填失败（降级不阻塞）: %s", e)
+
+    # 构建 callback URL（word-template 使用 __word__ 作为 sheet_name 标识）
+    word_callback_url = f"{callback_base}/api/workpapers/{wp_id}/sheets/__word__/onlyoffice-callback"
 
     return {
         "document_url": document_url,
         "document_key": f"wp-{wp_id}-{wp.file_version}-{'pf' if prefilled else 'raw'}",
         "title": wp.file_path.split("/")[-1] if wp.file_path else "声明书.docx",
         "onlyoffice_url": settings.ONLYOFFICE_URL,
+        "callback_url": word_callback_url,
         "prefilled": prefilled,
     }
 
 
-async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID) -> bool:
+async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID, *, user: "User | None" = None) -> bool:
     """用 python-docx 替换 Word 模板中的占位符，写回底稿文件。
 
-    占位符格式：{{client_name}} / {{audit_period}} / {{partner_name}} / {{uncorrected_misstatements}}
-    仅在文件内实际含占位符时才写回（幂等：已替换过的不再重复操作）。
+    支持的占位符 token:
+      {{entity_name}}  — 被审计单位名称
+      {{client_name}}  — 同 entity_name（向后兼容）
+      {{period_end}}   — 审计期末日期（YYYY年MM月DD日）
+      {{audit_period}} — 同 period_end（向后兼容，YYYY-MM-DD 格式）
+      {{preparer}}     — 编制人（当前用户姓名）
+      {{current_date}} — 当前日期（YYYY年MM月DD日）
+      {{partner_name}} — 签字合伙人
+      {{uncorrected_misstatements}} — 未更正错报摘要
+      {{date}}         — 当前日期 ISO（向后兼容）
+
+    规则：
+    - 若对应值为 None，保留 {{token}} 不替换（用户可手动填写）
+    - 替换操作在项目级副本上执行，原模板文件不变
+    - 已有快照时直接返回 False（幂等，不重复预填）
+    - 替换后记录日志：logger.info("prefill wp_code=%s fields=%s", ...)
     """
-    import re
+    import logging
+    import shutil
+    from datetime import date as _date
     from pathlib import Path
 
+    logger = logging.getLogger(__name__)
+
     file_path = Path(wp.file_path)
-    if not file_path.exists() or not file_path.suffix.lower() == '.docx':
+    if not file_path.suffix.lower() == '.docx':
         return False
+
+    # ─── 快照幂等逻辑：已有快照则跳过预填 ───────────────────────────────────
+    # 获取 wp_code（从 wp_index 表 JOIN）
+    wp_code: str | None = None
+    if hasattr(wp, 'wp_index_id') and wp.wp_index_id:
+        idx_result = await db.execute(
+            sa.select(WpIndex.wp_code).where(WpIndex.id == wp.wp_index_id)
+        )
+        wp_code = idx_result.scalar_one_or_none()
+    if not wp_code:
+        # fallback: 从 file_path 提取 stem
+        wp_code = file_path.stem
+
+    snapshot_path = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
+
+    # 幂等检查：快照已存在 → 直接返回，不重复预填
+    if snapshot_path.exists():
+        # 确保 wp.file_path 指向快照（后续操作使用快照）
+        if str(wp.file_path) != str(snapshot_path):
+            wp.file_path = str(snapshot_path)
+        return False
+
+    # 原模板文件必须存在才能复制
+    if not file_path.exists():
+        return False
+
+    # 创建快照目录并复制模板到快照路径（原模板不修改）
+    snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(str(file_path), str(snapshot_path))
+
+    # 更新 wp.file_path 指向快照，后续替换在快照上执行
+    wp.file_path = str(snapshot_path)
 
     try:
         from docx import Document
     except ImportError:
         return False
 
-    doc = Document(str(file_path))
-    full_text = "\n".join(p.text for p in doc.paragraphs)
+    doc = Document(str(snapshot_path))
+
+    # 检查段落和表格中是否存在占位符
+    all_text_parts: list[str] = [p.text for p in doc.paragraphs]
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for para in cell.paragraphs:
+                    all_text_parts.append(para.text)
+    full_text = "\n".join(all_text_parts)
     if "{{" not in full_text:
         return False  # 无占位符或已替换
 
-    # 取项目信息
+    # ─── 取项目信息 ─────────────────────────────────────────────────────────
     proj_row = (await db.execute(
         sa.text("SELECT name, client_name, audit_period_end FROM projects WHERE id = :pid"),
         {"pid": str(project_id)},
     )).first()
-    client_name = (proj_row[1] if proj_row else "") or (proj_row[0] if proj_row else "")
-    audit_period = str(proj_row[2])[:10] if proj_row and proj_row[2] else ""
 
-    # 取签字合伙人
+    # entity_name / client_name: client_name 优先，fallback 到 name
+    entity_name: str | None = None
+    if proj_row:
+        entity_name = proj_row[1] or proj_row[0] or None
+
+    # period_end: 格式化为 YYYY年MM月DD日
+    period_end_formatted: str | None = None
+    audit_period_iso: str | None = None
+    if proj_row and proj_row[2]:
+        try:
+            raw_date = proj_row[2]
+            if hasattr(raw_date, 'strftime'):
+                period_end_formatted = raw_date.strftime("%Y年%m月%d日")
+                audit_period_iso = raw_date.strftime("%Y-%m-%d")
+            else:
+                # 字符串 fallback
+                ds = str(raw_date)[:10]  # YYYY-MM-DD
+                parts = ds.split("-")
+                if len(parts) == 3:
+                    period_end_formatted = f"{parts[0]}年{parts[1]}月{parts[2]}日"
+                    audit_period_iso = ds
+        except Exception:
+            pass
+
+    # current_date: YYYY年MM月DD日
+    today = _date.today()
+    current_date_formatted = today.strftime("%Y年%m月%d日")
+
+    # ─── 取编制人（当前用户） ───────────────────────────────────────────────
+    preparer_name: str | None = None
+    if user:
+        # 从 staff_members 通过 user_id 获取中文姓名
+        staff_row = (await db.execute(sa.text(
+            "SELECT name FROM staff_members WHERE user_id = :uid AND is_deleted = false LIMIT 1"
+        ), {"uid": str(user.id)})).first()
+        preparer_name = staff_row[0] if staff_row else user.username
+
+    # ─── 取签字合伙人 ──────────────────────────────────────────────────────
     partner_row = (await db.execute(sa.text(
         "SELECT s.name FROM project_assignments pa JOIN staff_members s ON s.id=pa.staff_id "
         "WHERE pa.project_id=:pid AND pa.role='partner' LIMIT 1"
     ), {"pid": str(project_id)})).first()
-    partner_name = partner_row[0] if partner_row else ""
+    partner_name: str | None = partner_row[0] if partner_row else None
 
-    # 取未更正错报摘要
-    misstatement_text = "无"
+    # ─── 取未更正错报摘要 ──────────────────────────────────────────────────
+    misstatement_text: str | None = "无"
     try:
         from app.services.misstatement_summary_service import MisstatementSummaryService
         svc = MisstatementSummaryService(db)
         year = int(str(proj_row[2])[:4]) if proj_row and proj_row[2] else 2025
         misstatement_text = await svc.get_for_representation_letter(project_id, year)
     except Exception as e:
-        import logging as _logging
-        _logging.getLogger(__name__).warning("获取未更正错报摘要失败 pid=%s: %s", project_id, e)
+        logger.warning("获取未更正错报摘要失败 pid=%s: %s", project_id, e)
 
-    # 替换占位符
-    replacements = {
-        "{{client_name}}": client_name,
-        "{{audit_period}}": audit_period,
+    # ─── 构建替换映射（None 值不替换） ─────────────────────────────────────
+    token_values: dict[str, str | None] = {
+        "{{entity_name}}": entity_name,
+        "{{client_name}}": entity_name,  # 向后兼容，同 entity_name
+        "{{period_end}}": period_end_formatted,
+        "{{audit_period}}": audit_period_iso,  # 向后兼容 YYYY-MM-DD
+        "{{preparer}}": preparer_name,
+        "{{current_date}}": current_date_formatted,
         "{{partner_name}}": partner_name,
         "{{uncorrected_misstatements}}": misstatement_text,
-        "{{date}}": str(sa.func.now())[:10] if False else __import__("datetime").date.today().isoformat(),
+        "{{date}}": today.isoformat(),  # 向后兼容
     }
 
-    replaced = False
-    for para in doc.paragraphs:
-        for key, val in replacements.items():
-            if key in para.text:
-                # 简单替换（保留 run 格式）
-                for run in para.runs:
-                    if key in run.text:
-                        run.text = run.text.replace(key, val)
-                        replaced = True
+    # 过滤掉值为 None 的 token（保留原始 {{token}} 不替换）
+    replacements: dict[str, str] = {k: v for k, v in token_values.items() if v is not None}
 
-    # 也检查表格中的占位符
+    if not replacements:
+        return False
+
+    # ─── 执行替换 ──────────────────────────────────────────────────────────
+    replaced_fields: list[str] = []
+
+    def _replace_in_paragraphs(paragraphs) -> None:
+        for para in paragraphs:
+            for key, val in replacements.items():
+                if key in para.text:
+                    for run in para.runs:
+                        if key in run.text:
+                            run.text = run.text.replace(key, val)
+                            if key not in replaced_fields:
+                                replaced_fields.append(key)
+
+    # 替换段落
+    _replace_in_paragraphs(doc.paragraphs)
+
+    # 替换表格中的占位符
     for table in doc.tables:
         for row in table.rows:
             for cell in row.cells:
-                for para in cell.paragraphs:
-                    for key, val in replacements.items():
-                        if key in para.text:
-                            for run in para.runs:
-                                if key in run.text:
-                                    run.text = run.text.replace(key, val)
-                                    replaced = True
+                _replace_in_paragraphs(cell.paragraphs)
 
-    if replaced:
-        doc.save(str(file_path))
+    if replaced_fields:
+        doc.save(str(snapshot_path))
+        logger.info("prefill wp_code=%s fields=%s", wp_code, replaced_fields)
 
-    return replaced
+    return bool(replaced_fields)
 
 
 @router.get("/working-papers/{wp_id}/export-pdf")
@@ -705,3 +859,60 @@ async def parse_workpaper(
     elif not dry_run:
         await db.commit()
     return result
+
+
+@router.get("/a16/recommended-version")
+async def get_a16_recommended_version(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_project_access("readonly")),
+):
+    """根据项目 business_category 推荐 A16 声明书版本。
+
+    返回推荐版本、所有变体列表（含项目中是否已创建）、始终必需列表。
+    """
+    from app.services.template_selector import (
+        A16_ALL_VERSIONS,
+        A16_ALWAYS_REQUIRED,
+        A16_LABELS,
+        get_a16_label,
+        recommend_a16_version,
+    )
+
+    # 1. 查询项目 business_category
+    row = (await db.execute(
+        sa.text("SELECT business_category FROM projects WHERE id = :pid"),
+        {"pid": str(project_id)},
+    )).first()
+    business_category: str | None = row[0] if row else None
+
+    # 2. 推荐版本
+    recommended_code = recommend_a16_version(business_category)
+    recommended_label = get_a16_label(recommended_code)
+
+    # 3. 查询项目中已存在的 A16-x 底稿
+    existing_result = await db.execute(
+        sa.select(WpIndex.wp_code).where(
+            WpIndex.project_id == project_id,
+            WpIndex.wp_code.like("A16-%"),
+            WpIndex.is_deleted == sa.false(),
+        )
+    )
+    existing_codes: set[str] = {r[0] for r in existing_result.all()}
+
+    # 4. 构建 all_versions
+    all_versions = [
+        {
+            "code": code,
+            "label": A16_LABELS.get(code, ""),
+            "exists_in_project": code in existing_codes,
+        }
+        for code in A16_ALL_VERSIONS
+    ]
+
+    return {
+        "recommended_code": recommended_code,
+        "recommended_label": recommended_label,
+        "all_versions": all_versions,
+        "always_required": A16_ALWAYS_REQUIRED,
+    }

@@ -67,8 +67,9 @@ sheets:
       - A5:C5
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   1.文号规则:
-    component_type: h-static-doc
-    class_code: H-辅助说明
+    component_type: skip
+    class_code: I-占位
+    hidden: true
     fixed_cells:
       A1: 致同会计师事务所
       A2: 业务类型
@@ -135,8 +136,9 @@ sheets:
       - A19:G19
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   2.业务约定书和报告文号:
-    component_type: a-program-console
-    class_code: A-一般程序表
+    component_type: skip
+    class_code: I-占位
+    hidden: true
     dynamic_table:
       start_row: 6
       end_row: dynamic
@@ -179,8 +181,9 @@ sheets:
       - C6:E6
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   3.对应报告文号规则:
-    component_type: h-static-doc
-    class_code: H-辅助说明
+    component_type: skip
+    class_code: I-占位
+    hidden: true
     fixed_cells:
       A2: 一、鉴证业务
     dynamic_table:

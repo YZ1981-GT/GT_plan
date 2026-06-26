@@ -13,7 +13,7 @@
  *  - 变动原因列可编辑（debounce 2s 自动保存）
  *  - 科目行点击跳转对应循环底稿（emit navigate-row，由父级处理跳转）
  */
-import { ref, computed, reactive, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/services/apiProxy'
 
 // ─── Types ───
@@ -117,11 +117,14 @@ const props = withDefaults(defineProps<{
   wpId: string
   sheetName?: string
   schema?: Record<string, unknown>
-  htmlData: { analytical_review: AnalyticalReviewData }
+  htmlData?: { analytical_review: AnalyticalReviewData } | null
+  projectId?: string
   readonly?: boolean
 }>(), {
   sheetName: '',
   schema: () => ({}),
+  htmlData: null,
+  projectId: '',
   readonly: false,
 })
 
@@ -134,10 +137,37 @@ const emit = defineEmits<{
 const activeTab = ref('bs_horizontal')
 const reasonEdits = ref<Record<string, string>>({})
 const saveTimer = ref<ReturnType<typeof setTimeout> | null>(null)
+const selfLoadedData = ref<AnalyticalReviewData | null>(null)
+const loading = ref(false)
+const isFullscreen = ref(false)
 
 // ─── Computed: Data ───
-const data = computed(() => props.htmlData?.analytical_review)
+const data = computed(() => props.htmlData?.analytical_review ?? selfLoadedData.value)
 const scopeLabel = computed(() => data.value?.scope === 'consolidated' ? '合并' : '母公司')
+
+// ─── Self-Loading: 当 htmlData 未提供时自行获取 render-config ───
+
+async function loadRenderConfig() {
+  if (props.htmlData?.analytical_review || !props.wpId) return
+  loading.value = true
+  try {
+    const res = await api.get<any>(`/api/workpapers/${props.wpId}/render-config?force_component_type=analytical-review`)
+    const htmlData = res?.sheets?.[0]?.html_data ?? res?.htmlData ?? res
+    if (htmlData?.analytical_review) {
+      selfLoadedData.value = htmlData.analytical_review
+    }
+  } catch (e: any) {
+    console.warn('[GtAnalyticalReview] render-config 加载失败:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  if (!props.htmlData) {
+    loadRenderConfig()
+  }
+})
 
 // ─── Computed: Available tabs ───
 interface TabDef {
@@ -508,30 +538,27 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="gt-analytical-review">
-    <!-- ─── 顶部标题 ─── -->
-    <div class="gt-analytical-review__header">
-      <div class="gt-analytical-review__title">
-        <span class="gt-analytical-review__icon">📊</span>
-        <span>已审报表分析性复核（{{ scopeLabel }}）</span>
-      </div>
-      <div class="gt-analytical-review__meta">
-        <span v-if="data">{{ data.wp_code }} · {{ data.year }}年度</span>
-        <span v-if="data" class="gt-analytical-review__materiality">
+  <div :class="['gt-analytical-review', { 'gt-analytical-review--fullscreen': isFullscreen }]" v-loading="loading">
+    <!-- ─── Tab 导航 + 元信息（合并一行） ─── -->
+    <div class="gt-analytical-review__tab-bar">
+      <el-tabs v-model="activeTab" class="gt-analytical-review__tabs">
+        <el-tab-pane
+          v-for="tab in availableTabs"
+          :key="tab.key"
+          :label="tab.label"
+          :name="tab.key"
+        />
+      </el-tabs>
+      <div v-if="data" class="gt-analytical-review__meta">
+        <span>{{ data.wp_code }} · {{ data.year }}年度</span>
+        <span class="gt-analytical-review__materiality">
           重要性水平: {{ formatAmount(data.materiality) }}
         </span>
+        <el-button size="small" @click="isFullscreen = !isFullscreen">
+          {{ isFullscreen ? '退出全屏' : '全屏' }}
+        </el-button>
       </div>
     </div>
-
-    <!-- ─── Tab 导航 ─── -->
-    <el-tabs v-model="activeTab" class="gt-analytical-review__tabs">
-      <el-tab-pane
-        v-for="tab in availableTabs"
-        :key="tab.key"
-        :label="tab.label"
-        :name="tab.key"
-      />
-    </el-tabs>
 
     <!-- ─── 表格区域 ─── -->
     <div class="gt-analytical-review__content">
@@ -1064,42 +1091,45 @@ onBeforeUnmount(() => {
   background: var(--gt-color-bg-white);
 }
 
-/* ─── Header ─── */
-.gt-analytical-review__header {
+/* ─── Tab Bar (tabs + meta in one row) ─── */
+.gt-analytical-review--fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  background: #fff;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.gt-analytical-review__tab-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--gt-color-border);
-  background: var(--gt-color-primary-bg);
+  padding: 0 16px;
 }
 
-.gt-analytical-review__title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--gt-font-size-lg);
-  font-weight: 600;
-  color: var(--gt-color-primary);
-}
-
-.gt-analytical-review__icon {
-  font-size: 20px;
+.gt-analytical-review__tab-bar .gt-analytical-review__tabs {
+  flex: 1;
+  padding: 0;
 }
 
 .gt-analytical-review__meta {
   display: flex;
   align-items: center;
-  gap: 16px;
-  font-size: var(--gt-font-size-sm);
-  color: var(--gt-color-text-secondary);
+  gap: 12px;
+  font-size: var(--gt-font-size-sm, 12px);
+  color: var(--gt-color-text-secondary, #909399);
+  white-space: nowrap;
 }
 
 .gt-analytical-review__materiality {
   padding: 2px 8px;
-  background: var(--gt-color-primary-bg);
-  border: 1px solid var(--gt-color-border-purple-light);
-  border-radius: var(--gt-radius-sm);
+  background: var(--gt-color-primary-bg, #f5f0ff);
+  border: 1px solid var(--gt-color-border-purple-light, #d9b8ff);
+  border-radius: var(--gt-radius-sm, 4px);
 }
 
 /* ─── Tabs ─── */

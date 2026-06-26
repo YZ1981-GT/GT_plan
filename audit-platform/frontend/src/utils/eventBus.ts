@@ -326,6 +326,10 @@ export type Events = {
   // consol-phase1-arch-lock 需求 4.3: 后端返回 423 合并锁定 → 刷新前端锁定态
   'consol-lock:detected': { projectId?: string }
 
+  // A1 Dashboard 子底稿依赖联动
+  'a17-audit-summary-completed': { projectId?: string }
+  'a1-11-signing-completed': { projectId?: string }
+
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void
   'shortcut:undo': void

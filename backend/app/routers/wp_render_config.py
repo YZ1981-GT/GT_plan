@@ -613,12 +613,13 @@ async def export_template(
 async def get_render_config(
     wp_id: UUID,
     sheet_name: str | None = Query(None, description="可选，仅返回单 sheet 数据"),
+    component_type: str | None = Query(None, alias="force_component_type", description="强制使用指定 componentType 渲染策略"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """获取底稿渲染 schema + 项目数据 + 跨底稿引用（dispatch 模式）。"""
     try:
-        return await _get_render_config_impl(wp_id, sheet_name, db, current_user)
+        return await _get_render_config_impl(wp_id, sheet_name, db, current_user, force_component_type=component_type)
     except Exception as _fatal:
         # 临时：把完整堆栈写到文件方便排查 500
         import traceback
@@ -633,6 +634,7 @@ async def _get_render_config_impl(
     sheet_name: str | None,
     db: AsyncSession,
     current_user,
+    force_component_type: str | None = None,
 ):
     """实际实现（从原 get_render_config 提取）。"""
     from app.routers.wp_render_strategies import RENDERER_DISPATCH
@@ -725,7 +727,9 @@ async def _get_render_config_impl(
     # class_code 独立派生 componentType，不能用 wp_code 级 override 压平所有 sheet。
     # wp_code override 仅对单 sheet 底稿生效（如 D1 应收票据审定表整张走 d-form-table）。
     _real_sheets = [c for c in classifications
-                    if not (c.sheet_name and "GT_Custom" in c.sheet_name)]
+                    if not (c.sheet_name and "GT_Custom" in c.sheet_name)
+                    and not (getattr(c, "class_code", "") or "").startswith("I-")
+                    and _WP_CODE_OVERRIDE.get(c.sheet_name) != "skip"]
     _is_multi_sheet = len(_real_sheets) > 1
 
     # 多 sheet 底稿 tab 排序：按模板 xlsx sheetnames 顺序排列
@@ -748,6 +752,9 @@ async def _get_render_config_impl(
         if sheet_name and cls.sheet_name != sheet_name:
             continue
         if cls.sheet_name and "GT_Custom" in cls.sheet_name:
+            continue
+        # sheet_name 级 skip override（隐藏辅助 sheet，如 A1-11 的文号规则页）
+        if cls.sheet_name and _WP_CODE_OVERRIDE.get(cls.sheet_name) == "skip":
             continue
         ovr = _WP_CODE_OVERRIDE.get(wp_code)
         # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
@@ -797,6 +804,10 @@ async def _get_render_config_impl(
             continue
 
         renderer = RENDERER_DISPATCH.get(component_type)
+        # force_component_type 覆盖（A1 Dashboard 子Tab需强制使用指定渲染策略）
+        if force_component_type and force_component_type in RENDERER_DISPATCH:
+            component_type = force_component_type
+            renderer = RENDERER_DISPATCH[force_component_type]
         if renderer:
             ctx = RenderContext(
                 db=db, project_id=project_id, wp_id=wp_id, wp_code=wp_code,
@@ -806,7 +817,8 @@ async def _get_render_config_impl(
                 year=_prog_year, business_category=_prog_biz,
                 cross_ref_items=[_CRI(wp_code=ci.wp_code, cell=ci.cell) for ci in cross_ref_items],
                 prep_info=None, classifications=classifications, audit_cycle=wp_index.audit_cycle,
-                source_files=list(getattr(cls, "source_files", []) or []))
+                source_files=list(getattr(cls, "source_files", []) or []),
+                user_id=current_user.id)
             try:
                 result = await renderer(ctx)
                 if result is not None:
@@ -841,6 +853,9 @@ async def _get_render_config_impl(
                     sheet_html_data = strip_standard_header(_grid)
             except Exception:  # noqa: BLE001
                 pass
+        # skip 类 sheet 不加入输出（隐藏的辅助说明 sheet）
+        if component_type == "skip":
+            continue
         sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,
                        "schema": sheet_schema, "html_data": sheet_html_data,
                        "cross_refs": [i.model_dump() for i in cross_ref_items],
@@ -866,7 +881,35 @@ async def _get_render_config_impl(
         except Exception:
             pass
     from app.services.wp_guidance_service import get_wp_guidance
-    return {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
-            "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,
-            "sheets": sheets, "fill_results": fill_results, "guidance": get_wp_guidance(wp_code)}
+
+    # Step 9: word-template sign_status + OnlyOffice permissions
+    sign_status: str | None = None
+    permissions: dict | None = None
+    _first_ct = sheets[0]["componentType"] if sheets else None
+    if _first_ct == "word-template" and _prog_year:
+        # scope 格式：A16 子版本 → word_template:A16:{wp_code}；其他 → word_template:{wp_code}
+        if wp_code.startswith("A16-"):
+            _sign_scope = f"word_template:A16:{wp_code}"
+        else:
+            _sign_scope = f"word_template:{wp_code}"
+        try:
+            from app.services.field_override_service import FieldOverrideService
+            _fos = FieldOverrideService(db)
+            sign_status = await _fos.get(
+                project_id=project_id, year=_prog_year,
+                scope=_sign_scope, item_key="sign_status", field="value",
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("sign_status 查询失败 wp_code=%s: %s", wp_code, e)
+        if not sign_status:
+            sign_status = "draft"
+        permissions = {"edit": sign_status != "signed"}
+
+    response = {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
+                "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,
+                "sheets": sheets, "fill_results": fill_results, "guidance": get_wp_guidance(wp_code)}
+    if sign_status is not None:
+        response["sign_status"] = sign_status
+        response["permissions"] = permissions
+    return response
 

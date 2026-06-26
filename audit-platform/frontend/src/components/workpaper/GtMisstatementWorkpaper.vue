@@ -9,12 +9,27 @@
  * 以 activeTab 作为 sheet_name 保存到 parsed_data.html_data[tabId]。
  * 这避免了 GtWpRenderer.onSave 使用外层 activeSheetName 导致 sub-tab
  * 数据存错位的问题。
+ *
+ * 增强 (a13-misstatement-aggregation):
+ * - A13-2 使用 A13DetailEnhanced (添加 来源底稿列 + Prior_Year_Status标签列)
+ * - A13-5 使用 CommunicationDraftPanel (沟通函草稿生成)
+ * - 保存后由后端 EventBus 发布 WORKPAPER_SAVED, 触发聚合 + SSE 推送
+ *
+ * Integration (Task 13):
+ * - A13-2~5 onDFormSave → POST /api/workpapers/{wpId}/save
+ * - 后端 save 端点发布 WORKPAPER_SAVED event (wp_code=A13-2/3/4/5)
+ * - 后端 _on_a13_sheet_saved handler 接收 → debounce → Aggregation_Resolver
+ * - 完成后 broadcast_raw SSE 'a13_summary_updated'
+ * - 前端 MisstatementSummaryView 通过 eventBus SSE 监听自动刷新
+ * - MaterialityIndicator 实时更新三色状态
  */
 import { ref, watch } from 'vue'
 import { api } from '@/services/apiProxy'
 import GtAProgramConsole from './GtAProgramConsole.vue'
 import MisstatementSummaryView from './MisstatementSummaryView.vue'
 import GtDForm from './GtDForm/GtDForm.vue'
+import A13DetailEnhanced from './A13DetailEnhanced.vue'
+import CommunicationDraftPanel from './CommunicationDraftPanel.vue'
 
 const props = defineProps<{
   wpId: string
@@ -69,6 +84,7 @@ function getTabHtmlData(tabId: string): Record<string, any> {
 /**
  * GtDForm 保存回调 — 直接持久化到后端
  * 使用当前 activeTab 作为 sheet_name，确保 sub-tab 数据存到正确的键下。
+ * 后端 save 端点会发布 WORKPAPER_SAVED 事件，触发聚合链路。
  */
 async function onDFormSave(data: Record<string, any>) {
   try {
@@ -108,7 +124,32 @@ async function onDFormSave(data: Record<string, any>) {
           :wp-id="wpId"
         />
 
-        <!-- A13-2 ~ A13-5 d-form-table -->
+        <!-- A13-2 错报明细 (增强版: 来源底稿列 + Prior_Year_Status) -->
+        <A13DetailEnhanced
+          v-else-if="t.id === 'A13-2'"
+          :wp-id="wpId"
+          :sheet-name="t.id"
+          :schema="getTabSchema(t.id)"
+          :html-data="getTabHtmlData(t.id)"
+          :readonly="readonly"
+          @save="onDFormSave"
+        />
+
+        <!-- A13-5 沟通 (增强版: 沟通函草稿面板) -->
+        <template v-else-if="t.id === 'A13-5'">
+          <GtDForm
+            :wp-id="wpId"
+            :sheet-name="t.id"
+            form-type="d-form-table"
+            :schema="getTabSchema(t.id)"
+            :html-data="getTabHtmlData(t.id)"
+            :readonly="readonly"
+            @save="onDFormSave"
+          />
+          <CommunicationDraftPanel :wp-id="wpId" />
+        </template>
+
+        <!-- A13-3 / A13-4 标准 d-form-table -->
         <GtDForm
           v-else
           :wp-id="wpId"

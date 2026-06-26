@@ -266,3 +266,191 @@ async def _resolve_ctrl_deficiency(db: AsyncSession, project_id: UUID, year: int
         IssueTicket.project_id == project_id, IssueTicket.category == "internal_control", IssueTicket.status != "rejected",
     ))).scalar() or 0
     return {"summary": f"已识别{count}项内控缺陷" if count else "暂无已识别缺陷"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Review Dashboard Status（A1 看板五级复核状态）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_LEVEL_LABELS: dict[str, str] = {
+    "A21": "现场负责人",
+    "A22": "经理",
+    "A23": "合伙人",
+    "A24": "质控",
+    "A25": "EQCR",
+}
+
+
+@auto_resolver("review_dashboard_status")
+async def _resolve_review_dashboard_status(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """A1 看板五级复核状态汇总。
+
+    数据来源: wp_index + working_paper + project_assignments + checklist_responses
+    返回结构: {"levels": [...]}
+    """
+    from app.services.a21_a25_version_selector import get_applicable_review_templates
+    from app.services.review_rbac_guard import REVIEW_ROLE_MAP, extract_base_level
+
+    # 1. 获取适用的复核模板 wp_codes
+    templates = await get_applicable_review_templates(db, project_id)
+    applicable_codes = [t["wp_code"] for t in templates if t.get("applicable")]
+
+    if not applicable_codes:
+        return {"levels": []}
+
+    # 2. 查询各 wp_code 对应的 working_paper（通过 wp_index JOIN）
+    wp_info_rows = (await db.execute(sa.text(
+        """
+        SELECT wi.wp_code, wp.id AS wp_id
+        FROM wp_index wi
+        JOIN working_paper wp ON wp.wp_index_id = wi.id
+        WHERE wi.project_id = :pid
+          AND wi.is_deleted = false
+          AND wp.is_deleted = false
+          AND wi.wp_code = ANY(:codes)
+        """
+    ), {"pid": str(project_id), "codes": applicable_codes})).fetchall()
+
+    # wp_code → wp_id mapping
+    code_to_wp_id: dict[str, str] = {}
+    for row in wp_info_rows:
+        code_to_wp_id[row.wp_code] = str(row.wp_id)
+
+    # 3. 查询 project_assignments → role → staff_name
+    assignment_rows = (await db.execute(sa.text(
+        """
+        SELECT pa.role, sm.name
+        FROM project_assignments pa
+        JOIN staff_members sm ON sm.id = pa.staff_id AND sm.is_deleted = false
+        WHERE pa.project_id = :pid
+          AND pa.is_deleted = false
+        """
+    ), {"pid": str(project_id)})).fetchall()
+
+    # role → name mapping (first match)
+    role_to_name: dict[str, str] = {}
+    for row in assignment_rows:
+        if row.role not in role_to_name:
+            role_to_name[row.role] = row.name
+
+    # 4. 批量查询 sign 状态: all -sign records for this project
+    sign_rows = (await db.execute(sa.text(
+        """
+        SELECT wi.wp_code, cr.conclusion, cr.remark, cr.updated_at
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE wp.project_id = :pid
+          AND wp.is_deleted = false
+          AND wi.wp_code = ANY(:codes)
+          AND cr.item_id = wi.wp_code || '-sign'
+        """
+    ), {"pid": str(project_id), "codes": applicable_codes})).fetchall()
+
+    # wp_code → sign info
+    sign_info: dict[str, dict] = {}
+    for row in sign_rows:
+        sign_info[row.wp_code] = {
+            "conclusion": row.conclusion,
+            "remark": row.remark,
+            "updated_at": str(row.updated_at) if row.updated_at else None,
+        }
+
+    # 5. 批量查询 progress: 已填写项 / 总适用项（排除 system items）
+    progress_rows = (await db.execute(sa.text(
+        """
+        SELECT wi.wp_code,
+               COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE cr.conclusion IS NOT NULL AND cr.conclusion != '') AS completed
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE wp.project_id = :pid
+          AND wp.is_deleted = false
+          AND wi.wp_code = ANY(:codes)
+          AND cr.item_id NOT LIKE '%-sign'
+          AND cr.item_id NOT LIKE '%-record'
+          AND cr.item_id NOT LIKE '%-unlock-log'
+        GROUP BY wi.wp_code
+        """
+    ), {"pid": str(project_id), "codes": applicable_codes})).fetchall()
+
+    progress_map: dict[str, dict[str, int]] = {}
+    for row in progress_rows:
+        progress_map[row.wp_code] = {"completed": row.completed, "total": row.total}
+
+    # 6. 批量查询是否有任何非 system 响应存在（用于 in_progress 判定）
+    response_exists_rows = (await db.execute(sa.text(
+        """
+        SELECT wi.wp_code, COUNT(*) AS cnt
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE wp.project_id = :pid
+          AND wp.is_deleted = false
+          AND wi.wp_code = ANY(:codes)
+          AND cr.item_id NOT LIKE '%-sign'
+          AND cr.item_id NOT LIKE '%-record'
+          AND cr.item_id NOT LIKE '%-unlock-log'
+        GROUP BY wi.wp_code
+        """
+    ), {"pid": str(project_id), "codes": applicable_codes})).fetchall()
+
+    has_responses: set[str] = set()
+    for row in response_exists_rows:
+        if row.cnt > 0:
+            has_responses.add(row.wp_code)
+
+    # 7. 组装结果
+    levels: list[dict] = []
+    for code in applicable_codes:
+        base_level = extract_base_level(code)
+        level_label = _LEVEL_LABELS.get(base_level or "", base_level or code)
+
+        # reviewer_name: 从 REVIEW_ROLE_MAP 查找角色，再从 role_to_name 拿名字
+        reviewer_name: str | None = None
+        if base_level and base_level in REVIEW_ROLE_MAP:
+            for role in REVIEW_ROLE_MAP[base_level]:
+                if role in role_to_name:
+                    reviewer_name = role_to_name[role]
+                    break
+
+        # sign_status 判定
+        si = sign_info.get(code)
+        signer_name: str | None = None
+        signed_at: str | None = None
+
+        if si and si["conclusion"] == "pass":
+            sign_status = "pass"
+            signed_at = si["updated_at"]
+            # 尝试从 remark 提取 signer info
+            if si["remark"]:
+                import json
+                try:
+                    remark_data = json.loads(si["remark"])
+                    if isinstance(remark_data, dict):
+                        signer_name = remark_data.get("signer_name")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+        elif si and si["conclusion"] == "reject":
+            sign_status = "reject"
+        elif code in has_responses:
+            sign_status = "in_progress"
+        else:
+            sign_status = "not_started"
+
+        # progress
+        progress = progress_map.get(code, {"completed": 0, "total": 0})
+
+        levels.append({
+            "wp_code": code,
+            "level": base_level or code,
+            "level_label": level_label,
+            "reviewer_name": reviewer_name,
+            "sign_status": sign_status,
+            "signed_at": signed_at,
+            "signer_name": signer_name,
+            "progress": progress,
+        })
+
+    return {"levels": levels}

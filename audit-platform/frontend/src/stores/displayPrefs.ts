@@ -22,6 +22,7 @@ import {
   type AmountUnit, type FontSize,
   AMOUNT_UNITS, FONT_SIZES,
 } from '@/utils/formatters'
+import { fmtDateTime as _fmtDateTime } from '@/utils/formatters'
 
 const STORAGE_KEY = 'gt_display_prefs'
 
@@ -125,8 +126,36 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
   }
 
   // 格式化金额（带单位换算）— 模板中直接调用
-  function fmt(v: any): string {
+  // null/非数字 → '—'；opts.rawUnit=true → 不做单位换算（原始元值直接格式化）
+  function fmt(v: any, opts?: { rawUnit?: boolean }): string {
+    if (v == null) return '—'
+    const n = typeof v === 'number' ? v : Number(v)
+    if (isNaN(n)) return '—'
+    if (opts?.rawUnit) {
+      // 不做单位换算，仅按 decimals 格式化原始值
+      if (!showZero.value && n === 0) return '—'
+      return n.toLocaleString('zh-CN', {
+        minimumFractionDigits: decimals.value,
+        maximumFractionDigits: decimals.value,
+      })
+    }
     return fmtAmountUnit(v, amountUnit.value, decimals.value, showZero.value)
+  }
+
+  /** fmt 的语义别名（便于 import 命名一致） */
+  const fmtAmount = fmt
+
+  /** 格式化百分比 */
+  function fmtPercent(v: any, d = 1): string {
+    if (v == null) return '—'
+    const n = typeof v === 'number' ? v : Number(v)
+    if (isNaN(n)) return '—'
+    return `${n.toFixed(d)}%`
+  }
+
+  /** 格式化日期时间（转发 utils/formatters 唯一实现） */
+  function fmtDateTime(v: string | Date | null | undefined): string {
+    return _fmtDateTime(v)
   }
 
   /**
@@ -214,6 +243,9 @@ export const useDisplayPrefsStore = defineStore('displayPrefs', () => {
     setFixedColumns,
     getFixedColumns,
     fmt,
+    fmtAmount,
+    fmtPercent,
+    fmtDateTime,
     amountClass,
     unitSuffix,
     unitDivisor,

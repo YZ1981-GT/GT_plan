@@ -32,9 +32,9 @@ vi.mock('@/services/apiProxy', () => ({
   },
 }))
 
-// Mock OnlyOfficeEditor
-vi.mock('@/components/deliverable/OnlyOfficeEditor.vue', () => ({
-  default: { name: 'OnlyOfficeEditor', template: '<div class="mock-onlyoffice" />' },
+// Mock OnlyOfficeWordDialog
+vi.mock('../OnlyOfficeWordDialog.vue', () => ({
+  default: { name: 'OnlyOfficeWordDialog', template: '<div class="mock-onlyoffice" />', props: ['visible', 'documentUrl', 'documentKey', 'title', 'mode', 'callbackUrl'] },
 }))
 
 // Global stubs for Element Plus components
@@ -99,6 +99,8 @@ function createWrapper(props: any = {}) {
   return mount(WorkpaperWordEditor, {
     props: {
       wpId: 'wp-test-001',
+      wpCode: 'A16',
+      projectId: 'proj-test-123',
       ...props,
     },
     global: {
@@ -1120,7 +1122,7 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
     await flushPromises()
 
     const vm = wrapper.vm as any
-    await vm.updateSignStatus('sent')
+    await vm.updateSignStatus('pending')
     await flushPromises()
 
     // 发送不弹对话框
@@ -1128,7 +1130,7 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
     // 直接调用 API
     expect(mockApiPost).toHaveBeenCalledWith(
       expect.stringContaining('/sign-status'),
-      expect.objectContaining({ status: 'sent', version: 'A16-1' }),
+      expect.objectContaining({ status: 'pending', version: 'A16-1' }),
     )
   })
 

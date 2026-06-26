@@ -48,6 +48,7 @@ export interface FormulaResult {
 
 export interface WpIndexItem {
   id: string
+  wp_id?: string | null
   wp_code: string
   wp_name: string
   audit_cycle: string | null

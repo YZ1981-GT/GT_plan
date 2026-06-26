@@ -710,6 +710,68 @@ class ChainOrchestrator:
         # Total subtables collapsed (sheets within primary workpapers)
         total_subtables = sum(len(subs) for subs in matched_subtable_info.values())
 
+        # ─── 8. 为 skip 子底稿创建独立 wp_index（聚合组件内嵌 Tab 需要） ───────
+        # 当主底稿(如 A1)已创建，其子表(如 A1-11~A1-16)在 wp_code_overrides 中标为 skip
+        # 时，前端聚合组件(GtA1Dashboard/GtA17Bundle 等)需要通过 wp_index 查找这些子底稿
+        # 的 wp_id 来渲染内嵌 Tab。此处为这些 skip 子表创建独立的 wp_index + working_paper。
+        from app.services.wp_code_override_loader import load_wp_code_overrides
+        _skip_overrides = load_wp_code_overrides()
+        skip_sub_created = 0
+        for primary_code in sorted(matched_codes):
+            # 查找该主底稿下所有被标为 skip 的子表
+            skip_prefix = primary_code + "-"
+            skip_subs = [
+                code for code, ct in _skip_overrides.items()
+                if ct == "skip" and code.startswith(skip_prefix)
+            ]
+            for sub_code in sorted(skip_subs):
+                try:
+                    # Idempotent check
+                    existing = await db.execute(
+                        sa.select(WpIndex.id).where(
+                            WpIndex.project_id == project_id,
+                            WpIndex.wp_code == sub_code,
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        continue
+
+                    sub_name = code_name_map.get(sub_code) or f"底稿{sub_code}"
+                    cycle = primary_code[0] if primary_code and primary_code[0].isalpha() else None
+
+                    sub_wp_index = WpIndex(
+                        project_id=project_id,
+                        wp_code=sub_code,
+                        wp_name=sub_name,
+                        audit_cycle=cycle,
+                        status=WpStatus.not_started,
+                    )
+                    db.add(sub_wp_index)
+                    await db.flush()
+
+                    sub_wp = WorkingPaper(
+                        wp_index_id=sub_wp_index.id,
+                        project_id=project_id,
+                        source_type=WpSourceType.template,
+                        file_path=f"storage/projects/{project_id}/workpapers/{sub_code}.xlsx",
+                        parsed_data={},
+                    )
+                    db.add(sub_wp)
+                    await db.flush()
+                    skip_sub_created += 1
+                except Exception as sub_err:
+                    logger.warning(
+                        "chain_orchestrator: skip sub-workpaper %s creation failed: %s",
+                        sub_code, sub_err,
+                    )
+
+        if skip_sub_created:
+            logger.info(
+                "chain_orchestrator: created %d skip sub-workpaper wp_index records",
+                skip_sub_created,
+            )
+        # ─── END skip 子底稿创建 ─────────────────────────────────────────────────
+
         return {
             "created": created_count,  # 主底稿数（实际生成的 wp_index 文件）
             "files_copied": copied_count,

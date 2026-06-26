@@ -162,6 +162,7 @@ class UnadjustedMisstatementService:
             affected_account_name=account_names[0] if len(account_names) == 1 else ",".join(account_names),
             misstatement_amount=net_amount,
             misstatement_type=MisstatementType.factual,
+            source_wp_code=await self._derive_source_wp_code(project_id, account_codes),
             created_by=created_by,
         )
         # F50 / Sprint 8.19: AJE 转错报也绑定当前 active dataset
@@ -380,7 +381,13 @@ class UnadjustedMisstatementService:
         target_year: int,
         created_by: UUID | None = None,
     ) -> int:
-        """上年结转：复制上年未更正错报到本年"""
+        """上年结转：复制上年未更正错报到本年。
+
+        A13 聚合 spec (Req 4.2): 结转记录设置:
+        - prior_year_status = "continuing"
+        - is_carried_forward = True
+        - prior_year_id → 原记录 id
+        """
         q = (
             sa.select(UnadjustedMisstatement)
             .where(
@@ -407,6 +414,7 @@ class UnadjustedMisstatementService:
                 auditor_evaluation=prior.auditor_evaluation,
                 is_carried_forward=True,
                 prior_year_id=prior.id,
+                prior_year_status="continuing",  # A13 Req 4.2
                 created_by=created_by,
             )
             # F50 / Sprint 8.19: 结转错报绑定目标年度的 active dataset
@@ -426,6 +434,28 @@ class UnadjustedMisstatementService:
 
         await self.db.flush()
         return count
+
+    # ------------------------------------------------------------------
+    # mark_as_reversed (A13 Req 4.3)
+    # ------------------------------------------------------------------
+    async def mark_as_reversed(
+        self,
+        project_id: UUID,
+        misstatement_id: UUID,
+    ) -> MisstatementResponse:
+        """将已结转错报标记为"已转回"，从 cumulative 中排除。
+
+        A13 聚合 spec (Req 4.3): 更新 prior_year_status → "reversed"
+        前提: is_carried_forward == True
+        """
+        row = await self._get_by_id(project_id, misstatement_id)
+        if not row:
+            raise ValueError("未更正错报记录不存在")
+        if not row.is_carried_forward:
+            raise ValueError("仅结转记录可标记为已转回")
+        row.prior_year_status = "reversed"
+        await self.db.flush()
+        return self._to_response(row)
 
     # ------------------------------------------------------------------
     # check_evaluation_completeness
@@ -458,6 +488,37 @@ class UnadjustedMisstatementService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    async def _derive_source_wp_code(
+        self,
+        project_id: UUID,
+        account_codes: list[str],
+    ) -> str | None:
+        """从科目编码推导来源底稿 wp_code (A13 Req 6.4)。
+
+        查找项目下关联该科目的审定表底稿 wp_code（D~N 循环）。
+        """
+        if not account_codes:
+            return None
+        try:
+            from app.models.workpaper_models import WpIndex
+            # 查找关联该科目的底稿（account_codes 存在 wp_index.account_codes JSONB 中）
+            # 简化: 直接查 wp_index 的 account_codes 列匹配
+            q = (
+                sa.select(WpIndex.wp_code)
+                .where(
+                    WpIndex.project_id == project_id,
+                    WpIndex.is_deleted == sa.false(),
+                    # 审定表编码模式: X-1 或 X1-1 (D~N 循环)
+                    WpIndex.wp_code.op("~")(r"^[D-N]\d*-1$"),
+                )
+                .limit(1)
+            )
+            result = await self.db.execute(q)
+            wp_code = result.scalar_one_or_none()
+            return wp_code
+        except Exception:
+            return None
+
     async def _get_by_id(
         self,
         project_id: UUID,

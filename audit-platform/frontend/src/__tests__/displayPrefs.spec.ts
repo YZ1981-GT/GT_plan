@@ -178,3 +178,98 @@ describe('useDisplayPrefsStore', () => {
     })
   })
 })
+
+describe('displayPrefs 格式化统一出口', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+  })
+
+  describe('fmt null/非数字 guard', () => {
+    it('null → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmt(null)).toBe('—')
+    })
+
+    it('undefined → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmt(undefined)).toBe('—')
+    })
+
+    it('非数字字符串 → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmt('abc')).toBe('—')
+    })
+
+    it('NaN → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmt(NaN)).toBe('—')
+    })
+  })
+
+  describe('fmt rawUnit 选项', () => {
+    it('rawUnit=true 不做单位换算', () => {
+      const store = useDisplayPrefsStore()
+      store.setUnit('wan')
+      // 正常 fmt 会除以 10000：10000 → 1.00
+      expect(store.fmt(10000)).toBe('1.00')
+      // rawUnit=true：10000 原样格式化
+      expect(store.fmt(10000, { rawUnit: true })).toBe('10,000.00')
+    })
+
+    it('rawUnit + showZero=false + 值为0 → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmt(0, { rawUnit: true })).toBe('—')
+    })
+  })
+
+  describe('fmtAmount 别名', () => {
+    it('fmtAmount 与 fmt 返回相同结果', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtAmount(12345)).toBe(store.fmt(12345))
+      expect(store.fmtAmount(null)).toBe(store.fmt(null))
+    })
+  })
+
+  describe('fmtPercent', () => {
+    it('正常数值格式化为百分比', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtPercent(12.345)).toBe('12.3%')
+      expect(store.fmtPercent(12.345, 2)).toBe('12.35%')
+    })
+
+    it('null → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtPercent(null)).toBe('—')
+    })
+
+    it('非数字 → "—"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtPercent('abc')).toBe('—')
+    })
+  })
+
+  describe('fmtDateTime', () => {
+    it('null → "-"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtDateTime(null)).toBe('-')
+    })
+
+    it('undefined → "-"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtDateTime(undefined)).toBe('-')
+    })
+
+    it('非法日期 → "-"', () => {
+      const store = useDisplayPrefsStore()
+      expect(store.fmtDateTime('not-a-date')).toBe('-')
+    })
+
+    it('有效 ISO 字符串返回非空格式化结果', () => {
+      const store = useDisplayPrefsStore()
+      const result = store.fmtDateTime('2025-06-15T14:30:00')
+      expect(result).not.toBe('-')
+      expect(result.length).toBeGreaterThan(5)
+    })
+  })
+})

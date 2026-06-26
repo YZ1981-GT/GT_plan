@@ -1,0 +1,42 @@
+[
+  {
+    "rule_id": "gc_vs_opinion",
+    "description": "持续经营存疑但出具无保留意见需解释",
+    "severity": "warning",
+    "source_chapter": "A17-1-ch10",
+    "target_chapter": "A17-1-ch14",
+    "source_pattern": "重大不确定性|持续经营.*存疑|重大疑虑",
+    "target_pattern": "标准无保留|无保留意见",
+    "condition": "source_matches AND target_matches"
+  },
+  {
+    "rule_id": "kam_required_listed",
+    "description": "上市公司审计必须披露 KAM",
+    "severity": "error",
+    "source_chapter": "A17-1-ch12",
+    "target_chapter": null,
+    "source_pattern": null,
+    "target_pattern": null,
+    "condition": "source_empty AND project.business_category == '上市公司'"
+  },
+  {
+    "rule_id": "fraud_vs_opinion",
+    "description": "舞弊线索未在审计结论中体现",
+    "severity": "warning",
+    "source_chapter": "A17-1-ch15",
+    "target_chapter": "A17-1-ch14",
+    "source_pattern": "舞弊|fraud|虚假",
+    "target_pattern": "保留|否定|无法表示",
+    "condition": "source_matches AND NOT target_matches"
+  },
+  {
+    "rule_id": "risk_vs_opinion",
+    "description": "未应对风险与审计结论不一致",
+    "severity": "warning",
+    "source_chapter": "A17-1-ch06",
+    "target_chapter": "A17-1-ch14",
+    "source_pattern": "未解决|遗留|未应对|未消除",
+    "target_pattern": "标准无保留|无保留意见",
+    "condition": "source_matches AND target_matches"
+  }
+]

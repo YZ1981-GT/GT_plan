@@ -1,5 +1,8 @@
 """底稿公式依赖图构建 + 拓扑排序 + 循环引用检测
 
+**内部层**：由 StalePropagationEngine 间接调用（via incremental_refresh），
+勿作为对外 stale 入口。详见 backend/docs/STALE-PROPAGATION-LAYERS.md
+
 D4 架构决策：公式解析器 → 构建依赖图 → 拓扑排序 → 逐个求值
 
 依赖关系：

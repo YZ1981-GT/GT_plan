@@ -94,10 +94,10 @@ describe('projectGanttUtils.cycleColor — 颜色映射', () => {
     expect(cycleColor('AB')).toBe(CYCLE_COLOR_MAP.other)
   })
 
-  it('D 循环 = 蓝色 / F = 绿色 / H = 橙红色（与设计稿一致）', () => {
-    expect(cycleColor('D')).toBe('#409EFF')
-    expect(cycleColor('F')).toBe('#67C23A')
-    expect(cycleColor('H')).toBe('#F56C6C')
+  it('D 循环 = 统一色板蓝 / F = 绿 / H = 橙（与 cyclePalette 单一真源一致）', () => {
+    expect(cycleColor('D')).toBe(CYCLE_COLOR_MAP.D)
+    expect(cycleColor('F')).toBe(CYCLE_COLOR_MAP.F)
+    expect(cycleColor('H')).toBe(CYCLE_COLOR_MAP.H)
   })
 })
 

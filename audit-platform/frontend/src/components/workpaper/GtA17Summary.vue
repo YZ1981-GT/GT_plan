@@ -3,13 +3,22 @@
  * GtA17Summary — A17-1 重大事项概要汇总
  *
  * 章节导航式 HTML 底稿组件（16 章）。
- * 左侧目录导航（点击跳转 + 完成状态）+ 右侧章节编辑区（提示栏 + textarea）。
- * MVP（A17-core）：纯文本编辑 + 提示栏折叠 + 「从关联模块拉取」按钮壳。
+ * 左侧目录导航（点击跳转 + 完成状态）+ 右侧章节编辑区（提示栏 + 富文本编辑器）。
+ * 增强版：富文本 HTML 编辑器 + source_label RefChip 渲染 + DOMPurify 消毒保存。
  * debounce 1500ms 自动保存至 checklist_responses 表。
+ *
+ * Requirements: 1.1, 1.2, 1.3, 1.5, 2.1, 2.4
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { sanitizeHtml } from '@/composables/useSanitize'
+import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
+import { resolveWpCodeState, type WpCodeNavState } from '@/composables/useA17Navigation'
+import { A17RichTextEditor, SourceLabelChips, ConsistencyPanel, KamEmbedPanel, SubDocNavigator } from '@/components/workpaper/a17'
+import type { ConsistencyResult } from '@/components/workpaper/a17/ConsistencyPanel.vue'
+import { plainTextToHtml } from '@/components/workpaper/a17/plainTextCompat'
+import { getDefaultAiMode } from '@/components/workpaper/a17/aiModeDefault'
 
 // ─── Types ───
 interface ChapterDefinition {
@@ -20,7 +29,12 @@ interface ChapterDefinition {
 interface ChapterData { content: string; source_label: string }
 
 // ─── Props / Emits ───
-const props = defineProps<{ projectId: string; wpId: string; wpCode?: string }>()
+const props = defineProps<{
+  projectId: string
+  wpId: string
+  wpCode?: string
+  kamReferences?: Array<{ source: string; title: string; riskLevel?: string; wpCode: string; summary: string }>
+}>()
 const emit = defineEmits<{
   (e: 'save'): void
   (e: 'chapter-change', chapterId: string, content: string): void
@@ -33,6 +47,25 @@ const activeChapterId = ref('')
 const loading = ref(false)
 const pulling = ref<string | null>(null)
 const collapseActive = ref<string[]>([])
+
+// ─── wp_index for RefChip navigation ───
+const wpIndex = ref<WpIndexItem[]>([])
+const navStateMap = computed<Record<string, WpCodeNavState>>(() => {
+  const map: Record<string, WpCodeNavState> = {}
+  // 预计算 source_label 中可能用到的 wp_code 导航状态
+  for (const [, data] of Object.entries(chapterDataMap.value)) {
+    if (data.source_label) {
+      const segments = data.source_label.split('+').filter(Boolean)
+      for (const seg of segments) {
+        const trimmed = seg.trim()
+        if (!map[trimmed]) {
+          map[trimmed] = resolveWpCodeState(trimmed, wpIndex.value)
+        }
+      }
+    }
+  }
+  return map
+})
 
 // ─── Save State ───
 const saving = ref(false)
@@ -91,6 +124,12 @@ const aiLoading = ref(false)
 const aiDialogVisible = ref(false)
 const aiDraft = ref('')
 const aiError = ref('')
+const aiMode = ref<'generate' | 'polish'>('generate')
+
+// ─── Consistency Check State ───
+const consistencyResults = ref<ConsistencyResult[]>([])
+const consistencyLoading = ref(false)
+const consistencyPanelVisible = ref(false)
 
 // ─── Computed ───
 const activeChapter = computed(() => chapters.value.find((ch) => ch.id === activeChapterId.value))
@@ -113,7 +152,7 @@ function canPull(ch: ChapterDefinition): boolean {
   return ch.data_source.type === 'auto' && (ch.data_source.ready === true || ch.data_source.ready === 'partial')
 }
 
-// ─── Debounce Save ───
+// ─── Debounce Save (with sanitizeHtml before persist) ───
 async function saveChapter(chapterId: string) {
   if (!props.projectId || !props.wpId || !chapterId) return
   const data = chapterDataMap.value[chapterId]
@@ -122,12 +161,14 @@ async function saveChapter(chapterId: string) {
   saving.value = true
   saveStatus.value = 'saving'
   try {
+    // 保存前调用 sanitizeHtml 清洗 HTML 内容
+    const sanitizedContent = sanitizeHtml(data.content)
     await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items: [{
         item_id: chapterId,
         conclusion: null,
-        remark: data.content,
+        remark: sanitizedContent,
         wp_ref: data.source_label || null,
       }],
     })
@@ -158,16 +199,17 @@ function flushPendingSave() {
   if (saveTimer) {
     clearTimeout(saveTimer)
     saveTimer = null
-    // 同步 sendBeacon 兜底（页面即将关闭时 async 不可靠）
     const chId = activeChapterId.value
     const data = chapterDataMap.value[chId]
     if (chId && data && props.projectId && props.wpId) {
+      // sendBeacon 兜底也走 sanitizeHtml
+      const sanitizedContent = sanitizeHtml(data.content)
       const payload = JSON.stringify({
         project_id: props.projectId,
         items: [{
           item_id: chId,
           conclusion: null,
-          remark: data.content,
+          remark: sanitizedContent,
           wp_ref: data.source_label || null,
         }],
       })
@@ -192,12 +234,20 @@ async function handleAiGenerate() {
   if (!activeChapter.value) return
   aiDraft.value = ''
   aiError.value = ''
+  aiMode.value = getDefaultAiMode(activeContent.value)
   aiDialogVisible.value = true
+}
+
+async function doAiGenerate() {
+  if (!activeChapter.value) return
+  aiDraft.value = ''
+  aiError.value = ''
   aiLoading.value = true
   try {
     const result = await api.post(`/api/a17/chapters/${activeChapter.value.id}/ai-generate`, {
       project_id: props.projectId,
       user_hint: '',
+      mode: aiMode.value,
     }) as { draft?: string; error?: string }
     if (result?.error) { aiError.value = result.error }
     else if (result?.draft) { aiDraft.value = result.draft }
@@ -212,6 +262,34 @@ function adoptAiDraft() {
     aiDialogVisible.value = false
     ElMessage.success('已采纳 AI 建议稿')
   }
+}
+
+// ─── Consistency Check ───
+async function handleConsistencyCheck() {
+  if (!props.projectId || !props.wpId) return
+  consistencyLoading.value = true
+  consistencyPanelVisible.value = true
+  consistencyResults.value = []
+  try {
+    const result = await api.post('/api/a17/consistency-check', {
+      project_id: props.projectId,
+      wp_id: props.wpId,
+    }) as { results?: ConsistencyResult[]; checked_at?: string }
+    consistencyResults.value = result?.results || []
+  } catch (err: any) {
+    ElMessage.warning('一致性校验服务暂不可用')
+    consistencyPanelVisible.value = false
+  } finally {
+    consistencyLoading.value = false
+  }
+}
+
+function handleConsistencyNavigate(chapterId: string) {
+  selectChapter(chapterId)
+}
+
+function handleConsistencyClose() {
+  consistencyPanelVisible.value = false
 }
 
 // ─── Data Loading ───
@@ -233,11 +311,27 @@ async function loadResponses() {
     })
     const records = (data as Array<{ item_id: string; remark: string | null; wp_ref: string | null }>) || []
     for (const rec of records) {
-      if (rec.item_id?.startsWith('A17-1-ch'))
-        chapterDataMap.value[rec.item_id] = { content: rec.remark || '', source_label: rec.wp_ref || '' }
+      if (rec.item_id?.startsWith('A17-1-ch')) {
+        // 加载时自动检测纯文本/HTML 并兼容渲染
+        const content = rec.remark || ''
+        const htmlContent = plainTextToHtml(content)
+        chapterDataMap.value[rec.item_id] = {
+          content: htmlContent,
+          source_label: rec.wp_ref || '',
+        }
+      }
     }
   } catch (err: any) { ElMessage.error('加载章节数据失败: ' + (err?.message || '')) }
   finally { loading.value = false }
+}
+
+async function loadWpIndex() {
+  if (!props.projectId) return
+  try {
+    wpIndex.value = await getWpIndex(props.projectId)
+  } catch {
+    wpIndex.value = []
+  }
 }
 
 // ─── Navigation ───
@@ -259,7 +353,8 @@ async function handlePull(ch: ChapterDefinition) {
     if (result?.content) {
       if (!chapterDataMap.value[ch.id])
         chapterDataMap.value[ch.id] = { content: '', source_label: '' }
-      chapterDataMap.value[ch.id].content = result.content
+      // 拉取的内容也做纯文本兼容处理
+      chapterDataMap.value[ch.id].content = plainTextToHtml(result.content)
       chapterDataMap.value[ch.id].source_label = result.source_label || ''
       ElMessage.success('拉取成功')
       emit('chapter-change', ch.id, result.content)
@@ -273,12 +368,16 @@ async function handlePull(ch: ChapterDefinition) {
 onMounted(async () => {
   await loadChapterDefinitions()
   await loadResponses()
+  await loadWpIndex()
   await loadIssueHints()
   checkAiEnabled()
 })
 onBeforeUnmount(() => { flushPendingSave() })
 watch(() => [props.projectId, props.wpId], async () => {
-  if (props.projectId && props.wpId) await loadResponses()
+  if (props.projectId && props.wpId) {
+    await loadResponses()
+    await loadWpIndex()
+  }
 })
 </script>
 
@@ -300,6 +399,8 @@ watch(() => [props.projectId, props.wpId], async () => {
     </aside>
     <!-- 右侧章节编辑区 -->
     <main class="gt-a17-summary__main">
+      <!-- A17 子文档快速导航 -->
+      <SubDocNavigator :project-id="props.projectId" />
       <template v-if="activeChapter">
         <div :id="`a17-chapter-${activeChapter.id}`" class="gt-a17-summary__chapter">
           <div class="gt-a17-summary__chapter-title">
@@ -332,33 +433,67 @@ watch(() => [props.projectId, props.wpId], async () => {
               @click="handlePull(activeChapter)">从关联模块拉取</el-button>
             <el-button v-if="aiEnabled" size="small" type="success"
               :loading="aiLoading" @click="handleAiGenerate">AI 辅助生成</el-button>
-            <el-tag v-if="activeSourceLabel" size="small" type="info" effect="plain">
-              来源: {{ activeSourceLabel }}
-            </el-tag>
+            <el-button size="small" type="warning"
+              :loading="consistencyLoading" @click="handleConsistencyCheck">一致性校验</el-button>
+            <!-- source_label 渲染为 RefChip -->
+            <SourceLabelChips
+              v-if="activeSourceLabel"
+              :source-label="activeSourceLabel"
+              :nav-state-map="navStateMap"
+              :project-id="projectId"
+            />
             <span class="gt-a17-summary__save-status">
               <span v-if="saveStatus === 'saving'" class="save-status--saving">保存中...</span>
               <span v-else-if="saveStatus === 'saved'" class="save-status--saved">✓ 已保存</span>
               <span v-else-if="saveStatus === 'error'" class="save-status--error">保存失败</span>
             </span>
           </div>
-          <!-- 正文编辑区 -->
-          <el-input v-model="activeContent" type="textarea"
-            :autosize="{ minRows: 8, maxRows: 24 }" placeholder="请输入本章节内容..."
-            class="gt-a17-summary__textarea" />
+          <!-- 一致性校验结果面板 -->
+          <ConsistencyPanel
+            :results="consistencyResults"
+            :loading="consistencyLoading"
+            :visible="consistencyPanelVisible"
+            @navigate-chapter="handleConsistencyNavigate"
+            @close="handleConsistencyClose"
+          />
+          <!-- ch12 KAM 嵌入面板 -->
+          <KamEmbedPanel
+            v-if="activeChapterId === 'A17-1-ch12'"
+            :project-id="props.projectId"
+            :wp-id="props.wpId"
+          />
+          <!-- 富文本编辑器（替代原 el-input textarea） -->
+          <A17RichTextEditor
+            v-model="activeContent"
+            placeholder="请输入本章节内容..."
+          />
         </div>
       </template>
       <div v-else class="gt-a17-summary__empty">请从左侧目录选择章节开始编辑</div>
     </main>
     <!-- AI 预览弹窗 -->
-    <el-dialog v-model="aiDialogVisible" title="AI 辅助生成预览" width="600px" :close-on-click-modal="false">
+    <el-dialog v-model="aiDialogVisible" title="AI 辅助生成" width="600px" :close-on-click-modal="false">
+      <!-- 模式选择器 -->
+      <div class="gt-a17-summary__ai-mode">
+        <span class="ai-mode__label">生成模式：</span>
+        <el-radio-group v-model="aiMode" :disabled="aiLoading">
+          <el-radio value="generate">从头生成</el-radio>
+          <el-radio value="polish">润色改进</el-radio>
+        </el-radio-group>
+      </div>
+      <!-- 开始生成按钮 -->
+      <div v-if="!aiLoading && !aiDraft && !aiError" class="gt-a17-summary__ai-start">
+        <el-button type="primary" @click="doAiGenerate">开始生成</el-button>
+      </div>
       <div v-if="aiLoading" class="gt-a17-summary__ai-loading">
         <el-icon class="is-loading"><i class="el-icon-loading" /></el-icon>
         <span>正在生成建议稿...</span>
       </div>
       <div v-else-if="aiError" class="gt-a17-summary__ai-error">{{ aiError }}</div>
-      <el-input v-else v-model="aiDraft" type="textarea" readonly :autosize="{ minRows: 6, maxRows: 16 }" />
+      <el-input v-else-if="aiDraft" v-model="aiDraft" type="textarea" readonly :autosize="{ minRows: 6, maxRows: 16 }" />
       <template #footer>
         <el-button @click="aiDialogVisible = false">关闭</el-button>
+        <el-button v-if="aiError" type="warning" :loading="aiLoading" @click="doAiGenerate">重试</el-button>
         <el-button type="primary" :disabled="!aiDraft || aiLoading" @click="adoptAiDraft">采纳</el-button>
       </template>
     </el-dialog>
@@ -392,17 +527,17 @@ watch(() => [props.projectId, props.wpId], async () => {
 .guidance-issue-hints { margin-top: var(--gt-space-3); }
 .guidance-issue-hints__list { margin: var(--gt-space-2) 0 0; padding-left: 18px; font-size: var(--gt-font-size-sm); line-height: 1.6; }
 /* ─── 操作栏 ─── */
-.gt-a17-summary__action-bar { display: flex; align-items: center; gap: var(--gt-space-3); margin-bottom: var(--gt-space-3); }
+.gt-a17-summary__action-bar { display: flex; align-items: center; gap: var(--gt-space-3); margin-bottom: var(--gt-space-3); flex-wrap: wrap; }
 .gt-a17-summary__save-status { margin-left: auto; font-size: var(--gt-font-size-xs); line-height: 1; }
 .save-status--saving { color: var(--gt-color-text-tertiary); }
 .save-status--saved { color: var(--gt-color-success); }
 .save-status--error { color: var(--gt-color-danger); }
-/* ─── 文本编辑区 ─── */
-.gt-a17-summary__textarea :deep(.el-textarea__inner) { font-size: var(--gt-font-size-base); line-height: var(--gt-line-height-loose); font-family: var(--gt-font-family); border-radius: var(--gt-radius-sm); }
-.gt-a17-summary__textarea :deep(.el-textarea__inner:focus) { border-color: var(--gt-color-primary); box-shadow: 0 0 0 2px rgba(75, 45, 119, 0.1); }
 /* ─── 空状态 ─── */
 .gt-a17-summary__empty { display: flex; align-items: center; justify-content: center; height: 200px; color: var(--gt-color-text-tertiary); }
 /* ─── AI 弹窗 ─── */
+.gt-a17-summary__ai-mode { margin-bottom: var(--gt-space-4); display: flex; align-items: center; gap: var(--gt-space-2); }
+.ai-mode__label { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); white-space: nowrap; }
+.gt-a17-summary__ai-start { display: flex; justify-content: center; padding: var(--gt-space-4); }
 .gt-a17-summary__ai-loading { display: flex; align-items: center; gap: var(--gt-space-2); padding: var(--gt-space-4); color: var(--gt-color-text-secondary); }
 .gt-a17-summary__ai-error { padding: var(--gt-space-3); color: var(--gt-color-danger); font-size: var(--gt-font-size-sm); }
 </style>

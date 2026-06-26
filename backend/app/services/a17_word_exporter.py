@@ -47,6 +47,143 @@ _RED_PLACEHOLDER_PATTERNS: list[re.Pattern] = [
 _BLUE_GUIDANCE_PATTERN = re.compile(r"【[^】]*】")
 
 
+# ─── HTML → docx 转换引擎 ────────────────────────────────────────────────────
+
+
+def _html_to_docx(doc, html_content: str) -> None:
+    """将 HTML 内容转换为 Word 文档元素。
+
+    支持:
+    - h3/h4 → Heading 3/4 样式段落
+    - ul/ol → 列表段落（List Bullet / List Number）
+    - strong → bold run
+    - em → italic run
+    - table → Table 对象
+    - br → 换行
+    - p/div → 普通段落
+    - 不支持的标签 → 静默跳过（保留其文本内容）
+
+    Requirements: 1.6
+    """
+    from html.parser import HTMLParser
+
+    class _DocxHtmlParser(HTMLParser):
+        def __init__(self, document):
+            super().__init__()
+            self.doc = document
+            self.current_paragraph = None
+            self.tag_stack: list[str] = []
+            self.list_stack: list[str] = []  # 'ul' or 'ol'
+            self.table_data: list[list[str]] = []
+            self.current_row: list[str] = []
+            self.current_cell_text = ""
+            self.in_table = False
+
+        def handle_starttag(self, tag: str, attrs):
+            tag = tag.lower()
+            self.tag_stack.append(tag)
+
+            if tag in ("h3", "h4"):
+                level = 3 if tag == "h3" else 4
+                self.current_paragraph = self.doc.add_paragraph(style=f"Heading {level}")
+            elif tag == "p":
+                if not self.in_table:
+                    self.current_paragraph = self.doc.add_paragraph()
+            elif tag == "div":
+                if not self.in_table:
+                    self.current_paragraph = self.doc.add_paragraph()
+            elif tag in ("ul", "ol"):
+                self.list_stack.append(tag)
+            elif tag == "li":
+                list_type = self.list_stack[-1] if self.list_stack else "ul"
+                style = "List Number" if list_type == "ol" else "List Bullet"
+                try:
+                    self.current_paragraph = self.doc.add_paragraph(style=style)
+                except KeyError:
+                    # 如果样式不存在，使用普通段落加前缀
+                    self.current_paragraph = self.doc.add_paragraph()
+            elif tag == "table":
+                self.in_table = True
+                self.table_data = []
+            elif tag == "tr":
+                self.current_row = []
+            elif tag in ("td", "th"):
+                self.current_cell_text = ""
+            elif tag == "br":
+                if self.current_paragraph is not None:
+                    self.current_paragraph.add_run("\n")
+            # strong/em/b/i 不创建新段落，在 handle_data 中通过 tag_stack 判断格式
+
+        def handle_endtag(self, tag: str):
+            tag = tag.lower()
+
+            if tag in ("td", "th"):
+                self.current_row.append(self.current_cell_text)
+                self.current_cell_text = ""
+            elif tag == "tr":
+                self.table_data.append(self.current_row)
+                self.current_row = []
+            elif tag == "table":
+                self._flush_table()
+                self.in_table = False
+            elif tag in ("ul", "ol"):
+                if self.list_stack:
+                    self.list_stack.pop()
+            elif tag in ("h3", "h4", "p", "div", "li"):
+                self.current_paragraph = None
+
+            if self.tag_stack and self.tag_stack[-1] == tag:
+                self.tag_stack.pop()
+
+        def handle_data(self, data: str):
+            if self.in_table:
+                self.current_cell_text += data
+                return
+
+            text = data
+            if not text:
+                return
+
+            if self.current_paragraph is None:
+                # 顶层文本，创建段落
+                self.current_paragraph = self.doc.add_paragraph()
+
+            run = self.current_paragraph.add_run(text)
+
+            # 根据 tag_stack 设置格式
+            if "strong" in self.tag_stack or "b" in self.tag_stack:
+                run.bold = True
+            if "em" in self.tag_stack or "i" in self.tag_stack:
+                run.italic = True
+
+        def _flush_table(self):
+            """将收集的表格数据写入 Word Table 对象"""
+            if not self.table_data:
+                return
+            rows = len(self.table_data)
+            cols = max((len(row) for row in self.table_data), default=0)
+            if rows == 0 or cols == 0:
+                return
+
+            table = self.doc.add_table(rows=rows, cols=cols)
+            table.style = "Table Grid"
+            for r_idx, row_data in enumerate(self.table_data):
+                for c_idx, cell_text in enumerate(row_data):
+                    if c_idx < cols:
+                        table.rows[r_idx].cells[c_idx].text = cell_text
+
+    # 如果内容不含 HTML 标签，按纯文本处理（兼容旧数据）
+    if not re.search(r"<[a-zA-Z][^>]*>", html_content):
+        for line in html_content.split("\n"):
+            stripped = line.strip()
+            if stripped:
+                doc.add_paragraph(stripped)
+        return
+
+    parser = _DocxHtmlParser(doc)
+    parser.feed(html_content)
+
+
 # ─── 公共类 ──────────────────────────────────────────────────────────────────
 
 
@@ -124,8 +261,9 @@ class A17WordExporter:
         2. 加载项目上下文（client_name, audit_year）
         3. 定位模板文件
         4. 调用 docx_template_filler 处理颜色语义 + 占位符
-        5. 将章节内容写入文档对应位置
-        6. 返回 docx 字节流
+        5. 将章节内容写入文档对应位置（HTML→docx 转换）
+        6. 自动触发一致性校验（warn 不阻断）
+        7. 返回 docx 字节流
         """
         try:
             from docx import Document
@@ -148,10 +286,33 @@ class A17WordExporter:
         # 4. 调用 filler 处理颜色语义（蓝删 / 红替换转黑 / 注释表删）
         doc, fill_result = fill_and_export(doc, context)
 
-        # 5. 将章节内容追加到文档末尾（模板已处理，章节数据补入）
+        # 5. 将章节内容追加到文档末尾（HTML→docx 增强转换）
         self._inject_chapter_content(doc, responses)
 
-        # 6. 导出为 bytes
+        # 6. 自动触发一致性校验（仅记录日志，不阻断导出）
+        try:
+            from app.services.a17_consistency_checker import check_consistency
+
+            # 查询 project.business_category
+            proj_result = await db.execute(
+                text("SELECT business_category FROM project WHERE id = :pid"),
+                {"pid": str(project_id)},
+            )
+            proj_row = proj_result.fetchone()
+            business_category = proj_row.business_category if proj_row else None
+
+            check_results = check_consistency(responses, business_category)
+            error_results = [r for r in check_results if r.severity == "error"]
+            if error_results:
+                logger.warning(
+                    "A17-1 导出时一致性校验发现 %d 个 error 级别问题: %s",
+                    len(error_results),
+                    [r.rule_id for r in error_results],
+                )
+        except Exception as e:
+            logger.debug("导出时一致性校验失败（不阻断）: %s", e)
+
+        # 7. 导出为 bytes
         return export_to_bytes(doc)
 
     # ─── 私有方法 ──────────────────────────────────────────────────────────
@@ -207,8 +368,9 @@ class A17WordExporter:
     ) -> None:
         """将章节填写内容注入到文档中。
 
-        在模板已处理（蓝删/红替换）后，将用户填写的各章节正文
-        作为段落追加到文档末尾。模板中如有对应锚点则替换。
+        增强版：解析 HTML 内容，将 h3/h4 → Heading 样式，
+        ul/ol → 列表段落，strong → bold run，em → italic run，
+        table → Table 对象。不支持的标签静默跳过。
         """
         chapters = get_chapter_definitions()
 
@@ -218,15 +380,12 @@ class A17WordExporter:
             if not content or not content.strip():
                 continue
 
-            # 添加章节标题 + 正文
+            # 添加章节标题
             heading = f"{ch['seq']}. {ch['title']}"
             doc.add_paragraph(heading, style="Heading 2")
 
-            # 按换行分段写入
-            for line in content.split("\n"):
-                stripped = line.strip()
-                if stripped:
-                    doc.add_paragraph(stripped)
+            # 解析 HTML 内容并转换为 Word 元素
+            _html_to_docx(doc, content)
 
 
 # ─── 分发注册接口（供 wp_export_word_service 调用）──────────────────────────

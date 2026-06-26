@@ -1,10 +1,10 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-21  
+**最后更新**：2026-06-23  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**169**（active 0 + archived 169）+ 全局交叉索引 1  
-**最高迁移**：V088  
-**测试总数**：16699 collected / 0 collection errors（2026-06-19 修复）  
+**Spec 总数**：**184**（active 4 + archived 181）+ 全局交叉索引 1  
+**最高迁移**：V093  
+**测试总数**：~17000+（含 PBT 30+ properties）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -51,13 +51,16 @@
 
 ## 二、已归档 Spec（155 个，10 分类）
 
-**当前 active = 0**（全部已归档）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 4**（3 全局治理 + 1 A1-11）。新建 spec 放 `.kiro/specs/{name}/`。
 
 ### Active Specs
 
 | Spec | 状态 | 迁移 | 说明 |
 |------|------|------|------|
-| （无） | — | — | 全部已归档 |
+| `display-format-single-source` | 🔵 未启动 | 无 | 金额/时间/百分比格式化收口到 displayPrefs 统一出口 + CI 守卫（43处formatAmount+70+处裸toLocaleString）|
+| `cycle-palette-single-source` | 🔵 未启动 | 无 | 循环色板单一真源（cyclePalette.ts + --gt-cycle-* CSS 变量），4 处分裂收口 |
+| `stale-propagation-cleanup-doc` | 🔵 未启动 | 无 | 删死代码 stale_incremental_propagation.py + stale 分层文档 |
+| `a1-11-signing-control-form` | 🔵 进行中 | 无 | A1-11签发流转表（Task 1-4 done，5 PBT进行中）|
 
 ```
 _archive/
@@ -72,6 +75,7 @@ _archive/
 ├── 09-consolidation-phases/      4   合并模块
 ├── 10-A~S-workpaper-all-cycles-complete/ 13  A~S全循环底稿（568任务，2026-06-19完成）
 ├── 11-confirmation-d0-module/   10   D0函证模块（283任务，2026-06-22完成）
+├── 12-2026-06-23-batch/         12   架构加固+A类深化+分发持久化（2026-06-23完成）
 └── 99-superseded/                4   已被取代
 ```
 
@@ -132,6 +136,23 @@ _archive/
 | `post-enhancement-bugfix` | → R9 + `global-refinement-v3` |
 | `note-account-mapping-seed` | → `disclosure-note-full-revamp` |
 | `linkage-panorama-graph` | → `enterprise-linkage` |
+
+### 2.11 `12-2026-06-23-batch/`（12）
+
+| Spec | 类型 | 摘要 |
+|------|------|------|
+| `a17-summary-enhancement` | Feature | 富文本RTE+一致性校验+LLM跨章polish+KAM集成+子文档导航+Word导出增强 |
+| `a-cycle-docx-online` | Feature | A循环 docx 在线化（13必做+14 PBT） |
+| `a-review-checklist-rbac` | Feature | 五级复核表RBAC+Sequential Gate+Sign-Lock+Unlock+Dashboard |
+| `a13-misstatement-aggregation` | Feature | 事件驱动聚合+三色预警+上年结转+沟通函+ref_chip+SSE |
+| `cross-workpaper-dispatch-persistence` | Feature | D0分发持久化 V093+DispatchService+EventBus+前端composable |
+| `authorization-enforcement-baseline` | Feature | require_operation工厂+CI lint+7高风险端点接入 |
+| `custom-query-authorization-hardening` | Bugfix | IDOR read+cross-project write修复 |
+| `qc-python-rule-load-hardening` | Bugfix | _ALLOWED_RULE_PREFIXES白名单+admin-only python规则 |
+| `report-cache-year-isolation` | Bugfix | _cache_key加year维度+SCAN通配符 |
+| `single-source-cleanup` | Refactor | 6项去重收口（枚举合并+lru_cache+formula_grammar单源） |
+| `multi-worker-readiness` | Feature | Redis分布式导入锁+地址坐标库single-flight+OCR服务化 |
+| `workpaper-save-orchestrator` | Refactor | 统一after_save编排器+孤立EventBus删除 |
 
 ---
 
