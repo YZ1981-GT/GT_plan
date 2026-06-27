@@ -1,10 +1,11 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-23  
+**最后更新**：2026-06-27  
 **当前分支**：`work/2026-05-30-wp-specs`  
-**Spec 总数**：**184**（active 4 + archived 181）+ 全局交叉索引 1  
+**Spec 总数**：**195**（active 13 + archived 182）+ 全局交叉索引 1  
+**当前 active = 13**（3 全局治理 + 1 A1-11 + 6 A17子底稿 + 3 新增A类底稿）  
 **最高迁移**：V093  
-**测试总数**：~17000+（含 PBT 30+ properties）  
+**测试总数**：~17100+（含 PBT 30+ properties）  
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -51,7 +52,7 @@
 
 ## 二、已归档 Spec（155 个，10 分类）
 
-**当前 active = 4**（3 全局治理 + 1 A1-11）。新建 spec 放 `.kiro/specs/{name}/`。
+**当前 active = 13**（3 全局治理 + 1 A1-11 + 6 A17子底稿 + 3 新增A类底稿）。新建 spec 放 `.kiro/specs/{name}/`。
 
 ### Active Specs
 
@@ -61,6 +62,16 @@
 | `cycle-palette-single-source` | 🔵 未启动 | 无 | 循环色板单一真源（cyclePalette.ts + --gt-cycle-* CSS 变量），4 处分裂收口 |
 | `stale-propagation-cleanup-doc` | 🔵 未启动 | 无 | 删死代码 stale_incremental_propagation.py + stale 分层文档 |
 | `a1-11-signing-control-form` | 🔵 进行中 | 无 | A1-11签发流转表（Task 1-4 done，5 PBT进行中）|
+| `a17-1-audit-summary` | 🔵 未启动 | 无 | A17-1重大事项概要汇总专属组件(16章折叠卡片+签字表+左侧导航+B50/A13/A1-15联动) |
+| `a17-2-1-kam` | 🔵 未启动 | 无 | A17-2-1关键审计事项(KAM)动态增删卡片+候选表+适用性开关+A17-1联动 |
+| `a17-3-consultation-record` | 🔵 未启动 | 无 | A17-3业务咨询记录(元信息+4章+文件tag+AI准则查询预留) |
+| `a17-3-1-consultation-execution` | 🔵 未启动 | 无 | A17-3-1业务咨询结果执行情况(极简5区块+A17-3引用联动) |
+| `a17-4-disagreement-record` | 🔵 未启动 | 无 | A17-4重大专业分歧事项(人员动态表+6章textarea+签字区) |
+| `a17-6-closing-meeting` | 🔵 未启动 | 无 | A17-6总结会会议纪要(最简组件,6字段卡片) |
+| `a17-7-independence-declaration` | 🔵 未启动 | 无 | A17-7/A17-7A独立性声明书(variant双变体,签字表+威胁记录+期间承诺,~400行) |
+| `a10-1-governance-communication` | 🔵 未启动 | 无 | A10-1与治理层沟通函(16章折叠卡片+左侧导航+服务费表格+签发,~600行) |
+| `a12-1-legal-confirmation` | 🔵 未启动 | 无 | A12-1法律事务确认函(发函3问询+回函确认+诉讼动态列表+A5-3联动,~450行) |
+| `a27-1-it-audit-memo` | 🔵 未启动 | 无 | A27-1 IT审计总结备忘录(IT团队表+7章卡片+三选一radio+条件展开+4个GtIndexChip,~500行) |
 
 ```
 _archive/
@@ -68,7 +79,7 @@ _archive/
 ├── 02-workpaper-cycles/         16   审计循环（11循环+5基础，548 tasks）
 ├── 03-refinement-rounds/         9   五角色轮转（R1~R9）
 ├── 04-infra-architecture/       29   基础设施/全局架构
-├── 05-business-features/        38   业务专项（含ledger/wp系列）
+├── 05-business-features/        39   业务专项（含ledger/wp系列）
 ├── 06-engineering-governance/    6   工程治理
 ├── 07-workpaper-slimdown/       15   底稿瘦身 + 模块治理
 ├── 08-disclosure-notes/          5   附注模块
@@ -102,7 +113,7 @@ _archive/
 
 **账表导入（5）**：`ledger-import-view-refactor` · `ledger-import-header-adapter-contract` · `ledger-import-sign-convention-migration` · `ledger-balance-diagnostics-report-line-coverage` · `ledger-sign-convention-unify`
 
-**底稿专项（16）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix` · `workpaper-guardrail-cleanup` · `workpaper-account-package-d1-d2-pilot` · `workpaper-ai-conclusion-copilot` · `workpaper-content-semantic-contract` · `workpaper-bad-debt-nested-structure` · `workpaper-unified-import-export`
+**底稿专项（17）**：`wp-evidence-collection` · `wp-frontend-ux-polish` · `wp-functional-actions` · `wp-generation-pipeline` · `wp-locate-foundation` · `wp-performance-virtualization` · `wp-template-migration` · `wp-traceability-panel` · `wp-tsj-llm-review` · `wp-ai-review-ux-fix` · `workpaper-guardrail-cleanup` · `workpaper-account-package-d1-d2-pilot` · `workpaper-ai-conclusion-copilot` · `workpaper-content-semantic-contract` · `workpaper-bad-debt-nested-structure` · `workpaper-unified-import-export` · `word-template-dual-mode`
 
 **报表/查询/角色（5）**：`advanced-query-enhancements-p1p2` · `partner-dashboard` · `procedure-applicability-trimming` · `role-based-view-switching` · `report-module-enhancement`
 
@@ -153,6 +164,12 @@ _archive/
 | `single-source-cleanup` | Refactor | 6项去重收口（枚举合并+lru_cache+formula_grammar单源） |
 | `multi-worker-readiness` | Feature | Redis分布式导入锁+地址坐标库single-flight+OCR服务化 |
 | `workpaper-save-orchestrator` | Refactor | 统一after_save编排器+孤立EventBus删除 |
+
+### 2.12 `05-business-features/` 补充
+
+| Spec | 类型 | 摘要 |
+|------|------|------|
+| `word-template-dual-mode` | Feature | 25个word-template底稿统一双模式框架：el-segmented(结构化视图/在线编辑)+python-docx解析器+占位符提取+checklist_responses持久化+AI预填disabled+导出Word/导出模板/导入数据。33/33任务，~120测试 |
 
 ---
 

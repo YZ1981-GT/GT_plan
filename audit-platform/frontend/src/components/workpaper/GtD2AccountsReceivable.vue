@@ -220,12 +220,51 @@
     <!-- Tab 9: ECL 测算 D2-9 -->
     <el-tab-pane name="ecl-calculation" :lazy="true">
       <template #label><span :class="tabDotClass('ecl-calculation')">○</span> ECL测算 D2-9</template>
-      <div class="d2-section"><p>ECL 测算面板（迁徙率法 / 个别认定）</p></div>
+      <div class="d2-section">
+        <h3>应收账款坏账准备测算表</h3>
+        <p class="d2-audit-objective">审计目标：应收账款以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录</p>
+        <h4>（一）单项计提坏账准备</h4>
+        <el-table :data="d2.eclIndividualItems?.value || []" size="small" border>
+          <el-table-column type="index" label="序号" width="50" />
+          <el-table-column prop="debtorName" label="债务人名称" width="140" />
+          <el-table-column label="审定账面余额①" width="120"><template #default="{ row }">{{ fmtAmount(row.balance) }}</template></el-table-column>
+          <el-table-column label="预期信用损失率②" width="120"><template #default="{ row }">{{ fmtPercent(row.eclRate) }}</template></el-table-column>
+          <el-table-column label="应计提③=①×②" width="120"><template #default="{ row }"><span class="auto-calc">{{ fmtAmount(row.shouldProvision) }}</span></template></el-table-column>
+          <el-table-column label="实际计提④" width="110"><template #default="{ row }">{{ fmtAmount(row.actualProvision) }}</template></el-table-column>
+          <el-table-column label="差异⑤=③-④" width="110"><template #default="{ row }"><span :class="{ 'diff-exceed': Math.abs(row.difference || 0) > 0 }">{{ fmtAmount(row.difference) }}</span></template></el-table-column>
+          <el-table-column prop="basis" label="计提依据" />
+        </el-table>
+        <h4>（二）账龄组合计提</h4>
+        <el-alert type="info" :closable="false" show-icon title="账龄组合测算数据参见 D2-3 坏账准备 Tab（迁徙率矩阵+账龄段明细）" />
+      </div>
     </el-tab-pane>
     <!-- Tab 10: 计量测试 D2-10 -->
     <el-tab-pane name="ecl-measurement" :lazy="true">
       <template #label><span :class="tabDotClass('ecl-measurement')">○</span> 计量测试 D2-10</template>
-      <div class="d2-section"><p>ECL 计量测试面板</p></div>
+      <div class="d2-section">
+        <h3>预期信用损失的计量测试表</h3>
+        <p class="d2-audit-objective">审计目标：验证预期信用损失计量的合理性（CAS 22 / IFRS 9）</p>
+        <el-alert type="info" :closable="false" show-icon style="margin-bottom:12px">
+          <template #title>计量原则</template>
+          <template #default>
+            <ul class="d2-ecl-notes">
+              <li>预期信用损失 = 账面余额 × (1 - 估计未来现金流量折现值 / 账面余额)</li>
+              <li>折现率采用初始确认时确定的实际利率或其近似值</li>
+              <li>即使预计可全额收款但晚于合同到期期限，也会产生信用损失</li>
+            </ul>
+          </template>
+        </el-alert>
+        <h4>单项计提 ECL 率确定</h4>
+        <el-table :data="d2.eclMeasurementItems?.value || []" size="small" border>
+          <el-table-column prop="category" label="单项计提" width="120" />
+          <el-table-column label="账面余额" width="110"><template #default="{ row }">{{ fmtAmount(row.balance) }}</template></el-table-column>
+          <el-table-column label="估计现金流(1年)" width="120"><template #default="{ row }">{{ fmtAmount(row.cf1y) }}</template></el-table-column>
+          <el-table-column label="估计现金流(2年)" width="120"><template #default="{ row }">{{ fmtAmount(row.cf2y) }}</template></el-table-column>
+          <el-table-column label="折现值" width="110"><template #default="{ row }"><span class="auto-calc">{{ fmtAmount(row.discountedValue) }}</span></template></el-table-column>
+          <el-table-column label="发生概率" width="90"><template #default="{ row }">{{ fmtPercent(row.probability) }}</template></el-table-column>
+          <el-table-column label="ECL率" width="90"><template #default="{ row }"><span class="auto-calc">{{ fmtPercent(row.eclRate) }}</span></template></el-table-column>
+        </el-table>
+      </div>
     </el-tab-pane>
     <!-- Tab 11: 分析程序 D2-5 -->
     <el-tab-pane name="analysis" :lazy="true">
@@ -284,29 +323,68 @@
     <el-tab-pane name="general-check">
       <template #label><span :class="tabDotClass('general-check')">○</span> 检查表 D2-7</template>
       <div class="d2-section">
-        <h4>应收账款通用检查</h4>
-        <div v-for="n in 8" :key="n" class="check-row">
-          <span class="check-label">{{ n }}. 检查项{{ n }}</span>
-          <el-select size="small" :disabled="review.isReadonly.value" placeholder="结论" @change="(val: string) => onCheckChange('check7', n, val)">
-            <el-option value="符合" label="符合" />
-            <el-option value="不符合" label="不符合" />
-            <el-option value="不适用" label="不适用" />
-          </el-select>
+        <h3>应收账款检查表</h3>
+        <p class="d2-audit-objective">审计目标：应收账款是存在的，记录于恰当账户，以恰当金额包括在财务报表中</p>
+        <h4>样本选取</h4>
+        <div class="d2-sample-params">
+          <div class="check-row">
+            <span class="check-label">测试总体：</span>
+            <el-input size="small" :disabled="review.isReadonly.value" placeholder="如：借方发生额XX笔金额XX" style="flex:1" @input="(val: string) => onProcTextChange(0, 'd2-7-population', val)" />
+          </div>
+          <div class="check-row">
+            <span class="check-label">抽样方法：</span>
+            <el-select size="small" :disabled="review.isReadonly.value" placeholder="选择" style="width:200px" @change="(val: string) => onCheckChange('d2-7-method', 0, val)">
+              <el-option value="随机选样" label="随机选样" />
+              <el-option value="系统选样" label="系统选样" />
+              <el-option value="货币单元抽样" label="货币单元抽样" />
+              <el-option value="随意选样" label="随意选样（非统计）" />
+            </el-select>
+          </div>
         </div>
+        <h4>本期增减变动检查</h4>
+        <el-alert type="info" :closable="false" show-icon title="核对内容：1.原始凭证是否齐全 2.记账凭证与原始凭证是否相符 3.账务处理是否正确 4.是否记录于恰当的会计期间 5.其他" style="margin-bottom:8px" />
+        <el-table :data="d2.voucherCheckSamples?.value || []" size="small" border>
+          <el-table-column type="index" width="50" />
+          <el-table-column prop="customerName" label="客户名称" width="120" />
+          <el-table-column prop="voucherDate" label="日期" width="100" />
+          <el-table-column prop="voucherNo" label="凭证编号" width="100" />
+          <el-table-column prop="content" label="业务内容" width="140" />
+          <el-table-column prop="counterAccount" label="对方科目" width="100" />
+          <el-table-column label="借方" width="100"><template #default="{ row }">{{ fmtAmount(row.debitAmount) }}</template></el-table-column>
+          <el-table-column label="贷方" width="100"><template #default="{ row }">{{ fmtAmount(row.creditAmount) }}</template></el-table-column>
+          <el-table-column label="1" width="40"><template #default="{ row }">{{ row.check1 || '' }}</template></el-table-column>
+          <el-table-column label="2" width="40"><template #default="{ row }">{{ row.check2 || '' }}</template></el-table-column>
+          <el-table-column label="3" width="40"><template #default="{ row }">{{ row.check3 || '' }}</template></el-table-column>
+          <el-table-column label="4" width="40"><template #default="{ row }">{{ row.check4 || '' }}</template></el-table-column>
+          <el-table-column label="5" width="40"><template #default="{ row }">{{ row.check5 || '' }}</template></el-table-column>
+          <el-table-column prop="isAbnormal" label="异常" width="60" />
+          <el-table-column prop="remark" label="备注" />
+        </el-table>
+        <el-button v-if="!review.isReadonly.value" size="small" type="primary" style="margin-top:8px" @click="d2.addVoucherCheckSample?.({})">+ 新增样本行</el-button>
       </div>
     </el-tab-pane>
     <!-- Tab 15: 会计政策 D2-8 -->
     <el-tab-pane name="policy-check">
       <template #label><span :class="tabDotClass('policy-check')">○</span> 会计政策 D2-8</template>
       <div class="d2-section">
-        <h4>ECL 会计政策一致性检查</h4>
-        <div v-for="n in 5" :key="'policy-'+n" class="check-row">
-          <span class="check-label">{{ n }}. 政策检查项{{ n }}</span>
-          <el-select size="small" :disabled="review.isReadonly.value" placeholder="结论" @change="(val: string) => onCheckChange('policy', n, val)">
-            <el-option value="符合" label="符合" />
-            <el-option value="不符合" label="不符合" />
-            <el-option value="不适用" label="不适用" />
-          </el-select>
+        <h3>坏账准备计提会计政策检查</h3>
+        <p class="d2-audit-objective">审计目标：验证坏账准备计提政策的合理性和一致性</p>
+        <div class="d2-policy-sections">
+          <div class="policy-block">
+            <h4>（一）应收账款坏账准备计提会计政策</h4>
+            <p class="policy-hint">说明被审计单位信用风险组合划分依据、预期信用损失计量方法等</p>
+            <el-input type="textarea" :rows="4" :disabled="review.isReadonly.value" placeholder="描述被审计单位的坏账准备计提政策..." @input="(val: string) => onProcTextChange(0, 'd2-8-policy-desc', val)" />
+          </div>
+          <div class="policy-block">
+            <h4>（二）被审计单位历史坏账损失情况</h4>
+            <p class="policy-hint">说明历史损失率的数据来源，以及项目组核实该等数据所执行的程序。需考虑货币的时间价值</p>
+            <el-input type="textarea" :rows="4" :disabled="review.isReadonly.value" placeholder="描述历史坏账损失数据及核实程序..." @input="(val: string) => onProcTextChange(0, 'd2-8-history', val)" />
+          </div>
+          <div class="policy-block">
+            <h4>（三）前瞻性信息的来源及其影响</h4>
+            <p class="policy-hint">说明预期损失率的前瞻性信息来源（内部模型/第三方/外部专家），以及项目组对前瞻性信息可靠性所执行的程序</p>
+            <el-input type="textarea" :rows="4" :disabled="review.isReadonly.value" placeholder="描述前瞻性信息来源及核实程序..." @input="(val: string) => onProcTextChange(0, 'd2-8-forward', val)" />
+          </div>
         </div>
       </div>
     </el-tab-pane>
@@ -314,29 +392,57 @@
     <el-tab-pane name="writeoff-check">
       <template #label><span :class="tabDotClass('writeoff-check')">○</span> 转回核销 D2-11</template>
       <div class="d2-section">
-        <h4>转回核销检查</h4>
-        <div v-for="n in 4" :key="'wo-'+n" class="check-row">
-          <span class="check-label">{{ n }}. 转回核销检查项{{ n }}</span>
-          <el-select size="small" :disabled="review.isReadonly.value" placeholder="结论" @change="(val: string) => onCheckChange('writeoff', n, val)">
-            <el-option value="符合" label="符合" />
-            <el-option value="不符合" label="不符合" />
-            <el-option value="不适用" label="不适用" />
-          </el-select>
-        </div>
+        <h3>大额坏账准备转回、核销检查表</h3>
+        <p class="d2-audit-objective">审计目标：验证坏账准备转回/核销的合理性和完整性</p>
+        <h4>（一）本期重要的坏账准备转回或转销检查</h4>
+        <el-table :data="d2.writeoffReversalItems?.value || []" size="small" border>
+          <el-table-column type="index" width="50" />
+          <el-table-column prop="companyName" label="单位名称" width="120" />
+          <el-table-column prop="reversalReason" label="转回原因" width="140" />
+          <el-table-column prop="recoveryMethod" label="收回方式" width="100" />
+          <el-table-column prop="originalBasis" label="原确定坏账准备的依据" width="160" />
+          <el-table-column label="收回/转回金额" width="120"><template #default="{ row }">{{ fmtAmount(row.amount) }}</template></el-table-column>
+          <el-table-column label="转回前累计已计提" width="130"><template #default="{ row }">{{ fmtAmount(row.priorProvision) }}</template></el-table-column>
+          <el-table-column prop="reasonability" label="合理性分析" />
+        </el-table>
+        <el-button v-if="!review.isReadonly.value" size="small" type="primary" style="margin-top:8px" @click="d2.addWriteoffReversal?.({})">+ 新增转回记录</el-button>
+
+        <h4 style="margin-top:16px">（二）本期重要的核销应收账款检查</h4>
+        <el-table :data="d2.writeoffItems?.value || []" size="small" border>
+          <el-table-column type="index" width="50" />
+          <el-table-column prop="companyName" label="单位名称" width="120" />
+          <el-table-column prop="nature" label="应收账款性质" width="120" />
+          <el-table-column label="核销金额" width="110"><template #default="{ row }">{{ fmtAmount(row.amount) }}</template></el-table-column>
+          <el-table-column prop="writeoffReason" label="核销原因" width="140" />
+          <el-table-column prop="procedure" label="履行的核销程序" width="140" />
+          <el-table-column prop="isRelatedParty" label="关联交易" width="80" />
+          <el-table-column prop="reasonability" label="合理性分析" />
+        </el-table>
+        <el-button v-if="!review.isReadonly.value" size="small" type="primary" style="margin-top:8px" @click="d2.addWriteoffItem?.({})">+ 新增核销记录</el-button>
       </div>
     </el-tab-pane>
     <!-- Tab 17: 业务模式 D2-13 -->
     <el-tab-pane name="bizmodel-check">
       <template #label><span :class="tabDotClass('bizmodel-check')">○</span> 业务模式 D2-13</template>
       <div class="d2-section">
-        <h4>业务模式分析检查</h4>
-        <div v-for="n in 5" :key="'biz-'+n" class="check-row">
-          <span class="check-label">{{ n }}. 业务模式检查项{{ n }}</span>
-          <el-select size="small" :disabled="review.isReadonly.value" placeholder="结论" @change="(val: string) => onCheckChange('bizmodel', n, val)">
-            <el-option value="符合" label="符合" />
-            <el-option value="不符合" label="不符合" />
-            <el-option value="不适用" label="不适用" />
-          </el-select>
+        <h3>应收账款业务模式分析</h3>
+        <p class="d2-audit-objective">审计目标：验证应收账款金融资产分类的恰当性（CAS 22 / IFRS 9）</p>
+        <h4>（一）应收账款业务模式及依据</h4>
+        <el-table :data="d2.bizModelGroups?.value || []" size="small" border>
+          <el-table-column prop="groupName" label="组合名称" width="160" />
+          <el-table-column prop="bizModel" label="管理应收账款业务模式" width="220" />
+          <el-table-column prop="basis" label="具体依据" />
+        </el-table>
+        <h4 style="margin-top:16px">（二）应收账款分类判断</h4>
+        <el-table :data="d2.bizModelQuestions?.value || []" size="small" border>
+          <el-table-column prop="question" label="了解并观察实际情况" width="380" />
+          <el-table-column v-for="g in (d2.bizModelGroups?.value || []).slice(0, 3)" :key="g.groupName" :label="g.groupName" width="100">
+            <template #default="{ row }">{{ row.answers?.[g.groupName] || '' }}</template>
+          </el-table-column>
+        </el-table>
+        <div v-if="d2.bizModelConclusion?.value" class="biz-conclusion">
+          <h4>分类结论</h4>
+          <p>{{ d2.bizModelConclusion.value }}</p>
         </div>
       </div>
     </el-tab-pane>
@@ -585,4 +691,12 @@ void props
 .review-section h4 { margin: 0 0 8px; }
 .pending-list { margin-bottom: 12px; font-size: 13px; color: #666; }
 .pending-list ul { margin: 4px 0; padding-left: 20px; }
+.d2-audit-objective { font-size: 12px; color: #666; margin: 4px 0 16px; padding: 8px 12px; background: #f5f5f5; border-radius: 4px; border-left: 3px solid #1890ff; }
+.d2-sample-params { margin-bottom: 16px; }
+.d2-policy-sections { display: flex; flex-direction: column; gap: 16px; }
+.policy-block h4 { margin: 0 0 4px; }
+.policy-hint { font-size: 12px; color: #999; margin: 0 0 8px; }
+.d2-ecl-notes { margin: 4px 0 0 16px; font-size: 12px; line-height: 1.8; }
+.biz-conclusion { margin-top: 12px; padding: 12px; background: #f6ffed; border-radius: 6px; border: 1px solid #b7eb8f; }
+.biz-conclusion h4 { margin: 0 0 4px; }
 </style>

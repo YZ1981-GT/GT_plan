@@ -21,7 +21,7 @@ export interface A1SubTab {
   id: string
   label: string
   wpCode: string
-  componentType: 'signing-form' | 'checklist' | 'analytical-review' | 'a1-12-dual-checklist' | 'a1-15-disclosure-checklist'
+  componentType: 'signing-form' | 'checklist' | 'analytical-review' | 'a1-12-dual-checklist' | 'a1-15-disclosure-checklist' | 'a1-17-corresponding-data'
   dependsOn?: string
 }
 
@@ -58,9 +58,8 @@ export const A1_SUB_TABS: A1SubTab[] = [
   { id: 'A1-13', label: '分析性复核（母公司）', wpCode: 'A1-13', componentType: 'analytical-review' },
   { id: 'A1-14', label: '分析性复核（合并）', wpCode: 'A1-14', componentType: 'analytical-review' },
   { id: 'A1-15', label: '企业会计准则财务报表系列及勾稽对照表', wpCode: 'A1-15', componentType: 'a1-15-disclosure-checklist', dependsOn: 'a111-signed' },
-  { id: 'A1-16', label: '上市公司额外披露要求审核对比表', wpCode: 'A1-16', componentType: 'checklist' },
-  { id: 'A1-17', label: '对应数据', wpCode: 'A1-17', componentType: 'checklist' },
-  { id: 'A1-18', label: '实际抽样比及工时用量记录', wpCode: 'A1-18', componentType: 'checklist' },
+  { id: 'A1-16', label: '上市公司额外披露要求审核对比表', wpCode: 'A1-16', componentType: 'a1-15-disclosure-checklist' },
+  { id: 'A1-17', label: '对应数据', wpCode: 'A1-17', componentType: 'a1-17-corresponding-data' },
 ]
 
 // ─── Composable ───
@@ -90,6 +89,9 @@ export function useA1SubWorkpapers(options: UseA1SubWorkpapersOptions): UseA1Sub
     isA115Locked.value ? 'A1-11 签发流转控制表未完成，无法进行归档检查' : '',
   )
 
+  // ─── State: sub-workpaper response counts ───
+  const subResponseCounts = ref<Record<string, { filled: number; total: number }>>({})
+
   // ─── Computed: progress integration ───
   const subWorkpaperCompletions = computed<Record<string, CompletionStatus>>(() => {
     const map: Record<string, CompletionStatus> = {}
@@ -98,7 +100,16 @@ export function useA1SubWorkpapers(options: UseA1SubWorkpapersOptions): UseA1Sub
       if (tab.id === 'A1-11') {
         map[tab.id] = isA111Signed.value ? 'completed' : 'not_started'
       } else {
-        map[tab.id] = 'not_started'
+        const counts = subResponseCounts.value[tab.wpCode]
+        if (!counts || counts.total === 0) {
+          map[tab.id] = 'not_started'
+        } else if (counts.filled >= counts.total) {
+          map[tab.id] = 'completed'
+        } else if (counts.filled > 0) {
+          map[tab.id] = 'in_progress'
+        } else {
+          map[tab.id] = 'not_started'
+        }
       }
     }
     return map
@@ -157,6 +168,37 @@ export function useA1SubWorkpapers(options: UseA1SubWorkpapersOptions): UseA1Sub
       // API may not exist yet — default to locked (safe side)
       isA17Completed.value = false
     }
+
+    // Fetch sub-workpaper progress (response counts)
+    await refreshSubProgress()
+  }
+
+  async function refreshSubProgress(): Promise<void> {
+    const codes = A1_SUB_TABS
+      .filter(t => t.id !== 'A1-11' && wpIdMap.value[t.wpCode])
+      .map(t => t.wpCode)
+
+    const results: Record<string, { filled: number; total: number }> = {}
+
+    await Promise.all(
+      codes.map(async (wpCode) => {
+        const wpId = wpIdMap.value[wpCode]
+        if (!wpId) return
+        try {
+          const responses = await api.get(`/api/workpapers/${wpId}/checklist-responses`, {
+            params: { project_id: projectId.value },
+            _silent: true,
+          } as any) as any[]
+          const total = responses?.length ?? 0
+          const filled = responses?.filter((r: any) => r.conclusion && r.conclusion !== '').length ?? 0
+          results[wpCode] = { filled, total }
+        } catch {
+          // silent — no data means not_started
+        }
+      }),
+    )
+
+    subResponseCounts.value = results
   }
 
   // ─── EventBus ───
@@ -169,14 +211,23 @@ export function useA1SubWorkpapers(options: UseA1SubWorkpapersOptions): UseA1Sub
     isA111Signed.value = true
   }
 
+  function handleSubWorkpaperSaved(payload?: any) {
+    // When any sub-workpaper is saved, refresh progress counts
+    if (payload?.wp_code && /^A1-1[2-8]$/.test(payload.wp_code)) {
+      refreshSubProgress()
+    }
+  }
+
   function setupEventListeners() {
     eventBus.on('a17-audit-summary-completed', handleA17Completed)
     eventBus.on('a1-11-signing-completed', handleA111Signed)
+    eventBus.on('workpaper:saved', handleSubWorkpaperSaved)
   }
 
   function cleanup() {
     eventBus.off('a17-audit-summary-completed', handleA17Completed)
     eventBus.off('a1-11-signing-completed', handleA111Signed)
+    eventBus.off('workpaper:saved', handleSubWorkpaperSaved)
   }
 
   return {

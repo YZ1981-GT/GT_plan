@@ -14,7 +14,7 @@
 <template>
   <div class="gt-a1-dashboard">
     <!-- ═══ 顶层平级 Tab 栏（参照 D0 函证样式） ═══ -->
-    <el-tabs v-model="topTabActive" class="gt-a1-dashboard__top-tabs">
+    <el-tabs v-model="topTabActive" class="gt-a1-dashboard__top-tabs" @wheel.prevent="onTabWheel">
       <!-- Tab: A1 程序表（默认） -->
       <el-tab-pane label="A1 程序表" name="main">
     <!-- 编制信息（从 GtWpRenderer 移入，跟随 Tab 切换） -->
@@ -259,8 +259,43 @@
           :wp-id="subWps.wpIdMap.value[tab.wpCode]"
           :readonly="isSubTabReadonly(tab)"
         />
+        <GtA117CorrespondingData
+          v-else-if="tab.componentType === 'a1-17-corresponding-data'"
+          :wp-id="subWps.wpIdMap.value[tab.wpCode]"
+          :readonly="isSubTabReadonly(tab)"
+        />
       </el-tab-pane>
     </el-tabs>
+    <!-- 切换按钮：绝对定位到 Tab 栏右上角 -->
+    <el-dropdown class="gt-a1-dashboard__switch-dropdown" trigger="click" @command="onSwitchTab" popper-class="gt-a1-switch-popper">
+      <span class="gt-a1-dashboard__switch-trigger">
+        <el-icon><Switch /></el-icon>
+        切换
+        <el-icon class="gt-a1-dashboard__switch-arrow"><ArrowDown /></el-icon>
+      </span>
+      <template #dropdown>
+        <el-dropdown-menu>
+          <div class="gt-a1-switch-popper__header">快速跳转页签</div>
+          <el-dropdown-item
+            command="main"
+            :class="{ 'is-active-item': topTabActive === 'main' }"
+          >
+            <el-icon><Document /></el-icon>
+            A1 程序表
+          </el-dropdown-item>
+          <el-dropdown-item divided disabled style="height:1px;padding:0;margin:4px 12px;background:#ebeef5;" />
+          <el-dropdown-item
+            v-for="tab in subWps.visibleTabs.value"
+            :key="tab.id"
+            :command="tab.id"
+            :class="{ 'is-active-item': topTabActive === tab.id }"
+          >
+            <el-icon><Document /></el-icon>
+            {{ tab.label }}
+          </el-dropdown-item>
+        </el-dropdown-menu>
+      </template>
+    </el-dropdown>
 
     <!-- ═══ 裁剪理由弹窗 ═══ -->
     <el-dialog v-model="trimVisible" title="裁剪理由" width="450px" :close-on-click-modal="false">
@@ -323,7 +358,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, reactive, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import { ArrowDown, InfoFilled } from '@element-plus/icons-vue'
+import { ArrowDown, InfoFilled, Back, Switch, Document } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtAuditFlowGraph from '@/components/workpaper/GtAuditFlowGraph.vue'
 import ReviewDashboardCard from '@/components/workpaper/ReviewDashboardCard.vue'
@@ -339,6 +374,7 @@ const GtChecklistTable = defineAsyncComponent(() => import('./GtChecklistTable.v
 const GtAnalyticalReview = defineAsyncComponent(() => import('./GtAnalyticalReview.vue'))
 const GtA112DualChecklist = defineAsyncComponent(() => import('./GtA112DualChecklist.vue'))
 const GtA115DisclosureChecklist = defineAsyncComponent(() => import('./GtA115DisclosureChecklist.vue'))
+const GtA117CorrespondingData = defineAsyncComponent(() => import('./GtA117CorrespondingData.vue'))
 
 // ─── Types ───
 interface ProgramRow {
@@ -411,10 +447,23 @@ const subTabActive = ref('')
 const topTabActive = ref('main')
 const subTabsExpanded = ref(true)
 
+/** 鼠标滚轮横向滚动 Tab 栏（参照函证底稿 SheetTopTabs） */
+function onTabWheel(e: WheelEvent): void {
+  const tabsEl = document.querySelector('.gt-a1-dashboard__top-tabs .el-tabs__nav-scroll')
+  if (tabsEl) {
+    tabsEl.scrollLeft += e.deltaY || e.deltaX
+  }
+}
+
+/** 切换按钮下拉菜单→跳转到对应 Tab */
+function onSwitchTab(tabName: string): void {
+  topTabActive.value = tabName
+}
+
 function isSubTabReadonly(tab: A1SubTab): boolean {
   if (props.readonly) return true
   if (tab.id === 'A1-11' && subWps.isA111Locked.value) return true
-  if (tab.id === 'A1-15' && subWps.isA115Locked.value) return true
+  // A1-15 锁定时仅显示警告，不阻止填写（用户仍可编辑核对表内容）
   return false
 }
 
@@ -769,6 +818,7 @@ function debounceSave() {
 
 <style scoped>
 .gt-a1-dashboard {
+  position: relative;
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -1006,11 +1056,70 @@ function debounceSave() {
 }
 
 /* ═══ 顶层平级 Tab 栏（参照 D0 函证样式） ═══ */
+.gt-a1-dashboard__top-tabs {
+  position: relative;
+}
+
+.gt-a1-dashboard__switch-dropdown {
+  position: absolute;
+  right: -10px;
+  top: -2px;
+  z-index: 10;
+}
+
+.gt-a1-dashboard__switch-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6750A4;
+  cursor: pointer;
+  border: 1px solid #d4c5f9;
+  border-radius: 6px;
+  background: #faf7ff;
+  transition: all 0.15s;
+  user-select: none;
+}
+
+.gt-a1-dashboard__switch-trigger:hover {
+  background: #f0ebff;
+  border-color: #6750A4;
+  box-shadow: 0 2px 6px rgba(103, 80, 164, 0.12);
+}
+
+.gt-a1-dashboard__switch-arrow {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
 .gt-a1-dashboard__top-tabs :deep(.el-tabs__header) {
   margin: 0 0 16px;
   background: #fafafa;
   border-radius: 6px 6px 0 0;
   border-bottom: 2px solid var(--gt-color-border-purple, #6750A4);
+}
+
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__nav-scroll) {
+  scroll-behavior: smooth;
+}
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__nav-prev),
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__nav-next) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 38px;
+  font-size: 14px;
+  color: #606266;
+  cursor: pointer;
+  background: #fafafa;
+  transition: color 0.15s;
+}
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__nav-prev:hover),
+.gt-a1-dashboard__top-tabs :deep(.el-tabs__nav-next:hover) {
+  color: #6750A4;
 }
 .gt-a1-dashboard__top-tabs :deep(.el-tabs__item) {
   font-size: 13px;
@@ -1020,6 +1129,62 @@ function debounceSave() {
 }
 .gt-a1-dashboard__top-tabs :deep(.el-tabs__item.is-active) {
   font-weight: 600;
+  color: #6750A4;
+}
+</style>
+
+<!-- 非 scoped 样式：下拉面板 popper -->
+<style>
+.gt-a1-switch-popper {
+  border-radius: 8px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid #ebeef5 !important;
+  min-width: 220px !important;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu {
+  padding: 6px 0;
+}
+
+.gt-a1-switch-popper__header {
+  padding: 8px 16px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #909399;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu__item {
+  padding: 8px 16px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.1s;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu__item .el-icon {
+  font-size: 14px;
+  color: #909399;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu__item:hover {
+  background: #f0ebff;
+  color: #6750A4;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu__item:hover .el-icon {
+  color: #6750A4;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu__item.is-active-item {
+  background: #f3f0ff;
+  color: #6750A4;
+  font-weight: 600;
+}
+
+.gt-a1-switch-popper .el-dropdown-menu__item.is-active-item .el-icon {
   color: #6750A4;
 }
 </style>

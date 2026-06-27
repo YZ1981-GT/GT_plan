@@ -1,0 +1,83 @@
+# F2-22 存货监盘计划 — audit-sheet 预设结构
+# 提供默认表头和示例行，让审计助理打开即有框架可填
+wp_code: F2-22
+component_type: audit-sheet
+title: 存货监盘计划
+audit_rows:
+  - id: header-info
+    item: 基本信息
+    bold: true
+    isSection: true
+  - id: r1
+    item: 被审计单位
+    indent: 1
+  - id: r2
+    item: 审计年度
+    indent: 1
+  - id: r3
+    item: 监盘日期
+    indent: 1
+  - id: r4
+    item: 监盘地点
+    indent: 1
+  - id: header-scope
+    item: 监盘范围
+    bold: true
+    isSection: true
+  - id: r5
+    item: 监盘仓库/地点
+    indent: 1
+  - id: r6
+    item: 存货类型覆盖
+    indent: 1
+  - id: r7
+    item: 占存货总额比例
+    indent: 1
+  - id: r8
+    item: 选取重要性标准
+    indent: 1
+  - id: header-team
+    item: 监盘团队分工
+    bold: true
+    isSection: true
+  - id: r9
+    item: 项目负责人
+    indent: 1
+  - id: r10
+    item: 盘点观察人员
+    indent: 1
+  - id: r11
+    item: 抽盘人员
+    indent: 1
+  - id: r12
+    item: 截止测试人员
+    indent: 1
+  - id: header-procedure
+    item: 监盘程序要点
+    bold: true
+    isSection: true
+  - id: r13
+    item: 盘前准备（核对盘点表/编号连续性）
+    indent: 1
+  - id: r14
+    item: 盘中执行（观察/抽盘/截止）
+    indent: 1
+  - id: r15
+    item: 盘后跟进（倒轧/差异调查）
+    indent: 1
+  - id: header-risk
+    item: 特别关注事项
+    bold: true
+    isSection: true
+  - id: r16
+    item: 是否存在异地仓库/第三方代管
+    indent: 1
+  - id: r17
+    item: 是否存在舞弊风险需不预先通知
+    indent: 1
+  - id: r18
+    item: 是否需要专家参与（如贵金属/化学品）
+    indent: 1
+audit_sections:
+  notes_label: 审计说明
+  conclusion_label: 监盘计划结论

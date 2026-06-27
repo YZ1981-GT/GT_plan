@@ -327,7 +327,11 @@
       </div>
 
       <!-- DOCX Word 编辑模式 (Task 4.5) -->
-      <div v-else-if="activeMode === 'docx'" class="gt-a115-disclosure-checklist__docx-view">
+      <!-- DOCX Word 编辑模式 -->
+      <div
+        v-else-if="activeMode === 'docx'"
+        class="gt-a115-disclosure-checklist__docx-view"
+      >
         <template v-if="docxAvailable">
           <GtOnlyOfficeSheet
             :wp-id="props.wpId"
@@ -357,7 +361,7 @@
  * - HTML 模式：左 SectionNav + 右 ChecklistBody
  * - DOCX 模式：GtOnlyOfficeSheet
  */
-import { ref, computed, onMounted, onBeforeUnmount, watch, toRef } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick, toRef } from 'vue'
 import { useRoute } from 'vue-router'
 import { Search, Loading, WarningFilled } from '@element-plus/icons-vue'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
@@ -597,14 +601,21 @@ onMounted(async () => {
   // 检查 OnlyOffice 健康状态（非阻塞）
   checkOnlyofficeHealth()
 
-  // 初始化导航 Observer（需等 DOM 渲染后）
-  if (activeMode.value === 'html') {
-    setTimeout(() => initObserver(), 100)
-  }
-
   // 启动 "已保存" 倒计时
   savedAgoTimer = setInterval(updateSavedAgo, 1000)
 })
+
+// 当 template 加载完成 + DOM 渲染后初始化 Observer
+watch(
+  () => template.value,
+  async (tpl) => {
+    if (tpl && activeMode.value === 'html') {
+      await nextTick()
+      // 额外延迟确保 v-for DOM 已渲染（大列表需要时间）
+      setTimeout(() => initObserver(), 200)
+    }
+  },
+)
 
 onBeforeUnmount(() => {
   flushPendingSave()

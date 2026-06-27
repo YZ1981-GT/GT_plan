@@ -112,14 +112,20 @@ export function useA115Checklist(wpId: Ref<string>, readonly: Ref<boolean>) {
       const res = await api.get<any>(
         `/api/workpapers/${wpId.value}/render-config?force_component_type=a1-15-disclosure-checklist`,
       )
-      if (res?.template) {
-        template.value = res.template
+      // render-config API 返回标准 {sheets: [...]} 结构，
+      // 我们的渲染器输出嵌套在 sheets[0].html_data 中
+      const htmlData = res?.sheets?.[0]?.html_data ?? res
+      if (htmlData?.template) {
+        template.value = htmlData.template
+      } else {
+        error.value = '模板数据为空，请确认 A1-15 底稿文件已上传'
+        return
       }
-      if (res?.responses) {
+      if (htmlData?.responses) {
         // 合并 items
         const items: Record<string, A115ItemResponse> = {}
-        if (res.responses.items) {
-          for (const [k, v] of Object.entries(res.responses.items as Record<string, any>)) {
+        if (htmlData.responses.items) {
+          for (const [k, v] of Object.entries(htmlData.responses.items as Record<string, any>)) {
             items[k] = {
               conclusion: v.conclusion ?? null,
               remark: v.remark ?? '',
@@ -129,11 +135,11 @@ export function useA115Checklist(wpId: Ref<string>, readonly: Ref<boolean>) {
         }
         responses.value = {
           items,
-          toc_applicability: res.responses.toc_applicability ?? {},
+          toc_applicability: htmlData.responses.toc_applicability ?? {},
         }
       }
-      if (res?.cross_reference_map) {
-        crossRefMap.value = { ...CROSS_REFERENCE_MAP, ...res.cross_reference_map }
+      if (htmlData?.cross_reference_map) {
+        crossRefMap.value = { ...CROSS_REFERENCE_MAP, ...htmlData.cross_reference_map }
       }
     } catch (e: any) {
       error.value = e?.message || '数据加载失败'

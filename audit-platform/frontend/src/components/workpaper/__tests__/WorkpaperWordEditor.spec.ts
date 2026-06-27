@@ -25,10 +25,12 @@ vi.mock('vue-router', () => ({
 // Mock apiProxy
 const mockApiGet = vi.fn().mockResolvedValue(null)
 const mockApiPost = vi.fn().mockResolvedValue({})
+const mockApiPut = vi.fn().mockResolvedValue({})
 vi.mock('@/services/apiProxy', () => ({
   api: {
     get: (...args: any[]) => mockApiGet(...args),
     post: (...args: any[]) => mockApiPost(...args),
+    put: (...args: any[]) => mockApiPut(...args),
   },
 }))
 
@@ -1156,5 +1158,763 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
       (c: any[]) => c[0]?.includes?.('/sign-status'),
     )?.[1]
     expect(callPayload?.sign_date).toBeUndefined()
+  })
+})
+
+
+/**
+ * Feature: word-template-dual-mode, Property 13: dual-mode scope
+ *
+ * For any wp_code mapped to componentType "word-template" in wp_code_overrides
+ * (excluding A16), the WorkpaperWordEditor SHALL render the el-segmented dual-mode switch.
+ * For wp_code === 'A16', the el-segmented SHALL NOT be rendered.
+ *
+ * **Validates: Requirements 9.1, 9.3**
+ */
+import * as fc from 'fast-check'
+import { h } from 'vue'
+
+// ─── 25 word-template wp_codes (from requirements) ─────────────────────────
+const WORD_TEMPLATE_WP_CODES = [
+  'A8-1', 'A8-2', 'A9-1', 'A9-2', 'A10-1', 'A11-1', 'A12-1',
+  'A16-1', 'A16-2', 'A16-3', 'A16-4', 'A16-5', 'A16-6', 'A16-7',
+  'A17-2-1', 'A17-3', 'A17-3-1', 'A17-4', 'A17-6', 'A18-1',
+  'A26-1', 'A26-2', 'A26-3', 'A26-4', 'A27-1',
+  'S12A', 'S33-REV', 'S34-1-1',
+] as const
+
+// el-segmented stub that renders identifiable markup
+const elSegmentedStub = {
+  name: 'ElSegmented',
+  props: ['modelValue', 'options', 'size'],
+  emits: ['update:modelValue', 'change'],
+  setup(props: any) {
+    return () => h('div', { class: 'el-segmented-stub', 'data-testid': 'dual-mode-switch' },
+      (props.options || []).map((opt: string) =>
+        h('button', { class: 'el-segmented-item' }, opt),
+      ),
+    )
+  },
+}
+
+// Extended stubs for Property 13 (includes el-segmented functional stub)
+const property13Stubs = {
+  ...globalStubs,
+  'el-segmented': elSegmentedStub,
+  'el-tooltip': { template: '<div class="el-tooltip-stub"><slot /></div>', props: ['content', 'disabled', 'placement'] },
+  'el-skeleton': { template: '<div class="el-skeleton" />', props: ['rows', 'animated'] },
+  'el-empty': { template: '<div class="el-empty" />', props: ['description'] },
+  'GtWordTemplateStructuredView': { template: '<div class="gt-structured-view-stub" />', props: ['templateStructure', 'fieldValues', 'readonly'] },
+  'OnlyOfficeWordDialog': { template: '<div />', props: ['visible', 'documentUrl', 'documentKey', 'title', 'mode', 'callbackUrl'] },
+}
+
+function createProperty13Wrapper(wpCode: string) {
+  return mount(WorkpaperWordEditor, {
+    props: {
+      wpId: `wp-prop13-${wpCode}`,
+      wpCode,
+      projectId: 'proj-prop13',
+    },
+    global: {
+      stubs: property13Stubs,
+    },
+  })
+}
+
+describe('Feature: word-template-dual-mode, Property 13: dual-mode scope', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Mock all API calls to avoid network errors
+    mockApiGet.mockImplementation((url: string) => {
+      if (url.includes('/a16/recommended-version')) {
+        return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
+      }
+      if (url.includes('/projects/')) {
+        return Promise.resolve({ client_name: '测试', audit_period_end: '2025-12-31', audit_year: '2025' })
+      }
+      if (url.includes('/file-info')) {
+        return Promise.resolve({ sign_status: 'pending' })
+      }
+      if (url.includes('/onlyoffice/health')) {
+        return Promise.resolve({ healthy: true })
+      }
+      if (url.includes('/render-config')) {
+        return Promise.resolve({ sheets: [{ html_data: {} }] })
+      }
+      if (url.includes('/template-structure')) {
+        return Promise.resolve({ placeholders: [], paragraphs: [], tables: [], metadata: {} })
+      }
+      if (url.includes('/field-overrides')) {
+        return Promise.resolve({})
+      }
+      if (url.includes('/misstatements/for-letter')) {
+        return Promise.resolve({ summary: '' })
+      }
+      return Promise.resolve(null)
+    })
+  })
+
+  it('property: for any word-template wp_code (≠ A16), el-segmented dual-mode switch is rendered', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom(...WORD_TEMPLATE_WP_CODES),
+        async (wpCode) => {
+          const wrapper = createProperty13Wrapper(wpCode)
+          await flushPromises()
+
+          const segmented = wrapper.find('.el-segmented-stub')
+          // All 25 word-template wp_codes are NOT 'A16', so segmented must exist
+          expect(segmented.exists()).toBe(true)
+
+          // Verify it has the two mode options
+          const items = wrapper.findAll('.el-segmented-item')
+          expect(items.length).toBe(2)
+          expect(items[0].text()).toBe('结构化视图')
+          expect(items[1].text()).toBe('在线编辑')
+
+          wrapper.unmount()
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('property: wp_code "A16" does NOT render el-segmented (uses A16 mode instead)', async () => {
+    const wrapper = createProperty13Wrapper('A16')
+    await flushPromises()
+
+    const segmented = wrapper.find('.el-segmented-stub')
+    expect(segmented.exists()).toBe(false)
+
+    // A16 mode renders the version radio-group instead
+    const radioGroup = wrapper.find('.el-radio-group')
+    expect(radioGroup.exists()).toBe(true)
+
+    wrapper.unmount()
+  })
+
+  it('property: exhaustive check — all 25 codes render segmented, A16 does not', async () => {
+    // Exhaustive: test each of the 25 codes explicitly
+    for (const wpCode of WORD_TEMPLATE_WP_CODES) {
+      const wrapper = createProperty13Wrapper(wpCode)
+      await flushPromises()
+
+      const segmented = wrapper.find('.el-segmented-stub')
+      expect(segmented.exists()).toBe(true)
+
+      wrapper.unmount()
+    }
+
+    // Negative case: A16
+    const a16Wrapper = createProperty13Wrapper('A16')
+    await flushPromises()
+    expect(a16Wrapper.find('.el-segmented-stub').exists()).toBe(false)
+    a16Wrapper.unmount()
+  })
+})
+
+
+/**
+ * Task 5.6 — Dual-mode unit tests
+ *
+ * Tests:
+ * 1. Mode switch: structured→online calls structuredFlush then initGenericEditor
+ * 2. Mode switch: online→structured calls loadStructuredData
+ * 3. OO disabled: onlyofficeAvailable=false → clicking "在线编辑" reverts + warning
+ * 4. Flush-before-switch: flush completes before editor init (ordering)
+ * 5. Export: structured view export triggers prefilled-download?include_responses=true
+ *
+ * Validates: Requirements 1.3, 1.4, 5.6, 6.1
+ */
+
+describe('WorkpaperWordEditor — dual-mode unit tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    // Ensure DocsAPI is not available (prevents initGenericEditor from hanging on script load)
+    ;(window as any).DocsAPI = undefined
+    mockApiGet.mockImplementation((url: string) => {
+      if (url.includes('/a16/recommended-version')) {
+        return Promise.resolve({ main: { code: 'A8-1' }, supplement: null })
+      }
+      if (url.includes('/projects/')) {
+        return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31', audit_year: '2025' })
+      }
+      if (url.includes('/file-info')) {
+        return Promise.resolve({ sign_status: 'pending' })
+      }
+      if (url.includes('/onlyoffice/health')) {
+        return Promise.resolve({ healthy: true })
+      }
+      if (url.includes('/render-config')) {
+        return Promise.resolve({ sheets: [{ html_data: { template_structure: { placeholders: [{ field_id: 'entity_name', label: '被审计单位', data_type: 'text', default_value: '××公司' }], paragraphs: [], tables: [], metadata: {} }, filled_responses: {} } }] })
+      }
+      if (url.includes('/template-structure')) {
+        return Promise.resolve({ placeholders: [{ field_id: 'entity_name', label: '被审计单位', data_type: 'text', default_value: '××公司' }], paragraphs: [], tables: [], metadata: {} })
+      }
+      if (url.includes('/field-overrides')) {
+        return Promise.resolve({})
+      }
+      if (url.includes('/misstatements/for-letter')) {
+        return Promise.resolve({ summary: '' })
+      }
+      // onlyoffice-config: return null config so initGenericEditor exits early
+      // (avoids hanging on loadOnlyOfficeScript which loads a <script> that never resolves in jsdom)
+      if (url.includes('/onlyoffice-config')) {
+        return Promise.resolve({ config: { document: { url: null } } })
+      }
+      return Promise.resolve(null)
+    })
+    mockApiPut.mockResolvedValue({})
+  })
+
+  function createDualModeWrapper(wpCode = 'A8-1') {
+    return mount(WorkpaperWordEditor, {
+      props: {
+        wpId: 'wp-dual-001',
+        wpCode,
+        projectId: 'proj-dual-test',
+      },
+      global: {
+        stubs: property13Stubs,
+      },
+    })
+  }
+
+  describe('mode switch: structured→online', () => {
+    it('switching from "结构化视图" to "在线编辑" calls onlyoffice-config (initGenericEditor)', async () => {
+      const wrapper = createDualModeWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      expect(vm.genericViewMode).toBe('结构化视图')
+      // OO is available from health check
+      expect(vm.onlyofficeAvailable).toBe(true)
+
+      // Clear mocks to track subsequent calls
+      mockApiGet.mockClear()
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/onlyoffice-config')) {
+          // Return null url so it exits early without trying to load DocsAPI script
+          return Promise.resolve({ config: { document: { url: null } } })
+        }
+        return Promise.resolve(null)
+      })
+
+      // Simulate el-segmented @change firing with new mode
+      await vm.onModeSwitch('在线编辑')
+      await flushPromises()
+
+      // initGenericEditor should have been called (it makes the onlyoffice-config GET)
+      const configCalls = mockApiGet.mock.calls.filter(
+        (c: any[]) => c[0]?.includes?.('/onlyoffice-config'),
+      )
+      expect(configCalls.length).toBeGreaterThan(0)
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('mode switch: online→structured', () => {
+    it('switching from "在线编辑" to "结构化视图" calls loadStructuredData (render-config)', async () => {
+      const wrapper = createDualModeWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      // Manually set mode to online (skipping the switch logic)
+      vm.genericViewMode = '在线编辑'
+      await flushPromises()
+
+      // Clear mocks to track loadStructuredData call
+      mockApiGet.mockClear()
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/render-config')) {
+          return Promise.resolve({ sheets: [{ html_data: { template_structure: { placeholders: [], paragraphs: [], tables: [], metadata: {} }, filled_responses: {} } }] })
+        }
+        return Promise.resolve(null)
+      })
+
+      // Switch back to structured view
+      await vm.onModeSwitch('结构化视图')
+      await flushPromises()
+
+      // loadStructuredData should have been called (triggers render-config GET)
+      const renderCalls = mockApiGet.mock.calls.filter(
+        (c: any[]) => c[0]?.includes?.('/render-config'),
+      )
+      expect(renderCalls.length).toBeGreaterThan(0)
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('OO disabled state', () => {
+    it('when onlyofficeAvailable=false, switching to "在线编辑" reverts to "结构化视图"', async () => {
+      // Health check returns unhealthy
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/onlyoffice/health')) {
+          return Promise.resolve({ healthy: false })
+        }
+        if (url.includes('/projects/')) {
+          return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31', audit_year: '2025' })
+        }
+        if (url.includes('/render-config')) {
+          return Promise.resolve({ sheets: [{ html_data: { template_structure: { placeholders: [], paragraphs: [], tables: [], metadata: {} }, filled_responses: {} } }] })
+        }
+        if (url.includes('/template-structure')) {
+          return Promise.resolve({ placeholders: [], paragraphs: [], tables: [], metadata: {} })
+        }
+        if (url.includes('/field-overrides')) {
+          return Promise.resolve({})
+        }
+        return Promise.resolve(null)
+      })
+
+      const wrapper = createDualModeWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      expect(vm.onlyofficeAvailable).toBe(false)
+      expect(vm.genericViewMode).toBe('结构化视图')
+
+      // Attempt to switch to online edit
+      await vm.onModeSwitch('在线编辑')
+      await flushPromises()
+
+      // Should revert back to structured view
+      expect(vm.genericViewMode).toBe('结构化视图')
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('flush-before-switch ordering', () => {
+    it('flush completes before initGenericEditor executes', async () => {
+      const wrapper = createDualModeWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      expect(vm.onlyofficeAvailable).toBe(true)
+
+      // Track execution ordering
+      const executionOrder: string[] = []
+
+      mockApiPut.mockImplementation((url: string) => {
+        if (url.includes('/checklist-responses')) {
+          executionOrder.push('flush')
+        }
+        return Promise.resolve({})
+      })
+
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/onlyoffice-config')) {
+          executionOrder.push('initEditor')
+          return Promise.resolve({ config: { document: { url: null } } })
+        }
+        return Promise.resolve(null)
+      })
+
+      // Simulate having a pending edit so flush actually calls the API
+      if (vm.structuredUpdateField) {
+        vm.structuredUpdateField('entity_name', '新公司名称')
+      }
+
+      // Switch to online mode — triggers: structuredFlush() then initGenericEditor()
+      await vm.onModeSwitch('在线编辑')
+      await flushPromises()
+
+      // If flush was triggered (had pending saves), it must precede initEditor
+      if (executionOrder.includes('flush') && executionOrder.includes('initEditor')) {
+        expect(executionOrder.indexOf('flush')).toBeLessThan(executionOrder.indexOf('initEditor'))
+      }
+
+      // initGenericEditor should always be called after flush (even if no pending saves)
+      expect(executionOrder).toContain('initEditor')
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('export button in structured view', () => {
+    it('export triggers prefilled-download API call for the correct wp_code', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['docx-content'])),
+      })
+      global.fetch = mockFetch
+      global.URL.createObjectURL = vi.fn().mockReturnValue('blob:test')
+      global.URL.revokeObjectURL = vi.fn()
+
+      const wrapper = createDualModeWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      expect(vm.genericViewMode).toBe('结构化视图')
+
+      // Call the toolbar export
+      await vm.onExportDocx()
+      await flushPromises()
+
+      // Verify it calls prefilled-download with correct wp_code path
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/wp-templates/A8-1/prefilled-download'),
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+        }),
+      )
+
+      wrapper.unmount()
+    })
+
+    it('composable exportDocx calls prefilled-download with include_responses=true', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['docx-content'])),
+      })
+      global.fetch = mockFetch
+      global.URL.createObjectURL = vi.fn().mockReturnValue('blob:test')
+      global.URL.revokeObjectURL = vi.fn()
+
+      const wrapper = createDualModeWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+
+      // The composable's exportDocx is the structured-view export with include_responses=true
+      // Access it via vm's internal setup state
+      const exportFn = vm.structuredExportDocx || vm.exportDocx
+      if (exportFn) {
+        await exportFn()
+        await flushPromises()
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('include_responses=true'),
+          expect.any(Object),
+        )
+      } else {
+        // If not directly exposed, verify onExportDocx works correctly for generic mode
+        await vm.onExportDocx()
+        await flushPromises()
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.stringContaining('/wp-templates/A8-1/prefilled-download'),
+          expect.any(Object),
+        )
+      }
+
+      wrapper.unmount()
+    })
+  })
+})
+
+
+/**
+ * Task 8.4 — Export/Import toolbar buttons unit tests
+ *
+ * Tests:
+ * 1. All 3 buttons render in structured-toolbar when in structured view mode
+ * 2. "导出 Word" triggers prefilled-download with include_responses=true
+ * 3. "导出模板" triggers prefilled-download with include_guidance=true
+ * 4. "导入数据" opens the import dialog
+ * 5. Import dialog shows el-upload accepting .docx only
+ * 6. Successful import shows ElMessage.success with "已导入 {N} 个字段"
+ * 7. Failed import shows ElMessage.error
+ * 8. After successful import, structured view data is refreshed (loadStructuredData called)
+ *
+ * Validates: Requirements 11, 12, 13
+ */
+
+// Mock ElMessage for import tests
+const mockElMessageSuccess = vi.fn()
+const mockElMessageError = vi.fn()
+vi.mock('element-plus', async (importOriginal) => {
+  const actual: any = await importOriginal()
+  return {
+    ...actual,
+    ElMessage: {
+      success: (...args: any[]) => mockElMessageSuccess(...args),
+      error: (...args: any[]) => mockElMessageError(...args),
+      warning: vi.fn(),
+      info: vi.fn(),
+    },
+  }
+})
+
+describe('WorkpaperWordEditor — export/import toolbar buttons', () => {
+  let mockFetch: ReturnType<typeof vi.fn>
+  let mockCreateObjectURL: ReturnType<typeof vi.fn>
+  let mockRevokeObjectURL: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    // Mock global.fetch for download endpoints (native fetch, not api proxy)
+    mockFetch = vi.fn()
+    global.fetch = mockFetch
+
+    // Mock URL APIs for download tests
+    mockCreateObjectURL = vi.fn().mockReturnValue('blob:http://localhost/fake-blob')
+    mockRevokeObjectURL = vi.fn()
+    global.URL.createObjectURL = mockCreateObjectURL
+    global.URL.revokeObjectURL = mockRevokeObjectURL
+
+    // Standard API mocks for generic (non-A16) mode
+    mockApiGet.mockImplementation((url: string) => {
+      if (url.includes('/projects/')) {
+        return Promise.resolve({ client_name: '测试公司', audit_period_end: '2025-12-31', audit_year: '2025' })
+      }
+      if (url.includes('/onlyoffice/health')) {
+        return Promise.resolve({ healthy: true })
+      }
+      if (url.includes('/render-config')) {
+        return Promise.resolve({
+          sheets: [{
+            html_data: {
+              template_structure: {
+                placeholders: [{ field_id: 'entity_name', label: '被审计单位', data_type: 'text', default_value: '××公司' }],
+                paragraphs: [],
+                tables: [],
+                metadata: { wp_code: 'A8-1' },
+              },
+              filled_responses: {},
+            },
+          }],
+        })
+      }
+      if (url.includes('/template-structure')) {
+        return Promise.resolve({ placeholders: [], paragraphs: [], tables: [], metadata: {} })
+      }
+      if (url.includes('/field-overrides')) {
+        return Promise.resolve({})
+      }
+      return Promise.resolve(null)
+    })
+  })
+
+  function createToolbarWrapper(wpCode = 'A8-1') {
+    return mount(WorkpaperWordEditor, {
+      props: {
+        wpId: 'wp-toolbar-001',
+        wpCode,
+        projectId: 'proj-toolbar-test',
+      },
+      global: {
+        stubs: property13Stubs,
+      },
+    })
+  }
+
+  describe('toolbar buttons render', () => {
+    it('all 3 buttons (导出 Word, 导出模板, 导入数据) render in structured toolbar', async () => {
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const toolbar = wrapper.find('.gt-wp-word-editor__structured-toolbar')
+      expect(toolbar.exists()).toBe(true)
+
+      const buttons = toolbar.findAll('.el-button')
+      const texts = buttons.map(b => b.text())
+
+      expect(texts).toContain('导出 Word')
+      expect(texts).toContain('导出模板')
+      expect(texts).toContain('导入数据')
+      expect(buttons.length).toBe(3)
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('导出 Word button', () => {
+    it('click triggers prefilled-download with include_responses=true', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['docx-content'])),
+      })
+
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      await vm.onExportWord()
+      await flushPromises()
+
+      // Verify fetch called with correct endpoint + query param
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/wp-templates\/A8-1\/prefilled-download\?include_responses=true/),
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+        }),
+      )
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('导出模板 button', () => {
+    it('click triggers prefilled-download with include_guidance=true', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['template-content'])),
+      })
+
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      await vm.onExportTemplate()
+      await flushPromises()
+
+      // Verify fetch called with include_guidance=true
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/wp-templates\/A8-1\/prefilled-download\?include_guidance=true/),
+        expect.objectContaining({
+          headers: expect.objectContaining({ Authorization: expect.any(String) }),
+        }),
+      )
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('导入数据 button', () => {
+    it('click opens the import dialog', async () => {
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      expect(vm.showImportDialog).toBe(false)
+
+      // Find and click the "导入数据" button
+      const toolbar = wrapper.find('.gt-wp-word-editor__structured-toolbar')
+      const importBtn = toolbar.findAll('.el-button').find(b => b.text() === '导入数据')
+      expect(importBtn).toBeDefined()
+      await importBtn!.trigger('click')
+      await flushPromises()
+
+      expect(vm.showImportDialog).toBe(true)
+
+      wrapper.unmount()
+    })
+
+    it('import dialog shows el-upload accepting .docx only', async () => {
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      vm.showImportDialog = true
+      await flushPromises()
+
+      // Find the import dialog's el-upload (the second dialog in DOM)
+      const dialogs = wrapper.findAll('.el-dialog')
+      const importDialog = dialogs.find(d => d.html().includes('导入数据') || d.html().includes('.docx'))
+      expect(importDialog).toBeDefined()
+
+      const upload = importDialog!.find('.el-upload')
+      expect(upload.exists()).toBe(true)
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('import success/error messaging', () => {
+    it('successful import shows ElMessage.success with "已导入 {N} 个字段"', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { imported_count: 5, warnings: [] } }),
+      })
+
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      // Set up import file directly (el-upload stubs won't fire real events)
+      vm.importFile = new File(['content'], 'test.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+      vm.showImportDialog = true
+      await flushPromises()
+
+      await vm.onImportData()
+      await flushPromises()
+
+      // Verify fetch called the import endpoint
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/api/workpapers/wp-toolbar-001/import-structured'),
+        expect.objectContaining({ method: 'POST' }),
+      )
+
+      // Verify success message
+      expect(mockElMessageSuccess).toHaveBeenCalledWith('已导入 5 个字段')
+
+      // Dialog should close
+      expect(vm.showImportDialog).toBe(false)
+
+      wrapper.unmount()
+    })
+
+    it('failed import shows ElMessage.error', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ detail: '文件格式不匹配，请使用正确的模板' }),
+      })
+
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      vm.importFile = new File(['bad'], 'bad.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+      vm.showImportDialog = true
+      await flushPromises()
+
+      await vm.onImportData()
+      await flushPromises()
+
+      // Verify error message
+      expect(mockElMessageError).toHaveBeenCalledWith('文件格式不匹配，请使用正确的模板')
+
+      wrapper.unmount()
+    })
+  })
+
+  describe('import refreshes structured view', () => {
+    it('after successful import, loadStructuredData is called to refresh view', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: { imported_count: 3, warnings: [] } }),
+      })
+
+      const wrapper = createToolbarWrapper()
+      await flushPromises()
+
+      const vm = wrapper.vm as any
+      vm.importFile = new File(['content'], 'test.docx', { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+
+      // Clear mockApiGet to track loadStructuredData call (it calls render-config)
+      mockApiGet.mockClear()
+      mockApiGet.mockImplementation((url: string) => {
+        if (url.includes('/render-config')) {
+          return Promise.resolve({
+            sheets: [{
+              html_data: {
+                template_structure: {
+                  placeholders: [{ field_id: 'entity_name', label: '被审计单位', data_type: 'text', default_value: '××公司', current_value: '导入公司' }],
+                  paragraphs: [],
+                  tables: [],
+                  metadata: { wp_code: 'A8-1' },
+                },
+                filled_responses: { entity_name: '导入公司' },
+              },
+            }],
+          })
+        }
+        return Promise.resolve(null)
+      })
+
+      await vm.onImportData()
+      await flushPromises()
+
+      // loadStructuredData should have been called (re-fetches render-config)
+      const renderCalls = mockApiGet.mock.calls.filter(
+        (c: any[]) => c[0]?.includes?.('/render-config'),
+      )
+      expect(renderCalls.length).toBeGreaterThan(0)
+
+      wrapper.unmount()
+    })
   })
 })

@@ -25,9 +25,11 @@ import GtAProgramConsole from './GtAProgramConsole.vue'
 
 // Lazy-loaded sub-components
 const GtA17Summary = defineAsyncComponent(() => import('./GtA17Summary.vue'))
+const GtA171AuditSummary = defineAsyncComponent(() => import('./GtA171AuditSummary.vue'))
 const WorkpaperWordEditor = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 const GtEmbeddedChecklist = defineAsyncComponent(() => import('./GtEmbeddedChecklist.vue'))
 const IndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
+const GtA1721Kam = defineAsyncComponent(() => import('./GtA1721Kam.vue'))
 
 // ─── Props ───
 const props = defineProps<{
@@ -41,7 +43,7 @@ const props = defineProps<{
 interface TabDef {
   id: string
   label: string
-  kind: 'program' | 'a17-summary' | 'word' | 'checklist' | 'independence'
+  kind: 'program' | 'a17-summary' | 'word' | 'checklist' | 'independence' | 'kam'
   wpCode?: string
   tracked?: boolean
 }
@@ -49,7 +51,7 @@ interface TabDef {
 const TABS: TabDef[] = [
   { id: 'program', label: '审计程序', kind: 'program' },
   { id: 'A17-1', label: '重大事项概要', kind: 'a17-summary', wpCode: 'A17-1', tracked: true },
-  { id: 'A17-2-1', label: '交审审计专项', kind: 'word', wpCode: 'A17-2-1' },
+  { id: 'A17-2-1', label: '关键审计事项', kind: 'kam', wpCode: 'A17-2-1' },
   { id: 'A17-3', label: '业务备案报告', kind: 'word', wpCode: 'A17-3' },
   { id: 'A17-3-1', label: '备案部门检查报告', kind: 'word', wpCode: 'A17-3-1' },
   { id: 'A17-4', label: '义务注意事项通知', kind: 'word', wpCode: 'A17-4' },
@@ -295,11 +297,10 @@ onMounted(async () => {
         </template>
 
         <!-- a17-summary tab -->
-        <GtA17Summary
+        <GtA171AuditSummary
           v-else-if="tab.kind === 'a17-summary'"
-          :project-id="props.projectId"
           :wp-id="getTabWpId(tab)"
-          :kam-references="kamReferences"
+          :project-id="props.projectId"
         />
 
         <!-- word tab -->
@@ -307,6 +308,13 @@ onMounted(async () => {
           v-else-if="tab.kind === 'word'"
           :wp-id="getTabWpId(tab)"
           :readonly="isTabReadonly(tab)"
+        />
+
+        <!-- kam tab -->
+        <GtA1721Kam
+          v-else-if="tab.kind === 'kam'"
+          :wp-id="getTabWpId(tab)"
+          :project-id="props.projectId"
         />
 
         <!-- checklist tab -->

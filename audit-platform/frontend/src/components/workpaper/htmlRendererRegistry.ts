@@ -88,11 +88,30 @@ export type HtmlComponentType =
   | 'b13-bundle'
   | 'b19-bundle'
   | 'b51-bundle'
+  | 'f2-stocktake-bundle'
   | 'c-control-test'
   | 'd1-notes-receivable'
   | 'd2-accounts-receivable'
   | 'a1-12-dual-checklist'
   | 'a1-15-disclosure-checklist'
+  | 'a1-17-corresponding-data'
+  | 'a17-6-closing-meeting'
+  | 'a18-1-regulatory-submission'
+  | 'a18-2-regulatory-communication'
+  | 'a8-1-other-info-representation'
+  | 'a11-1-subsequent-events-inquiry'
+  | 'a17-3-consultation-record'
+  | 'a17-3-1-consultation-execution'
+  | 'a17-4-disagreement-record'
+  | 'a17-7-independence-declaration'
+  | 'a9-1-deficiency-letter'
+  | 'a9-2-deficiency-letter-governance'
+  | 'a27-1-it-audit-memo'
+  | 'a12-1-legal-confirmation'
+  | 'a10-1-governance-communication'
+  | 'a17-1-audit-summary'
+  | 'a17-2-1-kam'
+  | 'a5-1-cashflow-audit'
   | 'review-bundle'
 
 /**
@@ -186,6 +205,7 @@ const GtB2Bundle = defineAsyncComponent(() => import('./GtB2Bundle.vue'))
 const GtB13Bundle = defineAsyncComponent(() => import('./GtB13Bundle.vue'))
 const GtB19Bundle = defineAsyncComponent(() => import('./GtB19Bundle.vue'))
 const GtB51Bundle = defineAsyncComponent(() => import('./GtB51Bundle.vue'))
+const GtF2StocktakeBundle = defineAsyncComponent(() => import('./GtF2StocktakeBundle.vue'))
 const GtReviewBundle = defineAsyncComponent(() => import('./GtReviewBundle.vue'))
 const GtD1NotesReceivable = defineAsyncComponent(() => import('./GtD1NotesReceivable.vue'))
 const GtD2AccountsReceivable = defineAsyncComponent(() => import('./GtD2AccountsReceivable.vue'))
@@ -703,6 +723,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     contextProps: 'standard',
   },
   {
+    componentType: 'f2-stocktake-bundle',
+    component: GtF2StocktakeBundle,
+    icon: '📦',
+    label: 'F2 存货监盘',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
     componentType: 'a1-12-dual-checklist',
     component: GtA112DualChecklist,
     icon: '✅',
@@ -715,6 +743,150 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtA115DisclosureChecklist,
     icon: '📋',
     label: 'A1-15 企业会计准则财务报表列报及披露核对表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a1-17-corresponding-data',
+    component: defineAsyncComponent(() => import('./GtA117CorrespondingData.vue')),
+    icon: '📊',
+    label: 'A1-17 对应数据程序表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-6-closing-meeting',
+    component: defineAsyncComponent(() => import('./GtA176ClosingMeeting.vue')),
+    icon: '📋',
+    label: 'A17-6 总结会会议纪要',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a18-1-regulatory-submission',
+    component: defineAsyncComponent(() => import('./GtA181RegulatorySubmission.vue')),
+    icon: '📨',
+    label: 'A18-1 向监管部门报送审计小结',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a18-2-regulatory-communication',
+    component: defineAsyncComponent(() => import('./GtA182RegulatoryCommunication.vue')),
+    icon: '📮',
+    label: 'A18-2 与监管层沟通函',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a8-1-other-info-representation',
+    component: defineAsyncComponent(() => import('./GtA81OtherInfoRepresentation.vue')),
+    icon: '📋',
+    label: 'A8-1 管理层对其他信息的书面声明',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a11-1-subsequent-events-inquiry',
+    component: defineAsyncComponent(() => import('./GtA111SubsequentEventsInquiry.vue')),
+    icon: '📅',
+    label: 'A11-1 期后事项问询函',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-3-consultation-record',
+    component: defineAsyncComponent(() => import('./GtA173ConsultationRecord.vue')),
+    icon: '📋',
+    label: 'A17-3 业务咨询记录',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-3-1-consultation-execution',
+    component: defineAsyncComponent(() => import('./GtA1731ConsultationExecution.vue')),
+    icon: '📋',
+    label: 'A17-3-1 咨询结果执行',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-4-disagreement-record',
+    component: defineAsyncComponent(() => import('./GtA174DisagreementRecord.vue')),
+    icon: '📋',
+    label: 'A17-4 重大专业分歧事项记录',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-7-independence-declaration',
+    component: defineAsyncComponent(() => import('./GtA177IndependenceDeclaration.vue')),
+    icon: '✍️',
+    label: 'A17-7 独立性声明书',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a9-1-deficiency-letter',
+    component: defineAsyncComponent(() => import('./GtA91DeficiencyLetter.vue')),
+    icon: '📋',
+    label: 'A9-1 内控缺陷沟通函',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a9-2-deficiency-letter-governance',
+    component: defineAsyncComponent(() => import('./GtA91DeficiencyLetter.vue')),
+    icon: '📋',
+    label: 'A9-2 治理层内控缺陷沟通函',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a27-1-it-audit-memo',
+    component: defineAsyncComponent(() => import('./GtA271ItAuditMemo.vue')),
+    icon: '💻',
+    label: 'A27-1 IT审计总结备忘录',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a12-1-legal-confirmation',
+    component: defineAsyncComponent(() => import('./GtA121LegalConfirmation.vue')),
+    icon: '⚖️',
+    label: 'A12-1 法律事务确认函',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a10-1-governance-communication',
+    component: defineAsyncComponent(() => import('./GtA101GovernanceCommunication.vue')),
+    icon: '📋',
+    label: 'A10-1 与治理层沟通函',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-1-audit-summary',
+    component: defineAsyncComponent(() => import('./GtA171AuditSummary.vue')),
+    icon: '📋',
+    label: 'A17-1 重大事项概要汇总',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a17-2-1-kam',
+    component: defineAsyncComponent(() => import('./GtA1721Kam.vue')),
+    icon: '🔑',
+    label: 'A17-2-1 关键审计事项',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a5-1-cashflow-audit',
+    component: defineAsyncComponent(() => import('./GtA51CashflowAudit.vue')),
+    icon: '💰',
+    label: 'A5-1 现金流量表审计',
     emits: ['save'],
     contextProps: 'standard',
   },

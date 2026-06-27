@@ -175,16 +175,71 @@
     <!-- ═══ 通用模式：直接加载 OnlyOffice editor ═══ -->
     <template v-else>
       <section class="gt-wp-word-editor__generic-section">
-        <div v-if="onlyofficeAvailable" class="gt-wp-word-editor__editor-area">
-          <div :id="editorContainerId" class="gt-wp-word-editor__oo-container" />
+        <!-- 双模式切换 (Task 5.1 + 5.4: tooltip when OO unavailable) -->
+        <div class="gt-wp-word-editor__mode-switch">
+          <el-tooltip
+            :content="'OnlyOffice 不可用'"
+            :disabled="onlyofficeAvailable"
+            placement="top"
+          >
+            <el-segmented
+              v-model="genericViewMode"
+              :options="genericModeOptions"
+              size="small"
+              @change="onModeSwitch"
+            />
+          </el-tooltip>
+          <span class="gt-wp-word-editor__save-indicator" :class="`save-status--${structuredSaveStatus}`">
+            {{ structuredSaveStatus === 'saved' ? '✓ 已保存' : structuredSaveStatus === 'saving' ? '保存中…' : '● 未保存' }}
+          </span>
         </div>
-        <div v-else class="gt-wp-word-editor__degraded-generic">
-          <el-alert type="info" :closable="false" show-icon>
-            OnlyOffice 不可用，请下载模板到本地编辑后上传。
-          </el-alert>
-          <div class="gt-wp-word-editor__toolbar" style="margin-top: 12px">
-            <el-button size="small" @click="downloadTemplate('main')">⬇️ 下载模板</el-button>
-            <el-button size="small" @click="showUpload = true; uploadTarget = 'main'">⬆️ 上传</el-button>
+
+        <!-- 结构化视图 -->
+        <div v-if="genericViewMode === '结构化视图'" class="gt-wp-word-editor__structured-area">
+          <!-- 导出/导入工具栏 (Task 8.1, 8.2, 8.3) -->
+          <div class="gt-wp-word-editor__structured-toolbar">
+            <el-button size="small" :icon="Download" @click="onExportWord" :loading="exportingWord">
+              导出 Word
+            </el-button>
+            <el-button size="small" :icon="Document" @click="onExportTemplate" :loading="exportingTemplate">
+              导出模板
+            </el-button>
+            <el-button size="small" :icon="Upload" @click="showImportDialog = true">
+              导入数据
+            </el-button>
+          </div>
+
+          <el-skeleton v-if="structuredLoading" :rows="8" animated />
+          <GtWordTemplateStructuredView
+            v-else-if="structuredTemplateStructure"
+            :template-structure="structuredTemplateStructure"
+            :field-values="structuredFieldValues"
+            :readonly="readonly"
+            @update:field="onStructuredFieldUpdate"
+            @ai-fill="onAiFill"
+          />
+          <el-empty v-else description="模板解析失败，请使用在线编辑模式" />
+        </div>
+
+        <!-- 在线编辑 -->
+        <div v-else class="gt-wp-word-editor__editor-area">
+          <template v-if="onlyofficeAvailable">
+            <div class="gt-wp-word-editor__oo-toolbar">
+              <el-button size="small" @click="toggleFullscreen">
+                {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
+              </el-button>
+            </div>
+            <div :id="editorContainerId" class="gt-wp-word-editor__oo-container" :class="{ 'is-fullscreen': isFullscreen }" />
+          </template>
+          <div v-else class="gt-wp-word-editor__degraded-generic">
+            <el-alert type="warning" :closable="false" show-icon>
+              <template #title>OnlyOffice 不可用，已降级为只读模式</template>
+              <span>请使用「结构化视图」编辑字段，或下载模板到本地编辑后上传。</span>
+            </el-alert>
+            <div class="gt-wp-word-editor__toolbar" style="margin-top: 12px">
+              <el-button size="small" @click="downloadTemplate('main')">⬇️ 下载模板</el-button>
+              <el-button size="small" @click="showUpload = true; uploadTarget = 'main'">⬆️ 上传</el-button>
+            </div>
           </div>
         </div>
       </section>
@@ -235,6 +290,32 @@
         </div>
       </el-upload>
     </el-dialog>
+
+    <!-- 导入数据弹窗 (Task 8.3) -->
+    <el-dialog v-model="showImportDialog" title="导入数据" width="480px" :close-on-click-modal="false">
+      <p style="margin: 0 0 12px; color: var(--el-text-color-secondary); font-size: 13px">
+        上传离线填写的 .docx 文件，系统将自动解析并导入字段数据。
+      </p>
+      <el-upload
+        ref="importUploadRef"
+        :auto-upload="false"
+        accept=".docx"
+        :limit="1"
+        drag
+        :on-change="onImportFileChange"
+        :on-remove="onImportFileRemove"
+      >
+        <div style="padding: 20px; text-align: center">
+          <p>拖拽或点击选择 .docx 文件</p>
+        </div>
+      </el-upload>
+      <template #footer>
+        <el-button @click="showImportDialog = false" :disabled="importing">取消</el-button>
+        <el-button type="primary" @click="onImportData" :loading="importing" :disabled="!importFile">
+          开始导入
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -242,8 +323,11 @@
 import { ref, computed, onMounted, onUnmounted, reactive, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Download, Document, Upload } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
+import GtWordTemplateStructuredView from './GtWordTemplateStructuredView.vue'
+import { useWordTemplateStructured } from './composables/useWordTemplateStructured'
 
 const props = defineProps<{
   wpId: string
@@ -263,6 +347,130 @@ const wpCode = computed(() => props.wpCode || '')
 
 // ─── Mode Detection ───
 const isA16Mode = computed(() => wpCode.value === 'A16')
+
+// ─── Generic Mode: Dual-mode switch (Task 5.1) ───
+const genericViewMode = ref<'结构化视图' | '在线编辑'>('结构化视图')
+const genericModeOptions = ['结构化视图', '在线编辑']
+
+// ─── Structured View (useWordTemplateStructured composable) ───
+const {
+  templateStructure: structuredTemplateStructure,
+  fieldValues: structuredFieldValues,
+  loading: structuredLoading,
+  saveStatus: structuredSaveStatus,
+  loadStructure: loadStructuredData,
+  updateField: structuredUpdateField,
+  flushPendingSaves: structuredFlush,
+  exportDocx: structuredExportDocx,
+  exportTemplate: structuredExportTemplate,
+  triggerAiFill: structuredAiFill,
+} = useWordTemplateStructured({
+  wpId: computed(() => props.wpId),
+  wpCode: wpCode,
+  projectId: projectId,
+})
+
+function onStructuredFieldUpdate(fieldId: string, value: string) {
+  structuredUpdateField(fieldId, value)
+}
+
+function onAiFill(fieldId: string) {
+  structuredAiFill(fieldId)
+}
+
+// ─── Export/Import Toolbar (Task 8.1, 8.2, 8.3) ───
+const exportingWord = ref(false)
+const exportingTemplate = ref(false)
+const showImportDialog = ref(false)
+const importing = ref(false)
+const importFile = ref<File | null>(null)
+const importUploadRef = ref<any>(null)
+
+/** Task 8.1: Export Word with responses merged */
+async function onExportWord() {
+  exportingWord.value = true
+  try {
+    await structuredExportDocx()
+  } finally {
+    exportingWord.value = false
+  }
+}
+
+/** Task 8.2: Export template with guidance */
+async function onExportTemplate() {
+  exportingTemplate.value = true
+  try {
+    await structuredExportTemplate()
+  } finally {
+    exportingTemplate.value = false
+  }
+}
+
+/** Task 8.3: Import file change handler */
+function onImportFileChange(file: any) {
+  importFile.value = file?.raw || null
+}
+
+function onImportFileRemove() {
+  importFile.value = null
+}
+
+/** Task 8.3: Import structured data from uploaded docx */
+async function onImportData() {
+  if (!importFile.value) return
+  importing.value = true
+  try {
+    const formData = new FormData()
+    formData.append('file', importFile.value)
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token') || ''
+    const r = await fetch(`/api/workpapers/${props.wpId}/import-structured`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    })
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}))
+      throw new Error(err?.detail || err?.message || '导入失败')
+    }
+    const data = await r.json()
+    // ResponseWrapperMiddleware: actual payload in data.data
+    const result = data?.data || data
+    const importedCount = result?.imported_count ?? 0
+    showImportDialog.value = false
+    importFile.value = null
+    ElMessage.success(`已导入 ${importedCount} 个字段`)
+    // Refresh structured view
+    await loadStructuredData()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导入失败，请重试')
+  } finally {
+    importing.value = false
+  }
+}
+
+// ─── Mode Switch Logic (Task 5.3 + 5.4) ───
+async function onModeSwitch(newMode: string) {
+  if (newMode === '在线编辑') {
+    // Task 5.4: Guard — prevent switching when OnlyOffice unavailable
+    if (!onlyofficeAvailable.value) {
+      genericViewMode.value = '结构化视图'
+      ElMessage.warning('OnlyOffice 不可用')
+      return
+    }
+    // Structured→Online: flush pending saves then init OnlyOffice
+    await structuredFlush()
+    await initGenericEditor()
+  } else {
+    // Online→Structured: reload template-structure API for latest responses
+    await loadStructuredData()
+  }
+}
+
+// ─── Fullscreen toggle (generic online edit) ───
+const isFullscreen = ref(false)
+function toggleFullscreen() {
+  isFullscreen.value = !isFullscreen.value
+}
 
 // ─── Common State ───
 const loading = ref(false)
@@ -447,8 +655,9 @@ function onOffline() {
 
 // ─── Methods ───
 async function loadProjectInfo() {
+  if (!projectId.value) return
   try {
-    const info = await api.get<any>(`/api/projects/${projectId.value}`)
+    const info = await api.get<any>(`/api/projects/${projectId.value}`, { _silent: true } as any)
     const d = info?.data || info
     placeholders.client_name = d?.client_name || d?.name || ''
     placeholders.entity_name = d?.client_name || d?.name || ''
@@ -466,7 +675,7 @@ async function loadProjectInfo() {
     // Try to get audit report date for sign_date default
     try {
       const year = getAuditYear()
-      const report = await api.get<any>(`/api/audit-report?project_id=${projectId.value}&year=${year}`)
+      const report = await api.get<any>(`/api/audit-report?project_id=${projectId.value}&year=${year}`, { _silent: true } as any)
       const rd = report?.report_date || report?.data?.report_date
       if (rd) cachedReportDate.value = typeof rd === 'string' ? rd.slice(0, 10) : ''
     } catch { /* audit_report may not exist yet */ }
@@ -569,8 +778,8 @@ async function loadMisstatementSummary() {
 
 async function checkHealth() {
   try {
-    const r = await api.get<{ available: boolean }>('/api/deliverables/onlyoffice/health')
-    onlyofficeAvailable.value = r?.available ?? false
+    const r = await api.get<{ healthy: boolean }>('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    onlyofficeAvailable.value = r?.healthy ?? false
   } catch {
     onlyofficeAvailable.value = false
   }
@@ -591,7 +800,8 @@ async function loadSignStatus() {
       const scope = `word_template:${wpCode.value}`
       const overrides = await api.get<any>('/api/workpapers/field-overrides', {
         params: { project_id: projectId.value, year, scope },
-      })
+        _silent: true,
+      } as any)
       signStatus.value = overrides?.sign_status?.value || 'draft'
     } catch { signStatus.value = 'draft' }
     return
@@ -599,7 +809,8 @@ async function loadSignStatus() {
   // A16 mode
   try {
     const info = await api.get<any>(
-      `/api/workpapers/${props.wpId}/file-info?version=${encodeURIComponent(selectedVersion.value)}`,
+      `/api/projects/${projectId.value}/working-papers/${props.wpId}/file-info?version=${encodeURIComponent(selectedVersion.value)}`,
+      { _silent: true } as any,
     )
     signStatus.value = info?.sign_status || 'draft'
   } catch { signStatus.value = 'draft' }
@@ -609,7 +820,8 @@ async function loadSupplementSignStatus() {
   if (!supplementEnabled.value) return
   try {
     const info = await api.get<any>(
-      `/api/workpapers/${props.wpId}/file-info?version=${encodeURIComponent(SUPPLEMENT_CODE)}`,
+      `/api/projects/${projectId.value}/working-papers/${props.wpId}/file-info?version=${encodeURIComponent(SUPPLEMENT_CODE)}`,
+      { _silent: true } as any,
     )
     supplementSignStatus.value = info?.sign_status || 'draft'
   } catch { /* ignore */ }
@@ -758,7 +970,8 @@ async function openEditor(target: 'main' | 'supplement') {
   try {
     const config = await api.get<any>(`/api/workpapers/${props.wpId}/onlyoffice-config`, {
       params: { version },
-    })
+      _silent: true,
+    } as any)
     documentUrl.value = config.document_url || ''
     documentKey.value = config.document_key || `wp-${props.wpId}-${version}-${Date.now()}`
     callbackUrl.value = config.callback_url || ''
@@ -827,15 +1040,18 @@ function onDocumentSaved() {
 async function initGenericEditor() {
   if (isA16Mode.value || !onlyofficeAvailable.value) return
 
-  const version = wpCode.value
+  // word-template 底稿使用 GtOnlyOfficeSheet 相同的端点格式：
+  // /api/workpapers/{wpId}/sheets/{sheetName}/onlyoffice-config
+  const sheetName = props.sheetName || props.htmlData?.sheet_name || wpCode.value || 'Sheet1'
   try {
-    const config = await api.get<any>(`/api/workpapers/${props.wpId}/onlyoffice-config`, {
-      params: { version },
-    })
-    if (!config?.document_url) return
+    const resp = await api.get<any>(
+      `/api/workpapers/${props.wpId}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
+      { params: { project_id: projectId.value }, _silent: true } as any,
+    )
+    if (!resp?.config?.document?.url) return
 
     // Load OnlyOffice JS API
-    const base = (import.meta as any).env?.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
+    const base = resp.onlyoffice_url || (import.meta as any).env?.VITE_ONLYOFFICE_URL || 'http://localhost:8080'
     await loadOnlyOfficeScript(base)
     await nextTick()
 
@@ -845,26 +1061,12 @@ async function initGenericEditor() {
       return
     }
 
+    // 使用后端返回的完整 config + token
     const editorConfig: any = {
-      document: {
-        fileType: 'docx',
-        key: config.document_key || `wp-${props.wpId}-${version}-${Date.now()}`,
-        title: documentTitle.value,
-        url: config.document_url,
-      },
-      documentType: 'word',
-      editorConfig: {
-        mode: props.readonly ? 'view' : 'edit',
-        callbackUrl: config.callback_url || '',
-        lang: 'zh',
-        customization: {
-          autosave: true,
-          forcesave: true,
-        },
-      },
+      ...resp.config,
+      ...(resp.token ? { token: resp.token } : {}),
       events: {
         onDocumentStateChange(event: any) {
-          // event.data === true means document has unsaved changes
           if (event?.data) {
             saveState.value = 'unsaved'
           }
@@ -876,10 +1078,6 @@ async function initGenericEditor() {
           saveState.value = 'saved'
         },
       },
-    }
-
-    if (config.token) {
-      editorConfig.token = config.token
     }
 
     ooEditorInstance = new DocsAPI.DocEditor(editorContainerId, editorConfig)
@@ -934,9 +1132,10 @@ onMounted(async () => {
     loadSupplementSignStatus()
   }
 
-  // Generic mode: init inline editor
+  // Generic mode: init inline editor + load structured data
   if (!isA16Mode.value) {
     await nextTick()
+    loadStructuredData()
     initGenericEditor()
   }
 })
@@ -1082,5 +1281,52 @@ onUnmounted(() => {
 .gt-wp-word-editor__degraded-generic {
   padding: 24px;
   text-align: center;
+}
+
+/* Mode switch (Task 5.1) */
+.gt-wp-word-editor__mode-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.gt-wp-word-editor__save-indicator {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.gt-wp-word-editor__save-indicator.save-status--saved {
+  color: var(--el-color-success, #67c23a);
+}
+.gt-wp-word-editor__save-indicator.save-status--saving {
+  color: var(--el-color-warning, #e6a23c);
+}
+.gt-wp-word-editor__save-indicator.save-status--unsaved {
+  color: var(--el-color-danger, #f56c6c);
+}
+.gt-wp-word-editor__structured-area {
+  min-height: 400px;
+}
+.gt-wp-word-editor__structured-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--el-border-color-lighter, #ebeef5);
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter, #f5f7fa);
+}
+.gt-wp-word-editor__oo-toolbar {
+  margin-bottom: 8px;
+}
+.gt-wp-word-editor__oo-container.is-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2000;
+  height: 100vh !important;
 }
 </style>

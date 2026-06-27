@@ -87,6 +87,10 @@ def register_system_routers(app: FastAPI) -> None:
               dv_router, consistency_router]:
         app.include_router(r, tags=["查账与试算"])
 
+    # ═══ §3b. 通用 auto_data_source resolver API ═══
+    from app.routers.auto_data import router as auto_data_router
+    app.include_router(auto_data_router, tags=["auto-data"])
+
     # ═══ §6. 合并报表 ═══
     from app.routers.consolidation import router as consol_router
     from app.routers.consol_scope import router as cs_router

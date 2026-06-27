@@ -330,6 +330,9 @@ export type Events = {
   'a17-audit-summary-completed': { projectId?: string }
   'a1-11-signing-completed': { projectId?: string }
 
+  // A17-2-1 KAM 更新（联动 A17-1 第十二章）
+  'kam:updated': { count: number; summaries: { index: number; basic: string }[] }
+
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void
   'shortcut:undo': void

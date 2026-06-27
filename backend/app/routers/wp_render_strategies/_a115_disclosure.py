@@ -88,16 +88,17 @@ async def render(ctx: RenderContext) -> dict | None:
     from app.services.field_override_service import FieldOverrideService
 
     wp_id = ctx.wp_id
+    wp_code = ctx.wp_code
     db = ctx.db
 
     # ─── 1. 解析 DOCX 获取模板数据（全局 mtime 缓存） ───────────────────────
     template: dict | None = None
     try:
-        template = await get_checklist_template("A1-15")
+        template = await get_checklist_template(wp_code)
     except FileNotFoundError:
-        logger.warning("A1-15 模板文件未找到")
+        logger.warning("%s 模板文件未找到", wp_code)
     except Exception as e:  # noqa: BLE001
-        logger.warning("A1-15 模板解析失败: %s", e)
+        logger.warning("%s 模板解析失败: %s", wp_code, e)
 
     if template is None:
         return None

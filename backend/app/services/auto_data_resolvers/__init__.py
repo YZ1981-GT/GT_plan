@@ -94,4 +94,4 @@ async def resolve_auto_data_source(
 # 触发各域子模块的 @auto_resolver 装饰器注册
 # 放在 auto_resolver 定义之后（文件末尾），避免循环导入
 # ═══════════════════════════════════════════════════════════════════════════════
-from . import _adjustments, _consol, _control_b, _cycle, _completion, _misstatement_aggregation, _tax_income  # noqa: E402,F401
+from . import _adjustments, _consol, _control_b, _cycle, _completion, _misstatement_aggregation, _tax_income, _going_concern  # noqa: E402,F401

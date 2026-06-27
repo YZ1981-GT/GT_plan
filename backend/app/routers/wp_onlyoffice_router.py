@@ -16,7 +16,7 @@ from pathlib import Path
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.deps import require_project_access
+from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper
 
@@ -166,6 +166,48 @@ def _sign_jwt(payload: dict) -> str:
     return jwt.encode(payload, settings.ONLYOFFICE_JWT_SECRET, algorithm="HS256")
 
 
+def _extract_placeholder_value_from_docx(
+    file_path: Path, placeholder
+) -> str | None:
+    """从已保存的 docx 中提取指定占位符位置的当前文本值。
+
+    根据 placeholder.position 定位到段落或表格单元格，
+    提取该位置的文本。如果占位符 pattern 仍然存在则返回 None（未编辑）。
+    """
+    try:
+        from docx import Document
+
+        doc = Document(str(file_path))
+        pos = placeholder.position
+
+        if "paragraph_index" in pos:
+            para_idx = pos["paragraph_index"]
+            if para_idx < len(doc.paragraphs):
+                para_text = doc.paragraphs[para_idx].text.strip()
+                # 如果整段文字就是占位符本身，用户未编辑
+                if placeholder.pattern in para_text:
+                    return None
+                # 尝试用占位符位置前后文本提取填充值
+                # 简化方案：返回完整段落文本（单占位符段落）
+                return para_text if para_text else None
+        elif "table_index" in pos:
+            tbl_idx = pos["table_index"]
+            row_idx = pos.get("row", 0)
+            col_idx = pos.get("col", 0)
+            if tbl_idx < len(doc.tables):
+                table = doc.tables[tbl_idx]
+                if row_idx < len(table.rows):
+                    row = table.rows[row_idx]
+                    if col_idx < len(row.cells):
+                        cell_text = row.cells[col_idx].text.strip()
+                        if placeholder.pattern in cell_text:
+                            return None
+                        return cell_text if cell_text else None
+    except Exception:
+        return None
+    return None
+
+
 def _sign_wopi_token(wp_id: UUID, wp_code: str, ttl_seconds: int = 300) -> str:
     """为 WOPI download_url 生成短时效签名 token。
 
@@ -217,6 +259,100 @@ async def get_onlyoffice_health(db: AsyncSession = Depends(get_db)):
         "healthy": healthy,
         "active_sessions": active,
         "max_sessions": MAX_SESSIONS,
+    }
+
+
+# ---------------------------------------------------------------------------
+# GET /api/workpapers/{wp_id}/template-structure
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{wp_id}/template-structure")
+async def get_template_structure(
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """返回 word-template 底稿的解析后模板结构 + 已填数据。
+
+    1. 查询底稿 + wp_code
+    2. 校验 componentType == "word-template"
+    3. 解析模板文件（带 mtime 缓存）
+    4. 合并 checklist_responses 当前值
+    5. 返回 {template_structure, filled_responses, sign_status}
+    """
+    from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+    from app.services.wp_template_finder import find_template_file_any
+    from app.services.wp_docx_template_parser import get_cached_structure
+
+    # 1. 查询底稿 + wp_code + 项目软删守卫
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+
+    # 2. 校验 componentType 是否为 word-template
+    component_type = _WP_CODE_OVERRIDE.get(wp_code)
+    if component_type != "word-template":
+        raise HTTPException(status_code=400, detail="该底稿不是 word-template 类型")
+
+    # 3. 解析模板文件路径
+    template_path = find_template_file_any(wp_code)
+    if not template_path or not template_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"模板文件不存在: {wp_code}"
+        )
+
+    # 4. 获取缓存的 TemplateStructure
+    try:
+        structure = get_cached_structure(str(template_path), wp_code)
+    except (ValueError, Exception) as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"模板解析失败: {e}")
+
+    # 5. 查询 checklist_responses (item_id LIKE 'wt-{wp_code}-%')
+    filled_responses: dict[str, str] = {}
+    prefix = f"wt-{wp_code}-"
+
+    try:
+        result = await db.execute(
+            sa.text(
+                "SELECT item_id, conclusion, remark "
+                "FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
+            ),
+            {"wp_id": str(wp_id), "prefix": f"{prefix}%"},
+        )
+        for row in result.fetchall():
+            field_id = row.item_id[len(prefix):]
+            value = row.conclusion or row.remark or ""
+            if value:
+                filled_responses[field_id] = value
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "template-structure: checklist_responses 查询失败 wp_id=%s: %s",
+            wp_id, e,
+        )
+
+    # 6. 序列化结构 + 合并 current_value
+    from dataclasses import asdict as _asdict
+
+    placeholders = []
+    for p in structure.placeholders:
+        p_dict = _asdict(p)
+        p_dict["current_value"] = filled_responses.get(p.field_id, "")
+        placeholders.append(p_dict)
+
+    paragraphs = [_asdict(para) for para in structure.paragraphs]
+    tables = [_asdict(tbl) for tbl in structure.tables]
+
+    template_structure = {
+        "placeholders": placeholders,
+        "paragraphs": paragraphs,
+        "tables": tables,
+        "metadata": structure.metadata,
+    }
+
+    return {
+        "template_structure": template_structure,
+        "filled_responses": filled_responses,
+        "sign_status": None,
     }
 
 
@@ -586,6 +722,48 @@ async def post_sheet_onlyoffice_callback(
             )
             return {"error": 1}
 
+        # ─── word-template: 从保存的 docx 提取占位符值并回写 checklist_responses ───
+        if is_word_template:
+            try:
+                from app.services.wp_docx_template_parser import parse_template
+
+                structure = parse_template(str(target))
+                if structure.placeholders:
+                    prefix = f"wt-{wp_code}-"
+                    for placeholder in structure.placeholders:
+                        # 从已保存文档中提取当前占位符位置的实际文本值
+                        # 如果文本与原始 pattern 不同，说明用户已编辑
+                        current_value = _extract_placeholder_value_from_docx(
+                            target, placeholder
+                        )
+                        if current_value and current_value != placeholder.pattern:
+                            item_id = f"{prefix}{placeholder.field_id}"
+                            await db.execute(
+                                sa.text(
+                                    "INSERT INTO checklist_responses "
+                                    "(project_id, wp_id, item_id, conclusion, remark) "
+                                    "VALUES (:pid, :wid, :iid, :val, '') "
+                                    "ON CONFLICT (project_id, wp_id, item_id) "
+                                    "DO UPDATE SET conclusion = :val"
+                                ),
+                                {
+                                    "pid": str(project_id),
+                                    "wid": str(wp_id),
+                                    "iid": item_id,
+                                    "val": current_value,
+                                },
+                            )
+                    await db.commit()
+                    logger.info(
+                        "OnlyOffice callback: word-template 占位符值已同步 wp_id=%s wp_code=%s",
+                        wp_id, wp_code,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "OnlyOffice callback: word-template 占位符提取失败 wp_id=%s: %s",
+                    wp_id, exc,
+                )
+
         # 更新 workpaper.updated_at（last_modified）
         from datetime import datetime, timezone
 
@@ -642,3 +820,186 @@ async def post_sheet_onlyoffice_callback(
 
     # 5. status=1 等：编辑中，无操作
     return {"error": 0}
+
+
+# ─── POST /api/workpapers/{wp_id}/import-structured ──────────────────────────
+# Task 7.3: 导入离线填写的 docx → 解析占位符 → 写回 checklist_responses
+
+
+@router.post("/{wp_id}/import-structured")
+async def import_structured_docx(
+    wp_id: UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """导入离线填写的 docx，解析占位符值并写回 checklist_responses。
+
+    流程：
+    1. 校验上传文件为有效 docx
+    2. 查询底稿 + wp_code + 校验 word-template 类型
+    3. 获取参考模板的 TemplateStructure（占位符列表）
+    4. 解析上传的 docx 提取占位符位置的当前文本
+    5. 对比参考模板默认值，提取用户填写的值
+    6. Upsert 到 checklist_responses
+    7. 返回 {imported_count, warnings}
+    """
+    from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+    from app.services.wp_template_finder import find_template_file_any
+    from app.services.wp_docx_template_parser import get_cached_structure
+
+    # 1. 验证文件类型
+    filename = file.filename or ""
+    if not filename.lower().endswith(".docx"):
+        raise HTTPException(
+            status_code=422,
+            detail="文件格式不匹配，请使用正确的模板（仅支持 .docx）",
+        )
+
+    # 2. 查询底稿 + wp_code + 项目软删守卫
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+
+    # 3. 校验 componentType 是否为 word-template
+    component_type = _WP_CODE_OVERRIDE.get(wp_code)
+    if component_type != "word-template":
+        raise HTTPException(status_code=400, detail="该底稿不是 word-template 类型")
+
+    # 4. 获取参考模板结构
+    template_path = find_template_file_any(wp_code)
+    if not template_path or not template_path.exists():
+        raise HTTPException(
+            status_code=404, detail=f"模板文件不存在: {wp_code}"
+        )
+
+    try:
+        ref_structure = get_cached_structure(str(template_path), wp_code)
+    except (ValueError, Exception) as e:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail=f"参考模板解析失败: {e}")
+
+    if not ref_structure.placeholders:
+        raise HTTPException(
+            status_code=422,
+            detail="该模板无可编辑占位符，无法导入数据",
+        )
+
+    # 5. 保存上传文件到临时位置并解析
+    import tempfile
+
+    try:
+        content = await file.read()
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"文件读取失败: {exc}")
+
+    if len(content) < 100:
+        raise HTTPException(
+            status_code=422,
+            detail="文件格式不匹配，请使用正确的模板",
+        )
+
+    tmp_dir = tempfile.mkdtemp(prefix="wp_import_")
+    tmp_path = Path(tmp_dir) / "uploaded.docx"
+    try:
+        tmp_path.write_bytes(content)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"文件保存失败: {exc}")
+
+    # 6. 验证上传文件为有效 docx
+    from docx import Document as _Doc
+
+    try:
+        _Doc(str(tmp_path))
+    except Exception:
+        # 清理临时文件
+        try:
+            tmp_path.unlink(missing_ok=True)
+            Path(tmp_dir).rmdir()
+        except OSError:
+            pass
+        raise HTTPException(
+            status_code=422,
+            detail="文件格式不匹配，请使用正确的模板",
+        )
+
+    # 7. 从上传文件中提取占位符值
+    imported_count = 0
+    warnings: list[str] = []
+    prefix = f"wt-{wp_code}-"
+
+    # 预加载上传文档用于结构校验
+    try:
+        uploaded_doc = _Doc(str(tmp_path))
+        uploaded_para_count = len(uploaded_doc.paragraphs)
+        uploaded_table_count = len(uploaded_doc.tables)
+    except Exception:
+        uploaded_para_count = 0
+        uploaded_table_count = 0
+
+    for placeholder in ref_structure.placeholders:
+        current_value = _extract_placeholder_value_from_docx(tmp_path, placeholder)
+
+        if current_value is None:
+            # 占位符原样保留（未编辑）或位置无法定位
+            # 检查是否位置超出上传文档范围（结构不匹配）
+            pos = placeholder.position
+            if "paragraph_index" in pos:
+                if pos["paragraph_index"] >= uploaded_para_count:
+                    warnings.append(
+                        f"字段 '{placeholder.label}' (位置 paragraph[{pos['paragraph_index']}]) 在上传文件中不存在"
+                    )
+            elif "table_index" in pos:
+                if pos["table_index"] >= uploaded_table_count:
+                    warnings.append(
+                        f"字段 '{placeholder.label}' (位置 table[{pos['table_index']}]) 在上传文件中不存在"
+                    )
+            continue
+
+        # 值与默认值相同 → 跳过（用户未真正填写）
+        if current_value == placeholder.default_value:
+            continue
+
+        # 8. Upsert to checklist_responses
+        item_id = f"{prefix}{placeholder.field_id}"
+        try:
+            await db.execute(
+                sa.text(
+                    "INSERT INTO checklist_responses "
+                    "(project_id, wp_id, item_id, conclusion, remark) "
+                    "VALUES (:pid, :wid, :iid, :val, '') "
+                    "ON CONFLICT (project_id, wp_id, item_id) "
+                    "DO UPDATE SET conclusion = :val"
+                ),
+                {
+                    "pid": str(wp.project_id),
+                    "wid": str(wp_id),
+                    "iid": item_id,
+                    "val": current_value,
+                },
+            )
+            imported_count += 1
+        except Exception as exc:
+            warnings.append(
+                f"字段 '{placeholder.label}' 保存失败: {exc}"
+            )
+
+    # 9. 提交事务
+    if imported_count > 0:
+        try:
+            await db.commit()
+        except Exception as exc:
+            logger.error(
+                "import-structured: 事务提交失败 wp_id=%s: %s",
+                wp_id, exc,
+            )
+            raise HTTPException(status_code=500, detail=f"数据保存失败: {exc}")
+
+    # 10. 清理临时文件
+    try:
+        tmp_path.unlink(missing_ok=True)
+        Path(tmp_dir).rmdir()
+    except OSError:
+        pass
+
+    return {
+        "imported_count": imported_count,
+        "warnings": warnings,
+    }

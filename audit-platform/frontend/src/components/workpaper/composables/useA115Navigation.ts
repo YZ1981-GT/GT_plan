@@ -43,13 +43,25 @@ export function useA115Navigation(
     destroyObserver()
 
     const root = containerRef.value
-    if (!root) return
+    if (!root) {
+      // Fallback: 如果 DOM 容器不可用，默认显示前 3 个章节
+      const sectionsList = sections.value
+      for (let i = 0; i < Math.min(3, sectionsList.length); i++) {
+        visibleSections.value.add(sectionsList[i].id)
+      }
+      if (sectionsList.length > 0) {
+        activeSectionId.value = sectionsList[0].id
+      }
+      return
+    }
 
-    // 初始化：默认显示第一个章节（如果有的话）
+    // 初始化：默认显示前 3 个章节
     if (sections.value.length > 0 && visibleSections.value.size === 0) {
-      const firstId = sections.value[0].id
-      addWithNeighbors(firstId)
-      activeSectionId.value = firstId
+      const sectionsList = sections.value
+      for (let i = 0; i < Math.min(3, sectionsList.length); i++) {
+        visibleSections.value.add(sectionsList[i].id)
+      }
+      activeSectionId.value = sectionsList[0].id
     }
 
     observer = new IntersectionObserver(

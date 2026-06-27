@@ -60,8 +60,8 @@ function withSetup(refs: HarnessRefs) {
 }
 
 describe('useEditorMode - HTML_COMPONENT_TYPES allowlist', () => {
-  it('contains exactly 14 entries (HTML registry + skip)', () => {
-    expect(HTML_COMPONENT_TYPES.size).toBe(14)
+  it('contains exactly 79 entries (HTML registry + skip)', () => {
+    expect(HTML_COMPONENT_TYPES.size).toBe(79)
   })
 
   it('includes the documented HTML class types', () => {

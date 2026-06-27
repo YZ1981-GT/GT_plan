@@ -8,7 +8,17 @@
   Validates: Requirements R2, R3, R5, R6
 -->
 <template>
-  <div class="gt-onlyoffice-sheet">
+  <div :class="['gt-onlyoffice-sheet', { 'gt-onlyoffice-sheet--fullscreen': isFullscreen }]">
+    <!-- 全屏切换按钮 -->
+    <div class="gt-onlyoffice-sheet__toolbar">
+      <el-button
+        size="small"
+        :icon="isFullscreen ? 'Close' : 'FullScreen'"
+        @click="toggleFullscreen"
+      >
+        {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
+      </el-button>
+    </div>
     <div v-if="loading" class="gt-onlyoffice-sheet__loading">
       <el-icon class="gt-onlyoffice-sheet__spinner" :size="24"><Loading /></el-icon>
       <span>加载中...</span>
@@ -48,7 +58,24 @@ const emit = defineEmits<{
 const loading = ref(true)
 const error = ref(false)
 const editorContainer = ref<HTMLElement | null>(null)
+const isFullscreen = ref(false)
 let editorInstance: any = null
+
+function toggleFullscreen(): void {
+  isFullscreen.value = !isFullscreen.value
+  if (isFullscreen.value) {
+    document.addEventListener('keydown', handleEscFullscreen)
+  } else {
+    document.removeEventListener('keydown', handleEscFullscreen)
+  }
+}
+
+function handleEscFullscreen(e: KeyboardEvent): void {
+  if (e.key === 'Escape' && isFullscreen.value) {
+    isFullscreen.value = false
+    document.removeEventListener('keydown', handleEscFullscreen)
+  }
+}
 
 // 唯一容器 ID（避免多实例冲突）——一次性生成，禁止用 computed+Date.now()
 // （computed 每次求值返回不同 ID，导致 DocEditor 找不到容器 → 降级 bug）
@@ -188,6 +215,7 @@ onBeforeUnmount(() => {
     }
     editorInstance = null
   }
+  document.removeEventListener('keydown', handleEscFullscreen)
 })
 </script>
 
@@ -199,6 +227,32 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   position: relative;
+}
+
+/* 全屏模式 */
+.gt-onlyoffice-sheet--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #fff;
+  min-height: 100vh;
+  height: 100vh;
+  border-radius: 0;
+}
+
+.gt-onlyoffice-sheet__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
+}
+
+.gt-onlyoffice-sheet--fullscreen .gt-onlyoffice-sheet__toolbar {
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #dcdfe6;
 }
 
 .gt-onlyoffice-sheet__loading {
@@ -233,5 +287,9 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   min-height: 500px;
+}
+
+.gt-onlyoffice-sheet--fullscreen .gt-onlyoffice-sheet__editor-container {
+  min-height: calc(100vh - 44px);
 }
 </style>
