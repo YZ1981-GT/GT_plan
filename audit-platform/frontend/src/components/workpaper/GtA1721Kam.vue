@@ -318,7 +318,7 @@
     </div>
 
     <!-- Online Edit Mode -->
-    <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A17-2-1" class="gt-a1721__oo" />
+    <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A17-2-1" :project-id="props.projectId" class="gt-a1721__oo" />
   </div>
 </template>
 
@@ -377,7 +377,9 @@ async function checkOOHealth() {
   try {
     const { api } = await import('@/services/apiProxy')
     const res = await api.get<any>('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    if (!res?.healthy) {
+    // ResponseWrapperMiddleware信封：{code,message,data:{healthy:true}} 或直接 {healthy:true}
+    const healthy = res?.data?.healthy ?? res?.healthy
+    if (!healthy) {
       modeOptions.value = ['结构化视图']
     }
   } catch {
