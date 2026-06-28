@@ -128,14 +128,14 @@ export interface TabDef {
 
 export const A17_BUNDLE_TABS: TabDef[] = [
   { id: 'program', label: '审计程序', kind: 'program' },
-  { id: 'A17-1', label: '重大事项概要', kind: 'a17-summary', wpCode: 'A17-1', tracked: true },
-  { id: 'A17-2-1', label: '交审审计专项', kind: 'word', wpCode: 'A17-2-1' },
-  { id: 'A17-3', label: '业务备案报告', kind: 'word', wpCode: 'A17-3' },
-  { id: 'A17-3-1', label: '备案部门检查报告', kind: 'word', wpCode: 'A17-3-1' },
-  { id: 'A17-4', label: '义务注意事项通知', kind: 'word', wpCode: 'A17-4' },
-  { id: 'A17-5', label: '审计完成核对表', kind: 'checklist', wpCode: 'A17-5', tracked: true },
-  { id: 'A17-6', label: '总结会议纪要', kind: 'word', wpCode: 'A17-6', tracked: true },
-  { id: 'A17-7', label: '独立性签署', kind: 'independence', wpCode: 'A17-7', tracked: true },
+  { id: 'A17-1', label: '重大事项概要汇总', kind: 'a17-summary', wpCode: 'A17-1', tracked: true },
+  { id: 'A17-2-1', label: '关键审计事项', kind: 'kam', wpCode: 'A17-2-1' },
+  { id: 'A17-3', label: '业务咨询记录', kind: 'word', wpCode: 'A17-3' },
+  { id: 'A17-3-1', label: '业务咨询执行记录', kind: 'word', wpCode: 'A17-3-1' },
+  { id: 'A17-4', label: '重大专业分歧事项记录', kind: 'word', wpCode: 'A17-4' },
+  { id: 'A17-5', label: '审计工作完成核对表', kind: 'checklist', wpCode: 'A17-5', tracked: true },
+  { id: 'A17-6', label: '总结会会议纪要', kind: 'word', wpCode: 'A17-6', tracked: true },
+  { id: 'A17-7', label: '独立性声明书', kind: 'independence', wpCode: 'A17-7', tracked: true },
 ]
 
 // ─── Composable ───
@@ -168,9 +168,9 @@ export function useA17BundleState(options: UseA17BundleStateOptions): UseA17Bund
   })
 
   const subTabCompletions = computed<SubTabCompletion[]>(() => [
-    { tabId: 'A17-1', label: 'KAM', status: completionMap.value['A17-1'] },
+    { tabId: 'A17-1', label: '概要汇总', status: completionMap.value['A17-1'] },
     { tabId: 'A17-5', label: '核对表', status: completionMap.value['A17-5'] },
-    { tabId: 'A17-6', label: '总结会议', status: completionMap.value['A17-6'] },
+    { tabId: 'A17-6', label: '总结会', status: completionMap.value['A17-6'] },
     { tabId: 'A17-7', label: '独立性', status: completionMap.value['A17-7'] },
   ])
 
@@ -199,7 +199,7 @@ export function useA17BundleState(options: UseA17BundleStateOptions): UseA17Bund
     },
     {
       id: 'independence',
-      label: 'A17-7 独立性签署完成',
+      label: 'A17-7 独立性声明书完成',
       satisfied: completionMap.value['A17-7'] === 'completed',
     },
   ])

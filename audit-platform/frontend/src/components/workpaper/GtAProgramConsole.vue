@@ -726,6 +726,38 @@ watch(() => props.htmlData, () => {
   initData()
 }, { deep: true })
 
+// ─── Self-load: 当 htmlData.programs 为空时从 render-config 加载 ───
+async function selfLoad() {
+  if (props.htmlData?.programs?.length) return
+  try {
+    const res = await api.get<any>(
+      `/api/workpapers/${props.wpId}/render-config?force_component_type=a-program-console`,
+      { _silent: true } as any,
+    )
+    const data = res?.sheets?.[0]?.html_data
+    if (data?.programs?.length) {
+      programs.value = data.programs.map((p: any, i: number) => ({
+        id: p.id || `row-${i + 1}`,
+        program_no: p.program_no ?? i + 1,
+        program_desc: p.program_desc || '',
+        program_category: p.program_category || '',
+        linked_workpapers: p.linked_workpapers || '',
+        execution_summary: p.execution_summary || '',
+        status: p.status || 'pending',
+        trim_reason: p.trim_reason || '',
+        summary: p.summary || '',
+        sub_steps: p.sub_steps || [],
+        assertions: p.assertions || {},
+        phase: p.phase || '',
+      }))
+    }
+  } catch { /* silent — 降级显示空态 */ }
+}
+
+onMounted(() => {
+  selfLoad()
+})
+
 // ─── Computed ───
 const availableCategories = computed(() => {
   const cats = new Set<string>()

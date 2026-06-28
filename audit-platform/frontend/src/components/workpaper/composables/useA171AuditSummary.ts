@@ -90,8 +90,7 @@ export interface UseA171Return {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const SIGNATURE_ROLES: string[] = [
-  '编制人', '一级复核', '二级复核', '三级复核', '项目合伙人',
-  '质量控制复核', '项目质量控制复核人', '技术复核人', '独立复核人', '其他',
+  '编制人（项目现场负责人）', '复核人（项目合伙人）', '项目质量复核合伙人（如适用）', '质量控制复核人（如适用）',
 ]
 
 const DEFAULT_CHAPTERS: Record<string, ChapterData> = {
@@ -258,7 +257,7 @@ export function useA171AuditSummary(opts: UseA171Options): UseA171Return {
 
   // ─── Update Signature ───
   function updateSignature(rowIndex: number, col: 'name' | 'date', value: string) {
-    if (rowIndex < 0 || rowIndex >= 10) return
+    if (rowIndex < 0 || rowIndex >= signatureTable.value.length) return
     signatureTable.value[rowIndex][col] = value || null
     const itemId = buildA171SignatureItemId(rowIndex, col)
     pendingItems.set(itemId, { item_id: itemId, conclusion: value || null, remark: null })

@@ -88,6 +88,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "d2-accounts-receivable",
     "a1-15-disclosure-checklist",
     "a1-17-corresponding-data",
+    "a3-8-goodwill-impairment",
     "a17-6-closing-meeting",
     "a18-1-regulatory-submission",
     "a18-2-regulatory-communication",

@@ -50,14 +50,14 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'program', label: '审计程序', kind: 'program' },
-  { id: 'A17-1', label: '重大事项概要', kind: 'a17-summary', wpCode: 'A17-1', tracked: true },
+  { id: 'A17-1', label: '重大事项概要汇总', kind: 'a17-summary', wpCode: 'A17-1', tracked: true },
   { id: 'A17-2-1', label: '关键审计事项', kind: 'kam', wpCode: 'A17-2-1' },
-  { id: 'A17-3', label: '业务备案报告', kind: 'word', wpCode: 'A17-3' },
-  { id: 'A17-3-1', label: '备案部门检查报告', kind: 'word', wpCode: 'A17-3-1' },
-  { id: 'A17-4', label: '义务注意事项通知', kind: 'word', wpCode: 'A17-4' },
-  { id: 'A17-5', label: '审计完成核对表', kind: 'checklist', wpCode: 'A17-5', tracked: true },
-  { id: 'A17-6', label: '总结会议纪要', kind: 'word', wpCode: 'A17-6', tracked: true },
-  { id: 'A17-7', label: '独立性签署', kind: 'independence', wpCode: 'A17-7', tracked: true },
+  { id: 'A17-3', label: '业务咨询记录', kind: 'word', wpCode: 'A17-3' },
+  { id: 'A17-3-1', label: '业务咨询执行记录', kind: 'word', wpCode: 'A17-3-1' },
+  { id: 'A17-4', label: '重大专业分歧事项记录', kind: 'word', wpCode: 'A17-4' },
+  { id: 'A17-5', label: '审计工作完成核对表', kind: 'checklist', wpCode: 'A17-5', tracked: true },
+  { id: 'A17-6', label: '总结会会议纪要', kind: 'word', wpCode: 'A17-6', tracked: true },
+  { id: 'A17-7', label: '独立性声明书', kind: 'independence', wpCode: 'A17-7', tracked: true },
 ]
 
 // ─── State ───
@@ -297,40 +297,55 @@ onMounted(async () => {
         </template>
 
         <!-- a17-summary tab -->
-        <GtA171AuditSummary
-          v-else-if="tab.kind === 'a17-summary'"
-          :wp-id="getTabWpId(tab)"
-          :project-id="props.projectId"
-        />
+        <template v-else-if="tab.kind === 'a17-summary'">
+          <GtA171AuditSummary
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :project-id="props.projectId"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
 
         <!-- word tab -->
-        <WorkpaperWordEditor
-          v-else-if="tab.kind === 'word'"
-          :wp-id="getTabWpId(tab)"
-          :readonly="isTabReadonly(tab)"
-        />
+        <template v-else-if="tab.kind === 'word'">
+          <WorkpaperWordEditor
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :readonly="isTabReadonly(tab)"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
 
         <!-- kam tab -->
-        <GtA1721Kam
-          v-else-if="tab.kind === 'kam'"
-          :wp-id="getTabWpId(tab)"
-          :project-id="props.projectId"
-        />
+        <template v-else-if="tab.kind === 'kam'">
+          <GtA1721Kam
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :project-id="props.projectId"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
 
         <!-- checklist tab -->
-        <GtEmbeddedChecklist
-          v-else-if="tab.kind === 'checklist'"
-          :wp-id="getTabWpId(tab)"
-          :checklist-wp-code="applicableA17_5[0] || 'A17-5-1'"
-          :readonly="isTabReadonly(tab)"
-        />
+        <template v-else-if="tab.kind === 'checklist'">
+          <GtEmbeddedChecklist
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :checklist-wp-code="applicableA17_5[0] || 'A17-5-1'"
+            :readonly="isTabReadonly(tab)"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
 
         <!-- independence tab -->
-        <IndependenceSigning
-          v-else-if="tab.kind === 'independence'"
-          :wp-id="getTabWpId(tab)"
-          :readonly="isTabReadonly(tab)"
-        />
+        <template v-else-if="tab.kind === 'independence'">
+          <IndependenceSigning
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :readonly="isTabReadonly(tab)"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
       </el-tab-pane>
     </el-tabs>
   </div>
@@ -396,6 +411,14 @@ onMounted(async () => {
   background: var(--gt-color-bg-elevated);
   border-radius: var(--gt-radius-sm);
   border: 1px solid var(--gt-color-border-light);
+}
+
+/* ─── Empty placeholder ─── */
+.gt-a17-bundle__empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--gt-color-text-tertiary, #909399);
+  font-size: 14px;
 }
 
 .signoff-title {

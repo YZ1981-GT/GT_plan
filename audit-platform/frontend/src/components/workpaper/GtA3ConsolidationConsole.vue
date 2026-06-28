@@ -2,12 +2,16 @@
   GtA3ConsolidationConsole.vue — A3 合并流程程序表 · 合并专用卡片中控台
 
   仅在合并项目(consolidated)中生成。
-  5 条程序关联合并模块已有页面（范围/抵销/内部往来/试算/附注），
+  Tab 结构：程序表 | A3-3 结构化主体判断 | A3-8 商誉减值测试
+  程序卡片关联合并模块已有页面（范围/抵销/内部往来/试算/附注），
   chip 点击跳转到对应模块 Tab，不创建独立子底稿。
 -->
 
 <template>
   <div class="gt-a3-console">
+    <el-tabs v-model="activeTab">
+      <!-- Tab 1: 程序表 -->
+      <el-tab-pane label="合并程序表" name="program" lazy>
     <!-- 顶部总览 -->
     <div class="gt-a3-console__overview">
       <div class="gt-a3-console__stats">
@@ -94,16 +98,68 @@
         <el-button type="primary" :disabled="!trimReason.trim()" @click="confirmTrim">确认裁剪</el-button>
       </template>
     </el-dialog>
+
+    <!-- 合并底稿索引：A3 系列子表与合并模块/商誉底稿的联动入口 -->
+    <div class="gt-a3-console__index">
+      <div class="gt-a3-console__index-title">📑 合并底稿索引</div>
+      <p class="gt-a3-console__index-hint">
+        A3-1/2/4/5/6/7 为合并模块各视图的纸面映射（数据实时取自合并模块，点击跳转查看）；
+        A3-3 结构化主体判断、A3-8 商誉减值测试为独立测算底稿。
+      </p>
+      <div class="gt-a3-console__index-list">
+        <div v-for="link in indexLinks" :key="link.code" class="gt-a3-console__index-item">
+          <span class="gt-a3-console__index-code">{{ link.code }}</span>
+          <span class="gt-a3-console__index-name">{{ link.name }}</span>
+          <el-tag
+            v-if="link.route"
+            size="small"
+            class="program-card__route-chip"
+            @click="navigateToRoute(link.route)"
+          >📂 {{ link.routeLabel }}</el-tag>
+          <GtIndexChip
+            v-for="ref in link.refs || []"
+            :key="`${link.code}-${ref}`"
+            :value="ref"
+            :validate="true"
+            @click="handleChipClick"
+          />
+        </div>
+      </div>
+    </div>
+      </el-tab-pane>
+
+      <!-- Tab 2: A3-3 结构化主体判断 (OnlyOffice) -->
+      <el-tab-pane v-if="wpIdMap['A3-3']" label="A3-3 结构化主体判断" name="A3-3" lazy>
+        <GtOnlyOfficeSheet
+          :wp-id="wpIdMap['A3-3']"
+          sheet-name="A3-3"
+          :readonly="readonly"
+        />
+      </el-tab-pane>
+
+      <!-- Tab 3: A3-8 商誉减值测试 -->
+      <el-tab-pane v-if="wpIdMap['A3-8']" label="A3-8 商誉减值测试" name="A3-8" lazy>
+        <GtA38GoodwillImpairment
+          :wp-id="wpIdMap['A3-8']"
+          :project-id="projectId"
+          :readonly="readonly"
+        />
+      </el-tab-pane>
+    </el-tabs>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowDown, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { api } from '@/services/apiProxy'
+import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
+
+const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtA38GoodwillImpairment = defineAsyncComponent(() => import('./GtA38GoodwillImpairment.vue'))
 
 interface ProgramRow {
   id: string
@@ -143,6 +199,53 @@ const route = useRoute()
 const router = useRouter()
 const programs = ref<ProgramRow[]>([])
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
+const activeTab = ref('program')
+const wpIndex = ref<WpIndexItem[]>([])
+
+// 子底稿 wpId 映射：A3-3 / A3-8
+const wpIdMap = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const item of wpIndex.value) {
+    if (item.wp_code === 'A3-3' || item.wp_code === 'A3-8') {
+      map[item.wp_code] = item.wp_id || item.id
+    }
+  }
+  return map
+})
+
+// 加载 wpIndex
+onMounted(async () => {
+  if (projectId.value) {
+    try {
+      wpIndex.value = await getWpIndex(projectId.value)
+    } catch {
+      wpIndex.value = []
+    }
+  }
+  // route query 定位 tab
+  const tab = route.query.sheet as string
+  if (tab && ['program', 'A3-3', 'A3-8'].includes(tab)) {
+    activeTab.value = tab
+  }
+})
+
+// 合并底稿索引：A3 系列子表联动入口（route=跳合并模块 Tab；refs=GtIndexChip 跳底稿）
+interface IndexLink {
+  code: string
+  name: string
+  route?: string
+  routeLabel?: string
+  refs?: string[]
+}
+const indexLinks: IndexLink[] = [
+  { code: 'A3-1/-2', name: '合并报表试算', route: 'route:/consolidation?tab=trial', routeLabel: '合并试算' },
+  { code: 'A3-4', name: '合并报表试算（含金融企业项目）', route: 'route:/consolidation?tab=trial', routeLabel: '合并试算' },
+  { code: 'A3-7', name: '内部往来核对表', route: 'route:/consolidation?tab=internal-trade', routeLabel: '内部往来' },
+  { code: 'A3-5', name: '合并附注汇总', route: 'route:/consolidation?tab=notes', routeLabel: '合并附注' },
+  { code: 'A3-6', name: '母公司附注汇总', route: 'route:/consolidation?tab=notes', routeLabel: '合并附注' },
+  { code: 'A3-3', name: '结构化主体纳入合并范围判断', route: 'route:/consolidation?tab=scope', routeLabel: '合并范围', refs: ['A3-3'] },
+  { code: 'A3-8', name: '商誉减值测试（合并层）', refs: ['A3-8', 'A3-8-1', 'I3-2', 'I3-6', 'I3-7'] },
+]
 
 // Trim dialog
 const trimVisible = ref(false)
@@ -313,10 +416,19 @@ function debounceSave() {
 
 <style scoped>
 .gt-a3-console {
-  padding: 20px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+}
+.gt-a3-console :deep(.el-tabs) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.gt-a3-console :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: auto;
+  padding: 20px;
   max-width: 1000px;
   margin: 0 auto;
 }
@@ -383,4 +495,51 @@ function debounceSave() {
 .program-card__exec-text { font-size: 12px; color: #909399; }
 .program-card__right { flex-shrink: 0; padding-top: 2px; }
 .program-card__status-tag { cursor: pointer; }
+
+/* 合并底稿索引 */
+.gt-a3-console__index {
+  margin-top: 8px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e8e8ec;
+  border-radius: 10px;
+}
+.gt-a3-console__index-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c5282;
+  margin-bottom: 6px;
+}
+.gt-a3-console__index-hint {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+.gt-a3-console__index-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.gt-a3-console__index-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f7f9fc;
+  flex-wrap: wrap;
+}
+.gt-a3-console__index-code {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c5282;
+  min-width: 70px;
+}
+.gt-a3-console__index-name {
+  font-size: 13px;
+  color: #303133;
+  flex: 1;
+  min-width: 160px;
+}
 </style>

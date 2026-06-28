@@ -109,6 +109,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'a17-1-audit-summary',
       'a17-2-1-kam',
       'a5-1-cashflow-audit',
+      'a3-8-goodwill-impairment',
       'b1-4-due-diligence-report',
       'review-bundle',
     ]

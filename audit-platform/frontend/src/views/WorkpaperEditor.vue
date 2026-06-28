@@ -924,9 +924,11 @@ onMounted(() => {
 
   // wp-locate-foundation Task 4.2: 读 route.query.sheet / cell → 触发定位
   // 使用 nextTick + 短延迟确保 GtWpRenderer 已挂载
+  // 注意：仅 queryCell 存在时触发 locate-cell（定位单元格）。
+  // 单独 querySheet 无 cell 时，是 Tab 导航请求，由 bundle 组件内部 watcher 处理。
   const querySheet = route.query.sheet as string | undefined
   const queryCell = route.query.cell as string | undefined
-  if (querySheet || queryCell) {
+  if (queryCell) {
     nextTick(() => {
       setTimeout(() => {
         eventBus.emit('workpaper:locate-cell', {

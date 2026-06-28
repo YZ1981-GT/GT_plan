@@ -55,19 +55,43 @@
             />
           </div>
           <div v-show="expandedCycleGroups[group.code]" class="gt-wpb-cycle-group__body">
-            <div
-              v-for="row in group.items"
-              :key="row.id"
-              class="gt-wpb-cycle-item"
-              @click="onWorkbenchRowClick(row)"
-            >
-              <span class="gt-wpb-cycle-item__code">{{ row.wp_code }}</span>
-              <span class="gt-wpb-cycle-item__name">{{ row.wp_name }}</span>
-              <el-tag :type="row.status_type" size="small" class="gt-wpb-cycle-item__status">{{ row.status_label }}</el-tag>
-              <span class="gt-wpb-cycle-item__assignee">{{ row.assignee_name || '—' }}</span>
-              <span class="gt-wpb-cycle-item__steps" v-if="row.total_steps">{{ row.completed_steps || 0 }}/{{ row.total_steps }}</span>
-              <GtRowActions :actions="getWpRowActions(row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, row)" class="gt-wpb-cycle-item__actions" />
-            </div>
+            <template v-for="node in buildTree(group.items)" :key="node.row.id">
+              <!-- 父底稿行（有子项时可折叠） -->
+              <div
+                class="gt-wpb-cycle-item"
+                :class="{ 'gt-wpb-cycle-item--parent': node.children.length > 0 }"
+                @click="onWorkbenchRowClick(node.row)"
+              >
+                <span class="gt-wpb-cycle-item__toggle" @click.stop="node.children.length ? toggleParentWp(node.row.wp_code) : undefined">
+                  {{ node.children.length ? (expandedParentWps[node.row.wp_code] ? '▾' : '▸') : '' }}
+                </span>
+                <span class="gt-wpb-cycle-item__code">{{ node.row.wp_code }}</span>
+                <span class="gt-wpb-cycle-item__name">{{ node.row.wp_name }}</span>
+                <el-tag v-if="node.children.length" size="small" type="info" effect="plain" class="gt-wpb-cycle-item__child-count">
+                  {{ node.children.length }} 子表
+                </el-tag>
+                <el-tag :type="node.row.status_type" size="small" class="gt-wpb-cycle-item__status">{{ node.row.status_label }}</el-tag>
+                <span class="gt-wpb-cycle-item__assignee">{{ node.row.assignee_name || '—' }}</span>
+                <span class="gt-wpb-cycle-item__steps" v-if="node.row.total_steps">{{ node.row.completed_steps || 0 }}/{{ node.row.total_steps }}</span>
+                <GtRowActions :actions="getWpRowActions(node.row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, node.row)" class="gt-wpb-cycle-item__actions" />
+              </div>
+              <!-- 子底稿行（折叠） -->
+              <template v-if="node.children.length && expandedParentWps[node.row.wp_code]">
+                <div
+                  v-for="child in node.children"
+                  :key="child.id"
+                  class="gt-wpb-cycle-item gt-wpb-cycle-item--child"
+                  @click="onChildRowClick(node.row, child)"
+                >
+                  <span class="gt-wpb-cycle-item__toggle"></span>
+                  <span class="gt-wpb-cycle-item__code">{{ child.wp_code }}</span>
+                  <span class="gt-wpb-cycle-item__name">{{ child.wp_name }}</span>
+                  <el-tag :type="child.status_type" size="small" class="gt-wpb-cycle-item__status">{{ child.status_label }}</el-tag>
+                  <span class="gt-wpb-cycle-item__assignee">{{ child.assignee_name || '—' }}</span>
+                  <span class="gt-wpb-cycle-item__steps" v-if="child.total_steps">{{ child.completed_steps || 0 }}/{{ child.total_steps }}</span>
+                </div>
+              </template>
+            </template>
           </div>
         </div>
       </div>
@@ -358,6 +382,7 @@
  * Requirements: 2.5, 3.5, 4.6, 5.1, 5.2
  */
 import { inject, ref, computed, reactive, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { WP_LIST_CONTEXT_KEY } from '@/composables/useWorkpaperListContext'
 import type { WpChildProps, WpChildEmits, MutatePayload } from '@/composables/useWorkpaperListContext'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
@@ -374,6 +399,7 @@ const emit = defineEmits<WpChildEmits>()
 const _ctx = inject(WP_LIST_CONTEXT_KEY)
 if (!_ctx) throw new ReferenceError('WpListContext not provided — must be used inside WorkpaperList Shell')
 const ctx = _ctx
+const router = useRouter()
 
 // ─── 工作台私有状态 ─────────────────────────────────────────────────────────────
 const workbenchProgressCollapsed = ref(false)
@@ -504,6 +530,68 @@ function toggleCycleGroup(code: string) {
   expandedCycleGroups[code] = !expandedCycleGroups[code]
 }
 
+// ─── 子底稿折叠：父底稿下折叠其子底稿（如 A1 → A1-11~A1-18）────────────────
+const expandedParentWps = reactive<Record<string, boolean>>({})
+
+function toggleParentWp(code: string) {
+  expandedParentWps[code] = !expandedParentWps[code]
+}
+
+interface TreeNode {
+  row: typeof workbenchTableData.value[number]
+  children: typeof workbenchTableData.value
+}
+
+/**
+ * 将扁平列表构建为父-子树结构。
+ * 规则：若存在编码 X（如 A1）且有其他编码以 X- 开头（如 A1-11），
+ * 则 X- 开头的条目折叠到 X 下面作为 children。
+ */
+function buildTree(items: typeof workbenchTableData.value): TreeNode[] {
+  // 找出所有"父"编码：该编码有至少一个以 `code-` 开头的兄弟
+  const codes = items.map(i => i.wp_code)
+  const parentCodes = new Set<string>()
+  for (const code of codes) {
+    // 检查是否有其他条目以此 code + '-' 开头
+    if (codes.some(c => c !== code && c.startsWith(code + '-'))) {
+      parentCodes.add(code)
+    }
+  }
+
+  // 将子条目归入其最具体的父
+  const childOf = new Map<string, string>() // childCode → parentCode
+  for (const item of items) {
+    // 找到最长匹配的 parent（如 A17 优先于 A1）
+    let bestParent = ''
+    for (const p of parentCodes) {
+      if (item.wp_code.startsWith(p + '-') && p.length > bestParent.length) {
+        bestParent = p
+      }
+    }
+    if (bestParent) childOf.set(item.wp_code, bestParent)
+  }
+
+  const result: TreeNode[] = []
+  const childMap = new Map<string, typeof items>()
+
+  for (const item of items) {
+    const parent = childOf.get(item.wp_code)
+    if (parent) {
+      if (!childMap.has(parent)) childMap.set(parent, [])
+      childMap.get(parent)!.push(item)
+    } else {
+      result.push({ row: item, children: [] })
+    }
+  }
+
+  // 挂载 children
+  for (const node of result) {
+    node.children = childMap.get(node.row.wp_code) || []
+  }
+
+  return result
+}
+
 const groupedWorkbenchData = computed(() => {
   const data = workbenchTableData.value
   const groups = new Map<string, typeof data>()
@@ -537,6 +625,18 @@ function onWorkbenchCycleClick(code: string) {
 
 function onWorkbenchRowClick(row: any) {
   if (row.id) emit('navigate', row.id)
+}
+
+/**
+ * 子底稿点击：跳转到父底稿编辑器，带 ?sheet=childCode 自动定位 Tab
+ */
+function onChildRowClick(parentRow: any, childRow: any) {
+  if (!parentRow.id) return
+  router.push({
+    name: 'WorkpaperEditor',
+    params: { projectId: props.projectId, wpId: parentRow.id },
+    query: { sheet: childRow.wp_code },
+  })
 }
 
 function getWpRowActions(_row: any): RowAction[] {
@@ -1382,4 +1482,27 @@ function onGuideWpClick(wpCode: string) {
   font-size: 12px;
 }
 .gt-wpb-cycle-item__actions { flex-shrink: 0; }
+
+/* 父底稿（有子项时）可折叠样式 */
+.gt-wpb-cycle-item--parent { font-weight: 500; }
+.gt-wpb-cycle-item--parent:hover { background: #f3eef9; }
+.gt-wpb-cycle-item__toggle {
+  width: 18px;
+  flex-shrink: 0;
+  cursor: pointer;
+  color: #909399;
+  font-size: 12px;
+  text-align: center;
+}
+.gt-wpb-cycle-item__child-count {
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+/* 子底稿行缩进 */
+.gt-wpb-cycle-item--child {
+  padding-left: 20px;
+  background: #fafbfd;
+}
+.gt-wpb-cycle-item--child:hover { background: #f5f3f8; }
+.gt-wpb-cycle-item--child .gt-wpb-cycle-item__code { color: #606266; font-weight: 400; }
 </style>

@@ -112,6 +112,7 @@ export type HtmlComponentType =
   | 'a17-1-audit-summary'
   | 'a17-2-1-kam'
   | 'a5-1-cashflow-audit'
+  | 'a3-8-goodwill-impairment'
   | 'b1-4-due-diligence-report'
   | 'review-bundle'
 
@@ -889,6 +890,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '💰',
     label: 'A5-1 现金流量表审计',
     emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'a3-8-goodwill-impairment',
+    component: defineAsyncComponent(() => import('./GtA38GoodwillImpairment.vue')),
+    icon: '💠',
+    label: 'A3-8 商誉减值测试',
+    emits: ['save', 'jump-to-workpaper'],
     contextProps: 'standard',
   },
   {

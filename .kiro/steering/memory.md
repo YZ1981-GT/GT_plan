@@ -26,6 +26,7 @@ inclusion: always
 - **三表HTML渲染**：底稿目录+审定表+附注全走HTML，仅复杂公式/DCF/图表留OnlyOffice
 - **联动是核心价值**：ref_index chip+auto_data_source实时取数；孤立底稿=无价值
 - **A17系列联动策略(2026-06-26确认)**：只做GtIndexChip跳转，不做EventBus数据自动同步（A17-1引用A17-2-1/A17-3/B50/A13/A1-15均为跳转；A17-3-1对A17-3为只读引用展示）
+- **✅ A3合并系列治理(2026-06-28完成)**：**第一步**：①overrides补齐(A3-1/-2/-4/-5/-6/-7→skip合并模块镜像,A3-3→audit-sheet) ②GtA3ConsolidationConsole加「合并底稿索引」区(7行route:chip跳合并模块Tab) ③修复ConsolidationIndex的route.query.tab→activeTab别名同步(TAB_ALIAS:scope→structure/trial→consol_tb/notes→consol_note)。**第二步**：A3-8商誉减值测试专属组件`a3-8-goodwill-impairment`，9/9任务全绿(47测试:12 PBT+14单元+16注册契约+5后端)。useA38Goodwill公式引擎(减值=max(diff,0)/CAPM Ke=Rf+β(Rm-Rf)/WACC,D+E=0→null/DCF折现/终值base(1+g)/(r-g)/可收回孰高/减值损失先冲商誉再按比例二次分摊总和守恒)；GtA38GoodwillImpairment.vue 4Tab+双模式+GtIndexChip(I3-2/I3-6/I3-7只跳转)。**A3-8↔I3=合并层↔单体层**(I3-6减值/I3-7可收回=单体,A3-8=合并)。**第三步**：GtA3ConsolidationConsole升级为el-tabs bundle(3Tab:程序表/A3-3 OO/A3-8专属),子底稿wpId通过getWpIndex解析,v-if按wpIdMap动态显示。注：测试项目0ec33无A3-8 wp实例,全UI流程待合并项目验证
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **开发前必先逐sheet读源模板**；**导入导出三级**；**适用性自动判断**
 
@@ -115,7 +116,9 @@ inclusion: always
 - D2 聚合 12 空白 tab；A 循环 docx 弹窗（30 个待加 WpPopupDocxEditor）
 - **✅ useEditorMode.spec.ts 断言已修复**：htmlRendererRegistry.spec.ts expected 列表已更新至 82 componentType（含 A17-1/A17-2-1/A5-1 + 9 个 A17/A18/A8/A11 专属组件）
 - 外部依赖：LLM embedding / 合并 UAT / GitHub 默认分支改 main / MinerU+OCR
-- **🟡 平台级批量导入导出**(待建spec)：一键导出/导入跨模块(底稿/报表/附注)所有模板和数据。打包zip+异步队列+大文件下载。等18个双模式组件完成后再建spec
+- **🟡 签字表交互优化方向(2026-06-28确认)**：所有底稿签字表（A17-1等4角色签字区）从手动input改为按钮弹窗确认模式（点击"确认编制/复核完成"→弹窗确认→自动填当前用户+时间戳）。与A1-11签发流转表交互一致，不可伪造。需改composable+模板+可能后端。下轮做
+- **✅ A17-1签字表修正为4角色(2026-06-28)**：源模板只有4角色(编制人项目现场负责人/复核人项目合伙人/项目质量复核合伙人如适用/质量控制复核人如适用)，原实现错误设为10角色。composable SIGNATURE_ROLES已修正+边界检查改为动态length+35测试全绿
+- **🟡 A17-1各章节编制提示(待做)**：源模板每章有蓝色编制提示文字(填写要求/注意事项/准则引用)，当前composable只有简短guidance。需从docx逐章提取完整提示→补入a17_chapter_definitions.json的guidance字段→前端各章节卡片增加折叠"编制提示"区(el-collapse/el-alert info)
 - **架构优化**：①拆 event_handlers.py ②前端 Top-5 巨型 Vue 拆分 ③services/ 按域建子包
 - **🟡 omp(can1357/oh-my-pi)借鉴点**(2026-06-28,待LLM Phase3+)：①Hashline内容锚定→底稿并发冲突field-level检测 ②Subagent隔离+schema-validated output→/ai-generate结构化返回 ③Hindsight项目记忆→v3.0跨年续审知识继承(retain/recall模式) ④Stream Rules实时拦截→QC规则在LLM生成阶段截断重试
 - **✅ A15 财务指标自动取数**(2026-06-27)：`_going_concern.py` resolver从TB自动算流动比率/速动比率/资产负债率/净资产/累计未分配利润+三色风险等级。GtA15Bundle增加指标卡片。通用`GET /api/projects/{pid}/auto-data/{source}?year=`端点（可复用于任何resolver）
@@ -146,6 +149,10 @@ inclusion: always
 - **🔴 大章节底稿聚合模式**：A17/A16/B30 等大章节底稿需做"统一入口组件+子表作为tab"模式（参考函证D0/B22A），子底稿映射skip由主组件内tab切换渲染
 - **🔴 A1 Dashboard子Tab组件必须自加载**：GtA1Dashboard只传wpId不传htmlData，子组件（GtAnalyticalReview/GtChecklistTable等）需在htmlData未提供时自行调render-config获取数据。render-config已支持`?force_component_type=`查询参数强制指定渲染策略（解决skip映射底稿在Dashboard内嵌时无法触发正确renderer的问题）
 - **🔴 子底稿wp_code_overrides必须保持skip**：A1-11~A1-17在overrides中必须是`skip`（否则在底稿列表中平铺显示），Dashboard内嵌时通过`force_component_type`指定真实componentType。改为非skip会导致列表中子底稿暴露
+- **✅ 底稿列表子表折叠+目录化(2026-06-28)**：WorkpaperWorkbenchView增加buildTree父子折叠(最长前缀+'-'自动识别)，子行去掉GtRowActions(纯目录条目)，点击子行→router.push到父底稿编辑器+?sheet=childCode定位Tab。父行点击→直接打开编辑器(onWorkbenchRowClick)，折叠箭头单独@click.stop控制展开收起
+- **🔴 WorkpaperEditor locate-cell误触发修复(2026-06-28)**：`?sheet=`单独存在时不再触发`workpaper:locate-cell`事件（原逻辑`if(querySheet||queryCell)`改为`if(queryCell)`）。单独sheet是Tab切换信号由bundle组件watcher处理，非Excel单元格定位。否则bundle底稿打开时弹"未找到对应科目位置"误报
+- **🔴 Bundle子Tab组件必须守卫wpId为空(2026-06-28)**：A17Bundle/A1Dashboard等bundle内嵌子底稿组件时，若`getTabWpId(tab)`返回空串（子底稿未生成），必须`v-if`守卫不渲染组件，否则组件selfLoad请求404触发http.ts全局拦截器弹"Not Found(ID:xxx)"。修复：空wpId时显示"该子底稿尚未生成"占位提示
+- **🔴 GtAProgramConsole需selfLoad(2026-06-28)**：原组件无selfLoad，完全依赖父组件(GtWpRenderer)传htmlData。bundle内嵌场景(A17Bundle等)不传htmlData→程序表为空。修复：onMounted增加selfLoad，当htmlData.programs为空时调render-config?force_component_type=a-program-console获取后端生成的程序数据
 - **🔴 render-config返回结构是`{sheets:[{html_data:{...}}]}`**：自加载组件从`res.sheets[0].html_data`取渲染器输出，非顶层`res.template`。A1-15已踩坑修复（空白页根因）
 - **GtOnlyOfficeSheet 内置全屏**：全屏编辑功能加在组件内部(position:fixed+z-index:2000+ESC退出)，所有使用场景自动获得，不需各调用方重复实现
 - **🔴 contenteditable v-model** 必加 isInternalChange/focus guard
@@ -163,7 +170,7 @@ inclusion: always
 - **✅ OnlyOffice"10人编辑"误报修复(2026-06-28)**：`onlyoffice_session_limiter.py`原用独立计数器`onlyoffice:session_count`(无TTL)与session key(有TTL)脱节,OO持续降级致release从不触发,计数虚高到10。重写为SCAN统计去重user_id数作席位(自愈),删独立计数器。`deliverable.py`的`onlyoffice_config`端点只在edit mode(`oos._editor_mode(status)=="edit"`)才acquire_session,只读预览不占席位。同一用户多文档/版本只占1席
 - **✅ 版本链下载用认证下载(2026-06-28)**：`DeliverableVersionList.vue`原用`el-button :href target=_blank`不带Bearer token→改为`downloadFile`(axios blob)。`get_version_chain`排序加`version_no.desc()`次级排序(created_at同秒时确定性)
 - **🔴 naive UTC时间戳前端少8小时(2026-06-28)**：后端`func.now()`/`datetime.utcnow`存的是naive UTC(无时区标记如`2026-06-28T04:06:49`)，前端`new Date()`按本地时间解析→中国少8小时。修复：补`Z`标记`/[zZ]|[+-]\d{2}:?\d{2}$/.test(v)?v:v+'Z'`再交`displayPrefs.fmtDateTime`转本地。已修DeliverableVersionList+DeliverableGroupList导出时间。**其他显示后端时间戳的组件同理需补Z**
-- **🔴 新专属组件必须有selfLoad逻辑**：当htmlData prop为null(bundle内嵌场景)，组件onMounted必须自行调`render-config?force_component_type=xxx`加载数据。否则bundle内Tab显示空白。A17-1/A17-2-1已踩坑修复
+- **🔴 新专属组件必须有selfLoad逻辑**：当htmlData prop为null(bundle内嵌场景)，组件onMounted必须自行调`render-config?force_component_type=xxx`加载数据。否则bundle内Tab显示空白。A17-1/A17-2-1/A1-12(2026-06-28)已踩坑修复。**A1-12根因**：GtA112DualChecklist的loadRenderConfig漏带`?force_component_type=a1-12-dual-checklist`，A1-12映射skip→默认render走通用策略不返回checklistData→结构化视图空白(只剩签字区骨架)。后端_a112_dual解析器本身正常(2分类14项4签字)
 - **🔴 新专属组件的bundle集成三件事**：①wp_code_overrides保持`skip`(子底稿不在列表暴露) ②父bundle的Tab kind+组件引用切换到新组件 ③composable函数签名调用别传错(对象vs直接ref)
 - **🔴 WorkpaperWordEditor健康检查+OO加载已修复(2026-06-26)**：①健康检查原错误调`/api/deliverables/onlyoffice/health`(不存在)→改为`/api/workpapers/onlyoffice/health`(返回`{healthy:bool}`) ②`initGenericEditor`原调不存在的`/onlyoffice-config?version=`端点→改为与GtOnlyOfficeSheet相同的`/sheets/{sheetName}/onlyoffice-config`+project_id参数 ③直接透传后端返回的完整config给DocEditor（不再前端自己拼）
 

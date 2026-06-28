@@ -184,8 +184,8 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('updates signature date', () => {
       const { composable } = setup()
-      composable.updateSignature(4, 'date', '2024-12-31')
-      expect(composable.signatureTable.value[4].date).toBe('2024-12-31')
+      composable.updateSignature(3, 'date', '2024-12-31')
+      expect(composable.signatureTable.value[3].date).toBe('2024-12-31')
     })
 
     it('saves with correct item_id', async () => {
@@ -202,18 +202,18 @@ describe('useA171AuditSummary — Unit', () => {
     it('invalid index does nothing', () => {
       const { composable } = setup()
       composable.updateSignature(-1, 'name', 'x')
-      composable.updateSignature(10, 'name', 'x')
+      composable.updateSignature(4, 'name', 'x')
       // All remain null
       for (const row of composable.signatureTable.value) {
         expect(row.name).toBeNull()
       }
     })
 
-    it('10 signature roles initialized correctly', () => {
+    it('4 signature roles initialized correctly', () => {
       const { composable } = setup()
-      expect(composable.signatureTable.value.length).toBe(10)
-      expect(composable.signatureTable.value[0].role).toBe('编制人')
-      expect(composable.signatureTable.value[9].role).toBe('其他')
+      expect(composable.signatureTable.value.length).toBe(4)
+      expect(composable.signatureTable.value[0].role).toBe('编制人（项目现场负责人）')
+      expect(composable.signatureTable.value[3].role).toBe('质量控制复核人（如适用）')
     })
   })
 
@@ -353,7 +353,7 @@ describe('useA171AuditSummary PBT — Property 1: item_id format', () => {
   it('buildA171SignatureItemId always produces a171-signature-{row}-{col} format', () => {
     fc.assert(
       fc.property(
-        fc.integer({ min: 0, max: 9 }),
+        fc.integer({ min: 0, max: 3 }),
         fc.constantFrom('name', 'date'),
         (rowIndex, col) => {
           const itemId = buildA171SignatureItemId(rowIndex, col)
@@ -376,7 +376,7 @@ describe('useA171AuditSummary PBT — Property 1: item_id format', () => {
           ynAnswer: fc.constantFrom('Y' as const, 'N' as const),
           ynExplanation: fc.string({ minLength: 1, maxLength: 30 }),
           tableChapter: fc.constantFrom(6, 8),
-          signRow: fc.integer({ min: 0, max: 9 }),
+          signRow: fc.integer({ min: 0, max: 3 }),
           signCol: fc.constantFrom('name' as const, 'date' as const),
           signValue: fc.string({ minLength: 1, maxLength: 10 }),
         }),
