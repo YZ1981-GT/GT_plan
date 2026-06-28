@@ -352,26 +352,69 @@ async function aiGenerate(section: number) {
     3: '值得关注的内控缺陷', 4: '重大职业判断事项',
     5: '导致变更审计程序的情形', 6: '可能导致出具非无保留意见审计报告的事项',
   }
+  const guidances: Record<number, string> = {
+    1: '根据B50识别的特别风险，按JSON数组格式返回表格数据，每行含risk(风险描述)/impact(影响报告意见的错报)/measure(所采取措施及结论)/diff(与审计应对措施差异说明)。示例：[{"risk":"收入确认舞弊风险","impact":"可能高估营业收入","measure":"执行了截止测试和细节测试","diff":"无差异"}]',
+    4: '生成重大职业判断表格数据。按JSON数组返回，每行含content(判断内容)/importance(影响财务报告的重要性)/procedure(已执行程序及结论)/change_needed(应对措施是否需改变)。',
+    5: '生成导致变更审计程序的情形表格。按JSON数组返回，每行含event(事项)/impact(对审计报告意见影响)/procedure(已执行程序及取得证据)/change_needed(应对措施是否需改变)。',
+  }
   aiLoading.value = section
   try {
     const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
-      chapter: 4, chapter_title: titles[section] || '', guidance: '',
+      chapter: 4, chapter_title: titles[section] || '', guidance: guidances[section] || '',
       existing_content: '', knowledge_doc_ids: [],
     }, { _silent: true } as any)
     const content = res?.content || ''
     if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+
     switch (section) {
-      case 1: s1HasRisk.value = true; s1Rows.value = [{ risk: content, impact: '', measure: '', diff: '' }]; break
+      case 1: {
+        s1HasRisk.value = true
+        const parsed = _tryParseJsonArray(content)
+        if (parsed?.length) {
+          s1Rows.value = parsed.map((r: any) => ({ risk: r.risk || '', impact: r.impact || '', measure: r.measure || '', diff: r.diff || '' }))
+        } else {
+          s1Rows.value = [{ risk: content, impact: '', measure: '', diff: '' }]
+        }
+        break
+      }
       case 2: s2Corrected.value = content; break
       case 3: s3Content.value = content; s3HasDeficiency.value = true; break
-      case 4: s4HasJudgment.value = true; s4Rows.value = [{ content, importance: '', procedure: '', change_needed: '' }]; break
-      case 5: s5HasDifficulty.value = true; s5Rows.value = [{ event: content, impact: '', procedure: '', change_needed: '' }]; break
+      case 4: {
+        s4HasJudgment.value = true
+        const parsed = _tryParseJsonArray(content)
+        if (parsed?.length) {
+          s4Rows.value = parsed.map((r: any) => ({ content: r.content || '', importance: r.importance || '', procedure: r.procedure || '', change_needed: r.change_needed || '' }))
+        } else {
+          s4Rows.value = [{ content, importance: '', procedure: '', change_needed: '' }]
+        }
+        break
+      }
+      case 5: {
+        s5HasDifficulty.value = true
+        const parsed = _tryParseJsonArray(content)
+        if (parsed?.length) {
+          s5Rows.value = parsed.map((r: any) => ({ event: r.event || '', impact: r.impact || '', procedure: r.procedure || '', change_needed: r.change_needed || '' }))
+        } else {
+          s5Rows.value = [{ event: content, impact: '', procedure: '', change_needed: '' }]
+        }
+        break
+      }
       case 6: s6Content.value = content; s6HasModification.value = true; break
     }
     save()
     ElMessage.success('AI 已生成')
   } catch { ElMessage.warning('AI 生成失败') }
   finally { aiLoading.value = null }
+}
+
+/** 尝试从 AI 返回内容中解析 JSON 数组 */
+function _tryParseJsonArray(text: string): any[] | null {
+  try { const arr = JSON.parse(text); if (Array.isArray(arr)) return arr } catch {}
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (match) { try { const arr = JSON.parse(match[1]); if (Array.isArray(arr)) return arr } catch {} }
+  const bracketMatch = text.match(/\[[\s\S]*\]/)
+  if (bracketMatch) { try { const arr = JSON.parse(bracketMatch[0]); if (Array.isArray(arr)) return arr } catch {} }
+  return null
 }
 
 onMounted(loadData)

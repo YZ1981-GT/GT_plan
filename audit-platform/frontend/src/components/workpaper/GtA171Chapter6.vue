@@ -229,9 +229,9 @@ async function aiGenerate(section: number) {
     3: '"延伸检查"程序执行情况',
   }
   const guidances: Record<number, string> = {
-    1: '根据B50风险评估矩阵中识别的财务报表层次重大错报风险，说明总体应对措施的执行情况。',
+    1: '根据B50风险评估矩阵中识别的财务报表层次重大错报风险，生成表格数据。请按JSON数组格式返回，每行包含risk(风险描述)和response(总体应对措施的执行情况)两个字段。示例：[{"risk":"管理层凌驾控制的风险","response":"执行了日记账分录测试和会计估计复核"}]',
     2: '对照总体审计策略中识别的认定层次重大错报风险（长投减值/收入舞弊/减值准备/或有事项/资产购买），说明各项执行情况及结果。',
-    3: '说明延伸检查程序的适用情形（资本运作/融资/首次承接/高风险行业/发现舞弊迹象），以及执行的领域、性质、范围、时间和结果。',
+    3: '说明延伸检查程序执行情况。请按JSON数组格式返回，每行包含area(领域或业务流程)、nature(性质)、scope(范围)、time(时间)、result(结果)。示例：[{"area":"收入确认","nature":"核查关联方资金流水","scope":"全部关联交易","time":"2025.12","result":"未发现异常"}]',
   }
   aiLoading.value = section
   try {
@@ -241,13 +241,47 @@ async function aiGenerate(section: number) {
     }, { _silent: true } as any)
     const content = res?.content || ''
     if (!content) { ElMessage.info('AI 未生成有效内容'); return }
-    if (section === 1) { s1Rows.value = [{ risk: content, response: '' }] }
-    else if (section === 2) { s2Contents[0] = content }
-    else if (section === 3) { s3Applicable.value = true; s3Rows.value = [{ area: content, nature: '', scope: '', time: '', result: '' }] }
+
+    if (section === 1) {
+      // 尝试解析 JSON 数组
+      const parsed = _tryParseJsonArray(content)
+      if (parsed && parsed.length > 0) {
+        s1Rows.value = parsed.map((r: any) => ({ risk: r.risk || '', response: r.response || '' }))
+      } else {
+        // 降级：把内容分行填入
+        const lines = content.split('\n').filter((l: string) => l.trim())
+        s1Rows.value = lines.map((l: string) => ({ risk: l, response: '' }))
+      }
+    } else if (section === 2) {
+      s2Contents[0] = content
+    } else if (section === 3) {
+      s3Applicable.value = true
+      const parsed = _tryParseJsonArray(content)
+      if (parsed && parsed.length > 0) {
+        s3Rows.value = parsed.map((r: any) => ({
+          area: r.area || '', nature: r.nature || '', scope: r.scope || '', time: r.time || '', result: r.result || '',
+        }))
+      } else {
+        s3Rows.value = [{ area: content, nature: '', scope: '', time: '', result: '' }]
+      }
+    }
     save()
     ElMessage.success('AI 已生成')
   } catch { ElMessage.warning('AI 生成失败') }
   finally { aiLoading.value = null }
+}
+
+/** 尝试从 AI 返回内容中解析 JSON 数组 */
+function _tryParseJsonArray(text: string): any[] | null {
+  // 先尝试直接解析
+  try { const arr = JSON.parse(text); if (Array.isArray(arr)) return arr } catch {}
+  // 尝试提取 ```json ... ``` 代码块
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (match) { try { const arr = JSON.parse(match[1]); if (Array.isArray(arr)) return arr } catch {} }
+  // 尝试提取 [ ... ] 部分
+  const bracketMatch = text.match(/\[[\s\S]*\]/)
+  if (bracketMatch) { try { const arr = JSON.parse(bracketMatch[0]); if (Array.isArray(arr)) return arr } catch {} }
+  return null
 }
 
 onMounted(loadData)
