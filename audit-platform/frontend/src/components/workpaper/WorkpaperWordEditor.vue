@@ -229,7 +229,7 @@
                 {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
               </el-button>
             </div>
-            <div :id="editorContainerId" class="gt-wp-word-editor__oo-container" :class="{ 'is-fullscreen': isFullscreen }" />
+            <div ref="ooContainerRef" :id="editorContainerId" class="gt-wp-word-editor__oo-container" :class="{ 'is-fullscreen': isFullscreen }" />
           </template>
           <div v-else class="gt-wp-word-editor__degraded-generic">
             <el-alert type="warning" :closable="false" show-icon>
@@ -468,8 +468,32 @@ async function onModeSwitch(newMode: string) {
 
 // ─── Fullscreen toggle (generic online edit) ───
 const isFullscreen = ref(false)
+const ooContainerRef = ref<HTMLElement | null>(null)
+
 function toggleFullscreen() {
-  isFullscreen.value = !isFullscreen.value
+  if (!isFullscreen.value) {
+    const el = ooContainerRef.value
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => { /* fallback to CSS */ })
+    } else if ((el as any)?.webkitRequestFullscreen) {
+      (el as any).webkitRequestFullscreen()
+    }
+    isFullscreen.value = true
+    document.addEventListener('fullscreenchange', _onFsChange)
+  } else {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+    isFullscreen.value = false
+    document.removeEventListener('fullscreenchange', _onFsChange)
+  }
+}
+
+function _onFsChange() {
+  if (!document.fullscreenElement && isFullscreen.value) {
+    isFullscreen.value = false
+    document.removeEventListener('fullscreenchange', _onFsChange)
+  }
 }
 
 // ─── Common State ───
