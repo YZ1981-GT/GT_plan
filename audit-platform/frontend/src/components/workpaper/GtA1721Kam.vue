@@ -65,10 +65,14 @@
             <div class="gt-a1721__guidance-body">
               对于"重大事项概要汇总"（A17-1）底稿的四（一）至（五）中记录的需合伙人关注事项，如果未识别为需沟通的关键审计事项，需在本底稿中记录判断理由。<br/><br/>
               候选事项按4类分组填列：<br/>
-              (一) 评估的重大错报风险较高的领域或识别出的特别风险<br/>
-              (二) 涉及重大管理层判断的领域（包括涉及重大会计估计的领域）<br/>
-              (三) 本期重大交易或事项对审计的影响<br/>
-              (四) 其他
+              <b>(一) 评估的重大错报风险较高的领域或识别出的特别风险</b><br/>
+              <span style="color:#909399">示例：收入确认的准确性（计算收入时，参数的选取及系统处理的准确性、及时性将对收入金额产生重要影响）；固定资产减值准备的计提（采用收益法测算，结果具有高度不确定性）</span><br/><br/>
+              <b>(二) 涉及重大管理层判断（包括具有高度估计不确定性的会计估计）的领域</b><br/>
+              <span style="color:#909399">示例：第三层次公允价值计量的金融资产的估值（金额重大且涉及复杂的估值模型）；开发支出资本化（确定是否满足所有资本化条件需要管理层进行重大会计判断和估计）</span><br/><br/>
+              <b>(三) 本期重大交易或事项对审计的影响</b><br/>
+              <span style="color:#909399">示例：对外投资的结构化主体纳入合并范围的判断（重大投资活动会对合并范围产生重大影响）；非同一控制下收购子公司（收购日公允价值确定、商誉计算、控制权分析）；在一段时间内确认的工程收入（完工百分比法时，履约进度及预计总成本主要依赖管理层的重大估计和判断）</span><br/><br/>
+              <b>(四) 其他</b><br/>
+              <span style="color:#909399">示例：合同负债列报的重大错报（重大错报已经更正，且该账户并非财务报表使用者重点关注的领域）；对境外子公司审计程序受限（审计范围受限情形影响审计意见类型）</span>
             </div>
           </details>
           <el-table
@@ -86,7 +90,7 @@
                 <el-input
                   :model-value="row.description"
                   size="small"
-                  placeholder="描述候选关键审计事项"
+                  placeholder="如：收入确认的准确性 / 商誉减值测试"
                   @change="(v: string) => updateCandidate($index, 'description', v)"
                 />
               </template>
@@ -127,7 +131,7 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="是否沟通" width="90" align="center">
+            <el-table-column label="是否确定为KAM" width="90" align="center">
               <template #default="{ row, $index }">
                 <el-select
                   :model-value="row.communicate"
@@ -139,12 +143,12 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="原因" min-width="160">
+            <el-table-column label="判断的原因和理据" min-width="160">
               <template #default="{ row, $index }">
                 <el-input
                   :model-value="row.reason"
                   size="small"
-                  placeholder="说明原因"
+                  placeholder="判断的原因和理据"
                   @change="(v: string) => updateCandidate($index, 'reason', v)"
                 />
               </template>
