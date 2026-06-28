@@ -31,6 +31,7 @@ const GtEmbeddedChecklist = defineAsyncComponent(() => import('./GtEmbeddedCheck
 const IndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
 const GtA1721Kam = defineAsyncComponent(() => import('./GtA1721Kam.vue'))
 const GtA173ConsultationRecord = defineAsyncComponent(() => import('./GtA173ConsultationRecord.vue'))
+const GtA1731ConsultationExecution = defineAsyncComponent(() => import('./GtA1731ConsultationExecution.vue'))
 
 // ─── Props ───
 const props = defineProps<{
@@ -44,7 +45,7 @@ const props = defineProps<{
 interface TabDef {
   id: string
   label: string
-  kind: 'program' | 'a17-summary' | 'word' | 'checklist' | 'independence' | 'kam' | 'consultation'
+  kind: 'program' | 'a17-summary' | 'word' | 'checklist' | 'independence' | 'kam' | 'consultation' | 'consultation-exec'
   wpCode?: string
   tracked?: boolean
 }
@@ -54,7 +55,7 @@ const TABS: TabDef[] = [
   { id: 'A17-1', label: '重大事项概要汇总', kind: 'a17-summary', wpCode: 'A17-1', tracked: true },
   { id: 'A17-2-1', label: '关键审计事项', kind: 'kam', wpCode: 'A17-2-1' },
   { id: 'A17-3', label: '业务咨询记录', kind: 'consultation', wpCode: 'A17-3' },
-  { id: 'A17-3-1', label: '业务咨询执行记录', kind: 'word', wpCode: 'A17-3-1' },
+  { id: 'A17-3-1', label: '业务咨询执行记录', kind: 'consultation-exec', wpCode: 'A17-3-1' },
   { id: 'A17-4', label: '重大专业分歧事项记录', kind: 'word', wpCode: 'A17-4' },
   { id: 'A17-5', label: '审计工作完成核对表', kind: 'checklist', wpCode: 'A17-5', tracked: true },
   { id: 'A17-6', label: '总结会会议纪要', kind: 'word', wpCode: 'A17-6', tracked: true },
@@ -313,6 +314,17 @@ onMounted(async () => {
         <!-- consultation tab (A17-3) -->
         <template v-else-if="tab.kind === 'consultation'">
           <GtA173ConsultationRecord
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :project-id="props.projectId"
+            :readonly="isTabReadonly(tab)"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
+
+        <!-- consultation-exec tab (A17-3-1) -->
+        <template v-else-if="tab.kind === 'consultation-exec'">
+          <GtA1731ConsultationExecution
             v-if="getTabWpId(tab)"
             :wp-id="getTabWpId(tab)"
             :project-id="props.projectId"

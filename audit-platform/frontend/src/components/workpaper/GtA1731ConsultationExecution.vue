@@ -189,7 +189,9 @@
       v-else
       :wp-id="props.wpId"
       sheet-name="A17-3-1"
+      :project-id="props.projectId"
       class="gt-a1731__oo"
+      @fallback="handleOOFallback"
     />
   </div>
 </template>
@@ -197,6 +199,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useA1731ConsultationExecution } from './composables/useA1731ConsultationExecution'
 import GtIndexChip from './GtIndexChip.vue'
 
@@ -208,12 +211,13 @@ defineOptions({ name: 'GtA1731ConsultationExecution' })
 
 const props = withDefaults(defineProps<{
   wpId: string
+  projectId?: string
   readonly?: boolean
-}>(), { readonly: false })
+}>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
 const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const modeOptions = ref(['结构化视图', '在线编辑'])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -230,8 +234,24 @@ const {
   flushPendingSaves,
 } = useA1731ConsultationExecution(wpIdRef)
 
+// ─── OO Health Check + Fallback ───
+async function checkOOHealth() {
+  try {
+    const { default: http } = await import('@/utils/http')
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
+    if (!healthy) modeOptions.value = ['结构化视图']
+  } catch {
+    modeOptions.value = ['结构化视图']
+  }
+}
+
+function handleOOFallback() {
+  ElMessage.warning('OnlyOffice 编辑器加载失败，请尝试 docker restart audit-onlyoffice')
+}
+
 // ─── Lifecycle ───
-onMounted(() => { loadData(props.wpId) })
+onMounted(() => { checkOOHealth(); loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })
 
 defineExpose({ reload: () => loadData(props.wpId) })
