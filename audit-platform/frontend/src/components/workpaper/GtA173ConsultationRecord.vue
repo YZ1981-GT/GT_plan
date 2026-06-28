@@ -140,9 +140,9 @@
               />
             </div>
 
-            <!-- 相关文件 (file tags) -->
+            <!-- 相关文件（上传+OCR识别→知识库） -->
             <div class="gt-a173__field">
-              <label class="gt-a173__label">相关文件</label>
+              <label class="gt-a173__label">相关文件（上传后自动OCR识别并存入知识库）</label>
               <div class="gt-a173__file-tags">
                 <el-tag
                   v-for="(file, idx) in sections[1].files"
@@ -153,14 +153,31 @@
                 >
                   {{ file }}
                 </el-tag>
-                <el-input
-                  v-if="!props.readonly"
-                  v-model="newFileTag"
-                  size="small"
-                  class="gt-a173__file-input"
-                  placeholder="输入文件名后回车"
-                  @keyup.enter="handleAddFileTag"
-                />
+              </div>
+              <el-upload
+                v-if="!props.readonly"
+                :action="`/api/knowledge-base/projects/${props.projectId}/documents`"
+                :headers="uploadHeaders"
+                :on-success="handleUploadSuccess"
+                :on-error="handleUploadError"
+                :show-file-list="false"
+                accept=".pdf,.docx,.doc,.png,.jpg,.jpeg,.xlsx,.xls"
+                multiple
+                class="gt-a173__upload"
+              >
+                <el-button size="small" type="primary" plain>📎 上传附件</el-button>
+              </el-upload>
+              <el-input
+                v-if="!props.readonly"
+                v-model="newFileTag"
+                size="small"
+                class="gt-a173__file-input"
+                placeholder="或手动输入文件名后回车"
+                @keyup.enter="handleAddFileTag"
+              />
+              <div v-if="uploadedDocIds.length" class="gt-a173__doc-hint">
+                <el-icon><Document /></el-icon>
+                <span>已上传 {{ uploadedDocIds.length }} 个文件，AI生成时将自动引用识别内容</span>
               </div>
             </div>
           </div>
@@ -286,8 +303,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
-import { Loading, MagicStick } from '@element-plus/icons-vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { Loading, MagicStick, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
   useA173ConsultationRecord,
@@ -329,12 +346,36 @@ const {
 
 // ─── File Tag Input ───
 const newFileTag = ref('')
+const uploadedDocIds = ref<string[]>([])
+
+// Upload headers (auth token)
+const uploadHeaders = computed(() => {
+  const token = localStorage.getItem('token') || ''
+  return { Authorization: token ? `Bearer ${token}` : '' }
+})
 
 function handleAddFileTag() {
   if (newFileTag.value.trim()) {
     addFileTag(newFileTag.value)
     newFileTag.value = ''
   }
+}
+
+function handleUploadSuccess(response: any, file: any) {
+  const filename = response?.data?.filename || file?.name || ''
+  if (filename) {
+    addFileTag(filename)
+  }
+  // 如果后端返回了 doc_id（OCR 识别后入库的文档 ID）
+  const docId = response?.data?.doc_id || response?.data?.id
+  if (docId) {
+    uploadedDocIds.value.push(docId)
+  }
+  ElMessage.success(`${filename} 上传成功，已存入知识库`)
+}
+
+function handleUploadError() {
+  ElMessage.warning('文件上传失败，请重试')
 }
 
 // ─── AI Generate ───
@@ -363,7 +404,7 @@ async function aiGenerate(section: number) {
       chapter: section, chapter_title: titles[section] || '',
       guidance: guidances[section] || '',
       existing_content: existingContent,
-      knowledge_doc_ids: [],
+      knowledge_doc_ids: uploadedDocIds.value,
     }, { _silent: true } as any)
     const content = res?.content || ''
     if (!content) { ElMessage.info('AI 未生成有效内容'); return }
@@ -478,6 +519,12 @@ defineExpose({ reload: () => loadData(props.wpId) })
 .gt-a173__file-tags {
   display: flex;
   flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.gt-a173__upload { display: inline-block; margin-right: 8px; }
+.gt-a173__doc-hint { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: #67c23a; }
   gap: 8px;
   align-items: center;
 }
