@@ -117,7 +117,8 @@ async function initialize() {
   try {
     // Step 0: 主动健康预检 — 不健康直接降级，不加载 api.js
     const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    if (!health.data?.healthy) {
+    const healthData = health.data?.data ?? health.data
+    if (!healthData?.healthy) {
       throw new Error('OnlyOffice unhealthy (preflight)')
     }
 
@@ -131,7 +132,8 @@ async function initialize() {
       params: configParams,
       _silent: true,
     } as any)
-    const { config, token, onlyoffice_url } = response.data
+    const configPayload = response.data?.data ?? response.data
+    const { config, token, onlyoffice_url } = configPayload
 
     // 确定 OnlyOffice 服务 URL（API 响应优先，VITE 环境变量兜底）
     const baseUrl = onlyoffice_url || import.meta.env.VITE_ONLYOFFICE_URL || ''
@@ -169,6 +171,10 @@ async function initialize() {
     } else {
       editorConfig.type = 'desktop'
     }
+
+    // 确保 iframe 占满容器
+    editorConfig.height = '100%'
+    editorConfig.width = '100%'
 
     // 注册 DocEditor 事件回调（捕获 iframe 内部错误，R8）
     editorConfig.events = {
@@ -238,6 +244,7 @@ onBeforeUnmount(() => {
   min-height: 100vh;
   height: 100vh;
   border-radius: 0;
+  overflow: hidden;
 }
 
 .gt-onlyoffice-sheet__toolbar {
@@ -285,11 +292,16 @@ onBeforeUnmount(() => {
 .gt-onlyoffice-sheet__editor-container {
   flex: 1;
   width: 100%;
-  height: 100%;
-  min-height: 500px;
+  min-height: 0;
+}
+
+.gt-onlyoffice-sheet__editor-container :deep(iframe) {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 .gt-onlyoffice-sheet--fullscreen .gt-onlyoffice-sheet__editor-container {
+  height: calc(100vh - 44px);
   min-height: calc(100vh - 44px);
 }
 </style>
