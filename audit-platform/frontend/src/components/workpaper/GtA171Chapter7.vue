@@ -16,7 +16,10 @@
         </div>
       </template>
       <template v-if="expertApplicable">
-        <el-input v-model="expertContent" type="textarea" :autosize="{minRows:2}" placeholder="说明利用了哪位专家、工作内容、对审计的贡献、注册会计师对专家工作的评估结论。详见S12。" @change="save" />
+        <div class="gt-ch7__textarea-wrap">
+          <el-input v-model="expertContent" type="textarea" :autosize="{minRows:2}" placeholder="说明利用了哪位专家、工作内容、对审计的贡献、注册会计师对专家工作的评估结论。详见S12。" @change="save" />
+          <el-button size="small" class="gt-ch7__ai-btn" :loading="aiLoading === 'expert'" @click="aiGenerate('expert')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="info" :closable="false" show-icon title="不适用（本期审计未利用专家工作）。详见S12。" />
     </el-card>
@@ -32,7 +35,10 @@
         </div>
       </template>
       <template v-if="taxApplicable">
-        <el-input v-model="taxContent" type="textarea" :autosize="{minRows:2}" placeholder="说明税务专家复核情况。详见A28。" @change="save" />
+        <div class="gt-ch7__textarea-wrap">
+          <el-input v-model="taxContent" type="textarea" :autosize="{minRows:2}" placeholder="说明税务专家复核情况。详见A28。" @change="save" />
+          <el-button size="small" class="gt-ch7__ai-btn" :loading="aiLoading === 'tax'" @click="aiGenerate('tax')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="info" :closable="false" show-icon title="不适用。详见A28。" />
     </el-card>
@@ -56,6 +62,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{ wpId: string; projectId: string }>()
@@ -64,6 +71,7 @@ const expertApplicable = ref(false)
 const expertContent = ref('')
 const taxApplicable = ref(false)
 const taxContent = ref('')
+const aiLoading = ref<string | null>(null)
 
 let _saveTimer: ReturnType<typeof setTimeout> | null = null
 function save() {
@@ -99,6 +107,29 @@ async function loadData() {
   } catch { /* silent */ }
 }
 
+// ─── AI Generate ───
+async function aiGenerate(key: string) {
+  const titles: Record<string, string> = { expert: '利用专家工作情况', tax: '税务专家复核情况' }
+  const guidances: Record<string, string> = {
+    expert: '说明利用了哪位专家、该专家的工作内容、对审计的贡献、注册会计师对专家工作的评估结论。',
+    tax: '说明税务专家复核的范围、发现的问题及结论。',
+  }
+  aiLoading.value = key
+  try {
+    const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
+      chapter: 7, chapter_title: titles[key] || '', guidance: guidances[key] || '',
+      existing_content: '', knowledge_doc_ids: [],
+    }, { _silent: true } as any)
+    const content = res?.content || ''
+    if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+    if (key === 'expert') { expertContent.value = content; expertApplicable.value = true }
+    else if (key === 'tax') { taxContent.value = content; taxApplicable.value = true }
+    save()
+    ElMessage.success('AI 已生成')
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiLoading.value = null }
+}
+
 onMounted(loadData)
 </script>
 
@@ -108,6 +139,9 @@ onMounted(loadData)
 .gt-ch7__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .gt-ch7__card-actions { display: flex; align-items: center; gap: 8px; }
 .gt-ch7__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
+.gt-ch7__textarea-wrap { position: relative; }
+.gt-ch7__ai-btn { position: absolute; top: 4px; right: 4px; z-index: 5; opacity: 0.7; }
+.gt-ch7__ai-btn:hover { opacity: 1; }
 .gt-ch7__guidance { margin-top: 4px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
 .gt-ch7__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
 .gt-ch7__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; }

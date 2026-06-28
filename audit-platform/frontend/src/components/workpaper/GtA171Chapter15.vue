@@ -29,9 +29,15 @@
           </div>
         </details>
         <div class="gt-ch15__sub-label">1、识别出的内部控制缺陷汇总</div>
-        <el-input v-model="icDeficiencySummary" type="textarea" :autosize="{minRows:3}" placeholder="(1)财务报告内控缺陷汇总 (2)非财务报告内控重大缺陷 (3)期后整改情况（可索引B22B）" @change="save" />
+        <div class="gt-ch15__textarea-wrap">
+          <el-input v-model="icDeficiencySummary" type="textarea" :autosize="{minRows:3}" placeholder="(1)财务报告内控缺陷汇总 (2)非财务报告内控重大缺陷 (3)期后整改情况（可索引B22B）" @change="save" />
+          <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'ic1'" @click="aiGenerate('ic1')">🤖 AI</el-button>
+        </div>
         <div class="gt-ch15__sub-label" style="margin-top:12px">2、拟发表的内部控制审计意见类型</div>
-        <el-input v-model="icOpinionType" type="textarea" :autosize="{minRows:2}" placeholder="标准无保留意见 / 非标准意见（说明原因）" @change="save" />
+        <div class="gt-ch15__textarea-wrap">
+          <el-input v-model="icOpinionType" type="textarea" :autosize="{minRows:2}" placeholder="标准无保留意见 / 非标准意见（说明原因）" @change="save" />
+          <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'ic2'" @click="aiGenerate('ic2')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="info" :closable="false" show-icon title="不适用（本项目不需要出具内部控制审计报告）。" />
     </el-card>
@@ -56,15 +62,24 @@
         <div class="gt-ch15__sub-items">
           <div class="gt-ch15__sub-item">
             <div class="gt-ch15__sub-label">1、非经营性资产</div>
-            <el-input v-model="bondNonOperating" type="textarea" :autosize="{minRows:2}" placeholder="描述非经营性资产情况及审计程序" @change="save" />
+            <div class="gt-ch15__textarea-wrap">
+              <el-input v-model="bondNonOperating" type="textarea" :autosize="{minRows:2}" placeholder="描述非经营性资产情况及审计程序" @change="save" />
+              <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'bond1'" @click="aiGenerate('bond1')">🤖 AI</el-button>
+            </div>
           </div>
           <div class="gt-ch15__sub-item">
             <div class="gt-ch15__sub-label">2、偿债能力分析</div>
-            <el-input v-model="bondSolvency" type="textarea" :autosize="{minRows:2}" placeholder="偿债能力分析（资产负债率/净利润覆盖/债券余额比例）" @change="save" />
+            <div class="gt-ch15__textarea-wrap">
+              <el-input v-model="bondSolvency" type="textarea" :autosize="{minRows:2}" placeholder="偿债能力分析（资产负债率/净利润覆盖/债券余额比例）" @change="save" />
+              <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'bond2'" @click="aiGenerate('bond2')">🤖 AI</el-button>
+            </div>
           </div>
           <div class="gt-ch15__sub-item">
             <div class="gt-ch15__sub-label">3、担保情况</div>
-            <el-input v-model="bondGuarantee" type="textarea" :autosize="{minRows:2}" placeholder="担保有效性、抵押质押情况、互保连环保分析" @change="save" />
+            <div class="gt-ch15__textarea-wrap">
+              <el-input v-model="bondGuarantee" type="textarea" :autosize="{minRows:2}" placeholder="担保有效性、抵押质押情况、互保连环保分析" @change="save" />
+              <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'bond3'" @click="aiGenerate('bond3')">🤖 AI</el-button>
+            </div>
           </div>
         </div>
       </template>
@@ -88,7 +103,10 @@
             3、新三板挂牌审计一般问题核查（5大类：合法合规/财务与业务匹配性/财务规范性/财务指标与会计政策/关联交易）。
           </div>
         </details>
-        <el-input v-model="neeqContent" type="textarea" :autosize="{minRows:4}" placeholder="核查情况说明（可分别描述上述三方面的核查结论）" @change="save" />
+        <div class="gt-ch15__textarea-wrap">
+          <el-input v-model="neeqContent" type="textarea" :autosize="{minRows:4}" placeholder="核查情况说明（可分别描述上述三方面的核查结论）" @change="save" />
+          <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'neeq'" @click="aiGenerate('neeq')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="info" :closable="false" show-icon title="不适用（本项目不涉及新三板审计业务）。" />
     </el-card>
@@ -109,7 +127,10 @@
         <div class="gt-ch15__guidance-body">如识别出舞弊或获取的信息表明可能存在舞弊，应当及时向项目合伙人报告。需考虑：管理层凌驾控制迹象；收入确认舞弊风险；日记账分录异常；关联方交易舞弊迹象。如发现舞弊，说明性质、金额、应对措施及对审计意见的影响。</div>
       </details>
       <template v-if="fraudAnswer === 'found'">
-        <el-input v-model="fraudContent" type="textarea" :autosize="{minRows:3}" placeholder="描述发现的舞弊或舞弊迹象及处理措施" @change="save" />
+        <div class="gt-ch15__textarea-wrap">
+          <el-input v-model="fraudContent" type="textarea" :autosize="{minRows:3}" placeholder="描述发现的舞弊或舞弊迹象及处理措施" @change="save" />
+          <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'fraud'" @click="aiGenerate('fraud')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="success" :closable="false" show-icon title="本期审计未发现舞弊或舞弊迹象。" />
     </el-card>
@@ -126,7 +147,10 @@
         </div>
       </template>
       <template v-if="legalAnswer === 'found'">
-        <el-input v-model="legalContent" type="textarea" :autosize="{minRows:3}" placeholder="描述违法违规行为及影响评估" @change="save" />
+        <div class="gt-ch15__textarea-wrap">
+          <el-input v-model="legalContent" type="textarea" :autosize="{minRows:3}" placeholder="描述违法违规行为及影响评估" @change="save" />
+          <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'legal'" @click="aiGenerate('legal')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="success" :closable="false" show-icon title="未发现被审计单位存在重大违反法律法规的行为。" />
     </el-card>
@@ -143,7 +167,10 @@
         </div>
       </template>
       <template v-if="componentAnswer === 'used'">
-        <el-input v-model="componentContent" type="textarea" :autosize="{minRows:3}" placeholder="名称、负责范围、沟通安排、复核程序及结论（参见B30）" @change="save" />
+        <div class="gt-ch15__textarea-wrap">
+          <el-input v-model="componentContent" type="textarea" :autosize="{minRows:3}" placeholder="名称、负责范围、沟通安排、复核程序及结论（参见B30）" @change="save" />
+          <el-button size="small" class="gt-ch15__ai-btn" :loading="aiLoading === 'component'" @click="aiGenerate('component')">🤖 AI</el-button>
+        </div>
       </template>
       <el-alert v-else type="info" :closable="false" show-icon title="不适用（本次审计未利用组成部分审计师的工作）。" />
     </el-card>
@@ -152,6 +179,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{ wpId: string; projectId: string }>()
@@ -178,6 +206,7 @@ const legalContent = ref('')
 // (六) 组成部分
 const componentAnswer = ref<'na' | 'used'>('na')
 const componentContent = ref('')
+const aiLoading = ref<string | null>(null)
 
 // ─── Persistence ───
 let _saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -245,6 +274,44 @@ async function loadData() {
   } catch { /* silent */ }
 }
 
+// ─── AI Generate ───
+async function aiGenerate(key: string) {
+  const titles: Record<string, string> = {
+    ic1: '内部控制缺陷汇总',
+    ic2: '内部控制审计意见类型',
+    bond1: '非经营性资产情况',
+    bond2: '偿债能力分析',
+    bond3: '担保情况分析',
+    neeq: '新三板审计特殊核查事项',
+    fraud: '舞弊相关情况',
+    legal: '违反法律法规情况',
+    component: '组成部分审计师利用情况',
+  }
+  aiLoading.value = key
+  try {
+    const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
+      chapter: 15, chapter_title: titles[key] || '', guidance: '',
+      existing_content: '', knowledge_doc_ids: [],
+    }, { _silent: true } as any)
+    const content = res?.content || ''
+    if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+    switch (key) {
+      case 'ic1': icDeficiencySummary.value = content; break
+      case 'ic2': icOpinionType.value = content; break
+      case 'bond1': bondNonOperating.value = content; break
+      case 'bond2': bondSolvency.value = content; break
+      case 'bond3': bondGuarantee.value = content; break
+      case 'neeq': neeqContent.value = content; break
+      case 'fraud': fraudContent.value = content; break
+      case 'legal': legalContent.value = content; break
+      case 'component': componentContent.value = content; break
+    }
+    save()
+    ElMessage.success('AI 已生成')
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiLoading.value = null }
+}
+
 onMounted(loadData)
 </script>
 
@@ -261,4 +328,8 @@ onMounted(loadData)
 .gt-ch15__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
 .gt-ch15__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
 .gt-ch15__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; }
+
+.gt-ch15__textarea-wrap { position: relative; }
+.gt-ch15__ai-btn { position: absolute; top: 4px; right: 4px; z-index: 5; opacity: 0.7; }
+.gt-ch15__ai-btn:hover { opacity: 1; }
 </style>
