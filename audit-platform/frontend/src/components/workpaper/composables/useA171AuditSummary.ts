@@ -100,7 +100,7 @@ const DEFAULT_CHAPTERS: Record<string, ChapterData> = {
   '3': { type: 'textarea', title: '三、对审计计划的更新和修改', content: null },
   '4': { type: 'textarea', title: '四、审计过程中合伙人已关注的事项', content: null },
   '5': { type: 'textarea', title: '五、业务咨询记录及专业意见分歧解决情况', content: null },
-  '6': { type: 'table', title: '六、对重大错报风险的应对措施执行情况', rows: [] },
+  '6': { type: 'textarea', title: '六、对重大错报风险的应对措施执行情况', content: null },
   '7': { type: 'textarea', title: '七、利用专家的工作', content: null },
   '8': { type: 'textarea', title: '八、已审财务报表分析', content: null },
   '9': { type: 'yn', title: '九、对关联方及关联方交易的结论', answer: null, explanation: null },

@@ -139,57 +139,12 @@
                 </div>
               </div>
 
-              <!-- Table type: chapter 6 -->
-              <div v-else-if="n === 6 && chapters['6']?.type === 'table'" class="gt-a171__table-wrap">
-                <details v-if="CHAPTER_GUIDANCE[6]" class="gt-a171__guidance">
-                  <summary>📋 编制提示</summary>
-                  <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[6] }}</div>
-                </details>
-                <el-table :data="(chapters['6'] as any).rows" border size="small">
-                  <el-table-column label="风险描述" min-width="160">
-                    <template #default="{ row, $index }">
-                      <el-input
-                        :model-value="row.risk"
-                        size="small"
-                        @change="(v: string) => updateTableCell(6, $index, 'risk', v)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="应对措施" min-width="160">
-                    <template #default="{ row, $index }">
-                      <el-input
-                        :model-value="row.response"
-                        size="small"
-                        @change="(v: string) => updateTableCell(6, $index, 'response', v)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="执行情况" min-width="160">
-                    <template #default="{ row, $index }">
-                      <el-input
-                        :model-value="row.result"
-                        size="small"
-                        @change="(v: string) => updateTableCell(6, $index, 'result', v)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="结论" min-width="120">
-                    <template #default="{ row, $index }">
-                      <el-input
-                        :model-value="row.conclusion"
-                        size="small"
-                        @change="(v: string) => updateTableCell(6, $index, 'conclusion', v)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="60" align="center">
-                    <template #default="{ $index }">
-                      <el-button type="danger" link size="small" @click="removeTableRow(6, $index)">删除</el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <el-button size="small" type="primary" plain class="gt-a171__add-row" @click="addTableRow(6)">+ 添加行</el-button>
-              </div>
+              <!-- Chapter 6: structured component -->
+              <GtA171Chapter6
+                v-else-if="n === 6"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+              />
 
               <!-- Y/N type: chapters 9,10,11,12 -->
               <div v-else-if="chapters[String(n)]?.type === 'yn'" class="gt-a171__yn-wrap">
@@ -268,6 +223,7 @@ const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 const GtA171ReviewPanel = defineAsyncComponent(() => import('./GtA171ReviewPanel.vue'))
 const GtA171Chapter3 = defineAsyncComponent(() => import('./GtA171Chapter3.vue'))
 const GtA171Chapter4 = defineAsyncComponent(() => import('./GtA171Chapter4.vue'))
+const GtA171Chapter6 = defineAsyncComponent(() => import('./GtA171Chapter6.vue'))
 const GtA171Chapter8 = defineAsyncComponent(() => import('./GtA171Chapter8.vue'))
 const GtA171Chapter15 = defineAsyncComponent(() => import('./GtA171Chapter15.vue'))
 
