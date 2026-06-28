@@ -102,6 +102,13 @@
                 :project-id="props.projectId || ''"
               />
 
+              <!-- Chapter 6: structured component -->
+              <GtA171Chapter6
+                v-else-if="n === 6"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+              />
+
               <!-- Chapter 15: structured component -->
               <GtA171Chapter15
                 v-else-if="n === 15"
@@ -146,13 +153,6 @@
                   </el-tooltip>
                 </div>
               </div>
-
-              <!-- Chapter 6: structured component -->
-              <GtA171Chapter6
-                v-else-if="n === 6"
-                :wp-id="props.wpId"
-                :project-id="props.projectId || ''"
-              />
 
               <!-- Y/N type: chapters 9,10,11,12 -->
               <div v-else-if="chapters[String(n)]?.type === 'yn'" class="gt-a171__yn-wrap">
