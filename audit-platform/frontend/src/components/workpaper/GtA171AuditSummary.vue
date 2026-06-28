@@ -94,6 +94,20 @@
                 :client-name="projectContext.client_name"
               />
 
+              <!-- Chapter 4: structured component -->
+              <GtA171Chapter4
+                v-else-if="n === 4"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+              />
+
+              <!-- Chapter 15: structured component -->
+              <GtA171Chapter15
+                v-else-if="n === 15"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+              />
+
               <!-- Textarea type (other chapters) -->
               <div v-else-if="chapters[String(n)]?.type === 'textarea'" class="gt-a171__textarea-wrap">
                 <el-input
@@ -230,8 +244,26 @@
       </div>
     </div>
 
-    <!-- Online Edit Mode -->
-    <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A17-1" class="gt-a171__oo" />
+    <!-- Online Edit Mode — 从结构化数据生成 docx 后用 OnlyOffice 编辑 -->
+    <div v-else class="gt-a171__oo-mode">
+      <div v-if="ooGenerating" class="gt-a171__oo-loading">
+        <el-icon class="is-loading" :size="24"><Loading /></el-icon>
+        <span>正在生成 Word 文档...</span>
+      </div>
+      <GtOnlyOfficeSheet
+        v-else-if="ooReady"
+        :wp-id="props.wpId"
+        sheet-name="A17-1"
+        :project-id="props.projectId"
+        class="gt-a171__oo"
+      />
+      <div v-else class="gt-a171__oo-error">
+        <el-alert type="warning" :closable="false" show-icon>
+          <template #title>Word 文档生成失败</template>
+          <span>{{ ooError || '请重试或切回结构化视图' }}</span>
+        </el-alert>
+      </div>
+    </div>
 
     <!-- Review Panel -->
     <GtA171ReviewPanel
@@ -257,6 +289,8 @@ const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 const GtA171ReviewPanel = defineAsyncComponent(() => import('./GtA171ReviewPanel.vue'))
 const GtA171Chapter3 = defineAsyncComponent(() => import('./GtA171Chapter3.vue'))
+const GtA171Chapter4 = defineAsyncComponent(() => import('./GtA171Chapter4.vue'))
+const GtA171Chapter15 = defineAsyncComponent(() => import('./GtA171Chapter15.vue'))
 
 defineOptions({ name: 'GtA171AuditSummary' })
 
@@ -376,10 +410,37 @@ async function checkOOHealth() {
   }
 }
 
-// Flush before switching to OO
+// ─── OO Mode State ───
+const ooGenerating = ref(false)
+const ooReady = ref(false)
+const ooError = ref('')
+
+// Flush + generate docx before switching to OO; sync back when returning
 watch(mode, async (newMode, oldMode) => {
   if (oldMode === '结构化视图' && newMode === '在线编辑') {
     await flushPendingSaves()
+    // Generate docx from structured data
+    ooGenerating.value = true
+    ooReady.value = false
+    ooError.value = ''
+    try {
+      const { api } = await import('@/services/apiProxy')
+      await api.post(`/api/workpapers/${props.wpId}/a171/generate-docx`)
+      ooReady.value = true
+    } catch (err: any) {
+      ooError.value = err?.response?.data?.detail || err?.message || '生成失败'
+    } finally {
+      ooGenerating.value = false
+    }
+  } else if (oldMode === '在线编辑' && newMode === '结构化视图') {
+    // Sync docx edits back to structured data
+    try {
+      const { api } = await import('@/services/apiProxy')
+      await api.post(`/api/workpapers/${props.wpId}/a171/sync-from-docx`)
+      // Reload render data
+      await selfLoad()
+    } catch { /* best effort */ }
+    ooReady.value = false
   }
 })
 
@@ -562,4 +623,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* OO */
 .gt-a171__oo { height: calc(100vh - 200px); min-height: 500px; }
+.gt-a171__oo-mode { min-height: 400px; }
+.gt-a171__oo-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 80px 20px; color: #909399; font-size: 14px; }
+.gt-a171__oo-error { padding: 40px 20px; }
 </style>
