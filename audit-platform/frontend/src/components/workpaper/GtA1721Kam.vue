@@ -54,7 +54,10 @@
           <template #header>
             <div class="gt-a1721__section-header">
               <span class="gt-a1721__section-title">一、关键审计事项候选清单</span>
-              <el-button type="primary" size="small" plain @click="addCandidate">+ 添加候选</el-button>
+              <div class="gt-a1721__section-actions">
+                <el-button size="small" :loading="aiLoading === 'candidates'" @click="aiGenerateCandidates">🤖 AI</el-button>
+                <el-button type="primary" size="small" plain @click="addCandidate">+ 添加候选</el-button>
+              </div>
             </div>
           </template>
           <el-table
@@ -125,7 +128,10 @@
         <div class="gt-a1721__section gt-a1721__kam-cards">
           <div class="gt-a1721__section-header">
             <span class="gt-a1721__section-title">二、关键审计事项详情</span>
-            <el-button type="primary" size="small" plain @click="addKam">+ 添加关键审计事项</el-button>
+            <div class="gt-a1721__section-actions">
+              <el-button size="small" :loading="aiLoading === 'kam'" @click="aiGenerateKam">🤖 AI</el-button>
+              <el-button type="primary" size="small" plain @click="addKam">+ 添加关键审计事项</el-button>
+            </div>
           </div>
 
           <el-card
@@ -255,6 +261,7 @@
 <script setup lang="ts">
 import { ref, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useA1721Kam } from './composables/useA1721Kam'
 import type { A1721RenderData } from './composables/useA1721Kam'
 
@@ -354,6 +361,74 @@ async function selfLoad() {
   } catch { /* silent — component renders empty state gracefully */ }
 }
 
+// ─── AI Generate ───
+const aiLoading = ref<string | null>(null)
+
+async function aiGenerateCandidates() {
+  aiLoading.value = 'candidates'
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
+      chapter: 12, chapter_title: '关键审计事项候选清单',
+      guidance: '根据B50风险评估矩阵中识别的重大错报风险，生成关键审计事项候选清单。按JSON数组返回，每行含description(事项描述)/risk_level(高/中/低)/communicate(Y/N)/reason(原因)。示例：[{"description":"商誉减值测试","risk_level":"高","communicate":"Y","reason":"涉及重大会计估计和管理层判断"}]',
+      existing_content: '', knowledge_doc_ids: [],
+    }, { _silent: true } as any)
+    const content = res?.content || ''
+    if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+    const parsed = _tryParseJsonArray(content)
+    if (parsed?.length) {
+      for (const r of parsed) {
+        addCandidate()
+        const idx = candidates.value.length - 1
+        if (r.description) updateCandidate(idx, 'description', r.description)
+        if (r.risk_level) updateCandidate(idx, 'risk_level', r.risk_level)
+        if (r.communicate) updateCandidate(idx, 'communicate', r.communicate)
+        if (r.reason) updateCandidate(idx, 'reason', r.reason)
+      }
+    }
+    ElMessage.success('AI 已生成候选清单')
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiLoading.value = null }
+}
+
+async function aiGenerateKam() {
+  aiLoading.value = 'kam'
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
+      chapter: 12, chapter_title: '关键审计事项详情',
+      guidance: '根据候选清单中标记为"沟通"的事项，生成关键审计事项详情。按JSON数组返回，每行含basic(基本情况)/policy(会计政策及重大估计)/reason(认定为KAM的原因)/response(审计应对措施)/result(审计结果)/note_disclosure(附注披露建议)。',
+      existing_content: candidates.value.filter(c => c.communicate === 'Y').map(c => c.description).join('; '),
+      knowledge_doc_ids: [],
+    }, { _silent: true } as any)
+    const content = res?.content || ''
+    if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+    const parsed = _tryParseJsonArray(content)
+    if (parsed?.length) {
+      for (const r of parsed) {
+        addKam()
+        const idx = kams.value.length - 1
+        if (r.basic) updateKamField(idx, 'basic', r.basic)
+        if (r.policy) updateKamField(idx, 'policy', r.policy)
+        if (r.reason) updateKamField(idx, 'reason', r.reason)
+        if (r.response) updateKamField(idx, 'response', r.response)
+        if (r.result) updateKamField(idx, 'result', r.result)
+      }
+    }
+    ElMessage.success('AI 已生成 KAM 详情')
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiLoading.value = null }
+}
+
+function _tryParseJsonArray(text: string): any[] | null {
+  try { const arr = JSON.parse(text); if (Array.isArray(arr)) return arr } catch {}
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  if (match) { try { const arr = JSON.parse(match[1]); if (Array.isArray(arr)) return arr } catch {} }
+  const bracketMatch = text.match(/\[[\s\S]*\]/)
+  if (bracketMatch) { try { const arr = JSON.parse(bracketMatch[0]); if (Array.isArray(arr)) return arr } catch {} }
+  return null
+}
+
 onMounted(() => { checkOOHealth(); selfLoad() })
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: () => flushPendingSaves() })
@@ -396,6 +471,7 @@ defineExpose({ reload: () => flushPendingSaves() })
   font-weight: 600;
   color: #303133;
 }
+.gt-a1721__section-actions { display: flex; align-items: center; gap: 8px; }
 
 /* Applicability */
 .gt-a1721__applicability { border-left: 3px solid #e6a23c; }
