@@ -150,10 +150,10 @@ async def _load_cross_references(project_id, db) -> dict:
             sa.text(
                 "SELECT wi.wp_code, wp.id AS wp_id "
                 "FROM wp_index wi "
-                "JOIN working_papers wp ON wp.wp_index_id = wi.id "
-                "WHERE wi.wp_code IN :codes AND wp.project_id = :project_id"
+                "JOIN working_paper wp ON wp.wp_index_id = wi.id "
+                "WHERE wi.wp_code = ANY(:codes) AND wp.project_id = :project_id"
             ),
-            {"codes": tuple(CROSS_REF_WP_CODES), "project_id": str(project_id)},
+            {"codes": list(CROSS_REF_WP_CODES), "project_id": str(project_id)},
         )
         for row in result.fetchall():
             dict_key = key_map.get(row.wp_code)
