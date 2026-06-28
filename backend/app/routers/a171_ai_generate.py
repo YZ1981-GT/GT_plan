@@ -128,8 +128,6 @@ def _build_user_prompt(
     if project_context.get("report_scope"):
         scope_map = {"standalone": "单体财务报表", "consolidated": "合并及母公司财务报表"}
         ctx_lines.append(f"报告范围：{scope_map.get(project_context['report_scope'], project_context['report_scope'])}")
-    if project_context.get("industry"):
-        ctx_lines.append(f"所属行业：{project_context['industry']}")
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
         parts.append("请在生成内容中直接使用上述项目信息替换占位符，不要使用[待填]。\n")
@@ -154,13 +152,12 @@ async def _load_project_context(wp_id: str, db: AsyncSession) -> dict:
         "audit_year": "",
         "business_category": "",
         "report_scope": "",
-        "industry": "",
     }
     try:
         result = await db.execute(
             sa.text("""
                 SELECT p.id, p.client_name, p.audit_year, p.business_category,
-                       p.report_scope, p.industry
+                       p.report_scope
                 FROM working_paper wp
                 JOIN projects p ON wp.project_id = p.id
                 WHERE wp.id = :wp_id
@@ -175,7 +172,6 @@ async def _load_project_context(wp_id: str, db: AsyncSession) -> dict:
             ctx["audit_period"] = f"{row.audit_year}年度" if row.audit_year else ""
             ctx["business_category"] = row.business_category or ""
             ctx["report_scope"] = getattr(row, "report_scope", "") or ""
-            ctx["industry"] = getattr(row, "industry", "") or ""
     except Exception as e:
         logger.warning("A17-1 AI: project context 加载失败: %s", e)
     return ctx
@@ -232,3 +228,63 @@ async def _load_auto_kb_docs(
     except Exception as e:
         logger.warning("A17-1 AI: 自动检索KB失败 (降级为无参考): %s", e)
     return texts, sources
+
+
+# ---------------------------------------------------------------------------
+# A17-1 Docx 双向同步端点
+# ---------------------------------------------------------------------------
+
+
+@router.post("/api/workpapers/{wp_id}/a171/generate-docx")
+async def a171_generate_docx(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """结构化→Word：从 checklist_responses 生成 docx 文件，返回 onlyoffice-config 所需信息"""
+    from app.services.a171_docx_sync import generate_docx
+    import sqlalchemy as sa
+
+    # 获取 project_id
+    row = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wid LIMIT 1"),
+        {"wid": wp_id},
+    )
+    pid = row.scalar_one_or_none()
+    if not pid:
+        raise HTTPException(404, "底稿不存在")
+
+    try:
+        file_path = await generate_docx(UUID(wp_id), pid, db)
+        return {"ok": True, "file_path": str(file_path)}
+    except FileNotFoundError as e:
+        raise HTTPException(404, str(e))
+    except Exception as e:
+        logger.error("A17-1 generate_docx 失败: %s", e, exc_info=True)
+        raise HTTPException(500, f"生成 Word 失败: {str(e)[:200]}")
+
+
+@router.post("/api/workpapers/{wp_id}/a171/sync-from-docx")
+async def a171_sync_from_docx(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Word→结构化：从项目存储的 docx 解析内容回写到 checklist_responses"""
+    from app.services.a171_docx_sync import sync_docx_to_responses
+    import sqlalchemy as sa
+
+    row = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wid LIMIT 1"),
+        {"wid": wp_id},
+    )
+    pid = row.scalar_one_or_none()
+    if not pid:
+        raise HTTPException(404, "底稿不存在")
+
+    try:
+        count = await sync_docx_to_responses(UUID(wp_id), pid, db, current_user.id)
+        return {"ok": True, "synced_chapters": count}
+    except Exception as e:
+        logger.error("A17-1 sync_from_docx 失败: %s", e, exc_info=True)
+        raise HTTPException(500, f"同步失败: {str(e)[:200]}")

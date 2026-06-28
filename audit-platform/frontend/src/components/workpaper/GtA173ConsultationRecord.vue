@@ -525,9 +525,6 @@ defineExpose({ reload: () => loadData(props.wpId) })
 
 .gt-a173__upload { display: inline-block; margin-right: 8px; }
 .gt-a173__doc-hint { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: 12px; color: #67c23a; }
-  gap: 8px;
-  align-items: center;
-}
 
 .gt-a173__file-input {
   width: 200px;
