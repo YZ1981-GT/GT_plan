@@ -108,6 +108,13 @@
                 :project-id="props.projectId || ''"
               />
 
+              <!-- Chapter 8: structured component with auto-data -->
+              <GtA171Chapter8
+                v-else-if="n === 8"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+              />
+
               <!-- Textarea type (other chapters) -->
               <div v-else-if="chapters[String(n)]?.type === 'textarea'" class="gt-a171__textarea-wrap">
                 <!-- 编制提示 -->
@@ -182,52 +189,6 @@
                   </el-table-column>
                 </el-table>
                 <el-button size="small" type="primary" plain class="gt-a171__add-row" @click="addTableRow(6)">+ 添加行</el-button>
-              </div>
-
-              <!-- Table type: chapter 8 -->
-              <div v-else-if="n === 8 && chapters['8']?.type === 'table'" class="gt-a171__table-wrap">
-                <details v-if="CHAPTER_GUIDANCE[8]" class="gt-a171__guidance">
-                  <summary>📋 编制提示</summary>
-                  <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[8] }}</div>
-                </details>
-                <el-table :data="(chapters['8'] as any).rows" border size="small">
-                  <el-table-column label="项目" min-width="160">
-                    <template #default="{ row, $index }">
-                      <el-input
-                        :model-value="row.item"
-                        size="small"
-                        @change="(v: string) => updateTableCell(8, $index, 'item', v)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="金额（元）" min-width="140">
-                    <template #default="{ row, $index }">
-                      <el-input-number
-                        :model-value="row.amount"
-                        :precision="2"
-                        :controls="false"
-                        size="small"
-                        placeholder="金额"
-                        @change="(v: number | undefined) => updateTableCell(8, $index, 'amount', v ?? null)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="说明" min-width="160">
-                    <template #default="{ row, $index }">
-                      <el-input
-                        :model-value="row.note"
-                        size="small"
-                        @change="(v: string) => updateTableCell(8, $index, 'note', v)"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="60" align="center">
-                    <template #default="{ $index }">
-                      <el-button type="danger" link size="small" @click="removeTableRow(8, $index)">删除</el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <el-button size="small" type="primary" plain class="gt-a171__add-row" @click="addTableRow(8)">+ 添加行</el-button>
               </div>
 
               <!-- Y/N type: chapters 9,10,11,12 -->
@@ -307,6 +268,7 @@ const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 const GtA171ReviewPanel = defineAsyncComponent(() => import('./GtA171ReviewPanel.vue'))
 const GtA171Chapter3 = defineAsyncComponent(() => import('./GtA171Chapter3.vue'))
 const GtA171Chapter4 = defineAsyncComponent(() => import('./GtA171Chapter4.vue'))
+const GtA171Chapter8 = defineAsyncComponent(() => import('./GtA171Chapter8.vue'))
 const GtA171Chapter15 = defineAsyncComponent(() => import('./GtA171Chapter15.vue'))
 
 defineOptions({ name: 'GtA171AuditSummary' })

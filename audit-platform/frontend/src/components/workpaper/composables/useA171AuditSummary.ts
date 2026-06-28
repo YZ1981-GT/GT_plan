@@ -102,7 +102,7 @@ const DEFAULT_CHAPTERS: Record<string, ChapterData> = {
   '5': { type: 'textarea', title: '五、业务咨询记录及专业意见分歧解决情况', content: null },
   '6': { type: 'table', title: '六、对重大错报风险的应对措施执行情况', rows: [] },
   '7': { type: 'textarea', title: '七、利用专家的工作', content: null },
-  '8': { type: 'table', title: '八、已审财务报表分析', rows: [] },
+  '8': { type: 'textarea', title: '八、已审财务报表分析', content: null },
   '9': { type: 'yn', title: '九、对关联方及关联方交易的结论', answer: null, explanation: null },
   '10': { type: 'yn', title: '十、基于持续经营假设的考虑', answer: null, explanation: null },
   '11': { type: 'yn', title: '十一、对期后事项形成的结论', answer: null, explanation: null },
