@@ -222,14 +222,14 @@
         </div>
 
         <!-- 在线编辑 -->
-        <div v-else class="gt-wp-word-editor__editor-area">
+        <div v-else ref="ooContainerRef" class="gt-wp-word-editor__editor-area">
           <template v-if="onlyofficeAvailable">
             <div class="gt-wp-word-editor__oo-toolbar">
               <el-button size="small" @click="toggleFullscreen">
                 {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
               </el-button>
             </div>
-            <div ref="ooContainerRef" :id="editorContainerId" class="gt-wp-word-editor__oo-container" :class="{ 'is-fullscreen': isFullscreen }" />
+            <div :id="editorContainerId" class="gt-wp-word-editor__oo-container" :class="{ 'is-fullscreen': isFullscreen }" />
           </template>
           <div v-else class="gt-wp-word-editor__degraded-generic">
             <el-alert type="warning" :closable="false" show-icon>
@@ -1352,5 +1352,14 @@ onUnmounted(() => {
   bottom: 0;
   z-index: 2000;
   height: 100vh !important;
+}
+
+/* Native fullscreen: editor-area fills viewport */
+.gt-wp-word-editor__editor-area:fullscreen {
+  background: #fff;
+  height: 100vh;
+}
+.gt-wp-word-editor__editor-area:fullscreen .gt-wp-word-editor__oo-container {
+  height: calc(100vh - 40px);
 }
 </style>
