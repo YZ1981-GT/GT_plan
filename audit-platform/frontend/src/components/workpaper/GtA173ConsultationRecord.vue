@@ -298,6 +298,7 @@
       sheet-name="A17-3"
       :project-id="props.projectId"
       class="gt-a173__oo"
+      @fallback="handleOOFallback"
     />
   </div>
 </template>
@@ -429,6 +430,11 @@ async function checkOOHealth() {
   } catch {
     modeOptions.value = ['结构化视图']
   }
+}
+
+function handleOOFallback() {
+  // OO 加载失败时提示用户尝试docker restart
+  ElMessage.warning('OnlyOffice 编辑器加载失败。如果持续出现，请执行 docker restart audit-onlyoffice 后刷新页面。')
 }
 
 // ─── Lifecycle ───
