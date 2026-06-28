@@ -10,7 +10,10 @@
       <template #header>
         <div class="gt-ch6__card-hd">
           <span class="gt-ch6__card-title">（一）财务报表层次重大错报风险的总体应对措施</span>
-          <el-button size="small" :loading="aiLoading === 1" @click="aiGenerate(1)">🤖 AI</el-button>
+          <div class="gt-ch6__card-actions">
+            <GtIndexChip value="B50" :context-project-id="props.projectId" />
+            <el-button size="small" :loading="aiLoading === 1" @click="aiGenerate(1)">🤖 AI</el-button>
+          </div>
         </div>
       </template>
       <el-table :data="s1Rows" border size="small" class="gt-ch6__table">
@@ -119,9 +122,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+
+const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 
 interface S1Row { risk: string; response: string }
 interface S3Row { area: string; nature: string; scope: string; time: string; result: string }
@@ -271,18 +276,7 @@ async function aiGenerate(section: number) {
   finally { aiLoading.value = null }
 }
 
-/** 尝试从 AI 返回内容中解析 JSON 数组 */
-function _tryParseJsonArray(text: string): any[] | null {
-  // 先尝试直接解析
-  try { const arr = JSON.parse(text); if (Array.isArray(arr)) return arr } catch {}
-  // 尝试提取 ```json ... ``` 代码块
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (match) { try { const arr = JSON.parse(match[1]); if (Array.isArray(arr)) return arr } catch {} }
-  // 尝试提取 [ ... ] 部分
-  const bracketMatch = text.match(/\[[\s\S]*\]/)
-  if (bracketMatch) { try { const arr = JSON.parse(bracketMatch[0]); if (Array.isArray(arr)) return arr } catch {} }
-  return null
-}
+import { tryParseJsonArray as _tryParseJsonArray } from '@/utils/aiJsonParse'
 
 onMounted(loadData)
 </script>

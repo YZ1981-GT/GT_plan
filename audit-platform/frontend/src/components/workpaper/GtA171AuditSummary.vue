@@ -160,6 +160,13 @@
                   <summary>📋 编制提示</summary>
                   <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[n] }}</div>
                 </details>
+                <!-- 关联底稿索引跳转 -->
+                <div class="gt-a171__yn-refs">
+                  <GtIndexChip v-if="n === 9" value="A7" :context-project-id="props.projectId" />
+                  <GtIndexChip v-if="n === 10" value="A15" :context-project-id="props.projectId" />
+                  <GtIndexChip v-if="n === 11" value="A11" :context-project-id="props.projectId" />
+                  <GtIndexChip v-if="n === 12" value="A17-2-1" :context-project-id="props.projectId" />
+                </div>
                 <el-radio-group
                   :model-value="(chapters[String(n)] as any).answer"
                   @change="(v: string) => handleYnChange(n, v as 'Y' | 'N' | null)"
@@ -564,6 +571,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* Y/N */
 .gt-a171__yn-wrap { display: flex; flex-direction: column; gap: 12px; }
+.gt-a171__yn-refs { display: flex; gap: 6px; }
 .gt-a171__yn-explanation { margin-top: 4px; }
 
 /* OO */

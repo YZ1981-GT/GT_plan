@@ -125,9 +125,11 @@ async function loadAutoData() {
   if (!props.projectId) return
   autoLoading.value = true
   try {
+    // 从 projectId 推断年份(后端auto-data端点要求year参数)
+    const yearParam = new Date().getFullYear()
     const res = await api.get<any>(
       `/api/projects/${props.projectId}/auto-data/a17_ch08_analytical_review`,
-      { _silent: true } as any,
+      { params: { year: yearParam }, _silent: true } as any,
     )
     const data = res?.data ?? res
     if (data?.items && Array.isArray(data.items)) {

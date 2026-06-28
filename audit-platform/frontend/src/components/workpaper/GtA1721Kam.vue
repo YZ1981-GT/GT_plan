@@ -91,7 +91,7 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column label="风险等级" width="120">
+            <el-table-column label="风险等级" width="100">
               <template #default="{ row, $index }">
                 <el-select
                   :model-value="row.risk_level"
@@ -105,7 +105,29 @@
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="是否沟通" width="100" align="center">
+            <el-table-column label="沟通记录索引" width="110">
+              <template #default="{ row, $index }">
+                <el-input
+                  :model-value="row.ref_index || ''"
+                  size="small"
+                  placeholder="如A10-1"
+                  @change="(v: string) => updateCandidate($index, 'ref_index', v)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="是否重点关注" width="100" align="center">
+              <template #default="{ row, $index }">
+                <el-select
+                  :model-value="row.is_focus || ''"
+                  size="small"
+                  @change="(v: string) => updateCandidate($index, 'is_focus', v)"
+                >
+                  <el-option label="是" value="Y" />
+                  <el-option label="否" value="N" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="是否沟通" width="90" align="center">
               <template #default="{ row, $index }">
                 <el-select
                   :model-value="row.communicate"
@@ -458,14 +480,7 @@ async function aiGenerateKam() {
   finally { aiLoading.value = null }
 }
 
-function _tryParseJsonArray(text: string): any[] | null {
-  try { const arr = JSON.parse(text); if (Array.isArray(arr)) return arr } catch {}
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (match) { try { const arr = JSON.parse(match[1]); if (Array.isArray(arr)) return arr } catch {} }
-  const bracketMatch = text.match(/\[[\s\S]*\]/)
-  if (bracketMatch) { try { const arr = JSON.parse(bracketMatch[0]); if (Array.isArray(arr)) return arr } catch {} }
-  return null
-}
+import { tryParseJsonArray as _tryParseJsonArray } from '@/utils/aiJsonParse'
 
 onMounted(() => { checkOOHealth(); selfLoad() })
 onBeforeUnmount(() => { flushPendingSaves() })

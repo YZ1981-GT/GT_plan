@@ -534,15 +534,16 @@ async def sync_docx_to_responses(
             )
             count += 1
 
-    # yn 章节 (ch9-12) — 从文本判断 Y/N
+    # yn 章节 (ch9-12) — 从文本首句判断 Y/N（避免解释文本中偶发否定词误判）
     YN_CHAPTERS = {9, 10, 11, 12}
-    YN_NEGATIVE_KEYWORDS = ["不存在", "不适用", "未发现", "不存在重大"]
+    YN_NEGATIVE_KEYWORDS = ["不存在", "不适用", "未发现", "无重大"]
     for ch_num in YN_CHAPTERS:
         content = chapters.get(ch_num, "")
         if not content:
             continue
-        # 判断是否为否定结论
-        answer = "N" if any(kw in content for kw in YN_NEGATIVE_KEYWORDS) else "Y"
+        # 只检查首句（第一行或前50字符）判断 Y/N
+        first_line = content.split("\n")[0][:80]
+        answer = "N" if any(kw in first_line for kw in YN_NEGATIVE_KEYWORDS) else "Y"
         explanation = content if answer == "Y" else None
         item_id = f"a171-ch{ch_num}-yn"
         await db.execute(

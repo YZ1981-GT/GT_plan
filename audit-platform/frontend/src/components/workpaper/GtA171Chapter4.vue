@@ -60,7 +60,10 @@
       <template #header>
         <div class="gt-ch4__card-hd">
           <span class="gt-ch4__card-title">（二）已更正或未更正的错报</span>
-          <el-button size="small" :loading="aiLoading === 2" @click="aiGenerate(2)">🤖 AI</el-button>
+          <div class="gt-ch4__card-actions">
+            <GtIndexChip value="A13" :context-project-id="props.projectId" />
+            <el-button size="small" :loading="aiLoading === 2" @click="aiGenerate(2)">🤖 AI</el-button>
+          </div>
         </div>
       </template>
       <div class="gt-ch4__sub-items">
@@ -246,9 +249,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+
+const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
 
 interface RiskRow { risk: string; impact: string; measure: string; diff: string }
 interface JudgmentRow { content: string; importance: string; procedure: string; change_needed: string }
@@ -407,15 +412,7 @@ async function aiGenerate(section: number) {
   finally { aiLoading.value = null }
 }
 
-/** 尝试从 AI 返回内容中解析 JSON 数组 */
-function _tryParseJsonArray(text: string): any[] | null {
-  try { const arr = JSON.parse(text); if (Array.isArray(arr)) return arr } catch {}
-  const match = text.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (match) { try { const arr = JSON.parse(match[1]); if (Array.isArray(arr)) return arr } catch {} }
-  const bracketMatch = text.match(/\[[\s\S]*\]/)
-  if (bracketMatch) { try { const arr = JSON.parse(bracketMatch[0]); if (Array.isArray(arr)) return arr } catch {} }
-  return null
-}
+import { tryParseJsonArray as _tryParseJsonArray } from '@/utils/aiJsonParse'
 
 onMounted(loadData)
 </script>
