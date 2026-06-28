@@ -100,6 +100,10 @@
               </template>
             </el-table-column>
           </el-table>
+          <details class="gt-a174__guidance" style="margin-top:8px">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a174__guidance-body">注："职位"填写编号是否属性对在项目组内角色，同时填写负责审计对应项目中哪些工作。"项目内角色"包括直接参与分歧事项中的全部工作人员：编制人、项目负责经理、项目部门负责人、项目所需要配置的其他人员、相关此策其他项目有分歧的专业人员。</div>
+          </details>
         </el-card>
 
         <!-- Section Cards -->
