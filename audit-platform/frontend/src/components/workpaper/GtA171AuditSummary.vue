@@ -69,18 +69,19 @@
                   <!-- Cross references -->
                   <GtIndexChip
                     v-if="n === 6 && crossReferences.b50_wp_id"
-                    :wp-id="crossReferences.b50_wp_id"
-                    label="B50"
+                    :value="'B50'"
+                    :context-project-id="props.projectId"
                   />
                   <GtIndexChip
                     v-if="n === 14 && crossReferences.a13_wp_id"
-                    :wp-id="crossReferences.a13_wp_id"
-                    label="A13"
+                    :value="'A13'"
+                    :context-project-id="props.projectId"
                   />
                   <GtIndexChip
                     v-if="n === 14 && crossReferences.a115_wp_id"
-                    :wp-id="crossReferences.a115_wp_id"
-                    label="A1-15"
+                    :value="'A1-15'"
+                    :context-project-id="props.projectId"
+                  />
                   />
                   <el-button text size="small" class="gt-a171__review-btn" @click.stop="openReview(n)">💬</el-button>
                 </div>
