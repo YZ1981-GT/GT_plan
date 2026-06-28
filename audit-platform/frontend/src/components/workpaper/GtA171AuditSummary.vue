@@ -40,32 +40,18 @@
       <div class="gt-a171__content">
         <!-- Signature Table -->
         <el-card shadow="never" class="gt-a171__signature-card">
-          <template #header><span class="gt-a171__card-title">签字表</span></template>
-          <el-table :data="signatureTable" border size="small" class="gt-a171__sig-table">
-            <el-table-column label="角色" prop="role" width="140" />
-            <el-table-column label="签名" min-width="160">
-              <template #default="{ row, $index }">
-                <el-input
-                  :model-value="row.name || ''"
-                  size="small"
-                  placeholder="姓名"
-                  @change="(v: string) => updateSignature($index, 'name', v)"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="日期" width="180">
-              <template #default="{ row, $index }">
-                <el-date-picker
-                  :model-value="row.date"
-                  type="date"
-                  size="small"
-                  value-format="YYYY-MM-DD"
-                  placeholder="选择日期"
-                  @change="(v: string) => updateSignature($index, 'date', v || '')"
-                />
-              </template>
-            </el-table-column>
-          </el-table>
+          <template #header><span class="gt-a171__card-title">签字确认</span></template>
+          <div class="gt-a171__sig-grid">
+            <div
+              v-for="(row, idx) in visibleSignatureRows"
+              :key="idx"
+              class="gt-a171__sig-item"
+            >
+              <div class="gt-a171__sig-role">{{ row.role }}</div>
+              <el-input :model-value="row.name || ''" size="small" placeholder="姓名" @change="(v: string) => updateSignature(row.originalIndex, 'name', v)" />
+              <el-date-picker :model-value="row.date" type="date" size="small" value-format="YYYY-MM-DD" placeholder="日期" @change="(v: string) => updateSignature(row.originalIndex, 'date', v || '')" />
+            </div>
+          </div>
         </el-card>
 
         <!-- 16 Chapter Cards -->
@@ -74,7 +60,7 @@
           <template v-for="n in 16" :key="n">
             <el-collapse-item
               :name="n"
-              :id="`a171-section-${n}`"
+              :id="`a171-chapter-${n}`"
               class="gt-a171__chapter-item"
             >
               <template #title>
@@ -96,23 +82,35 @@
                     :wp-id="crossReferences.a115_wp_id"
                     label="A1-15"
                   />
+                  <el-button text size="small" class="gt-a171__review-btn" @click.stop="openReview(n)">💬</el-button>
                 </div>
               </template>
 
-              <!-- Textarea type -->
-              <div v-if="chapters[String(n)]?.type === 'textarea'" class="gt-a171__textarea-wrap">
+              <!-- Chapter 3: structured component -->
+              <GtA171Chapter3
+                v-if="n === 3"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+                :client-name="projectContext.client_name"
+              />
+
+              <!-- Textarea type (other chapters) -->
+              <div v-else-if="chapters[String(n)]?.type === 'textarea'" class="gt-a171__textarea-wrap">
                 <el-input
                   :model-value="(chapters[String(n)] as any).content || ''"
                   type="textarea"
                   :autosize="{ minRows: 4 }"
                   :placeholder="`请输入${chapters[String(n)]?.title}相关内容`"
-                  @change="(v: string) => updateTextarea(n, v)"
+                  @input="(v: string) => updateTextarea(n, v)"
                 />
-                <el-button size="small" disabled class="gt-a171__ai-btn">
-                  <el-tooltip content="AI 辅助填写即将上线" placement="top">
-                    <span>🤖 AI</span>
+                <div class="gt-a171__btn-group">
+                  <el-tooltip v-if="CHAPTER_TEMPLATE[n]" content="从源模板骨架预填（即时，无需网络）" placement="top">
+                    <el-button size="small" class="gt-a171__prefill-btn" @click.stop="handleTemplatePrefill(n)">📝 模板预填</el-button>
                   </el-tooltip>
-                </el-button>
+                  <el-tooltip content="基于编制提示和项目知识库 AI 辅助填充" placement="top">
+                    <el-button size="small" class="gt-a171__ai-btn" @click.stop="handleAiChapterFill(n)">🤖 AI</el-button>
+                  </el-tooltip>
+                </div>
               </div>
 
               <!-- Table type: chapter 6 -->
@@ -234,18 +232,31 @@
 
     <!-- Online Edit Mode -->
     <GtOnlyOfficeSheet v-else :wp-id="props.wpId" sheet-name="A17-1" class="gt-a171__oo" />
+
+    <!-- Review Panel -->
+    <GtA171ReviewPanel
+      :visible="reviewVisible"
+      :wp-id="props.wpId"
+      :chapter-num="reviewChapterNum"
+      :chapter-title="reviewChapterTitle"
+      :current-user="'审计员'"
+      @close="reviewVisible = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, toRef, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
-import { useA171AuditSummary } from './composables/useA171AuditSummary'
+import { useA171AuditSummary, CHAPTER_TEMPLATE } from './composables/useA171AuditSummary'
 import { useA171Navigation } from './composables/useA171Navigation'
 import type { A171RenderData } from './composables/useA171AuditSummary'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
+const GtA171ReviewPanel = defineAsyncComponent(() => import('./GtA171ReviewPanel.vue'))
+const GtA171Chapter3 = defineAsyncComponent(() => import('./GtA171Chapter3.vue'))
 
 defineOptions({ name: 'GtA171AuditSummary' })
 
@@ -273,6 +284,7 @@ const {
   updateYn,
   updateSignature,
   flushPendingSaves,
+  prefillFromTemplate,
 } = useA171AuditSummary({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -280,29 +292,53 @@ const {
 })
 
 // ─── Navigation ───
-const { activeChapter, scrollToChapter, completionStatus } = useA171Navigation(chapters)
+const { activeChapter, scrollToChapter: _rawScroll, completionStatus } = useA171Navigation(chapters)
+
+// Wrap scroll to auto-expand target chapter first
+function scrollToChapter(n: number) {
+  if (!expandedChapters.value.includes(n)) {
+    expandedChapters.value = [...expandedChapters.value, n]
+  }
+  // Wait for DOM update after expand
+  import('vue').then(({ nextTick }) => nextTick(() => _rawScroll(n)))
+}
 
 // ─── Collapse State: all collapsed by default ───
 const expandedChapters = ref<number[]>([])
 
+// ─── Signature visibility by business_category ───
+const visibleSignatureRows = computed(() => {
+  const bc = projectContext.value?.business_category || ''
+  // A类: 4角色全显 | B类: 编制人+复核人+EQCR(跳过质控)=3 | C类: 编制人+复核人=2
+  if (bc.startsWith('A')) {
+    return signatureTable.value.map((row, idx) => ({ ...row, originalIndex: idx }))
+  } else if (bc.startsWith('B')) {
+    // 跳过 index 2 (质量控制复核合伙人)
+    return signatureTable.value
+      .filter((_, idx) => idx !== 2)
+      .map((row, idx) => ({ ...row, originalIndex: idx === 2 ? 3 : idx < 2 ? idx : idx + 1 }))
+  }
+  // C类及其他：只显示前2个
+  return signatureTable.value.slice(0, 2).map((row, idx) => ({ ...row, originalIndex: idx }))
+})
 // ─── Helpers ───
 const CHAPTER_NAV_LABELS: Record<number, string> = {
-  1: '一、审计概况',
-  2: '二、会计变更',
-  3: '三、关键事项',
-  4: '四、持续经营',
-  5: '五、范围调整',
-  6: '六、风险应对',
-  7: '七、集团审计',
-  8: '八、财务分析',
-  9: '九、舞弊识别',
-  10: '十、违规情况',
-  11: '十一、关联方',
-  12: '十二、期后事项',
-  13: '十三、审计意见',
-  14: '十四、错报处理',
-  15: '十五、治理沟通',
-  16: '十六、审计总结',
+  1: '一、审计约定范围',
+  2: '二、独立性',
+  3: '三、计划更新修改',
+  4: '四、合伙人关注',
+  5: '五、咨询及分歧',
+  6: '六、风险应对执行',
+  7: '七、利用专家',
+  8: '八、财务报表分析',
+  9: '九、关联方结论',
+  10: '十、持续经营',
+  11: '十一、期后事项',
+  12: '十二、关键审计事项',
+  13: '十三、其他信息',
+  14: '十四、审计结论',
+  15: '十五、特殊考虑',
+  16: '十六、下年度关注',
 }
 
 function getNavLabel(n: number): string {
@@ -384,13 +420,67 @@ async function selfLoad() {
   } catch { /* silent */ }
 }
 
+// ─── Template Prefill Handler ───
+// ─── Review Panel State ───
+const reviewVisible = ref(false)
+const reviewChapterNum = ref(1)
+const reviewChapterTitle = ref('')
+
+function openReview(n: number) {
+  reviewChapterNum.value = n
+  reviewChapterTitle.value = chapters.value[String(n)]?.title || `第${n}章`
+  reviewVisible.value = true
+}
+
+function handleTemplatePrefill(chapterNum: number) {
+  const ch = chapters.value[String(chapterNum)]
+  if (!ch || ch.type !== 'textarea') return
+  if ((ch as any).content) {
+    ElMessageBox.confirm(
+      '当前章节已有内容，模板预填将覆盖现有内容。确定继续？',
+      '确认覆盖',
+      { type: 'warning', confirmButtonText: '覆盖', cancelButtonText: '取消' },
+    ).then(() => {
+      prefillFromTemplate(chapterNum)
+      ElMessage.success('已从模板预填')
+    }).catch(() => { /* cancel */ })
+    return
+  }
+  prefillFromTemplate(chapterNum)
+  ElMessage.success('已从模板预填')
+}
+
+// ─── AI Chapter Fill (calls existing endpoint) ───
+async function handleAiChapterFill(chapterNum: number) {
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const titles = chapters.value[String(chapterNum)]?.title || ''
+    const res = await api.post<any>(
+      `/api/workpapers/${props.wpId}/a171/ai-generate`,
+      { chapter: chapterNum, chapter_title: titles, guidance: '', existing_content: (chapters.value[String(chapterNum)] as any)?.content || '', knowledge_doc_ids: [] },
+      { _silent: true } as any,
+    )
+    const content = res?.content || ''
+    if (content) {
+      updateTextarea(chapterNum, content)
+      ElMessage.success('AI 已生成内容')
+    } else {
+      ElMessage.info('AI 未生成有效内容，请检查 LLM 服务')
+    }
+  } catch (err: any) {
+    const detail = err?.response?.data?.detail
+    const msg = typeof detail === 'string' ? detail : (err?.message || '生成失败')
+    ElMessage.warning(`AI 生成失败：${msg}`)
+  }
+}
+
 onMounted(() => { checkOOHealth(); selfLoad() })
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: () => flushPendingSaves() })
 </script>
 
 <style scoped>
-.gt-a171 { padding: 16px; }
+.gt-a171 { padding: 16px; font-size: 13px; }
 .gt-a171__toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .gt-a171__save-status { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; }
 
@@ -441,8 +531,10 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* Signature card */
 .gt-a171__signature-card { border-radius: 8px; }
-.gt-a171__card-title { font-size: 15px; font-weight: 600; color: #303133; }
-.gt-a171__sig-table { width: 100%; }
+.gt-a171__card-title { font-size: 14px; font-weight: 600; color: #303133; }
+.gt-a171__sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gt-a171__sig-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafafa; font-size: 13px; }
+.gt-a171__sig-role { font-size: 13px; font-weight: 500; color: #606266; min-width: 110px; white-space: nowrap; flex-shrink: 0; }
 
 /* Chapters */
 .gt-a171__chapters { border: none; }
@@ -452,7 +544,13 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* Textarea */
 .gt-a171__textarea-wrap { position: relative; }
-.gt-a171__ai-btn { position: absolute; top: 4px; right: 4px; opacity: 0.6; }
+.gt-a171__btn-group { position: absolute; top: 4px; right: 4px; z-index: 10; display: flex; gap: 4px; }
+.gt-a171__ai-btn { opacity: 0.7; }
+.gt-a171__ai-btn:hover { opacity: 1; }
+.gt-a171__prefill-btn { opacity: 0.7; }
+.gt-a171__prefill-btn:hover { opacity: 1; }
+.gt-a171__review-btn { margin-left: auto; opacity: 0.6; }
+.gt-a171__review-btn:hover { opacity: 1; }
 
 /* Table */
 .gt-a171__table-wrap { display: flex; flex-direction: column; gap: 8px; }

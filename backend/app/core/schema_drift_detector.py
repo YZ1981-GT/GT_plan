@@ -85,6 +85,10 @@ class SchemaDriftDetector:
         "_category_correction_backup",
         "_note_guidance_split_backup",
         "_note_text_ch8_backup",
+        # checklist_responses: 裸 SQL 迁移建表，无独立 ORM 模型（数据通过 raw SQL 操作）
+        "checklist_responses",
+        # custom_account_packages: 裸 SQL 迁移建表
+        "custom_account_packages",
     })
 
     # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用）

@@ -57,7 +57,7 @@ class ChecklistResponseOut(BaseModel):
 
 class BatchSaveRequest(BaseModel):
     """批量保存请求体"""
-    project_id: uuid.UUID
+    project_id: Optional[uuid.UUID] = None
     items: list[ChecklistResponseItem]
 
 
@@ -116,6 +116,19 @@ async def batch_save_checklist_responses(
     if not body.items:
         return []
 
+    # --- 自动解析 project_id（如果前端未传） ---
+    resolved_project_id = body.project_id
+    if not resolved_project_id:
+        pid_row = await db.execute(
+            text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+            {"wp_id": str(wp_id)},
+        )
+        pid_val = pid_row.scalar_one_or_none()
+        if pid_val:
+            resolved_project_id = pid_val
+        else:
+            raise HTTPException(status_code=400, detail="无法确定 project_id，请确认底稿存在")
+
     # --- Review-checklist RBAC + Sign-Lock 前置校验 ---
     # 从 wp_index 获取 wp_code，判断是否为复核表
     wp_code_row = await db.execute(
@@ -131,11 +144,11 @@ async def batch_save_checklist_responses(
 
     if wp_code_val and extract_base_level(wp_code_val):
         # 是 A2[1-5] 复核表 → 执行 guard
-        rbac_denied = await check_rbac(db, current_user.id, body.project_id, wp_code_val)
+        rbac_denied = await check_rbac(db, current_user.id, resolved_project_id, wp_code_val)
         if rbac_denied:
             raise HTTPException(status_code=403, detail="无权编辑此级别复核表")
 
-        locked, _, _ = await check_sign_lock(db, body.project_id, wp_code_val)
+        locked, _, _ = await check_sign_lock(db, resolved_project_id, wp_code_val)
         if locked:
             raise HTTPException(status_code=403, detail="复核表已锁定")
 
@@ -155,7 +168,7 @@ async def batch_save_checklist_responses(
     """)
 
     try:
-        results = await _do_batch_save(db, wp_id, body, current_user, upsert_sql, now)
+        results = await _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolved_project_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -166,7 +179,7 @@ async def batch_save_checklist_responses(
     return results
 
 
-async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now):
+async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolved_project_id):
     """实际执行批量保存逻辑（从主函数抽出以支持全局 try/except）。"""
 
     # UPSERT: INSERT ... ON CONFLICT (wp_id, item_id) DO UPDATE
@@ -267,6 +280,17 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now):
                         status_code=422,
                         detail=f"B30 conclusion 值无效，收到: '{item.conclusion}'",
                     )
+            elif item.item_id.startswith("a171-"):
+                # A17-1 重大事项概要汇总：签字=任意字符串(姓名/日期)，章节=null(存remark)
+                pass  # no validation — conclusion is freeform (name/date for signature, null for chapters)
+            elif any(item.item_id.startswith(p) for p in (
+                "a101-", "a121-", "a1721-", "a271-", "a91-", "a92-",
+                "a117-", "a176-", "a181-", "a182-", "a81-", "a111-",
+                "a173-", "a1731-", "a174-", "a177-", "a51-",
+                "b14-", "wt-",
+            )):
+                # 专属组件自由格式：签字/日期/长文本均存 conclusion，跳过白名单校验
+                pass
             elif any(item.item_id.startswith(f"C{n}-") for n in range(2, 16)):
                 # C2~C15 控制测试：控制点结论 + 样本结果 + 循环结论 + 测试方法 + 签字标记
                 allowed = (
@@ -340,7 +364,7 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now):
             row = await db.execute(
                 upsert_sql,
                 {
-                    "project_id": str(body.project_id),
+                    "project_id": str(resolved_project_id),
                     "wp_id": str(wp_id),
                     "item_id": item.item_id,
                     "conclusion": item.conclusion,

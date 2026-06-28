@@ -72,7 +72,10 @@ const wpIdMap = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}
   for (const item of wpIndex.value) {
     if (item.wp_code?.startsWith('A17-')) {
-      map[item.wp_code] = item.id
+      // 必须用 wp_id (working_paper.id)，不能用 id (wp_index.id)
+      // checklist_responses FK 引用 working_paper(id)
+      const wpId = item.wp_id || ''
+      if (wpId) map[item.wp_code] = wpId
     }
   }
   return map

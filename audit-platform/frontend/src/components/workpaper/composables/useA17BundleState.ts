@@ -212,7 +212,8 @@ export function useA17BundleState(options: UseA17BundleStateOptions): UseA17Bund
     try {
       const data = await api.get(`/api/workpapers/${wpId}/checklist-responses`, {
         params: { project_id: projectId.value },
-      })
+        _silent: true,
+      } as any)
       return (data as ChecklistResponse[]) || []
     } catch {
       return []
@@ -247,7 +248,9 @@ export function useA17BundleState(options: UseA17BundleStateOptions): UseA17Bund
       return
     }
     try {
-      const data = await api.get(`/api/projects/${projectId.value}/kam-references`)
+      const data = await api.get(`/api/projects/${projectId.value}/kam-references`, {
+        _silent: true,
+      } as any)
       kamReferences.value = (data as KamReference[]) || []
     } catch {
       kamReferences.value = []

@@ -40,22 +40,22 @@ function setup(data: A171RenderData | null = null) {
 
 function buildChaptersRef(overrides?: Partial<Record<string, Partial<ChapterData>>>) {
   const base: Record<string, ChapterData> = {
-    '1': { type: 'textarea', title: '一、审计工作概况', content: null },
-    '2': { type: 'textarea', title: '二、重大会计政策及估计变更', content: null },
-    '3': { type: 'textarea', title: '三、关键审计事项', content: null },
-    '4': { type: 'textarea', title: '四、持续经营评估', content: null },
-    '5': { type: 'textarea', title: '五、审计范围调整', content: null },
-    '6': { type: 'table', title: '六、重大错报风险应对', rows: [] },
-    '7': { type: 'textarea', title: '七、集团审计事项', content: null },
+    '1': { type: 'textarea', title: '一、审计业务约定范围及执行情况', content: null },
+    '2': { type: 'textarea', title: '二、独立性', content: null },
+    '3': { type: 'textarea', title: '三、对审计计划的更新和修改', content: null },
+    '4': { type: 'textarea', title: '四、需合伙人关注事项', content: null },
+    '5': { type: 'textarea', title: '五、业务咨询记录及专业意见分歧解决情况', content: null },
+    '6': { type: 'table', title: '六、对重大错报风险的应对措施执行情况', rows: [] },
+    '7': { type: 'textarea', title: '七、利用专家的工作', content: null },
     '8': { type: 'table', title: '八、已审财务报表分析', rows: [] },
-    '9': { type: 'yn', title: '九、舞弊识别', answer: null, explanation: null },
-    '10': { type: 'yn', title: '十、违反法规情况', answer: null, explanation: null },
-    '11': { type: 'yn', title: '十一、关联方事项', answer: null, explanation: null },
-    '12': { type: 'yn', title: '十二、期后事项', answer: null, explanation: null },
-    '13': { type: 'textarea', title: '十三、审计意见', content: null },
-    '14': { type: 'textarea', title: '十四、错报汇总与处理', content: null },
-    '15': { type: 'textarea', title: '十五、与治理层沟通事项', content: null },
-    '16': { type: 'textarea', title: '十六、审计总结', content: null },
+    '9': { type: 'yn', title: '九、对关联方及关联方交易的结论', answer: null, explanation: null },
+    '10': { type: 'yn', title: '十、基于持续经营假设的考虑', answer: null, explanation: null },
+    '11': { type: 'yn', title: '十一、对期后事项形成的结论', answer: null, explanation: null },
+    '12': { type: 'yn', title: '十二、拟在审计报告中沟通的关键审计事项', answer: null, explanation: null },
+    '13': { type: 'textarea', title: '十三、其他信息', content: null },
+    '14': { type: 'textarea', title: '十四、财务报表审计结论', content: null },
+    '15': { type: 'textarea', title: '十五、其他特殊考虑事项', content: null },
+    '16': { type: 'textarea', title: '十六、提请下年度审计关注事项', content: null },
   }
   if (overrides) {
     for (const [k, v] of Object.entries(overrides)) {
@@ -263,19 +263,19 @@ describe('GtA171AuditSummary — Unit', () => {
   // ─── Signature Table ───
 
   describe('signature table', () => {
-    it('has 10 rows', () => {
+    it('has 4 rows', () => {
       const composable = setup()
-      expect(composable.signatureTable.value.length).toBe(10)
+      expect(composable.signatureTable.value.length).toBe(4)
     })
 
-    it('first row is 编制人', () => {
+    it('first row is 编制人（项目现场负责人）', () => {
       const composable = setup()
-      expect(composable.signatureTable.value[0].role).toBe('编制人')
+      expect(composable.signatureTable.value[0].role).toBe('编制人（项目现场负责人）')
     })
 
-    it('last row is 其他', () => {
+    it('last row is 质量控制复核人（如适用）', () => {
       const composable = setup()
-      expect(composable.signatureTable.value[9].role).toBe('其他')
+      expect(composable.signatureTable.value[3].role).toBe('质量控制复核人（如适用）')
     })
 
     it('all rows have name and date as null initially', () => {

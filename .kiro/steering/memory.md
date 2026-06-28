@@ -29,6 +29,7 @@ inclusion: always
 - **✅ A3合并系列治理(2026-06-28完成)**：**第一步**：①overrides补齐(A3-1/-2/-4/-5/-6/-7→skip合并模块镜像,A3-3→audit-sheet) ②GtA3ConsolidationConsole加「合并底稿索引」区(7行route:chip跳合并模块Tab) ③修复ConsolidationIndex的route.query.tab→activeTab别名同步(TAB_ALIAS:scope→structure/trial→consol_tb/notes→consol_note)。**第二步**：A3-8商誉减值测试专属组件`a3-8-goodwill-impairment`，9/9任务全绿(47测试:12 PBT+14单元+16注册契约+5后端)。useA38Goodwill公式引擎(减值=max(diff,0)/CAPM Ke=Rf+β(Rm-Rf)/WACC,D+E=0→null/DCF折现/终值base(1+g)/(r-g)/可收回孰高/减值损失先冲商誉再按比例二次分摊总和守恒)；GtA38GoodwillImpairment.vue 4Tab+双模式+GtIndexChip(I3-2/I3-6/I3-7只跳转)。**A3-8↔I3=合并层↔单体层**(I3-6减值/I3-7可收回=单体,A3-8=合并)。**第三步**：GtA3ConsolidationConsole升级为el-tabs bundle(3Tab:程序表/A3-3 OO/A3-8专属),子底稿wpId通过getWpIndex解析,v-if按wpIdMap动态显示。注：测试项目0ec33无A3-8 wp实例,全UI流程待合并项目验证
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **开发前必先逐sheet读源模板**；**导入导出三级**；**适用性自动判断**
+- **模板预填优先于AI生成(2026-06-28)**：结构化章节组件中，源模板有固定骨架文本的章节优先用CHAPTER_TEMPLATE+projectContext变量替换做预填（即时无网络），AI仅用于需跨底稿总结/判断的复杂章节
 
 ## 环境配置
 
@@ -116,9 +117,11 @@ inclusion: always
 - D2 聚合 12 空白 tab；A 循环 docx 弹窗（30 个待加 WpPopupDocxEditor）
 - **✅ useEditorMode.spec.ts 断言已修复**：htmlRendererRegistry.spec.ts expected 列表已更新至 82 componentType（含 A17-1/A17-2-1/A5-1 + 9 个 A17/A18/A8/A11 专属组件）
 - 外部依赖：LLM embedding / 合并 UAT / GitHub 默认分支改 main / MinerU+OCR
-- **🟡 签字表交互优化方向(2026-06-28确认)**：所有底稿签字表（A17-1等4角色签字区）从手动input改为按钮弹窗确认模式（点击"确认编制/复核完成"→弹窗确认→自动填当前用户+时间戳）。与A1-11签发流转表交互一致，不可伪造。需改composable+模板+可能后端。下轮做
-- **✅ A17-1签字表修正为4角色(2026-06-28)**：源模板只有4角色(编制人项目现场负责人/复核人项目合伙人/项目质量复核合伙人如适用/质量控制复核人如适用)，原实现错误设为10角色。composable SIGNATURE_ROLES已修正+边界检查改为动态length+35测试全绿
-- **🟡 A17-1各章节编制提示(待做)**：源模板每章有蓝色编制提示文字(填写要求/注意事项/准则引用)，当前composable只有简短guidance。需从docx逐章提取完整提示→补入a17_chapter_definitions.json的guidance字段→前端各章节卡片增加折叠"编制提示"区(el-collapse/el-alert info)
+- **✅ A17-1签字表按钮弹窗确认模式(2026-06-28)**：签字表从手动input改为按钮弹窗确认（ElMessageBox.confirm显示操作/角色/当前用户/不可撤销警告→确认后自动填用户名+当天日期）。与A1-11签发流转表交互一致。useAuthStore取当前用户。4角色。61测试全绿
+- **✅ A17-1各章编制提示+标题对齐源模板(2026-06-28)**：新增CHAPTER_GUIDANCE常量(16章×源模板蓝色字体提示)，每章卡片内折叠"📋编制提示"区(蓝色左边线+浅蓝背景pre-wrap)。DEFAULT_CHAPTERS标题同步对齐源模板完整名称。左侧导航标签同步更新
+- **✅ A17-1 AI章节生成端点(2026-06-28)**：新增`POST /api/workpapers/{wp_id}/a171/ai-generate`(`a171_ai_generate.py`，注册到router_registry AI与辅助组)。按B14模式：加载project_context+知识库(用户指定doc_ids或ReferenceDocService自动检索)+CPA专属system prompt+编制提示注入→chat_completion(RAG context_documents)。前端点击🤖AI→弹el-dialog选知识库文档(checkbox-group)→确认后调端点→结果填textarea
+- **✅ A17-1签字角色按business_category联动(2026-06-28)**：4角色基础(编制人/复核人/质控/EQCR)。A类=4全显/B类=跳过质控显3(编制+复核+EQCR)/C类=只显2(编制+复核)。前后端SIGNATURE_ROLES统一为4行
+- **🟡 AI对话模式(2026-06-28用户要求)**：AI辅助缺少信息时应采用对话方式追问用户(而非报错)。需在章节AI区增加轻量chat对话流+LLM服务降级时友好提示而非红色错误。当前已做降级友好提示，对话流待下轮
 - **架构优化**：①拆 event_handlers.py ②前端 Top-5 巨型 Vue 拆分 ③services/ 按域建子包
 - **🟡 omp(can1357/oh-my-pi)借鉴点**(2026-06-28,待LLM Phase3+)：①Hashline内容锚定→底稿并发冲突field-level检测 ②Subagent隔离+schema-validated output→/ai-generate结构化返回 ③Hindsight项目记忆→v3.0跨年续审知识继承(retain/recall模式) ④Stream Rules实时拦截→QC规则在LLM生成阶段截断重试
 - **✅ A15 财务指标自动取数**(2026-06-27)：`_going_concern.py` resolver从TB自动算流动比率/速动比率/资产负债率/净资产/累计未分配利润+三色风险等级。GtA15Bundle增加指标卡片。通用`GET /api/projects/{pid}/auto-data/{source}?year=`端点（可复用于任何resolver）
@@ -139,9 +142,13 @@ inclusion: always
 - **🔴 余额表 KEY_COLUMNS 勿加 account_name**；SELECT tb_balance 必含 direction
 - **🔴 PG ON CONFLICT DO NOTHING 不返回跳过行**：需二次查询得 skipped
 - **router_registry 必查**；**service 只 flush 不 commit**
+- **🔴 GtIndexChip传入的wp-id必须是working_paper表的真实UUID**：传wp_index.id会导致组件内部`.includes()`崩溃(Cannot read properties of undefined)。跨章节引用chip只能用后端render策略返回的cross_references中已验证的wp_id，不能从wp_index API直接取id字段（那是wp_index表的id不是working_paper的id）
+- **🔴 Bundle wpIdMap必须用item.wp_id不能用item.id(2026-06-28)**：`getWpIndex`返回的`id`是wp_index表id，`wp_id`才是working_paper表id。Bundle传给子组件的wpId必须用`item.wp_id`，否则checklist_responses的FK约束(wp_id→working_paper.id)报ForeignKeyViolationError。A17Bundle已修复
 - **🔴 新增 componentType 必须同步更新 `VALID_COMPONENT_TYPES`**（`wp_classification_service.py`），否则 `validate_overrides` 启动时 raise ValueError 阻止 uvicorn 启动
 - **🔴 报告正文生成空白根因**：`audit_report_template`表空(未seed)→`load_body_template`返回空sections→docx只有【草稿DRAFT】水印。修复`POST /api/audit-report/templates/load-seed`(种子`backend/data/audit_report_templates_seed.json`,28段落=4意见类型×2公司类型)。**重建DB后会复现，初始化需含此seed**
 - **🔴 删除主表前必清FK子表**：`delete_task`需先删`export_job_items_v2`+`deliverable_section_state`再删`word_export_task_versions`+`word_export_task`，否则FK约束500
+- **🔴 结构化章节数据不能存到textarea content(2026-06-28踩坑)**：A17-1第3章把JSON结构化数据存入chapters['3'].content导致乱码——hydrate时JSON字符串被当textarea文本显示。正确做法：结构化章节的各字段用独立item_id前缀(如`a171-ch3-mod-*`/`a171-ch3-mat-*`)分别存checklist_responses，不经过content字段。已git恢复，待重做
+- **✅ A17-1章节标题对齐源模板(2026-06-28)**：CHAPTERS_META+DEFAULT_CHAPTERS标题全部从`A17-1 重大事项概要汇总.docx`重新提取修正（之前16章标题全是编造的）。正确结构：ch1审计约定范围/ch2独立性/ch3计划更新/ch4合伙人已关注事项(6子节)/ch5咨询及分歧/ch6重大错报风险应对/ch7利用专家/ch8已审报表分析/ch9关联方/ch10持续经营/ch11期后事项/ch12 KAM/ch13其他信息/ch14审计结论/ch15其他特殊考虑/ch16下年度关注
 - **地址坐标库 single-flight + 增量失效**；**WorkpaperSaveOrchestrator 统一 after_save**
 
 ### 前端
@@ -162,7 +169,7 @@ inclusion: always
 - **confirmation _format 统一规则**：有 `_format`→可编辑；无→空态；有 cells 无 _format→旧格式只读
 - **聚合程序表**：用 sheet 级编码(D2A)查模板，非父码(D2)
 - **wp_code_overrides 支持 sheet_name key**：按完整 sheet_name 映射 `skip` 可隐藏多 sheet 底稿的辅助 sheet；`component_type=="skip"` 的 sheet 不渲染为 tab
-- **🔴 API调用可能触发全局404弹窗**：http.ts拦截器默认对404弹ElMessage。组件内预期可能404的请求必须加`{_silent:true} as any`配置项避免全局弹错（如useA1SubWorkpapers.refreshDependencyStatus）
+- **🔴 API调用可能触发全局404弹窗**：http.ts拦截器默认对404弹ElMessage。组件内预期可能404的请求必须加`{_silent:true} as any`配置项避免全局弹错（如useA1SubWorkpapers.refreshDependencyStatus）。**useA17BundleState的loadResponses/loadKamReferences也已修复(2026-06-28)**
 - **🔴 http.ts 5xx重试弹窗去重**：重试提示用全局单例(`_retryInflight`计数+共用一个toast)，多并发请求只显一个、全完成自动关。禁止每请求各弹`duration:0`永不消失的toast（会疯狂堆叠）
 - **🔴 Docker端口转发故障诊断**：宿主机连PG/Redis报`connection was closed in the middle`/`connection_lost()`（非`Connect call failed`）= Docker端口转发层坏。`docker exec psql`能连但宿主机asyncpg连不上→`docker restart audit-postgres audit-redis`刷新转发。后端reload模式会自动重连。另：宿主机后端进程在DB起来前启动会卡死503(postgres/redis unavailable)，需杀进程(含multiprocessing-fork孤儿子进程)重启。**OnlyOffice 8080端口同样会坏**：容器healthy但宿主机`curl localhost:8080/healthcheck`返000、容器内部200→后端health_check失败→前端降级→xlsx预览显示"格式不支持"。修复`docker restart audit-onlyoffice`
 - **🔴 交付件预览previewType支持xlsx**：DeliverablePreview/OnlyOfficeEditor/DeliverableCenter的previewType联合类型已含`'xlsx'`（用`@vue-office/excel`，已装），后端`/preview-url`端点suffix白名单含`.xlsx`。OnlyOffice降级时xlsx也能只读预览（纵深防御）。报告正文生成对话框(AuditReportEditor+DeliverableCenter)顶部加了意见类型选择警告提示+required

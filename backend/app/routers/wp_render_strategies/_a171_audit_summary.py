@@ -19,40 +19,116 @@ logger = logging.getLogger(__name__)
 
 # 16 章节元数据 (type: textarea / table / yn)
 CHAPTERS_META: list[dict] = [
-    {"number": 1, "type": "textarea", "title": "一、审计工作概况"},
-    {"number": 2, "type": "textarea", "title": "二、重大会计政策及估计变更"},
-    {"number": 3, "type": "textarea", "title": "三、关键审计事项"},
-    {"number": 4, "type": "textarea", "title": "四、持续经营评估"},
-    {"number": 5, "type": "textarea", "title": "五、审计范围调整"},
-    {"number": 6, "type": "table", "title": "六、重大错报风险应对"},
-    {"number": 7, "type": "textarea", "title": "七、集团审计事项"},
+    {"number": 1, "type": "textarea", "title": "一、审计业务约定范围及执行情况"},
+    {"number": 2, "type": "textarea", "title": "二、独立性"},
+    {"number": 3, "type": "textarea", "title": "三、对审计计划的更新和修改"},
+    {"number": 4, "type": "textarea", "title": "四、审计过程中合伙人已关注的事项"},
+    {"number": 5, "type": "textarea", "title": "五、业务咨询记录及专业意见分歧解决情况"},
+    {"number": 6, "type": "table", "title": "六、对重大错报风险的应对措施执行情况"},
+    {"number": 7, "type": "textarea", "title": "七、利用专家的工作"},
     {"number": 8, "type": "table", "title": "八、已审财务报表分析"},
-    {"number": 9, "type": "yn", "title": "九、舞弊识别"},
-    {"number": 10, "type": "yn", "title": "十、违反法规情况"},
-    {"number": 11, "type": "yn", "title": "十一、关联方事项"},
-    {"number": 12, "type": "yn", "title": "十二、期后事项"},
-    {"number": 13, "type": "textarea", "title": "十三、审计意见"},
-    {"number": 14, "type": "textarea", "title": "十四、错报汇总与处理"},
-    {"number": 15, "type": "textarea", "title": "十五、与治理层沟通事项"},
-    {"number": 16, "type": "textarea", "title": "十六、审计总结"},
+    {"number": 9, "type": "yn", "title": "九、对关联方及关联方交易的结论"},
+    {"number": 10, "type": "yn", "title": "十、基于持续经营假设的考虑"},
+    {"number": 11, "type": "yn", "title": "十一、对期后事项形成的结论"},
+    {"number": 12, "type": "yn", "title": "十二、拟在审计报告中沟通的关键审计事项"},
+    {"number": 13, "type": "textarea", "title": "十三、其他信息"},
+    {"number": 14, "type": "textarea", "title": "十四、财务报表审计结论"},
+    {"number": 15, "type": "textarea", "title": "十五、其他特殊考虑事项"},
+    {"number": 16, "type": "textarea", "title": "十六、提请下年度审计关注事项"},
 ]
 
-# 签字表 10 行角色
+# 签字表 4 行角色（按业务类别过滤显示：A=4全显/B=跳过质控=3/C=前2）
 SIGNATURE_ROLES: list[str] = [
-    "编制人",
-    "一级复核",
-    "二级复核",
-    "三级复核",
-    "项目合伙人",
-    "质量控制复核",
-    "项目质量控制复核人",
-    "技术复核人",
-    "独立复核人",
-    "其他",
+    "编制人（项目现场负责人）",
+    "复核人（项目合伙人）",
+    "质量控制复核合伙人",
+    "EQCR技术复核人",
 ]
 
 # 跨引用 wp_code 列表
 CROSS_REF_WP_CODES = ["B50", "A13", "A1-15"]
+
+
+async def _load_b50_risk_prefill(project_id, db) -> list[dict]:
+    """从 B50 风险评估矩阵提取 H/M 风险项，预填 A17-1 第6章表格.
+
+    查询逻辑：
+    1. 找该项目 B50 底稿的 wp_id
+    2. 查 checklist_responses 中 item_id LIKE 'B50-T3-matrix-%-RMM' 且 conclusion IN ('H','M')
+    3. 从 item_id 解析 account_name + assertion，结合 remark 构造风险描述
+    """
+    try:
+        # 1. 查 B50 wp_id
+        wp_row = await db.execute(
+            sa.text(
+                "SELECT wp.id FROM working_paper wp "
+                "JOIN wp_index wi ON wp.wp_index_id = wi.id "
+                "WHERE wp.project_id = :pid AND wi.wp_code = 'B50' "
+                "LIMIT 1"
+            ),
+            {"pid": str(project_id)},
+        )
+        b50_wp = wp_row.scalar_one_or_none()
+        if not b50_wp:
+            return []
+
+        # 2. 查高/中风险的 RMM 单元格
+        result = await db.execute(
+            sa.text(
+                "SELECT item_id, conclusion, remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id LIKE 'B50-T3-matrix-%-RMM' "
+                "AND conclusion IN ('H', 'M') "
+                "ORDER BY item_id"
+            ),
+            {"wp_id": str(b50_wp)},
+        )
+        rows = result.fetchall()
+        if not rows:
+            return []
+
+        # 3. 解析 item_id → 风险描述
+        # 格式: B50-T3-matrix-{account}-{assertion}-RMM
+        ASSERTION_CN = {
+            "existence": "存在",
+            "completeness": "完整性",
+            "accuracy": "准确性",
+            "cutoff": "截止",
+            "classification": "分类",
+            "presentation": "列报",
+        }
+        LEVEL_CN = {"H": "高", "M": "中"}
+
+        prefill: list[dict] = []
+        for row in rows:
+            # 解析 item_id
+            parts = row.item_id.removeprefix("B50-T3-matrix-").removesuffix("-RMM")
+            # parts = "account_name-assertion"，assertion 是最后一个 '-' 分割
+            last_dash = parts.rfind("-")
+            if last_dash <= 0:
+                continue
+            account = parts[:last_dash]
+            assertion = parts[last_dash + 1:]
+
+            level_cn = LEVEL_CN.get(row.conclusion, row.conclusion)
+            assertion_cn = ASSERTION_CN.get(assertion, assertion)
+            remark = row.remark or ""
+
+            # 构造风险描述
+            risk_desc = f"【{level_cn}风险】{account} - {assertion_cn}认定"
+            if remark:
+                risk_desc += f"：{remark}"
+
+            prefill.append({
+                "risk": risk_desc,
+                "response": "",
+                "result": "",
+                "conclusion": "",
+            })
+
+        return prefill
+    except Exception as e:
+        logger.warning("A17-1 B50风险预填查询失败 project_id=%s: %s", project_id, e)
+        return []
 
 
 async def _load_cross_references(project_id, db) -> dict:
@@ -168,13 +244,15 @@ async def render(ctx: RenderContext) -> dict | None:
 
     # ─── 2. 加载项目上下文 ───────────────────────────────────────────────
     project_context: dict = {
+        "project_id": str(project_id),
         "client_name": "",
         "audit_period": "",
         "preparer": None,
+        "business_category": "",
     }
     try:
         proj_result = await db.execute(
-            sa.text("SELECT client_name, audit_year FROM projects WHERE id = :pid"),
+            sa.text("SELECT client_name, audit_year, business_category FROM projects WHERE id = :pid"),
             {"pid": str(project_id)},
         )
         proj_row = proj_result.fetchone()
@@ -183,6 +261,7 @@ async def render(ctx: RenderContext) -> dict | None:
             year = proj_row.audit_year
             if year:
                 project_context["audit_period"] = f"{year}年度"
+            project_context["business_category"] = proj_row.business_category or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("A17-1 project context 查询失败: %s", e)
 
@@ -209,6 +288,13 @@ async def render(ctx: RenderContext) -> dict | None:
             ch_data["explanation"] = yn_data.get("explanation")
 
         chapters[str(num)] = ch_data
+
+    # ─── 4.1 Chapter 6 B50 风险预填（表格为空时从 B50 拉取 H/M 风险项）───
+    ch6 = chapters.get("6", {})
+    if ch6.get("type") == "table" and not ch6.get("rows"):
+        prefill_rows = await _load_b50_risk_prefill(project_id, db)
+        if prefill_rows:
+            ch6["prefill_rows"] = prefill_rows
 
     # ─── 5. 构建 signature_table (10 rows) ───────────────────────────────
     signature_table: list[dict] = []

@@ -1525,7 +1525,30 @@ function onConsolTreeSelect(data: ConsolTreeSelectPayload) {
   }
 }
 
+// route.query.tab 别名 → 真实 el-tab-pane name（A3 中控台 route: chip 跳转用）
+const TAB_ALIAS: Record<string, string> = {
+  scope: 'structure',
+  structure: 'structure',
+  eliminations: 'worksheets',
+  'internal-trade': 'worksheets',
+  worksheets: 'worksheets',
+  trial: 'consol_tb',
+  consol_tb: 'consol_tb',
+  report: 'consol_report',
+  consol_report: 'consol_report',
+  notes: 'consol_note',
+  consol_note: 'consol_note',
+}
+
+function syncTabFromQuery() {
+  const q = route.query.tab
+  if (typeof q === 'string' && TAB_ALIAS[q]) {
+    activeTab.value = TAB_ALIAS[q]
+  }
+}
+
 onMounted(async () => {
+  syncTabFromQuery()
   updateConsolEquityTableHeight()
   window.addEventListener('resize', updateConsolEquityTableHeight)
   await loadProjectInfo()
@@ -1624,6 +1647,9 @@ watch(activeTab, (tab) => {
   if (tab === 'consol_note' && !consolNoteTree.value.length) loadConsolNoteTree()
   if (tab === 'consol_tb' && !consolTbRows.value.length) loadConsolTb()
 })
+
+// 在合并页内通过 route: chip 二次跳转（query.tab 变化但组件不重挂载）时同步 Tab
+watch(() => route.query.tab, syncTabFromQuery)
 </script>
 
 <style>

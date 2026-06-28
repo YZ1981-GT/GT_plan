@@ -270,8 +270,8 @@ describe('useA171AuditSummary — Unit', () => {
   describe('hydration from render data', () => {
     it('hydrates textarea chapters', () => {
       const chapters = {
-        '1': { type: 'textarea', title: '一、审计工作概况', content: '已填内容' },
-        '2': { type: 'textarea', title: '二、重大会计政策及估计变更', content: null },
+        '1': { type: 'textarea', title: '一、审计业务约定范围及执行情况', content: '已填内容' },
+        '2': { type: 'textarea', title: '二、独立性', content: null },
       }
       const { composable } = setup({ chapters } as any)
       expect((composable.chapters.value['1'] as any).content).toBe('已填内容')
@@ -279,7 +279,7 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('hydrates table chapters', () => {
       const chapters = {
-        '6': { type: 'table', title: '六、重大错报风险应对', rows: [{ risk: '存货', response: '盘点', result: '正常', conclusion: '通过' }] },
+        '6': { type: 'table', title: '六、对重大错报风险的应对措施执行情况', rows: [{ risk: '存货', response: '盘点', result: '正常', conclusion: '通过' }] },
       }
       const { composable } = setup({ chapters } as any)
       expect((composable.chapters.value['6'] as any).rows.length).toBe(1)
@@ -287,7 +287,7 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('hydrates yn chapters', () => {
       const chapters = {
-        '9': { type: 'yn', title: '九、舞弊识别', answer: 'Y', explanation: '说明' },
+        '9': { type: 'yn', title: '九、对关联方及关联方交易的结论', answer: 'Y', explanation: '说明' },
       }
       const { composable } = setup({ chapters } as any)
       expect((composable.chapters.value['9'] as any).answer).toBe('Y')
@@ -295,7 +295,7 @@ describe('useA171AuditSummary — Unit', () => {
     })
 
     it('hydrates signature table', () => {
-      const sig = Array.from({ length: 10 }, (_, i) => ({
+      const sig = Array.from({ length: 4 }, (_, i) => ({
         role: `角色${i}`,
         name: i === 0 ? '张三' : null,
         date: null,

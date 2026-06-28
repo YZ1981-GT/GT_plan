@@ -16,14 +16,6 @@
         :options="modeOptions"
         size="default"
       />
-      <el-button
-        v-if="activeMode === 'docx'"
-        size="small"
-        :icon="FullScreen"
-        @click="isFullscreen = !isFullscreen"
-      >
-        {{ isFullscreen ? '退出全屏' : '全屏编辑' }}
-      </el-button>
     </div>
 
     <!-- HTML 结构化视图 -->
@@ -279,12 +271,8 @@
     <!-- DOCX Word编辑模式 -->
     <div
       v-else-if="activeMode === 'docx'"
-      :class="['gt-a112-dual-checklist__docx-view', { 'gt-a112-dual-checklist__docx-view--fullscreen': isFullscreen }]"
+      class="gt-a112-dual-checklist__docx-view"
     >
-      <div v-if="isFullscreen" class="gt-a112-dual-checklist__fullscreen-toolbar">
-        <span class="gt-a112-dual-checklist__fullscreen-title">A1-12 重大事项决定程序核查表</span>
-        <el-button size="small" @click="isFullscreen = false">退出全屏</el-button>
-      </div>
       <GtOnlyOfficeSheet
         :wp-id="props.wpId"
         sheet-name="A1-12"
@@ -309,7 +297,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Delete, FullScreen } from '@element-plus/icons-vue'
+import { Plus, Delete } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
@@ -395,7 +383,6 @@ const checklistData = ref<A112ChecklistData | null>(null)
 const responses = ref<A112Responses>({ items: {}, header: {}, custom_items: [] })
 const loading = ref(false)
 const docxDirty = ref(false)
-const isFullscreen = ref(false)
 
 // ─── Mode Options ───────────────────────────────────────────────────────────
 
@@ -578,7 +565,7 @@ async function loadRenderConfig() {
   loading.value = true
   isInitialLoad = true
   try {
-    const res = await api.get<any>(`/api/workpapers/${props.wpId}/render-config`)
+    const res = await api.get<any>(`/api/workpapers/${props.wpId}/render-config?force_component_type=a1-12-dual-checklist`)
     // render_a112_dual 返回 htmlData = { checklistData, responses }
     const htmlData = res?.sheets?.[0]?.html_data ?? res?.htmlData ?? res
     if (htmlData?.checklistData) {
@@ -604,10 +591,6 @@ async function loadRenderConfig() {
 // ─── Mode Switch Sync (Task 3.8 + 3.9) ─────────────────────────────────────
 
 watch(activeMode, async (newMode, oldMode) => {
-  // 退出全屏
-  if (newMode === 'html') {
-    isFullscreen.value = false
-  }
   // DOCX→HTML 切回：若 docxDirty 需刷新数据
   if (newMode === 'html' && oldMode === 'docx' && docxDirty.value) {
     docxDirty.value = false
@@ -791,34 +774,6 @@ defineExpose({
   height: 100% !important;
   min-height: calc(100vh - 260px);
   border: none;
-}
-
-/* 全屏模式 */
-.gt-a112-dual-checklist__docx-view--fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 2000;
-  background: #fff;
-  padding: 0;
-  min-height: unset;
-}
-
-.gt-a112-dual-checklist__fullscreen-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: #f5f7fa;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.gt-a112-dual-checklist__fullscreen-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #303133;
 }
 
 .gt-a112-dual-checklist__header-card {
