@@ -95,7 +95,7 @@
           <template #header>
             <div class="gt-a1731__section-header">
               <span class="gt-a1731__card-title">一、咨询事项描述</span>
-              <GtIndexChip wp-code="A17-3" label="A17-3" />
+              <GtIndexChip value="A17-3" />
             </div>
           </template>
 
