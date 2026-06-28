@@ -195,6 +195,134 @@ async def generate_docx(wp_id: UUID, project_id: UUID, db: AsyncSession) -> Path
                 parts.append(f"\n3、项目完成工时情况\n{hours}")
         ch_contents[3] = "\n".join(parts) if parts else "审计工作按总体审计策略进行，本期未对审计计划做重大修改。"
 
+    # 2c. 特殊处理 ch4/ch6/ch7/ch8/ch15：从独立 item_id 组装成文本
+    import json as _json2
+
+    async def _load_prefixed(prefix: str) -> dict[str, str]:
+        """加载指定前缀的 checklist_responses"""
+        try:
+            r = await db.execute(
+                sa.text("SELECT item_id, conclusion, remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id LIKE :prefix"),
+                {"wp_id": str(wp_id), "prefix": f"{prefix}%"},
+            )
+            return {row.item_id: (row.conclusion or row.remark or "") for row in r.fetchall()}
+        except Exception:
+            return {}
+
+    # ch4: 6子节
+    ch4_items = await _load_prefixed("a171-ch4-")
+    if ch4_items:
+        parts4 = []
+        if ch4_items.get("a171-ch4-s1-hasrisk") == "Y":
+            rows = ch4_items.get("a171-ch4-s1-rows", "")
+            if rows:
+                try:
+                    for r in _json2.loads(rows):
+                        parts4.append(f"• 特别风险：{r.get('risk','')} | 措施：{r.get('measure','')} | 结论：{r.get('diff','')}")
+                except Exception:
+                    pass
+        else:
+            parts4.append("（一）本期未识别特别风险。")
+        parts4.append(f"\n（二）已更正错报：{ch4_items.get('a171-ch4-s2-corrected', '')}")
+        parts4.append(f"未更正错报：{ch4_items.get('a171-ch4-s2-uncorrected', '')}")
+        if ch4_items.get("a171-ch4-s3-hasdeficiency") == "Y":
+            parts4.append(f"\n（三）内控缺陷：{ch4_items.get('a171-ch4-s3-content', '')}")
+        else:
+            parts4.append("\n（三）本期未识别值得关注的内控缺陷。")
+        if ch4_items.get("a171-ch4-s4-hasjudgment") == "Y":
+            parts4.append(f"\n（四）重大职业判断：详见表格")
+        else:
+            parts4.append("\n（四）本期未涉及需特别说明的重大职业判断事项。")
+        if ch4_items.get("a171-ch4-s5-hasdifficulty") == "Y":
+            parts4.append(f"\n（五）变更审计程序情形：详见表格")
+        else:
+            parts4.append("\n（五）本期未遇到导致变更审计程序的情形。")
+        if ch4_items.get("a171-ch4-s6-hasmodification") == "Y":
+            parts4.append(f"\n（六）{ch4_items.get('a171-ch4-s6-content', '')}")
+        else:
+            parts4.append("\n（六）不存在可能导致出具非无保留意见审计报告的事项。")
+        ch_contents[4] = "\n".join(parts4)
+
+    # ch6: 3子节
+    ch6_items = await _load_prefixed("a171-ch6-")
+    if ch6_items:
+        parts6 = []
+        s1_rows = ch6_items.get("a171-ch6-s1-rows", "")
+        if s1_rows:
+            try:
+                for r in _json2.loads(s1_rows):
+                    parts6.append(f"• 风险：{r.get('risk','')} → 执行：{r.get('response','')}")
+            except Exception:
+                pass
+        s2_contents = ch6_items.get("a171-ch6-s2-contents", "")
+        if s2_contents:
+            try:
+                for i, c in enumerate(_json2.loads(s2_contents)):
+                    if c:
+                        parts6.append(f"\n{i+1}、{c}")
+            except Exception:
+                pass
+        if ch6_items.get("a171-ch6-s3-applicable") == "Y":
+            parts6.append("\n（三）延伸检查程序：已执行")
+        else:
+            parts6.append("\n（三）延伸检查程序：不适用")
+        if parts6:
+            ch_contents[6] = "\n".join(parts6)
+
+    # ch7: 专家/税务
+    ch7_items = await _load_prefixed("a171-ch7-")
+    if ch7_items:
+        parts7 = []
+        if ch7_items.get("a171-ch7-expert-applicable") == "Y":
+            parts7.append(f"利用专家工作：{ch7_items.get('a171-ch7-expert-content', '')}")
+        else:
+            parts7.append("利用专家工作：不适用")
+        if ch7_items.get("a171-ch7-tax-applicable") == "Y":
+            parts7.append(f"税务专家复核：{ch7_items.get('a171-ch7-tax-content', '')}")
+        else:
+            parts7.append("税务专家复核：不适用")
+        ch_contents[7] = "\n".join(parts7)
+
+    # ch8: 3子节(纯textarea)
+    ch8_items = await _load_prefixed("a171-ch8-")
+    if ch8_items:
+        parts8 = []
+        s1 = ch8_items.get("a171-ch8-s1-content", "")
+        s2 = ch8_items.get("a171-ch8-s2-content", "")
+        s3 = ch8_items.get("a171-ch8-s3-content", "")
+        if s1:
+            parts8.append(f"（一）已审财务报表分析\n{s1}")
+        if s2:
+            parts8.append(f"\n（二）同行业公司对比分析\n{s2}")
+        if s3:
+            parts8.append(f"\n（三）财务与非财务信息印证\n{s3}")
+        if parts8:
+            ch_contents[8] = "\n".join(parts8)
+
+    # ch15: 6子节
+    ch15_items = await _load_prefixed("a171-ch15-")
+    if ch15_items:
+        parts15 = []
+        if ch15_items.get("a171-ch15-ic-applicable") == "Y":
+            parts15.append(f"（一）内控审计意见\n缺陷汇总：{ch15_items.get('a171-ch15-ic-deficiency', '')}\n意见类型：{ch15_items.get('a171-ch15-ic-opinion', '')}")
+        else:
+            parts15.append("（一）出具内部控制审计意见的考虑：不适用")
+        if ch15_items.get("a171-ch15-bond-applicable") == "Y":
+            parts15.append(f"\n（二）发债业务\n非经营性资产：{ch15_items.get('a171-ch15-bond-nonop', '')}\n偿债能力：{ch15_items.get('a171-ch15-bond-solvency', '')}\n担保：{ch15_items.get('a171-ch15-bond-guarantee', '')}")
+        else:
+            parts15.append("\n（二）发债业务的特殊考虑：不适用")
+        if ch15_items.get("a171-ch15-neeq-applicable") == "Y":
+            parts15.append(f"\n（三）新三板核查\n{ch15_items.get('a171-ch15-neeq-content', '')}")
+        else:
+            parts15.append("\n（三）新三板审计业务特殊核查事项：不适用")
+        fraud = ch15_items.get("a171-ch15-fraud-answer", "none")
+        parts15.append(f"\n（四）舞弊：{'有发现 - ' + ch15_items.get('a171-ch15-fraud-content', '') if fraud == 'found' else '未发现'}")
+        legal = ch15_items.get("a171-ch15-legal-answer", "none")
+        parts15.append(f"（五）违法：{'有发现 - ' + ch15_items.get('a171-ch15-legal-content', '') if legal == 'found' else '未发现'}")
+        comp = ch15_items.get("a171-ch15-component-answer", "na")
+        parts15.append(f"（六）组成部分审计师：{'已利用 - ' + ch15_items.get('a171-ch15-component-content', '') if comp == 'used' else '不适用'}")
+        ch_contents[15] = "\n".join(parts15)
+
     # 3. 打开 docx，定位各章节并替换内容
     doc = Document(str(file_path))
     current_ch: Optional[int] = None
@@ -220,8 +348,8 @@ async def generate_docx(wp_id: UUID, project_id: UUID, db: AsyncSession) -> Path
         ch_end_indices[current_ch] = len(doc.paragraphs)
 
     # 第二遍：对有新内容的章节，清空原内容段落并写入新内容
-    # 注意：只处理 textarea 类型章节（1-5, 7, 13-16），table/yn 章节不覆盖
-    TEXTAREA_CHAPTERS = {1, 2, 3, 4, 5, 7, 13, 14, 15, 16}
+    # 注意：结构化章节(3-8,15)已在step 2c组装为文本，与纯textarea章节统一写入
+    TEXTAREA_CHAPTERS = {1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16}
 
     for ch_num in sorted(ch_contents.keys()):
         if ch_num not in TEXTAREA_CHAPTERS:
@@ -335,8 +463,8 @@ async def sync_docx_to_responses(
     now = datetime.now(timezone.utc)
     count = 0
 
-    # textarea 章节（跳过 ch3，它有独立 item_id）
-    TEXTAREA_CHAPTERS = {1, 2, 4, 5, 7, 13, 14, 15, 16}
+    # textarea 章节（跳过 ch3/ch4/ch6/ch7/ch8/ch15，它们有独立 item_id）
+    TEXTAREA_CHAPTERS = {1, 2, 5, 9, 10, 11, 12, 13, 14, 16}
     for ch_num, content in chapters.items():
         if ch_num not in TEXTAREA_CHAPTERS:
             continue
