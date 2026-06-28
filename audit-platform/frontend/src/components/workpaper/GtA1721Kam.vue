@@ -53,13 +53,24 @@
         <el-card shadow="never" class="gt-a1721__section gt-a1721__candidates">
           <template #header>
             <div class="gt-a1721__section-header">
-              <span class="gt-a1721__section-title">一、关键审计事项候选清单</span>
+              <span class="gt-a1721__section-title">一、识别关键审计事项</span>
               <div class="gt-a1721__section-actions">
                 <el-button size="small" :loading="aiLoading === 'candidates'" @click="aiGenerateCandidates">🤖 AI</el-button>
                 <el-button type="primary" size="small" plain @click="addCandidate">+ 添加候选</el-button>
               </div>
             </div>
           </template>
+          <details class="gt-a1721__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a1721__guidance-body">
+              对于"重大事项概要汇总"（A17-1）底稿的四（一）至（五）中记录的需合伙人关注事项，如果未识别为需沟通的关键审计事项，需在本底稿中记录判断理由。<br/><br/>
+              候选事项按4类分组填列：<br/>
+              (一) 评估的重大错报风险较高的领域或识别出的特别风险<br/>
+              (二) 涉及重大管理层判断的领域（包括涉及重大会计估计的领域）<br/>
+              (三) 本期重大交易或事项对审计的影响<br/>
+              (四) 其他
+            </div>
+          </details>
           <el-table
             :data="candidates"
             border
@@ -127,12 +138,22 @@
         <!-- Section 二: KAM 详情卡片 -->
         <div class="gt-a1721__section gt-a1721__kam-cards">
           <div class="gt-a1721__section-header">
-            <span class="gt-a1721__section-title">二、关键审计事项详情</span>
+            <span class="gt-a1721__section-title">二、在审计报告中沟通的关键审计事项</span>
             <div class="gt-a1721__section-actions">
               <el-button size="small" :loading="aiLoading === 'kam'" @click="aiGenerateKam">🤖 AI</el-button>
               <el-button type="primary" size="small" plain @click="addKam">+ 添加关键审计事项</el-button>
             </div>
           </div>
+          <details class="gt-a1721__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a1721__guidance-body">
+              注1：建议分别描述①基本情况②相关会计政策③认定的原因；<br/>
+              注2：建议依次描述①了解、评估并测试关键内部控制②了解和评估相关会计政策、实质性程序等③实施审计程序的结果（需要避免使预期使用者认为这种描述是针对单一关键审计事项发表单独的意见，也需要避免使预期使用者对财务报表整体的审计意见产生疑问）；<br/>
+              注3：底稿索引，含内部控制、实质性程序及与治理层沟通等。<br/><br/>
+              在审计报告中描述一项关键审计事项在审计中如何应对时，描述的详细程度属于职业判断。根据CSA 1504第十三条第（二）项的要求，注册会计师<b>可以</b>描述下列要素：(1)审计应对措施或审计方案中，与该事项最为相关或对评估的重大错报风险最有针对性的方面；(2)对已实施审计程序的简要概述；(3)实施审计程序的结果；(4)对该事项的主要看法。<br/><br/>
+              注册会计师可能需要注意用于描述关键审计事项的语言，使之：(1)不暗示注册会计师在对财务报表形成审计意见时尚未恰当解决该事项；(2)将该事项直接联系到被审计单位的具体情况，避免使用一般化或标准化的语言；(3)能够体现出对该事项在相关财务报表披露（如有）中如何应对的考虑；(4)不对财务报表单一要素单独发表意见，也不暗示是对财务报表单一要素单独发表意见。
+            </div>
+          </details>
 
           <el-card
             v-for="(kam, idx) in kams"
@@ -220,6 +241,15 @@
                   @change="(v: string) => updateKamField(idx, 'ref_index', v)"
                 />
               </div>
+              <div class="gt-a1721__kam-field">
+                <label class="gt-a1721__kam-label">财务报表附注索引号</label>
+                <el-input
+                  :model-value="kam.note_index || ''"
+                  size="small"
+                  placeholder="如：财务报表附注 五、20"
+                  @change="(v: string) => updateKamField(idx, 'note_index', v)"
+                />
+              </div>
             </div>
           </el-card>
 
@@ -229,8 +259,16 @@
         <!-- Section 三: 附注披露 -->
         <el-card shadow="never" class="gt-a1721__section gt-a1721__notes">
           <template #header>
-            <span class="gt-a1721__section-title">三、附注披露引用</span>
+            <span class="gt-a1721__section-title">三、被审计单位财务报表附注的相关披露</span>
           </template>
+          <details class="gt-a1721__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a1721__guidance-body">
+              针对每个关键审计事项，分别描述：<br/>
+              1、会计政策及会计估计<br/>
+              2、报表附注披露（如项目注释、关联方及关联交易、其他重要事项等）
+            </div>
+          </details>
           <div v-if="notes.length === 0" class="gt-a1721__notes-empty">
             请先在第二节添加关键审计事项
           </div>
@@ -472,6 +510,11 @@ defineExpose({ reload: () => flushPendingSaves() })
   color: #303133;
 }
 .gt-a1721__section-actions { display: flex; align-items: center; gap: 8px; }
+
+/* 编制提示 */
+.gt-a1721__guidance { margin: 8px 0; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
+.gt-a1721__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
+.gt-a1721__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; }
 
 /* Applicability */
 .gt-a1721__applicability { border-left: 3px solid #e6a23c; }
