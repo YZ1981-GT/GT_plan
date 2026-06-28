@@ -96,7 +96,7 @@
             <div class="gt-a1731__section-header">
               <span class="gt-a1731__card-title">一、咨询事项描述</span>
               <div class="gt-a1731__section-actions">
-                <GtIndexChip value="A17-3" />
+                <el-button size="small" type="primary" text @click="switchToA173Tab">A17-3 ↗</el-button>
                 <el-button size="small" :loading="aiLoading === 1" @click="aiGenerate(1)">🤖 AI</el-button>
               </div>
             </div>
@@ -268,6 +268,8 @@ const GtOnlyOfficeSheet = defineAsyncComponent(
 
 defineOptions({ name: 'GtA1731ConsultationExecution' })
 
+const emit = defineEmits<{ 'switch-tab': [tabId: string] }>()
+
 const props = withDefaults(defineProps<{
   wpId: string
   projectId?: string
@@ -292,6 +294,11 @@ const {
   updateSection,
   flushPendingSaves,
 } = useA1731ConsultationExecution(wpIdRef)
+
+// ─── Tab Switch (navigate to A17-3 within Bundle) ───
+function switchToA173Tab() {
+  emit('switch-tab', 'A17-3')
+}
 
 // ─── Section 三 Y/N State ───
 const s3Agree = ref('Y')

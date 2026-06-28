@@ -329,6 +329,7 @@ onMounted(async () => {
             :wp-id="getTabWpId(tab)"
             :project-id="props.projectId"
             :readonly="isTabReadonly(tab)"
+            @switch-tab="(tabId: string) => { active = tabId }"
           />
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
         </template>
