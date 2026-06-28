@@ -320,8 +320,9 @@ defineOptions({ name: 'GtA173ConsultationRecord' })
 
 const props = withDefaults(defineProps<{
   wpId: string
+  projectId?: string
   readonly?: boolean
-}>(), { readonly: false })
+}>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
 const mode = ref('结构化视图')
