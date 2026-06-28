@@ -110,6 +110,11 @@
 
               <!-- Textarea type (other chapters) -->
               <div v-else-if="chapters[String(n)]?.type === 'textarea'" class="gt-a171__textarea-wrap">
+                <!-- 编制提示 -->
+                <details v-if="CHAPTER_GUIDANCE[n]" class="gt-a171__guidance">
+                  <summary>📋 编制提示</summary>
+                  <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[n] }}</div>
+                </details>
                 <el-input
                   :model-value="(chapters[String(n)] as any).content || ''"
                   type="textarea"
@@ -129,6 +134,10 @@
 
               <!-- Table type: chapter 6 -->
               <div v-else-if="n === 6 && chapters['6']?.type === 'table'" class="gt-a171__table-wrap">
+                <details v-if="CHAPTER_GUIDANCE[6]" class="gt-a171__guidance">
+                  <summary>📋 编制提示</summary>
+                  <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[6] }}</div>
+                </details>
                 <el-table :data="(chapters['6'] as any).rows" border size="small">
                   <el-table-column label="风险描述" min-width="160">
                     <template #default="{ row, $index }">
@@ -177,6 +186,10 @@
 
               <!-- Table type: chapter 8 -->
               <div v-else-if="n === 8 && chapters['8']?.type === 'table'" class="gt-a171__table-wrap">
+                <details v-if="CHAPTER_GUIDANCE[8]" class="gt-a171__guidance">
+                  <summary>📋 编制提示</summary>
+                  <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[8] }}</div>
+                </details>
                 <el-table :data="(chapters['8'] as any).rows" border size="small">
                   <el-table-column label="项目" min-width="160">
                     <template #default="{ row, $index }">
@@ -219,6 +232,10 @@
 
               <!-- Y/N type: chapters 9,10,11,12 -->
               <div v-else-if="chapters[String(n)]?.type === 'yn'" class="gt-a171__yn-wrap">
+                <details v-if="CHAPTER_GUIDANCE[n]" class="gt-a171__guidance">
+                  <summary>📋 编制提示</summary>
+                  <div class="gt-a171__guidance-body">{{ CHAPTER_GUIDANCE[n] }}</div>
+                </details>
                 <el-radio-group
                   :model-value="(chapters[String(n)] as any).answer"
                   @change="(v: string) => handleYnChange(n, v as 'Y' | 'N' | null)"
@@ -280,7 +297,7 @@
 <script setup lang="ts">
 import { ref, toRef, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
-import { useA171AuditSummary, CHAPTER_TEMPLATE } from './composables/useA171AuditSummary'
+import { useA171AuditSummary, CHAPTER_TEMPLATE, CHAPTER_GUIDANCE } from './composables/useA171AuditSummary'
 import { useA171Navigation } from './composables/useA171Navigation'
 import type { A171RenderData } from './composables/useA171AuditSummary'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -516,9 +533,10 @@ async function handleAiChapterFill(chapterNum: number) {
   try {
     const { api } = await import('@/services/apiProxy')
     const titles = chapters.value[String(chapterNum)]?.title || ''
+    const guidance = CHAPTER_GUIDANCE[chapterNum] || ''
     const res = await api.post<any>(
       `/api/workpapers/${props.wpId}/a171/ai-generate`,
-      { chapter: chapterNum, chapter_title: titles, guidance: '', existing_content: (chapters.value[String(chapterNum)] as any)?.content || '', knowledge_doc_ids: [] },
+      { chapter: chapterNum, chapter_title: titles, guidance, existing_content: (chapters.value[String(chapterNum)] as any)?.content || '', knowledge_doc_ids: [] },
       { _silent: true } as any,
     )
     const content = res?.content || ''
@@ -626,4 +644,9 @@ defineExpose({ reload: () => flushPendingSaves() })
 .gt-a171__oo-mode { min-height: 400px; }
 .gt-a171__oo-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 80px 20px; color: #909399; font-size: 14px; }
 .gt-a171__oo-error { padding: 40px 20px; }
+
+/* 编制提示折叠区 */
+.gt-a171__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
+.gt-a171__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
+.gt-a171__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; white-space: pre-wrap; }
 </style>
