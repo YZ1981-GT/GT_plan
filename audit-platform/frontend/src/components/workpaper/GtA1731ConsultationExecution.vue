@@ -46,6 +46,28 @@
             <div class="gt-a1731__meta-item">
               <label>执行人</label>
               <el-input
+                :model-value="metaInfo.reviewer"
+                size="small"
+                :disabled="props.readonly"
+                placeholder="复核人"
+                @change="(v: string) => updateMeta('reviewer', v)"
+              />
+            </div>
+            <div class="gt-a1731__meta-item">
+              <label>复核日期</label>
+              <el-date-picker
+                :model-value="metaInfo.review_date"
+                type="date"
+                size="small"
+                value-format="YYYY-MM-DD"
+                :disabled="props.readonly"
+                placeholder="选择日期"
+                @change="(v: string) => updateMeta('review_date', v || '')"
+              />
+            </div>
+            <div class="gt-a1731__meta-item">
+              <label>执行人</label>
+              <el-input
                 :model-value="metaInfo.executor"
                 size="small"
                 :disabled="props.readonly"
@@ -63,28 +85,6 @@
                 :disabled="props.readonly"
                 placeholder="选择日期"
                 @change="(v: string) => updateMeta('execution_date', v || '')"
-              />
-            </div>
-            <div class="gt-a1731__meta-item">
-              <label>复核日期</label>
-              <el-date-picker
-                :model-value="metaInfo.review_date"
-                type="date"
-                size="small"
-                value-format="YYYY-MM-DD"
-                :disabled="props.readonly"
-                placeholder="选择日期"
-                @change="(v: string) => updateMeta('review_date', v || '')"
-              />
-            </div>
-            <div class="gt-a1731__meta-item">
-              <label>复核人</label>
-              <el-input
-                :model-value="metaInfo.reviewer"
-                size="small"
-                :disabled="props.readonly"
-                placeholder="复核人"
-                @change="(v: string) => updateMeta('reviewer', v)"
               />
             </div>
           </div>
