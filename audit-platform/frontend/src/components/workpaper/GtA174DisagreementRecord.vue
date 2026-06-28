@@ -110,8 +110,15 @@
           shadow="never"
         >
           <template #header>
-            <span class="gt-a174__card-title">{{ sec.title }}</span>
+            <div class="gt-a174__card-header">
+              <span class="gt-a174__card-title">{{ sec.title }}</span>
+              <el-button size="small" :loading="aiLoading === sec.num" @click="aiGenerate(sec.num)">🤖 AI</el-button>
+            </div>
           </template>
+          <details v-if="sec.guidance" class="gt-a174__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a174__guidance-body">{{ sec.guidance }}</div>
+          </details>
           <el-input
             :model-value="getSectionValue(sec.num)"
             type="textarea"
@@ -170,7 +177,9 @@
       v-else
       :wp-id="props.wpId"
       sheet-name="A17-4"
+      :project-id="props.projectId"
       class="gt-a174__oo"
+      @fallback="handleOOFallback"
     />
   </div>
 </template>
@@ -178,6 +187,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, defineAsyncComponent, computed } from 'vue'
 import { Loading, Plus, Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useA174DisagreementRecord } from './composables/useA174DisagreementRecord'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(
@@ -188,12 +198,13 @@ defineOptions({ name: 'GtA174DisagreementRecord' })
 
 const props = withDefaults(defineProps<{
   wpId: string
+  projectId?: string
   readonly?: boolean
-}>(), { readonly: false })
+}>(), { projectId: '', readonly: false })
 
 // ─── Mode Switch ───
 const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const modeOptions = ref(['结构化视图', '在线编辑'])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -215,12 +226,11 @@ const {
 
 // ─── Section configs ───
 const sectionConfigs = [
-  { num: 1, title: '一、分歧事项描述', minRows: 3, placeholder: '请描述存在专业意见分歧的事项' },
-  { num: 2, title: '二、各方意见', minRows: 4, placeholder: '请描述各方意见分歧的内容' },
-  { num: 3, title: '三、咨询/讨论过程', minRows: 4, placeholder: '请描述咨询或讨论的过程' },
-  { num: 4, title: '四、最终结论', minRows: 3, placeholder: '请描述最终结论' },
-  { num: 5, title: '五、后续措施', minRows: 4, placeholder: '请描述后续措施安排' },
-  { num: 6, title: '六、备注', minRows: 3, placeholder: '请输入备注内容' },
+  { num: 1, title: '二、专业意见分歧事由', minRows: 4, placeholder: '描述存在专业意见分歧的业务背景、事由、各方主要观点和分析意见', guidance: '需要说明存在专业意见分歧的业务背景，审计过程中遇到的事项以及各方主要观点、事由、影响和主要的分析意见。' },
+  { num: 2, title: '三、已执行的审计程序', minRows: 4, placeholder: '描述对专业分歧事项已采取的审计程序和获取的审计证据', guidance: '描述对专业分歧事项已采取的审计程序和获取的审计证据。' },
+  { num: 3, title: '四、被审计单位和监管机构的意见', minRows: 4, placeholder: '记录管理层、治理层、监管方、董事会、审计委员会等的意见', guidance: '记录管理层、治理层（如审计委员会）、监管方、董事会等对该事项的意见和反馈。' },
+  { num: 4, title: '五、解决方式和结论', minRows: 4, placeholder: '描述解决方式和最终审计结论', guidance: '描述解决方式（进一步咨询/修改方案/提升至合伙人会议等）、解决条件，并参照会计问题的处理准则或标准体现审计结论。标明需要配套执行的后续事项。' },
+  { num: 5, title: '六、废弃事项落实情况', minRows: 3, placeholder: '如有废弃记录，清理相关备案并详载记录', guidance: '存入该废弃记录、清理和备案记录需审计报告形成的通知准则体系，标明需要配套执行任务等，详载清楚相关的必须记录。' },
 ]
 
 /** Helper to get section value by number */
@@ -230,8 +240,56 @@ function getSectionValue(secNum: number): string {
   return sec ? (sec as any)[fieldMap[secNum]] || '' : ''
 }
 
+// ─── AI Generate ───
+const aiLoading = ref<number | null>(null)
+async function aiGenerate(section: number) {
+  const titles: Record<number, string> = {
+    1: '存在专业意见分歧的人员及其职位',
+    2: '专业意见分歧事由',
+    3: '已执行的审计程序',
+    4: '被审计单位和监管机构的意见',
+    5: '解决方式和结论',
+    6: '废弃事项落实情况',
+  }
+  const guidances: Record<number, string> = {
+    2: '需要说明存在专业意见分歧的业务背景、审计过程中遇到的事项，以及各方主要观点、事由、影响和分析意见。',
+    3: '描述对专业分歧事项已采取的审计程序和获取的审计证据。',
+    4: '记录管理层、治理层（如审计委员会）、监管方、董事会等对该事项的意见。',
+    5: '描述解决方式（如进一步咨询/修改方案/提升至合伙人会议）和最终审计结论。标明需要配套执行的后续事项。',
+    6: '如有废弃记录，清理相关备案并详载记录。',
+  }
+  aiLoading.value = section
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
+      chapter: section, chapter_title: titles[section] || '', guidance: guidances[section] || '',
+      existing_content: '', knowledge_doc_ids: [],
+    }, { _silent: true } as any)
+    const content = res?.content || ''
+    if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+    updateSection(section, 'content', content)
+    ElMessage.success('AI 已生成')
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiLoading.value = null }
+}
+
+// ─── OO Health Check + Fallback ───
+async function checkOOHealth() {
+  try {
+    const { default: http } = await import('@/utils/http')
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
+    if (!healthy) modeOptions.value = ['结构化视图']
+  } catch {
+    modeOptions.value = ['结构化视图']
+  }
+}
+function handleOOFallback() {
+  ElMessage.warning('OnlyOffice 编辑器加载失败，请尝试 docker restart audit-onlyoffice')
+}
+
 // ─── Lifecycle ───
-onMounted(() => { loadData(props.wpId) })
+onMounted(() => { checkOOHealth(); loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })
 
 defineExpose({ reload: () => loadData(props.wpId) })
@@ -302,4 +360,9 @@ defineExpose({ reload: () => loadData(props.wpId) })
   height: calc(100vh - 200px);
   min-height: 500px;
 }
+
+/* 编制提示 */
+.gt-a174__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
+.gt-a174__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
+.gt-a174__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; white-space: pre-wrap; }
 </style>
