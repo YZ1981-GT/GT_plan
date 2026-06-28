@@ -108,6 +108,13 @@
                 :project-id="props.projectId || ''"
               />
 
+              <!-- Chapter 7: structured component -->
+              <GtA171Chapter7
+                v-else-if="n === 7"
+                :wp-id="props.wpId"
+                :project-id="props.projectId || ''"
+              />
+
               <!-- Chapter 8: structured component with auto-data -->
               <GtA171Chapter8
                 v-else-if="n === 8"
@@ -224,6 +231,7 @@ const GtA171ReviewPanel = defineAsyncComponent(() => import('./GtA171ReviewPanel
 const GtA171Chapter3 = defineAsyncComponent(() => import('./GtA171Chapter3.vue'))
 const GtA171Chapter4 = defineAsyncComponent(() => import('./GtA171Chapter4.vue'))
 const GtA171Chapter6 = defineAsyncComponent(() => import('./GtA171Chapter6.vue'))
+const GtA171Chapter7 = defineAsyncComponent(() => import('./GtA171Chapter7.vue'))
 const GtA171Chapter8 = defineAsyncComponent(() => import('./GtA171Chapter8.vue'))
 const GtA171Chapter15 = defineAsyncComponent(() => import('./GtA171Chapter15.vue'))
 
