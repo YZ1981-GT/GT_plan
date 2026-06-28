@@ -18,6 +18,14 @@
         @rendered="loading = false"
         @error="onError"
       />
+      <VueOfficeExcel
+        v-else-if="previewType === 'xlsx' && url"
+        :src="url"
+        :request-options="authRequestOptions"
+        style="height: 70vh"
+        @rendered="loading = false"
+        @error="onError"
+      />
       <div v-else-if="previewType === 'html' && htmlContent" class="deliverable-preview__html" v-html="htmlContent" />
       <el-alert
         v-else
@@ -39,12 +47,14 @@ import { ref, computed, watch } from 'vue'
 import DraftWatermark from './DraftWatermark.vue'
 import VueOfficeDocx from '@vue-office/docx'
 import VueOfficePdf from '@vue-office/pdf'
+import VueOfficeExcel from '@vue-office/excel'
 import '@vue-office/docx/lib/index.css'
+import '@vue-office/excel/lib/index.css'
 import { useAuthStore } from '@/stores/auth'
 
 const props = defineProps<{
   title: string
-  previewType: 'docx' | 'pdf' | 'html' | 'unsupported'
+  previewType: 'docx' | 'pdf' | 'xlsx' | 'html' | 'unsupported'
   url?: string
   htmlContent?: string
   showWatermark?: boolean
@@ -64,8 +74,8 @@ const authRequestOptions = computed(() => ({
 }))
 
 watch(() => props.previewType, () => {
-  // docx/pdf 需等 @rendered 事件才取消 loading；html 和 unsupported 立即取消
-  loading.value = (props.previewType === 'docx' || props.previewType === 'pdf')
+  // docx/pdf/xlsx 需等 @rendered 事件才取消 loading；html 和 unsupported 立即取消
+  loading.value = ['docx', 'pdf', 'xlsx'].includes(props.previewType)
 }, { immediate: true })
 
 function onError() {

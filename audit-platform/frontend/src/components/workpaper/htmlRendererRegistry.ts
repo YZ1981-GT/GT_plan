@@ -112,6 +112,7 @@ export type HtmlComponentType =
   | 'a17-1-audit-summary'
   | 'a17-2-1-kam'
   | 'a5-1-cashflow-audit'
+  | 'b1-4-due-diligence-report'
   | 'review-bundle'
 
 /**
@@ -887,6 +888,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtA51CashflowAudit.vue')),
     icon: '💰',
     label: 'A5-1 现金流量表审计',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'b1-4-due-diligence-report',
+    component: defineAsyncComponent(() => import('./GtB14DueDiligenceReport.vue')),
+    icon: '📋',
+    label: 'B1-4 尽职调查报告',
     emits: ['save'],
     contextProps: 'standard',
   },

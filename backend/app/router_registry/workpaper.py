@@ -104,6 +104,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.completion_phase import router as completion_phase
     from app.routers.a17_summary import router as a17_summary
     from app.routers.a18_regulatory import router as a18_regulatory
+    from app.routers.b14_ai_generate import router as b14_ai_generate
     from app.routers.a21_review import router as a21_review
     from app.routers.wp_export_word import router as wp_export_word
     from app.routers.b5_version import router as b5_version
@@ -123,7 +124,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],
-        "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation],
+        "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, b14_ai_generate],
         "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry],
         "科目工作包": [account_packages],
     }

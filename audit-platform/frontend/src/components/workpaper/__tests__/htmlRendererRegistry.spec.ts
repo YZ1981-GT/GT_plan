@@ -83,6 +83,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'b13-bundle',
       'b19-bundle',
       'b51-bundle',
+      'f2-stocktake-bundle',
       'c-control-test',
       'd1-notes-receivable',
       'd2-accounts-receivable',
@@ -108,6 +109,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'a17-1-audit-summary',
       'a17-2-1-kam',
       'a5-1-cashflow-audit',
+      'b1-4-due-diligence-report',
       'review-bundle',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)

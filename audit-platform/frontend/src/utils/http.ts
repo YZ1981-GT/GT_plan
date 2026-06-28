@@ -187,6 +187,27 @@ let refreshQueue: Array<{
   reject: (error: unknown) => void
 }> = []
 
+// ── 5xx 重试提示单例（多并发请求共用一个 toast，避免弹窗堆叠）──
+let _retryMsgHandle: ReturnType<typeof ElMessage> | null = null
+let _retryInflight = 0
+function _showRetryToast(attempt: number) {
+  _retryInflight++
+  if (_retryMsgHandle) return
+  _retryMsgHandle = ElMessage.warning({
+    message: `服务器暂时异常，正在重试...`,
+    duration: 0,
+    showClose: true,
+    onClose: () => { _retryMsgHandle = null },
+  })
+}
+function _hideRetryToast() {
+  _retryInflight = Math.max(0, _retryInflight - 1)
+  if (_retryInflight === 0 && _retryMsgHandle) {
+    _retryMsgHandle.close()
+    _retryMsgHandle = null
+  }
+}
+
 // ── 响应拦截器 ──────────────────────────────────────────
 http.interceptors.response.use(
   (response: AxiosResponse) => {
@@ -340,14 +361,13 @@ http.interceptors.response.use(
     // 500/502/503 自动重试（最多 2 次）+ loading 提示
     if (status && status >= 500 && (originalRequest._retryCount ?? 0) < 2) {
       originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
-      const retryMsg = ElMessage.info({
-        message: `服务器暂时异常，正在第 ${originalRequest._retryCount} 次重试...`,
-        duration: 0,
-        showClose: true,
-      })
-      await new Promise((r) => setTimeout(r, 1000 * originalRequest._retryCount!))
-      retryMsg.close()
-      return http(originalRequest)
+      _showRetryToast(originalRequest._retryCount)
+      try {
+        await new Promise((r) => setTimeout(r, 1000 * originalRequest._retryCount!))
+        return await http(originalRequest)
+      } finally {
+        _hideRetryToast()
+      }
     }
 
     // 分级错误提示

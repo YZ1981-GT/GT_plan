@@ -8,7 +8,9 @@
       <el-table-column prop="version_no" label="版本" width="70" />
       <el-table-column prop="status" label="状态" width="100" />
       <el-table-column prop="exporter_name" label="导出者" width="120" />
-      <el-table-column prop="exported_at" label="导出时间" width="170" />
+      <el-table-column prop="exported_at" label="导出时间" width="170">
+        <template #default="{ row }">{{ formatTime(row.exported_at) }}</template>
+      </el-table-column>
       <el-table-column prop="file_size" label="大小" width="100">
         <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
       </el-table-column>
@@ -52,6 +54,19 @@
 
 <script setup lang="ts">
 import type { DeliverableItem } from '@/services/deliverableApi'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+const displayPrefs = useDisplayPrefsStore()
+
+/**
+ * 格式化导出时间。后端时间戳为 naive UTC（func.now()/utcnow），
+ * 补 'Z' 标记后由统一格式化器转本地时区显示。
+ */
+function formatTime(v: string | null | undefined): string {
+  if (!v) return '-'
+  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(v)
+  return displayPrefs.fmtDateTime(hasTz ? v : `${v}Z`)
+}
 
 defineProps<{
   grouped: Record<string, DeliverableItem[]>

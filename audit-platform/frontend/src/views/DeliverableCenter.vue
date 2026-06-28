@@ -118,9 +118,20 @@
     </el-dialog>
 
     <el-dialog v-model="showGenerateReport" title="生成审计报告正文" width="520px">
+      <el-alert
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      >
+        <template #title>请先选择审计意见类型</template>
+        <div style="font-size: 12px; line-height: 1.6">
+          意见类型决定报告正文采用的模板（无保留 / 带强调事项段 / 保留 / 否定 / 无法表示意见），请根据审计结论审慎选择。
+        </div>
+      </el-alert>
       <el-form label-width="120px">
-        <el-form-item label="审计意见类型">
-          <el-select v-model="genForm.opinion_type" style="width: 100%">
+        <el-form-item label="审计意见类型" required>
+          <el-select v-model="genForm.opinion_type" style="width: 100%" placeholder="请选择审计意见类型">
             <el-option label="标准无保留意见" value="unqualified" />
             <el-option label="带强调事项段的无保留意见" value="unqualified_with_emphasis" />
             <el-option label="保留意见" value="qualified" />
@@ -140,9 +151,20 @@
       </el-form>
       <template #footer>
         <el-button @click="showGenerateReport = false">取消</el-button>
-        <el-button type="primary" :loading="generating" @click="runGenerateReport">生成正文</el-button>
+        <el-button type="primary" :loading="generating" @click="runGenerateReport">下一步</el-button>
       </template>
     </el-dialog>
+
+    <!-- 可选段落确认弹窗（报告正文两阶段生成 §13.1，走真实 Word 模板） -->
+    <OptionalSectionDialog
+      v-model:visible="optDialogVisible"
+      :optional-sections="optSections"
+      :missing-fields="optMissingFields"
+      :template-version="optTemplateVersion"
+      :company-subtype-resolved="optCompanySubtype"
+      :confirm-loading="confirmReportLoading"
+      @confirm="onReportOptConfirm"
+    />
   </div>
 </template>
 
@@ -159,6 +181,7 @@ import DeliverableGroupList from '@/components/deliverable/DeliverableGroupList.
 import DeliverableVersionList from '@/components/deliverable/DeliverableVersionList.vue'
 import DeliverableExportDialog from '@/components/deliverable/DeliverableExportDialog.vue'
 import DeliverablePreview from '@/components/deliverable/DeliverablePreview.vue'
+import OptionalSectionDialog from '@/components/deliverable/OptionalSectionDialog.vue'
 import {
   deliverableDownloadUrl,
   fetchDeliverables,
@@ -172,12 +195,14 @@ import {
   fetchExportJob,
   renderDisclosureNotes,
   renderFinancialReports,
-  renderReportBody,
+  previewReportBody,
+  confirmReportBody,
   rejectDeliverable,
   submitApproval,
   deleteDeliverable,
   type DeliverableItem,
   type DeliverableVersion,
+  type OptionalSection,
 } from '@/services/deliverableApi'
 import {
   checkGenerateReady,
@@ -204,8 +229,8 @@ const editorUrl = ref('')
 const previewWatermark = ref(false)
 
 // OnlyOffice 降级时传给 DeliverablePreview 的 previewType
-// docx → VueOfficeDocx 可渲染；xlsx/xls → 不支持（显示下载提示）
-const editorPreviewType = computed<'docx' | 'pdf' | 'html' | 'unsupported'>(() => {
+// docx → VueOfficeDocx；pdf → VueOfficePdf；xlsx/xls → VueOfficeExcel（只读预览）
+const editorPreviewType = computed<'docx' | 'pdf' | 'xlsx' | 'html' | 'unsupported'>(() => {
   let suffix = editorItem.value?.file_name?.split('.').pop()?.toLowerCase()
   if (!suffix) {
     const dt = editorItem.value?.doc_type || ''
@@ -214,7 +239,8 @@ const editorPreviewType = computed<'docx' | 'pdf' | 'html' | 'unsupported'>(() =
   }
   if (suffix === 'docx') return 'docx'
   if (suffix === 'pdf') return 'pdf'
-  return 'unsupported'  // xlsx/xls 等 VueOfficeDocx 不支持
+  if (suffix === 'xlsx' || suffix === 'xls') return 'xlsx'
+  return 'unsupported'
 })
 const items = ref<DeliverableItem[]>([])
 const grouped = ref<Record<string, DeliverableItem[]>>({})
@@ -230,7 +256,7 @@ const financialReportDataMode = ref<'audited' | 'unadjusted'>('audited')
 const selectedReportTypes = ref<string[]>(['balance_sheet', 'income_statement', 'cash_flow_statement', 'equity_statement', 'impairment_provision'])
 const previewVisible = ref(false)
 const previewTitle = ref('')
-const previewType = ref<'docx' | 'pdf' | 'html' | 'unsupported'>('html')
+const previewType = ref<'docx' | 'pdf' | 'xlsx' | 'html' | 'unsupported'>('html')
 const previewUrl = ref('')
 const previewHtml = ref('')
 
@@ -239,6 +265,15 @@ const genForm = ref({
   company_type: 'non_listed',
   is_pie: false,
 })
+
+// ── 报告正文两阶段生成（preview → OPT 弹窗 → confirm，走真实 Word 模板）──
+const optDialogVisible = ref(false)
+const optSections = ref<OptionalSection[]>([])
+const optMissingFields = ref<string[]>([])
+const optTemplateVersion = ref('')
+const optCompanySubtype = ref('')
+const optPreviewSessionId = ref('')
+const confirmReportLoading = ref(false)
 
 // 生成入口前置数据就绪状态（需求 21.4 / Property 37）
 const readiness = ref<DataReadiness>({ trialBalanceReady: false, reportsReady: false })
@@ -442,29 +477,48 @@ async function goGenerateNotes() {
 }
 
 async function runGenerateReport() {
+  // 两阶段第一步：preview（不落库），走真实 Word 模板，返回可选段落
   generating.value = true
   try {
-    const res = await renderReportBody(projectId.value, {
+    const result = await previewReportBody(projectId.value, {
       year: year.value,
       opinion_type: genForm.value.opinion_type,
-      company_type: genForm.value.company_type,
-      is_pie: genForm.value.is_pie,
-      include_emphasis: genForm.value.opinion_type === 'unqualified_with_emphasis',
+      company_subtype: null,
+      template_variant: 'simple',
     })
-    if (res.platform_persist_failed) {
-      ElMessage.warning('平台留存失败，文件已生成但请尽快下载')
-    } else {
-      ElMessage.success('报告正文已生成并保存到交付中心')
-    }
+    optPreviewSessionId.value = result.preview_session_id
+    optSections.value = result.optional_sections || []
+    optMissingFields.value = result.missing_fields || []
+    optTemplateVersion.value = result.template_version || ''
+    optCompanySubtype.value = result.company_subtype_resolved || ''
+    showGenerateReport.value = false
+    optDialogVisible.value = true
+  } catch {
+    ElMessage.error('生成报告正文预览失败')
+  } finally {
+    generating.value = false
+  }
+}
+
+/** OPT 弹窗确认 → 两阶段第二步：confirm（入库，版本递增，真实 Word 模板填充） */
+async function onReportOptConfirm(selections: Record<string, boolean>) {
+  confirmReportLoading.value = true
+  try {
+    const res = await confirmReportBody(projectId.value, {
+      year: year.value,
+      preview_session_id: optPreviewSessionId.value,
+      optional_sections: selections,
+    })
+    ElMessage.success('报告正文已生成并保存到交付中心')
     if (res.validation_warning) {
       ElMessage.warning(res.validation_warning)
     }
-    showGenerateReport.value = false
+    optDialogVisible.value = false
     await loadList()
   } catch {
     ElMessage.error('生成报告正文失败')
   } finally {
-    generating.value = false
+    confirmReportLoading.value = false
   }
 }
 

@@ -29,6 +29,7 @@ from ._a171_audit_summary import render as render_a171_audit_summary
 from ._a1721_kam import render as render_a1721_kam
 from ._a271_it_audit_memo import render as render_a271_it_audit_memo
 from ._a51_cashflow import render as render_a51_cashflow
+from ._b14_due_diligence import render as render_b14_due_diligence
 from ._word_template import render as render_word_template
 from ._analytical_review import render as render_analytical_review
 from ._audit_sheet import render as render_audit_sheet
@@ -64,6 +65,7 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "a17-1-audit-summary": render_a171_audit_summary,
     "a17-2-1-kam": render_a1721_kam,
     "a5-1-cashflow-audit": render_a51_cashflow,
+    "b1-4-due-diligence-report": render_b14_due_diligence,
     "a2-adjustment-console": render_a_program,
     "a3-consolidation-console": render_a_program,
     "audit-sheet": render_audit_sheet,

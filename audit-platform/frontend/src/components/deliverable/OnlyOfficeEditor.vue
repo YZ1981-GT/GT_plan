@@ -118,7 +118,7 @@ const props = defineProps<{
   versionNo: number
   year: number
   title: string
-  previewType: 'docx' | 'pdf' | 'html' | 'unsupported'
+  previewType: 'docx' | 'pdf' | 'xlsx' | 'html' | 'unsupported'
   previewUrl?: string
   showWatermark?: boolean
   /** 出品物当前状态（终态检测） */

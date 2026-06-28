@@ -94,7 +94,8 @@ inclusion: always
 - **✅ b30-group-audit**(2026-06-24 完成)：B30集团审计范围确定底稿，25/25必做任务全绿（37 optional测试待执行）。3 composables(1134行主composable) + 969行 Vue + 集团结构树(el-tree拖拽5层) + 组成部分分类(15%阈值) + 重要性分配(0.75系数,clamp[15%,85%]) + 覆盖率热力图(加权1.0/0.5/0.25/0.0) + 组成部分审计师 + B15→B30→B50三方联动 + 导入导出三级
 - **🟡 B60 LLM辅助策略文档**：待 LLM Phase3 接入后，用 vLLM 辅助生成总体审计策略文档（不需专属组件，需 resolver + /ai-generate 接口）
 - **❌ b40-sampling-strategy 已删除**(2026-06-24)：B40 实际是"项目组讨论程序表"(CAS 1211)而非"审计抽样策略"，requirements 已删除需重新建 spec
-- **🟡 B类全面专属组件升级计划**(2026-06-24确认)：用户要求所有B类底稿均升级为专属组件(12个待做)。B40=项目组讨论(XLSX+DOCX备忘录+SCOT再评估)。B19保留a-program-console，B15已redirect，B60待LLM
+- **✅ b1-4-due-diligence-report**(2026-06-27 完成)：B1-4尽职调查报告专属组件，24/24全绿（12 hypothesis + 20 fast-check + 28 vitest + 17后端集成 + 16契约 + 4 Playwright E2E = 97测试）。新componentType`b1-4-due-diligence-report`，useB14DueDiligence+useB14Navigation 2 composables+GtB14DueDiligenceReport.vue(~450行)。13章折叠卡片(textarea/table/mixed)+左侧导航(180px sticky scrollspy+完成点+进度条)+标准版/简化版双变体(ch11/ch12可见性控制)+签字区(partner/manager/report_date)+GtIndexChip(B15/B22A/B50)+AI辅助生成(POST b14/chapters/{chId}/ai-generate+知识库检索+跨章上下文+CPA专属prompt)+2s debounce自动保存+双模式(el-segmented)+OO健康检查
+- **🟡 B类全面专属组件升级计划**(2026-06-24确认)：用户要求所有B类底稿均升级为专属组件(12个待做)。B40=项目组讨论(XLSX+DOCX备忘录+SCOT再评估)。B19保留a-program-console，B15已redirect，B60待LLM。**6-27复盘结论：B类完成度最高，6核心专属(含B1-4)+4 bundle全绿。真缺口仅B40(需重建spec)+B60(待LLM)。✅P0已完成：32个B类docx批量注册word-template(B5约定书11+B2沟通函6+B1承接3+B18内审2+B40备忘录2+B60策略8)**
 - **✅ B2/B13/B19/B51 bundle + B23/B30 附件Tab**(2026-06-24 完成)：4个简单bundle(b2/b13/b19/b51) + B23追加8附件Tab(穿行测试) + B30追加7附件Tab(集团附件)。B类48个子底稿全skip+主组件全有Tab内嵌。使用GtWpRenderer lazy渲染附件
 - **🔴 D~N循环专属组件方案**(2026-06-24决定)：不做通用substantive-bundle——各循环业务差异大，通用组件不精美。每个D~N循环做独立专属组件(参照D0函证模式)。D1=应收票据（不是采购付款！又犯了凭编码猜内容的错）。必须先查源模板确认实际内容再建spec
 - **✅ d1-notes-receivable**(2026-06-24 完成)：D1应收票据专属组件，76/76全绿（13 PBT fast-check + 88 vitest + 1 hypothesis）。useD1FormData(180行)+useD1NotesReceivable(1237行)+useD1Review(106行)+GtD1NotesReceivable(580行)。21 Sheet→18 Tab统一入口+审定表D1-1跨sheet公式联动(D1-2!B14等)+ECL坏账准备(迁徙率连乘/个别)+SPPI业务模式+背书贴现终止确认+贴息P×R×D/360+监盘倒推A+B-C+质押>50%警告+关联方自动匹配+附注披露(上市/国企)+调整分录↔审定表双向同步+trail_balance回写+B50/C2/A13四方EventBus
@@ -116,6 +117,7 @@ inclusion: always
 - 外部依赖：LLM embedding / 合并 UAT / GitHub 默认分支改 main / MinerU+OCR
 - **🟡 平台级批量导入导出**(待建spec)：一键导出/导入跨模块(底稿/报表/附注)所有模板和数据。打包zip+异步队列+大文件下载。等18个双模式组件完成后再建spec
 - **架构优化**：①拆 event_handlers.py ②前端 Top-5 巨型 Vue 拆分 ③services/ 按域建子包
+- **🟡 omp(can1357/oh-my-pi)借鉴点**(2026-06-28,待LLM Phase3+)：①Hashline内容锚定→底稿并发冲突field-level检测 ②Subagent隔离+schema-validated output→/ai-generate结构化返回 ③Hindsight项目记忆→v3.0跨年续审知识继承(retain/recall模式) ④Stream Rules实时拦截→QC规则在LLM生成阶段截断重试
 - **✅ A15 财务指标自动取数**(2026-06-27)：`_going_concern.py` resolver从TB自动算流动比率/速动比率/资产负债率/净资产/累计未分配利润+三色风险等级。GtA15Bundle增加指标卡片。通用`GET /api/projects/{pid}/auto-data/{source}?year=`端点（可复用于任何resolver）
 - **✅ A13 错报汇总自动聚合**(已确认完成)：`_misstatement_aggregation.py`+`a13_event_handler.py`+MisstatementSummaryView全链路完整（之前误判为未做）
 - **✅ A类底稿P1全完成确认**(2026-06-27)：A13聚合/A15取数/A21~25 RBAC(REVIEW_ROLE_MAP+evaluate_guard)/A1-13~14分析性复核(analytical_review_service从financial_report取数)/A17-1 GtIndexChip(3关键位置)——全部已有实现
@@ -135,6 +137,8 @@ inclusion: always
 - **🔴 PG ON CONFLICT DO NOTHING 不返回跳过行**：需二次查询得 skipped
 - **router_registry 必查**；**service 只 flush 不 commit**
 - **🔴 新增 componentType 必须同步更新 `VALID_COMPONENT_TYPES`**（`wp_classification_service.py`），否则 `validate_overrides` 启动时 raise ValueError 阻止 uvicorn 启动
+- **🔴 报告正文生成空白根因**：`audit_report_template`表空(未seed)→`load_body_template`返回空sections→docx只有【草稿DRAFT】水印。修复`POST /api/audit-report/templates/load-seed`(种子`backend/data/audit_report_templates_seed.json`,28段落=4意见类型×2公司类型)。**重建DB后会复现，初始化需含此seed**
+- **🔴 删除主表前必清FK子表**：`delete_task`需先删`export_job_items_v2`+`deliverable_section_state`再删`word_export_task_versions`+`word_export_task`，否则FK约束500
 - **地址坐标库 single-flight + 增量失效**；**WorkpaperSaveOrchestrator 统一 after_save**
 
 ### 前端
@@ -152,6 +156,13 @@ inclusion: always
 - **聚合程序表**：用 sheet 级编码(D2A)查模板，非父码(D2)
 - **wp_code_overrides 支持 sheet_name key**：按完整 sheet_name 映射 `skip` 可隐藏多 sheet 底稿的辅助 sheet；`component_type=="skip"` 的 sheet 不渲染为 tab
 - **🔴 API调用可能触发全局404弹窗**：http.ts拦截器默认对404弹ElMessage。组件内预期可能404的请求必须加`{_silent:true} as any`配置项避免全局弹错（如useA1SubWorkpapers.refreshDependencyStatus）
+- **🔴 http.ts 5xx重试弹窗去重**：重试提示用全局单例(`_retryInflight`计数+共用一个toast)，多并发请求只显一个、全完成自动关。禁止每请求各弹`duration:0`永不消失的toast（会疯狂堆叠）
+- **🔴 Docker端口转发故障诊断**：宿主机连PG/Redis报`connection was closed in the middle`/`connection_lost()`（非`Connect call failed`）= Docker端口转发层坏。`docker exec psql`能连但宿主机asyncpg连不上→`docker restart audit-postgres audit-redis`刷新转发。后端reload模式会自动重连。另：宿主机后端进程在DB起来前启动会卡死503(postgres/redis unavailable)，需杀进程(含multiprocessing-fork孤儿子进程)重启。**OnlyOffice 8080端口同样会坏**：容器healthy但宿主机`curl localhost:8080/healthcheck`返000、容器内部200→后端health_check失败→前端降级→xlsx预览显示"格式不支持"。修复`docker restart audit-onlyoffice`
+- **🔴 交付件预览previewType支持xlsx**：DeliverablePreview/OnlyOfficeEditor/DeliverableCenter的previewType联合类型已含`'xlsx'`（用`@vue-office/excel`，已装），后端`/preview-url`端点suffix白名单含`.xlsx`。OnlyOffice降级时xlsx也能只读预览（纵深防御）。报告正文生成对话框(AuditReportEditor+DeliverableCenter)顶部加了意见类型选择警告提示+required
+- **✅ 交付件报告正文走真实Word模板(2026-06-28)**：DeliverableCenter"生成报告"原调legacy `renderReportBody`(/report-body/render,docxtpl极简自动模板39KB)→改为两阶段`previewReportBody→OPT弹窗→confirmReportBody`(TemplateFillService真实模板155KB,与AuditReportEditor同路径)。弹窗用`OptionalSectionDialog`(props:optional-sections/missing-fields/template-version/company-subtype-resolved/confirm-loading,emit confirm)。Playwright实测v3生成=152KB真实模板✓
+- **✅ OnlyOffice"10人编辑"误报修复(2026-06-28)**：`onlyoffice_session_limiter.py`原用独立计数器`onlyoffice:session_count`(无TTL)与session key(有TTL)脱节,OO持续降级致release从不触发,计数虚高到10。重写为SCAN统计去重user_id数作席位(自愈),删独立计数器。`deliverable.py`的`onlyoffice_config`端点只在edit mode(`oos._editor_mode(status)=="edit"`)才acquire_session,只读预览不占席位。同一用户多文档/版本只占1席
+- **✅ 版本链下载用认证下载(2026-06-28)**：`DeliverableVersionList.vue`原用`el-button :href target=_blank`不带Bearer token→改为`downloadFile`(axios blob)。`get_version_chain`排序加`version_no.desc()`次级排序(created_at同秒时确定性)
+- **🔴 naive UTC时间戳前端少8小时(2026-06-28)**：后端`func.now()`/`datetime.utcnow`存的是naive UTC(无时区标记如`2026-06-28T04:06:49`)，前端`new Date()`按本地时间解析→中国少8小时。修复：补`Z`标记`/[zZ]|[+-]\d{2}:?\d{2}$/.test(v)?v:v+'Z'`再交`displayPrefs.fmtDateTime`转本地。已修DeliverableVersionList+DeliverableGroupList导出时间。**其他显示后端时间戳的组件同理需补Z**
 - **🔴 新专属组件必须有selfLoad逻辑**：当htmlData prop为null(bundle内嵌场景)，组件onMounted必须自行调`render-config?force_component_type=xxx`加载数据。否则bundle内Tab显示空白。A17-1/A17-2-1已踩坑修复
 - **🔴 新专属组件的bundle集成三件事**：①wp_code_overrides保持`skip`(子底稿不在列表暴露) ②父bundle的Tab kind+组件引用切换到新组件 ③composable函数签名调用别传错(对象vs直接ref)
 - **🔴 WorkpaperWordEditor健康检查+OO加载已修复(2026-06-26)**：①健康检查原错误调`/api/deliverables/onlyoffice/health`(不存在)→改为`/api/workpapers/onlyoffice/health`(返回`{healthy:bool}`) ②`initGenericEditor`原调不存在的`/onlyoffice-config?version=`端点→改为与GtOnlyOfficeSheet相同的`/sheets/{sheetName}/onlyoffice-config`+project_id参数 ③直接透传后端返回的完整config给DocEditor（不再前端自己拼）

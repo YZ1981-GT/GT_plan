@@ -89,7 +89,10 @@ class DeliverableService(ExportTaskService):
         result = await self.db.execute(
             sa.select(WordExportTaskVersion)
             .where(WordExportTaskVersion.word_export_task_id == task_id)
-            .order_by(WordExportTaskVersion.created_at.desc())
+            .order_by(
+                WordExportTaskVersion.created_at.desc(),
+                WordExportTaskVersion.version_no.desc(),
+            )
         )
         return list(result.scalars().all())
 
@@ -111,6 +114,20 @@ class DeliverableService(ExportTaskService):
             raise ValueError(f"交付物不存在: {task_id}")
         if task.status in ("confirmed", "signed", "archived"):
             raise ValueError("已确认/已签章/已归档的交付物不可删除")
+        # 清理关联的 export_job_items_v2（FK 约束）
+        from app.models.phase13_models import ExportJobItem
+        await self.db.execute(
+            sa.delete(ExportJobItem).where(
+                ExportJobItem.word_export_task_id == task_id
+            )
+        )
+        # 清理 deliverable_section_state
+        from app.models.audit_platform_models import DeliverableSectionState
+        await self.db.execute(
+            sa.delete(DeliverableSectionState).where(
+                DeliverableSectionState.word_export_task_id == task_id
+            )
+        )
         # 删除版本记录
         await self.db.execute(
             sa.delete(WordExportTaskVersion).where(

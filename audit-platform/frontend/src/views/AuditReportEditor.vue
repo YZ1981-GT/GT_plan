@@ -134,9 +134,20 @@
 
     <!-- 生成报告弹窗 -->
     <el-dialog append-to-body v-model="showGenerateDialog" title="生成审计报告" width="500px">
+      <el-alert
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 16px"
+      >
+        <template #title>请先选择审计意见类型</template>
+        <div style="font-size: var(--gt-font-size-xs); line-height: 1.6">
+          意见类型决定报告正文采用的模板（无保留 / 保留 / 否定 / 无法表示意见），生成后正文结构据此确定，请根据审计结论审慎选择。
+        </div>
+      </el-alert>
       <el-form label-width="100px">
-        <el-form-item label="意见类型">
-          <el-select v-model="genForm.opinion_type" style="width: 100%" :disabled="isLocked">
+        <el-form-item label="意见类型" required>
+          <el-select v-model="genForm.opinion_type" style="width: 100%" :disabled="isLocked" placeholder="请选择审计意见类型">
             <el-option label="标准无保留意见" value="unqualified" />
             <el-option label="保留意见" value="qualified" />
             <el-option label="否定意见" value="adverse" />

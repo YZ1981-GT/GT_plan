@@ -106,6 +106,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "a17-2-1-kam",
     "a5-1-cashflow-audit",
     "f2-stocktake-bundle",
+    "b1-4-due-diligence-report",
 }
 
 # wp_code 级专用路由覆盖（优先于 class_code 派生）

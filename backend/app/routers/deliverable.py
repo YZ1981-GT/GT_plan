@@ -338,7 +338,7 @@ async def preview_version(
 
     if version.file_path:
         suffix = Path(version.file_path).suffix.lower()
-        if suffix in (".docx", ".pdf"):
+        if suffix in (".docx", ".pdf", ".xlsx"):
             return {
                 "preview_type": suffix.lstrip("."),
                 "url": f"/api/projects/{project_id}/deliverables/{task_id}/versions/{version_no}/download",
@@ -1062,15 +1062,7 @@ async def onlyoffice_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    # 并发编辑会话限制
     from app.services.onlyoffice_session_limiter import acquire_session
-    doc_key = f"deliverable-{task_id}-{version_no}"
-    allowed = await acquire_session(current_user.id, doc_key)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail="当前在线编辑人数已达上限（10人），请稍后再试",
-        )
 
     svc = DeliverableService(db)
     task = await svc.get_task(task_id)
@@ -1088,6 +1080,17 @@ async def onlyoffice_config(
     oos = OnlyOfficeCallbackService(db)
     if not oos.enabled:
         raise HTTPException(status_code=503, detail="OnlyOffice 集成未启用")
+
+    # 并发编辑会话限制：仅可编辑态（edit mode）占席位，只读预览不计入
+    is_edit_mode = oos._editor_mode(task.status) == "edit"
+    if is_edit_mode:
+        doc_key = f"deliverable-{task_id}-{version_no}"
+        allowed = await acquire_session(current_user.id, doc_key)
+        if not allowed:
+            raise HTTPException(
+                status_code=429,
+                detail="当前在线编辑人数已达上限（10人），请稍后再试",
+            )
 
     base = settings.ONLYOFFICE_CALLBACK_BASE or "http://host.docker.internal:9980"
     # 生成签名下载 URL（OnlyOffice 不携带 Bearer header，需免认证端点）

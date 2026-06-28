@@ -381,6 +381,7 @@ declare module 'vue' {
     GtAuditFlowGraph: typeof import('./components/workpaper/GtAuditFlowGraph.vue')['default']
     GtAuditSheet: typeof import('./components/workpaper/GtAuditSheet.vue')['default']
     GtB13Bundle: typeof import('./components/workpaper/GtB13Bundle.vue')['default']
+    GtB14DueDiligenceReport: typeof import('./components/workpaper/GtB14DueDiligenceReport.vue')['default']
     GtB19Bundle: typeof import('./components/workpaper/GtB19Bundle.vue')['default']
     GtB22AControlMatrix: typeof import('./components/workpaper/GtB22AControlMatrix.vue')['default']
     GtB22BDeficiencyEvaluation: typeof import('./components/workpaper/GtB22BDeficiencyEvaluation.vue')['default']
