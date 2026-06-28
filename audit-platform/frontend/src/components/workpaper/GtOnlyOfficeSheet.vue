@@ -8,7 +8,7 @@
   Validates: Requirements R2, R3, R5, R6
 -->
 <template>
-  <div :class="['gt-onlyoffice-sheet', { 'gt-onlyoffice-sheet--fullscreen': isFullscreen }]">
+  <div ref="rootEl" :class="['gt-onlyoffice-sheet', { 'gt-onlyoffice-sheet--fullscreen': isFullscreen }]">
     <!-- 全屏切换按钮 -->
     <div class="gt-onlyoffice-sheet__toolbar">
       <el-button
@@ -57,23 +57,50 @@ const emit = defineEmits<{
 // ─── State ───
 const loading = ref(true)
 const error = ref(false)
+const rootEl = ref<HTMLElement | null>(null)
 const editorContainer = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
 let editorInstance: any = null
 
 function toggleFullscreen(): void {
-  isFullscreen.value = !isFullscreen.value
-  if (isFullscreen.value) {
+  if (!isFullscreen.value) {
+    // 进入全屏：优先用浏览器原生 Fullscreen API
+    const el = rootEl.value
+    if (el?.requestFullscreen) {
+      el.requestFullscreen().catch(() => { /* fallback to CSS */ })
+    } else if ((el as any)?.webkitRequestFullscreen) {
+      (el as any).webkitRequestFullscreen()
+    }
+    isFullscreen.value = true
     document.addEventListener('keydown', handleEscFullscreen)
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
   } else {
+    // 退出全屏
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
+    isFullscreen.value = false
     document.removeEventListener('keydown', handleEscFullscreen)
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }
+}
+
+function handleFullscreenChange(): void {
+  // 用户按 ESC 退出浏览器全屏时同步状态
+  if (!document.fullscreenElement && isFullscreen.value) {
+    isFullscreen.value = false
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }
 }
 
 function handleEscFullscreen(e: KeyboardEvent): void {
   if (e.key === 'Escape' && isFullscreen.value) {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {})
+    }
     isFullscreen.value = false
     document.removeEventListener('keydown', handleEscFullscreen)
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
   }
 }
 
@@ -222,6 +249,7 @@ onBeforeUnmount(() => {
     editorInstance = null
   }
   document.removeEventListener('keydown', handleEscFullscreen)
+  document.removeEventListener('fullscreenchange', handleFullscreenChange)
 })
 </script>
 
