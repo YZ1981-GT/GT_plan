@@ -98,6 +98,10 @@
               <GtIndexChip value="A17-3" />
             </div>
           </template>
+          <details class="gt-a1731__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a1731__guidance-body">需要说明咨询事项的业务背景，主要存在的疑问及管理层建议、本项目的初步判断。可引用业务咨询记录（A17-3）相关内容。</div>
+          </details>
 
           <!-- A17-3 Reference Area (read-only) -->
           <div class="gt-a1731__reference">
@@ -131,35 +135,47 @@
           </div>
         </el-card>
 
-        <!-- Section 二: 执行情况 -->
+        <!-- Section 二: 咨询回复意见 -->
         <el-card class="gt-a1731__card" shadow="never">
           <template #header>
-            <span class="gt-a1731__card-title">二、咨询结果</span>
+            <span class="gt-a1731__card-title">二、咨询回复意见</span>
           </template>
+          <details class="gt-a1731__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a1731__guidance-body">完整引用专业技术部、专业技术委员会或者所外咨询者的回复意见。</div>
+          </details>
           <div class="gt-a1731__field">
             <el-input
               :model-value="sections[2].execution_details"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 15 }"
               :disabled="props.readonly"
-              placeholder="请填写咨询结果"
+              placeholder="完整引用专业技术部/委员会/所外咨询者的回复意见"
               @change="(v: string) => updateSection(2, 'execution_details', v)"
             />
           </div>
         </el-card>
 
-        <!-- Section 三: 执行结果 -->
+        <!-- Section 三: 咨询结果的执行情况 -->
         <el-card class="gt-a1731__card" shadow="never">
           <template #header>
-            <span class="gt-a1731__card-title">三、执行情况</span>
+            <span class="gt-a1731__card-title">三、咨询结果的执行情况</span>
           </template>
+          <details class="gt-a1731__guidance">
+            <summary>📋 编制提示</summary>
+            <div class="gt-a1731__guidance-body">
+              (一) 项目组是否与咨询意见达成一致意见：是/否，如否需说明最终解决情况（虽观点少出现，但需说明）。<br/>
+              (二) 咨询结果（结论）是否得到执行：是/否，如未得到执行需说明相关原因（如未执行、部分执行、暂缓执行、删除此段）。<br/>
+              (三) 咨询结果（结论）执行具体情况：项目负责要说明按照咨询回复意见是否完全或部分实施审计计划中计划的审计程序，执行人认定项目合伙人对执行过程的评价、对于会计问题的处理方式和相关标准数据的影响。
+            </div>
+          </details>
           <div class="gt-a1731__field">
             <el-input
               :model-value="sections[3].results"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 15 }"
               :disabled="props.readonly"
-              placeholder="请填写执行情况"
+              placeholder="(一)是否一致 (二)是否得到执行 (三)具体执行情况"
               @change="(v: string) => updateSection(3, 'results', v)"
             />
           </div>
@@ -368,4 +384,9 @@ defineExpose({ reload: () => loadData(props.wpId) })
   height: calc(100vh - 200px);
   min-height: 500px;
 }
+
+/* 编制提示 */
+.gt-a1731__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
+.gt-a1731__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
+.gt-a1731__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; }
 </style>
