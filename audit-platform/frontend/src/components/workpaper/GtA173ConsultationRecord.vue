@@ -107,6 +107,17 @@
           </template>
 
           <div class="gt-a173__fields">
+            <!-- 编制提示 -->
+            <details class="gt-a173__guidance">
+              <summary>📋 编制提示</summary>
+              <div class="gt-a173__guidance-body">
+                (一) 被审计单位业务概况及审计业务类型<br/>
+                (二) 咨询问题背景及主要问题（清楚揭示：会计事项、审计事项、会计及审计事项、其他）<br/>
+                1、相关会计事项概述（不适用删除）：交易背景的前因后果，金融会计处理方法与理由，各方主要利益关系，具体描述会计事项（如银根不到期、交易处理不一致时，推大方面发展为一致或交复杂等），或相关审计事项概述（不适用删除）<br/>
+                2、相关文件及附件（会计咨询：提供相关合同文件对目标审计事项的相关方面进行说明。提供必要的权威指引和支持方案的研究论证。同一领域，须提前查阅咨询记录和交流历史结论。审查确认咨询内容完整性和整备性/合理）<br/>
+                (三) 相关文件（可插入相关资料或附件）
+              </div>
+            </details>
             <!-- 业务概况 -->
             <div class="gt-a173__field">
               <label class="gt-a173__label">业务概况</label>
@@ -166,6 +177,16 @@
           </template>
 
           <div class="gt-a173__fields">
+            <details class="gt-a173__guidance">
+              <summary>📋 编制提示</summary>
+              <div class="gt-a173__guidance-body">
+                1、适用的准则，以及准则措施意见。<br/>
+                2、相关案例（如有）。<br/>
+                3、项目组意见及建议（与各主体交互、如与辅导的会计平行交互，对照处理性质及是否有非时间性的差异的合理判证及通知事项）。<br/>
+                4、对涉及范围的相关问题选择的合理性。<br/>
+                5、项目组是否赞同原目标建议？如否，当前项目背景或进展情形变化下应按何方式执行审计程序以满足审计需求和标准的建议（ 备注 ）。
+              </div>
+            </details>
             <div class="gt-a173__field">
               <el-input
                 :model-value="sections[2].opinion"
@@ -186,6 +207,13 @@
           </template>
 
           <div class="gt-a173__fields">
+            <details class="gt-a173__guidance">
+              <summary>📋 编制提示</summary>
+              <div class="gt-a173__guidance-body">
+                (一) 适用的准则和相关监管口径<br/>
+                (二) 咨询回复意见：在审查合同文件和具体情况后，从准则层面和业界判例指出适当的会计处理/审计应对方案。对于项目组提出的初步意见与评估，以及其执行的合理性补充说明。应强调是否执行了必须的程序与确认过程（程序和结论是否完善），达到事项可以解决的目标要求等。
+              </div>
+            </details>
             <div class="gt-a173__field">
               <label class="gt-a173__label">准则依据</label>
               <el-input
@@ -218,6 +246,14 @@
           </template>
 
           <div class="gt-a173__fields">
+            <details class="gt-a173__guidance">
+              <summary>📋 编制提示</summary>
+              <div class="gt-a173__guidance-body">
+                (一) 专业技术委员会回复意见（如适用）<br/>
+                (二) 所外咨询反馈（如适用）（如曾咨询了外部专家/GIMS等）（如无法取得所外咨询者对咨询结果的确认，应在咨询记录中说明所外咨询者的背景、咨询时间、咨询地点、咨询方式等）<br/><br/>
+                提示：咨询应当是基于项目组结合合同文件及现行专则或法了解出的，如项目背景或进则使之变化，或其目前阶段的处理意见或专家进展执行的角度。
+              </div>
+            </details>
             <div class="gt-a173__field">
               <el-input
                 :model-value="sections[4].opinion"
@@ -238,6 +274,7 @@
       v-else
       :wp-id="props.wpId"
       sheet-name="A17-3"
+      :project-id="props.projectId"
       class="gt-a173__oo"
     />
   </div>
@@ -264,7 +301,7 @@ const props = withDefaults(defineProps<{
 
 // ─── Mode Switch ───
 const mode = ref('结构化视图')
-const modeOptions = ['结构化视图', '在线编辑']
+const modeOptions = ref(['结构化视图', '在线编辑'])
 
 // ─── Composable ───
 const wpIdRef = ref(props.wpId)
@@ -294,8 +331,20 @@ function handleAddFileTag() {
   }
 }
 
+// ─── OO Health Check ───
+async function checkOOHealth() {
+  try {
+    const { default: http } = await import('@/utils/http')
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const healthy = res?.data?.data?.healthy ?? res?.data?.healthy
+    if (!healthy) modeOptions.value = ['结构化视图']
+  } catch {
+    modeOptions.value = ['结构化视图']
+  }
+}
+
 // ─── Lifecycle ───
-onMounted(() => { loadData(props.wpId) })
+onMounted(() => { checkOOHealth(); loadData(props.wpId) })
 onBeforeUnmount(() => { flushPendingSaves() })
 
 defineExpose({ reload: () => loadData(props.wpId) })
@@ -394,4 +443,9 @@ defineExpose({ reload: () => loadData(props.wpId) })
   height: calc(100vh - 200px);
   min-height: 500px;
 }
+
+/* 编制提示折叠区 */
+.gt-a173__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
+.gt-a173__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }
+.gt-a173__guidance-body { padding: 4px 10px 8px; font-size: 12px; color: #606266; line-height: 1.7; }
 </style>
