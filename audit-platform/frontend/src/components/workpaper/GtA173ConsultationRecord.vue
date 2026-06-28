@@ -98,11 +98,7 @@
           <template #header>
             <div class="gt-a173__card-header">
               <span class="gt-a173__card-title">一、咨询事项描述</span>
-              <el-tooltip content="AI 根据咨询问题自动查询相关准则即将上线" placement="top">
-                <el-button size="small" type="primary" disabled>
-                  <el-icon><MagicStick /></el-icon> AI 准则查询
-                </el-button>
-              </el-tooltip>
+              <el-button size="small" :loading="aiLoading === 1" @click="aiGenerate(1)">🤖 AI 准则查询</el-button>
             </div>
           </template>
 
@@ -173,7 +169,10 @@
         <!-- Section 二：项目组初步讨论意见 -->
         <el-card class="gt-a173__card" shadow="never">
           <template #header>
-            <span class="gt-a173__card-title">二、项目组初步讨论意见</span>
+            <div class="gt-a173__card-header">
+              <span class="gt-a173__card-title">二、项目组初步讨论意见</span>
+              <el-button size="small" :loading="aiLoading === 2" @click="aiGenerate(2)">🤖 AI</el-button>
+            </div>
           </template>
 
           <div class="gt-a173__fields">
@@ -203,7 +202,10 @@
         <!-- Section 三：专业技术部反馈 -->
         <el-card class="gt-a173__card" shadow="never">
           <template #header>
-            <span class="gt-a173__card-title">三、专业技术部反馈</span>
+            <div class="gt-a173__card-header">
+              <span class="gt-a173__card-title">三、专业技术部反馈</span>
+              <el-button size="small" :loading="aiLoading === 3" @click="aiGenerate(3)">🤖 AI</el-button>
+            </div>
           </template>
 
           <div class="gt-a173__fields">
@@ -242,7 +244,10 @@
         <!-- Section 四：专业技术委员会意见及所外咨询回复 -->
         <el-card class="gt-a173__card" shadow="never">
           <template #header>
-            <span class="gt-a173__card-title">四、专业技术委员会意见及所外咨询回复</span>
+            <div class="gt-a173__card-header">
+              <span class="gt-a173__card-title">四、专业技术委员会意见及所外咨询回复</span>
+              <el-button size="small" :loading="aiLoading === 4" @click="aiGenerate(4)">🤖 AI</el-button>
+            </div>
           </template>
 
           <div class="gt-a173__fields">
@@ -283,6 +288,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading, MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import {
   useA173ConsultationRecord,
   CONSULT_TYPE_OPTIONS,
@@ -329,6 +335,47 @@ function handleAddFileTag() {
     addFileTag(newFileTag.value)
     newFileTag.value = ''
   }
+}
+
+// ─── AI Generate ───
+const aiLoading = ref<number | null>(null)
+
+async function aiGenerate(section: number) {
+  const titles: Record<number, string> = {
+    1: '咨询事项相关准则查询',
+    2: '项目组初步讨论意见',
+    3: '专业技术部反馈意见',
+    4: '专业技术委员会意见',
+  }
+  const guidances: Record<number, string> = {
+    1: '根据咨询事项描述，查询相关中国审计准则(CAS)/会计准则(CAS)条款，列出适用的准则编号及关键条款。',
+    2: '基于咨询事项和相关准则，生成项目组初步讨论意见：包括适用准则分析、相关案例参考、项目组建议方案及审计程序建议。',
+    3: '从专业技术部角度，针对咨询事项给出回复：引用准则依据、指出正确的会计处理/审计应对方案、评估项目组初步意见的合理性。',
+    4: '从专业技术委员会角度，给出最终审核意见或所外咨询结论。',
+  }
+  aiLoading.value = section
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const existingContent = section === 1
+      ? `业务概况：${sections.value[1]?.overview || ''}\n问题背景：${sections.value[1]?.background || ''}`
+      : ''
+    const res = await api.post<any>(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
+      chapter: section, chapter_title: titles[section] || '',
+      guidance: guidances[section] || '',
+      existing_content: existingContent,
+      knowledge_doc_ids: [],
+    }, { _silent: true } as any)
+    const content = res?.content || ''
+    if (!content) { ElMessage.info('AI 未生成有效内容'); return }
+    switch (section) {
+      case 1: updateSection(1, 'background', content); break
+      case 2: updateSection(2, 'opinion', content); break
+      case 3: updateSection(3, 'reply', content); break
+      case 4: updateSection(4, 'opinion', content); break
+    }
+    ElMessage.success('AI 已生成')
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiLoading.value = null }
 }
 
 // ─── OO Health Check ───
