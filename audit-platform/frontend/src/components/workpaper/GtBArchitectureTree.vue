@@ -126,6 +126,7 @@ const ICON_MAP: Record<string, string> = {
   'h-static-doc': '📖',
   univer: '📊',
   skip: '⏭️',
+  external: '🔗',
 }
 
 // ─── 解析 navigation_rows → 节点 ───

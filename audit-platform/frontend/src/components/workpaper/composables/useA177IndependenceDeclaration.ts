@@ -1,385 +1,44 @@
-/**
- * useA177IndependenceDeclaration — A17-7 独立性声明书 数据管理 + 持久化
- *
- * Spec: .kiro/specs/a17-7-independence-declaration/
- * Task: 2.1
- *
- * 职责：
- * - loadData(wpId): 自加载 render-config?force_component_type=a17-7-independence-declaration
- * - variant-aware item_id prefix (a177- / a177a-)
- * - Team sign table CRUD (add/remove/update)
- * - Threat record CRUD (3 types: economic/loans/business)
- * - 2s debounce save, flush pending saves
- */
+/** useA177IndependenceDeclaration — A17-7 独立性声明书 多章节+双模式+AI+批量签署 */
 import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
 export type Variant = 'team' | 'committee'
 export type ThreatType = 'economic_interest' | 'loan_guarantee' | 'business_relation'
-
-export interface MetaInfo {
-  client_name: string
-  audit_year: string
-  index_no: string
+export interface MetaInfo { client_name: string; audit_year: string; index_no: string }
+export interface PeriodData { business_start: string | null; business_end: string | null; report_start: string | null; report_end: string | null }
+export interface CommitmentItem { id: string; label: string; answer: 'Y' | 'N' | null; explanation: string | null }
+export interface SignRow { index: number; name: string; signed: boolean; date: string | null }
+export interface PartnerSection { confirmed: boolean | null; explanation: string | null; partner_sign: { name: string | null; date: string | null }; manager_sign: { name: string | null; date: string | null } }
+export interface EconomicThreatRow { member: string; type: string; amount: string; measure: string }
+export interface LoanThreatRow { member: string; type: string; amount: string; measure: string }
+export interface BusinessThreatRow { member: string; description: string; measure: string }
+export interface ThreatRecords { economic_interest: EconomicThreatRow[]; loan_guarantee: LoanThreatRow[]; business_relation: BusinessThreatRow[] }
+export interface ProjectContext { client_name: string; audit_year: string; team_members: { name: string }[]; project_id: string }
+export interface ChapterData { title: string; type: 'declaration' | 'commitment' | 'signing' | 'partner' | 'threat' }
+export function getPrefix(variant: Variant): string { return variant === 'committee' ? 'a177a-' : 'a177-' }
+export const DEFAULT_CHAPTERS: Record<string, ChapterData> = {
+  '1': { title: '一、声明正文及业务期间', type: 'declaration' },
+  '2': { title: '二、独立性承诺事项', type: 'commitment' },
+  '3': { title: '三、项目组成员签字确认', type: 'signing' },
+  '4': { title: '四、合伙人及负责经理审查确认', type: 'partner' },
+  '5': { title: '五、独立性威胁记录（附件）', type: 'threat' },
 }
-
-export interface PeriodData {
-  business_start: string | null
-  business_end: string | null
-  report_start: string | null
-  report_end: string | null
+export const CHAPTER_GUIDANCE: Record<number, string> = {
+  1: '独立性声明书应在业务承接阶段签署，并在项目执行过程中如有变化及时更新。\n业务期间指自审计业务承接之日起至审计报告签发之日止的期间。\n财务报告期间指被审计单位财务报表所涵盖的期间。',
+  2: '经济利益包括直接经济利益和重大间接经济利益，含股票、债券、基金等投资。\n贷款与担保包括项目组成员或其近亲属与客户之间的贷款或担保关系。\n如对上述任何事项回答"是"，请在说明栏简述具体情况并在附件中记录详细措施。',
+  3: '项目组全体成员均须签字确认。签字即表明本人已阅读上述独立性承诺事项并确认遵守。\n可通过"发送确认"按钮将独立性声明弹窗推送给全体项目组成员进行电子签署确认。',
+  4: '合伙人审查确认：项目合伙人应审查全体成员的签字及威胁披露情况。\n如确认不存在独立性问题选择"是"，如发现问题选择"否"并说明措施。',
+  5: '如存在独立性威胁，应在此附件中如实披露：\n1.经济利益记录 2.贷款担保记录 3.商业关系记录\n无任何威胁时可不填写此附件。',
 }
-
-export interface SignRow {
-  index: number
-  name: string
-  signed: boolean
-  date: string | null
-}
-
-export interface PartnerSection {
-  confirmed: boolean | null
-  explanation: string | null
-  partner_sign: { name: string | null; date: string | null }
-  manager_sign: { name: string | null; date: string | null }
-}
-
-export interface EconomicThreatRow {
-  member: string
-  type: string
-  amount: string
-  measure: string
-}
-
-export interface LoanThreatRow {
-  member: string
-  type: string
-  amount: string
-  measure: string
-}
-
-export interface BusinessThreatRow {
-  member: string
-  description: string
-  measure: string
-}
-
-export interface ThreatRecords {
-  economic_interest: EconomicThreatRow[]
-  loan_guarantee: LoanThreatRow[]
-  business_relation: BusinessThreatRow[]
-}
-
-export interface ProjectContext {
-  client_name: string
-  audit_year: string
-  team_members: { name: string }[]
-}
-
-export interface UseA177Return {
-  loading: Ref<boolean>
-  variant: Ref<Variant>
-  metaInfo: Ref<MetaInfo>
-  declarationText: Ref<string>
-  periodData: Ref<PeriodData>
-  teamSignTable: Ref<SignRow[]>
-  partnerSection: Ref<PartnerSection>
-  threatRecords: Ref<ThreatRecords>
-  guidanceNotes: Ref<string[]>
-  projectContext: Ref<ProjectContext>
-  saveStatus: Ref<'saved' | 'saving' | 'unsaved'>
-  lastSavedAt: Ref<Date | null>
-  // Team sign table CRUD
-  addTeamMember: () => void
-  removeTeamMember: (index: number) => void
-  updateTeamMember: (index: number, field: keyof SignRow, value: any) => void
-  // Threat record CRUD
-  addThreatRow: (type: ThreatType) => void
-  removeThreatRow: (type: ThreatType, index: number) => void
-  updateThreatRow: (type: ThreatType, index: number, field: string, value: string) => void
-  // General
-  updatePeriod: (field: keyof PeriodData, value: string | null) => void
-  updatePartner: (field: string, value: any) => void
-  loadData: (id?: string) => Promise<void>
-  flushPendingSaves: () => Promise<void>
-}
-
-// ─── Helper: get prefix from variant ─────────────────────────────────────────
-
-export function getPrefix(variant: Variant): string {
-  return variant === 'committee' ? 'a177a-' : 'a177-'
-}
-
-// ─── Composable ──────────────────────────────────────────────────────────────
-
-export function useA177IndependenceDeclaration(wpId: Ref<string>): UseA177Return {
-  const loading = ref(false)
-  const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
-  const lastSavedAt = ref<Date | null>(null)
-
-  const variant = ref<Variant>('team')
-  const metaInfo = ref<MetaInfo>({ client_name: '', audit_year: '', index_no: 'A17-7' })
-  const declarationText = ref('')
-  const periodData = ref<PeriodData>({
-    business_start: null,
-    business_end: null,
-    report_start: null,
-    report_end: null,
-  })
-  const teamSignTable = ref<SignRow[]>([])
-  const partnerSection = ref<PartnerSection>({
-    confirmed: null,
-    explanation: null,
-    partner_sign: { name: null, date: null },
-    manager_sign: { name: null, date: null },
-  })
-  const threatRecords = ref<ThreatRecords>({
-    economic_interest: [],
-    loan_guarantee: [],
-    business_relation: [],
-  })
-  const guidanceNotes = ref<string[]>([])
-  const projectContext = ref<ProjectContext>({
-    client_name: '',
-    audit_year: '',
-    team_members: [],
-  })
-
-  // ─── Pending saves ───
-  const pendingItems = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-
-  // ─── Load Data ───
-  async function loadData(id?: string) {
-    const targetId = id || wpId.value
-    if (!targetId) return
-    loading.value = true
-    try {
-      const res = await api.get<any>(
-        `/api/workpapers/${targetId}/render-config?force_component_type=a17-7-independence-declaration`,
-        { _silent: true } as any,
-      )
-      const htmlData = res?.sheets?.[0]?.html_data ?? res
-      if (!htmlData) return
-
-      if (htmlData.variant) variant.value = htmlData.variant
-      if (htmlData.meta_info) Object.assign(metaInfo.value, htmlData.meta_info)
-      if (htmlData.declaration_text) declarationText.value = htmlData.declaration_text
-      if (htmlData.period_data) Object.assign(periodData.value, htmlData.period_data)
-      if (htmlData.team_sign_table && Array.isArray(htmlData.team_sign_table)) {
-        teamSignTable.value = htmlData.team_sign_table.map((r: any, i: number) => ({
-          index: r.index ?? i + 1,
-          name: r.name || '',
-          signed: !!r.signed,
-          date: r.date || null,
-        }))
-      }
-      if (htmlData.partner_section) {
-        partnerSection.value = {
-          confirmed: htmlData.partner_section.confirmed ?? null,
-          explanation: htmlData.partner_section.explanation ?? null,
-          partner_sign: htmlData.partner_section.partner_sign || { name: null, date: null },
-          manager_sign: htmlData.partner_section.manager_sign || { name: null, date: null },
-        }
-      }
-      if (htmlData.threat_records) {
-        threatRecords.value = {
-          economic_interest: htmlData.threat_records.economic_interest || [],
-          loan_guarantee: htmlData.threat_records.loan_guarantee || [],
-          business_relation: htmlData.threat_records.business_relation || [],
-        }
-      }
-      if (htmlData.guidance_notes) guidanceNotes.value = htmlData.guidance_notes
-      if (htmlData.project_context) Object.assign(projectContext.value, htmlData.project_context)
-    } catch {
-      // Silent fail — static structure
-    } finally {
-      loading.value = false
-    }
-  }
-
-  // ─── Team Sign Table CRUD ───
-  function addTeamMember() {
-    const nextIndex = teamSignTable.value.length > 0
-      ? Math.max(...teamSignTable.value.map(r => r.index)) + 1
-      : 1
-    teamSignTable.value.push({ index: nextIndex, name: '', signed: false, date: null })
-    _enqueueSignTableSave()
-  }
-
-  function removeTeamMember(index: number) {
-    if (index >= 0 && index < teamSignTable.value.length) {
-      teamSignTable.value.splice(index, 1)
-      // Re-index
-      teamSignTable.value.forEach((row, i) => { row.index = i + 1 })
-      _enqueueSignTableSave()
-    }
-  }
-
-  function updateTeamMember(index: number, field: keyof SignRow, value: any) {
-    if (index >= 0 && index < teamSignTable.value.length) {
-      ;(teamSignTable.value[index] as any)[field] = value
-      _enqueueSignTableSave()
-    }
-  }
-
-  function _enqueueSignTableSave() {
-    const prefix = getPrefix(variant.value)
-    // Save each row individually
-    teamSignTable.value.forEach((row, i) => {
-      const itemId = `${prefix}sign-${i + 1}`
-      pendingItems.set(itemId, {
-        item_id: itemId,
-        conclusion: null,
-        remark: JSON.stringify({ name: row.name, signed: row.signed, date: row.date }),
-      })
-    })
-    scheduleSave()
-  }
-
-  // ─── Threat Record CRUD ───
-  function addThreatRow(type: ThreatType) {
-    if (type === 'economic_interest') {
-      threatRecords.value.economic_interest.push({ member: '', type: '', amount: '', measure: '' })
-    } else if (type === 'loan_guarantee') {
-      threatRecords.value.loan_guarantee.push({ member: '', type: '', amount: '', measure: '' })
-    } else if (type === 'business_relation') {
-      threatRecords.value.business_relation.push({ member: '', description: '', measure: '' })
-    }
-    _enqueueThreatSave(type)
-  }
-
-  function removeThreatRow(type: ThreatType, index: number) {
-    const arr = threatRecords.value[type]
-    if (index >= 0 && index < arr.length) {
-      arr.splice(index, 1)
-      _enqueueThreatSave(type)
-    }
-  }
-
-  function updateThreatRow(type: ThreatType, index: number, field: string, value: string) {
-    const arr = threatRecords.value[type]
-    if (index >= 0 && index < arr.length) {
-      ;(arr[index] as any)[field] = value
-      _enqueueThreatSave(type)
-    }
-  }
-
-  function _enqueueThreatSave(type: ThreatType) {
-    const prefix = getPrefix(variant.value)
-    const typeKey = type === 'economic_interest' ? 'economic' : type === 'loan_guarantee' ? 'loan' : 'business'
-    const arr = threatRecords.value[type]
-    arr.forEach((row, i) => {
-      const itemId = `${prefix}threat-${typeKey}-${i + 1}`
-      pendingItems.set(itemId, {
-        item_id: itemId,
-        conclusion: null,
-        remark: JSON.stringify(row),
-      })
-    })
-    scheduleSave()
-  }
-
-  // ─── Update Period ───
-  function updatePeriod(field: keyof PeriodData, value: string | null) {
-    periodData.value[field] = value
-    const prefix = getPrefix(variant.value)
-    const fieldMap: Record<keyof PeriodData, string> = {
-      business_start: 'period-business-start',
-      business_end: 'period-business-end',
-      report_start: 'period-report-start',
-      report_end: 'period-report-end',
-    }
-    const itemId = `${prefix}${fieldMap[field]}`
-    pendingItems.set(itemId, { item_id: itemId, conclusion: null, remark: value || '' })
-    scheduleSave()
-  }
-
-  // ─── Update Partner ───
-  function updatePartner(field: string, value: any) {
-    const prefix = getPrefix(variant.value)
-    if (field === 'confirmed') {
-      partnerSection.value.confirmed = value
-      const itemId = `${prefix}partner-confirmed`
-      pendingItems.set(itemId, { item_id: itemId, conclusion: value ? 'Y' : 'N', remark: null })
-    } else if (field === 'explanation') {
-      partnerSection.value.explanation = value
-      const itemId = `${prefix}partner-explanation`
-      pendingItems.set(itemId, { item_id: itemId, conclusion: null, remark: value || '' })
-    } else if (field === 'partner_sign') {
-      partnerSection.value.partner_sign = value
-      const itemId = `${prefix}partner-sign`
-      pendingItems.set(itemId, { item_id: itemId, conclusion: null, remark: JSON.stringify(value) })
-    } else if (field === 'manager_sign') {
-      partnerSection.value.manager_sign = value
-      const itemId = `${prefix}manager-sign`
-      pendingItems.set(itemId, { item_id: itemId, conclusion: null, remark: JSON.stringify(value) })
-    }
-    scheduleSave()
-  }
-
-  // ─── Debounce Save ───
-  function scheduleSave() {
-    saveStatus.value = 'unsaved'
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => { saveTimer = null; doSave() }, 2000)
-  }
-
-  async function doSave(retryCount = 0) {
-    if (pendingItems.size === 0) return
-    const items = [...pendingItems.values()]
-    pendingItems.clear()
-    saveStatus.value = 'saving'
-
-    try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, { items })
-      saveStatus.value = 'saved'
-      lastSavedAt.value = new Date()
-    } catch {
-      if (retryCount < 3) {
-        for (const item of items) pendingItems.set(item.item_id, item)
-        setTimeout(() => doSave(retryCount + 1), 1000 * (retryCount + 1))
-        return
-      }
-      saveStatus.value = 'unsaved'
-      ElMessage.warning('保存失败，请检查网络后重试')
-    }
-  }
-
-  // ─── Flush ───
-  async function flushPendingSaves(): Promise<void> {
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
-    await doSave()
-  }
-
-  return {
-    loading,
-    variant,
-    metaInfo,
-    declarationText,
-    periodData,
-    teamSignTable,
-    partnerSection,
-    threatRecords,
-    guidanceNotes,
-    projectContext,
-    saveStatus,
-    lastSavedAt,
-    addTeamMember,
-    removeTeamMember,
-    updateTeamMember,
-    addThreatRow,
-    removeThreatRow,
-    updateThreatRow,
-    updatePeriod,
-    updatePartner,
-    loadData,
-    flushPendingSaves,
-  }
+export const DEFAULT_COMMITMENT_ITEMS: CommitmentItem[] = [
+  { id: 'economic', label: '本人及直系亲属不持有被审计单位及其关联方的直接或重大间接经济利益', answer: null, explanation: null },
+  { id: 'loan', label: '本人及直系亲属与被审计单位及其关联方之间不存在贷款或担保关系', answer: null, explanation: null },
+  { id: 'business', label: '本人及直系亲属与被审计单位之间不存在可能产生自身利益威胁的商业关系', answer: null, explanation: null },
+  { id: 'family', label: '本人的近亲属未在被审计单位及其关联方担任董事、经理或特定会计岗位', answer: null, explanation: null },
+  { id: 'employment', label: '本人未曾在被审计单位担任董事、经理或特定会计岗位（或已满足冷却期要求）', answer: null, explanation: null },
+]
+export const DECLARATION_TEMPLATES: Record<Variant, string> = {
+  team: '本人确认，在本项目的业务期间及财务报告期间内，本人及直系亲属与被审计单位之间不存在可能影响独立性的利害关系。如存在上述情形，已在附件中如实披露并采取了适当防范措施。',
+  committee: '本人作为专业技术委员会审核委员，确认在参与本项目的独立性判断过程中，本人与被审计单位之间不存在可能影响判断客观性的利害关系。',
 }

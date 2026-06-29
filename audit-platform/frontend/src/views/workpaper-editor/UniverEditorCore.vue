@@ -391,3 +391,44 @@ defineExpose({
     :smart-tip="smartTip"
   />
 </template>
+
+<style scoped>
+.gt-wp-editor-error-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  padding: 40px;
+}
+.gt-wp-editor-error-card {
+  text-align: center;
+  max-width: 420px;
+  padding: 40px 32px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  border: 1px solid #ebeef5;
+}
+.gt-wp-editor-error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+.gt-wp-editor-error-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+.gt-wp-editor-error-message {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 20px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+.gt-wp-editor-error-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+</style>

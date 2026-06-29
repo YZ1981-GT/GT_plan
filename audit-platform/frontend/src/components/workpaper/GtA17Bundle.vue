@@ -28,11 +28,12 @@ const GtA17Summary = defineAsyncComponent(() => import('./GtA17Summary.vue'))
 const GtA171AuditSummary = defineAsyncComponent(() => import('./GtA171AuditSummary.vue'))
 const WorkpaperWordEditor = defineAsyncComponent(() => import('./WorkpaperWordEditor.vue'))
 const GtEmbeddedChecklist = defineAsyncComponent(() => import('./GtEmbeddedChecklist.vue'))
-const IndependenceSigning = defineAsyncComponent(() => import('./IndependenceSigning.vue'))
+const GtA177IndependenceDeclaration = defineAsyncComponent(() => import('./GtA177IndependenceDeclaration.vue'))
 const GtA1721Kam = defineAsyncComponent(() => import('./GtA1721Kam.vue'))
 const GtA173ConsultationRecord = defineAsyncComponent(() => import('./GtA173ConsultationRecord.vue'))
 const GtA1731ConsultationExecution = defineAsyncComponent(() => import('./GtA1731ConsultationExecution.vue'))
 const GtA174DisagreementRecord = defineAsyncComponent(() => import('./GtA174DisagreementRecord.vue'))
+const GtA176ClosingMeeting = defineAsyncComponent(() => import('./GtA176ClosingMeeting.vue'))
 
 // ─── Props ───
 const props = defineProps<{
@@ -46,7 +47,7 @@ const props = defineProps<{
 interface TabDef {
   id: string
   label: string
-  kind: 'program' | 'a17-summary' | 'word' | 'checklist' | 'independence' | 'kam' | 'consultation' | 'consultation-exec' | 'disagreement'
+  kind: 'program' | 'a17-summary' | 'word' | 'checklist' | 'independence' | 'kam' | 'consultation' | 'consultation-exec' | 'disagreement' | 'closing-meeting'
   wpCode?: string
   tracked?: boolean
 }
@@ -59,8 +60,9 @@ const TABS: TabDef[] = [
   { id: 'A17-3-1', label: '业务咨询执行记录', kind: 'consultation-exec', wpCode: 'A17-3-1' },
   { id: 'A17-4', label: '重大专业分歧事项记录', kind: 'disagreement', wpCode: 'A17-4' },
   { id: 'A17-5', label: '审计工作完成核对表', kind: 'checklist', wpCode: 'A17-5', tracked: true },
-  { id: 'A17-6', label: '总结会会议纪要', kind: 'word', wpCode: 'A17-6', tracked: true },
+  { id: 'A17-6', label: '总结会会议纪要', kind: 'closing-meeting', wpCode: 'A17-6', tracked: true },
   { id: 'A17-7', label: '独立性声明书', kind: 'independence', wpCode: 'A17-7', tracked: true },
+  { id: 'A17-7A', label: '独立性声明书(专委会)', kind: 'independence', wpCode: 'A17-7A', tracked: false },
 ]
 
 // ─── State ───
@@ -89,6 +91,29 @@ const applicableA17_5 = computed(() =>
   ['A17-5-1', 'A17-5-2', 'A17-5-3', 'A17-5-4', 'A17-5-5']
     .filter(code => wpIdMap.value[code]),
 )
+
+// ─── A17-5 sub-tab switching ───
+const A175_LABELS: Record<string, string> = {
+  'A17-5-1': '财报审计',
+  'A17-5-2': '内控审计',
+  'A17-5-3': 'IPO业务',
+  'A17-5-4': '新三板',
+  'A17-5-5': '函证程序',
+}
+const activeA175Sub = ref('')
+const a175SubOptions = computed(() =>
+  applicableA17_5.value.map(code => ({ label: A175_LABELS[code] || code, value: code })),
+)
+const activeA175WpId = computed(() => {
+  const code = activeA175Sub.value || applicableA17_5.value[0] || ''
+  return wpIdMap.value[code] || ''
+})
+// Initialize activeA175Sub when applicableA17_5 resolves
+watch(applicableA17_5, (codes) => {
+  if (codes.length > 0 && !activeA175Sub.value) {
+    activeA175Sub.value = codes[0]
+  }
+}, { immediate: true })
 
 // ─── Visible tabs ───
 const visibleTabs = computed(() =>
@@ -356,6 +381,17 @@ onMounted(async () => {
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
         </template>
 
+        <!-- closing-meeting tab (A17-6) -->
+        <template v-else-if="tab.kind === 'closing-meeting'">
+          <GtA176ClosingMeeting
+            v-if="getTabWpId(tab)"
+            :wp-id="getTabWpId(tab)"
+            :project-id="props.projectId"
+            :readonly="isTabReadonly(tab)"
+          />
+          <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
+        </template>
+
         <!-- kam tab -->
         <template v-else-if="tab.kind === 'kam'">
           <GtA1721Kam
@@ -368,20 +404,31 @@ onMounted(async () => {
 
         <!-- checklist tab -->
         <template v-else-if="tab.kind === 'checklist'">
-          <GtEmbeddedChecklist
-            v-if="getTabWpId(tab)"
-            :wp-id="getTabWpId(tab)"
-            :checklist-wp-code="applicableA17_5[0] || 'A17-5-1'"
-            :readonly="isTabReadonly(tab)"
-          />
+          <div v-if="applicableA17_5.length > 0" class="gt-a17-bundle__checklist-wrapper">
+            <!-- A17-5 子表切换器 -->
+            <el-segmented
+              v-if="applicableA17_5.length > 1"
+              v-model="activeA175Sub"
+              :options="a175SubOptions"
+              size="small"
+              class="gt-a17-bundle__checklist-switcher"
+            />
+            <GtEmbeddedChecklist
+              v-if="activeA175WpId"
+              :wp-id="activeA175WpId"
+              :checklist-wp-code="activeA175Sub"
+              :readonly="isTabReadonly(tab)"
+            />
+          </div>
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
         </template>
 
         <!-- independence tab -->
         <template v-else-if="tab.kind === 'independence'">
-          <IndependenceSigning
+          <GtA177IndependenceDeclaration
             v-if="getTabWpId(tab)"
             :wp-id="getTabWpId(tab)"
+            :project-id="props.projectId"
             :readonly="isTabReadonly(tab)"
           />
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
@@ -459,6 +506,16 @@ onMounted(async () => {
   text-align: center;
   color: var(--gt-color-text-tertiary, #909399);
   font-size: 14px;
+}
+
+/* ─── A17-5 Checklist sub-tab switcher ─── */
+.gt-a17-bundle__checklist-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gt-a17-bundle__checklist-switcher {
+  align-self: flex-start;
 }
 
 .signoff-title {

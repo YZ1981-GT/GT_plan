@@ -31,6 +31,10 @@ const props = defineProps<{
   addCustomItem?: (sectionId: string) => void
   updateItemContent?: (itemId: string, content: string) => void
   polishWithLLM?: (itemId: string, selectedText: string) => void
+  /** A17-5: 获取 item 所属审计目标编号列表（反向索引标签） */
+  itemObjectives?: (itemId: string) => number[]
+  /** A17-5: 签字确认项（独立卡片渲染） */
+  conclusionItem?: ChecklistItem | null
 }>()
 
 // 默认显示准则索引号列（A1-15/A1-16 有该列）
@@ -178,6 +182,17 @@ function activateCell(itemId: string, field: string) {
                     应用建议 {{ signHintForItem(item)!.suggested_conclusion }}
                   </el-button>
                 </div>
+                <!-- A17-5: 目标反向索引标签 -->
+                <div
+                  v-if="itemObjectives && itemObjectives(item.id).length > 0"
+                  class="item-obj-tags"
+                >
+                  <span
+                    v-for="objIdx in itemObjectives(item.id)"
+                    :key="objIdx"
+                    class="item-obj-tag"
+                  >目标{{ objIdx }}</span>
+                </div>
               </div>
             </div>
             <div class="col-conclusion" @click.stop="activateCell(item.id, 'conclusion')">
@@ -240,9 +255,18 @@ function activateCell(itemId: string, field: string) {
                 @change="(val: string) => updateWpRef(item.id, val)"
                 @blur="activeCell = ''"
               />
-              <span v-else class="cell-display" :class="{ 'cell-empty': !getResponse(item.id).wp_ref }">
-                {{ getResponse(item.id).wp_ref || '索引' }}
-              </span>
+              <template v-else>
+                <span class="cell-display" :class="{ 'cell-empty': !getResponse(item.id).wp_ref }">
+                  {{ getResponse(item.id).wp_ref || '索引' }}
+                </span>
+                <!-- 预置索引号一键预填 -->
+                <span
+                  v-if="item.preset_wp_ref && !getResponse(item.id).wp_ref && !readonly"
+                  class="wpref-prefill"
+                  title="一键填入参考索引号"
+                  @click.stop="updateWpRef(item.id, item.preset_wp_ref!)"
+                >{{ item.preset_wp_ref }}</span>
+              </template>
             </div>
           </div>
 
@@ -264,6 +288,43 @@ function activateCell(itemId: string, field: string) {
             </div>
           </div>
         </template>
+      </div>
+
+      <!-- A17-5 审计结论签字区（独立卡片） -->
+      <div v-if="conclusionItem" class="gt-checklist-table__conclusion-card">
+        <div class="conclusion-card__header">
+          <span class="conclusion-card__icon">✍️</span>
+          <span class="conclusion-card__title">审计结论确认</span>
+        </div>
+        <div class="conclusion-card__body">
+          <p class="conclusion-card__text">
+            {{ conclusionItem.content || conclusionItem.standard_ref }}
+          </p>
+          <div class="conclusion-card__sign-row">
+            <span class="conclusion-card__sign-label">项目负责经理签字：</span>
+            <div class="conclusion-card__sign-input" @click.stop="activateCell(conclusionItem.id, 'conclusion')">
+              <el-select
+                v-if="activeCell === `${conclusionItem.id}:conclusion`"
+                :model-value="getResponse(conclusionItem.id).conclusion || ''"
+                placeholder="—"
+                size="small"
+                :disabled="readonly"
+                automatic-dropdown
+                @change="(val: string) => { updateConclusion(conclusionItem.id, val || null); activeCell = '' }"
+                @visible-change="(visible: boolean) => { if (!visible) activeCell = '' }"
+              >
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
+              </el-select>
+              <span v-else class="cell-display" :class="{ 'cell-empty': !getResponse(conclusionItem.id).conclusion }">
+                {{ getResponse(conclusionItem.id).conclusion === 'Y' ? '已确认' : getResponse(conclusionItem.id).conclusion === 'N' ? '未确认' : '待签字' }}
+              </span>
+            </div>
+          </div>
+          <p class="conclusion-card__hint">
+            提示：审计工作完成核对表需由项目负责经理整理，项目负责合伙人签阅。
+          </p>
+        </div>
       </div>
 
       <!-- 空条目 + 自定义添加（allowCustomItems 时） -->
@@ -565,5 +626,117 @@ function activateCell(itemId: string, field: string) {
 .item-content__polish-btn {
   flex-shrink: 0;
   font-size: 12px;
+}
+
+/* ─── 预置索引号一键预填 ─── */
+.wpref-prefill {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gt-color-primary, #409eff);
+  background: var(--gt-color-primary-bg, #ecf5ff);
+  border: 1px dashed var(--gt-color-primary, #409eff);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.wpref-prefill:hover {
+  background: var(--gt-color-primary, #409eff);
+  color: #fff;
+}
+
+/* ─── A17-5 目标反向索引标签 ─── */
+.item-obj-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.item-obj-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--gt-color-primary-bg, #ecf5ff);
+  color: var(--gt-color-primary, #409eff);
+  line-height: 1.4;
+}
+
+/* ─── A17-5 审计结论签字卡片 ─── */
+.gt-checklist-table__conclusion-card {
+  margin-top: 24px;
+  border: 2px solid var(--gt-color-border, #dcdfe6);
+  border-radius: 8px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+
+.conclusion-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #f5f0ff 0%, #ede8f7 100%);
+  border-bottom: 1px solid var(--gt-color-border-light, #e4e7ed);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--gt-color-text, #303133);
+}
+
+.conclusion-card__icon {
+  font-size: 18px;
+}
+
+.conclusion-card__title {
+  color: var(--gt-purple, #4b2d77);
+}
+
+.conclusion-card__body {
+  padding: 16px;
+}
+
+.conclusion-card__text {
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--gt-color-text, #303133);
+  margin: 0 0 16px;
+  white-space: pre-wrap;
+}
+
+.conclusion-card__sign-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--gt-color-border-light, #e4e7ed);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.conclusion-card__sign-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gt-color-text, #303133);
+  white-space: nowrap;
+}
+
+.conclusion-card__sign-input {
+  min-width: 100px;
+}
+
+.conclusion-card__hint {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+  margin: 0;
+  padding: 8px 0 0;
+  border-top: 1px dashed var(--gt-color-border-light, #e4e7ed);
 }
 </style>

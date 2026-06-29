@@ -65,6 +65,30 @@ def _safe_parse_json(raw: str | None) -> dict | list | None:
         return None
 
 
+_DEFAULT_COMMITMENT_ITEMS = [
+    {"id": "economic", "label": "本人及直系亲属不持有被审计单位及其关联方的直接或重大间接经济利益（包括股票、债券、基金等金融投资）"},
+    {"id": "loan", "label": "本人及直系亲属与被审计单位及其关联方之间不存在贷款或担保关系"},
+    {"id": "business", "label": "本人及直系亲属与被审计单位及其关联方之间不存在可能产生自身利益威胁的商业关系"},
+    {"id": "family", "label": "本人的近亲属未在被审计单位及其关联方担任董事、经理或特定会计岗位"},
+    {"id": "employment", "label": "本人未曾在被审计单位担任董事、经理或特定会计岗位（或已满足冷却期要求）"},
+]
+
+
+def _build_commitment_items(responses: dict) -> list[dict]:
+    """构建承诺事项列表，合并已保存的应答."""
+    items = []
+    for default in _DEFAULT_COMMITMENT_ITEMS:
+        cid = default["id"]
+        saved = responses.get(cid, {})
+        items.append({
+            "id": cid,
+            "label": default["label"],
+            "answer": saved.get("answer") if saved else None,
+            "explanation": saved.get("explanation") if saved else None,
+        })
+    return items
+
+
 async def _load_team_members(project_id, db) -> list[dict]:
     """查询 project_assignments JOIN users 获取团队成员名单.
 
@@ -76,7 +100,7 @@ async def _load_team_members(project_id, db) -> list[dict]:
             sa.text(
                 "SELECT u.display_name "
                 "FROM project_assignments pa "
-                "JOIN users u ON pa.user_id = u.id "
+                "JOIN users u ON pa.staff_id = u.id "
                 "WHERE pa.project_id = :pid "
                 "ORDER BY pa.created_at"
             ),
@@ -133,6 +157,8 @@ async def render(ctx: RenderContext) -> dict | None:
         "loan_guarantee": [],
         "business_relation": [],
     }
+
+    commitment_responses: dict = {}
 
     # ─── 3. 从 checklist_responses 加载已保存数据 ─────────────────────────
     try:
@@ -205,6 +231,11 @@ async def render(ctx: RenderContext) -> dict | None:
                 if isinstance(parsed, dict):
                     threat_records["business_relation"].append(parsed)
 
+            # Commitment items
+            elif suffix.startswith("commit-"):
+                cid = suffix.removeprefix("commit-")
+                commitment_responses[cid] = {"answer": conclusion or None, "explanation": remark or None}
+
     except Exception as e:  # noqa: BLE001
         logger.warning("A17-7 checklist_responses 查询失败 wp_id=%s: %s", wp_id, e)
 
@@ -235,6 +266,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # Team member pre-fill
     team_members = await _load_team_members(ctx.project_id, db)
     project_context["team_members"] = team_members
+    project_context["project_id"] = str(ctx.project_id)
 
     # Auto-fill meta
     if not meta_info["client_name"]:
@@ -249,11 +281,15 @@ async def render(ctx: RenderContext) -> dict | None:
             for i, m in enumerate(team_members)
         ]
 
+    # ─── 5. 承诺事项数据 ─────────────────────────────────────────────────
+    commitment_items = _build_commitment_items(commitment_responses)
+
     return {
         "variant": variant,
         "meta_info": meta_info,
         "declaration_text": declaration_text,
         "period_data": period_data,
+        "commitment_items": commitment_items,
         "team_sign_table": team_sign_table,
         "partner_section": partner_section,
         "threat_records": threat_records,

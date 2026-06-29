@@ -18,6 +18,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtChecklistSection from './GtChecklistSection.vue'
 import GtChecklistNav from './GtChecklistNav.vue'
+import GtChecklistObjectivePanel from './GtChecklistObjectivePanel.vue'
 import { useChecklistResponses } from '@/composables/useChecklistResponses'
 import { useChecklistSearch } from '@/composables/useChecklistSearch'
 import { useChecklistApplicability } from '@/composables/useChecklistApplicability'
@@ -178,23 +179,163 @@ const navItems = computed(() => {
 
 // ─── Computed: Search results (Task 8)：搜索逻辑见 useChecklistSearch ───
 
+// ─── A17-5 审计目标→核对程序 映射 (多对多，基于 seq_no 1-50) ───
+// 映射依据：A17-5-1 源模板 6 项审计目标描述 × 50 项核对程序内容语义归类
+// seq_no = item_id 末尾数字（非源模板 seq_label），全 50 项覆盖
+const OBJECTIVE_PROGRAM_MAP: Record<number, { label: string; programs: number[] }> = {
+  1: {
+    label: '错报评价与处理',
+    programs: [33, 34, 35, 36, 37],  // 累积错报/获取调整确认/未更正错报评估/沟通错报/签章确认
+  },
+  2: {
+    label: '获取管理层声明书',
+    programs: [44],  // 取得管理层书面声明
+  },
+  3: {
+    label: '内控缺陷及重大事项沟通',
+    programs: [7, 25, 32],  // 与治理层沟通审计范围+重大事项+内控/就错报等重大事项沟通/总结会沟通
+  },
+  4: {
+    label: '财务报表合规性',
+    programs: [16, 17, 18, 19, 20, 21, 22, 23, 24, 45],  // 政府补助/终止经营/期后/或有/承诺/关联方/持续经营/其他信息/会计估计/列报披露核对
+  },
+  5: {
+    label: '审计意见恰当性',
+    programs: [28, 29, 30, 31, 38],  // KAM确定+子项(1)(2)(3)/董事会接受财报
+  },
+  6: {
+    label: '充分证据与复核',
+    programs: [1, 2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 26, 27, 39, 40, 41, 42, 43, 46, 47, 48, 49],
+    // 承接/约定书/策略计划/风险评估/项目组讨论/策略批准/程序执行/询证函/监盘/组成部分/程序完成/范围/风险/舞弊/
+    // 总体复核/召开会议确定调整/经理复核/合伙人复核/质量复核/质控复核/技术复核/结转/备忘/追查/重大概要
+    // 注：seq_no 50 为签字确认声明行（非可操作程序），不计入任何目标
+  },
+}
+const isA17_5 = computed(() => (template.value?.wp_code || '').startsWith('A17-5'))
+const activeObjective = ref<number | null>(null)
+
+/** 当前选中 section 是否为"审计目标" */
+const isObjectiveSection = computed(() => {
+  return isA17_5.value && currentSection.value?.title?.includes('审计目标')
+})
+
+/** 所有 actionable item 的 id（用于目标面板匹配程序编号） */
+const allActionableItemIds = computed(() => {
+  const ids: string[] = []
+  for (const sec of sections.value) {
+    for (const item of sec.items) {
+      if (item.type === 'actionable') ids.push(item.id)
+    }
+  }
+  return ids
+})
+
+/** 反向索引：程序编号 → 所属目标编号数组 */
+const programToObjectives = computed<Record<number, number[]>>(() => {
+  const map: Record<number, number[]> = {}
+  for (const [key, obj] of Object.entries(OBJECTIVE_PROGRAM_MAP)) {
+    const idx = Number(key)
+    for (const prog of obj.programs) {
+      if (!map[prog]) map[prog] = []
+      map[prog].push(idx)
+    }
+  }
+  return map
+})
+
+/** 从 itemId 获取所属目标编号列表（用于反向标签） */
+function getItemObjectives(itemId: string): number[] {
+  const m = itemId.match(/(\d+)$/)
+  if (!m) return []
+  const num = parseInt(m[1])
+  return programToObjectives.value[num] || []
+}
+
+/** 定位到指定程序编号的条目（从目标面板点击 chip 跳转） */
+function locateProgram(programNum: number) {
+  // 找到包含该程序编号的 section 和 item
+  for (const sec of sections.value) {
+    for (const item of sec.items) {
+      if (item.type !== 'actionable') continue
+      const m = item.id.match(/(\d+)$/)
+      if (m && parseInt(m[1]) === programNum) {
+        // 切换到该 section
+        activeSection.value = sec.id
+        // 清除目标筛选以显示全部
+        activeObjective.value = null
+        return
+      }
+    }
+  }
+}
+
+function selectObjective(objIdx: number | null) {
+  activeObjective.value = activeObjective.value === objIdx ? null : objIdx
+}
+
+/** 判断item的序号是否属于当前选中目标对应的程序列表 */
+function isItemInObjective(itemId: string): boolean {
+  if (!activeObjective.value || !OBJECTIVE_PROGRAM_MAP[activeObjective.value]) return false
+  // 从item id中提取序号(格式通常为 "S2-1", "S2-2" ... 其中数字是程序编号)
+  const match = itemId.match(/\d+$/)
+  if (!match) return false
+  const num = parseInt(match[0])
+  return OBJECTIVE_PROGRAM_MAP[activeObjective.value].programs.includes(num)
+}
+
 // ─── Computed: Filtered items for current section (Task 10) ───
 const filteredCurrentItems = computed(() => {
   if (!currentSection.value) return []
   const items = currentSection.value.items
-  if (filterMode.value === 'all') return items
-  return items.filter(item => {
-    if (item.type === 'header') return true // always show headers for context
-    if (item.type !== 'actionable') return false
-    const resp = responses.value[item.id]
-    if (filterMode.value === 'unfilled') {
-      return !resp?.conclusion
-    }
-    if (filterMode.value === 'inapplicable') {
-      return resp?.conclusion === 'N/A'
-    }
-    return true
-  })
+  let result = items
+
+  // A17-5: 排除签字确认项（seq_no 50），单独渲染为结论签字区
+  if (isA17_5.value) {
+    result = result.filter(item => {
+      if (item.type !== 'actionable') return true
+      const m = item.id.match(/(\d+)$/)
+      if (m && parseInt(m[1]) === 50) return false
+      return true
+    })
+  }
+
+  // 按目标筛选（A17-5专用）
+  if (activeObjective.value && isA17_5.value) {
+    const programs = OBJECTIVE_PROGRAM_MAP[activeObjective.value]?.programs || []
+    result = result.filter(item => {
+      if (item.type === 'header') return true
+      const match = item.id.match(/\d+$/)
+      if (!match) return true
+      return programs.includes(parseInt(match[0]))
+    })
+  }
+
+  // 按填写状态筛选
+  if (filterMode.value !== 'all') {
+    result = result.filter(item => {
+      if (item.type === 'header') return true
+      if (item.type !== 'actionable') return false
+      const resp = responses.value[item.id]
+      if (filterMode.value === 'unfilled') return !resp?.conclusion
+      if (filterMode.value === 'inapplicable') return resp?.conclusion === 'N/A'
+      return true
+    })
+  }
+
+  return result
+})
+
+/** A17-5 签字确认项（seq_no 50）—— 独立渲染为结论签字卡片 */
+const conclusionItem = computed(() => {
+  if (!isA17_5.value || !currentSection.value) return null
+  // 仅在「核对程序」section 中显示
+  if (currentSection.value.title?.includes('审计目标')) return null
+  for (const item of currentSection.value.items) {
+    if (item.type !== 'actionable') continue
+    const m = item.id.match(/(\d+)$/)
+    if (m && parseInt(m[1]) === 50) return item
+  }
+  return null
 })
 
 // ─── Methods: Navigation ───
@@ -363,8 +504,9 @@ onMounted(() => {
   initFromProps()
   loadReviewSignHints()
   // Show applicability dialog on first open if no applicability data exists
+  // A17-5 系列只有 2 section（审计目标+核对程序）且都必须适用，不弹窗
   const hasApplicabilityData = Object.keys(sectionApplicability.value).length > 0
-  if (!hasApplicabilityData && toc.value.length > 0) {
+  if (!hasApplicabilityData && toc.value.length > 0 && !isA17_5.value) {
     nextTick(() => {
       showApplicabilityDialog.value = true
     })
@@ -426,6 +568,7 @@ onBeforeUnmount(() => {
         </el-button>
       </div>
       <el-button
+        v-if="!isA17_5"
         size="small"
         :disabled="readonly"
         @click="openApplicabilityDialog"
@@ -470,6 +613,22 @@ onBeforeUnmount(() => {
           <el-radio-button value="unfilled">未填</el-radio-button>
           <el-radio-button value="inapplicable">不适用</el-radio-button>
         </el-radio-group>
+      </div>
+      <!-- 审计目标筛选 (A17-5专用) -->
+      <div v-if="isA17_5" class="toolbar__objectives">
+        <el-dropdown size="small" @command="(cmd: number | null) => selectObjective(cmd)">
+          <el-button size="small" :type="activeObjective ? 'primary' : ''">
+            {{ activeObjective ? `目标${activeObjective}` : '按目标筛选' }} ▾
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item :command="null">全部程序</el-dropdown-item>
+              <el-dropdown-item v-for="(obj, idx) in OBJECTIVE_PROGRAM_MAP" :key="idx" :command="Number(idx)">
+                目标{{ idx }}：{{ obj.label }}（{{ obj.programs.length }}项）
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
       <!-- 批量标记 (Task 9) -->
       <div v-if="currentSection && !readonly" class="toolbar__batch">
@@ -535,11 +694,23 @@ onBeforeUnmount(() => {
       <GtChecklistNav
         :nav-items="navItems"
         :active-section="activeSection"
+        :active-objective="activeObjective"
+        :show-objectives="isA17_5"
         @select="selectSection"
+        @select-objective="selectObjective"
+      />
+
+      <!-- 右侧：审计目标追溯面板 (A17-5 专用，当选中"审计目标"section 时) -->
+      <GtChecklistObjectivePanel
+        v-if="isObjectiveSection"
+        :responses="responses"
+        :all-item-ids="allActionableItemIds"
+        @locate-program="locateProgram"
       />
 
       <!-- 右侧核对表主体（展示型子组件 GtChecklistSection） -->
       <GtChecklistSection
+        v-else
         :current-section="currentSection"
         :filtered-current-items="filteredCurrentItems"
         :section-applicable="currentSection ? isSectionApplicable(currentSection.id) : true"
@@ -558,6 +729,8 @@ onBeforeUnmount(() => {
         :add-custom-item="addCustomItem"
         :update-item-content="updateItemContent"
         :polish-with-l-l-m="polishWithLLM"
+        :item-objectives="isA17_5 ? getItemObjectives : undefined"
+        :conclusion-item="conclusionItem"
       />
     </div>
 

@@ -79,6 +79,44 @@ async def render(ctx: RenderContext) -> dict | None:
         })
         seq += 1
 
+    # ─── 外部关联 sheet（如 D0 函证项列入 D1 底稿目录） ─────────────────
+    # 源模板中各循环底稿目录会包含跨底稿的函证等 sheet，
+    # 从 account_package_registry 读取 source_wp_code != primary_wp_code 的条目追加。
+    try:
+        from app.services.account_package_registry_service import AccountPackageRegistryService
+        registry = AccountPackageRegistryService()
+        wp_code = ctx.wp_code or ""
+        for pkg in registry.get_packages():
+            if pkg.get("primary_wp_code") != wp_code:
+                continue
+            # 找到当前底稿对应的 package，追加外部 sheet
+            for sheet_def in pkg.get("sheets", []):
+                src = sheet_def.get("source_wp_code", "")
+                if src and src != wp_code:
+                    sheet_name = sheet_def.get("sheet_name", "")
+                    if not sheet_name:
+                        continue
+                    # 提取索引号
+                    ext_index = ""
+                    m = _SHEET_INDEX_PATTERN.search(sheet_name)
+                    if m:
+                        ext_index = m.group(1)
+                    else:
+                        ext_index = src
+                    navigation_rows.append({
+                        "seq": seq,
+                        "content": sheet_name,
+                        "index_ref": ext_index,
+                        "component_type": "external",
+                        "no_print": False,
+                        "is_external": True,
+                        "source_wp_code": src,
+                    })
+                    seq += 1
+            break  # 只匹配第一个 package
+    except Exception as e:  # noqa: BLE001
+        logger.debug("b-index: 外部关联 sheet 加载失败: %s", e)
+
     # ─── 循环底稿目录（跨底稿，同 audit_cycle 全部底稿） ──────────────────
     from app.services.wp_cycle_directory import build_cycle_workpapers
 

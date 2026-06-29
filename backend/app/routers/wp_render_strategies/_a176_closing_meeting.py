@@ -1,13 +1,12 @@
 """A17-6 总结会会议纪要 — 专属渲染策略.
 
 component_type = "a17-6-closing-meeting"
-极简组件：6 字段卡片（会议时间/参加人员/会议纪要/结论/附件）+ 元信息(6)。
+升级版：10项会议议题 + 元信息(12字段) + 双模式 + 双向回写
 数据持久化在 checklist_responses 表。
 """
 
 from __future__ import annotations
 
-import json
 import logging
 
 import sqlalchemy as sa
@@ -20,8 +19,7 @@ logger = logging.getLogger(__name__)
 async def render(ctx: RenderContext) -> dict | None:
     """A17-6 总结会会议纪要渲染策略.
 
-    返回 {meta_info, fields, project_context}
-    前端组件自带静态字段定义，后端只负责加载已保存数据。
+    返回 {meta_info, agenda, project_context}
     """
     wp_id = ctx.wp_id
     db = ctx.db
@@ -31,17 +29,17 @@ async def render(ctx: RenderContext) -> dict | None:
         "client_name": "",
         "period": "",
         "preparer": "",
+        "preparer_date": "",
         "reviewer": "",
-        "date": "",
+        "reviewer_date": "",
         "index_no": "A17-6",
-    }
-    fields: dict = {
+        "meeting_place": "",
         "meeting_time": "",
-        "attendees": "",
-        "minutes": "",
-        "conclusion": "",
-        "attachments": "",
+        "organizer": "",
+        "convener": "",
+        "recorder": "",
     }
+    agenda: dict = {str(i): "" for i in range(1, 11)}
 
     try:
         result = await db.execute(
@@ -58,10 +56,10 @@ async def render(ctx: RenderContext) -> dict | None:
                 key = item_id.removeprefix("a176-meta-")
                 if key in meta_info:
                     meta_info[key] = row.conclusion or row.remark or ""
-            elif item_id.startswith("a176-"):
-                key = item_id.removeprefix("a176-")
-                if key in fields:
-                    fields[key] = row.remark or row.conclusion or ""
+            elif item_id.startswith("a176-agenda-"):
+                idx = item_id.removeprefix("a176-agenda-")
+                if idx in agenda:
+                    agenda[idx] = row.remark or row.conclusion or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("A17-6 checklist_responses 查询失败 wp_id=%s: %s", wp_id, e)
 
@@ -96,6 +94,6 @@ async def render(ctx: RenderContext) -> dict | None:
 
     return {
         "meta_info": meta_info,
-        "fields": fields,
+        "agenda": agenda,
         "project_context": project_context,
     }
