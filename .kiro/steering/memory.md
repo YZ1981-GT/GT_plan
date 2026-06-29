@@ -13,6 +13,7 @@ inclusion: always
 - **🔴 codegraph 优先于 grep**：79k 节点/160k 边/4449 文件；grep 仅用于非符号文本
 - **触类旁通**；**改动前先 spec 三件套**（>500行/3+组件/跨前后端）；**改动后必 Playwright 实测**
 - **UI 全中文化**；**报表金额默认"元"**；**中文场景全链路不能崩**
+- **不要考虑轻量**：要考虑针对性、联动性、美观性、实操性、易懂性；审计UI要有逻辑追溯能力
 - 功能收敛；git 单 commit；**push 前必先 fetch**；**协作走 PR 不直推 main**
 - **spec 归档按功能分类**（05-business-features / 04-infra 等），不按日期批次建目录
 - 目标并发 6000 人；底稿编码致同 2025 修订版
@@ -30,6 +31,9 @@ inclusion: always
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **开发前必先逐sheet读源模板**；**导入导出三级**；**适用性自动判断**
 - **模板预填优先于AI生成(2026-06-28)**：结构化章节组件中，源模板有固定骨架文本的章节优先用CHAPTER_TEMPLATE+projectContext变量替换做预填（即时无网络），AI仅用于需跨底稿总结/判断的复杂章节
+- **结构化章节编制提示模式(2026-06-28)**：源模板红色提示文字用`<details>`折叠展示(蓝左边线+浅蓝背景)，默认收起不干扰编辑；有表格结构的子节用el-table动态行而非textarea(如Ch4特别风险4列/职业判断4列)；持久化用独立item_id前缀+JSON.stringify rows
+- **A17-1第8章自动取数模式(2026-06-28)**：GtA171Chapter8从A1-13/A1-14 analytical_review_service自动拉取显著变动项(resolver:`a17_ch08_analytical_review`注册于`_a17_ch08.py`)，前端调`/api/projects/{pid}/auto-data/a17_ch08_analytical_review?year=`展示表格，AI生成时把变动列表作为existing_content传给LLM
+- **AI生成表格数据规范(2026-06-28)**：表格型子节的AI guidance要求LLM按JSON数组返回(每行含各列字段名)，前端用`utils/aiJsonParse.ts`的`tryParseJsonArray`三层容错解析(直接parse/代码块/[]提取)，失败降级填第一列
 
 ## 环境配置
 
@@ -71,15 +75,16 @@ inclusion: always
 - **✅ a1-17-corresponding-data**(2026-06-26)：A1-17对应数据程序表专属组件，极简5条卡片。新componentType`a1-17-corresponding-data`+GtA117CorrespondingData.vue(~250行)。序号标签+是/否/不适用+执行人+执行情况textarea+索引号+进度条+debounce自动保存。后端`_a117_corresponding.py`从checklist_responses读JSON remark
 - **✅ a9-1-deficiency-letter**(2026-06-27 完成)：A9-1内控缺陷沟通函专属组件，22/22全绿（12 hypothesis + 18 fast-check + 50 vitest + 4 Playwright E2E = 84测试）。新componentType`a9-1-deficiency-letter`，useA91DeficiencyLetter+GtA91DeficiencyLetter.vue(~600行)。7区块卡片UI(收件人自动填+独立性Y/N+内控缺陷B22B联动+审计委员会可选+签发+管理层回复)+左侧mini导航+双模式+AI整改建议disabled预留。B22B按severity自动分组+EventBus `deficiency:severity-evaluated`实时刷新+2s debounce自动保存+JSON remark持久化
 - **✅ a9-2-deficiency-letter-governance**(2026-06-27 完成)：复用GtA91DeficiencyLetter+variant='governance'，13/13全绿（119测试含A91回归）。差异：收件人=董事会、无一般缺陷、无管理层回复区、item_id用a92-隔离。后端`_a91_deficiency_letter.py`重构为`_load_section_data(ctx,prefix)`+`_load_project_context`复用
-- **✅ a17-6-closing-meeting**(2026-06-26 完成)：最简6字段卡片。13/13全绿(33测试)。新componentType`a17-6-closing-meeting`
+- **✅ a17-6-closing-meeting**(2026-06-28 升级完成)：从极简6字段卡片升级为源模板对齐结构。10项会议议题卡片+元信息(12字段:含会议地点/组织者/召集人/记录员)+编制提示折叠(10项AGENDA_GUIDANCE)+双模式(el-segmented)+双向回写(a176_docx_sync.py generate-docx/sync-from-docx)+AI功能(复用a171/ai-generate端点per-agenda-item)+OO健康检查降级。Bundle kind从word→closing-meeting，新增a176_docx_sync.py路由+service。item_id前缀`a176-meta-*`/`a176-agenda-{1-10}`
+- **✅ A17-5核对表UI修复(2026-06-29)**：①GtA17Bundle A17-5 tab增加el-segmented子表切换(财报审计/内控审计/IPO/新三板/函证)，按项目实际生成的A17-5-x子底稿动态显示；②GtChecklistNav对"审计目标"section改为不可点击header+6个圆形数字tag(目标筛选器)；③GtChecklistTable新增OBJECTIVE_PROGRAM_MAP静态映射(6目标→47程序多对多)，工具栏"按目标筛选"下拉+左侧tag联动过滤核对程序项。纯前端方案不改后端
 - **✅ a18-1-regulatory-submission**(2026-06-26 完成)：极简3区块(收件人前缀+正文自动填+签发)。15/15全绿(26测试)。新componentType`a18-1-regulatory-submission`
 - **✅ a18-2-regulatory-communication**(2026-06-26 完成)：5区块(4事项Y/N/NA适用性+双CPA签+提示折叠)。15/15全绿(80测试)。新componentType`a18-2-regulatory-communication`
 - **✅ a8-1-other-info-representation**(2026-06-26 完成)：6条声明卡片(3含动态文件清单+1日期+1 Y/N+1 textarea)+签字区。17/17全绿(106测试)。新componentType`a8-1-other-info-representation`
 - **✅ a11-1-subsequent-events-inquiry**(2026-06-26 完成)：10个CAS QA卡片+元信息+证据+左侧12项导航。17/17全绿(103测试)。新componentType`a11-1-subsequent-events-inquiry`
 - **✅ a17-3-consultation-record**(2026-06-26 完成)：元信息+4章+文件tag+AI准则查询disabled。16/16全绿(88测试)。新componentType`a17-3-consultation-record`
-- **✅ a17-3-1-consultation-execution**(2026-06-26 完成)：极简5区块+A17-3引用联动(只读)。16/16全绿(69测试)。新componentType`a17-3-1-consultation-execution`
+- **✅ a17-3-1-consultation-execution**(2026-06-26 完成)：极简5区块+A17-3引用联动(只读)。16/16全绿(69测试)。新componentType`a17-3-1-consultation-execution`。**2026-06-28升级完成**：Bundle路由改专属组件+projectId+OO双模式+编制提示+Section三拆3子区(Y/N radio-button×2条件展开)+全Section AI按钮+A17-3实时联动(只读摘要+🔄刷新)+AI生成传A17-3摘要作context
 - **✅ a17-4-disagreement-record**(2026-06-26 完成)：人员动态表+6章+签字区。17/17全绿(75测试)。新componentType`a17-4-disagreement-record`
-- **✅ a17-7-independence-declaration**(2026-06-26 完成)：variant双变体(team/committee)+签字表预填+威胁记录3类。22/22全绿(102测试)。新componentType`a17-7-independence-declaration`
+- **✅ a17-7-independence-declaration**(2026-06-26 完成)：variant双变体(team/committee)+签字表预填+威胁记录3类。22/22全绿(102测试)。新componentType`a17-7-independence-declaration`。**2026-06-29升级完成**：从5区块卡片升级为A17-1模式5章节结构。左侧导航(completionDots)+5章折叠卡片(Ch1声明正文+期间/Ch2承诺事项5项Y/N/Ch3签字确认表+批量签署弹窗/Ch4合伙人审查+按钮签字/Ch5威胁记录3类)+编制提示(CHAPTER_GUIDANCE×5折叠)+AI辅助(`POST /a177/ai-generate`)+双模式(`POST /a177/generate-docx`+`POST /a177/sync-from-docx`)+`a177_docx_sync.py`双向同步服务+`a177_ai_generate.py`路由注册到router_registry"AI与辅助"组。签字采用按钮弹窗确认模式(ElMessageBox.confirm显示签署人+不可撤销警告)。"发送确认"按钮调用IndependenceSigningService批量推送全员电子签署
 - **✅ word-template-dual-mode**(2026-06-27 完成)：所有word-template底稿(25个wp_code)统一双模式框架，33/33任务全绿（7 PBT fast-check + 4 PBT GtView + 32 vitest + 9 guidance + 17 import + 5 Playwright E2E = ~120测试）。el-segmented切换(结构化视图/在线编辑)+后端python-docx模板解析器+占位符提取+checklist_responses持久化(item_id=`wt-{wp_code}-{field_id}`)+AI预填按钮(disabled占位)+导出占位符回写+OO callback反写+导出Word(合并responses)+导出模板(带蓝色说明事项include_guidance)+导入数据(POST import-structured离线docx解析回写)。不新建componentType，WorkpaperWordEditor内部增加结构化视图+toolbar三按钮
 - **✅ a17-1-audit-summary**(2026-06-27 完成)：A17-1重大事项概要汇总专属组件，22/22全绿（85测试）。新componentType`a17-1-audit-summary`，useA171AuditSummary+useA171Navigation(scrollspy+completionDots)+GtA171AuditSummary.vue(~280行)。签字表10×3+16章折叠卡片(10 textarea+2 table动态增删+4 Y/N条件展开)+GtIndexChip(B50/A13/A1-15)+左侧导航(完成指示)+AI disabled按钮+2s debounce自动保存
 - **✅ a17-2-1-kam**(2026-06-27 完成)：A17-2-1关键审计事项(KAM)专属组件，18/18全绿（92测试: 2 hypothesis + 30 fast-check + 43 vitest + 19后端 + 4 Playwright E2E）。新componentType`a17-2-1-kam`，useA1721Kam+GtA1721Kam.vue(~435行)。候选清单el-table(4列+communicate高亮)+KAM动态卡片(6 textarea+GtIndexChip+el-popconfirm删除)+附注per KAM+适用性el-switch(隐藏section 2/3)+EventBus `kam:updated`+2s debounce自动保存
@@ -141,18 +146,32 @@ inclusion: always
 - **🔴 测试掩盖 bug**：mock 不存在方法 = 把 bug 编进测试
 - **🔴 余额表 KEY_COLUMNS 勿加 account_name**；SELECT tb_balance 必含 direction
 - **🔴 PG ON CONFLICT DO NOTHING 不返回跳过行**：需二次查询得 skipped
+- **🔴 project_assignments列名是staff_id不是user_id(2026-06-29)**：`_a177_independence_declaration.py`的`_load_team_members`原用`pa.user_id`查询报`UndefinedColumnError`，正确列名`pa.staff_id`。且此错误会abort事务导致后续查询级联失败(InFailedSQLTransactionError)
+- **🔴 asyncpg不支持IN tuple参数(2026-06-28)**：`sa.text("...IN :codes")` + `{"codes": tuple(...)}` asyncpg报语法错误。必须用`= ANY(:codes)` + `list(...)`。错误会abort事务导致后续所有查询级联失败
 - **router_registry 必查**；**service 只 flush 不 commit**
-- **🔴 GtIndexChip传入的wp-id必须是working_paper表的真实UUID**：传wp_index.id会导致组件内部`.includes()`崩溃(Cannot read properties of undefined)。跨章节引用chip只能用后端render策略返回的cross_references中已验证的wp_id，不能从wp_index API直接取id字段（那是wp_index表的id不是working_paper的id）
+- **🔴 GtA17Bundle独立性Tab引用旧组件(2026-06-29修复)**：原`IndependenceSigning.vue`(旧签署进度组件)改为`GtA177IndependenceDeclaration.vue`(新5章节专属组件)。bundle的`kind:'independence'`分支需同步更新import+template引用
+- **🔴 fsWrite对编辑器打开的文件可能不落盘(2026-06-29踩坑)**：Kiro的fsWrite/fsAppend在文件被编辑器占用时可能写入内存缓冲但不刷盘，导致Vite读到旧文件。解决：先`Remove-Item -Force`确认删除，再用`node -e "fs.writeFileSync(...)"`直接写磁盘
 - **🔴 Bundle wpIdMap必须用item.wp_id不能用item.id(2026-06-28)**：`getWpIndex`返回的`id`是wp_index表id，`wp_id`才是working_paper表id。Bundle传给子组件的wpId必须用`item.wp_id`，否则checklist_responses的FK约束(wp_id→working_paper.id)报ForeignKeyViolationError。A17Bundle已修复
 - **🔴 新增 componentType 必须同步更新 `VALID_COMPONENT_TYPES`**（`wp_classification_service.py`），否则 `validate_overrides` 启动时 raise ValueError 阻止 uvicorn 启动
 - **🔴 报告正文生成空白根因**：`audit_report_template`表空(未seed)→`load_body_template`返回空sections→docx只有【草稿DRAFT】水印。修复`POST /api/audit-report/templates/load-seed`(种子`backend/data/audit_report_templates_seed.json`,28段落=4意见类型×2公司类型)。**重建DB后会复现，初始化需含此seed**
 - **🔴 删除主表前必清FK子表**：`delete_task`需先删`export_job_items_v2`+`deliverable_section_state`再删`word_export_task_versions`+`word_export_task`，否则FK约束500
 - **🔴 结构化章节数据不能存到textarea content(2026-06-28踩坑)**：A17-1第3章把JSON结构化数据存入chapters['3'].content导致乱码——hydrate时JSON字符串被当textarea文本显示。正确做法：结构化章节的各字段用独立item_id前缀(如`a171-ch3-mod-*`/`a171-ch3-mat-*`)分别存checklist_responses，不经过content字段。已git恢复，待重做
-- **✅ A17-1章节标题对齐源模板(2026-06-28)**：CHAPTERS_META+DEFAULT_CHAPTERS标题全部从`A17-1 重大事项概要汇总.docx`重新提取修正（之前16章标题全是编造的）。正确结构：ch1审计约定范围/ch2独立性/ch3计划更新/ch4合伙人已关注事项(6子节)/ch5咨询及分歧/ch6重大错报风险应对/ch7利用专家/ch8已审报表分析/ch9关联方/ch10持续经营/ch11期后事项/ch12 KAM/ch13其他信息/ch14审计结论/ch15其他特殊考虑/ch16下年度关注
+- **✅ A17-1双向互转实现(2026-06-28)**：结构化视图↔OnlyOffice Word编辑。checklist_responses为主存储，切OO时POST generate-docx(python-docx填充模板)→OO编辑，切回时POST sync-from-docx(解析docx 16章Title段落边界回写DB)。`a171_docx_sync.py`~150行。只同步textarea章节(1-5,7,13-16)，table/yn不走docx。项目级文件存`storage/projects/{pid}/workpapers/A/A17-1.docx`
+- **🔴 D~N循环全sheet HTML组件化策略(2026-06-29最终确认)**：所有D1 sheet（含31列宽表D1-7/D1-8）都做HTML精美组件，OnlyOffice仅为降级/偏好切换。核心逻辑：固定骨架上填数据，区别只是骨架复杂度。宽表用el-table横向滚动+列语义化(日期选择器/金额格式化/关联方匹配)。变动行=el-table动态添加行。导入导出三级(导出空模板→离线填写→导入解析识别动态行)解决批量数据场景。跨sheet公式=从TB/明细表取数(resolver)，前端composable公式引擎重算
+- **🟡 D1专属组件拆分计划(2026-06-29)**：useD1NotesReceivable.ts(1237行)太大，按Tab拆成独立子composable+子Vue组件，每文件200-400行。基于源模板实际sheet内容逐个补全占位Tab。分6个spec+1通用组件推进：①d1-adjudication-table(审定+明细+坏账,三件套齐全) ②d1-disclosure-note(附注上市+国企,三件套齐全,20需求) ③d1-endorsement-discount(业务模式+备查簿+贴现背书+贴息,三件套齐全,18需求) ④d1-inspection-check(三件套齐全,18需求8P: D1-10监盘15列宽表+D1-11关联方13列+D1-12质押16列+D1-13凭证抽样) ⑤d1-ecl-provision(三件套齐全,16需求8P: D1-14段落式政策检查左右分栏+D1-15八列测算表D=B×C/F=E-D) ⑥d1-writeoff-check(三件套齐全,12需求6P: D1-16坏账转回8列+核销5列双段表) ⑦audit-review-dialog(通用复核对话,三件套齐全,13需求)
+- **🟡 D1联动优化待办(2026-06-29复盘)**：P0:D1-12从D1-7"已质押"行导入(类似D1-8从D1-7导入贴现行)+D1-15 E列从D1-4自动取数(跨sheet auto_pull)。P1:D1-11从related_parties表导入关联方清单+D1-16差异不一致时"同步到D1-4"按钮+D1-10核对区增倒推调节子区域(当监盘日≠报表日)。P2:差异超标自动创建复核线程+跨spec复核链路(D1-15差异→A13错报通知)。**架构P0**：抽取d1SharedFormulas.ts(纯函数)/useD1ImportExport.ts(导入导出通用)/useD1DualMode.ts(双模式)/D1AuditNoteSection.vue(审计说明通用组件)
+- **🔴 D1 spec间数据契约(2026-06-29)**：Spec1(审定表)写入`D1-adj-{section}-{type}-{period}-audited`格式item_id，Spec2(附注)通过computed从同一allResponses Map读取这些key。8个跨spec item_id构成契约接口。行类型三分：fixed(不可删)/dynamic(浮动可增删)/summary(自动合计不可编辑)。提示文字用`<details>`折叠(蓝左边线+浅蓝背景默认收起)。GtIndexChip跳转审定表/坏账/附注模块
+- **🔴 披露表"说明"vs"提示"双层设计(2026-06-29)**："说明："=可编辑textarea(对上方表格数据补充说明，双向回写到附注模块，EventBus `disclosure:note-text-updated`/`note:section-updated`双向同步，last-write-wins冲突策略)。"【提示：】"=只读折叠区(编制指导告诉用户何时/如何填写，`<details>`默认收起)。两者在UI上通过样式区分，不可混淆
+- **🔴 底稿"说明"文本区三种模式(2026-06-29通用规范)**：①纯文本说明(textarea直接编辑+双向回写附注) ②适用性判断+预填(先radio选场景如终止/未终止/均有→预填模板文本→可编辑→双向回写) ③动态行提示(浅灰占位行"可无限量添加行"→点击addRow，不持久化纯UI)。持久化：①item_id含note前缀remark存文本 ②item_id含judgment前缀conclusion存判断值remark存编辑后文本 ③不存储
+- **🟡 audit-review-dialog(2026-06-29,三件套齐全)**：通用审计复核对话组件`GtReviewDialog.vue`(~400行)+`useReviewDialog.ts`(~300行)+`useReviewDialogProvider.ts`(~80行全局注入)。**全局可激活**：不限于审计说明/结论，底稿任意位置可右键"发起复核对话"(sectionId=任意字符串如`D1-adj-bank-current`)。三种激活方式：固定按钮/右键菜单(@cell-contextmenu)/选中文本工具栏。上下文摘要卡片(数据快照)+消息引用(quote类型)。活跃线程蓝/红圆点标记。后端V095_review_threads+review_messages。13需求+14 properties+39任务
+- **🟡 双模式双向回写联动规划(2026-06-28)**：以A17-1为契机推广到全平台。Phase1=A17-1验证(已完成) Phase2=通用DocxSyncService配置化覆盖25个word-template Phase3=Excel双向(OO xlsx callback→openpyxl解析→parsed_data / Univer保存→回写xlsx)。设计原则：明确主存储+切换时同步不实时双写+降级容错
+- **🔴 D~N双模式OO只显示当前Tab对应sheet(2026-06-29)**：多sheet xlsx底稿切OO模式时，不拆文件(会破坏跨sheet公式→#REF!)，而是打开完整xlsx+用OO API隐藏其他sheet(SetVisible(false))，只显示当前Tab的sheet。公式链完整保留、联动重算正常。通过`spreadsheet.activeSheet`+`onDocumentReady` JS宏实现
+- **🔴 GtOnlyOfficeSheet健康检查响应解析(2026-06-28修复)**：`http.get`返回AxiosResponse，`health.data`是ResponseWrapperMiddleware信封`{code,message,data:{healthy:true}}`，直接`.data?.healthy`拿到undefined→永远降级。修复：`health.data?.data?.healthy ?? health.data?.healthy`双层兼容
 - **地址坐标库 single-flight + 增量失效**；**WorkpaperSaveOrchestrator 统一 after_save**
 
 ### 前端
 - **🔴 底稿编码→实际内容必须查源模板**：不能凭编码猜内容（B40≠抽样策略，实际是项目组讨论CAS1211）；**开发前必先逐sheet读源模板**
+- **🔴 account_package_registry sheets数组顺序=tab顺序**：必须严格对齐源模板xlsx的sheet顺序（含D0函证插入位置），`resolve_package_sheets`按数组序返回classifications。sheet_name也必须与模板实际名完全一致
 - **🔴 大章节底稿聚合模式**：A17/A16/B30 等大章节底稿需做"统一入口组件+子表作为tab"模式（参考函证D0/B22A），子底稿映射skip由主组件内tab切换渲染
 - **🔴 A1 Dashboard子Tab组件必须自加载**：GtA1Dashboard只传wpId不传htmlData，子组件（GtAnalyticalReview/GtChecklistTable等）需在htmlData未提供时自行调render-config获取数据。render-config已支持`?force_component_type=`查询参数强制指定渲染策略（解决skip映射底稿在Dashboard内嵌时无法触发正确renderer的问题）
 - **🔴 子底稿wp_code_overrides必须保持skip**：A1-11~A1-17在overrides中必须是`skip`（否则在底稿列表中平铺显示），Dashboard内嵌时通过`force_component_type`指定真实componentType。改为非skip会导致列表中子底稿暴露
@@ -161,7 +180,7 @@ inclusion: always
 - **🔴 Bundle子Tab组件必须守卫wpId为空(2026-06-28)**：A17Bundle/A1Dashboard等bundle内嵌子底稿组件时，若`getTabWpId(tab)`返回空串（子底稿未生成），必须`v-if`守卫不渲染组件，否则组件selfLoad请求404触发http.ts全局拦截器弹"Not Found(ID:xxx)"。修复：空wpId时显示"该子底稿尚未生成"占位提示
 - **🔴 GtAProgramConsole需selfLoad(2026-06-28)**：原组件无selfLoad，完全依赖父组件(GtWpRenderer)传htmlData。bundle内嵌场景(A17Bundle等)不传htmlData→程序表为空。修复：onMounted增加selfLoad，当htmlData.programs为空时调render-config?force_component_type=a-program-console获取后端生成的程序数据
 - **🔴 render-config返回结构是`{sheets:[{html_data:{...}}]}`**：自加载组件从`res.sheets[0].html_data`取渲染器输出，非顶层`res.template`。A1-15已踩坑修复（空白页根因）
-- **GtOnlyOfficeSheet 内置全屏**：全屏编辑功能加在组件内部(position:fixed+z-index:2000+ESC退出)，所有使用场景自动获得，不需各调用方重复实现
+- **GtOnlyOfficeSheet 内置全屏**：改用浏览器原生`requestFullscreen()` API（CSS position:fixed在有transform的父容器中失效），`fullscreenchange`事件同步状态，ESC/按钮均可退出
 - **🔴 contenteditable v-model** 必加 isInternalChange/focus guard
 - **🔴 附注按 sort_order 排序**，禁中文字符串排序
 - **多 sheet 底稿**：各 sheet 按 class_code 独立派生
