@@ -6,8 +6,8 @@
 
 ## Tasks
 
-- [ ] 1. 实现共享公式引擎 useD1FormulaEngine.ts
-  - [ ] 1.1 创建 `composables/useD1FormulaEngine.ts`，实现全部纯函数
+- [x] 1. 实现共享公式引擎 useD1FormulaEngine.ts
+  - [x] 1.1 创建 `composables/useD1FormulaEngine.ts`，实现全部纯函数
     - 实现 `parseNum`（安全数值解析：null/undefined/空串/NaN → 0）
     - 实现 `calcAuditedAmount`（审定数 = 未审 + AJE + RJE，3参数净额版本，对应源模板E=B+C+D）
     - 实现 `calcChangeRate`（变动率，含期初=0特殊处理）
@@ -21,43 +21,43 @@
     - 实现 `calcCurrentUnadjusted`（期末未审数 = 期初审定 + 本期增加 - 本期减少，D1-2/D1-3用）
     - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.7, 6.4, 10.5_
 
-  - [ ]* 1.2 编写 Property 1 PBT：审定数公式正确性
+  - [x]* 1.2 编写 Property 1 PBT：审定数公式正确性
     - **Property 1: 审定数公式正确性**
     - 生成器：`fc.float({min:-1e9, max:1e9})` × 3（未审/AJE净额/RJE净额）
     - 断言：返回值 === 未审 + AJE + RJE
     - **Validates: Requirements 1.3, 4.5, 5.5, 6.3**
 
-  - [ ]* 1.3 编写 Property 2 PBT：变动额与变动率公式正确性
+  - [x]* 1.3 编写 Property 2 PBT：变动额与变动率公式正确性
     - **Property 2: 变动额与变动率公式正确性**
     - 生成器：`fc.float` × 2（含0边界策略）
     - 断言：变动额 === 期末-期初；变动率期初=0时特殊处理
     - **Validates: Requirements 1.4**
 
-  - [ ]* 1.4 编写 Property 3 PBT：小计行恒等于明细行之和
+  - [x]* 1.4 编写 Property 3 PBT：小计行恒等于明细行之和
     - **Property 3: 小计行恒等于明细行之和**
     - 生成器：`fc.array(fc.float, {minLength:1, maxLength:20})`
     - 断言：calcSubtotal(rows) === rows.reduce((a,b)=>a+b, 0)
     - **Validates: Requirements 1.5, 4.6, 5.6, 6.5**
 
-  - [ ]* 1.5 编写 Property 4 PBT：净值等于原值减坏账准备
+  - [x]* 1.5 编写 Property 4 PBT：净值等于原值减坏账准备
     - **Property 4: 净值等于原值减坏账准备**
     - 生成器：`fc.float` × 2
     - 断言：calcNetValue(gross, bad) === gross - bad
     - **Validates: Requirements 1.6**
 
-  - [ ]* 1.6 编写 Property 5 PBT：变动率阈值高亮判定
+  - [x]* 1.6 编写 Property 5 PBT：变动率阈值高亮判定
     - **Property 5: 变动率阈值高亮判定**
     - 生成器：`fc.float({min:-10, max:10})`
     - 断言：isChangeRateExceeding(r, 0.3) === (Math.abs(r) > 0.3)
     - **Validates: Requirements 1.7**
 
-  - [ ]* 1.7 编写 Property 11 PBT：坏账准备期末未审数公式
+  - [x]* 1.7 编写 Property 11 PBT：坏账准备期末未审数公式
     - **Property 11: 坏账准备期末未审数公式**
     - 生成器：`fc.float` × 6
     - 断言：calcBadDebtEndBalance(...) === 期初审定 + 计提 - 收回 - 转回 - 核销 + 其他
     - **Validates: Requirements 6.4**
 
-- [ ] 2. Checkpoint - 公式引擎验证
+- [x] 2. Checkpoint - 公式引擎验证
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 3. 实现 useD1Adjudication.ts composable

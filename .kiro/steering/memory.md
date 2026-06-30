@@ -44,6 +44,7 @@ inclusion: always
 - **DB_DISABLE_SSL=True**；连接池 150 / PG max_connections=200
 - **前端唯一路径**：`audit-platform/frontend/`
 - **codegraph v0.9.8**：hook 自动 sync
+- **OpenCode v1.17.11**：终端AI编程工具（`$USERPROFILE\.local\bin\opencode.exe`+Desktop桌面版），Go单二进制，支持75+模型。当前接本地vLLM(`opencode.json`: npm=@ai-sdk/openai-compatible, baseURL=http://localhost:8100/v1, model=`Kbenkhaled/Qwen3.5-27B-NVFP4`(从/v1/models确认的精确ID))。kirotoken.cloud备用(key=csk_enBY5…但服务端401/404未解决)
 - **OnlyOffice 9.4.0**：见踩坑节
 - **部署v2.0**：瘦客户端(Electron)+内网全栈(FastAPI+PG+Redis+vLLM+MinIO)
 
