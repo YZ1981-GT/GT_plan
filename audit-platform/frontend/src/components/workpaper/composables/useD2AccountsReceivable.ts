@@ -337,6 +337,27 @@ export function getTabStatusFromResponses(tabResponses: ChecklistResponse[]): Ta
 }
 
 // ─── Main Composable ─────────────────────────────────────────────────────────
+// NOTE: Logic for individual tabs has been extracted to dedicated composables:
+// - useD2Adjudication (审定表 D2-1)
+// - useD2Detail (明细表 D2-2)
+// - useD2BadDebt (坏账准备 D2-3)
+// - useD2Adjustment (调整分录 D2-4)
+// - useD2Analysis (分析程序 D2-5)
+// - useD2RelatedParty (关联方 D2-6)
+// - useD2VoucherCheck (凭证抽查 D2-7)
+// - useD2PolicyCheck (政策检查 D2-8)
+// - useD2Ecl (ECL测算 D2-9/D2-10)
+// - useD2WriteoffCheck (转回核销 D2-11)
+// - useD2PledgeCheck (质押保理 D2-12)
+// - useD2BizModel (业务模式 D2-13)
+// - useD2Cutoff (截止测试)
+// - useD2Disclosure (附注披露)
+// - useD2Procedure (程序表 D2A)
+// - useD2ImportExport (导入导出)
+// - useD2DualMode (双模式切换)
+//
+// This composable retains: Tab management, route sync, EventBus coordination,
+// and backward-compatible exports consumed by the existing test suite.
 
 export function useD2AccountsReceivable(
   allResponses: Ref<Map<string, ChecklistResponse>>,

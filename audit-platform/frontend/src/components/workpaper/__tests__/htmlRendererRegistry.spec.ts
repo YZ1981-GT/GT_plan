@@ -111,6 +111,11 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'a5-1-cashflow-audit',
       'a3-8-goodwill-impairment',
       'b1-4-due-diligence-report',
+      'd4-operating-revenue',
+      'd3-prepaid-accounts',
+      'd5-receivables-financing',
+      'd6-contract-assets',
+      'd7-contract-liabilities',
       'review-bundle',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
@@ -241,5 +246,24 @@ describe('htmlRendererRegistry — 工具函数', () => {
     expect(getSheetIcon('univer')).toBe('📊')
     expect(getSheetIcon('skip')).toBe('⏭️')
     expect(getSheetIcon('unknown')).toBe('📄')
+  })
+})
+
+
+describe('htmlRendererRegistry — D3 预收账款注册契约', () => {
+  it('d3-prepaid-accounts 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('d3-prepaid-accounts')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('d3-prepaid-accounts')
+    expect(entry?.icon).toBe('💰')
+    expect(entry?.label).toBe('D3 预收账款')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 d3-prepaid-accounts', () => {
+    expect(isHtmlComponentType('d3-prepaid-accounts')).toBe(true)
   })
 })

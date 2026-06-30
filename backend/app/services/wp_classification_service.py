@@ -108,6 +108,11 @@ VALID_COMPONENT_TYPES: set[str] = {
     "a5-1-cashflow-audit",
     "f2-stocktake-bundle",
     "b1-4-due-diligence-report",
+    "d4-operating-revenue",
+    "d3-prepaid-accounts",
+    "d5-receivables-financing",
+    "d6-contract-assets",
+    "d7-contract-liabilities",
 }
 
 # wp_code 级专用路由覆盖（优先于 class_code 派生）

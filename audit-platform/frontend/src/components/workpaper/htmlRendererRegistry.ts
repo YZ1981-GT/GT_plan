@@ -114,6 +114,11 @@ export type HtmlComponentType =
   | 'a5-1-cashflow-audit'
   | 'a3-8-goodwill-impairment'
   | 'b1-4-due-diligence-report'
+  | 'd4-operating-revenue'
+  | 'd3-prepaid-accounts'
+  | 'd5-receivables-financing'
+  | 'd6-contract-assets'
+  | 'd7-contract-liabilities'
   | 'review-bundle'
 
 /**
@@ -906,6 +911,46 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '📋',
     label: 'B1-4 尽职调查报告',
     emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd4-operating-revenue',
+    component: defineAsyncComponent(() => import('./GtD4OperatingRevenue.vue')),
+    icon: '💹',
+    label: 'D4 营业收入',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd3-prepaid-accounts',
+    component: defineAsyncComponent(() => import('./GtD3PrepaidAccounts.vue')),
+    icon: '💰',
+    label: 'D3 预收账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd5-receivables-financing',
+    component: defineAsyncComponent(() => import('./GtD5ReceivablesFinancing.vue')),
+    icon: '📈',
+    label: 'D5 应收款项融资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd6-contract-assets',
+    component: defineAsyncComponent(() => import('./GtD6ContractAssets.vue')),
+    icon: '📋',
+    label: 'D6 合同资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'd7-contract-liabilities',
+    component: defineAsyncComponent(() => import('./GtD7ContractLiabilities.vue')),
+    icon: '📋',
+    label: 'D7 合同负债',
+    emits: ['save', 'completed'],
     contextProps: 'standard',
   },
   {

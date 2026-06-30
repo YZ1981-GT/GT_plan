@@ -734,7 +734,9 @@ async def _get_render_config_impl(
 
     # 多 sheet 底稿 tab 排序：按模板 xlsx sheetnames 顺序排列
     # （DB created_at 顺序不可靠；openpyxl read_only 取 sheetnames → 按 index 排序）
-    if _is_multi_sheet and _tpl and Path(_tpl).exists() and str(_tpl).endswith((".xlsx", ".xls")):
+    # 注意：pkg_sheets（来自 account_package_registry）的顺序已经是正确的 registry 声明顺序，
+    # 不应被模板 xlsx 的 sheet tab 顺序覆盖（registry 名称可能与模板 sheet tab 名不完全匹配）。
+    if _is_multi_sheet and not pkg_sheets and _tpl and Path(_tpl).exists() and str(_tpl).endswith((".xlsx", ".xls")):
         try:
             import openpyxl
             _wb = openpyxl.load_workbook(_tpl, read_only=True, data_only=True)
@@ -770,8 +772,20 @@ async def _get_render_config_impl(
         try:
             if _is_multi_sheet:
                 if _sheet_ovr:
-                    # sheet 级 override 命中（精细 confirmation-* 组件）→ 直接采用
+                    # sheet 级 override 命中（精细 confirmation-* 组件 或 D4A→a-program-console）→ 直接采用
                     component_type = _sheet_ovr
+                elif pkg_sheets and ovr:
+                    # pkg_sheets（专属组件 registry）模式：非 b-index 的 sheet 统一用 wp_code override
+                    # （附注/明细/调整等都路由到同一专属组件由其内部按 sheetName 分发）
+                    # 但合成底稿目录（class_code 以 "B-" 开头）保留原生 b-index 渲染
+                    _cls_code_prefix = (getattr(cls, "class_code", "") or "")[:2]
+                    if _cls_code_prefix == "B-":
+                        try:
+                            component_type = derive_component_type(cls, ignore_wp_code_override=True)
+                        except ClassificationNotFoundError:
+                            component_type = "b-index"
+                    else:
+                        component_type = ovr
                 else:
                     # 否则按 class_code 派生（跳过父码 wp_code override 避免压平）
                     try:

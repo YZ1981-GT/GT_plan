@@ -39,6 +39,11 @@ from ._c_note import render as render_c_note
 from ._checklist import render as render_checklist
 from ._review_checklist import render as render_review_checklist
 from ._univer_grid import render as render_univer_grid
+from ._d4_operating_revenue import render as render_d4_operating_revenue
+from ._d3_prepaid_accounts import render as render_d3_prepaid_accounts
+from ._d5_receivables_financing import render as render_d5_receivables_financing
+from ._d6_contract_assets import render as render_d6_contract_assets
+from ._d7_contract_liabilities import render as render_d7_contract_liabilities
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -77,4 +82,9 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "c-note-table": render_c_note,
     "univer": render_univer_grid,
     "word-template": render_word_template,
+    "d4-operating-revenue": render_d4_operating_revenue,
+    "d3-prepaid-accounts": render_d3_prepaid_accounts,
+    "d5-receivables-financing": render_d5_receivables_financing,
+    "d6-contract-assets": render_d6_contract_assets,
+    "d7-contract-liabilities": render_d7_contract_liabilities,
 }
