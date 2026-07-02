@@ -233,7 +233,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # 从 sheet 名提取程序表编码（如 D2A/D4A），提取不到回退父 wp_code。
     import re as _re
     _sheet_code = ctx.wp_code
-    _m = _re.search(r"([A-Z]\d+[A-Z](?:-\d+)*|[A-Z]\d+-\d+)", ctx.classification.sheet_name or "")
+    _m = _re.search(r"([A-Z]\d+(?:-\d+)?[A-Z](?:-\d+)*|[A-Z]\d+[A-Z](?:-\d+)*|[A-Z]\d+-\d+[A-Z]?)", ctx.classification.sheet_name or "")
     if _m:
         _sheet_code = _m.group(1)
     # 程序表内容来自 sheet 自己的来源模板（聚合 source_files），否则全局模板路径

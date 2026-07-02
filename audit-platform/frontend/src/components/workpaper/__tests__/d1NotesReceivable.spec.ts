@@ -33,18 +33,18 @@ describe('9.1 注册契约测试', () => {
     expect(overrides['D1']).toBe('d1-notes-receivable')
   })
 
-  it('wp_code_overrides: D1-1→skip, D1-4→skip', async () => {
+  it('wp_code_overrides: D1-1~D1-4 全部路由到 d1-notes-receivable（sheetName 分发）', async () => {
     const mod = await import('../../../../../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = (mod as any).default ?? mod
-    expect(overrides['D1-1']).toBe('skip')
-    expect(overrides['D1-4']).toBe('skip')
+    expect(overrides['D1-1']).toBe('d1-notes-receivable')
+    expect(overrides['D1-4']).toBe('d1-notes-receivable')
   })
 
-  it('wp_code_overrides: D1-2→audit-sheet, D1-3→audit-sheet', async () => {
+  it('wp_code_overrides: D1-2/D1-3 路由到 d1-notes-receivable', async () => {
     const mod = await import('../../../../../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = (mod as any).default ?? mod
-    expect(overrides['D1-2']).toBe('audit-sheet')
-    expect(overrides['D1-3']).toBe('audit-sheet')
+    expect(overrides['D1-2']).toBe('d1-notes-receivable')
+    expect(overrides['D1-3']).toBe('d1-notes-receivable')
   })
 
   it('htmlRendererRegistry includes d1-notes-receivable componentType', async () => {

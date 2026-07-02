@@ -116,6 +116,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'd5-receivables-financing',
       'd6-contract-assets',
       'd7-contract-liabilities',
+      'e1-monetary-fund',
       'review-bundle',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)

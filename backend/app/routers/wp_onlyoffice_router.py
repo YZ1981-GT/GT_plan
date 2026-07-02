@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import shutil
 from pathlib import Path
 from uuid import UUID
@@ -84,12 +85,17 @@ def _resolve_wp_file(
     project_id: UUID,
     wp_code: str,
     template_path: Path | None,
+    *,
+    visible_sheet: str | None = None,
 ) -> Path:
     """解析 wp_code 对应的单一共享文件（不再 per-sheet 复制）。
 
     按 {wp_code}.{ext} 命名单一文件，扩展名取自模板实际类型。
     同一 wp_code 的多个 sheet 共享此文件。
     首次从模板整本复制一次，后续复用。
+
+    visible_sheet: 若提供，首次复制后用 openpyxl 隐藏非目标 sheet
+                   （解决多sheet workbook在OO中显示无关tab的问题）。
     """
     storage_dir = _onlyoffice_storage_dir(project_id)
 
@@ -113,8 +119,55 @@ def _resolve_wp_file(
     if template_path and template_path.exists():
         storage_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(template_path, target)
+
+        # 隐藏非目标 sheet（多sheet workbook 场景）
+        if visible_sheet and ext in (".xlsx", ".xlsm"):
+            _hide_non_target_sheets(target, visible_sheet)
+
         return target
     raise FileNotFoundError(f"OnlyOffice 文件不存在且无模板可复制: {file_name}")
+
+
+def _hide_non_target_sheets(file_path: Path, target_sheet: str) -> None:
+    """用 openpyxl 将非目标 sheet 设为 hidden，让 OO 只显示目标 tab。
+
+    匹配逻辑：target_sheet 可能是完整名或末尾含编码，用 endswith 或 contains 匹配。
+    至少保留一个可见 sheet（否则 xlsx 无效）。
+    """
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(str(file_path))
+        if len(wb.sheetnames) <= 1:
+            wb.close()
+            return
+
+        # 找到目标 sheet（精确匹配优先，否则 endswith / contains）
+        target_ws = None
+        for ws in wb.worksheets:
+            if ws.title == target_sheet:
+                target_ws = ws
+                break
+        if not target_ws:
+            for ws in wb.worksheets:
+                if target_sheet in ws.title or ws.title.endswith(target_sheet):
+                    target_ws = ws
+                    break
+        if not target_ws:
+            # 无法匹配，不隐藏（安全降级）
+            wb.close()
+            return
+
+        # 设置目标为活动 sheet，其余隐藏
+        for ws in wb.worksheets:
+            if ws == target_ws:
+                ws.sheet_state = 'visible'
+            else:
+                ws.sheet_state = 'hidden'
+        wb.active = wb.worksheets.index(target_ws)
+        wb.save(str(file_path))
+        wb.close()
+    except Exception as e:
+        logger.warning("_hide_non_target_sheets failed for %s: %s", file_path.name, e)
 
 
 def _generate_doc_key(file_path: Path, wp_code: str) -> str:
@@ -388,18 +441,27 @@ async def get_sheet_onlyoffice_config(
     # 3. 解析文件路径（项目存储优先 → 回退模板）
     from app.services.wp_template_finder import find_template_file_any
 
-    template_path = find_template_file_any(wp_code)
+    # 聚合包内的独立 source_wp_code sheet（如 D4-5）：尝试用 sheet 级编码找独立模板
+    _sheet_wp_code = wp_code
+    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+    if _m and _m.group(1) != wp_code:
+        _candidate = _m.group(1)
+        _candidate_tpl = find_template_file_any(_candidate)
+        if _candidate_tpl:
+            _sheet_wp_code = _candidate
+
+    template_path = find_template_file_any(_sheet_wp_code)
     try:
-        file_path = _resolve_wp_file(project_id, wp_code, template_path)
+        file_path = _resolve_wp_file(project_id, _sheet_wp_code, template_path, visible_sheet=sheet_name)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
     # 4. 生成 doc_key
-    doc_key = _generate_doc_key(file_path, wp_code)
+    doc_key = _generate_doc_key(file_path, _sheet_wp_code)
 
     # 5. 构建 URL（download_url 嵌短时效签名 token，确保 WOPI 鉴权不依赖容器 outbox JWT）
     base_url = settings.ONLYOFFICE_CALLBACK_BASE or str(request.base_url).rstrip("/")
-    wopi_token = _sign_wopi_token(wp_id, wp_code)
+    wopi_token = _sign_wopi_token(wp_id, _sheet_wp_code)
     download_url = (
         f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents"
     )
@@ -523,9 +585,19 @@ async def get_sheet_wopi_contents(
     # 解析文件路径
     from app.services.wp_template_finder import find_template_file_any
 
-    template_path = find_template_file_any(wp_code)
+    # 🔴 必须与 onlyoffice-config 端点使用相同的 sheet 级 wp_code 解析逻辑：
+    # 聚合包内独立 source sheet（如 D4-5）应服务其独立文件，而非父 wp_code（D4）
+    # 对应的任意 D4 模板（否则 OO 下载到 D4-12 合同检查表却标题显示 D4-5）。
+    _sheet_wp_code = wp_code
+    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+    if _m and _m.group(1) != wp_code:
+        _candidate = _m.group(1)
+        if find_template_file_any(_candidate):
+            _sheet_wp_code = _candidate
+
+    template_path = find_template_file_any(_sheet_wp_code)
     try:
-        file_path = _resolve_wp_file(project_id, wp_code, template_path)
+        file_path = _resolve_wp_file(project_id, _sheet_wp_code, template_path, visible_sheet=sheet_name)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
@@ -675,6 +747,17 @@ async def post_sheet_onlyoffice_callback(
         wp, wp_code = await _load_wp_or_404(db, wp_id)
         project_id = wp.project_id
 
+        # 🔴 与 config / WOPI 端点一致：聚合包内独立 source sheet（如 D4-5）
+        # 保存回其独立文件而非父 wp_code（D4），否则用户编辑丢失。
+        from app.services.wp_template_finder import find_template_file_any as _find_tpl
+
+        _save_wp_code = wp_code
+        _m_save = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+        if _m_save and _m_save.group(1) != wp_code:
+            _cand = _m_save.group(1)
+            if _find_tpl(_cand):
+                _save_wp_code = _cand
+
         # 下载编辑后文件
         try:
             async with httpx.AsyncClient(timeout=60) as client:
@@ -700,9 +783,9 @@ async def post_sheet_onlyoffice_callback(
             # word-template: 保存到 storage/{project_id}/workpapers/{wp_code}.docx
             target = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
         else:
-            # xlsx: 保存到原有 OnlyOffice 存储目录
+            # xlsx: 保存到原有 OnlyOffice 存储目录（用 sheet 级 wp_code）
             storage_dir = _onlyoffice_storage_dir(project_id)
-            target = storage_dir / f"{wp_code}.xlsx"
+            target = storage_dir / f"{_save_wp_code}.xlsx"
 
         try:
             target.parent.mkdir(parents=True, exist_ok=True)

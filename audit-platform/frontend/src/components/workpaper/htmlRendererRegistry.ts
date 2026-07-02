@@ -119,6 +119,7 @@ export type HtmlComponentType =
   | 'd5-receivables-financing'
   | 'd6-contract-assets'
   | 'd7-contract-liabilities'
+  | 'e1-monetary-fund'
   | 'review-bundle'
 
 /**
@@ -950,6 +951,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtD7ContractLiabilities.vue')),
     icon: '📋',
     label: 'D7 合同负债',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'e1-monetary-fund',
+    component: defineAsyncComponent(() => import('./GtE1MonetaryFund.vue')),
+    icon: '💵',
+    label: 'E1 货币资金',
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },

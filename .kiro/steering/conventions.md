@@ -868,3 +868,54 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 - **🔴 调试顺序**：①先确认 git HEAD 配置正确（其他人能用→非代码问题）②只改 `.env` 对齐 secret+重启后端 ③禁止 `docker exec` 手动改容器 local.json（不可复现）④docker-compose 环境变量是唯一正确入口。secret 三方一致：config.py 默认值=docker-compose 默认值=.env 值
 - **"下载失败"=SSRF 拦私有 IP**→`local.json` 加 `request-filtering-agent.allowPrivateIPAddress=true`（容器重建需重做）；**"无法保存"=ResponseWrapperMiddleware 包装 callback**→`_SKIP_CONTAINS=("onlyoffice/callback",)` 跳过
 - **降级预览 previewType 必须按实际文件后缀动态传**（docx→'docx'，xlsx→'unsupported'）；`.env` 本地 dev 须 `ONLYOFFICE_URL=http://localhost:8080`（非 Docker 内部名）
+
+
+## D~N循环底稿专属组件UI规范（2026-07-02定稿）
+
+### 架构模式
+- 主入口接sheetName prop用v-if分发（禁止内部el-tabs，外层GtWpRenderer已有目录chips）
+- defineAsyncComponent lazy加载所有子组件（减少首屏bundle）
+- 未匹配sheet走OnlyOffice fallback（GtOnlyOfficeSheet全高）
+- sheetName是完整中文名（如"营业收入审定表D4-1"），用regex提取末尾编码匹配
+
+### 表格配色约定
+- 分组列头配色：浅绿(账面/基础信息) / 浅蓝(核对对象/凭证) / 浅紫(第三方/审批) / 浅橙(申报)
+- 公式/自动取数单元格：虚线下划线 + cursor:help + tooltip显示来源
+- 差异≠0红色高亮；变动>30%红色；>20%黄色
+- 合计行不可编辑（灰底）
+
+### 审计意见区
+- el-card包裹（标题"审计意见区"）
+- 内含：审计说明textarea + 审计结论textarea + 右侧AI辅助按钮 + 复核按钮
+- 不要独立悬浮；不要多个散落的textarea
+
+### 导入导出
+- el-dropdown"导入导出▾"下拉菜单（导出模板/导出数据/导入数据用el-upload）
+- 复用useXImportExport composable（调后端三端点）
+- 必须用http(axios)不能用原生fetch（无auth header）
+- StreamingResponse中文文件名用RFC5987编码
+
+### 双/三模式切换
+- el-segmented（结构化视图 / 矩阵视图 / 在线编辑）或（结构化视图 / 在线编辑）
+- 切换前OO健康检查（/api/workpapers/onlyoffice/health）
+- 不可用时禁用"在线编辑"+ tooltip
+
+### 统计仪表板
+- 表格上方el-row 3~4张统计卡片（样本数/覆盖率/异常率/金额合计等）
+- 数字用大字号 + 色彩编码（绿色正常/黄色警告/红色异常）
+
+### 引导与提示
+- 复杂底稿顶部蓝色渐变引导区（序号步骤，2列grid）
+- 源模板方法论红字→琥珀色左边线+浅黄背景嵌入对应区域上方
+- 编制提示→`<details>`折叠底部（蓝左边线+浅蓝背景默认收起）
+
+### AI辅助
+- 每个section标题行右侧放🤖AI按钮（section-header-row flex justify-between）
+- 调POST /api/workpapers/{wpId}/{cycle}/ai-generate（传sectionId+上下文）
+- 弹确认预览Dialog再填入（不直接覆盖）
+- aiHealth检查：禁用降级提示而非报错
+
+### GtIndexChip
+- prop名是`value`（不是wp/wp-code/label）
+- 聚合包内部sheet(D4-1/D4-2等)不能用GtIndexChip跳转（非独立wp_code）→用静态el-tag
+- 点击跳转到目标底稿（resolve wp_code→router.push）

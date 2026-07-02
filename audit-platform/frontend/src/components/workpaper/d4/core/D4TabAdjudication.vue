@@ -8,9 +8,13 @@
  *
  * Requirements: 2.1-2.10, 19.1, 21.1
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, ref, inject, toRef, type Ref } from 'vue'
 import { useD4Adjudication, type AdjudicationRow, type AdjudicationSection } from '../../composables/useD4Adjudication'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
+import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -87,17 +91,63 @@ const hasDifference = computed(() => Math.abs(differenceRow.value) > 0.005)
 const tableData = computed(() => {
   const result: (AdjudicationRow & { _sectionLabel?: string })[] = []
   for (const section of sections.value) {
-    // 添加明细行
     for (const row of section.rows) {
       result.push(row)
     }
-    // 添加小计行
     result.push(section.subtotalRow)
   }
-  // 添加营业收入合计行
   result.push(grandTotalRow.value)
   return result
 })
+
+// ─── AI辅助（真实接入） ──────────────────────────────────────────────
+const aiAvailable = ref(false)
+const aiLoadingKey = ref<string | null>(null)
+async function checkAiHealth() {
+  try {
+    const res = await http.get('/api/ai/health', { _silent: true } as any)
+    const s = res.data?.data?.status ?? res.data?.status
+    aiAvailable.value = s === 'healthy' || s === 'degraded'
+  } catch { aiAvailable.value = false }
+}
+checkAiHealth()
+
+async function generateAuditNote() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingKey.value = 'note'
+  try {
+    const ctx = sections.value.map(sec => {
+      const sub = sec.subtotalRow
+      return `${sec.sectionLabel}: 本期审定=${fmtAmount(sub.currentAudited)}, 上期审定=${fmtAmount(sub.priorAudited)}, 变动率=${fmtRate(getChangeRate(sub))}`
+    }).join('\n')
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
+      section: 'adj-note', existingContent: ctx, relatedContext: {},
+    }, { _silent: true } as any)
+    const text = res.data?.data?.content ?? res.data?.content ?? ''
+    if (!text) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(text.length > 300 ? text.slice(0, 300) + '…' : text, 'AI 生成 · 审计说明', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    auditNote.value = text
+  } catch (e: any) { if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('AI 生成失败') }
+  finally { aiLoadingKey.value = null }
+}
+
+async function generateAuditConclusion() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingKey.value = 'conclusion'
+  try {
+    const ctx = `审计说明：${auditNote.value || '（未填写）'}\n差异：${hasDifference.value ? fmtAmount(differenceRow.value) : '核对一致'}`
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
+      section: 'adj-conclusion', existingContent: ctx, relatedContext: {},
+    }, { _silent: true } as any)
+    const text = res.data?.data?.content ?? res.data?.content ?? ''
+    if (!text) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(text.length > 300 ? text.slice(0, 300) + '…' : text, 'AI 生成 · 审计结论', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    auditConclusion.value = text
+  } catch (e: any) { if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('AI 生成失败') }
+  finally { aiLoadingKey.value = null }
+}
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 </script>
 
 <template>
@@ -145,12 +195,18 @@ const tableData = computed(() => {
     <!-- 区块标题 + 操作 -->
     <div class="section-toolbar">
       <div class="toolbar-left">
+        <el-tooltip placement="top" :show-after="300">
+        <template #content>
+          本表项目列数据从 D4-2(主营明细) 和 D4-3(其他明细) 自动取数填充。<br/>
+          添加行前，建议先完成 D4-2/D4-3 底稿编制。
+        </template>
         <el-button size="small" :disabled="isReadonly" @click="addProductRow">+ 添加产品行</el-button>
+      </el-tooltip>
       </div>
       <div class="toolbar-right">
-        <span class="gt-index-chip" title="跳转D4-2主营明细">D4-2</span>
-        <span class="gt-index-chip" title="跳转D4-6指标分析">D4-6</span>
-        <span class="gt-index-chip" title="跳转D4-7月度毛利">D4-7</span>
+        <GtIndexChip value="wp:D4-2" :context-project-id="projectId" />
+        <GtIndexChip value="wp:D4-6" :context-project-id="projectId" />
+        <GtIndexChip value="wp:D4-7" :context-project-id="projectId" />
       </div>
     </div>
 
@@ -169,7 +225,7 @@ const tableData = computed(() => {
           openReviewDialog(`D4-1-adj-${section.sectionKey}-${row.rowKey}`)
         }"
       >
-        <el-table-column prop="label" label="项目" width="160" fixed>
+        <el-table-column prop="label" label="项目" min-width="160" fixed>
           <template #default="{ row }">
             <el-input
               v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -184,7 +240,7 @@ const tableData = computed(() => {
 
         <!-- 本期 -->
         <el-table-column label="本期" align="center">
-          <el-table-column label="未审数" width="120" align="right">
+          <el-table-column label="未审数" min-width="100" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly && !row.isFromCrossSheet"
@@ -197,7 +253,7 @@ const tableData = computed(() => {
               <span v-else :class="getCellClass(row, 'currentUnadjusted')">{{ fmtAmount(row.currentUnadjusted) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="AJE" width="110" align="right">
+          <el-table-column label="账项调整" min-width="100" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly && !row.isFromCrossSheet"
@@ -210,7 +266,7 @@ const tableData = computed(() => {
               <span v-else :class="getCellClass(row, 'currentAje')">{{ fmtAmount(row.currentAje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="RJE" width="110" align="right">
+          <el-table-column label="重分类调整" min-width="100" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly && !row.isFromCrossSheet"
@@ -223,7 +279,7 @@ const tableData = computed(() => {
               <span v-else :class="getCellClass(row, 'currentRje')">{{ fmtAmount(row.currentRje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="审定数" width="130" align="right">
+          <el-table-column label="审定数" min-width="110" align="right">
             <template #default="{ row }">
               <span class="audited-cell">{{ fmtAmount(row.currentAudited) }}</span>
             </template>
@@ -232,7 +288,7 @@ const tableData = computed(() => {
 
         <!-- 上期 -->
         <el-table-column label="上期" align="center">
-          <el-table-column label="未审数" width="120" align="right">
+          <el-table-column label="未审数" min-width="100" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -245,7 +301,7 @@ const tableData = computed(() => {
               <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="AJE" width="100" align="right">
+          <el-table-column label="账项调整" min-width="100" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -258,7 +314,7 @@ const tableData = computed(() => {
               <span v-else>{{ fmtAmount(row.priorAje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="RJE" width="100" align="right">
+          <el-table-column label="重分类调整" min-width="100" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.isEditable && !row.isFixed && !isReadonly"
@@ -271,7 +327,7 @@ const tableData = computed(() => {
               <span v-else>{{ fmtAmount(row.priorRje) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="审定数" width="120" align="right">
+          <el-table-column label="审定数" min-width="110" align="right">
             <template #default="{ row }">
               <span class="audited-cell">{{ fmtAmount(row.priorAudited) }}</span>
             </template>
@@ -279,22 +335,9 @@ const tableData = computed(() => {
         </el-table-column>
 
         <!-- 变动 -->
-        <el-table-column label="变动率" width="100" align="right">
+        <el-table-column label="变动率" min-width="90" align="right">
           <template #default="{ row }">
             <span :class="getCellClass(row, 'changeRate')">{{ fmtRate(getChangeRate(row)) }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 操作 -->
-        <el-table-column label="" width="60" align="center">
-          <template #default="{ row }">
-            <el-button
-              v-if="row.isEditable && !row.isFixed && !isReadonly"
-              type="danger"
-              size="small"
-              link
-              @click="removeProductRow(row.rowKey)"
-            >删</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -308,39 +351,38 @@ const tableData = computed(() => {
       :show-header="false"
       style="width: 100%; margin-bottom: 16px"
     >
-      <el-table-column width="160" fixed>
+      <el-table-column min-width="160" fixed>
         <template #default>
           <span class="font-bold">营业收入合计</span>
         </template>
       </el-table-column>
-      <el-table-column width="120" align="right">
+      <el-table-column min-width="100" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.currentUnadjusted) }}</span></template>
       </el-table-column>
-      <el-table-column width="110" align="right">
+      <el-table-column min-width="100" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.currentAje) }}</span></template>
       </el-table-column>
-      <el-table-column width="110" align="right">
+      <el-table-column min-width="100" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.currentRje) }}</span></template>
       </el-table-column>
-      <el-table-column width="130" align="right">
+      <el-table-column min-width="110" align="right">
         <template #default="{ row }"><span class="audited-cell">{{ fmtAmount(row.currentAudited) }}</span></template>
       </el-table-column>
-      <el-table-column width="120" align="right">
+      <el-table-column min-width="100" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.priorUnadjusted) }}</span></template>
       </el-table-column>
-      <el-table-column width="100" align="right">
+      <el-table-column min-width="100" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.priorAje) }}</span></template>
       </el-table-column>
-      <el-table-column width="100" align="right">
+      <el-table-column min-width="100" align="right">
         <template #default="{ row }"><span>{{ fmtAmount(row.priorRje) }}</span></template>
       </el-table-column>
-      <el-table-column width="120" align="right">
+      <el-table-column min-width="110" align="right">
         <template #default="{ row }"><span class="audited-cell">{{ fmtAmount(row.priorAudited) }}</span></template>
       </el-table-column>
-      <el-table-column width="100" align="right">
+      <el-table-column min-width="90" align="right">
         <template #default="{ row }"><span :class="{ 'rate-warning': isChangeRateExceeding(getChangeRate(row), 0.3) }">{{ fmtRate(getChangeRate(row)) }}</span></template>
       </el-table-column>
-      <el-table-column width="60" />
     </el-table>
 
     <!-- TB核对行 -->
@@ -360,51 +402,79 @@ const tableData = computed(() => {
       </el-button>
     </div>
 
-    <!-- 审计说明 -->
-    <div class="audit-note-section">
-      <div class="note-header">
-        <h4>审计说明</h4>
-        <div class="note-actions">
-          <el-button size="small" disabled title="AI生成审计说明（开发中）">🤖 AI生成</el-button>
-          <el-button
-            size="small"
-            circle
-            title="发起复核对话"
-            @click="openReviewDialog?.('D4-1-adj-note')"
-          >💬</el-button>
+    <!-- ─── 审计意见区（卡片式，紧贴表格下方） ───── -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:D4-6" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D4-7" :context-project-id="projectId" />
+          </div>
         </div>
-      </div>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入审计说明（变动率>30%的项目需解释原因）..."
-        :disabled="isReadonly"
-      />
-    </div>
+      </template>
 
-    <!-- 审计结论 -->
-    <div class="audit-note-section">
-      <div class="note-header">
-        <h4>审计结论</h4>
-        <div class="note-actions">
-          <el-button size="small" disabled title="AI生成审计结论（开发中）">🤖 AI生成</el-button>
+      <!-- 1. 审计说明 -->
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">1. 审计说明</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoadingKey === 'note'"
+                :disabled="isReadonly || !aiAvailable" @click="generateAuditNote">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReviewDialog?.('D4-1-adj-note')">💬</el-button>
+          </div>
         </div>
+        <el-input
+          v-model="auditNote"
+          type="textarea"
+          :autosize="{ minRows: 4, maxRows: 10 }"
+          :placeholder="`(1) 营业收入本期较上期增加（负数为减少）：____元，变动率____%\n主要原因（比例超过30%的）：\n(2) 公司前五名客户营业收入总额为____元，占公司全部主营业务收入的比例为____%。\n(3) 实际执行的审计程序和完成的底稿概述`"
+          :disabled="isReadonly"
+        />
       </div>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 5 }"
-        placeholder="请输入审计结论..."
-        :disabled="isReadonly"
-      />
-    </div>
+
+      <!-- 2. 审计结论 -->
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">2. 审计结论</span>
+          <el-tooltip :content="aiTip" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoadingKey === 'conclusion'"
+              :disabled="isReadonly || !aiAvailable" @click="generateAuditConclusion">🤖 AI辅助</el-button>
+          </el-tooltip>
+        </div>
+        <el-input
+          v-model="auditConclusion"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 5 }"
+          placeholder="请输入审计结论..."
+          :disabled="isReadonly"
+        />
+      </div>
+    </el-card>
+
+    <!-- 上市规则提示（底部折叠，不突兀） -->
+    <details class="guidance-details guidance-bottom">
+      <summary>📋 上市规则提示</summary>
+      <div class="guidance-content guidance-red">
+        <p>提示1: 根据2024年沪深北交易所修订的《上市规则》，公司最近一个会计年度经审计的扣除非经常性损益后的净利润和或者扣除非经常性损益前后较低者为负值的，公司应当在年度报告或者更正公告中披露营业收入扣除情况及扣除后的营业收入金额。</p>
+        <p>提示2: 针对被近一个会计年度经审计营业收入低于3亿元（沪深主板）/1亿元（科创板、创业板）和净利润及扣除非经常性损益后的净利润均为正值的公司，会计师事务所应当对其日常经营性营业收入扣除情况出具专项核查意见。项目组需完成营业收入扣除情况及相关信息核查表（查看模板）。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <style scoped>
 .d4-tab-adjudication {
   padding: 12px;
+}
+.d4-tab-adjudication :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d4-tab-adjudication :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -480,6 +550,7 @@ const tableData = computed(() => {
 :deep(.subtotal-row-bg) {
   background-color: #fafafa !important;
   font-weight: 600;
+  font-size: 13px;
 }
 .tb-check-row {
   display: flex;
@@ -500,22 +571,76 @@ const tableData = computed(() => {
 .action-row {
   margin-bottom: 16px;
 }
-.audit-note-section {
-  margin-bottom: 16px;
-}
-.note-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.note-header h4 {
-  margin: 0;
-  font-size: 14px;
-  color: #303133;
-}
 .note-actions {
   display: flex;
   gap: 6px;
+}
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
+}
+.note-structure {
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.note-prompt {
+  margin: 4px 0;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-bottom {
+  margin-top: 16px;
+  border-left-color: #f56c6c;
+  background: #fef0f0;
+}
+.guidance-bottom summary {
+  color: #f56c6c;
+}
+.guidance-red p {
+  color: #c45656;
+  font-size: 12px;
 }
 </style>

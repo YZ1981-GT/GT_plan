@@ -1,36 +1,40 @@
 # backend/data/wp_render_schema/E1-10.yaml
-# 调整分录汇总 — d-form-table 渲染 schema
-# Requirements: Task 25（E1-10 调整分录汇总）
-# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+# 已开立银行账户清单核对表 — d-form-table 渲染 schema（降级/元数据；主渲染走专属组件 e1-monetary-fund）
+# Requirements: E1 spec R8（银行账户核对）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx / sheet: 已开立银行账户清单核对表E1-10
+# 真实结构：人行《已开立银行结算账户清单》与账面核对，验证账户完整性
+# 修订(2026-07-01)：修正历史语义错误——旧版误标为"调整分录汇总"，实为银行账户清单核对表
 
 wp_code: E1-10
-wp_name: 调整分录汇总
+wp_name: 已开立银行账户清单核对表
 component_type: d-form-table
 template_path: backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
 related_accounts:
-  - code: '1001'
-    name: 库存现金
   - code: '1002'
     name: 银行存款
-  - code: '1012'
-    name: 其他货币资金
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 调整分录汇总：汇总 E 类货币资金循环的全部调整分录
+# 已开立银行结算账户清单与账面核对：验证账户完整性（存在性/权利义务）
+# IPO/上市/新三板/重组/对银行账户存在疑虑时，应直接完成底稿 E1-29 银行账户分析
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
-  - name: 调整分录
-    account_code_prefix: '100'
+  - name: 账户清单核对
+    account_code_prefix: '1002'
     fields:
-      - { field: entry_no, label: 分录编号, type: text }
-      - { field: account_code, label: 科目编码, type: text }
-      - { field: account_name, label: 科目名称, type: text, readonly: true }
-      - { field: debit_amount, label: 借方金额, type: number }
-      - { field: credit_amount, label: 贷方金额, type: number }
-      - { field: description, label: 调整说明, type: textarea }
+      - { field: seq, label: 序号, type: number }
+      - { field: bank_name, label: 开户银行名称, type: text }
+      - { field: account_no, label: 账号, type: text }
+      - { field: account_type, label: 账户性质, type: text }
+      - { field: account_status, label: 账户状态, type: text }
+      - { field: open_date, label: 开户日期, type: date }
+      - { field: close_date, label: 销户日期, type: date }
+      - { field: open_reason, label: 开户原因, type: text }
+      - { field: close_reason, label: 销户原因, type: text }
+      - { field: match_result, label: 与企业信息核对一致, type: enum, enum: ['一致', '不一致'] }
+      - { field: mismatch_reason, label: 不一致原因, type: textarea }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿引用
@@ -38,15 +42,15 @@ sections:
 
 cross_refs:
   - ref_id: CW-E1-10-001
-    target_wp: E1-1
-    target_field: 审计调整金额
-    description: '调整分录汇总 → E1-1 审定表 aje_debit/aje_credit'
-    severity: required
+    target_wp: E1-29
+    target_field: 银行账户分析
+    description: 'IPO/存在疑虑时 → E1-29 银行账户分析（异地开户/资金流向）'
+    severity: info
     direction: outbound
 
   - ref_id: CW-E1-10-002
-    target_wp: A2
-    target_field: 调整分录总表
-    description: '调整分录 → A2 调整分录总表同步'
+    target_wp: E1-18
+    target_field: 征信报告信息
+    description: '账户完整性核对 ← E1-18 企业信用报告查询（账户是否在征信中）'
     severity: info
-    direction: outbound
+    direction: inbound

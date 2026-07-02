@@ -9,10 +9,13 @@
  *
  * Requirements: 3.1-3.10, 19.3, 21.2
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4RevenueDetail, type RevenueDetailRow } from '../../composables/useD4RevenueDetail'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -100,6 +103,55 @@ const hasDifference = computed(() => Math.abs(verificationRow.value.diff) > 0.00
 
 // ─── 月份标签 ─────────────────────────────────────────────────────────
 const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
+
+// ─── AI辅助（真实接入 /d4/ai-generate） ──────────────────────────────
+const aiAvailable = ref(false)
+const aiLoadingKey = ref<string | null>(null)
+async function checkAiHealth() {
+  try {
+    const res = await http.get('/api/ai/health', { _silent: true } as any)
+    const s = res.data?.data?.status ?? res.data?.status
+    aiAvailable.value = s === 'healthy' || s === 'degraded'
+  } catch { aiAvailable.value = false }
+}
+checkAiHealth()
+
+async function callD4Ai(section: string, existing: string): Promise<string> {
+  const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
+    section, existingContent: existing, relatedContext: {},
+  }, { _silent: true } as any)
+  return res.data?.data?.content ?? res.data?.content ?? ''
+}
+
+async function generateNote() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingKey.value = 'note'
+  try {
+    const ctx = rows.value.map(r =>
+      `${r.product}: 本期审定=${fmtAmount(r.audited)}, 未审变动=${fmtRate(r.unadjustedChangeRate)}`
+    ).join('\n')
+    const text = await callD4Ai('revenue-change', ctx)
+    if (!text) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(text.length > 300 ? text.slice(0, 300) + '…' : text, 'AI 生成 · 审计说明', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    auditNote.value = text
+  } catch (e: any) { if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('AI 生成失败') }
+  finally { aiLoadingKey.value = null }
+}
+
+async function generateConclusion() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingKey.value = 'conclusion'
+  try {
+    const ctx = `审计说明：${auditNote.value || '（未填写）'}\n核对：${hasDifference.value ? '与TB有差异' + fmtAmount(verificationRow.value.diff) : '与TB核对一致'}`
+    const text = await callD4Ai('adj-conclusion', ctx)
+    if (!text) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(text.length > 300 ? text.slice(0, 300) + '…' : text, 'AI 生成 · 审计结论', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    auditConclusion.value = text
+  } catch (e: any) { if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('AI 生成失败') }
+  finally { aiLoadingKey.value = null }
+}
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 </script>
 
 <template>
@@ -126,7 +178,13 @@ const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8�
           style="width: 200px"
         />
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 添加产品行</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="importFromLedger">从序时账导入</el-button>
+        <el-tooltip placement="top" :show-after="300">
+          <template #content>
+            从序时账(tb_ledger)按科目6001、按产品维度、按月汇总导入。<br/>
+            取数条件：当前项目年度 + 科目编码6001开头 + 贷方发生额。
+          </template>
+          <el-button size="small" :disabled="isReadonly" @click="importFromLedger">从序时账导入</el-button>
+        </el-tooltip>
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -148,7 +206,7 @@ const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8�
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <span class="gt-index-chip" title="跳转D4-8产品毛利">D4-8</span>
+        <span class="chip-wrap"><GtIndexChip value="wp:D4-8" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
@@ -355,46 +413,68 @@ const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8�
       <el-tag v-else type="success" size="small">核对一致</el-tag>
     </div>
 
-    <!-- 审计说明 -->
-    <div class="audit-note-section">
-      <div class="note-header">
-        <h4>审计说明</h4>
-        <div class="note-actions">
-          <el-button size="small" disabled>🤖 AI生成</el-button>
-          <el-button size="small" circle @click="openReviewDialog?.('D4-2-note')">💬</el-button>
+    <!-- 审计意见区（卡片式，与D4-1/D4-5统一） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D4-8" :context-project-id="projectId" />
+          </div>
         </div>
-      </div>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入审计说明（对产品收入变动情况的分析）..."
-        :disabled="isReadonly"
-      />
-    </div>
+      </template>
 
-    <!-- 审计结论 -->
-    <div class="audit-note-section">
-      <div class="note-header">
-        <h4>审计结论</h4>
-        <div class="note-actions">
-          <el-button size="small" disabled>🤖 AI生成</el-button>
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">1. 审计说明</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoadingKey === 'note'"
+                :disabled="isReadonly || !aiAvailable" @click="generateNote">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReviewDialog?.('D4-2-note')">💬</el-button>
+          </div>
         </div>
+        <el-input
+          v-model="auditNote"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          placeholder="请输入审计说明（如：XX公司收入主要集中在第X季度，主要原因是……，经查询同行业数据，季节变化符合行业周期）..."
+          :disabled="isReadonly"
+        />
       </div>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 5 }"
-        placeholder="请输入审计结论..."
-        :disabled="isReadonly"
-      />
-    </div>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">2. 审计结论</span>
+          <el-tooltip :content="aiTip" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoadingKey === 'conclusion'"
+              :disabled="isReadonly || !aiAvailable" @click="generateConclusion">🤖 AI辅助</el-button>
+          </el-tooltip>
+        </div>
+        <el-input
+          v-model="auditConclusion"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 5 }"
+          placeholder="请输入审计结论..."
+          :disabled="isReadonly"
+        />
+      </div>
+    </el-card>
   </div>
 </template>
 
 <style scoped>
 .d4-tab-revenue-detail {
   padding: 12px;
+}
+.d4-tab-revenue-detail :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d4-tab-revenue-detail :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -433,19 +513,7 @@ const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8�
   gap: 6px;
   align-items: center;
 }
-.gt-index-chip {
-  display: inline-block;
-  padding: 2px 8px;
-  font-size: 12px;
-  background: #e6f7ff;
-  border: 1px solid #91d5ff;
-  border-radius: 4px;
-  color: #1890ff;
-  cursor: pointer;
-}
-.gt-index-chip:hover {
-  background: #bae7ff;
-}
+.chip-wrap { display: inline-flex; align-items: center; }
 .virtual-hint {
   margin-bottom: 8px;
 }
@@ -501,6 +569,50 @@ const monthLabels = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8�
   color: #303133;
 }
 .note-actions {
+  display: flex;
+  gap: 6px;
+}
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
   display: flex;
   gap: 6px;
 }

@@ -1,0 +1,115 @@
+{
+  "wp_code": "H8",
+  "name": "使用权资产",
+  "version": "2025-R5",
+  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/H8.yaml",
+  "account_codes": [
+    "1702"
+  ],
+  "source_files": [
+    {
+      "file": "H8 使用权资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "使用权资产实质性程序表H8A",
+        "审定表H8-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表H8-2",
+        "调整分录汇总H8-3",
+        "摊销测算表H8-4",
+        "减值测试表H8-5",
+        "检查表H8-6"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "使用权资产实质性程序表H8A",
+      "code": "H8A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表H8-1",
+      "code": "H8-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-020"
+        }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase": {
+            "col": 3,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 4,
+            "label": "本期减少"
+          },
+          "closing_balance": {
+            "col": 5,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 6,
+            "label": "审计调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          }
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "H8-listed",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "code": "H8-soe",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "明细表H8-2",
+      "code": "H8-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总H8-3",
+      "code": "H8-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "摊销测算表H8-4",
+      "code": "H8-4",
+      "type": "calculation"
+    },
+    {
+      "exact_name": "减值测试表H8-5",
+      "code": "H8-5",
+      "type": "calculation"
+    },
+    {
+      "exact_name": "检查表H8-6",
+      "code": "H8-6",
+      "type": "check"
+    }
+  ]
+}

@@ -2959,3 +2959,36 @@ A~S 全循环底稿完成后，`pytest --collect-only` 报 **23 个 collection e
 - conventions.md 补 9 个铁律章节（event_bus 4处修复 / 测试掩盖反模式同源4例 / asyncpg / router 与 API 形态 / 前端 UI / 附注导出 / 账表导入 / xlsx 渲染 / OnlyOffice 调试）——之前 memory 精简时这些铁律未在备份文件留存，本次补全
 - memory.md 从 240 行精简到 ~110 行（A~S 循环明细压缩为总结行）；高频踩坑铁律保留可操作细节
 - INDEX.md：active spec 17→1，循环表全部标 ✅ 含实测数，归档树加 `10-A~S-workpaper-all-cycles-complete/`
+
+
+## 2026-07-02：D4底稿模块清理+spec归档+开发方法论固化
+
+### 清理动作
+- 删除 `useD4Inspection.ts`（死代码，无任何import引用，已被useD4ContractInspection+useD4WalkthroughTest+useD4CompletenessCheck完全替代）
+- 删除根目录一次性脚本 `add_notes_to_json.py` + `update_json_from_yaml.py`（硬编码绝对路径d:/GT_plan/，已执行完毕）
+- 归档3个已完成D4 spec到`_archive/05-business-features/`：d4-operating-revenue / d4-12-contract-inspection / d4-14-walkthrough-test
+
+### spec三件套更新（d4-operating-revenue）
+更新design.md和tasks.md反映实际实现与原计划9个关键差异：
+1. 无内部el-tabs → sheetName prop v-if分发（外层GtWpRenderer目录行已提供导航）
+2. useD4Inspection已删除 → 拆为3个独立composable
+3. 附注合并为单composable useD4Disclosure（variant参数区分上市/国企）
+4. D4-12升级为三模式（卡片/矩阵/OO）+ D4ContractCard + D4ContractMatrix
+5. D4-14升级为穿行测试7维度+一致性引擎 + D4WalkthroughCard + D4WalkthroughMatrix
+6. D4-5升级为真AI+真GtIndexChip+引导6步+GT紫配色
+7. D4-22A改为包装组件D4TabIpoProcedure（selfLoad带sheet_name）
+8. 新增composable：useD4KeyIndicator/useD4InvoiceCompare/useD4CustomerDetail
+9. 后端新增_d4_contract_ocr.py（OCR→vLLM结构化提取）
+
+### 开发方法论固化
+在requirements.md新增"开发方法论"章节，固化D4开发流程为后续循环(F/G/H/I/J/K/L/M/N)参考模板：
+- Phase0双源输入：openpyxl脚本实读xlsx（列头/公式权威）+ 底稿模板库md（业务逻辑权威）+ 交叉验证
+- 功能方向7项：联动/美观/溯源/易操作/导入导出/AI/双三模式
+- 三件套产出规范：requirements引用xlsx列头+md业务场景；design含数据流图+properties；tasks按Phase排序
+- 此方法论同步更新到memory.md"D~N专属组件开发标准模板"铁律
+
+### D4最终统计
+- 前端：47个Vue子组件 + 18个composable（删除useD4Inspection后）+ GtD4OperatingRevenue主入口
+- 后端：4个py文件（_d4_import_export/_d4_resolvers/_d4_ai_generate/_d4_contract_ocr）+ render策略
+- 测试：169+(vitest 124 + pytest 45) + D4-12(31) + D4-14(88) = 288+测试覆盖
+- 注册：38个wp_code映射 + 41个registry sheet + 8个AI section

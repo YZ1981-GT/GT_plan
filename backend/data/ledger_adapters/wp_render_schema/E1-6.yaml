@@ -1,35 +1,45 @@
 # backend/data/wp_render_schema/E1-6.yaml
-# 受限货币资金明细 — d-form-table 渲染 schema
-# Requirements: Task 25（E1-6 受限货币资金明细）
-# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+# 银行存款余额调节表 — d-form-table 渲染 schema（降级/元数据；主渲染走专属组件 e1-monetary-fund）
+# Requirements: E1 spec R6（银行存款余额调节表）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx / sheet: 银行存款余额调节表E1-6
+# 真实结构：按开户银行分组，企业侧调节 + 银行侧未达账项明细核对
+# 修订(2026-07-01)：修正历史语义错误——旧版误标为"受限货币资金明细"，实为银行余额调节表
 
 wp_code: E1-6
-wp_name: 受限货币资金明细
+wp_name: 银行存款余额调节表
 component_type: d-form-table
 template_path: backend/wp_templates/E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
 template_version: v2025-R5
 applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
 related_accounts:
-  - code: '1001'
-    name: 库存现金
   - code: '1002'
     name: 银行存款
-  - code: '1012'
-    name: 其他货币资金
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 受限货币资金：记录因质押/冻结/保证金等原因受限的资金
+# 银行存款余额调节表：账面余额 ↔ 银行对账单余额，逐项调节未达账项
+# 每个开户银行一组：企业日记账余额 + 银行已收企业未收 - 银行已付企业未付 = 调节后
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
-  - name: 受限货币资金
-    account_code_prefix: '100'
+  - name: 余额调节
+    account_code_prefix: '1002'
+    group_by: bank_account          # 按开户银行/账号分组
     fields:
-      - { field: account_code, label: 科目编码, type: text }
-      - { field: account_name, label: 科目名称, type: text }
-      - { field: restricted_amount, label: 受限金额, type: number }
-      - { field: restriction_reason, label: 受限原因, type: text }
-      - { field: expected_release_date, label: 预计解除日期, type: date }
+      - { field: bank_name, label: 开户银行, type: text }
+      - { field: account_no, label: 银行账号, type: text }
+      - { field: currency, label: 币种, type: text }
+      - { field: book_balance, label: 企业银行存款日记账余额, type: number }
+      # 银行已收企业未收（明细：银行收款日期/收款金额/记账日期/凭证编号/经济内容/对应科目/报表日后是否入账/是否调整）
+      - { field: bank_recv_not_book, label: 加：银行已收企业未收款项, type: number }
+      # 银行已付企业未付
+      - { field: bank_paid_not_book, label: 减：银行已付企业未付款项, type: number }
+      - { field: adjusted_book_balance, label: 调节后企业余额, type: number, formula: "book_balance + bank_recv_not_book - bank_paid_not_book" }
+      - { field: statement_balance, label: 银行对账单余额, type: number }
+      - { field: book_recv_not_bank, label: 加：企业已收银行未收款项, type: number }
+      - { field: book_paid_not_bank, label: 减：企业已付银行未付款项, type: number }
+      - { field: adjusted_statement_balance, label: 调节后银行余额, type: number, formula: "statement_balance + book_recv_not_bank - book_paid_not_bank" }
+      - { field: diff, label: 差异, type: number, formula: "adjusted_book_balance - adjusted_statement_balance" }
+      - { field: diff_reason, label: 差异原因, type: textarea }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿引用
@@ -37,8 +47,8 @@ sections:
 
 cross_refs:
   - ref_id: CW-E1-6-001
-    target_wp: E1-1
-    target_field: 受限货币资金总额
-    description: '受限资金合计 → E1-1 审定表附注披露参考'
+    target_wp: E1-3
+    target_field: 银行存款余额调节表索引号
+    description: '余额调节表 ← E1-3 银行存款明细表（对账单余额/差异核对）'
     severity: info
-    direction: outbound
+    direction: inbound

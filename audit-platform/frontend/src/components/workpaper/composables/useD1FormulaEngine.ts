@@ -108,6 +108,20 @@ export function calcDifference(actual: number, should: number): number {
   return actual - should
 }
 
+// ─── 安全除法（IFERROR 语义） ────────────────────────────────────────────────
+
+/**
+ * 安全除法：divisor=0 返回 0，否则返回 numerator/divisor
+ *
+ * 对应源模板 IFERROR(x/y, 0) 语义，用于：
+ * - 比例列计算 = IFERROR(本行余额 / 合计行余额, 0)
+ * - 预期信用损失率 = IFERROR(坏账准备 / 账面余额, 0)
+ */
+export function safeDivide(numerator: number, divisor: number): number {
+  if (divisor === 0) return 0
+  return numerator / divisor
+}
+
 // ─── 坏账准备变动公式 ────────────────────────────────────────────────────────
 
 /**
@@ -137,4 +151,92 @@ export function calcCurrentUnadjusted(
   decrease: number
 ): number {
   return priorAudited + increase - decrease
+}
+
+// ─── 贴息（贴现利息）公式 ────────────────────────────────────────────────────
+
+/**
+ * 贴息天数 = 到期日 - 贴现日（自然天数差）
+ *
+ * D1-9 贴息检查表：解析到期日与贴现日为日期，返回相差的整数天数。
+ * 任一日期为空或非法 → 返回 0。
+ * 贴现日 > 到期日（异常数据）→ 返回 0（贴息天数显示为 0）。
+ */
+export function calcDiscountDays(maturityDate: string, discountDate: string): number {
+  if (!maturityDate || !discountDate) return 0
+  const maturity = new Date(maturityDate).getTime()
+  const discount = new Date(discountDate).getTime()
+  if (isNaN(maturity) || isNaN(discount)) return 0
+  const days = (maturity - discount) / 86400000
+  if (days < 0) return 0
+  return days
+}
+
+/**
+ * 应计贴现利息 = 票面金额 × 贴现率 × 贴息天数 / 360
+ *
+ * D1-9 贴息检查表核心公式 P×R×D/360，用于与账面贴现利息核对。
+ */
+export function calcDiscountInterest(faceValue: number, discountRate: number, days: number): number {
+  return (faceValue * discountRate * days) / 360
+}
+
+/**
+ * 贴息差异 = 应计贴现利息 - 账面贴现利息
+ *
+ * D1-9 贴息检查表：正值表示应计大于账面（少计），负值表示应计小于账面（多计）。
+ * 差异 ≠ 0 时高亮提示。
+ */
+export function calcInterestDifference(calculated: number, booked: number): number {
+  return calculated - booked
+}
+
+// ─── 业务模式与列报项目判定（QA矩阵IF公式） ──────────────────────────────────
+
+/**
+ * QA矩阵业务模式判定：根据4个 Y/N 答案返回业务模式描述
+ *
+ * D1-6 业务模式分析，对应源模板 R21 的 IF(AND(...)) 嵌套公式：
+ * - Q1=Y ∧ Q2=N → 以收取合同现金流量为目标的业务模式
+ * - Q1=Y ∧ Q2=Y ∧ Q4=Y → 以收取合同现金流量和出售金融资产为目标的业务模式
+ * - Q1=N ∨ (Q2=Y ∧ Q4=N) → 其他业务模式（以公允价值计量且其变动计入当期损益）
+ * - 其余 → ''（判定条件不足）
+ */
+export function determineBusinessMode(
+  q1: 'Y' | 'N' | '', q2: 'Y' | 'N' | '', q3: 'Y' | 'N' | '', q4: 'Y' | 'N' | ''
+): string {
+  if (q1 === 'Y' && q2 === 'N') {
+    return '属于以收取合同现金流量为目标的业务模式'
+  }
+  if (q1 === 'Y' && q2 === 'Y' && q4 === 'Y') {
+    return '属于以收取合同现金流量和出售金融资产为目标的业务模式'
+  }
+  if (q1 === 'N' || (q2 === 'Y' && q4 === 'N')) {
+    return '其他业务模式（以公允价值计量且其变动计入当期损益）'
+  }
+  return ''
+}
+
+/**
+ * 列报项目判定：根据业务模式返回列报科目
+ *
+ * D1-6 判定结果 → D1-1 列报分类映射。
+ * 注意判定顺序：'收取合同现金流量和出售金融资产' 必须先于 '收取合同现金流量为目标' 判断，
+ * 因为前者字符串包含子串 '收取合同现金流量'，顺序颠倒会导致误匹配。
+ * - 收取合同现金流量和出售金融资产 → 应收款项融资
+ * - 收取合同现金流量为目标 → 应收票据
+ * - 其他业务模式 → 以公允价值计量且其变动计入当期损益的金融资产
+ * - 其余 → ''
+ */
+export function determineReportItem(businessMode: string): string {
+  if (businessMode.includes('收取合同现金流量和出售金融资产')) {
+    return '应收款项融资'
+  }
+  if (businessMode.includes('收取合同现金流量为目标')) {
+    return '应收票据'
+  }
+  if (businessMode.includes('其他业务模式')) {
+    return '以公允价值计量且其变动计入当期损益的金融资产'
+  }
+  return ''
 }

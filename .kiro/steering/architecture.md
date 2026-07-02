@@ -463,3 +463,74 @@ SheetCellRangePicker → Module_Cell_Resolver (路由器)
 - adj → `adjustments` 表 UPDATE (按列名)
 - tb → `trial_balance.audited_amount` UPDATE (仅 G 列可写)
 - 乐观锁: X-File-Opened-At vs updated_at → 409 WritebackConflict
+
+
+## D~N循环专属组件架构模式（2026-07-02 D4定稿）
+
+### 标准目录结构
+```
+frontend/src/components/workpaper/
+├── GtXOperatingRevenue.vue           # 主入口 sheetName v-if分发
+├── x/                                # 循环代码小写
+│   ├── core/                         # 审定表+明细+调整+附注+目录
+│   ├── policy/                       # 政策检查
+│   ├── analysis/                     # 分析程序
+│   ├── inspection/                   # 检查程序(含子组件Card/Matrix)
+│   ├── related/                      # 关联方
+│   ├── ipo/                          # IPO/舞弊(条件可见)
+│   └── other/                        # 其他类(按需)
+├── composables/
+│   ├── useXFormulaEngine.ts          # 纯函数(可PBT)
+│   ├── useXFormData.ts               # 数据加载/保存/selfLoad/writebackTB
+│   ├── useXCrossSheet.ts             # 跨sheet联动computed
+│   ├── useXAdjudication.ts           # 审定表
+│   ├── useXImportExport.ts           # 导入导出(axios三端点)
+│   ├── useXDualMode.ts               # 双模式OO健康检查
+│   └── useX{Sheet}.ts               # 每sheet一个composable
+
+backend/app/routers/wp_render_strategies/
+├── _x_operating_revenue.py           # render策略+RENDERER_DISPATCH
+├── _x_import_export.py               # 3端点(export-template/data+import-data)
+├── _x_ai_generate.py                 # AI多section
+└── _x_resolvers.py                   # auto_data resolver(TB取数)
+
+backend/app/services/auto_data_resolvers/
+└── _x_revenue.py                     # resolver注册
+```
+
+### 注册四件套（每个新循环必做）
+1. `VALID_COMPONENT_TYPES`（wp_classification_service.py）
+2. `htmlRendererRegistry`（前端componentType→Vue组件映射）
+3. `RENDERER_DISPATCH`（后端componentType→render策略函数）
+4. `account_package_registry.json`（sheet清单+顺序=目录行顺序）
+
+### 数据流模式
+```
+TB(科目余额) ─────────→ useXFormData.loadAll()
+                              ↓
+allResponses Map ←── checklist_responses API
+         ↓ (computed链，不走API)
+useXCrossSheet ──→ 各子composable ──→ 各Vue子组件
+         ↓
+EventBus(substantive:adjudicated) ──→ TB回写
+```
+
+### 已完成的专属组件（10个循环）
+| componentType | 科目 | sheet数 | composable数 | 测试数 |
+|---|---|---|---|---|
+| d1-notes-receivable | 1131应收票据 | 21 | 18+shared | 200+ |
+| d2-accounts-receivable | 1122应收账款 | 20 | 18+shared | 200+ |
+| d4-operating-revenue | 6001+6051收入 | 42 | 18 | 288+ |
+| d5-receivables-financing | 1124应收款项融资 | 7 | 8 | 43 |
+| d6-contract-assets | 1402合同资产 | 12 | 11 | 42 |
+| e1-monetary-fund | 1001+1002+1012货币资金 | 27 | 15 | 52 |
+| c-control-test | C2~C15控制测试 | 共用 | 3 | 25+ |
+| b50-risk-assessment | 风险矩阵 | - | 3 | 32 |
+| b22a-control-matrix | 内控五要素 | - | 3 | 48 |
+| b22b-deficiency-evaluation | 内控缺陷 | - | 3 | 57 |
+
+### 开发方法论（双源输入）
+新循环开发前必须完成Phase0：
+1. openpyxl脚本实读源xlsx → sheet结构/列头/公式（权威列名来源）
+2. 读`BCD类底稿md/X循环底稿模板库.md` → 业务逻辑/联动/认定（权威语义来源）
+3. 两源交叉验证 → 产出spec三件套

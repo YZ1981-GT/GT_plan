@@ -4,20 +4,29 @@
  * Spec: .kiro/specs/d1-notes-receivable/
  * Tasks: 3.1 ~ 3.13
  *
- * 职责：
+ * 职责（拆分后保留）：
  * - Tab 管理 + localStorage 持久化
- * - 审定表 D1-1 计算（公式 + 跨 sheet 引用）
  * - 程序表 D1A 状态/结论/进度
- * - ECL 坏账准备（迁徙率法/个别认定）
- * - 业务模式分析（SPPI + 到期分析）
- * - 背书贴现 CRUD + 终止确认
- * - 贴息计算
- * - 监盘倒推
- * - 质押检查
- * - 关联方检查
  * - 附注披露
  * - 调整分录 CRUD + 审定表同步
  * - EventBus 联动（发布 + 监听 + 卸载注销）
+ *
+ * 已拆出至独立 composable：
+ * - 审定表 D1-1 → useD1Adjudication.ts
+ * - 原值明细 D1-2 → useD1DetailCategory.ts
+ * - 原值明细 D1-3 → useD1DetailCustomer.ts
+ * - 坏账准备 D1-4 → useD1BadDebt.ts
+ * - 业务模式 D1-6 → useD1BusinessMode.ts
+ * - 备查簿 D1-7 → useD1MemoReconciliation.ts
+ * - 背书贴现 D1-8 → useD1EndorsementDetail.ts
+ * - 贴息 D1-9 → useD1InterestCheck.ts
+ * - 监盘 D1-10 → useD1InventoryCount.ts
+ * - 关联方 D1-11 → useD1RelatedPartyCheck.ts
+ * - 质押 D1-12 → useD1PledgeCheck.ts
+ * - 抽样凭证核对 D1-13 → useD1SamplingVouching.ts
+ * - ECL测算 D1-14/D1-15 → useD1EclCalc.ts
+ * - 政策检查 D1-14 → useD1PolicyCheck.ts
+ * - 共享纯函数 → useD1FormulaEngine.ts
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
@@ -25,7 +34,6 @@ import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ProcedureStatus = '未开始' | '执行中' | '已完成' | '不适用'
-export type EclMethod = '组合评估' | '个别认定'
 export type BusinessModelType =
   | '以摊余成本计量'
   | '以公允价值计量且变动计入其他综合收益'
@@ -35,32 +43,6 @@ export type DisclosureConclusion = '已披露且准确' | '已披露但需修改
 export type CheckConclusion = '符合' | '不符合' | '不适用'
 export type TabStatus = 'completed' | 'in-progress' | 'not-started'
 export type AdjustmentType = 'AJE' | 'RJE'
-
-export interface AdjudicationRow {
-  rowKey: string
-  label: string
-  priorPeriod: number
-  currentUnadjusted: number
-  periodChange: number
-  ajeDebit: number
-  ajeCredit: number
-  rjeDebit: number
-  rjeCredit: number
-  auditedAmount: number
-  changeRate: number | null | ''
-  isFromCrossSheet: boolean
-}
-
-export interface CrossSheetRefValues {
-  d12_B14: number
-  d12_C14: number
-  d12_D14: number
-  d12_B13: number
-  d12_C13: number
-  d12_D13: number
-  d14_B23: number
-  d14_C23: number
-}
 
 export interface ProcedureStep {
   stepOrder: number
@@ -79,37 +61,6 @@ export interface ProcedureStep {
 export interface RiskIndicator {
   level: 'H' | 'M' | 'L'
   description: string
-}
-
-export interface AgingBand {
-  bandKey: string
-  label: string
-  priorBalance: number
-  currentProvision: number
-  currentReversal: number
-  currentWriteOff: number
-  endBalance: number
-  expectedLossRate: number
-  shouldProvision: number
-  actualProvision: number
-  difference: number
-}
-
-export interface MigrationRateRow {
-  fromBand: string
-  toBand: string
-  year1Rate: number
-  year2Rate: number
-  year3Rate: number
-  averageRate: number
-}
-
-export interface EclSummary {
-  totalEndBalance: number
-  totalShouldProvision: number
-  totalActualProvision: number
-  totalDifference: number
-  exceedsMateriality: boolean
 }
 
 export interface MaturityGroup {
@@ -148,6 +99,7 @@ export interface DiscountInterestItem {
   difference: number
 }
 
+/** @deprecated Use InventoryCountRow from d1InspectionFormulas.ts instead */
 export interface InventoryReconciliation {
   countDate: string
   countLocation: string
@@ -159,6 +111,7 @@ export interface InventoryReconciliation {
   difference: number
 }
 
+/** @deprecated Use PledgeRow from d1InspectionFormulas.ts instead */
 export interface PledgeItem {
   index: number
   noteNo: string
@@ -169,6 +122,7 @@ export interface PledgeItem {
   isRestricted: boolean
 }
 
+/** @deprecated Use RelatedPartyRow from d1InspectionFormulas.ts instead */
 export interface RelatedPartyItem {
   index: number
   partyName: string
@@ -247,6 +201,19 @@ export const PROCEDURE_STEPS_CONFIG: Array<{
   { stepName: '结论', description: '汇总应收票据审计发现，形成整体结论', isRequired: false, relatedTab: null },
 ]
 
+/**
+ * @deprecated 已迁移至 useD1Adjudication.ts，此处保留仅为向后兼容测试导入
+ */
+export const ADJUDICATION_ROWS_CONFIG: Array<{ rowKey: string; label: string }> = [
+  { rowKey: 'bank-acceptance', label: '应收票据-银行承兑汇票' },
+  { rowKey: 'commercial-acceptance', label: '应收票据-商业承兑汇票' },
+  { rowKey: 'bad-debt', label: '坏账准备' },
+  { rowKey: 'book-value', label: '账面价值' },
+]
+
+/**
+ * @deprecated 已迁移至 useD1BadDebt.ts，此处保留仅为向后兼容测试导入
+ */
 export const AGING_BANDS_CONFIG: Array<{ bandKey: string; label: string }> = [
   { bandKey: 'not-overdue', label: '未逾期' },
   { bandKey: 'overdue-1-30', label: '逾期1-30天' },
@@ -256,19 +223,14 @@ export const AGING_BANDS_CONFIG: Array<{ bandKey: string; label: string }> = [
   { bandKey: 'overdue-1year', label: '逾期1年以上' },
 ]
 
-export const ADJUDICATION_ROWS_CONFIG: Array<{ rowKey: string; label: string }> = [
-  { rowKey: 'bank-acceptance', label: '应收票据-银行承兑汇票' },
-  { rowKey: 'commercial-acceptance', label: '应收票据-商业承兑汇票' },
-  { rowKey: 'bad-debt', label: '坏账准备' },
-  { rowKey: 'book-value', label: '账面价值' },
-]
-
 const LOCALSTORAGE_TAB_KEY = 'd1-notes-receivable-active-tab'
 
-// ─── Pure Functions (exported for testing) ───────────────────────────────────
+// ─── Pure Functions (exported for testing backward compatibility) ─────────────
+// These have equivalents in useD1FormulaEngine.ts but are kept here for
+// existing test imports. New code should use useD1FormulaEngine instead.
 
 /**
- * 审定数 = 期末未审数 + AJE借方 - AJE贷方 + RJE借方 - RJE贷方
+ * @deprecated Use calcAuditedAmount from useD1FormulaEngine instead (3-param net version)
  */
 export function getAuditedAmount(
   currentUnadjusted: number,
@@ -281,10 +243,7 @@ export function getAuditedAmount(
 }
 
 /**
- * 变动率三分支：
- * - 期初=0 且 审定数=0 → ''
- * - 期初=0 → 1
- * - 其他 → (审定数 - 期初) / 期初
+ * @deprecated Use calcChangeRate from useD1FormulaEngine instead
  */
 export function getChangeRate(priorPeriod: number, auditedAmount: number): number | '' {
   if (priorPeriod === 0 && auditedAmount === 0) return ''
@@ -293,7 +252,7 @@ export function getChangeRate(priorPeriod: number, auditedAmount: number): numbe
 }
 
 /**
- * ECL 迁徙率法：预期损失率 = 各阶段平均迁徙率连乘
+ * @deprecated Use calcExpectedLossRate from useD1FormulaEngine instead
  */
 export function calculateExpectedLossRate(migrationRates: number[]): number {
   if (migrationRates.length === 0) return 0
@@ -301,14 +260,14 @@ export function calculateExpectedLossRate(migrationRates: number[]): number {
 }
 
 /**
- * 应计提金额 = 余额 × 预期损失率
+ * @deprecated Use calcProvision from useD1FormulaEngine instead
  */
 export function calculateProvision(balance: number, lossRate: number): number {
   return balance * lossRate
 }
 
 /**
- * 差异 = 实际计提 - 应计提
+ * @deprecated Use calcDifference from useD1FormulaEngine instead
  */
 export function calculateDifference(actualProvision: number, shouldProvision: number): number {
   return actualProvision - shouldProvision
@@ -367,7 +326,6 @@ export function useD1NotesReceivable(
     const n = typeof val === 'number' ? val : parseFloat(val)
     return isNaN(n) ? 0 : n
   }
-
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Task 3.1: Tab 管理 + localStorage 持久化 + linkageRefs
@@ -438,86 +396,6 @@ export function useD1NotesReceivable(
   ])
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.2: 审定表 D1-1 计算逻辑
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  const crossSheetData = ref<Record<string, string | number>>({})
-  const d14Data = ref<Record<string, string | number>>({})
-
-  const crossSheetValues: ComputedRef<CrossSheetRefValues> = computed(() => ({
-    d12_B14: parseNum(crossSheetData.value['D1-2-B14']),
-    d12_C14: parseNum(crossSheetData.value['D1-2-C14']),
-    d12_D14: parseNum(crossSheetData.value['D1-2-D14']),
-    d12_B13: parseNum(crossSheetData.value['D1-2-B13']),
-    d12_C13: parseNum(crossSheetData.value['D1-2-C13']),
-    d12_D13: parseNum(crossSheetData.value['D1-2-D13']),
-    d14_B23: parseNum(d14Data.value['D1-4-B23'] ?? getVal('D1-ecl-total-prior').remark),
-    d14_C23: parseNum(d14Data.value['D1-4-C23'] ?? getVal('D1-ecl-total-current').remark),
-  }))
-
-  async function refreshCrossSheetData(): Promise<void> {
-    if (!loadSubWorkpaperData) return
-    try {
-      const d12 = await loadSubWorkpaperData('D1-2')
-      crossSheetData.value = Object.fromEntries(
-        Object.entries(d12).map(([k, v]) => [`D1-2-${k}`, v])
-      )
-    } catch { /* handled by useD1FormData */ }
-    try {
-      const d14 = await loadSubWorkpaperData('D1-4')
-      d14Data.value = Object.fromEntries(
-        Object.entries(d14).map(([k, v]) => [`D1-4-${k}`, v])
-      )
-    } catch { /* handled by useD1FormData */ }
-  }
-
-  /** 审定表各行数据 */
-  const adjudicationRows: ComputedRef<AdjudicationRow[]> = computed(() => {
-    return ADJUDICATION_ROWS_CONFIG.map(({ rowKey, label }) => {
-      let priorPeriod: number
-      let currentUnadjusted: number
-
-      // 跨 sheet 引用
-      if (rowKey === 'bank-acceptance') {
-        priorPeriod = crossSheetValues.value.d12_B14 || parseNum(getVal(`D1-adj-${rowKey}-prior`).remark)
-        currentUnadjusted = crossSheetValues.value.d12_C14 || parseNum(getVal(`D1-adj-${rowKey}-current`).remark)
-      } else if (rowKey === 'commercial-acceptance') {
-        priorPeriod = crossSheetValues.value.d12_B13 || parseNum(getVal(`D1-adj-${rowKey}-prior`).remark)
-        currentUnadjusted = crossSheetValues.value.d12_C13 || parseNum(getVal(`D1-adj-${rowKey}-current`).remark)
-      } else if (rowKey === 'bad-debt') {
-        priorPeriod = crossSheetValues.value.d14_B23 || parseNum(getVal(`D1-adj-${rowKey}-prior`).remark)
-        currentUnadjusted = crossSheetValues.value.d14_C23 || parseNum(getVal(`D1-adj-${rowKey}-current`).remark)
-      } else {
-        priorPeriod = parseNum(getVal(`D1-adj-${rowKey}-prior`).remark)
-        currentUnadjusted = parseNum(getVal(`D1-adj-${rowKey}-current`).remark)
-      }
-
-      const ajeDebit = parseNum(getVal(`D1-adj-${rowKey}-aje-dr`).remark)
-      const ajeCredit = parseNum(getVal(`D1-adj-${rowKey}-aje-cr`).remark)
-      const rjeDebit = parseNum(getVal(`D1-adj-${rowKey}-rje-dr`).remark)
-      const rjeCredit = parseNum(getVal(`D1-adj-${rowKey}-rje-cr`).remark)
-      const audited = getAuditedAmount(currentUnadjusted, ajeDebit, ajeCredit, rjeDebit, rjeCredit)
-      const rate = getChangeRate(priorPeriod, audited)
-      const isFromCrossSheet = ['bank-acceptance', 'commercial-acceptance', 'bad-debt'].includes(rowKey)
-
-      return {
-        rowKey,
-        label,
-        priorPeriod,
-        currentUnadjusted,
-        periodChange: currentUnadjusted - priorPeriod,
-        ajeDebit,
-        ajeCredit,
-        rjeDebit,
-        rjeCredit,
-        auditedAmount: audited,
-        changeRate: rate,
-        isFromCrossSheet,
-      }
-    })
-  })
-
-  // ═══════════════════════════════════════════════════════════════════════════
   // Task 3.3: 程序表 D1A 逻辑
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -569,160 +447,8 @@ export function useD1NotesReceivable(
   })
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.4: ECL 坏账准备逻辑
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  const eclMethod: ComputedRef<EclMethod> = computed(() => {
-    return (getVal('D1-ecl-method').conclusion as EclMethod) || '组合评估'
-  })
-
-  function setEclMethod(method: EclMethod): void {
-    const item = setLocal('D1-ecl-method', method)
-    saveImmediate([item])
-  }
-
-  const agingBands: ComputedRef<AgingBand[]> = computed(() => {
-    return AGING_BANDS_CONFIG.map(({ bandKey, label }) => {
-      const endBalance = parseNum(getVal(`D1-ecl-${bandKey}-balance`).remark)
-      const rateVal = parseNum(getVal(`D1-ecl-${bandKey}-rate`).remark) / 100
-      const expectedLossRate = Math.max(0, Math.min(1, rateVal))
-      const shouldProvision = calculateProvision(endBalance, expectedLossRate)
-      const actualProvision = parseNum(getVal(`D1-ecl-${bandKey}-actual`).remark)
-      const difference = calculateDifference(actualProvision, shouldProvision)
-
-      return {
-        bandKey,
-        label,
-        priorBalance: parseNum(getVal(`D1-ecl-${bandKey}-prior`).remark),
-        currentProvision: parseNum(getVal(`D1-ecl-${bandKey}-provision`).remark),
-        currentReversal: parseNum(getVal(`D1-ecl-${bandKey}-reversal`).remark),
-        currentWriteOff: parseNum(getVal(`D1-ecl-${bandKey}-writeoff`).remark),
-        endBalance,
-        expectedLossRate,
-        shouldProvision,
-        actualProvision,
-        difference,
-      }
-    })
-  })
-
-  const migrationRateMatrix: ComputedRef<MigrationRateRow[]> = computed(() => {
-    const rows: MigrationRateRow[] = []
-    for (let i = 0; i < AGING_BANDS_CONFIG.length - 1; i++) {
-      const from = AGING_BANDS_CONFIG[i].bandKey
-      const to = AGING_BANDS_CONFIG[i + 1].bandKey
-      const y1 = parseNum(getVal(`D1-ecl-migration-${from}-${to}-y1`).remark) / 100
-      const y2 = parseNum(getVal(`D1-ecl-migration-${from}-${to}-y2`).remark) / 100
-      const y3 = parseNum(getVal(`D1-ecl-migration-${from}-${to}-y3`).remark) / 100
-      const avg = (y1 + y2 + y3) / 3
-      rows.push({ fromBand: from, toBand: to, year1Rate: y1, year2Rate: y2, year3Rate: y3, averageRate: avg })
-    }
-    return rows
-  })
-
-  function getExpectedLossRateForBand(bandIndex: number): number {
-    const matrix = migrationRateMatrix.value
-    // Loss rate = product of average migration rates from this band to the end
-    const rates = matrix.slice(bandIndex).map(r => r.averageRate)
-    return calculateExpectedLossRate(rates)
-  }
-
-  function getProvisionForBand(bandIndex: number): number {
-    const band = agingBands.value[bandIndex]
-    if (!band) return 0
-    return calculateProvision(band.endBalance, band.expectedLossRate)
-  }
-
-  function getDifferenceForBand(bandIndex: number): number {
-    const band = agingBands.value[bandIndex]
-    if (!band) return 0
-    return band.difference
-  }
-
-  function isDifferenceExceedsMateriality(bandIndex: number): boolean {
-    const band = agingBands.value[bandIndex]
-    if (!band) return false
-    const materiality = parseNum(getVal('D1-ecl-materiality').remark)
-    if (materiality <= 0) return false
-    return Math.abs(band.difference) > materiality
-  }
-
-  const eclSummary: ComputedRef<EclSummary> = computed(() => {
-    const bands = agingBands.value
-    const totalEndBalance = bands.reduce((s, b) => s + b.endBalance, 0)
-    const totalShouldProvision = bands.reduce((s, b) => s + b.shouldProvision, 0)
-    const totalActualProvision = bands.reduce((s, b) => s + b.actualProvision, 0)
-    const totalDifference = totalActualProvision - totalShouldProvision
-    const materiality = parseNum(getVal('D1-ecl-materiality').remark)
-    const exceedsMateriality = materiality > 0 && Math.abs(totalDifference) > materiality
-
-    return { totalEndBalance, totalShouldProvision, totalActualProvision, totalDifference, exceedsMateriality }
-  })
-
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.5: 业务模式分析逻辑
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  const sppiTestResult: ComputedRef<'Y' | 'N' | null> = computed(() => {
-    const val = getVal('D1-sppi-result').conclusion
-    if (val === 'Y' || val === 'N') return val
-    return null
-  })
-
-  function setSppiTestResult(result: 'Y' | 'N'): void {
-    const item = setLocal('D1-sppi-result', result)
-    saveImmediate([item])
-  }
-
-  const businessModelChoice: ComputedRef<BusinessModelType | null> = computed(() => {
-    const val = getVal('D1-biz-model').conclusion as BusinessModelType | null
-    return val || null
-  })
-
-  function setBusinessModelChoice(model: BusinessModelType): void {
-    const item = setLocal('D1-biz-model', model)
-    saveImmediate([item])
-  }
-
-  const maturityAnalysis: ComputedRef<MaturityGroup[]> = computed(() => {
-    const groups: Array<{ groupKey: string; label: string }> = [
-      { groupKey: 'not-overdue', label: '未到期' },
-      { groupKey: 'overdue-30', label: '逾期≤30天' },
-      { groupKey: 'overdue-31-90', label: '逾期31-90天' },
-      { groupKey: 'overdue-90-plus', label: '逾期>90天' },
-    ]
-    const amounts = groups.map(g => parseNum(getVal(`D1-maturity-${g.groupKey}-amount`).remark))
-    const total = amounts.reduce((s, a) => s + a, 0)
-
-    return groups.map((g, i) => ({
-      groupKey: g.groupKey,
-      label: g.label,
-      amount: amounts[i],
-      percentage: total > 0 ? amounts[i] / total : 0,
-    }))
-  })
-
-  const suggestedClassification: ComputedRef<string | null> = computed(() => {
-    const sppi = sppiTestResult.value
-    const model = businessModelChoice.value
-    if (sppi === null || model === null) return null
-    if (sppi === 'Y' && model === '以摊余成本计量') {
-      return '分类正确：以摊余成本计量的金融资产'
-    }
-    if (sppi === 'N') {
-      return '注意：SPPI 测试未通过，应以公允价值计量'
-    }
-    return null
-  })
-
-  const hasOverdue90Plus: ComputedRef<boolean> = computed(() => {
-    const group = maturityAnalysis.value.find(g => g.groupKey === 'overdue-90-plus')
-    return (group?.amount ?? 0) > 0
-  })
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.6: 背书贴现逻辑
+  // 背书贴现明细（D1-8 已迁移至 useD1EndorsementDetail）
+  // 保留 endorsementItems / getEndorsementCount：关联方自动匹配(D1-11)依赖出票人清单
   // ═══════════════════════════════════════════════════════════════════════════
 
   function getEndorsementCount(): number {
@@ -748,295 +474,23 @@ export function useD1NotesReceivable(
     return items
   })
 
-  function addEndorsement(item: Partial<EndorsementItem>): void {
-    const count = getEndorsementCount()
-    if (count >= 100) return
-    const n = count + 1
-    const items: ChecklistItem[] = [setLocal('D1-endorse-count', null, String(n))]
-    if (item.noteNo) items.push(setLocal(`D1-endorse-${n}-noteNo`, null, item.noteNo))
-    if (item.drawer) items.push(setLocal(`D1-endorse-${n}-drawer`, null, item.drawer))
-    if (item.amount !== undefined) items.push(setLocal(`D1-endorse-${n}-amount`, null, String(item.amount)))
-    if (item.maturityDate) items.push(setLocal(`D1-endorse-${n}-maturityDate`, null, item.maturityDate))
-    if (item.endorseDate) items.push(setLocal(`D1-endorse-${n}-endorseDate`, null, item.endorseDate))
-    if (item.transferee) items.push(setLocal(`D1-endorse-${n}-transferee`, null, item.transferee))
-    if (item.derecognition) items.push(setLocal(`D1-endorse-${n}-derecognition`, item.derecognition))
-    if (item.remark) items.push(setLocal(`D1-endorse-${n}-remark`, null, item.remark))
-    saveImmediate(items)
-  }
-
-  function removeEndorsement(index: number): void {
-    const count = getEndorsementCount()
-    if (index < 1 || index > count) return
-    const items: ChecklistItem[] = []
-    const fields = ['noteNo', 'drawer', 'amount', 'maturityDate', 'endorseDate', 'transferee', 'derecognition', 'remark']
-
-    // Shift down
-    for (let i = index; i < count; i++) {
-      for (const f of fields) {
-        const srcId = `D1-endorse-${i + 1}-${f}`
-        const tgtId = `D1-endorse-${i}-${f}`
-        const src = getVal(srcId)
-        items.push(setLocal(tgtId, src.conclusion, src.remark))
-      }
-    }
-    // Clear last
-    for (const f of fields) {
-      items.push(setLocal(`D1-endorse-${count}-${f}`, null, null))
-    }
-    items.push(setLocal('D1-endorse-count', null, String(count - 1)))
-    saveImmediate(items)
-  }
-
-  const endorsementSummary: ComputedRef<EndorsementSummary> = computed(() => {
-    const items = endorsementItems.value
-    let endorsedNotMatured = 0
-    let discountedNotMatured = 0
-    let derecognizedAmount = 0
-    let notDerecognizedAmount = 0
-
-    for (const item of items) {
-      if (item.derecognition === '终止确认') {
-        derecognizedAmount += item.amount
-      } else if (item.derecognition === '不终止确认') {
-        notDerecognizedAmount += item.amount
-      }
-      // Categorize by type (endorsement vs discount based on transferee pattern)
-      endorsedNotMatured += item.amount
-    }
-
-    return { endorsedNotMatured, discountedNotMatured, derecognizedAmount, notDerecognizedAmount }
-  })
-
   // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.7: 贴息计算逻辑
+  // Task 3.8: 监盘倒推逻辑 → 已迁移至 useD1InventoryCount.ts
   // ═══════════════════════════════════════════════════════════════════════════
 
-  function getDiscountInterestCount(): number {
-    return parseNum(getVal('D1-interest-count').remark) || 0
-  }
-
-  const discountInterestItems: ComputedRef<DiscountInterestItem[]> = computed(() => {
-    const count = getDiscountInterestCount()
-    const items: DiscountInterestItem[] = []
-    for (let i = 1; i <= count; i++) {
-      const p = parseNum(getVal(`D1-interest-${i}-amount`).remark)
-      const r = parseNum(getVal(`D1-interest-${i}-rate`).remark) / 100
-      const d = parseNum(getVal(`D1-interest-${i}-days`).remark)
-      const auditeeInterest = parseNum(getVal(`D1-interest-${i}-auditee`).remark)
-      const auditorInterest = calculateInterest(p, r, d)
-      items.push({
-        index: i,
-        discountAmount: p,
-        discountRate: r,
-        discountDays: d,
-        auditeeInterest,
-        auditorInterest,
-        difference: auditeeInterest - auditorInterest,
-      })
-    }
-    return items
-  })
-
-  function addDiscountInterest(item: Partial<DiscountInterestItem>): void {
-    const count = getDiscountInterestCount()
-    const n = count + 1
-    const items: ChecklistItem[] = [setLocal('D1-interest-count', null, String(n))]
-    if (item.discountAmount !== undefined) items.push(setLocal(`D1-interest-${n}-amount`, null, String(item.discountAmount)))
-    if (item.discountRate !== undefined) items.push(setLocal(`D1-interest-${n}-rate`, null, String(item.discountRate * 100)))
-    if (item.discountDays !== undefined) items.push(setLocal(`D1-interest-${n}-days`, null, String(item.discountDays)))
-    if (item.auditeeInterest !== undefined) items.push(setLocal(`D1-interest-${n}-auditee`, null, String(item.auditeeInterest)))
-    saveImmediate(items)
-  }
-
-  function removeDiscountInterest(index: number): void {
-    const count = getDiscountInterestCount()
-    if (index < 1 || index > count) return
-    const items: ChecklistItem[] = []
-    const fields = ['amount', 'rate', 'days', 'auditee']
-    for (let i = index; i < count; i++) {
-      for (const f of fields) {
-        const src = getVal(`D1-interest-${i + 1}-${f}`)
-        items.push(setLocal(`D1-interest-${i}-${f}`, src.conclusion, src.remark))
-      }
-    }
-    for (const f of fields) {
-      items.push(setLocal(`D1-interest-${count}-${f}`, null, null))
-    }
-    items.push(setLocal('D1-interest-count', null, String(count - 1)))
-    saveImmediate(items)
-  }
-
   // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.8: 监盘倒推逻辑
+  // Task 3.9: 质押检查逻辑 → 已迁移至 useD1PledgeCheck.ts
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const inventoryReconciliation: ComputedRef<InventoryReconciliation> = computed(() => {
-    const countBalance = parseNum(getVal('D1-inventory-countBalance').remark)
-    const additions = parseNum(getVal('D1-inventory-additions').remark)
-    const deductions = parseNum(getVal('D1-inventory-deductions').remark)
-    const bsDateBalance = calculateBSDateBalance(countBalance, additions, deductions)
-    const bookBalance = parseNum(getVal('D1-inventory-bookBalance').remark)
-
-    return {
-      countDate: getVal('D1-inventory-countDate').remark || '',
-      countLocation: getVal('D1-inventory-countLocation').remark || '',
-      countBalance,
-      additions,
-      deductions,
-      bsDateBalance,
-      bookBalance,
-      difference: bookBalance - bsDateBalance,
-    }
-  })
-
-  const inventoryDifference: ComputedRef<number> = computed(() => {
-    return inventoryReconciliation.value.difference
-  })
-
   // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.9: 质押检查逻辑
+  // Task 3.10: 关联方检查逻辑 → 已迁移至 useD1RelatedPartyCheck.ts
   // ═══════════════════════════════════════════════════════════════════════════
-
-  function getPledgeCount(): number {
-    return parseNum(getVal('D1-pledge-count').remark) || 0
-  }
-
-  const pledgeItems: ComputedRef<PledgeItem[]> = computed(() => {
-    const count = getPledgeCount()
-    const items: PledgeItem[] = []
-    for (let i = 1; i <= count; i++) {
-      items.push({
-        index: i,
-        noteNo: getVal(`D1-pledge-${i}-noteNo`).remark || '',
-        amount: parseNum(getVal(`D1-pledge-${i}-amount`).remark),
-        pledgee: getVal(`D1-pledge-${i}-pledgee`).remark || '',
-        purpose: getVal(`D1-pledge-${i}-purpose`).remark || '',
-        releaseDate: getVal(`D1-pledge-${i}-releaseDate`).remark || '',
-        isRestricted: getVal(`D1-pledge-${i}-restricted`).conclusion === 'Y',
-      })
-    }
-    return items
-  })
-
-  function addPledge(item: Partial<PledgeItem>): void {
-    const count = getPledgeCount()
-    const n = count + 1
-    const items: ChecklistItem[] = [setLocal('D1-pledge-count', null, String(n))]
-    if (item.noteNo) items.push(setLocal(`D1-pledge-${n}-noteNo`, null, item.noteNo))
-    if (item.amount !== undefined) items.push(setLocal(`D1-pledge-${n}-amount`, null, String(item.amount)))
-    if (item.pledgee) items.push(setLocal(`D1-pledge-${n}-pledgee`, null, item.pledgee))
-    if (item.purpose) items.push(setLocal(`D1-pledge-${n}-purpose`, null, item.purpose))
-    if (item.releaseDate) items.push(setLocal(`D1-pledge-${n}-releaseDate`, null, item.releaseDate))
-    if (item.isRestricted !== undefined) items.push(setLocal(`D1-pledge-${n}-restricted`, item.isRestricted ? 'Y' : 'N'))
-    saveImmediate(items)
-  }
-
-  function removePledge(index: number): void {
-    const count = getPledgeCount()
-    if (index < 1 || index > count) return
-    const items: ChecklistItem[] = []
-    const fields = ['noteNo', 'amount', 'pledgee', 'purpose', 'releaseDate', 'restricted']
-    for (let i = index; i < count; i++) {
-      for (const f of fields) {
-        const src = getVal(`D1-pledge-${i + 1}-${f}`)
-        items.push(setLocal(`D1-pledge-${i}-${f}`, src.conclusion, src.remark))
-      }
-    }
-    for (const f of fields) {
-      items.push(setLocal(`D1-pledge-${count}-${f}`, null, null))
-    }
-    items.push(setLocal('D1-pledge-count', null, String(count - 1)))
-    saveImmediate(items)
-  }
-
-  const pledgeTotalAmount: ComputedRef<number> = computed(() => {
-    return pledgeItems.value.reduce((s, p) => s + p.amount, 0)
-  })
-
-  const pledgeRatio: ComputedRef<number> = computed(() => {
-    // Ratio = pledged / total notes receivable (book value row)
-    const bookValue = adjudicationRows.value.find(r => r.rowKey === 'book-value')
-    const total = bookValue?.auditedAmount || 0
-    if (total <= 0) return 0
-    return pledgeTotalAmount.value / total
-  })
-
-  const isPledgeRatioWarning: ComputedRef<boolean> = computed(() => {
-    return pledgeRatio.value > 0.5
-  })
-
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // Task 3.10: 关联方检查逻辑
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  function getRelatedPartyCount(): number {
-    return parseNum(getVal('D1-rp-count').remark) || 0
-  }
-
-  const relatedPartyItems: ComputedRef<RelatedPartyItem[]> = computed(() => {
-    const count = getRelatedPartyCount()
-    const items: RelatedPartyItem[] = []
-    for (let i = 1; i <= count; i++) {
-      items.push({
-        index: i,
-        partyName: getVal(`D1-rp-${i}-name`).remark || '',
-        relationType: getVal(`D1-rp-${i}-relation`).remark || '',
-        transactionAmount: parseNum(getVal(`D1-rp-${i}-amount`).remark),
-        noteNo: getVal(`D1-rp-${i}-noteNo`).remark || '',
-        isNormalTerms: getVal(`D1-rp-${i}-normalTerms`).conclusion === 'Y',
-        remark: getVal(`D1-rp-${i}-remark`).remark || '',
-      })
-    }
-    return items
-  })
-
-  function addRelatedParty(item: Partial<RelatedPartyItem>): void {
-    const count = getRelatedPartyCount()
-    const n = count + 1
-    const items: ChecklistItem[] = [setLocal('D1-rp-count', null, String(n))]
-    if (item.partyName) items.push(setLocal(`D1-rp-${n}-name`, null, item.partyName))
-    if (item.relationType) items.push(setLocal(`D1-rp-${n}-relation`, null, item.relationType))
-    if (item.transactionAmount !== undefined) items.push(setLocal(`D1-rp-${n}-amount`, null, String(item.transactionAmount)))
-    if (item.noteNo) items.push(setLocal(`D1-rp-${n}-noteNo`, null, item.noteNo))
-    if (item.isNormalTerms !== undefined) items.push(setLocal(`D1-rp-${n}-normalTerms`, item.isNormalTerms ? 'Y' : 'N'))
-    if (item.remark) items.push(setLocal(`D1-rp-${n}-remark`, null, item.remark))
-    saveImmediate(items)
-  }
-
-  function removeRelatedParty(index: number): void {
-    const count = getRelatedPartyCount()
-    if (index < 1 || index > count) return
-    const items: ChecklistItem[] = []
-    const fields = ['name', 'relation', 'amount', 'noteNo', 'normalTerms', 'remark']
-    for (let i = index; i < count; i++) {
-      for (const f of fields) {
-        const src = getVal(`D1-rp-${i + 1}-${f}`)
-        items.push(setLocal(`D1-rp-${i}-${f}`, src.conclusion, src.remark))
-      }
-    }
-    for (const f of fields) {
-      items.push(setLocal(`D1-rp-${count}-${f}`, null, null))
-    }
-    items.push(setLocal('D1-rp-count', null, String(count - 1)))
-    saveImmediate(items)
-  }
-
-  /** 自动匹配关联方（从项目关联方清单匹配出票人/承兑人） */
-  const matchedRelatedParties: ComputedRef<string[]> = computed(() => {
-    // Match endorsement drawers against known related party names
-    const rpNames = relatedPartyItems.value.map(rp => rp.partyName).filter(Boolean)
-    const endorseDrawers = endorsementItems.value.map(e => e.drawer).filter(Boolean)
-    // Return matching names
-    return endorseDrawers.filter(d => rpNames.includes(d))
-  })
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Task 3.11: 附注披露逻辑
   // ═══════════════════════════════════════════════════════════════════════════
 
   const disclosureTemplate: ComputedRef<'listed' | 'soe' | 'general'> = computed(() => {
-    // Determined by project attributes; fallback to 'general'
     const val = getVal('D1-disc-template').conclusion
     if (val === 'listed' || val === 'soe' || val === 'general') return val
     return 'general'
@@ -1181,40 +635,20 @@ export function useD1NotesReceivable(
     if (items.length > 0) saveImmediate(items)
   }
 
-  // Bidirectional sync: adjustment entries ↔ adjudication table AJE/RJE columns
-  // The adjudicationRows computed already reads from individual D1-adj-*-aje-dr/cr fields.
-  // When adjustments change, sync totals into the adjudication row fields.
+  // Bidirectional sync: adjustment totals → adjudication table AJE/RJE columns
   watch([ajeTotal, rjeTotal], ([newAje, newRje]) => {
-    // Sync AJE total into bank-acceptance row (primary substantive account)
-    const items: ChecklistItem[] = []
-    items.push(setLocal('D1-adj-bank-acceptance-aje-dr', null, String(newAje)))
-    items.push(setLocal('D1-adj-bank-acceptance-rje-dr', null, String(newRje)))
+    // Sync AJE/RJE totals into bank-acceptance row (primary substantive account)
+    setLocal('D1-adj-bank-acceptance-aje-dr', null, String(newAje))
+    setLocal('D1-adj-bank-acceptance-rje-dr', null, String(newRje))
     // Don't call saveImmediate here to avoid circular save loops;
-    // the adjudicationRows computed will re-derive from allResponses reactively.
+    // useD1Adjudication's computed will re-derive from allResponses reactively.
   })
 
   // ═══════════════════════════════════════════════════════════════════════════
   // Task 3.13: EventBus 联动
   // ═══════════════════════════════════════════════════════════════════════════
 
-  let previousAuditedAmount: number | null = null
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
-
-  /** 发布 substantive:adjudicated */
-  function publishAdjudicated(accountCode: string, auditedAmount: number, priorAmount: number, changeRate: number | null): void {
-    const payload: SubstantiveAdjudicatedPayload = {
-      wpCode: 'D1',
-      accountCode,
-      auditedAmount,
-      priorAmount,
-      changeRate,
-    }
-    try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-    } catch {
-      console.warn('[D1NotesReceivable] EventBus publish substantive:adjudicated failed')
-    }
-  }
 
   /** 发布 adjustment:created */
   function publishAdjustmentCreated(entry: AdjustmentEntry): void {
@@ -1233,28 +667,10 @@ export function useD1NotesReceivable(
     }
   }
 
-  // Watch audited amount changes to publish event
-  watch(adjudicationRows, (rows) => {
-    const bookValueRow = rows.find(r => r.rowKey === 'book-value')
-    if (!bookValueRow) return
-    const current = bookValueRow.auditedAmount
-    if (previousAuditedAmount !== null && previousAuditedAmount !== current) {
-      const rate = bookValueRow.changeRate
-      publishAdjudicated(
-        '1121',  // 应收票据标准科目编码
-        current,
-        bookValueRow.priorPeriod,
-        typeof rate === 'number' ? rate : null
-      )
-    }
-    previousAuditedAmount = current
-  }, { deep: true })
-
   /** 监听 risk:assessed（B50 → riskIndicators） */
   function onRiskAssessed(e: Event): void {
     const detail = (e as CustomEvent).detail
     if (!detail) return
-    // Store risk indicators by step number
     if (detail.stepIndex !== undefined && detail.level) {
       riskIndicators.value.set(detail.stepIndex, {
         level: detail.level,
@@ -1267,8 +683,6 @@ export function useD1NotesReceivable(
   function onControlTestConcluded(e: Event): void {
     const detail = (e as CustomEvent).detail
     if (!detail || detail.wpCode !== 'C2') return
-    // Store control test hint in findings of step 1 (获取明细) or relevant step
-    // This is informational — displayed in procedure table UI
     const hintKey = 'D1-proc-control-hint'
     const conclusion = detail.conclusion || ''
     setLocal(hintKey, null, conclusion)
@@ -1316,11 +730,6 @@ export function useD1NotesReceivable(
     tabVisited,
     linkageRefs,
 
-    // Task 3.2: 审定表 D1-1
-    adjudicationRows,
-    crossSheetValues,
-    refreshCrossSheetData,
-
     // Task 3.3: 程序表 D1A
     procedureSteps,
     setProcedureStatus,
@@ -1330,54 +739,8 @@ export function useD1NotesReceivable(
     overallConclusion,
     riskIndicators,
 
-    // Task 3.4: ECL 坏账准备
-    eclMethod,
-    setEclMethod,
-    agingBands,
-    migrationRateMatrix,
-    getExpectedLossRateForBand,
-    getProvisionForBand,
-    getDifferenceForBand,
-    isDifferenceExceedsMateriality,
-    eclSummary,
-
-    // Task 3.5: 业务模式分析
-    maturityAnalysis,
-    sppiTestResult,
-    setSppiTestResult,
-    businessModelChoice,
-    setBusinessModelChoice,
-    suggestedClassification,
-    hasOverdue90Plus,
-
-    // Task 3.6: 背书贴现
+    // 背书贴现明细（D1-8 已迁移，保留 endorsementItems 供关联方匹配 D1-11 使用）
     endorsementItems,
-    addEndorsement,
-    removeEndorsement,
-    endorsementSummary,
-
-    // Task 3.7: 贴息计算
-    discountInterestItems,
-    addDiscountInterest,
-    removeDiscountInterest,
-
-    // Task 3.8: 监盘倒推
-    inventoryReconciliation,
-    inventoryDifference,
-
-    // Task 3.9: 质押检查
-    pledgeItems,
-    addPledge,
-    removePledge,
-    pledgeTotalAmount,
-    pledgeRatio,
-    isPledgeRatioWarning,
-
-    // Task 3.10: 关联方检查
-    relatedPartyItems,
-    addRelatedParty,
-    removeRelatedParty,
-    matchedRelatedParties,
 
     // Task 3.11: 附注披露
     disclosureTemplate,
@@ -1394,7 +757,6 @@ export function useD1NotesReceivable(
     rjeTotal,
 
     // Task 3.13: EventBus
-    publishAdjudicated,
     publishAdjustmentCreated,
     unregisterEventListeners,
   }

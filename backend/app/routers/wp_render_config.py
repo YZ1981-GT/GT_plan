@@ -104,6 +104,7 @@ _ONLYOFFICE_HTML_WHITELIST: set[str] = {
     "d-form-paragraph",
     "bad-debt-sheet",
     "h-static-doc",
+    "d4-operating-revenue",
 }
 
 # 标准底稿编号：A~I + 数字（D1-1、E11）；CUST-01 等字母后非数字则视为自建
@@ -807,8 +808,9 @@ async def _get_render_config_impl(
 
         # 聚合工作包或独立底稿中 G- 前缀 class_code 强制走 OnlyOffice 编辑（不走 univer grid）
         # G-OnlyOffice = 聚合 grid_table；G-替代程序 = 独立底稿替代程序检查表等
+        # 但如果 sheet 已有 _sheet_ovr（专属组件 override），不强制走 OO
         _cls_code = getattr(cls, "class_code", "") or ""
-        if _is_multi_sheet and _cls_code.startswith("G-"):
+        if _is_multi_sheet and _cls_code.startswith("G-") and not _sheet_ovr:
             component_type = "onlyoffice-sheet"
             sheet_html_data = {"onlyoffice": True, "sheet_name": cls.sheet_name}
             sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,

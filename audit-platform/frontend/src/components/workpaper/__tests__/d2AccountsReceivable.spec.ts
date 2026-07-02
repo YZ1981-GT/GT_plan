@@ -34,20 +34,20 @@ describe('9.1 注册契约测试', () => {
     expect(overrides['D2']).toBe('d2-accounts-receivable')
   })
 
-  it('wp_code_overrides: D2-1→skip, D2-3→skip, D2-4→skip', async () => {
+  it('wp_code_overrides: D2-1/D2-3/D2-4 全部路由到 d2-accounts-receivable', async () => {
     const mod = await import('../../../../../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = (mod as any).default ?? mod
-    expect(overrides['D2-1']).toBe('skip')
-    expect(overrides['D2-3']).toBe('skip')
-    expect(overrides['D2-4']).toBe('skip')
+    expect(overrides['D2-1']).toBe('d2-accounts-receivable')
+    expect(overrides['D2-3']).toBe('d2-accounts-receivable')
+    expect(overrides['D2-4']).toBe('d2-accounts-receivable')
   })
 
-  it('wp_code_overrides: D2-2→audit-sheet, D2-5→audit-sheet, D2-6→audit-sheet', async () => {
+  it('wp_code_overrides: D2-2/D2-5/D2-6 路由到 d2-accounts-receivable', async () => {
     const mod = await import('../../../../../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = (mod as any).default ?? mod
-    expect(overrides['D2-2']).toBe('audit-sheet')
-    expect(overrides['D2-5']).toBe('audit-sheet')
-    expect(overrides['D2-6']).toBe('audit-sheet')
+    expect(overrides['D2-2']).toBe('d2-accounts-receivable')
+    expect(overrides['D2-5']).toBe('d2-accounts-receivable')
+    expect(overrides['D2-6']).toBe('d2-accounts-receivable')
   })
 
   it('htmlRendererRegistry includes d2-accounts-receivable componentType', async () => {

@@ -1,0 +1,115 @@
+{
+  "wp_code": "H5",
+  "name": "油气资产",
+  "version": "2025-R5",
+  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/H5.yaml",
+  "account_codes": [
+    "1631"
+  ],
+  "source_files": [
+    {
+      "file": "H5 油气资产.xlsx",
+      "sheets": [
+        "底稿目录",
+        "油气资产实质性程序表H5A",
+        "审定表H5-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表H5-2",
+        "调整分录汇总H5-3",
+        "折旧摊销测算表H5-4",
+        "减值测试表H5-5",
+        "检查表H5-6"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "油气资产实质性程序表H5A",
+      "code": "H5A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表H5-1",
+      "code": "H5-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "BS-017"
+        }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "opening_balance": {
+            "col": 2,
+            "label": "期初余额"
+          },
+          "increase": {
+            "col": 3,
+            "label": "本期增加"
+          },
+          "decrease": {
+            "col": 4,
+            "label": "本期减少"
+          },
+          "closing_balance": {
+            "col": 5,
+            "label": "期末余额"
+          },
+          "audit_adjustment": {
+            "col": 6,
+            "label": "审计调整"
+          },
+          "closing_audited": {
+            "col": 7,
+            "label": "期末审定数"
+          }
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "H5-listed",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "code": "H5-soe",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "明细表H5-2",
+      "code": "H5-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总H5-3",
+      "code": "H5-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "折旧摊销测算表H5-4",
+      "code": "H5-4",
+      "type": "calculation"
+    },
+    {
+      "exact_name": "减值测试表H5-5",
+      "code": "H5-5",
+      "type": "calculation"
+    },
+    {
+      "exact_name": "检查表H5-6",
+      "code": "H5-6",
+      "type": "check"
+    }
+  ]
+}

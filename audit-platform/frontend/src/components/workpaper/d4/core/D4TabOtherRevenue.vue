@@ -11,6 +11,7 @@
 import { computed, inject, toRef, type Ref } from 'vue'
 import { useD4OtherRevenue, type OtherRevenueRow } from '../../composables/useD4OtherRevenue'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
+import { useD4ImportExport } from '../../composables/useD4ImportExport'
 
 const props = defineProps<{
   wpId: string
@@ -51,6 +52,17 @@ const {
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+// ─── 导入导出 ─────────────────────────────────────────────────────────
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+})
+
+function handleImportUpload(file: File): boolean {
+  importData('D4-3', file)
+  return false
+}
 
 // ─── 样式判断 ─────────────────────────────────────────────────────────
 function getRateCellClass(rate: number | '' | 'N/A'): string {
@@ -99,9 +111,34 @@ const auditConclusion = computed({
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" :disabled="isReadonly" @click="addRow">+ 添加项目行</el-button>
+        <el-tooltip placement="top" :show-after="300">
+          <template #content>
+            本表为手工填列，非自动取数。<br/>
+            建议先导出模板，离线填写后再导入，效率更高。
+          </template>
+          <el-button size="small" :disabled="isReadonly" @click="addRow">+ 添加项目行</el-button>
+        </el-tooltip>
       </div>
       <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('D4-3')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('D4-3')">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx,.xls"
+                  :before-upload="handleImportUpload"
+                  :disabled="importing"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
@@ -318,6 +355,13 @@ const auditConclusion = computed({
 <style scoped>
 .d4-tab-other-revenue {
   padding: 12px;
+}
+.d4-tab-other-revenue :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d4-tab-other-revenue :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 .guidance-details {
   margin-bottom: 12px;

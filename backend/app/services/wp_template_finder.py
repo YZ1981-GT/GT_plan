@@ -142,13 +142,30 @@ def find_template_file(wp_code: str) -> Path | None:
         if "-" in wp_code:
             primary = wp_code.split("-")[0]
             sub_num = wp_code.split("-")[1]
+            # 尝试解析为数字进行范围判断
+            try:
+                sub_num_int = int(re.sub(r"[A-Za-z]", "", sub_num))
+            except (ValueError, TypeError):
+                sub_num_int = None
+
             for f in sorted(template_subdir.iterdir()):
                 if f.suffix.lower() not in (".xlsx", ".xlsm"):
                     continue
                 # 匹配模式: 文件名含 "{primary}-N至{primary}-M" 且 sub_num 在范围内
                 if f.name.startswith(primary + "-") and "至" in f.name:
-                    # 简单包含检查
-                    return f
+                    # 从文件名提取范围: "D4-22至D4-32..." → start=22, end=32
+                    range_match = re.search(
+                        rf"{re.escape(primary)}-(\d+).*至.*{re.escape(primary)}-(\d+)",
+                        f.name,
+                    )
+                    if range_match and sub_num_int is not None:
+                        start = int(range_match.group(1))
+                        end = int(range_match.group(2))
+                        if start <= sub_num_int <= end:
+                            return f
+                    elif not range_match:
+                        # 无法解析范围但文件名匹配模式，保守返回
+                        return f
             # 终极回退：用主表
             for f in sorted(template_subdir.iterdir()):
                 if f.name.startswith(primary + " ") and f.suffix.lower() in (".xlsx", ".xlsm"):

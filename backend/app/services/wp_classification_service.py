@@ -113,6 +113,9 @@ VALID_COMPONENT_TYPES: set[str] = {
     "d5-receivables-financing",
     "d6-contract-assets",
     "d7-contract-liabilities",
+    "e1-monetary-fund",
+    "confirmation-alternative-f05",
+    "confirmation-alternative-f06",
 }
 
 # wp_code 级专用路由覆盖（优先于 class_code 派生）

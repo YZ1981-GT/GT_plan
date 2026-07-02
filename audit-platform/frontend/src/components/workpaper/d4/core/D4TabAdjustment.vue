@@ -2,13 +2,17 @@
 /**
  * D4TabAdjustment — D4-4 调整分录
  *
- * el-table 10列 + "新增调整分录" + 借贷合计+平衡指示
- * "推送至A13"按钮 + 编制提示details折叠
+ * el-table 8列 + "新增调整分录" + 借贷合计+平衡指示
+ * "推送至A13"按钮 + 与调整分录模块双向联动 + 导入导出三级
  *
  * Requirements: 5.1-5.7
  */
 import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4Adjustment, type D4AdjustmentRow } from '../../composables/useD4Adjustment'
+import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -45,6 +49,17 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
+// ─── 导入导出 ─────────────────────────────────────────────────────────
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+})
+
+function handleImportUpload(file: File): boolean {
+  importData('D4-4', file)
+  return false
+}
+
 // ─── 选中行（用于推送A13） ─────────────────────────────────────────────
 const selectedRows = ref<D4AdjustmentRow[]>([])
 
@@ -64,6 +79,65 @@ const categoryOptions = [
   { label: '报表调整', value: '报表调整' },
   { label: '其他', value: '其他' },
 ]
+
+// ─── 审计说明/结论（allResponses存取，与D4-2一致） ────────────────────
+const auditNote = computed({
+  get: () => props.allResponses.get('D4-4-note')?.remark || '',
+  set: (val: string) => (props.allResponses as Map<string, any>).set('D4-4-note', { item_id: 'D4-4-note', conclusion: null, remark: val }),
+})
+const auditConclusion = computed({
+  get: () => props.allResponses.get('D4-4-conclusion')?.remark || '',
+  set: (val: string) => (props.allResponses as Map<string, any>).set('D4-4-conclusion', { item_id: 'D4-4-conclusion', conclusion: null, remark: val }),
+})
+
+// ─── AI辅助（真实接入） ──────────────────────────────────────────────
+const aiAvailable = ref(false)
+const aiLoadingKey = ref<string | null>(null)
+async function checkAiHealth() {
+  try {
+    const res = await http.get('/api/ai/health', { _silent: true } as any)
+    const s = res.data?.data?.status ?? res.data?.status
+    aiAvailable.value = s === 'healthy' || s === 'degraded'
+  } catch { aiAvailable.value = false }
+}
+checkAiHealth()
+
+async function callD4Ai(section: string, existing: string): Promise<string> {
+  const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
+    section, existingContent: existing, relatedContext: {},
+  }, { _silent: true } as any)
+  return res.data?.data?.content ?? res.data?.content ?? ''
+}
+
+async function generateNote() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingKey.value = 'note'
+  try {
+    const ctx = rows.value.map(r =>
+      `${r.description || '调整'}: ${r.accountName} 借${fmtAmount(r.debitAmount)}/贷${fmtAmount(r.creditAmount)} [${r.category}]`
+    ).join('\n') || '（暂无调整分录）'
+    const text = await callD4Ai('adj-note', ctx)
+    if (!text) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(text.length > 300 ? text.slice(0, 300) + '…' : text, 'AI 生成 · 审计说明', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    auditNote.value = text
+  } catch (e: any) { if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('AI 生成失败') }
+  finally { aiLoadingKey.value = null }
+}
+
+async function generateConclusion() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingKey.value = 'conclusion'
+  try {
+    const ctx = `审计说明：${auditNote.value || '（未填写）'}\n借贷${isBalanced.value ? '平衡' : '不平衡差异' + fmtAmount(balanceDiff.value)}`
+    const text = await callD4Ai('adj-conclusion', ctx)
+    if (!text) { ElMessage.warning('AI 未生成内容'); return }
+    await ElMessageBox.confirm(text.length > 300 ? text.slice(0, 300) + '…' : text, 'AI 生成 · 审计结论', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' })
+    auditConclusion.value = text
+  } catch (e: any) { if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('AI 生成失败') }
+  finally { aiLoadingKey.value = null }
+}
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 </script>
 
 <template>
@@ -77,15 +151,23 @@ const categoryOptions = [
         <p>3. 借贷合计必须平衡（借方合计=贷方合计），不平衡时无法确认。</p>
         <p>4. 确认后的调整分录将同步更新D4-1审定表的AJE/RJE列。</p>
         <p>5. 可选中分录推送至A13错报汇总表。</p>
+        <p>6. 本表与"调整分录"模块双向联动：此处新增的分录会同步到调整分录模块，反之亦然。</p>
       </div>
     </details>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
-          + 新增调整分录
-        </el-button>
+        <el-tooltip placement="top" :show-after="300">
+          <template #content>
+            本表与调整分录模块双向联动。<br/>
+            此处新增的分录会自动同步至调整分录模块(科目6001/6051)，<br/>
+            调整分录模块中涉及营业收入科目的分录也会自动回写至此表。
+          </template>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
+            + 新增调整分录
+          </el-button>
+        </el-tooltip>
         <el-button
           size="small"
           :disabled="isReadonly || selectedRows.length === 0"
@@ -95,6 +177,25 @@ const categoryOptions = [
         </el-button>
       </div>
       <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('D4-4')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('D4-4')">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx,.xls"
+                  :before-upload="handleImportUpload"
+                  :disabled="importing"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button
           size="small"
           type="success"
@@ -131,7 +232,7 @@ const categoryOptions = [
       <el-table-column type="selection" width="40" />
 
       <!-- 1. 摘要 -->
-      <el-table-column label="摘要" width="140">
+      <el-table-column label="摘要" min-width="200">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -179,7 +280,7 @@ const categoryOptions = [
       </el-table-column>
 
       <!-- 4. 会计科目 -->
-      <el-table-column label="会计科目" width="130">
+      <el-table-column label="会计科目" width="150">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -205,20 +306,7 @@ const categoryOptions = [
         </template>
       </el-table-column>
 
-      <!-- 6. 占位符 -->
-      <el-table-column label="占位符" width="90">
-        <template #default="{ row }">
-          <el-input
-            v-if="!isReadonly"
-            :model-value="row.placeholder"
-            size="small"
-            @change="(v: string) => updateCell(row.rowId, 'placeholder', v)"
-          />
-          <span v-else>{{ row.placeholder || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 7. 借方金额 -->
+      <!-- 6. 借方金额 -->
       <el-table-column label="借方" width="120" align="right">
         <template #default="{ row }">
           <el-input
@@ -232,7 +320,7 @@ const categoryOptions = [
         </template>
       </el-table-column>
 
-      <!-- 8. 贷方金额 -->
+      <!-- 7. 贷方金额 -->
       <el-table-column label="贷方" width="120" align="right">
         <template #default="{ row }">
           <el-input
@@ -246,7 +334,7 @@ const categoryOptions = [
         </template>
       </el-table-column>
 
-      <!-- 9. 索引号 -->
+      <!-- 8. 索引号 -->
       <el-table-column label="索引号" width="80">
         <template #default="{ row }">
           <el-input
@@ -256,19 +344,6 @@ const categoryOptions = [
             @change="(v: string) => updateCell(row.rowId, 'indexRef', v)"
           />
           <span v-else>{{ row.indexRef || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 10. 备注 -->
-      <el-table-column label="备注" min-width="100">
-        <template #default="{ row }">
-          <el-input
-            v-if="!isReadonly"
-            :model-value="row.remark"
-            size="small"
-            @change="(v: string) => updateCell(row.rowId, 'remark', v)"
-          />
-          <span v-else>{{ row.remark || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -288,14 +363,71 @@ const categoryOptions = [
 
     <!-- 空状态 -->
     <div v-if="rows.length === 0" class="empty-hint">
-      暂无调整分录。点击"新增调整分录"添加。
+      暂无调整分录。点击"新增调整分录"添加，或从调整分录模块自动同步。
     </div>
+
+    <!-- 审计意见区（卡片式，与D4-1/D4-2/D4-5统一） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
+            <GtIndexChip value="wp:A13" :context-project-id="projectId" />
+          </div>
+        </div>
+      </template>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">1. 审计说明</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoadingKey === 'note'"
+                :disabled="isReadonly || !aiAvailable" @click="generateNote">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReviewDialog?.('D4-4-note')">💬</el-button>
+          </div>
+        </div>
+        <el-input
+          v-model="auditNote"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          placeholder="请输入审计说明（汇总营业收入相关调整事项的原因与影响）..."
+          :disabled="isReadonly"
+        />
+      </div>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">2. 审计结论</span>
+          <el-tooltip :content="aiTip" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoadingKey === 'conclusion'"
+              :disabled="isReadonly || !aiAvailable" @click="generateConclusion">🤖 AI辅助</el-button>
+          </el-tooltip>
+        </div>
+        <el-input
+          v-model="auditConclusion"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 5 }"
+          placeholder="请输入审计结论..."
+          :disabled="isReadonly"
+        />
+      </div>
+    </el-card>
   </div>
 </template>
 
 <style scoped>
 .d4-tab-adjustment {
   padding: 12px;
+}
+.d4-tab-adjustment :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d4-tab-adjustment :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -353,5 +485,49 @@ const categoryOptions = [
   color: #909399;
   padding: 24px;
   font-size: 13px;
+}
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
 }
 </style>

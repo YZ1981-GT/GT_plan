@@ -84,7 +84,7 @@
 
       <!-- 工具栏：类别筛选 + 批量操作 -->
       <div class="gt-a-program-console__toolbar">
-        <div class="gt-a-program-console__filters">
+        <div v-if="!hideCategories" class="gt-a-program-console__filters">
           <el-radio-group v-model="activeCategory" size="small">
             <el-radio-button label="">全部</el-radio-button>
             <el-radio-button
@@ -583,8 +583,10 @@ const props = withDefaults(defineProps<{
   schema: AProgramSchema
   htmlData: AProgramHtmlData
   readonly?: boolean
+  hideCategories?: boolean
 }>(), {
   readonly: false,
+  hideCategories: false,
 })
 
 const emit = defineEmits<{

@@ -6499,6 +6499,157 @@
           "applicable_default": "yes"
         }
       ]
+    },
+    "D4-22A": {
+      "title": "营业收入实质性程序表(IPO/上市/新三板/重组/舞弊应对)",
+      "wp_code": "D4-22A",
+      "cycle": "D",
+      "items": [
+        {
+          "program_no": 1,
+          "program_desc": "对于通过电子方式自动生成、处理、记录的销售交易,必要时，考虑利用信息系统审计专家的工作。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 2,
+          "program_desc": "分析性程序：\n（1）结合被审计单位业务特点和其主要客户基本经营信息，分析其客户购买力、结构变化和销售波动情况，是否存在客户异常采购的情况；与其客户信息披露核对（如适用）。\n（2）结合存货底稿分析销售收入等财务信息与投入产出率、劳动生产率、产能、水电能耗、运输数量等非财务信息之间的关系。\n（3）获取年度预算资料，比较收入金额与年度预算是否存在重大差异，如果发现被审计单位的收入增长幅度明显高于管理层的预期，可以询问管理层的适当人员，并考虑管理层的答复是否与其他审计证据一致。例如，如果管理层表示收入增长是由于销售量增加所致，可以调查与市场需求相关的情况。\n（4）将销售收入变动幅度与销售商品及提供劳务收到的现金、应收账款/合同资产、存货、税金等项目的变动幅度进行比较，分析具体原因。\n（5）将人均创收金额等指标与同行业及行业领军企业比较是否存在异常，如果被审计单位人均创收超过行业领军企业，应保持警觉，考虑获取的审计证据是否能够支持。\n（6）了解期末在手订单情况，分析销售与采购是否配比，以及重要客户大量采购的原因、最终销售情况、终端客户同经销商地域的匹配性。\n（7）分析销售收入与销售费用之间的关系，包括销售人员的人均业绩指标、销售人员薪酬、广告费、差旅费，以及销售机构的设置、规模、数量、分布等。\n（8）根据增值税发票申报表或普通发票，估算全年收入，与实际收入金额比较。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "F2-63\n/D4-22\n/D4-23",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 3,
+          "program_desc": "对重要客户的货款回收进行检查,关注是否存在第三方回款情况,例如通过第三方账户，包括员工账户和其他个人账户回款，通过保理公司回款的情况。如果存在第三方回款，应获取并检查第三方代付协议，分析第三方回款的必要性和合理性。检查第三方与被审计单位及客户之间是否存在关联关系。必要时，向第三方函证。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "D4-24",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 4,
+          "program_desc": "如果被审计单位采用经销商的销售模式，需要关注：\n（1）检查被审计单位与经销商之间的协议或合同以及实际执行情况，确定与经销商是否为委托代理的关系，对经销商销售收入确认时点是否符合企业会计准则的规定；\n（2）关注主要的经销商与被审计单位之间是否存在关联方关系，检查出库单、货运单、商品验收单等相关支持性凭证，以确定是否满足收入确认的条件；\n（3）关注经销商布局的合理性、被审计单位频繁发生经销商加入和退出的情况，以及被审计单位对不稳定经销商的收入确认是否适当、退换货损失的处理是否适当、经销商最终销售情况等；\n（4）对经销商为委托代理销售的模式，检查被审计单位收入确认是否有代理商的销售清单、货物最终销售证明等支持性凭据。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "D4-14\n/D4-25\n/D4-",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 5,
+          "program_desc": "对境外销售收入，检查向主要国家和地区销售的金额、境外收入占比、结算模式等，不同贸易模式下的收入确认是否符合企业会计准则的规定，关注是否存在第三方回款、是否执行了核查、函证、现场走访等程序。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "D4-26",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 6,
+          "program_desc": "如果应收账款、合同资产增长比例高于销售收入的增长比例，考虑扩大函证比例、增加截止测试和期后收款测试的比例、使用与前期不同的抽样方法、实地走访客户等。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 7,
+          "program_desc": "对比历年主要客户清单，找出报告期新增的主要客户、原有主要客户交易额大幅减少或合作关系取消的情况，重点关注变化原因。关注会计期末是否存在突击确认销售以及期后是否存在大量销售退回的情况",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 8,
+          "program_desc": "结合应收账款审计，选择主要客户、异常客户收入等执行函证程序。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "D4-0",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 9,
+          "program_desc": "向被审计单位的客户函证相关的特定合同条款以及是否存在背后协议。相关的会计处理是否适当，往往会受到这些合同条款或协议的影响。例如，商品接受标准、交货与付款条件、不承担期后或持续性的卖方义务、退货权、保证转售金额以及撤销或退款等条款在此种情形下通常是相关的。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 10,
+          "program_desc": "如果被审计单位存在特殊交易模式或创新交易模式，分析其对交易经济实质和收入确认的影响。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 11,
+          "program_desc": "考虑大额或异常的交易是否表明存在一个先前没有披露的关联方：\n（1）查询客户工商、银行、税务信息资料，关注其地址、董事/监事/关键管理人员、联系方式等信息，并与其相关发票信息、网站信息进行核对，识别客户是否存在与被审计单位存在疑似关联关系的信息；\n（2）选取重要客户，获取关联方关系确认函；\n（3）取得实际控制人、董高监及其密切家庭人员的对外投资清单，与重要客户的股东和关键经办人员进行比对，关注与发行人实际控制人、董事、监事、高级管理人员关系密切的家庭成员与发行人的客户是否存在关联方关系；\n（4）取得保荐机构及其关联方、PE投资机构及其关联方、PE投资机构的股东或实际控制人控制或投资的其他企业清单，将这些利益相关方清单和重要客户及其法人、股东和关键经办人员名单进行比对，关注其是否与发行人发生大额交易从而导致发行人在报告期内收入、利润出现较大幅度增长；\n（5）获取发行人主要股东、董事、监事、关键管理人员及上述利益相关方的确认函，确认除其本人在被审计单位领取薪酬或分得股利外，其本人及其关系密切的家庭成员未与被审计单位有任何形式的交易。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "D4-27\n/D4-29\n/D4-",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 12,
+          "program_desc": "如果存在被审计单位关联方注销及非关联化的情况，需要关注被审计单位将原关联方非关联化行为的动机及后续交易的真实性、公允性。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 13,
+          "program_desc": "结合出库单及销售费用中的运输费等明细，检查货物运输单和提单，必要时向运输单位进行函证或走访，关注货物的流动是否真实发生，从而确定交易的真实性。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 14,
+          "program_desc": "期末在被审计单位的一处或多处发货现场实地观察发货情况或准备发出的商品情况（或待处理的退货），并结合所了解的情况实施适当的销售及存货截止测试。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 15,
+          "program_desc": "关注临近期末的大额销售、退货、调整等情况：\n（1）向被审计单位负责销售和市场开发的人员询问临近期末的销售或发货情况，向被审计单位内部法律顾问询问临近期末签订的销售合同是否存在异常的合同条款或条件；\n（2）检查临近期末执行的重要销售合同，以发现是否存在异常的定价、结算、发货、退货、换货或验收条款。对期后实施特定的检查，以发现是否存在改变或撤销合同条款的情况，以及是否存在退款的情况；\n（3）详细复核被审计单位在临近期末以及期后编制的调整分录，调查性质或金额异常的项目。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 16,
+          "program_desc": "结合存货、固定资产、无形资产循环审计，分析客户、供应商名单以及应收、应付等往来明细，检查是否针对同一对方单位或存在关联关系的对方单位同时存在销售、采购的情况，是否有合理的商业理由，关注是否存在第三方配合舞弊的情形。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 17,
+          "program_desc": "如果识别出被审计单位收入真实性存在重大异常情况，且通过常规审计程序无法获取充分、适当的审计证据时，考虑实施“延伸检查”程序，可以实施的“延伸检查”程序包括不限于：\n（1）利用企业信息查询工具查询公司注册资本、地址、成立时间、经营范围、法定代表人、股东、最终控制人等，了解公司经营范围，判断客户所购产品是否具有合理用途、是否存在关联关系、向客户销售金额是否与客户规模匹配等。\n（2）现场走访客户的办公场所、经营场所，访谈客户关键经办人员，或电话访谈关键经办人员。核实被访谈对象对象身份的真实性和适当性，根据实际情况设计访谈计划和访谈提纲，观察对方生产经营情况，判断其与被审计单位之间的交易规模是否和其生产经营规模匹配；\n（3）了解相关客户向被审计单位进行采购的商业理由、采购被审计单位商品的用途和去向、是否存在销售给被审计单位指定单位的情况、客户与被审计单位是否存在除购销交易以外的资金往来、了解客户从被审计单位采购的商品的生产、库存情况等，必要时进行实地察看。\n（4）在采用经销模式的情况下，关注经销商库存量是否存在明显不合理，检查经销商进销存记录、经销商的最终销售实现情况。\n（5）当注意到可能存在关联方（例如被审计单位控股股东、实际控制人、关键管理人员）或者第三方客户配合被审计单位虚构收入的迹象时，考虑获取并检查相关关联方或者客户的银行账户资金流水，关注是否存在与被审计单位相关供应商、客户或关联方的异常资金往来；考虑获取其下游客户的订单、对其下游客户进行实地走访等。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "D4-28\n/D4-29\n/D4-30\n/D4-31\n/D4-32",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        },
+        {
+          "program_no": 18,
+          "program_desc": "根据评估的舞弊风险等因素增加的审计程序。",
+          "program_category": "IPO/上市/新三板/重组/舞弊应对",
+          "linked_workpapers": "",
+          "assertions": {},
+          "phase": "IPO/上市/新三板/重组/舞弊应对"
+        }
+      ]
     }
   },
   "G0A": {
@@ -8372,349 +8523,1507 @@
   "L0A": {
     "name": "筹资循环函证实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位筹资循环风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制+C14 租赁控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13/C14", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "选择需函证的借款及债务（银行/债权人），编制函证清单。", "ref_index": "L0-1", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 4, "content": "核实被函证银行/债权人信息（名称、地址、联系人），确保函证有效送达。", "ref_index": "L0-2", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 5, "content": "设计询证函，包括借款余额、利率、到期日、担保物、限制性条款等核心信息。", "ref_index": "L0-1/L0-2", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 6, "content": "注册会计师直接收发询证函，跟函确认处理函证人员身份和权限。", "ref_index": "L0-3", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 7, "content": "核实回函真实性，比对印章签字，检查函证信息是否相符。", "ref_index": "L0-1/L0-4", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 8, "content": "对存在差异的回函实施差异调节程序。", "ref_index": "L0-4", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 9, "content": "对未回函项目实施替代程序（检查借款合同/还款记录/期后还款）。", "ref_index": "L0-5", "auto_data_source": "confirmation_summary_for_cycle", "applicable_default": "yes"},
-      {"seq": 10, "content": "汇总函证结果，评价函证程序对借款余额审计目标的实现程度。", "ref_index": "L0-1", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位筹资循环风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制+C14 租赁控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13/C14",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "选择需函证的借款及债务（银行/债权人），编制函证清单。",
+        "ref_index": "L0-1",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "核实被函证银行/债权人信息（名称、地址、联系人），确保函证有效送达。",
+        "ref_index": "L0-2",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "设计询证函，包括借款余额、利率、到期日、担保物、限制性条款等核心信息。",
+        "ref_index": "L0-1/L0-2",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "注册会计师直接收发询证函，跟函确认处理函证人员身份和权限。",
+        "ref_index": "L0-3",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "核实回函真实性，比对印章签字，检查函证信息是否相符。",
+        "ref_index": "L0-1/L0-4",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 8,
+        "content": "对存在差异的回函实施差异调节程序。",
+        "ref_index": "L0-4",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 9,
+        "content": "对未回函项目实施替代程序（检查借款合同/还款记录/期后还款）。",
+        "ref_index": "L0-5",
+        "auto_data_source": "confirmation_summary_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 10,
+        "content": "汇总函证结果，评价函证程序对借款余额审计目标的实现程度。",
+        "ref_index": "L0-1",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L1A": {
     "name": "短期借款实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位短期借款相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制短期借款明细表，与总账及明细账核对相符。", "ref_index": "L1-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "审查借款合同，确认借款金额、利率、期限、担保条件、限制性条款。", "ref_index": "L1-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "测算利息费用（本金×利率×天数/360），与账面利息核对。", "ref_index": "L1-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查还款情况，核实期后偿还记录与借款明细一致。", "ref_index": "L1-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "执行检查程序，包括利率合理性、授权审批、合同签章完整性。", "ref_index": "L1-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 8, "content": "检查短期借款是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位短期借款相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制短期借款明细表，与总账及明细账核对相符。",
+        "ref_index": "L1-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "审查借款合同，确认借款金额、利率、期限、担保条件、限制性条款。",
+        "ref_index": "L1-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "测算利息费用（本金×利率×天数/360），与账面利息核对。",
+        "ref_index": "L1-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查还款情况，核实期后偿还记录与借款明细一致。",
+        "ref_index": "L1-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "执行检查程序，包括利率合理性、授权审批、合同签章完整性。",
+        "ref_index": "L1-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 8,
+        "content": "检查短期借款是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L2A": {
     "name": "应付利息实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位应付利息相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制应付利息明细表，与总账核对。", "ref_index": "L2-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "测算各借款应付利息（本金×利率×计息期间），与账面已计提金额核对。", "ref_index": "L2-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查利息支付记录，确认已付利息正确冲减应付利息。", "ref_index": "L2-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查应付利息是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位应付利息相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制应付利息明细表，与总账核对。",
+        "ref_index": "L2-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "测算各借款应付利息（本金×利率×计息期间），与账面已计提金额核对。",
+        "ref_index": "L2-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查利息支付记录，确认已付利息正确冲减应付利息。",
+        "ref_index": "L2-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查应付利息是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L3A": {
     "name": "长期借款实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位长期借款相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制长期借款明细表，与总账及明细账核对相符。", "ref_index": "L3-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "审查借款合同，确认借款金额、利率、期限、担保条件、限制性条款。", "ref_index": "L3-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "测算利息费用（本金×利率×天数/360），与账面利息核对。", "ref_index": "L3-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查一年内到期长期借款，确认重分类为短期借款的金额正确。", "ref_index": "L3-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "执行检查程序，包括利率合理性、展期续贷、合同签章完整性。", "ref_index": "L3-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 8, "content": "检查长期借款是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位长期借款相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制长期借款明细表，与总账及明细账核对相符。",
+        "ref_index": "L3-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "审查借款合同，确认借款金额、利率、期限、担保条件、限制性条款。",
+        "ref_index": "L3-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "测算利息费用（本金×利率×天数/360），与账面利息核对。",
+        "ref_index": "L3-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查一年内到期长期借款，确认重分类为短期借款的金额正确。",
+        "ref_index": "L3-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "执行检查程序，包括利率合理性、展期续贷、合同签章完整性。",
+        "ref_index": "L3-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 8,
+        "content": "检查长期借款是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L4A": {
     "name": "应付债券实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位应付债券相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制应付债券明细表，与总账核对。", "ref_index": "L4-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "计算实际利率（IRR），验证发行价=面值×票面利率现金流折现。", "ref_index": "L4-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "编制摊余成本摊销表，验证每期利息费用和摊销额。", "ref_index": "L4-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "测算利息费用（期初摊余成本×实际利率），与账面核对。", "ref_index": "L4-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "分析折价/溢价余额变动，确认摊销方向及金额正确。", "ref_index": "L4-6", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 8, "content": "执行检查程序，包括债券条款、提前赎回、嵌入衍生工具判断。", "ref_index": "L4-7", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 9, "content": "检查应付债券是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位应付债券相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制应付债券明细表，与总账核对。",
+        "ref_index": "L4-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "计算实际利率（IRR），验证发行价=面值×票面利率现金流折现。",
+        "ref_index": "L4-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "编制摊余成本摊销表，验证每期利息费用和摊销额。",
+        "ref_index": "L4-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "测算利息费用（期初摊余成本×实际利率），与账面核对。",
+        "ref_index": "L4-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "分析折价/溢价余额变动，确认摊销方向及金额正确。",
+        "ref_index": "L4-6",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 8,
+        "content": "执行检查程序，包括债券条款、提前赎回、嵌入衍生工具判断。",
+        "ref_index": "L4-7",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 9,
+        "content": "检查应付债券是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L5A": {
     "name": "长期应付款实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位长期应付款相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制+C14 租赁控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13/C14", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制长期应付款明细表，与总账核对。", "ref_index": "L5-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "测算长期应付款现值，验证未确认融资费用分摊正确。", "ref_index": "L5-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查长期应付款是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位长期应付款相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制+C14 租赁控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13/C14",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制长期应付款明细表，与总账核对。",
+        "ref_index": "L5-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "测算长期应付款现值，验证未确认融资费用分摊正确。",
+        "ref_index": "L5-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查长期应付款是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L6A": {
     "name": "专项应付款实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位专项应付款相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制专项应付款明细表，与总账核对。", "ref_index": "L6-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查专项资金使用情况，确认资金使用符合规定用途。", "ref_index": "L6-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查专项应付款是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位专项应付款相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制专项应付款明细表，与总账核对。",
+        "ref_index": "L6-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查专项资金使用情况，确认资金使用符合规定用途。",
+        "ref_index": "L6-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查专项应付款是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L7A": {
     "name": "其他非流动负债实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位其他非流动负债相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制其他非流动负债明细表，与总账核对。", "ref_index": "L7-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "执行检查程序，确认各项其他非流动负债的性质和分类正确。", "ref_index": "L7-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查其他非流动负债是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位其他非流动负债相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制其他非流动负债明细表，与总账核对。",
+        "ref_index": "L7-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "执行检查程序，确认各项其他非流动负债的性质和分类正确。",
+        "ref_index": "L7-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查其他非流动负债是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "L8A": {
     "name": "财务费用实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位财务费用相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。", "ref_index": "C13", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"},
-      {"seq": 3, "content": "获取或编制财务费用明细表（利息支出/汇兑损益/手续费分类），与总账核对。", "ref_index": "L8-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "汇总各借款利息测算结果（L1-3短期+L3-3长期+L4-5债券），与账面利息费用核对。", "ref_index": "L8-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "分析财务费用结构变动原因，关注利率/汇率波动影响。", "ref_index": "L8-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "测算汇兑损益（(期末汇率-记账汇率)×外币余额），与账面核对。", "ref_index": "L8-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "检查财务费用是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位财务费用相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取控制测试结论（C13 债务控制），评价控制有效性对实质性程序的影响。",
+        "ref_index": "C13",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取或编制财务费用明细表（利息支出/汇兑损益/手续费分类），与总账核对。",
+        "ref_index": "L8-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "汇总各借款利息测算结果（L1-3短期+L3-3长期+L4-5债券），与账面利息费用核对。",
+        "ref_index": "L8-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "分析财务费用结构变动原因，关注利率/汇率波动影响。",
+        "ref_index": "L8-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "测算汇兑损益（(期末汇率-记账汇率)×外币余额），与账面核对。",
+        "ref_index": "L8-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "检查财务费用是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M1A": {
     "name": "应付股利实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位应付股利相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制应付股利明细表，与总账核对一致。", "ref_index": "M1-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查股东大会/董事会利润分配决议，核实分配金额、日期、对象。", "ref_index": "M1-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查报告期末应付股利余额合理性，核实是否已按决议足额计提。", "ref_index": "M1-1", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查期后支付情况，确认应付股利期后实际支付并核实对应银行流水。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查应付股利是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位应付股利相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制应付股利明细表，与总账核对一致。",
+        "ref_index": "M1-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查股东大会/董事会利润分配决议，核实分配金额、日期、对象。",
+        "ref_index": "M1-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查报告期末应付股利余额合理性，核实是否已按决议足额计提。",
+        "ref_index": "M1-1",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查期后支付情况，确认应付股利期后实际支付并核实对应银行流水。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查应付股利是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M2A": {
     "name": "实收资本（股本）实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位实收资本（股本）相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制实收资本明细表（按股东），与总账及工商登记核对。", "ref_index": "M2-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查验资报告，核实各股东出资方式、时间、金额。", "ref_index": "M2-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "核对工商登记信息，确认股东变更是否完成工商变更登记。", "ref_index": "M2-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查报告期内实收资本变动（增资/减资），核实审批程序及相关协议。", "ref_index": "M2-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查非货币资产出资的计量（评估报告/公允价值），确认入账金额合理性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "检查实收资本是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位实收资本（股本）相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制实收资本明细表（按股东），与总账及工商登记核对。",
+        "ref_index": "M2-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查验资报告，核实各股东出资方式、时间、金额。",
+        "ref_index": "M2-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "核对工商登记信息，确认股东变更是否完成工商变更登记。",
+        "ref_index": "M2-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查报告期内实收资本变动（增资/减资），核实审批程序及相关协议。",
+        "ref_index": "M2-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查非货币资产出资的计量（评估报告/公允价值），确认入账金额合理性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "检查实收资本是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M3A": {
     "name": "库存股实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位库存股相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制库存股明细表，与总账核对一致。", "ref_index": "M3-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查股份回购的董事会/股东大会决议及回购协议。", "ref_index": "M3-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "核实回购价格合理性，与市场价格/净资产比较。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查库存股注销处理的合规性（减少注册资本的审批程序）。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查库存股是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位库存股相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制库存股明细表，与总账核对一致。",
+        "ref_index": "M3-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查股份回购的董事会/股东大会决议及回购协议。",
+        "ref_index": "M3-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "核实回购价格合理性，与市场价格/净资产比较。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查库存股注销处理的合规性（减少注册资本的审批程序）。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查库存股是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M4A": {
     "name": "资本公积实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位资本公积相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制资本公积明细表（资本溢价/其他资本公积），与总账核对。", "ref_index": "M4-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "分析资本公积变动原因，核实各项变动是否有充分依据。", "ref_index": "M4-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查资本公积来源的合规性（股本溢价/资产评估增值/资本性拨款等）。", "ref_index": "M4-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查股份支付计入资本公积的金额，与J3股份支付底稿核对。", "ref_index": "M4-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查资本公积转增资本的审批程序及合规性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "检查资本公积是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位资本公积相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制资本公积明细表（资本溢价/其他资本公积），与总账核对。",
+        "ref_index": "M4-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "分析资本公积变动原因，核实各项变动是否有充分依据。",
+        "ref_index": "M4-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查资本公积来源的合规性（股本溢价/资产评估增值/资本性拨款等）。",
+        "ref_index": "M4-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查股份支付计入资本公积的金额，与J3股份支付底稿核对。",
+        "ref_index": "M4-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查资本公积转增资本的审批程序及合规性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "检查资本公积是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M5A": {
     "name": "盈余公积实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位盈余公积相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制盈余公积明细表（法定/任意），与总账核对。", "ref_index": "M5-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "验证法定盈余公积提取比例（10%净利润）是否合规，累计是否达注册资本50%。", "ref_index": "M5-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查任意盈余公积提取是否经股东大会决议批准。", "ref_index": "M5-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查盈余公积使用（转增资本/弥补亏损）的审批程序及合规性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查盈余公积是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位盈余公积相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制盈余公积明细表（法定/任意），与总账核对。",
+        "ref_index": "M5-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "验证法定盈余公积提取比例（10%净利润）是否合规，累计是否达注册资本50%。",
+        "ref_index": "M5-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查任意盈余公积提取是否经股东大会决议批准。",
+        "ref_index": "M5-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查盈余公积使用（转增资本/弥补亏损）的审批程序及合规性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查盈余公积是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M6A": {
     "name": "未分配利润实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位未分配利润相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "编制未分配利润勾稽表（期初+净利润-提取盈余-分配股利=期末），验证等式。", "ref_index": "M6-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查利润分配方案，核实董事会/股东大会决议内容。", "ref_index": "M6-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "核对以前年度损益调整对未分配利润的影响。", "ref_index": "M6-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "执行损益联动验证：将D~N全部损益类科目审定额合计与本年净利润核对。", "ref_index": "M6-5", "auto_data_source": "income_statement_total", "applicable_default": "yes"},
-      {"seq": 6, "content": "检查未分配利润是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位未分配利润相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "编制未分配利润勾稽表（期初+净利润-提取盈余-分配股利=期末），验证等式。",
+        "ref_index": "M6-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查利润分配方案，核实董事会/股东大会决议内容。",
+        "ref_index": "M6-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "核对以前年度损益调整对未分配利润的影响。",
+        "ref_index": "M6-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "执行损益联动验证：将D~N全部损益类科目审定额合计与本年净利润核对。",
+        "ref_index": "M6-5",
+        "auto_data_source": "income_statement_total",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查未分配利润是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M7A": {
     "name": "专项储备实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位专项储备相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制专项储备明细表（安全生产费/维简费），与总账核对。", "ref_index": "M7-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查安全生产费用提取标准的合规性（行业标准/营业收入比例）。", "ref_index": "M7-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查专项储备使用支出的合理性（安全设备/安全培训等）。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查专项储备是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位专项储备相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制专项储备明细表（安全生产费/维简费），与总账核对。",
+        "ref_index": "M7-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查安全生产费用提取标准的合规性（行业标准/营业收入比例）。",
+        "ref_index": "M7-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查专项储备使用支出的合理性（安全设备/安全培训等）。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查专项储备是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M8A": {
     "name": "一般风险准备实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位一般风险准备相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制一般风险准备明细表，与总账核对一致。", "ref_index": "M8-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "验证提取比例是否符合金融监管要求（不低于风险资产期末余额1%）。", "ref_index": "M8-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查一般风险准备使用（核销不良/弥补亏损）的审批程序。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查一般风险准备是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位一般风险准备相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制一般风险准备明细表，与总账核对一致。",
+        "ref_index": "M8-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "验证提取比例是否符合金融监管要求（不低于风险资产期末余额1%）。",
+        "ref_index": "M8-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查一般风险准备使用（核销不良/弥补亏损）的审批程序。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查一般风险准备是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M9A": {
     "name": "其他综合收益实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位其他综合收益相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制OCI明细表（按来源分类），与总账核对。", "ref_index": "M9-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查OCI分类的恰当性（不能重分类进损益 vs 后续可重分类进损益）。", "ref_index": "M9-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "追溯OCI来源（G8其他权益工具投资公允价值变动/外币折算/套期等），与来源底稿核对。", "ref_index": "M9-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查OCI转入损益的金额及条件是否满足（处置时/减值时转出）。", "ref_index": "M9-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查其他综合收益是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位其他综合收益相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制OCI明细表（按来源分类），与总账核对。",
+        "ref_index": "M9-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查OCI分类的恰当性（不能重分类进损益 vs 后续可重分类进损益）。",
+        "ref_index": "M9-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "追溯OCI来源（G8其他权益工具投资公允价值变动/外币折算/套期等），与来源底稿核对。",
+        "ref_index": "M9-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查OCI转入损益的金额及条件是否满足（处置时/减值时转出）。",
+        "ref_index": "M9-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查其他综合收益是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "M10A": {
     "name": "其他权益工具实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位其他权益工具相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制其他权益工具明细表（永续债/优先股/可转债权益成分），与总账核对。", "ref_index": "M10-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查权益/负债分类条件：无固定到期日/无强制付息义务/不含或有结算条款等永续债条件。", "ref_index": "M10-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查其他权益工具利息/股利的处理（计入权益而非损益），核实分配金额。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查其他权益工具是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位其他权益工具相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制其他权益工具明细表（永续债/优先股/可转债权益成分），与总账核对。",
+        "ref_index": "M10-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查权益/负债分类条件：无固定到期日/无强制付息义务/不含或有结算条款等永续债条件。",
+        "ref_index": "M10-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查其他权益工具利息/股利的处理（计入权益而非损益），核实分配金额。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查其他权益工具是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "N1A": {
     "name": "递延所得税资产实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位递延所得税资产相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制递延所得税资产明细表，与总账及各科目暂时性差异核对。", "ref_index": "N1-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "编制可抵扣暂时性差异计算表：逐科目比较账面价值与计税基础，计算差异×税率=DTA。", "ref_index": "N1-3", "auto_data_source": "temporary_differences_summary", "applicable_default": "yes"},
-      {"seq": 4, "content": "评估可抵扣暂时性差异确认条件：未来期间很可能获得足够应纳税所得额用以抵扣。", "ref_index": "N1-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "分析递延所得税资产变动原因，核实本期确认/转回金额的合理性。", "ref_index": "N1-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查递延所得税资产是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位递延所得税资产相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制递延所得税资产明细表，与总账及各科目暂时性差异核对。",
+        "ref_index": "N1-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "编制可抵扣暂时性差异计算表：逐科目比较账面价值与计税基础，计算差异×税率=DTA。",
+        "ref_index": "N1-3",
+        "auto_data_source": "temporary_differences_summary",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "评估可抵扣暂时性差异确认条件：未来期间很可能获得足够应纳税所得额用以抵扣。",
+        "ref_index": "N1-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "分析递延所得税资产变动原因，核实本期确认/转回金额的合理性。",
+        "ref_index": "N1-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查递延所得税资产是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "N2A": {
     "name": "应交税费实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位应交税费相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制应交税费明细表（按税种分列），与总账及纳税申报表核对。", "ref_index": "N2-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "执行增值税核对：销项税额-进项税额-进项转出=应缴增值税，与申报表比较。", "ref_index": "N2-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查各税种完整性：核实是否存在未计提的税费（如印花税、房产税、土地使用税）。", "ref_index": "N2-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "分析应交税费期末余额合理性，检查是否存在长期挂账或欠缴情况。", "ref_index": "N2-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查应交税费是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位应交税费相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制应交税费明细表（按税种分列），与总账及纳税申报表核对。",
+        "ref_index": "N2-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "执行增值税核对：销项税额-进项税额-进项转出=应缴增值税，与申报表比较。",
+        "ref_index": "N2-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查各税种完整性：核实是否存在未计提的税费（如印花税、房产税、土地使用税）。",
+        "ref_index": "N2-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "分析应交税费期末余额合理性，检查是否存在长期挂账或欠缴情况。",
+        "ref_index": "N2-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查应交税费是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "N3A": {
     "name": "递延所得税负债实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位递延所得税负债相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制递延所得税负债明细表，与总账及各科目暂时性差异核对。", "ref_index": "N3-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "编制应纳税暂时性差异计算表：逐科目比较账面价值与计税基础，计算差异×税率=DTL。", "ref_index": "N3-3", "auto_data_source": "temporary_differences_summary", "applicable_default": "yes"},
-      {"seq": 4, "content": "检查应纳税差异来源（资产评估增值/加速折旧/公允价值变动等），核实分类正确性。", "ref_index": "N3-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "分析递延所得税负债变动原因，核实本期确认/转回金额的合理性。", "ref_index": "N3-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查递延所得税负债是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位递延所得税负债相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制递延所得税负债明细表，与总账及各科目暂时性差异核对。",
+        "ref_index": "N3-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "编制应纳税暂时性差异计算表：逐科目比较账面价值与计税基础，计算差异×税率=DTL。",
+        "ref_index": "N3-3",
+        "auto_data_source": "temporary_differences_summary",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查应纳税差异来源（资产评估增值/加速折旧/公允价值变动等），核实分类正确性。",
+        "ref_index": "N3-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "分析递延所得税负债变动原因，核实本期确认/转回金额的合理性。",
+        "ref_index": "N3-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查递延所得税负债是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "N4A": {
     "name": "税金及附加实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位税金及附加相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "获取或编制税金及附加明细表（城建/教育附加/房产/土地/印花等），与总账及申报表核对。", "ref_index": "N4-2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "对各附加税进行测算验证：以相应税基（增值税/营业额/房产原值等）×法定税率核实计提正确性。", "ref_index": "N4-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "分析税金及附加同比变动，结合收入/增值税变动检查合理性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查税金及附加是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位税金及附加相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取或编制税金及附加明细表（城建/教育附加/房产/土地/印花等），与总账及申报表核对。",
+        "ref_index": "N4-2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "对各附加税进行测算验证：以相应税基（增值税/营业额/房产原值等）×法定税率核实计提正确性。",
+        "ref_index": "N4-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "分析税金及附加同比变动，结合收入/增值税变动检查合理性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查税金及附加是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "N5A": {
     "name": "所得税费用实质性程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位所得税费用相关风险评估结果，确认需实施的实质性程序。", "ref_index": "B50", "auto_data_source": "risk_for_cycle", "applicable_default": "yes"},
-      {"seq": 2, "content": "编制所得税计算表：利润总额±纳税调增调减=应纳税所得额×适用税率=当期所得税费用。", "ref_index": "N5-3", "auto_data_source": "income_tax_calculation", "applicable_default": "yes"},
-      {"seq": 3, "content": "编制纳税调增调减明细：逐项列示超标费用/免税收入/减值准备/折旧差异/加计扣除等。", "ref_index": "N5-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "执行有效税率分析：实际税负率 vs 法定税率25%，分析差异原因（优惠/调整/递延等）。", "ref_index": "N5-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "编制递延所得税联动表：读取N1/N3递延税资产/负债当期变动，核对递延所得税费用。", "ref_index": "N5-6", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查研发费用加计扣除金额，与I6-7加计扣除测算核对。", "ref_index": "N5-7", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "检查所得税费用是否已按企业会计准则在财务报表中做出恰当列报和披露。", "ref_index": "A1-15/A1-16", "auto_data_source": "control_test_result_for_cycle", "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位所得税费用相关风险评估结果，确认需实施的实质性程序。",
+        "ref_index": "B50",
+        "auto_data_source": "risk_for_cycle",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "编制所得税计算表：利润总额±纳税调增调减=应纳税所得额×适用税率=当期所得税费用。",
+        "ref_index": "N5-3",
+        "auto_data_source": "income_tax_calculation",
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "编制纳税调增调减明细：逐项列示超标费用/免税收入/减值准备/折旧差异/加计扣除等。",
+        "ref_index": "N5-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "执行有效税率分析：实际税负率 vs 法定税率25%，分析差异原因（优惠/调整/递延等）。",
+        "ref_index": "N5-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "编制递延所得税联动表：读取N1/N3递延税资产/负债当期变动，核对递延所得税费用。",
+        "ref_index": "N5-6",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查研发费用加计扣除金额，与I6-7加计扣除测算核对。",
+        "ref_index": "N5-7",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "检查所得税费用是否已按企业会计准则在财务报表中做出恰当列报和披露。",
+        "ref_index": "A1-15/A1-16",
+        "auto_data_source": "control_test_result_for_cycle",
+        "applicable_default": "yes"
+      }
     ]
   },
   "S1": {
     "name": "违反法规行为的考虑程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位所处法律法规环境，识别可能对财务报表产生重大影响的法规。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "询问管理层被审计单位是否遵循了相关法律法规，是否存在违规事项或未决诉讼。", "ref_index": "K5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "检查与监管机构/政府部门的往来函件，确认是否收到违规通知或处罚决定。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查法律顾问函回函中是否披露违法违规事项及其潜在财务影响。", "ref_index": "K5-5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "评估识别出的违反法规行为对财务报表的影响，确定是否需要调整或披露。", "ref_index": "A13", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "考虑违反法规行为对审计报告的影响，评估是否需要非标准审计意见或强调事项段。", "ref_index": "A17-1", "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位所处法律法规环境，识别可能对财务报表产生重大影响的法规。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "询问管理层被审计单位是否遵循了相关法律法规，是否存在违规事项或未决诉讼。",
+        "ref_index": "K5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "检查与监管机构/政府部门的往来函件，确认是否收到违规通知或处罚决定。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查法律顾问函回函中是否披露违法违规事项及其潜在财务影响。",
+        "ref_index": "K5-5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "评估识别出的违反法规行为对财务报表的影响，确定是否需要调整或披露。",
+        "ref_index": "A13",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "考虑违反法规行为对审计报告的影响，评估是否需要非标准审计意见或强调事项段。",
+        "ref_index": "A17-1",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   },
   "S2": {
     "name": "首次接受委托期初余额程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位的会计政策及其在期初余额反映期间的运用是否适当。", "ref_index": "B10", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "查阅前任注册会计师的审计工作底稿（如允许查阅），了解期初余额审计情况。", "ref_index": "B2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "针对期初流动资产和流动负债，检查本期收回/支付情况以证实期初余额。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "针对期初非流动资产，检查本期增减变动记录和支持性文件。", "ref_index": "H1", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "评估本期审计过程中获取的审计证据是否足以支持期初余额的合理性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "确定期初余额中的会计政策是否与本期一致，如不一致则评估变更影响。", "ref_index": "S3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "评估期初余额审计结论对审计报告类型的影响（是否需要保留意见/无法表示意见）。", "ref_index": "A17-1", "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位的会计政策及其在期初余额反映期间的运用是否适当。",
+        "ref_index": "B10",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "查阅前任注册会计师的审计工作底稿（如允许查阅），了解期初余额审计情况。",
+        "ref_index": "B2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "针对期初流动资产和流动负债，检查本期收回/支付情况以证实期初余额。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "针对期初非流动资产，检查本期增减变动记录和支持性文件。",
+        "ref_index": "H1",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "评估本期审计过程中获取的审计证据是否足以支持期初余额的合理性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "确定期初余额中的会计政策是否与本期一致，如不一致则评估变更影响。",
+        "ref_index": "S3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "评估期初余额审计结论对审计报告类型的影响（是否需要保留意见/无法表示意见）。",
+        "ref_index": "A17-1",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   },
   "S3": {
     "name": "会计政策变更/前期差错/估计变更程序表",
     "items": [
-      {"seq": 1, "content": "识别本期是否存在会计政策变更，评估变更理由的合理性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "检查会计政策变更的追溯调整是否正确（如适用），验证比较期间数据的重述。", "ref_index": "A2", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "识别是否存在前期差错更正，检查更正的会计处理和披露是否符合准则要求。", "ref_index": "A13", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "识别本期是否存在会计估计变更，评估变更的合理性和前瞻性处理是否正确。", "ref_index": "S14", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查政策变更/差错更正/估计变更是否在附注中做出充分披露。", "ref_index": "A1-15", "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "识别本期是否存在会计政策变更，评估变更理由的合理性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "检查会计政策变更的追溯调整是否正确（如适用），验证比较期间数据的重述。",
+        "ref_index": "A2",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "识别是否存在前期差错更正，检查更正的会计处理和披露是否符合准则要求。",
+        "ref_index": "A13",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "识别本期是否存在会计估计变更，评估变更的合理性和前瞻性处理是否正确。",
+        "ref_index": "S14",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查政策变更/差错更正/估计变更是否在附注中做出充分披露。",
+        "ref_index": "A1-15",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   },
   "S8": {
     "name": "租赁程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位的租赁业务类型及适用的会计政策（CAS21新/旧准则）。", "ref_index": "B10", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "获取所有租赁合同清单，区分承租人/出租人角色及融资/经营租赁分类。", "ref_index": "H8", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "对承租人：检查使用权资产和租赁负债的初始确认及后续计量是否正确。", "ref_index": "H8/H9", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "检查折现率选取（增量借款利率/内含利率）的合理性。", "ref_index": "H9-3", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查租赁变更和重新计量的会计处理是否恰当。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "检查短期租赁和低价值资产租赁的豁免适用是否合规。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 7, "content": "检查租赁相关信息在财务报表中的列报和披露是否完整。", "ref_index": "A1-15", "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位的租赁业务类型及适用的会计政策（CAS21新/旧准则）。",
+        "ref_index": "B10",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "获取所有租赁合同清单，区分承租人/出租人角色及融资/经营租赁分类。",
+        "ref_index": "H8",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "对承租人：检查使用权资产和租赁负债的初始确认及后续计量是否正确。",
+        "ref_index": "H8/H9",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "检查折现率选取（增量借款利率/内含利率）的合理性。",
+        "ref_index": "H9-3",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查租赁变更和重新计量的会计处理是否恰当。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "检查短期租赁和低价值资产租赁的豁免适用是否合规。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 7,
+        "content": "检查租赁相关信息在财务报表中的列报和披露是否完整。",
+        "ref_index": "A1-15",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   },
   "S10": {
     "name": "环境事项考虑程序表",
     "items": [
-      {"seq": 1, "content": "了解被审计单位所处行业的环境法规要求及合规状况。", "ref_index": "B10", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "询问管理层是否存在环境违法事项、环保处罚或环境修复义务。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "评估环境事项对资产减值（固定/无形/土地）的潜在影响。", "ref_index": "H1/I1", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "评估环境事项是否产生或有负债/预计负债，检查计量和披露。", "ref_index": "K5", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "检查环境事项相关信息是否在财务报表附注中适当披露。", "ref_index": "A1-15", "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "了解被审计单位所处行业的环境法规要求及合规状况。",
+        "ref_index": "B10",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "询问管理层是否存在环境违法事项、环保处罚或环境修复义务。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "评估环境事项对资产减值（固定/无形/土地）的潜在影响。",
+        "ref_index": "H1/I1",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "评估环境事项是否产生或有负债/预计负债，检查计量和披露。",
+        "ref_index": "K5",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "检查环境事项相关信息是否在财务报表附注中适当披露。",
+        "ref_index": "A1-15",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   },
   "S11": {
     "name": "利用服务机构程序表",
     "items": [
-      {"seq": 1, "content": "识别被审计单位使用的服务机构（外包业务处理/托管/云服务等）。", "ref_index": "B10", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "评估服务机构的活动是否与财务报告相关，是否影响被审计单位的内部控制。", "ref_index": "B22A-4", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "获取并评价服务机构审计报告（SOC1/ISAE3402）的适用性和时效性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "评估服务机构审计报告中控制目标/测试范围是否覆盖被审计单位关注的控制。", "ref_index": "C1", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "确定是否需要实施补充程序（实地访问/额外控制测试/替代程序）。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 6, "content": "评估服务机构相关内控缺陷对审计策略的影响。", "ref_index": "A14", "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "识别被审计单位使用的服务机构（外包业务处理/托管/云服务等）。",
+        "ref_index": "B10",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "评估服务机构的活动是否与财务报告相关，是否影响被审计单位的内部控制。",
+        "ref_index": "B22A-4",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "获取并评价服务机构审计报告（SOC1/ISAE3402）的适用性和时效性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "评估服务机构审计报告中控制目标/测试范围是否覆盖被审计单位关注的控制。",
+        "ref_index": "C1",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "确定是否需要实施补充程序（实地访问/额外控制测试/替代程序）。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 6,
+        "content": "评估服务机构相关内控缺陷对审计策略的影响。",
+        "ref_index": "A14",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   },
   "S13": {
     "name": "利用管理层专家程序表",
     "items": [
-      {"seq": 1, "content": "识别管理层在编制财务报表时利用专家的情况（评估/精算/工程等）。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 2, "content": "评价管理层专家的胜任能力、客观性和独立性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 3, "content": "了解专家工作的领域、方法和假设，评估其与审计目的的相关性。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 4, "content": "评价专家报告中使用的重大假设和方法是否合理且适用于当前情况。", "ref_index": "S14", "auto_data_source": null, "applicable_default": "yes"},
-      {"seq": 5, "content": "评价专家工作结果是否与其他审计证据一致，是否需要追加审计程序。", "ref_index": null, "auto_data_source": null, "applicable_default": "yes"}
+      {
+        "seq": 1,
+        "content": "识别管理层在编制财务报表时利用专家的情况（评估/精算/工程等）。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 2,
+        "content": "评价管理层专家的胜任能力、客观性和独立性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 3,
+        "content": "了解专家工作的领域、方法和假设，评估其与审计目的的相关性。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 4,
+        "content": "评价专家报告中使用的重大假设和方法是否合理且适用于当前情况。",
+        "ref_index": "S14",
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      },
+      {
+        "seq": 5,
+        "content": "评价专家工作结果是否与其他审计证据一致，是否需要追加审计程序。",
+        "ref_index": null,
+        "auto_data_source": null,
+        "applicable_default": "yes"
+      }
     ]
   }
 }

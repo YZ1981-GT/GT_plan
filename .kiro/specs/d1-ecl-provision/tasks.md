@@ -6,8 +6,8 @@
 
 ## Tasks
 
-- [ ] 1. 实现纯函数与类型定义
-  - [ ] 1.1 创建 `composables/useD1EclCalc.ts` 导出纯函数和类型
+- [x] 1. 实现纯函数与类型定义
+  - [x] 1.1 创建 `composables/useD1EclCalc.ts` 导出纯函数和类型
     - 定义 `EclRow` 接口（id/debtor/balance/lossRate/shouldProvision/actualProvision/difference/basis/indexRef）
     - 定义 `SumRow` 接口（balance/shouldProvision/actualProvision/difference）
     - 实现 `calculateShouldProvision(balance, lossRate)`: balance × lossRate
@@ -20,59 +20,59 @@
     - 实现 `serializeRows(rows)`/`deserializeRows(json)`: JSON持久化（computed字段hydrate时重算）
     - _Requirements: 6.4, 6.5, 6.6, 7.4, 7.5, 7.7, 8.3, 14.6, 15.2, 16.1, 16.2, 12.5, 12.6_
 
-  - [ ]* 1.2 编写 Property 1 PBT：D=B×C 应计提公式
+  - [x]* 1.2 编写 Property 1 PBT：D=B×C 应计提公式
     - **Property 1: D=B×C 应计提公式正确性**
     - 生成器：`fc.float({min:-1e8, max:1e8, noNaN:true})` × balance + `fc.float({min:0, max:1, noNaN:true})` × lossRate
     - 断言：calculateShouldProvision(balance, lossRate) === balance × lossRate（容差1e-10）
     - **Validates: Requirements 6.4, 7.4**
 
-  - [ ]* 1.3 编写 Property 2 PBT：F=E-D 差异公式
+  - [x]* 1.3 编写 Property 2 PBT：F=E-D 差异公式
     - **Property 2: F=E-D 差异公式正确性**
     - 生成器：`fc.float({min:-1e8, max:1e8, noNaN:true})` × actualProvision + shouldProvision
     - 断言：calculateDifference(actual, should) === actual - should
     - **Validates: Requirements 6.5, 7.4**
 
-  - [ ]* 1.4 编写 Property 3 PBT：SUM合计行+grandTotal不变量
+  - [x]* 1.4 编写 Property 3 PBT：SUM合计行+grandTotal不变量
     - **Property 3: SUM合计行不变量**
     - 生成器：`fc.array(eclRowArbitrary(), {minLength:0, maxLength:10})` × 2（portfolio + individual）
     - 断言：portfolioSumRow各字段 === Σ(row.field)；grandTotal === portfolioSum + individualSum 逐字段
     - **Validates: Requirements 6.6, 7.5, 7.7**
 
-  - [ ]* 1.5 编写 Property 4 PBT：exceedsMateriality判断
+  - [x]* 1.5 编写 Property 4 PBT：exceedsMateriality判断
     - **Property 4: 重要性判断公式正确性**
     - 生成器：`fc.float({min:-1e9, max:1e9, noNaN:true})` totalDiff + `fc.float({min:-100, max:1e9, noNaN:true})` materiality
     - 断言：checkExceedsMateriality(diff, mat) === (mat>0 AND |diff|>mat)
     - **Validates: Requirements 8.3**
 
-  - [ ]* 1.6 编写 Property 5 PBT：动态行增删计数
+  - [x]* 1.6 编写 Property 5 PBT：动态行增删计数
     - **Property 5: 动态行增删计数不变量**
     - 生成器：`fc.integer({min:0, max:20})` initialLength + operations序列
     - 断言：addRow→N+1；removeRow(valid i)→N-1；removeRow(invalid)→不变
     - **Validates: Requirements 6.3, 7.3**
 
-  - [ ]* 1.7 编写 Property 6 PBT：clampLossRate [0,1]
+  - [x]* 1.7 编写 Property 6 PBT：clampLossRate [0,1]
     - **Property 6: 损失率clamp [0,1]不变量**
     - 生成器：`fc.float({min:-10, max:10, noNaN:true})`
     - 断言：result∈[0,1]；v∈[0,1]→result===v；v<0→0；v>1→1
     - **Validates: Requirements 16.1, 16.2**
 
-  - [ ]* 1.8 编写 Property 7 PBT：JSON Round-Trip
+  - [x]* 1.8 编写 Property 7 PBT：JSON Round-Trip
     - **Property 7: JSON Round-Trip行数据持久化**
     - 生成器：自定义EclRow[]生成器（debtor:fc.string / balance:fc.float / lossRate:fc.float({0,1}) / actualProvision:fc.float）
     - 断言：deserializeRows(serializeRows(rows))各行debtor/balance/lossRate/actualProvision/basis/indexRef等价，shouldProvision/difference重算一致
     - **Validates: Requirements 12.5, 12.6**
 
-  - [ ]* 1.9 编写 Property 8 PBT：负数金额括号格式
+  - [x]* 1.9 编写 Property 8 PBT：负数金额括号格式
     - **Property 8: 负数金额括号格式**
     - 生成器：`fc.float({min:-1e9, max:-0.01, noNaN:true})`
     - 断言：formatAmountDisplay(amount, fmtAmount) 包含'('和')'，不包含'-'
     - **Validates: Requirements 15.2**
 
-- [ ] 2. Checkpoint - 纯函数与PBT验证
+- [x] 2. Checkpoint - 纯函数与PBT验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 3. 实现 useD1PolicyCheck.ts composable (~200行)
-  - [ ] 3.1 创建 `composables/useD1PolicyCheck.ts`
+- [x] 3. 实现 useD1PolicyCheck.ts composable (~200行)
+  - [x] 3.1 创建 `composables/useD1PolicyCheck.ts`
     - 定义 `UseD1PolicyCheckOptions` 接口（allResponses/wpId/projectId/saveImmediate/debouncedSave/isReadonly）
     - 定义 `PolicyConclusion`/`PolicyChangeFlag` 类型
     - 实现 Section 2 政策概述：policyOverviewLeft(Ref) / policyOverviewRight(Ref) / savePolicyOverview(debounce)
@@ -85,8 +85,8 @@
     - 写出跨Spec数据：D1-policy-conclusion(conclusion字段=合理性评价)
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 5.3, 5.4, 5.5, 10.3, 12.1, 12.3, 12.4, 14.3, 14.4_
 
-- [ ] 4. 实现 useD1EclCalc.ts composable (~300行)
-  - [ ] 4.1 创建 `composables/useD1EclCalc.ts` composable主体
+- [x] 4. 实现 useD1EclCalc.ts composable (~300行)
+  - [x] 4.1 创建 `composables/useD1EclCalc.ts` composable主体
     - 定义 `UseD1EclCalcOptions` 接口（allResponses/wpId/projectId/saveImmediate/debouncedSave/isReadonly）
     - 实现 portfolioRows: Ref<EclRow[]>（预设5行空行）
     - 实现 individualRows: Ref<EclRow[]>（预设3行空行）
@@ -105,11 +105,11 @@
     - 实现 exportTemplate/exportData/importData 存根（调用后端端点）
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 9.1, 9.2, 9.3, 9.4, 9.5, 10.1, 10.2, 10.4, 10.5, 12.2, 12.3, 12.4, 12.5, 12.6, 14.6, 15.1, 15.2, 15.3, 15.4, 15.5, 15.7, 16.1, 16.2, 16.3, 16.4_
 
-- [ ] 5. Checkpoint - 两个composable逻辑验证
+- [x] 5. Checkpoint - 两个composable逻辑验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. 实现 D1TabPolicyCheck.vue 组件 (~350行)
-  - [ ] 6.1 创建 `d1/D1TabPolicyCheck.vue`
+- [x] 6. 实现 D1TabPolicyCheck.vue 组件 (~350行)
+  - [x] 6.1 创建 `d1/D1TabPolicyCheck.vue`
     - Props: wpId/projectId/allResponses/isReadonly/displayPrefs
     - 使用 useD1PolicyCheck composable
     - 顶部 el-segmented 双模式切换（"结构化视图" | "在线编辑"）
@@ -123,8 +123,8 @@
     - GtOnlyOfficeSheet v-if="isOOMode" 降级模式
     - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 5.1, 5.2, 5.3, 5.4, 5.5, 11.1, 11.2, 11.3, 11.4, 11.5, 15.6_
 
-- [ ] 7. 实现 D1TabEclCalc.vue 组件 (~300行)
-  - [ ] 7.1 创建 `d1/D1TabEclCalc.vue`
+- [x] 7. 实现 D1TabEclCalc.vue 组件 (~300行)
+  - [x] 7.1 创建 `d1/D1TabEclCalc.vue`
     - Props: wpId/projectId/allResponses/isReadonly/displayPrefs
     - 使用 useD1EclCalc composable
     - 顶部 el-segmented 双模式切换 + 导入导出工具栏（导出模板/导出数据/导入数据）
@@ -144,24 +144,24 @@
     - 金额格式化：fmtAmount千分位2位小数 / 负数括号红色 / 零显示"-" / B/D/E/F右对齐 / A/G左对齐 / C居中
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 9.1, 9.2, 9.3, 9.4, 9.5, 11.1, 11.2, 11.3, 11.4, 11.5, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 16.1, 16.2, 16.3, 16.4_
 
-- [ ] 8. Checkpoint - 两个Vue组件渲染验证
+- [x] 8. Checkpoint - 两个Vue组件渲染验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 9. 主入口集成与代码拆分
-  - [ ] 9.1 修改 GtD1NotesReceivable.vue 集成两个新组件
+- [x] 9. 主入口集成与代码拆分
+  - [x] 9.1 修改 GtD1NotesReceivable.vue 集成两个新组件
     - 在 el-tabs 中为 D1-14/D1-15 新增 tab-pane，引用 D1TabPolicyCheck / D1TabEclCalc
     - 传递 allResponses/wpId/projectId/isReadonly/displayPrefs props
     - 替换原有 D1-14/D1-15 占位Tab内容
     - _Requirements: 14.1, 14.2, 14.5_
 
-  - [ ] 9.2 从 useD1NotesReceivable.ts 删除已拆出的ECL相关逻辑
+  - [x] 9.2 从 useD1NotesReceivable.ts 删除已拆出的ECL相关逻辑
     - 删除原 D1-14/D1-15 相关代码段
     - 确保 useD1NotesReceivable 行数缩减
     - 运行全部D1测试确认不回归
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
 
-- [ ] 10. 后端导入导出端点
-  - [ ] 10.1 扩展 `_d1_import_export.py` 添加D1-15导入导出
+- [x] 10. 后端导入导出端点
+  - [x] 10.1 扩展 `_d1_import_export.py` 添加D1-15导入导出
     - POST export-template：生成D1-15空白xlsx模板（8列表头+组合/单项两section header）
     - POST export-data：生成含当前组合+单项数据的xlsx文件
     - POST import-data：解析xlsx按section分隔符识别组合行与单项行，回写checklist_responses
@@ -172,27 +172,27 @@
     - 注册路由到 router_registry
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7_
 
-  - [ ]* 10.2 编写后端导入导出集成测试（hypothesis）
+  - [x]* 10.2 编写后端导入导出集成测试（hypothesis）
     - 随机行数据→export生成xlsx buffer→import解析→验证数据等价
     - 模板格式校验：验证导出模板含8列表头+2 section header
     - 列名篡改→400响应验证
     - **Validates: Requirements 13.2, 13.3**
 
-- [ ] 11. Checkpoint - 导入导出与主入口集成验证
+- [x] 11. Checkpoint - 导入导出与主入口集成验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 12. 回归测试与最终验证
-  - [ ] 12.1 运行全部D1相关测试确认无回归
+- [x] 12. 回归测试与最终验证
+  - [x] 12.1 运行全部D1相关测试确认无回归
     - vitest run D1相关测试文件
     - pytest backend/tests/ -k d1
     - 确认所有PBT(P1-P8)和单元测试全绿
     - _Requirements: 全部16条_
 
-- [ ] 13. Final checkpoint - 全部功能集成验证
+- [x] 13. Final checkpoint - 全部功能集成验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 14. P1 D1-15 E列从D1-4自动取数
-  - [ ] 14.1 在 useD1EclCalc.ts 中实现"从D1-4取数"逻辑
+- [x] 14. P1 D1-15 E列从D1-4自动取数
+  - [x] 14.1 在 useD1EclCalc.ts 中实现"从D1-4取数"逻辑
     - 从allResponses读取D1-adj-bad-debt-*前缀数据
     - 按组合section：按账龄段bandKey匹配→填入对应行E列
     - 按单项section：按债务人名称精确匹配→填入对应行E列
@@ -200,14 +200,14 @@
     - 用户编辑E列后清除autoPulled标记
     - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6_
 
-  - [ ] 14.2 在 D1TabEclCalc.vue 工具栏添加"从D1-4取数"按钮
+  - [x] 14.2 在 D1TabEclCalc.vue 工具栏添加"从D1-4取数"按钮
     - 按钮位于表格工具栏（导入导出按钮旁）
     - 点击→调用composable方法→E列填充+浅蓝背景
     - D1-4未填写时按钮旁黄色提示
     - _Requirements: 17.1, 17.6_
 
-- [ ] 15. P1 AI辅助生成审计说明/结论
-  - [ ] 15.1 启用 D1-14/D1-15 的🤖AI按钮
+- [x] 15. P1 AI辅助生成审计说明/结论
+  - [x] 15.1 启用 D1-14/D1-15 的🤖AI按钮
     - D1-14：点击→收集各section文本+核查意见+变更flag+合理性评价→调用/ai-generate
     - D1-15：点击→收集差异汇总+重要性+各行最大差异→调用/ai-generate
     - 复用a171/ai-generate模式（CPA system prompt + 编制提示注入）

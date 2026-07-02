@@ -1,8 +1,9 @@
 # backend/data/wp_render_schema/E1-1.yaml
-# 货币资金审定表 — d-form-table 渲染 schema
-# Requirements: G1-2（E1-1 审定表）
-# Design: §3 审定表标准字段 + §4.1 审定表→trial_balance 回写
-# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+# 货币资金审定表 — d-form-table 渲染 schema（降级/元数据；主渲染走专属组件 e1-monetary-fund）
+# Requirements: E1 spec R1/R2（审定表 + 函证集成）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx / sheet: 货币资金审定表E1-1
+# 真实结构：项目行矩阵（非按 1001/1002/1012 三 section），审定数 = 未审数 + 账项调整（单列合并）
+# 修订(2026-07-01)：修正历史 cross_refs 错误（旧版把"调整分录汇总"指向 E1-10，实为 E1-5）
 
 wp_code: E1-1
 wp_name: 货币资金审定表
@@ -19,37 +20,32 @@ related_accounts:
     name: 其他货币资金
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 审定表分 3 组，每组独立审定 + 合计行
+# 审定表项目行矩阵（真实模板 R7~R21）
+# 期初：未审数(B) 账项调整(C) 审定数(D=B+C)
+# 期末：未审数(E) 账项调整(F) 审定数(G=E+F)
+# 比较：变动额(H=G-D) 变动率(I=IF(...))
+# 项目行：库存现金/银行存款(本金)/其中存放财务公司款项/银行机构存款/其他货币资金(本金)/
+#         数字货币(本金)/应计利息(小计=SUM)/…/合计/其中境外/试算平衡表数/差异数
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
-  - name: 库存现金
-    account_code_prefix: '1001'
-    fields: &audit_determination_fields
-      - { field: account_code, label: 科目编码, type: text, readonly: true }
-      - { field: account_name, label: 科目名称, type: text, readonly: true }
-      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
-      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
-      - { field: aje_debit, label: 审计调整借方, type: number }
-      - { field: aje_credit, label: 审计调整贷方, type: number }
-      - { field: rje_debit, label: 重分类调整借方, type: number }
-      - { field: rje_credit, label: 重分类调整贷方, type: number }
-      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
-      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
-      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
-      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
-      - { field: variance_note, label: 差异说明, type: textarea }
-
-  - name: 银行存款
-    account_code_prefix: '1002'
-    fields: *audit_determination_fields
-
-  - name: 其他货币资金
-    account_code_prefix: '1012'
-    fields: *audit_determination_fields
+  - name: 货币资金审定
+    account_code_prefix: '100'
+    row_layout: fixed_matrix          # 固定项目行矩阵，跨sheet取数(E1-2/E1-3/E1-4)
+    fields:
+      - { field: item_name, label: 项目名称（外币及人民币）, type: text, readonly: true }
+      - { field: opening_unaudited, label: 期初未审数, type: number, auto_source: trial_balance.opening_balance }
+      - { field: opening_adjustment, label: 期初账项调整, type: number }
+      - { field: opening_audited, label: 期初审定数, type: number, formula: "opening_unaudited + opening_adjustment" }
+      - { field: ending_unaudited, label: 期末未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: ending_adjustment, label: 期末账项调整, type: number }
+      - { field: ending_audited, label: 期末审定数, type: number, formula: "ending_unaudited + ending_adjustment" }
+      - { field: variance_amount, label: 变动额, type: number, formula: "ending_audited - opening_audited" }
+      - { field: variance_pct, label: 变动率, type: percent, formula: "variance_amount / opening_audited" }
+      - { field: variance_note, label: 原因分析, type: textarea }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 联动配置
+# 联动配置：审定数 → trial_balance.audited_amount 回写（科目 1001/1002/1012）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 writeback:
@@ -58,37 +54,44 @@ writeback:
   handler: _on_d_audit_determination_saved
   match_pattern: "^[D-N]\\d+-1$"
   key_field: account_code
-  value_field: audited_amount
+  value_field: ending_audited
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 跨底稿引用
+# 跨底稿引用（真实取数关系）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 cross_refs:
   - ref_id: CW-E1-1-001
-    target_wp: E1-10
-    target_field: 调整分录汇总
-    description: '审定表调整金额 → E1-10 调整分录汇总'
-    severity: required
-    direction: outbound
-
-  - ref_id: CW-E1-1-002
     target_wp: E1-2
     target_field: 库存现金合计
-    description: '库存现金审定 ← E1-2 明细表合计'
+    description: '库存现金审定 ← E1-2 现金明细表合计（B22/G22/I22）'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-E1-1-002
+    target_wp: E1-3
+    target_field: 银行存款/其他货币资金合计
+    description: '银行存款/其他货币资金审定 ← E1-3 明细表分组合计'
     severity: info
     direction: inbound
 
   - ref_id: CW-E1-1-003
-    target_wp: E1-3
-    target_field: 银行存款合计
-    description: '银行存款审定 ← E1-3 明细表合计'
+    target_wp: E1-4
+    target_field: 数字货币合计
+    description: '数字货币审定 ← E1-4 数字货币明细表合计'
     severity: info
     direction: inbound
 
   - ref_id: CW-E1-1-004
-    target_wp: E1-4
-    target_field: 其他货币资金合计
-    description: '其他货币资金审定 ← E1-4 明细表合计'
+    target_wp: E1-5
+    target_field: 账项调整合计
+    description: '账项调整 ← E1-5 调整分录汇总（按科目借贷合计）'
+    severity: required
+    direction: inbound
+
+  - ref_id: CW-E1-1-005
+    target_wp: E0
+    target_field: 银行函证回函金额
+    description: '银行存款函证核对 ← E0 银行函证（回函金额/状态，经 E1-3 汇入）'
     severity: info
     direction: inbound

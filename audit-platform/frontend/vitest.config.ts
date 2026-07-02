@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    include: ['**/*.{test,spec}.?(c|m)[jt]s?(x)', '**/*.pbt.spec.?(c|m)[jt]s?(x)'],
     exclude: ['e2e/**', 'e2e-uat/**', 'node_modules/**', 'eslint-rules/**'],
   },
   resolve: {

@@ -1,7 +1,9 @@
 # backend/data/wp_render_schema/E1-2.yaml
-# 库存现金明细表 — d-form-table 渲染 schema
-# Requirements: Task 25（E1-2 库存现金明细表）
-# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx
+# 库存现金明细表 — d-form-table 渲染 schema（降级/元数据；主渲染走专属组件 e1-monetary-fund）
+# Requirements: E1 spec R3（库存现金明细表）
+# Template: E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx / sheet: 现金明细表E1-2
+# 真实结构：按币种（人民币/美元/日元/澳元/欧元…）记录，含外币折算 G=E×F
+# 修订(2026-07-01)：修正历史结构——旧版按"日期链式余额"，实为按币种+外币折算
 
 wp_code: E1-2
 wp_name: 库存现金明细表
@@ -14,18 +16,27 @@ related_accounts:
     name: 库存现金
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 库存现金明细：按日期记录现金收支
+# 库存现金明细：按币种记录期初/本期增减/期末，外币折算人民币
+# 期末余额(原币) E = 期初B + 本期增加C - 本期减少D
+# 期末折算人民币 G = E × 期末折算汇率F
+# 期末审定数(人民币) I = G + 审计调整H × F
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
   - name: 库存现金明细
     account_code_prefix: '1001'
+    group_by: currency              # 按币种分行
     fields:
-      - { field: date, label: 日期, type: date }
-      - { field: summary, label: 摘要, type: text }
-      - { field: income_amount, label: 收入, type: number }
-      - { field: expense_amount, label: 支出, type: number }
-      - { field: balance, label: 余额, type: number, formula: "balance_prev + income_amount - expense_amount" }
+      - { field: currency, label: 币种, type: text }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: period_increase, label: 本期增加, type: number }
+      - { field: period_decrease, label: 本期减少, type: number }
+      - { field: ending_fc, label: 期末余额（原币）, type: number, formula: "opening_balance + period_increase - period_decrease" }
+      - { field: fx_rate, label: 期末折算汇率, type: number }
+      - { field: ending_rmb, label: 期末折算人民币金额, type: number, formula: "ending_fc * fx_rate" }
+      - { field: audit_adjust_fc, label: 审计调整-原币（调减为负数）, type: number }
+      - { field: ending_audited_rmb, label: 期末审定数（人民币金额）, type: number, formula: "ending_rmb + audit_adjust_fc * fx_rate" }
+      - { field: remark, label: 备注, type: text }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿引用
@@ -35,6 +46,13 @@ cross_refs:
   - ref_id: CW-E1-2-001
     target_wp: E1-1
     target_field: 库存现金审定金额
-    description: '库存现金明细合计 → E1-1 审定表库存现金组'
+    description: '库存现金明细合计（B22/G22/I22）→ E1-1 审定表库存现金行'
     severity: required
+    direction: outbound
+
+  - ref_id: CW-E1-2-002
+    target_wp: E1-7
+    target_field: 现金盘点账面余额
+    description: '库存现金明细 ↔ E1-7/E1-8 现金盘点表核对'
+    severity: info
     direction: outbound

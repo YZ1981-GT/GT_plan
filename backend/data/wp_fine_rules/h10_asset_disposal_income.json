@@ -1,0 +1,115 @@
+{
+  "wp_code": "H10",
+  "name": "资产处置损益",
+  "version": "2025-R5",
+  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/H10.yaml",
+  "account_codes": [
+    "6702"
+  ],
+  "source_files": [
+    {
+      "file": "H10 资产处置损益.xlsx",
+      "sheets": [
+        "底稿目录",
+        "资产处置损益实质性程序表H10A",
+        "审定表H10-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表H10-2",
+        "调整分录汇总H10-3",
+        "检查表H10-4"
+      ]
+    }
+  ],
+  "sheet_rules": [
+    {
+      "exact_name": "资产处置损益实质性程序表H10A",
+      "code": "H10A",
+      "type": "procedure"
+    },
+    {
+      "exact_name": "审定表H10-1",
+      "code": "H10-1",
+      "type": "summary",
+      "header_rows": [
+        5,
+        6
+      ],
+      "data_start_row": 7,
+      "key_rows": {
+        "total": {
+          "row": 12,
+          "label": "合计",
+          "is_total": true,
+          "report_row": "IS-021"
+        }
+      },
+      "layout": {
+        "label_col": 1,
+        "columns": {
+          "current_unaudited": {
+            "col": 2,
+            "label": "本期未审"
+          },
+          "current_adjustment": {
+            "col": 3,
+            "label": "本期账项调整"
+          },
+          "current_reclass": {
+            "col": 4,
+            "label": "本期重分类调整"
+          },
+          "current_audited": {
+            "col": 5,
+            "label": "本期审定"
+          },
+          "prior_unaudited": {
+            "col": 6,
+            "label": "上期未审"
+          },
+          "prior_audited": {
+            "col": 7,
+            "label": "上期审定"
+          },
+          "change_amount": {
+            "col": 8,
+            "label": "变动额"
+          },
+          "change_rate": {
+            "col": 9,
+            "label": "变动率"
+          },
+          "reason": {
+            "col": 10,
+            "label": "原因分析"
+          }
+        }
+      }
+    },
+    {
+      "exact_name": "附注披露信息（上市公司）",
+      "code": "H10-listed",
+      "type": "disclosure_listed"
+    },
+    {
+      "exact_name": "附注披露信息（国有企业）",
+      "code": "H10-soe",
+      "type": "disclosure_soe"
+    },
+    {
+      "exact_name": "明细表H10-2",
+      "code": "H10-2",
+      "type": "detail"
+    },
+    {
+      "exact_name": "调整分录汇总H10-3",
+      "code": "H10-3",
+      "type": "adjustment"
+    },
+    {
+      "exact_name": "检查表H10-4",
+      "code": "H10-4",
+      "type": "check"
+    }
+  ]
+}

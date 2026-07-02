@@ -56,13 +56,11 @@
       <!-- D4-21 关联方 -->
       <D4TabRelatedPrice v-else-if="currentSheet === 'D4-21'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- D4-22 ~ D4-32 IPO/舞弊 -->
-      <GtAProgramConsole
+      <D4TabIpoProcedure
         v-else-if="currentSheet === 'D4-22A'"
         :wp-id="props.wpId"
-        sheet-name="D4-22A"
-        :schema="{ columns: [], rows: [] }"
-        :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
-        :readonly="isReadonly"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
       />
       <D4TabIpoIndicator v-else-if="currentSheet === 'D4-22'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabInvoiceCompare v-else-if="currentSheet === 'D4-23'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
@@ -151,6 +149,7 @@ const D4TabReturn = defineAsyncComponent(() => import('./d4/inspection/D4TabRetu
 const D4TabRelatedPrice = defineAsyncComponent(() => import('./d4/related/D4TabRelatedPrice.vue'))
 
 // IPO
+const D4TabIpoProcedure = defineAsyncComponent(() => import('./d4/ipo/D4TabIpoProcedure.vue'))
 const D4TabIpoIndicator = defineAsyncComponent(() => import('./d4/ipo/D4TabIpoIndicator.vue'))
 const D4TabInvoiceCompare = defineAsyncComponent(() => import('./d4/ipo/D4TabInvoiceCompare.vue'))
 const D4TabThirdParty = defineAsyncComponent(() => import('./d4/ipo/D4TabThirdParty.vue'))

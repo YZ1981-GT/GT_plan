@@ -1,8 +1,10 @@
 # backend/data/wp_render_schema/F4-1.yaml
-# 应付账款审定表 — d-form-table 渲染 schema
-# Requirements: G4-1（F4-1 审定表）
-# Design: §3 审定表标准字段 + §4.1 审定表→trial_balance 回写
-# Template: F4 应付账款.xlsx
+# 应付账款审定表 — d-form-table 渲染 schema（降级/元数据）
+# Requirements: F4-1 审定表
+# Template: F4 应付账款.xlsx / sheet: 审定表F4-1
+# 真实结构：按性质分类(货款/工程款/设备款/服务费/其他) + 按账龄分类 两维度
+#           审定数 = 未审数 + 账项调整 + 重分类调整（从明细表F4-2 SUMIF取数）
+# 修订(2026-07-01)：修正公式列AJE/RJE→账项调整+重分类调整；cross_ref调整分录F4-4→F4-3
 
 wp_code: F4-1
 wp_name: 应付账款审定表
@@ -15,26 +17,33 @@ related_accounts:
     name: 应付账款
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 审定表 — 单组（应付账款科目）
+# 一、按性质分类：货款/工程款/设备款/服务费/其他 + 合计
+# 二、按账龄分类：1年以内/1至2年/2至3年/3年以上（从明细表F4-2账龄列取数）
+# 每行：期初(未审/账项调整/重分类调整/审定) 期末(同) 变动额/变动率/原因分析
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
-  - name: 应付账款
+  - name: 按性质分类
     account_code_prefix: '2202'
+    row_layout: category_rows          # 货款/工程款/设备款/服务费/其他 + 合计
     fields: &audit_determination_fields
-      - { field: account_code, label: 科目编码, type: text, readonly: true }
-      - { field: account_name, label: 科目名称, type: text, readonly: true }
-      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
-      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
-      - { field: aje_debit, label: 审计调整借方, type: number }
-      - { field: aje_credit, label: 审计调整贷方, type: number }
-      - { field: rje_debit, label: 重分类调整借方, type: number }
-      - { field: rje_credit, label: 重分类调整贷方, type: number }
-      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
-      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
-      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
-      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
-      - { field: variance_note, label: 差异说明, type: textarea }
+      - { field: item_name, label: 项目, type: text, readonly: true }
+      - { field: opening_unaudited, label: 期初未审数, type: number, auto_source: trial_balance.opening_balance }
+      - { field: opening_aje, label: 期初账项调整, type: number }
+      - { field: opening_rje, label: 期初重分类调整, type: number }
+      - { field: opening_audited, label: 期初审定数, type: number, formula: "opening_unaudited + opening_aje + opening_rje" }
+      - { field: ending_unaudited, label: 期末未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: ending_aje, label: 期末账项调整, type: number }
+      - { field: ending_rje, label: 期末重分类调整, type: number }
+      - { field: ending_audited, label: 期末审定数, type: number, formula: "ending_unaudited + ending_aje + ending_rje" }
+      - { field: variance_amount, label: 变动额, type: number, formula: "ending_audited - opening_audited" }
+      - { field: variance_pct, label: 变动率, type: percent, formula: "variance_amount / opening_audited" }
+      - { field: variance_note, label: 原因分析, type: textarea }
+
+  - name: 按账龄分类
+    account_code_prefix: '2202'
+    row_layout: aging_rows             # 1年以内/1-2年/2-3年/3年以上
+    fields: *audit_determination_fields
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 联动配置
@@ -46,7 +55,7 @@ writeback:
   handler: _on_d_audit_determination_saved
   match_pattern: "^[D-N]\\d+-1$"
   key_field: account_code
-  value_field: audited_amount
+  value_field: ending_audited
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿引用
@@ -54,22 +63,15 @@ writeback:
 
 cross_refs:
   - ref_id: CW-F4-1-001
-    target_wp: F4-4
-    target_field: 调整分录汇总
-    description: '审定表调整金额 → F4-4 调整分录汇总'
-    severity: required
-    direction: outbound
-
-  - ref_id: CW-F4-1-002
     target_wp: F4-2
     target_field: 应付账款明细合计
-    description: '应付账款审定 ← F4-2 明细表合计'
+    description: '应付账款审定 ← F4-2 明细表合计（SUMIF按款项性质/账龄）'
     severity: info
     direction: inbound
 
-  - ref_id: CW-F4-1-003
+  - ref_id: CW-F4-1-002
     target_wp: F4-3
-    target_field: 应付账款账龄分析
-    description: '应付账款审定 ← F4-3 账龄分析'
-    severity: info
+    target_field: 调整分录汇总
+    description: '审定表账项调整 ← F4-3 调整分录汇总'
+    severity: required
     direction: inbound

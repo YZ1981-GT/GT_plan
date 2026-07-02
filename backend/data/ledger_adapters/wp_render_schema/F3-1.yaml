@@ -1,8 +1,10 @@
 # backend/data/wp_render_schema/F3-1.yaml
-# 应付票据审定表 — d-form-table 渲染 schema
-# Requirements: G3-1（F3-1 审定表）
-# Design: §3 审定表标准字段 + §4.1 审定表→trial_balance 回写
-# Template: F3 应付票据.xlsx
+# 应付票据审定表 — d-form-table 渲染 schema（降级/元数据）
+# Requirements: F3-1 审定表
+# Template: F3 应付票据.xlsx / sheet: 审定表F3-1
+# 真实结构：银行承兑汇票/商业承兑汇票两类(从明细表F3-2 SUMPRODUCT取数)
+#           审定数 = 未审数 + 账项调整 + 重分类调整；表尾试算平衡表数/差异数
+# 修订(2026-07-01)：修正公式列AJE/RJE→账项调整+重分类调整；cross_ref调整分录F3-4→F3-3
 
 wp_code: F3-1
 wp_name: 应付票据审定表
@@ -15,26 +17,25 @@ related_accounts:
     name: 应付票据
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 审定表 — 单组（应付票据科目）
+# 项目行：银行承兑汇票/商业承兑汇票 + 合计 + 试算平衡表数 + 差异数
+# 期初/期末各含：未审数/账项调整/重分类调整/审定数(=之和)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
-  - name: 应付票据
+  - name: 应付票据审定
     account_code_prefix: '2201'
+    row_layout: category_rows          # 银行承兑汇票/商业承兑汇票/合计/试算平衡差异
     fields: &audit_determination_fields
-      - { field: account_code, label: 科目编码, type: text, readonly: true }
-      - { field: account_name, label: 科目名称, type: text, readonly: true }
-      - { field: opening_balance, label: 期初余额, type: number, auto_source: trial_balance.opening_balance }
-      - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
-      - { field: aje_debit, label: 审计调整借方, type: number }
-      - { field: aje_credit, label: 审计调整贷方, type: number }
-      - { field: rje_debit, label: 重分类调整借方, type: number }
-      - { field: rje_credit, label: 重分类调整贷方, type: number }
-      - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_debit - aje_credit + rje_debit - rje_credit" }
-      - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
-      - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
-      - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
-      - { field: variance_note, label: 差异说明, type: textarea }
+      - { field: item_name, label: 项目, type: text, readonly: true }
+      - { field: opening_unaudited, label: 期初未审数, type: number, auto_source: trial_balance.opening_balance }
+      - { field: opening_aje, label: 期初账项调整, type: number }
+      - { field: opening_rje, label: 期初重分类调整, type: number }
+      - { field: opening_audited, label: 期初审定数, type: number, formula: "opening_unaudited + opening_aje + opening_rje" }
+      - { field: ending_unaudited, label: 期末未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: ending_aje, label: 期末账项调整, type: number }
+      - { field: ending_rje, label: 期末重分类调整, type: number }
+      - { field: ending_audited, label: 期末审定数, type: number, formula: "ending_unaudited + ending_aje + ending_rje" }
+      - { field: index_ref, label: 索引, type: text }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 联动配置
@@ -46,7 +47,7 @@ writeback:
   handler: _on_d_audit_determination_saved
   match_pattern: "^[D-N]\\d+-1$"
   key_field: account_code
-  value_field: audited_amount
+  value_field: ending_audited
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 跨底稿引用
@@ -54,15 +55,22 @@ writeback:
 
 cross_refs:
   - ref_id: CW-F3-1-001
-    target_wp: F3-4
-    target_field: 调整分录汇总
-    description: '审定表调整金额 → F3-4 调整分录汇总'
-    severity: required
-    direction: outbound
-
-  - ref_id: CW-F3-1-002
     target_wp: F3-2
     target_field: 应付票据明细合计
-    description: '应付票据审定 ← F3-2 明细表合计'
+    description: '应付票据审定 ← F3-2 明细表合计（SUMPRODUCT按票据类别）'
+    severity: info
+    direction: inbound
+
+  - ref_id: CW-F3-1-002
+    target_wp: F3-3
+    target_field: 调整分录汇总
+    description: '审定表账项调整 ← F3-3 调整分录汇总'
+    severity: required
+    direction: inbound
+
+  - ref_id: CW-F3-1-003
+    target_wp: F3-4
+    target_field: 应付票据利息测算
+    description: '带息应付票据 ← F3-4 利息测算表（应计利息）'
     severity: info
     direction: inbound
