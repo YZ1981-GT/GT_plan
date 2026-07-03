@@ -4,6 +4,42 @@
 
 实现F1预付账款底稿专属组件`f1-prepayment`。按依赖顺序：注册→公式引擎→基础设施→各sheet composable+Vue组件→后端→双模式→集成测试。主入口GtF1Prepayment.vue + 10个子组件 + 10个composable + 后端4个py文件。科目1123借方/资产类，核心公式：期末=期初+借方-贷方；审定数=未审+AJE+RJE；变动额=期末审定-期初审定。标准审定表（93公式）+ 11列明细表（69公式）+ 实质性分析 + 长期挂款检查 + 关联方检查 + 综合检查 + 附注披露 + 函证程序。F循环中等复杂度底稿。
 
+## Task Dependency Graph
+
+```json
+{
+  "waves": [
+    { "id": "wave1", "tasks": ["1.1", "1.2"] },
+    { "id": "wave2", "tasks": ["2.1", "2.2", "2.3", "2.4", "2.5", "2.6"] },
+    { "id": "wave3", "tasks": ["3.1"] },
+    { "id": "wave4", "tasks": ["4.1", "4.2"] },
+    { "id": "wave5", "tasks": ["6.1", "6.2"] },
+    { "id": "wave6", "tasks": ["7.1", "7.2", "7.3"] },
+    { "id": "wave7", "tasks": ["8.1", "8.2"] },
+    { "id": "wave8", "tasks": ["10.1", "11.1", "12.1", "13.1"] },
+    { "id": "wave9", "tasks": ["15.1"] },
+    { "id": "wave10", "tasks": ["16.1", "16.2", "16.3", "16.4", "16.5", "16.6", "16.7", "16.8", "16.9", "16.10"] },
+    { "id": "wave11", "tasks": ["17.1", "18.1", "19.1", "20.1"] },
+    { "id": "wave12", "tasks": ["22.1"] },
+    { "id": "wave13", "tasks": ["23.1"] },
+    { "id": "wave14", "tasks": ["24.1", "24.2"] },
+    { "id": "wave15", "tasks": ["25.1"] },
+    { "id": "wave16", "tasks": ["26.1", "27.1", "28.1", "28.2", "29.1"] }
+  ]
+}
+```
+
+## Notes
+
+- F1是借方科目（资产类），公式方向：期末=期初+借方-贷方
+- F1-1审定表有两级结构（按性质+按账龄），两个小计必须交叉校验相等
+- F1-2明细表(32列)拆为3区段Tab（基础+期初/本期发生+期末/账龄+结果）
+- F1-7检查表(93行×19列)采用借方/贷方独立区块设计
+- F1与F0存货循环函证联动（函证结果回填到明细表）
+- 抽凭引擎集成在F1-7（检查表），OCR集成在F1-7（📎列）
+- 截止自动提取(useCutoffAutoSampling)不适用于F1
+- F1A程序表直接复用a-program-console组件
+
 ## Tasks
 
 - [ ] 1. 组件注册与基础配置
@@ -97,59 +133,66 @@
 - [ ] 5. Checkpoint - 公式引擎与基础设施验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. 实现 useF1Adjudication.ts 审定表F1-1（93公式）
+- [ ] 6. 实现 useF1Adjudication.ts 审定表F1-1（两级结构：按性质+按账龄）
   - [ ] 6.1 创建 `composables/useF1Adjudication.ts`
-    - 定义 `AdjudicationRow` 类型（rowKey/label/期初/期末/变动/原因分析）
-    - 定义固定行配置：预付货款/预付服务费/预付租金/其他预付款 + 合计行 + 试算表数行 + 差异数行
-    - 实现 `rows` computed（从 allResponses 加载 + crossSheet聚合填入 + 公式计算）
-    - 实现 公式：审定数=未审+AJE+RJE；变动额=期末审定-期初审定；变动率=(期末-期初)/期初
+    - 定义 `AdjudicationRow` 类型（rowKey/label/期初未审/期初账项调整/期初重分类调整/期初审定/期末未审/期末账项调整/期末重分类调整/期末审定/变动额/变动率/原因分析/isDynamic/isTotal/section）
+    - 定义两级固定行配置：
+      - section='nature'：货款/工程款/设备款/服务费/其他 + 合计行（动态行可增删）
+      - section='aging'：1年以内含1年/1至2年含2年/2至3年含3年/3年以上 + 合计行（固定4行不可增删）
+      - 底部：试算平衡表数行 + 差异数行
+    - 实现 `natureRows` computed + `agingRows` computed（分级渲染）
+    - 实现 `natureTotalRow` computed + `agingTotalRow` computed（各级合计）
+    - 实现 公式：审定数=未审+账项调整+重分类调整；变动额=期末审定-期初审定；变动率=(期末-期初)/期初
     - 实现 trialBalanceAmount（从TB auto_data取数科目1123）+ trialBalanceDiff(=合计审定数-TB数)
+    - 实现 crossValidation computed（按性质合计 vs 按账龄合计 金额一致性校验，不一致红色警告）
     - 实现 changeAmount/changeRate/isExceeding 变动额与变动率（>30%红色高亮）
-    - 实现 explanation 双向绑定（原因分析textarea，支持AI生成）
+    - 实现 auditNote + auditConclusion 双向绑定（审计说明+审计结论textarea，支持AI生成）
     - 实现 updateCell（编辑 → 公式重算 → debouncedSave）
-    - 实现 addDynamicRow/removeDynamicRow（增删预付类型行）
+    - 实现 addDynamicRow/removeDynamicRow（仅"按性质"部分允许增删）
     - 实现 publishAdjudicated（EventBus: substantive:adjudicated，payload含wpCode='F1'/accountCode='1123'/auditedAmount/priorAmount/changeRate）
     - 实现 EventBus 监听 `adjustment:created`（AJE/RJE → 累加对应列）
     - 实现 `writebackTrialBalance`（回写 trial_balance.audited_amount 科目1123）
     - 实现序列化/反序列化（JSON.stringify rows → F1-adjudication-rows remark字段）
-    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10_
+    - _Requirements: 2.1~2.12, 3.1~3.10_
 
   - [ ]* 6.2 编写 Property 7 PBT：审定表公式链正确性
-    - 生成器：自定义 AdjudicationRow[] 生成器（完整字段）
-    - 断言：审定数===未审+AJE+RJE；变动额===期末-期初；变动率公式正确
+    - 生成器：自定义 AdjudicationRow[] 生成器（含两级结构完整字段）
+    - 断言：审定数===未审+账项调整+重分类调整；变动额===期末审定-期初审定；按性质合计===各性质行之和；按账龄合计===各账龄行之和
     - **Property 7: 审定表公式链正确性**
-    - **Validates: Requirements 2.3, 2.4, 2.5, 2.7_
+    - **Validates: Requirements 2.3, 2.4, 2.10**
 
-- [ ] 7. 实现 useF1Detail.ts 明细表F1-2（69公式）
+- [ ] 7. 实现 useF1Detail.ts 明细表F1-2（32列宽表→3区段）
   - [ ] 7.1 创建 `composables/useF1Detail.ts`，实现明细表F1-2核心逻辑
-    - 定义 `DetailRow` 类型（供应商名称/期初余额/本期增加/本期减少/期末余额/账龄/款项性质/审计调整/期末审定数/函证结果/备注）
+    - 定义 `DetailRow` 类型（32列完整字段按xlsx：债权人名称/公司代码/关联方类型/款项性质/期初未审余额/期初账项调整/期初重分类调整/期初审定余额/期初审定账龄4段/借方发生/贷方发生/期末余额/被审计单位重分类/期末未审余额/期末未审账龄4段/账项调整/重分类调整/审定数/期末审定账龄4段/是否函证/期后到货/备注）
     - 实现 `rows` reactive（从 F1-detail-rows remark JSON加载）
     - 实现 `totalRow` computed（SUM全部行各金额列，不可编辑）
-    - 实现 `filterBySupplierName` + `filteredRows` computed（按供应商名称筛选）
-    - 实现 `filterByAging` + `filteredRows` computed（按账龄筛选）
+    - 实现 `filterBySupplierName` + `filteredRows` computed（按债权人名称搜索筛选）
     - 实现 `filterByNature` + `filteredRows` computed（按款项性质筛选）
-    - 实现行公式链自动计算（期末余额 = 期初余额 + 本期增加 - 本期减少）
-    - 实现行公式链自动计算（期末审定数 = 期末余额 + 审计调整）
+    - 实现 `filterByAging` computed（仅显示3年以上有值的行）
+    - 实现行公式链：期初审定余额 = 期初未审 + 期初账项调整 + 期初重分类调整
+    - 实现行公式链：期末余额 = 期初审定余额 + 借方发生 - 贷方发生
+    - 实现行公式链：审定数 = 期末未审余额 + 账项调整 + 重分类调整
     - 实现 `updateCell`（编辑 → 公式重算 → debounce保存）
     - 实现 `addRow()`（在合计行上方新增空行，所有金额=0）
     - 实现 `removeRow(rowId)`
     - 实现序列化/反序列化（JSON.stringify rows → F1-detail-rows remark字段）
-    - 实现长期挂款标记（账龄='over_3_years'时isLongTerm=true）
-    - 实现关联方标记（来自F1-6数据）
+    - 实现长期挂款标记（"3年以上"账龄列有值时isLongTerm=true）
+    - 实现关联方标记（关联方类型非空时isRelatedParty=true）
     - 实现函证结果同步（来自F0数据）
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13, 4.14, 5.1, 5.2, 5.3, 5.6, 5.7_
+    - 实现区段配置导出（segmentA列定义/segmentB列定义/segmentC列定义，供Vue组件el-tabs渲染）
+    - _Requirements: 4.1~4.16, 5.1~5.10_
 
   - [ ]* 7.2 编写 Property 8 PBT：明细表余额计算公式链正确性
-    - 生成器：自定义 DetailRow[] 生成器（完整字段）
-    - 断言：每行期末余额 === 期初余额 + 本期增加 - 本期减少
+    - 生成器：自定义 DetailRow[] 生成器（完整32列字段）
+    - 断言：期末余额 === 期初审定余额 + 借方发生 - 贷方发生；审定数 === 期末未审 + 账项调整 + 重分类调整
     - **Property 8: 明细表余额计算公式链正确性**
-    - **Validates: Requirements 4.5, 4.6, 13.3_
+    - **Validates: Requirements 4.5, 4.6, 4.7, 13.3**
 
   - [ ]* 7.3 编写 Property 9 PBT：明细表合计行恒等于明细行之和
     - 生成器：`fc.array(DetailRow生成器, {minLength:0, maxLength:10})`
     - 断言：合计行各列 === SUM明细行对应列
     - **Property 9: 明细表合计行恒等于明细行之和**
-    - **Validates: Requirements 4.7, 13.6_
+    - **Validates: Requirements 4.8, 13.6**
 
 - [ ] 8. 实现 useF1Adjustment.ts 调整分录F1-3
   - [ ] 8.1 创建 `composables/useF1Adjustment.ts`，实现调整分录F1-3核心逻辑
@@ -214,20 +257,23 @@
     - 实现披露完整性评估（披露比例/风险等级）
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10_
 
-- [ ] 13. 实现 useF1ComprehensiveCheck.ts 综合检查F1-7
+- [ ] 13. 实现 useF1ComprehensiveCheck.ts 综合检查F1-7（借方+贷方两区块）
   - [ ] 13.1 创建 `composables/useF1ComprehensiveCheck.ts`，实现综合检查F1-7核心逻辑
-    - 定义抽样参数区数据结构（抽样总体/抽样方法/样本量/抽样比例）
-    - 定义检查记录区数据结构（样本编号/供应商名称/预付金额/合同核对/发票核对/入库核对/付款凭证核对/检查结论/问题描述/处理措施）
-    - 实现 `samplingParams` reactive（抽样参数配置）
-    - 实现 `checkRows` reactive（检查记录行）
-    - 实现 `checkResultStatistics` computed（样本通过率/主要问题类型统计）
-    - 实现 `autoSetConclusion` computed（任一核对为'核对不符'时自动设置检查结论为'不通过'）
+    - 定义抽样参数区数据结构（测试总体笔数金额/特定样本描述/抽样总体笔数金额/确定样本量/抽样方法/抽样过程）
+    - 定义借方检查区数据结构（16列：供应商名称/日期/凭证编号/业务内容/对方科目/对方明细科目/借方金额 + 付款审批单日期编号/是否恰当审批 + 银行回单日期/收款方/金额 + 合同供应商/合同金额/预付比例 + 索引号/是否异常）
+    - 定义贷方检查区数据结构（14列：供应商名称/日期/凭证编号/业务内容/对方科目/对方明细科目/贷方金额 + 入库单日期编号/品名/单位/数量 + 采购发票日期编号/对手方/金额 + 索引号/是否异常）
+    - 定义检查比例汇总结构（方向/账面金额/检查金额/检查比例/说明）
+    - 实现 `samplingParams` reactive（抽样参数6字段）
+    - 实现 `debitCheckRows` reactive（借方检查行）+ `creditCheckRows` reactive（贷方检查行）
+    - 实现 `debitTotalRow` computed + `creditTotalRow` computed（各区块合计行）
+    - 实现 `coverageStats` computed（检查比例 = 检查金额/账面金额）
+    - 实现 `isCoverageLow` computed（<50%时预警）
     - 实现 `updateCell`（编辑 → debounce保存）
-    - 实现 `addSampleRow()`（新增样本行）
-    - 实现 `removeSampleRow(rowId)`
+    - 实现 `addDebitRow()`/`removeDebitRow(id)`/`addCreditRow()`/`removeCreditRow(id)`（借方贷方独立增删行）
     - 实现序列化/反序列化（JSON.stringify → F1-comprehensive-check remark字段）
-    - 实现与明细表F1-2的数据联动（点击样本跳转到对应明细行）
-    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10_
+    - 实现行级OCR上传（复用OCR端点，识别凭证信息自动填入行）
+    - 实现段列配置导出（debitColumnGroups/creditColumnGroups，供Vue组件固定列+滚动列分组渲染）
+    - _Requirements: 10.1~10.12_
 
 - [ ] 14. Checkpoint - 分析与检查表验证
   - Ensure all tests pass, ask the user if questions arise.
@@ -254,27 +300,31 @@
     - 实现 selfLoad 逻辑
     - _Requirements: 1.2, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
 
-  - [ ] 16.2 创建 `components/workpaper/f1/F1TabAdjudication.vue`（审定表F1-1）
+  - [ ] 16.2 创建 `components/workpaper/f1/F1TabAdjudication.vue`（审定表F1-1，两级结构）
     - 调用 useF1Adjudication.ts
-    - 渲染 el-table（期初/期末/变动分析列）
-    - 实现动态行增删UI
+    - 渲染两级结构：el-card"一、按照性质分类"（动态行el-table+增删行按钮）+ el-card"二、按照账龄分类"（固定4行el-table）
+    - 每级el-table列：项目 | 期初(未审/账项调整/重分类调整/审定) | 期末(未审/账项调整/重分类调整/审定) | 变动额 | 变动率 | 原因分析
+    - 底部：试算平衡表数行 + 差异行（≠0红色）
+    - 实现crossValidation显示（按性质合计 vs 按账龄合计 不一致时红色警告条）
     - 实现变动率高亮（>30%红色）
-    - 实现差异行高亮（≠0红色）
-    - 实现AI生成按钮（原因分析）
+    - 实现"三、审计说明"textarea + "四、审计结论"textarea（均AI按钮右对齐）
     - 实现GtIndexChip（索引跳转）
     - 实现只读模式控制
-    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10_
+    - UI铁律：13px字体/公式列虚线下划线+tooltip/min-width自适应/审计说明el-card包裹
+    - _Requirements: 2.1~2.12_
 
-  - [ ] 16.3 创建 `components/workpaper/f1/F1TabDetail.vue`（明细表F1-2）
+  - [ ] 16.3 创建 `components/workpaper/f1/F1TabDetail.vue`（明细表F1-2，32列→3区段）
     - 调用 useF1Detail.ts
-    - 渲染 el-table（11列）
-    - 实现筛选器（供应商/账龄/款项性质）
-    - 实现下拉选择（账龄/款项性质/函证结果）
-    - 实现长期挂款高亮（橙色）
-    - 实现函证差异高亮（红色）
+    - 渲染 el-tabs 3区段切换（"基础+期初"/"本期发生+期末"/"账龄+结果"）
+    - 每区段内使用 el-table（固定列+横滚列分组）
+    - 区段间行位置同步（切换区段保持当前行选中状态）
+    - 实现筛选器（债权人名称搜索/款项性质下拉/仅3年以上切换）
+    - 实现下拉选择（关联方类型/款项性质/是否函证）
+    - 实现长期挂款高亮（橙色，3年以上有值）
+    - 实现函证差异高亮（红色，回函不符）
     - 实现虚拟滚动（行数>100）
-    - 实现导入银行对账单按钮
-    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13, 4.14_
+    - 实现导入导出（完整32列Excel模板）
+    - _Requirements: 4.1~4.16_
 
   - [ ] 16.4 创建 `components/workpaper/f1/F1TabAdjustment.vue`（调整分录F1-3）
     - 调用 useF1Adjustment.ts
@@ -312,15 +362,18 @@
     - 实现披露完整性评估
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10_
 
-  - [ ] 16.8 创建 `components/workpaper/f1/F1TabComprehensiveCheck.vue`（综合检查F1-7）
+  - [ ] 16.8 创建 `components/workpaper/f1/F1TabComprehensiveCheck.vue`（综合检查F1-7，借方+贷方两区块）
     - 调用 useF1ComprehensiveCheck.ts
-    - 渲染抽样参数区（表单）
-    - 渲染检查记录区（el-table）
-    - 实现下拉选择（合同核对/发票核对/入库核对/付款凭证核对/检查结论）
-    - 实现自动设置检查结论
-    - 实现汇总统计（通过率/主要问题）
-    - 实现跳转到明细表功能
-    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10_
+    - 渲染抽样参数区（6字段表单卡片）
+    - 渲染借方检查区（el-table 16列，固定凭证7列+滚动证据9列）
+    - 渲染贷方检查区（el-table 14列，固定凭证7列+滚动证据7列）
+    - 渲染检查比例汇总（3行×5列小表格，低比例橙色高亮）
+    - 实现下拉选择（是否恰当审批/是否异常）
+    - 实现借方/贷方独立增删行
+    - 实现行级OCR上传（📎列）
+    - 底部审计说明+审计结论textarea（AI辅助）
+    - 实现导入导出（借方+贷方两sheet）
+    - _Requirements: 10.1~10.12_
 
   - [ ] 16.9 创建 `components/workpaper/f1/F1TabDisclosure.vue`（附注披露）
     - 调用 useF1Disclosure.ts
@@ -340,11 +393,14 @@
 
 - [ ] 17. 实现后端导入导出端点
   - [ ] 17.1 创建 `backend/app/routers/wp_render_strategies/_f1_import_export.py`
-    - 实现 `export_f1_template` 端点（GET /api/workpapers/F1/export-template）
-    - 实现 `import_f1_data` 端点（POST /api/workpapers/F1/import）
-    - 实现 `export_f1_data` 端点（GET /api/workpapers/F1/export）
+    - 实现 `export_f1_template` 端点（POST /api/workpapers/{wp_id}/f1/export-template?sheet=F1-2）
+    - 实现 `import_f1_data` 端点（POST /api/workpapers/{wp_id}/f1/import-data?sheet=F1-2，multipart/form-data）
+    - 实现 `export_f1_data` 端点（POST /api/workpapers/{wp_id}/f1/export-data?sheet=F1-2）
+    - 支持sheet参数：F1-2(明细表32列)/F1-5(长期挂款)/F1-6(关联方)/F1-7-debit(借方检查)/F1-7-credit(贷方检查)
     - 实现 xlsx生成与解析（使用openpyxl）
-    - 实现数据校验与错误处理
+    - 实现数据校验与错误处理（列头匹配校验+类型校验）
+    - 导出模板含填写说明sheet
+    - StreamingResponse中文文件名RFC5987编码
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6_
 
 - [ ] 18. 实现后端AI生成端点
@@ -417,3 +473,48 @@
     - 文档更新完成
     - 部署到测试环境
     - 用户验收测试
+
+
+- [ ] 26. 抽凭引擎集成
+  - [ ] 26.1 F1-7综合检查表集成GtVoucherSamplingEngine
+    - 在F1TabComprehensiveCheck.vue抽样参数区添加"使用抽凭引擎"按钮
+    - import GtVoucherSamplingEngine组件（dialog模式）
+    - 点击按钮打开dialog，预填总体金额和科目代码1123
+    - 用户确认后将选中样本映射到借方/贷方检查区动态行：供应商名称→供应商名称列/日期→日期列/凭证编号→凭证编号列/金额→借方金额或贷方金额列
+    - 自动更新抽样参数区字段（样本量/抽样方法/置信水平）
+    - 已填入行添加tooltip来源标记"来自抽凭引擎 {algorithm}"
+    - _Requirements: 22_
+
+- [ ] 27. 版本链集成
+  - [ ] 27.1 集成useVersionTrail到GtF1Prepayment主入口
+    - import useVersionTrail composable并调用useVersionTrail(wpId)
+    - 在每次save成功后调用versionTrail.autoSnapshot()
+    - 工具栏右侧添加"版本历史"按钮（el-button icon="Clock"）
+    - 点击按钮打开GtWpVersionTrail drawer（direction="rtl" size="400px"）
+    - GtWpVersionTrail显示版本列表+VersionDiffPanel差异对比
+    - 支持手动创建命名快照（ElMessageBox.prompt输入备注）
+    - _Requirements: 23_
+
+- [ ] 28. 附注模块EventBus联动
+  - [ ] 28.1 附注Tab订阅substantive:adjudicated事件
+    - 在F1TabDisclosure.vue onMounted中subscribe EventBus `substantive:adjudicated`
+    - 回调中检查payload.wpCode==='F1' && payload.accountCode==='1123'
+    - 匹配则重新计算附注数据（从更新后的auditedAmount刷新账龄分布/坏账准备等）
+    - 显示蓝色info bar "数据已更新"（3秒auto-dismiss）
+    - onUnmounted中unsubscribe
+    - _Requirements: 24_
+
+  - [ ] 28.2 审定表发布disclosure:note-text-updated事件
+    - 在useF1Adjudication.ts中watch auditNote/auditConclusion变更
+    - 变更时debounce 2秒后publish EventBus `disclosure:note-text-updated`（payload: {wpCode:'F1', section:'adjudication', text: auditConclusion}）
+    - 事件供外部附注模块消费
+    - _Requirements: 24_
+
+- [ ] 29. 复核对话provide/inject架构
+  - [ ] 29.1 GtF1Prepayment主入口provide openReviewDialog
+    - import GtReviewDialog + useReviewDialog composable
+    - 在setup中provide('openReviewDialog', openReviewDialog)
+    - 每个子组件inject('openReviewDialog')
+    - 每个section标题栏右侧添加"复核"按钮（仅当inject成功时显示）
+    - section标题布局：flex justify-between；左侧h3标题；右侧el-button-group含AI+复核按钮
+    - _Requirements: 20 补充_

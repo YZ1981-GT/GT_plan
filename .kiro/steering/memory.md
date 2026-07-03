@@ -15,6 +15,7 @@ inclusion: always
 - **UI 全中文化**；**报表金额默认"元"**；**中文场景全链路不能崩**
 - **底稿表格UI统一规范**：表格字体13px；AI+复核按钮右对齐在section标题同行；公式列虚线下划线+cursor:help+tooltip来源；列宽min-width自适应；审计说明/结论el-card包裹；编制提示details折叠底部
 - **🔴 底稿导入导出统一规范**：el-dropdown"导入导出▾"(导出模板/导出数据/导入数据)，复用`useXImportExport`composable(后端三端点)。多区块分sheet导出。动态行表格才需要导入导出
+- **🔴 D~N底稿跨模块联动标准（6大集成）**：①版本链(useVersionTrail主入口集成+autoSnapshot) ②抽凭引擎(检查表GtVoucherSamplingEngine dialog→样本填入) ③截止自动提取(useCutoffAutoSampling→序时账±5天) ④附注EventBus(subscribe substantive:adjudicated刷新+publish disclosure:note-text-updated) ⑤行级OCR(📎列POST contract-ocr→ElMessageBox确认→merge) ⑥复核对话(主入口provide openReviewDialog→子组件inject→section标题栏右侧按钮)
 - **不要考虑轻量**：要考虑针对性、联动性、美观性、实操性、易懂性；审计UI要有逻辑追溯能力
 - **动态行新增交互**：需命名的动态行必须先弹ElMessageBox.prompt输入名称确认后再创建
 - **复杂底稿填报说明**：多步骤底稿顶部增加蓝色渐变引导区(序号步骤,2列grid)
@@ -38,9 +39,11 @@ inclusion: always
 - **开发前必先逐sheet读源模板**；**导入导出三级**；**适用性自动判断**
 - **模板预填优先于AI生成**：有固定骨架的章节用CHAPTER_TEMPLATE+变量替换做预填，AI仅用于复杂章节
 - **🔴 D~N专属组件开发标准模板**：Phase0双源输入(openpyxl脚本读xlsx+底稿模板库md交叉验证)→Phase1三件套→Phase2开发8步(①registry+yaml ②composable分层useXFormulaEngine纯函数 ③主入口sheetName v-if分发defineAsyncComponent lazy ④后端3-4py ⑤注册四件套 ⑥联动TB回写+EventBus+GtIndexChip ⑦UI铁律 ⑧功能方向:联动/美观/溯源/易操作/导入导出/AI/双三模式)
+- **🔴 宽表拆分策略**：>15列宽表必须拆分提升可操作性。方案按场景选择：①区段Tab(明细表32列→3区段Tab切换,行同步) ②借方/贷方独立区块(检查表→两区块el-table) ③固定列+滚动列(凭证基础列固定,证据列横滚) ④左右视觉分组(记账凭证|检查证据)。优先减少横滚,让用户单屏看到关键信息
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **OO sheet-name必须与源xlsx tab名完全一致**；**多sheet workbook OO隐藏非目标tab**
 - **D~N循环全sheet HTML组件化**：OnlyOffice仅为降级/偏好切换
+- **🔴 G4-9类列式转置结构**：源模板中"投资项目作为列头+检查项作为行"的转置表必须在前端转换为行式交互视图（列式→行式），不能直接套行式表格模板
 
 ## 环境配置
 
@@ -74,6 +77,28 @@ inclusion: always
 
 ### 活跃/待办
 - **🔵 D7合同负债**：三件套齐全待开发(25需求+31任务)
+- **🔵 F2存货(方案B三组拆分)**：f2-inventory-main三件套已创建(35sheet/20需求/12PBT/25任务组)；f2-inventory-valuation-impairment三件套已创建(13sheet/18需求/10PBT/16任务组)；f2-inventory-special三件套已创建(18sheet/22需求/12PBT/14任务组)
+- **🔵 F3应付票据**：三件套已创建(10sheet/14需求/8PBT/10波次，贷方公式+利息测算+逾期风险)
+- **🔵 F4应付账款**：三件套已创建(12sheet/16需求/8PBT/10波次，两级审定+未入账反向截止+供应商融资3区域)
+- **🔵 F5营业成本**：三件套已创建(9sheet/14需求/10PBT/10波次，损益类公式+成本倒轧4区+数量核对+月度波动)
+- **🔵 G0投资循环函证**：三件套已创建(9sheet/7需求/8PBT/7波次，复用D0+新建证券差异核对+投资替代程序29列)
+- **🔵 G1交易性金融资产**：三件套已创建(16sheet/16需求/12PBT/10波次，sheetName v-if+公允价值Level1-3+SPPI+证券监盘+衍生工具)
+- **🔵 G2应收利息**：三件套已创建(10sheet/15需求/10PBT/10波次，利息365天+ECL三阶段+103行检查表)
+- **🔵 G3应收股利**：三件套已创建(7sheet/9需求/10PBT/10波次，股利测算+33列4区段+分红率)
+- **🔵 G4债权投资(三组拆分,三件套齐全待开发)**：g4-bond-investment-main(8sheet/11需求/13PBT/52任务)；g4-bond-investment-sppi(4sheet/9需求/13PBT/25任务)；g4-bond-investment-ecl(7sheet/11需求/14PBT/37任务)
+- **🔵 G5长期应收款**：三件套齐全待开发(16sheet/18需求/18PBT/design+tasks已完成)
+- **🔵 G8其他权益工具投资**：三件套齐全待开发(10sheet/13需求/8PBT/15任务8波次)
+- **🔵 G9其他非流动金融资产**：三件套齐全待开发(10sheet/10需求/8PBT/21任务9波次,L3调节10因子+混合计量3分组)
+- **🔵 G10交易性金融负债**：三件套齐全待开发(12sheet/10需求/6PBT/17任务10波次,贷方公式+衍生78行5section+分类检查)
+- **🔵 G11投资收益**：三件套齐全待开发(9sheet/9需求/7PBT/12任务7波次,损益类+收益率分析+calcReturnRate)
+- **🔵 G12净敞口套期收益**：三件套齐全待开发(9sheet/6需求/7PBT/15任务9波次,套期有效性+净敞口79行+calcHedgeIneffectiveness)
+- **🔵 G13公允价值变动收益**：三件套齐全待开发(6sheet/4需求/6PBT/8任务6波次，最简洁)
+- **🔵 G14信用减值损失**：三件套齐全待开发(6sheet/4需求/7PBT/8任务6波次，坏账滚动)
+- **🔵 G6/G7三组拆分(三件套齐全待开发)**：
+  - G6其他债权投资：main(8sheet/7需求/8PBT/11任务8波次,77行8层审定+33列3Tab+ECL公式链)/sppi(6sheet/7需求/10PBT/14任务6波次,SPPI80行6section+业务模式chip+利息实际利率法)/ecl(5sheet/6需求/10PBT/11任务6波次,三阶段转置+ECL链+7项凭证核对)
+  - G7长期股权投资：main(7sheet/6需求/9PBT/12任务7波次,97行5组审定+54列5Tab+355行附注)/equity-method(8sheet/7需求/9PBT/11任务7波次,权益法测算★+内部交易顺逆流+减值MAX)/subsidiary(7sheet/7需求/8PBT/13任务10波次,CAS33控制六要素+同控/非同控+处置一揽子)
+- **🔵 G13公允价值变动收益**：requirements已创建(8sheet/4需求/6PBT，最简单损益+交叉勾稽)待design+tasks
+- **🔵 G14信用减值损失**：requirements已创建(8sheet/4需求/7PBT，借方费用+ECL汇总勾稽)待design+tasks
 - **✅ voucher-sampling-engine**：全部完成(5种算法+4端点+5Vue组件+D2集成+8后端PBT+13前端PBT+21集成+81单元=123测试全绿)
 - **✅ cutoff-test-auto-sampling**：全部完成(V096迁移+LedgerSamplingService+4端点+3Vue组件+D2集成+10PBT+集成测试)
 - **✅ workpaper-version-trail**：全部完成(V097迁移+VersionTrailService+5端点+useVersionTrail+GtWpVersionTrail+VersionDiffPanel+5自动钩子+7后端PBT+9前端PBT+16集成+24单元=62测试全绿)

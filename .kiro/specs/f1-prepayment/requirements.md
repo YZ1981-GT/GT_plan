@@ -1,8 +1,33 @@
-# Requirements Document: F1 预付账款底稿专属HTML精美组件
+# Requirements Document
 
 ## Introduction
 
-F1预付账款底稿的专属HTML精美组件构建。将现有通用渲染升级为独立专属组件 `f1-prepayment`，覆盖源模板11个有效sheet（程序表F1A + 审定表F1-1 + 明细表F1-2 + 调整分录F1-3 + 实质性分析F1-4 + 长期挂款检查F1-5 + 关联方检查F1-6 + 综合检查F1-7 + 附注上市 + 附注国企 + 函证程序表G1A-修订前），合计约320个公式。科目编码1123预付账款（借方科目/资产类）。核心特色：审定表标准结构（期初/期末+变动分析）、11列明细表（含账龄/款项性质/函证结果）、实质性分析（余额变动/周转率/账龄分布）、长期挂款检查（账龄1年以上大额预付）、关联方交易检查、综合检查（合同/发票/入库/付款凭证核对）、附注披露（上市公司账龄表/国企简化版）、与F0存货循环函证联动。F循环中等复杂度底稿。结构简洁（11有效sheet），1级el-tabs 10个tab-pane：程序表/审定表/明细表/调整分录/实质性分析/长期挂款/关联方/综合检查/附注披露/函证程序。附注含上市+国企切换。
+F1预付账款底稿的专属HTML精美组件构建。将现有通用渲染升级为独立专属组件 `f1-prepayment`，覆盖源模板11个有效sheet（程序表F1A + 函证程序表G1A-修订前 + 审定表F1-1 + 明细表F1-2 + 调整分录F1-3 + 实质性分析F1-4 + 长期挂款检查F1-5 + 关联方检查F1-6 + 综合检查F1-7 + 附注上市 + 附注国企），合计约320个公式。科目编码1123预付账款（借方科目/资产类）。
+
+**源模板sheet清单（openpyxl实读F1.xlsx 2026-07-03确认）**：
+
+| # | Sheet名 | 行×列 | 说明 |
+|---|---------|-------|------|
+| 1 | 底稿目录 | 22×10 | 目录导航 |
+| 2 | 预付账款实质性程序表F1A | 34×13 | 程序表 |
+| 3 | 预付账款实质性程序表G1A-修订前 | 96×15 | 函证程序（旧版） |
+| 4 | 审定表F1-1 | 28×13 | **两级结构**：按性质分类(货款/工程款/设备款/服务费/其他) + 按账龄分类(1年以内/1-2年/2-3年/3年以上) |
+| 5 | 附注披露信息(上市公司) | 39×14 | 账龄披露+前五名+坏账准备 |
+| 6 | 附注披露信息(国企) | 29×14 | 简化版账龄表 |
+| 7 | 明细表F1-2 | 55×32 | **32列宽表**（债权人/公司代码/关联方类型/款项性质/期初4列+账龄4段/借贷发生/期末+账龄4段/调整2列/审定+账龄4段/是否函证/期后到货/备注） |
+| 8 | 调整分录汇总F1-3 | 25×11 | 标准6列+附注项目 |
+| 9 | 实质性分析F1-4 | 56×20 | 余额变动+周转率+账龄分布 |
+| 10 | 长期挂款检查表F1-5 | 19×14 | 13列（含期后供货/支持性证据） |
+| 11 | 关联方及交易检查表F1-6 | 23×16 | 13列（含坏账准备/账面价值） |
+| 12 | 预付账款检查表F1-7 | 93×19 | **大表**：借方16列检查区+贷方14列检查区+检查比例汇总 |
+
+**注意**：md模板库中描述的F1-8(减值测试)/F1-9(重分类调整)/F1-10(完整性测试)在源xlsx模板中不存在，属于可选扩展底稿（项目按需创建），本spec不覆盖。
+
+**宽表处理策略**：
+- F1-2明细表(32列)：拆为3区段Tab（基础+期初/本期发生+期末/账龄+结果），每区段10-12列
+- F1-7检查表(19列)：拆为借方检查区+贷方检查区，每区块内固定凭证列+滚动证据列
+
+核心特色：审定表两级结构（按性质+按账龄双维度）、32列明细表分段呈现、借方/贷方独立检查区、与F0存货循环函证联动。F循环中等复杂度底稿。结构简洁（12 sheet），1级el-tabs 10个tab-pane：程序表/审定表/明细表/调整分录/实质性分析/长期挂款/关联方/综合检查/附注披露/函证程序。附注含上市+国企切换。
 
 ## Glossary
 
@@ -48,22 +73,27 @@ F1预付账款底稿的专属HTML精美组件构建。将现有通用渲染升�
 7. THE F1 组件 SHALL 在VALID_COMPONENT_TYPES中注册'f1-prepayment'
 8. THE GtF1Prepayment.vue SHALL 支持selfLoad（当htmlData prop为null时自行调render-config?force_component_type=f1-prepayment）
 
-### Requirement 2: 审定表F1-1 HTML渲染（93公式）
+### Requirement 2: 审定表F1-1 HTML渲染（两级结构：按性质+按账龄）
 
 **User Story:** As a 审计助理, I want to 在精美HTML表格中查看和编辑预付账款审定表, so that 我能清晰地看到期初期末数据、审计调整、变动分析。
 
 #### Acceptance Criteria
 
-1. THE Adjudication_Table SHALL 渲染为标准结构：动态行（按预付类型分类：预付货款/预付服务费/预付租金/其他预付款）→ 合计行 → 试算平衡表数行 → 差异数行
-2. THE Adjudication_Table SHALL 显示以下列：项目 | 期初数(未审/账项调整/重分类调整/审定) | 期末数(未审/账项调整/重分类调整/审定) | 变动额 | 变动率 | 原因分析
+1. THE Adjudication_Table SHALL 渲染为两级结构（对齐xlsx实际）：
+   - **一、按照性质分类**：动态行（货款/工程款/设备款/服务费/其他）→ 合计行
+   - **二、按照账龄分类**：固定行（1年以内含1年/1至2年含2年/2至3年含3年/3年以上）→ 合计行
+   - 底部：试算平衡表数行 → 差异数行
+2. THE Adjudication_Table 每级 SHALL 显示以下列（按xlsx实际）：项目 | 期初数(未审数/账项调整/重分类调整/审定数) | 期末数(未审数/账项调整/重分类调整/审定数) | 变动额 | 变动率 | 原因分析
 3. WHEN 用户编辑未审数/AJE/RJE单元格时, THE Formula_Engine SHALL 自动计算审定数（=未审+AJE+RJE）
 4. THE Formula_Engine SHALL 自动计算：合计=SUM(动态行)；变动额=期末审定-期初审定；变动率=(期末-期初)/期初（期初=0且期末=0→空,期初=0→'N/A'）
 5. THE Adjudication_Table SHALL 在底部显示试算平衡表数行（自动取数科目1123）和差异行（=合计审定数-试算表数），差异不为零时红色高亮
 6. WHEN 变动率绝对值超过30%时, THE Adjudication_Table SHALL 以红色高亮显示该比例单元格
 7. THE Adjudication_Table SHALL 对原因分析列提供textarea编辑（支持AI生成按钮）
-8. THE Adjudication_Table SHALL 支持动态行增删（在合计行上方新增/删除预付类型行）
-9. THE Adjudication_Table SHALL 支持与明细表F1-2的数据联动（明细表合计→审定表未审数）
-10. THE Adjudication_Table SHALL 支持与调整分录F1-3的数据联动（调整分录合计→审定表AJE/RJE列）
+8. THE Adjudication_Table SHALL "按性质"部分支持动态行增删（在合计行上方新增/删除类型行），"按账龄"部分为固定4行不可增删
+9. THE Adjudication_Table SHALL 底部"三、审计说明"（textarea+AI按钮）+"四、审计结论"（textarea+AI按钮）两个文本区域
+10. THE Adjudication_Table SHALL "按性质合计"与"按账龄合计"金额必须一致（不一致时红色警告）
+11. THE Adjudication_Table SHALL 支持与明细表F1-2的数据联动（明细表按款项性质聚合→性质分类未审数；明细表按账龄聚合→账龄分类未审数）
+12. THE Adjudication_Table SHALL 支持与调整分录F1-3的数据联动（调整分录合计→审定表AJE/RJE列）
 
 ### Requirement 3: 审定表F1-1 跨Sheet联动与回写
 
@@ -82,26 +112,33 @@ F1预付账款底稿的专属HTML精美组件构建。将现有通用渲染升�
 9. THE Adjudication_Table SHALL 实现 EventBus 监听 `adjustment:created`（AJE/RJE → 累加对应列）
 10. THE Adjudication_Table SHALL 实现 `writebackTrialBalance`（回写 trial_balance.audited_amount 科目1123）
 
-### Requirement 4: 明细表F1-2 HTML渲染（69公式）
+### Requirement 4: 明细表F1-2 HTML渲染（32列宽表→3区段拆分）
 
-**User Story:** As a 审计助理, I want to 在精美HTML表格中管理预付账款明细, so that 我能按供应商、账龄、款项性质跟踪预付账款的详细情况。
+**User Story:** As a 审计助理, I want to 在精美HTML表格中管理预付账款明细, so that 我能按供应商、账龄、款项性质跟踪预付账款的详细情况，且不需要大范围横向滚动。
+
+**设计决策：宽表拆分** — xlsx实际32列宽表拆为3个视觉区段（Tab或折叠面板），提升可操作性：
+- **区段A 基础信息+期初（C1-C12）**：债权人名称/公司代码/关联方类型/款项性质/期初未审余额/期初账项调整/期初重分类调整/期初审定余额/期初审定账龄(1年以下/1~2年/2~3年/3年以上)
+- **区段B 本期发生+期末（C13-C24）**：借方发生/贷方发生/期末余额/被审计单位重分类调整/期末未审余额/期末未审账龄(4段)/账项调整/重分类调整/审定数
+- **区段C 审定账龄+结果（C25-C31）**：期末审定账龄(1年以下/1~2年/2~3年/3年以上)/是否函证/期后到货/备注
 
 #### Acceptance Criteria
 
-1. THE Detail_Table SHALL 显示以下列：供应商名称 | 期初余额 | 本期增加 | 本期减少 | 期末余额 | 账龄 | 款项性质 | 审计调整 | 期末审定数 | 函证结果 | 备注
-2. THE Detail_Table SHALL 对账龄列应用下拉选择（1年以内/1-2年/2-3年/3年以上）
-3. THE Detail_Table SHALL 对款项性质列应用下拉选择（预付货款/预付服务费/预付租金/保证金/其他）
-4. THE Detail_Table SHALL 对函证结果列应用下拉选择（已发函/已回函/回函不符/未回函/替代程序）
-5. THE Formula_Engine SHALL 自动计算期末余额（= 期初余额 + 本期增加 - 本期减少）
-6. THE Formula_Engine SHALL 自动计算期末审定数（= 期末余额 + 审计调整）
-7. THE Detail_Table SHALL 在底部显示合计行（= SUM所有行各金额列），不可编辑
-8. THE Detail_Table SHALL 支持按供应商名称筛选行（搜索框在表头上方）
-9. THE Detail_Table SHALL 支持按账龄筛选行（下拉选择器在表头上方）
-10. THE Detail_Table SHALL 支持按款项性质筛选行（下拉选择器在表头上方）
-11. THE Detail_Table SHALL 支持添加/删除行功能（在合计行上方新增空行）
-12. WHEN 账龄为"3年以上"时, THE Detail_Table SHALL 以橙色背景高亮该行（长期挂款风险）
-13. WHEN 函证结果为"回函不符"时, THE Detail_Table SHALL 以红色背景高亮该行（函证差异）
-14. THE Detail_Table SHALL 支持导入银行对账单数据（Excel导入功能，可选）
+1. THE Detail_Table SHALL 按xlsx实际结构显示32列（分3区段呈现，el-tabs"基础+期初"/"本期发生+期末"/"账龄+结果"切换，每区段内横向可滚动）
+2. THE Detail_Table 区段A SHALL 显示：债权人名称 | 公司代码 | 关联方类型(下拉) | 款项性质(下拉：货款/工程款/设备款/服务费/其他) | 期初未审余额 | 期初账项调整 | 期初重分类调整 | 期初审定余额 | 期初审定账龄4列(1年以下/1~2年/2~3年/3年以上)
+3. THE Detail_Table 区段B SHALL 显示：借方发生 | 贷方发生 | 期末余额(=期初审定+借方-贷方) | 被审计单位重分类调整 | 期末未审余额 | 期末未审账龄4列 | 账项调整 | 重分类调整 | 审定数(=期末未审+账项调整+重分类调整)
+4. THE Detail_Table 区段C SHALL 显示：期末审定账龄4列(1年以下/1~2年/2~3年/3年以上) | 是否函证(下拉) | 期后到货 | 备注
+5. THE Formula_Engine SHALL 自动计算期末余额（= 期初审定余额 + 借方发生 - 贷方发生）
+6. THE Formula_Engine SHALL 自动计算审定数（= 期末未审余额 + 账项调整 + 重分类调整）
+7. THE Formula_Engine SHALL 自动计算期初审定余额（= 期初未审余额 + 期初账项调整 + 期初重分类调整）
+8. THE Detail_Table SHALL 在底部显示合计行（= SUM所有行各金额列），不可编辑
+9. THE Detail_Table SHALL 支持按债权人名称搜索筛选（搜索框在表头上方）
+10. THE Detail_Table SHALL 支持按款项性质筛选（下拉选择器）
+11. THE Detail_Table SHALL 支持按账龄段筛选（下拉选择"仅显示3年以上"等）
+12. THE Detail_Table SHALL 支持添加/删除行功能（在合计行上方新增空行）
+13. WHEN 任一"3年以上"账龄列有值时, THE Detail_Table SHALL 以橙色背景高亮该行（长期挂款风险）
+14. WHEN 是否函证为"回函不符"时, THE Detail_Table SHALL 以红色背景高亮该行
+15. THE Detail_Table SHALL 支持导入导出（导出包含完整32列Excel模板）
+16. THE Detail_Table 区段间 SHALL 保持行同步（同一行在3个区段中对齐，切换区段不丢失当前行位置）
 
 ### Requirement 5: 明细表F1-2 跨Sheet联动
 
@@ -188,22 +225,35 @@ F1预付账款底稿的专属HTML精美组件构建。将现有通用渲染升�
 9. THE Related_Party_Check SHALL 支持与关联方名录的数据联动（自动匹配关联关系）
 10. THE Related_Party_Check SHALL 提供关联方交易汇总报告（总金额/占比/披露完整性评估）
 
-### Requirement 10: 综合检查F1-7 HTML渲染
+### Requirement 10: 综合检查F1-7 HTML渲染（两区块：借方+贷方检查）
 
-**User Story:** As a 审计助理, I want to 在精美HTML表格中进行预付账款综合检查, so that 我能核对合同/发票/入库/付款凭证的完整性。
+**User Story:** As a 审计助理, I want to 在精美HTML表格中进行预付账款综合检查, so that 我能分别核对借方发生额（付款）和贷方发生额（到货/转销）的凭证完整性。
+
+**设计决策：按xlsx实际结构** — F1-7实际93行×19列，分为：抽样参数区（Row8-11）+ 借方金额检查区（Row14-36，16列）+ 贷方金额检查区（Row38-86，14列）+ 检查比例汇总（Row87-91）+ 审计说明+结论。每个检查区宽度较大（16列），拆为"凭证基础信息5列 | 检查证据N列"两视觉分组。
 
 #### Acceptance Criteria
 
-1. THE Comprehensive_Check SHALL 分为两个区块：抽样参数区、检查记录区
-2. THE 抽样参数区 SHALL 显示：抽样总体（笔数/金额）、抽样方法（随机/金额比例/风险导向）、样本量、抽样比例
-3. THE 检查记录区 SHALL 显示以下列：样本编号 | 供应商名称 | 预付金额 | 合同核对 | 发票核对 | 入库核对 | 付款凭证核对 | 检查结论 | 问题描述 | 处理措施
-4. THE Comprehensive_Check SHALL 对合同核对/发票核对/入库核对/付款凭证核对列应用下拉选择（核对一致/核对不符/未提供）
-5. THE Comprehensive_Check SHALL 对检查结论列应用下拉选择（通过/不通过/需补充资料）
-6. WHEN 任一核对为"核对不符"时, THE Comprehensive_Check SHALL 自动设置检查结论为"不通过"
-7. THE Comprehensive_Check SHALL 支持添加/删除样本行功能
-8. THE Comprehensive_Check SHALL 在底部显示汇总统计（样本通过率/主要问题类型）
-9. THE Comprehensive_Check SHALL 支持与明细表F1-2的数据联动（点击样本跳转到对应明细行）
-10. THE Comprehensive_Check SHALL 提供检查结果汇总报告（通过率/主要风险/改进建议）
+1. THE Comprehensive_Check SHALL 分为四个区块（参照xlsx实际结构）：抽样参数区 | 借方金额检查区 | 贷方金额检查区 | 检查比例汇总
+2. THE 抽样参数区 SHALL 显示4组字段（xlsx Row8-11）：测试总体(笔数/金额)/特定样本(描述)/抽样总体(笔数/金额)/确定样本量 + 抽样方法/抽样过程
+3. THE 借方金额检查区 SHALL 显示16列（记账凭证7列+付款审批单2列+银行回单3列+合同3列+索引号+是否异常）：
+   - 记账凭证组：供应商名称/日期/凭证编号/业务内容/对方科目/对方明细科目/借方金额
+   - 付款审批单组：日期编号/是否经过恰当审批
+   - 银行回单组：日期/收款方/金额
+   - 合同组：供应商名称/合同金额/预付比例
+   - 结论组：索引号/是否异常
+4. THE 贷方金额检查区 SHALL 显示14列（记账凭证7列+入库单4列+采购发票3列+索引号+是否异常）：
+   - 记账凭证组：供应商名称/日期/凭证编号/业务内容/对方科目/对方明细科目/贷方金额
+   - 入库单组：日期编号/品名/单位/数量
+   - 采购发票组：日期编号/对手方名称/金额
+   - 结论组：索引号/是否异常
+5. THE 每个检查区 SHALL 宽表拆为"固定列（凭证基础7列）+ 滚动列（证据N列）"两视觉分组
+6. THE 检查比例汇总 SHALL 显示：方向(本期借方/本期贷方/期末余额) | 账面金额 | 检查金额 | 检查比例 | 说明
+7. WHEN 检查比例低于50%时, THE Comprehensive_Check SHALL 以橙色高亮并提示"应扩大样本量或说明原因"
+8. THE Comprehensive_Check SHALL 支持添加/删除样本行功能（借方检查区和贷方检查区独立增删行）
+9. THE Comprehensive_Check SHALL 每区块底部显示合计行（SUM金额列）
+10. THE Comprehensive_Check SHALL 底部审计说明textarea + 审计结论textarea（均支持AI辅助生成）
+11. THE Comprehensive_Check SHALL 支持导入导出（导出含借方检查+贷方检查两个sheet）
+12. THE Comprehensive_Check SHALL 支持行级OCR上传（📎列，复用OCR端点）
 
 ### Requirement 11: 附注披露F1 HTML渲染
 
@@ -368,3 +418,52 @@ F1预付账款底稿的专属HTML精美组件构建。将现有通用渲染升�
 5. THE Performance SHALL 对图表渲染启用懒加载（滚动到可视区域才渲染）
 6. THE Performance SHALL 对导入导出启用进度条（显示处理进度）
 7. THE Performance SHALL 对AI生成启用超时控制（30秒超时自动取消）
+
+
+### Requirement 22: 抽凭引擎集成
+
+**User Story:** As a 审计助理, I want to 在F1-7综合检查表的抽样参数区使用抽凭引擎选取样本, so that 我能利用平台统一的5种抽样算法（随机/分层/特定项目/系统/货币单位）科学确定检查样本，选中样本自动填入检查行。
+
+#### Acceptance Criteria
+
+1. THE F1-7综合检查表抽样参数区 SHALL 提供"使用抽凭引擎"按钮（el-button type="primary" icon）
+2. WHEN 用户点击"使用抽凭引擎"按钮时, THE 系统 SHALL 打开 GtVoucherSamplingEngine 对话框（dialog模式）
+3. THE GtVoucherSamplingEngine 对话框 SHALL 预填总体金额（从F1-7抽样参数区取）和科目代码（1123预付账款）
+4. WHEN 用户在GtVoucherSamplingEngine中完成抽样并确认时, THE 系统 SHALL 将选中样本自动填入F1-7借方检查区/贷方检查区的动态行（供应商名称/日期/凭证编号/金额等字段从样本数据映射）
+5. THE 抽样参数区 SHALL 自动更新为引擎返回的参数（样本量/抽样方法/置信水平）
+6. THE 已通过抽凭引擎填入的行 SHALL 显示来源标记（tooltip: "来自抽凭引擎 {algorithm}"）
+
+### Requirement 23: 版本链集成
+
+**User Story:** As a 审计助理, I want to F1预付账款底稿自动记录版本快照, so that 我能追溯底稿变更历史并对比差异。
+
+#### Acceptance Criteria
+
+1. THE GtF1Prepayment 主入口 SHALL 集成 useVersionTrail composable（auto-snapshot on save）
+2. WHEN 用户保存底稿时, THE useVersionTrail SHALL 自动创建版本快照（POST /api/workpapers/{wp_id}/versions/snapshot）
+3. THE 工具栏 SHALL 提供"版本历史"按钮，点击打开 GtWpVersionTrail 抽屉面板
+4. THE GtWpVersionTrail SHALL 显示版本列表（时间/操作人/摘要），支持差异对比
+5. THE useVersionTrail SHALL 支持手动创建命名快照（用户可输入备注）
+6. THE 版本快照 SHALL 记录当前allResponses完整JSON + 操作人 + 时间戳
+
+### Requirement 24: 附注模块EventBus联动
+
+**User Story:** As a 审计助理, I want to F1附注披露Tab自动刷新当审定金额变更时, so that 附注数据始终与审定表保持一致，且结论文本变更能通知其他消费方。
+
+#### Acceptance Criteria
+
+1. THE F1TabDisclosure SHALL subscribe to `substantive:adjudicated` CustomEvent（通过EventBus监听）
+2. WHEN 收到 `substantive:adjudicated` 事件（wpCode='F1', accountCode='1123'）时, THE Disclosure SHALL 自动刷新附注中的审定金额数据（无需用户手动刷新）
+3. THE F1TabAdjudication SHALL 在审定表结论文本（审计说明/审计结论）变更时 publish `disclosure:note-text-updated` 事件（payload含 wpCode='F1'/section='adjudication'/text）
+4. THE `disclosure:note-text-updated` 事件 SHALL 供附注模块（disclosure_notes系统）消费，用于同步审定结论到附注草稿
+5. THE 附注Tab SHALL 显示"数据已更新"提示条（当收到adjudicated事件且数据有变化时，蓝色info bar 3秒自动消失）
+
+### Requirement 25: 复核对话provide/inject架构规范
+
+**User Story:** As a 开发者, I want to 复核对话按provide/inject模式集成, so that 所有子组件都能统一调用openReviewDialog。
+
+#### Acceptance Criteria
+
+9. THE GtF1Prepayment 主入口 SHALL provide('openReviewDialog', openReviewDialog)（从GtReviewDialog组件获取inject key）
+10. THE 每个子组件(F1TabAdjudication/F1TabDetail/F1TabComprehensiveCheck等) SHALL inject('openReviewDialog') 并在section标题栏右侧显示"复核"按钮
+11. THE section标题栏 SHALL 布局为：左侧section标题 + 右侧按钮组（AI按钮 + 复核按钮）
