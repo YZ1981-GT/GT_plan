@@ -547,3 +547,96 @@ LLM 不能直接成为审计结论。建议全局分级：
 5. 技术团队下一阶段 KPI 不应是“新增多少模块”，而应是“减少多少断点、统一多少组件、沉淀多少契约、降低多少维护成本”。
 
 一句话总结：这个平台已经具备企业级审计平台的骨架，但要从“功能集合”进化为“事务所级作业系统”，关键不在再加功能，而在统一口径、统一入口、统一体验、统一治理。只有这样，助理愿意每天用，经理愿意靠它管项目，质控愿意用它抽查，合伙人愿意基于它签发，EQCR 愿意把它作为独立复核证据链。
+
+---
+
+## 10. 实施进展追踪（2026-07-02 更新）
+
+> 本节基于代码实证，标注原文各建议的当前落地状态。
+
+### 10.1 P0 第一优先级落地情况
+
+| 编号 | 原建议 | 状态 | 实证 |
+|---|---|---|---|
+| P0-1 | 清理 developing 路由 | ✅ 已完成 | `meta.developing` 路由已全部移除或开放 |
+| P0-2 | 统一项目上下文与年度 | ✅ 已完成 | `useProjectStore`(Pinia) 全局管理 projectId/year/standard，路由自动同步 |
+| P0-3 | 金额 Decimal 全链路 | ✅ 已完成 | `displayPrefs.fmtAmount` 单一出口 + CI守卫(71处豁免清单) + spec归档 |
+| P0-4 | Stale 传播三层契约 | ✅ 已完成 | `StalePropagationEngine` + 分层文档 + 契约测试 |
+| P0-5 | 前后端权限矩阵统一 | ✅ 已完成 | `REVIEW_ROLE_MAP` + `evaluate_guard` + `usePermission` + v-permission |
+| P0-6 | AI 内容确认机制 | ✅ 已完成 | `AIContentMustBeConfirmedRule` + `/api/ai-chat/adopt` + PBT门禁测试 |
+| P0-7 | 四表到附注穿透契约 | ⚠️ 部分 | GtIndexChip+resolver+EventBus已实现；统一LinkageContract结构体待做 |
+
+### 10.2 底稿模块重大进展（原文§4.4未覆盖的新能力）
+
+自6月6日以来底稿模块发生质变：
+
+| 进展 | 规模 | 核心模式 |
+|---|---|---|
+| D循环专属组件全量完成 | D1~D7(D7待开发)，D4最大(42sheet/18composable/288+测试) | sheetName v-if分发 + defineAsyncComponent lazy |
+| E1货币资金专属组件 | 27 sheet / 15 composable / 52测试 | 同D循环标准模板 |
+| F循环registry校准 | 99 override条目 / 5审定表yaml实读校准 | openpyxl实读+md交叉验证 |
+| A/B/C类全量专属+聚合 | 82+ componentType / 222+ spec归档 | bundle+skip+内嵌Tab |
+| 底稿表格UI统一规范 | 全D/E专属组件对齐 | 13px/公式虚线tooltip/min-width/el-card审计意见区 |
+| 导入导出三级统一 | useXImportExport composable复用 | el-dropdown+后端三端点+RFC5987编码 |
+| 双/三模式统一 | el-segmented(结构化/矩阵/OO) | OO健康检查+降级禁用 |
+| AI辅助真实接入 | 8+ section per cycle | POST /ai-generate + 弹确认预览 |
+| OCR凭证识别 | D4-12合同+D4-14穿行 | UnifiedOCR→vLLM结构化JSON |
+
+### 10.3 原文§3.2 UI标准落地对照
+
+| 原建议 | 当前状态 |
+|---|---|
+| 页面头部统一 GtPageHeader | ✅ 全局已统一 |
+| 工具栏统一 GtToolbar | ✅ 已统一 |
+| 金额统一 GtAmountCell/displayPrefs | ✅ M1治理完成 + CI守卫 |
+| 状态标签统一 dictStore | ✅ statusMaps.ts + GtStatusTag |
+| 异常提示统一 | ✅ catch块ElMessage.error=0(CI卡点) |
+| 加载状态三级 | ✅ skeleton/v-loading/AsyncJobProgress |
+| 表格组件迁移 | ⚠️ 进行中：新页面禁裸el-table |
+| 大页面拆分 | ⚠️ 进行中：D2已拆(35文件)，D1已拆(6spec) |
+
+### 10.4 原文§2.2 联动断点对照
+
+| 原断点 | 当前状态 |
+|---|---|
+| developing路由拦截 | ✅ 已清理 |
+| 跨模块引用与冲突两套并行 | ⚠️ 仍存在 |
+| wp_code深链未统一resolve | ✅ GtIndexChip统一 |
+| WOPI/OO与Univer并存割裂 | ✅ 用户只见"结构化视图/在线编辑" |
+| Stale传播静默跳过 | ✅ 三层契约测试覆盖 |
+
+### 10.5 尚未落地的关键建议（下一阶段重点）
+
+| 原编号 | 建议 | 阻塞/原因 |
+|---|---|---|
+| §2.3 | 统一LinkageContract | 当前组合(GtIndexChip+EventBus+resolver)已覆盖主链路 |
+| §1.1 | 助理"我的作业台" | 待角色驾驶舱统一设计 |
+| §1.2 | 经理四象限首页 | ManagerDashboard有基础，未达四象限 |
+| §4.6 | 复核Aging闭环 | audit-review-dialog spec三件套齐全待开发 |
+| §4.13 | AI对话模式 | 降级提示已做，对话流待下轮 |
+| P2-1 | 多项目经营看板 | 待合并UAT+真实集团数据 |
+| P2-5 | 压测 | capacity-planning已分析，真实并发待做 |
+
+### 10.6 新增重要技术决策（6月6日后）
+
+| 决策 | 日期 | 影响 |
+|---|---|---|
+| D~N专属组件开发标准模板 | 07-02 | 双源输入+Phase0~2标准化，后续循环可复制 |
+| 无内部el-tabs | 06-30 | 外层GtWpRenderer目录行，专属组件sheetName分发 |
+| 函证模块跨循环共享 | 07-01 | 9个confirmation-*组件7循环复用 |
+| OO聚合包sheet级解析 | 07-01 | 三端点统一sheet级wp_code |
+| account_package_registry | 06-30 | sheet清单=目录行顺序 |
+
+### 10.7 修订后建议
+
+**第1阶段已基本完成**（P0全绿 + 底稿专属组件全量 + UI统一规范）。
+
+**当前应进入第2阶段**（试点1-2个周期）：
+1. D7合同负债开发（三件套齐全）
+2. voucher-sampling-engine通用抽凭引擎
+3. cutoff-test-auto-sampling截止测试自动提取
+4. audit-review-dialog通用复核对话
+5. vLLM Phase3接入（AI对话+B60策略）
+6. F~N循环专属组件按D4标准模板推进
+
+**第3阶段目标不变**：模板回流、压测、多项目看板、QC规则版本化。

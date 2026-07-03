@@ -36,9 +36,9 @@
     >
       <template #title>
         <span class="materiality-indicator__title">
-          累计未更正错报: {{ formatAmount(cumulativeTotal) }} 元
+          累计未更正错报: {{ prefs.fmt(cumulativeTotal) }} 元
           <template v-if="materiality?.pm">
-            &nbsp;/ PM: {{ formatAmount(materiality.pm) }} 元
+            &nbsp;/ PM: {{ prefs.fmt(materiality.pm) }} 元
             &nbsp;/ 比率: {{ ratioPercent }}
           </template>
         </span>
@@ -64,6 +64,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface MaterialityInfo {
   pm: number | null
@@ -118,10 +119,8 @@ const statusDescription = computed(() => {
   }
 })
 
-function formatAmount(val: number | null | undefined): string {
-  if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function goToB15() {
   router.push({

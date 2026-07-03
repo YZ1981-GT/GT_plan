@@ -2,10 +2,14 @@
 /**
  * D2TabVoucherCheck — 凭证抽查D2-7
  * 抽样参数区 + 凭证明细表(17列) + 进度条 + 底部汇总
+ * 集成 GtVoucherSamplingEngine 自动抽凭（Task 11.1）
  */
-import { inject, toRef, type Ref } from 'vue'
+import { inject, toRef, computed, type Ref } from 'vue'
 import { useD2VoucherCheck } from '../composables/useD2VoucherCheck'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
+import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import type { VoucherSampleRow } from '../composables/useD2VoucherCheck'
 
 const props = defineProps<{
   wpId: string
@@ -54,6 +58,7 @@ const {
   updateCell,
   updateParams,
   autoMarkAllCutoff,
+  debounceSave,
 } = useD2VoucherCheck({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -61,6 +66,100 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   bsDate: toRef(props, 'bsDate') as Ref<string>,
 })
+
+// ─── 年度计算（从bsDate提取，如 "2025-12-31" → 2025）─────────────────────────
+
+const year = computed(() => {
+  if (props.bsDate && props.bsDate.length >= 4) {
+    return parseInt(props.bsDate.slice(0, 4), 10)
+  }
+  return new Date().getFullYear() - 1
+})
+
+// ─── 当前审计阶段（默认年审）────────────────────────────────────────────────
+
+const currentPhase = computed<Phase>(() => 'final')
+
+// ─── 自动抽凭填充处理 (Task 11.1) ───────────────────────────────────────────
+
+function generateRowId(): string {
+  return `vc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+/**
+ * 将 SampledVoucher 映射为 D2-7 VoucherSampleRow
+ * 映射规则：
+ *   voucherNo → 凭证号
+ *   voucherDate → 日期
+ *   debitAmount → 借方金额（取较大者作为金额列）
+ *   creditAmount → 贷方金额
+ *   summary → 摘要
+ *   counterpartAccount → 对方科目（交易对手）
+ *   accountCode → 科目编码（科目名称）
+ * 标记 source: "自动抽凭"
+ */
+function mapSampledVoucherToRow(voucher: SampledVoucher, seq: number): VoucherSampleRow {
+  const debit = voucher.debitAmount ? parseFloat(voucher.debitAmount) : 0
+  const credit = voucher.creditAmount ? parseFloat(voucher.creditAmount) : 0
+  const amount = Math.max(debit, credit)
+
+  return {
+    rowId: generateRowId(),
+    seq,
+    voucherNo: voucher.voucherNo || '',
+    voucherDate: voucher.voucherDate || '',
+    amount,
+    counterparty: voucher.counterpartAccount || '',
+    abstract: voucher.summary || '',
+    accountName: voucher.accountCode || '',
+    attachmentCount: 0,
+    hasOriginal: '',
+    amountConsistent: '',
+    dateConsistent: '',
+    revenueDate: '',
+    isCutoff: false,
+    customerConfirm: '',
+    agingVerify: '',
+    abnormalFlag: '',
+    conclusion: '',
+    indexRef: '',
+    source: '自动抽凭',
+  }
+}
+
+/**
+ * 处理 GtVoucherSamplingEngine @filled 事件
+ * 将抽样结果映射到 D2-7 列结构并合并到 samples
+ * 同时回写抽样参数区（总体/样本量/方法/覆盖率）
+ */
+function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+  const { samples: sampledVouchers, fillMode } = payload
+  const mapped = sampledVouchers.map((v, idx) => mapSampledVoucherToRow(v, idx + 1))
+
+  if (fillMode === 'replace') {
+    // 替换模式：清空后填充
+    samples.value = mapped.map((s, i) => ({ ...s, seq: i + 1 }))
+  } else if (fillMode === 'merge') {
+    // 合并模式：按凭证号去重
+    const existingNos = new Set(samples.value.map(s => s.voucherNo))
+    const newSamples = mapped.filter(s => !existingNos.has(s.voucherNo))
+    const startSeq = samples.value.length + 1
+    newSamples.forEach((s, i) => { s.seq = startSeq + i })
+    samples.value.push(...newSamples)
+  } else {
+    // append 模式（默认）：追加到末尾
+    const startSeq = samples.value.length + 1
+    mapped.forEach((s, i) => { s.seq = startSeq + i })
+    samples.value.push(...mapped)
+  }
+
+  // 回写抽样参数区：样本量 = 填充笔数，总体规模从 payload 推算
+  updateParams('sampleSize', samples.value.length)
+  updateParams('populationSize', params.value.populationSize || samples.value.length)
+
+  // 触发 debounce 2s 自动保存
+  debounceSave()
+}
 </script>
 
 <template>
@@ -100,6 +199,21 @@ const {
         </el-form-item>
       </el-form>
     </el-card>
+
+    <!-- 自动抽凭引擎 (Task 11.1) -->
+    <el-collapse class="sampling-engine-collapse">
+      <el-collapse-item title="自动抽凭" name="auto-sampling">
+        <GtVoucherSamplingEngine
+          account-code="1122"
+          :phase="currentPhase"
+          default-method="random"
+          :workpaper-id="wpId"
+          :project-id="projectId"
+          :year="year"
+          @filled="handleSamplingFilled"
+        />
+      </el-collapse-item>
+    </el-collapse>
 
     <!-- 进度条 -->
     <div class="progress-bar">
@@ -173,6 +287,7 @@ const {
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .params-card { margin-bottom: 12px; }
+.sampling-engine-collapse { margin-bottom: 12px; }
 .progress-bar { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; }
 .summary-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 10px;

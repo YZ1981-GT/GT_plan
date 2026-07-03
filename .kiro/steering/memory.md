@@ -54,7 +54,7 @@ inclusion: always
 
 ## PG schema
 
-- MigrationRunner（非 alembic）；V+R 配对；`IF NOT EXISTS`；**最高 V094**
+- MigrationRunner（非 alembic）；V+R 配对；`IF NOT EXISTS`；**最高 V097**
 - trial_balance=standard_account_code/unadjusted_amount/aje_adjustment/audited_amount
 - working_paper 无 wp_code（在 wp_index，JOIN）
 - recalc 铁律：`tb_balance` v1 口径（借正贷负），`trial_balance` v2 正数；只汇总叶子；损益取发生额
@@ -74,16 +74,17 @@ inclusion: always
 
 ### 活跃/待办
 - **🔵 D7合同负债**：三件套齐全待开发(25需求+31任务)
-- **🔵 voucher-sampling-engine**：三件套齐全,P0(5种抽样算法+版本链+CAS1314)
-- **🔵 cutoff-test-auto-sampling**：三件套齐全,P0(3模式截止+LedgerSampling)
-- **🔵 workpaper-version-trail**：三件套齐全,P1(field-level快照+diff+回滚)
-- **🔵 全局一致性治理 3 spec**：display-format-single-source/cycle-palette-single-source/stale-propagation-cleanup-doc
+- **✅ voucher-sampling-engine**：全部完成(5种算法+4端点+5Vue组件+D2集成+8后端PBT+13前端PBT+21集成+81单元=123测试全绿)
+- **✅ cutoff-test-auto-sampling**：全部完成(V096迁移+LedgerSamplingService+4端点+3Vue组件+D2集成+10PBT+集成测试)
+- **✅ workpaper-version-trail**：全部完成(V097迁移+VersionTrailService+5端点+useVersionTrail+GtWpVersionTrail+VersionDiffPanel+5自动钩子+7后端PBT+9前端PBT+16集成+24单元=62测试全绿)
+- **✅ 全局一致性治理 3 spec**：~~display-format-single-source~~✅(12任务全完,统一出口fmt/fmtDateTime/fmtPercent+批1-3迁移58文件+CI守卫+Playwright E2E+豁免清单仅剩D循环128条)/~~cycle-palette-single-source~~✅(11任务全完)/~~stale-propagation-cleanup-doc~~✅(全6任务完成)
 - **🟡 B40项目组讨论**：需重建spec(实际是CAS1211不是审计抽样)
 - **🟡 B60 LLM辅助策略**：待vLLM Phase3
 - **🟡 AI对话模式**：章节AI追问用户而非报错，对话流待做
 - **🟡 存货监盘P2**：照片+GPS+OCR+差异预警
 - **🟡 voucher-attachment-intelligence**：P2凭证附件智能化(依赖voucher-sampling-engine)
-- **🟡 audit-review-dialog**：通用复核对话(三件套齐全,13需求)
+- **✅ audit-review-dialog**：通用复核对话(45任务全部完成,V095迁移+router+composable+Vue组件+PBT+集成测试)
+- **🔵 D2 refactor 待出 spec**：去el-tabs→sheetName分发+OO双模式+composable拆分+子目录重组（对齐D4标准）
 - **架构优化**：①拆 event_handlers.py ②前端 Top-5 巨型 Vue 拆分 ③services/ 按域建子包
 - 外部依赖：LLM embedding / 合并 UAT / GitHub 默认分支改 main / MinerU+OCR
 

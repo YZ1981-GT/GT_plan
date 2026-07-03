@@ -73,6 +73,7 @@
 
 <script setup lang="ts">
 import type { EqcrRelatedPartyTransaction } from '@/services/eqcrService'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   transactions: EqcrRelatedPartyTransaction[]
@@ -96,11 +97,13 @@ const TXN_TYPE_LABELS: Record<string, string> = {
   guarantee: '担保', service: '服务', asset_transfer: '资产转让', other: '其他',
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(value: string | null): string {
   if (value === null || value === undefined || value === '') return '—'
   const num = Number(value)
   if (Number.isNaN(num)) return value
-  return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(num)
 }
 
 function renderEvidence(refs: any): string {

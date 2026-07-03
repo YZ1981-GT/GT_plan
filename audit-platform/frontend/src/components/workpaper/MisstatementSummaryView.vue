@@ -24,17 +24,17 @@
     <div v-if="summaryResult && hasPriorYearData" class="misstatement-summary__prior-year">
       <el-descriptions :column="4" border size="small" title="错报分类汇总">
         <el-descriptions-item label="上年延续金额">
-          {{ formatAmount(summaryResult.prior_year?.continuing_amount) }} 元
+          {{ prefs.fmt(summaryResult.prior_year?.continuing_amount) }} 元
         </el-descriptions-item>
         <el-descriptions-item label="上年转回金额">
-          {{ formatAmount(summaryResult.prior_year?.reversed_amount) }} 元
+          {{ prefs.fmt(summaryResult.prior_year?.reversed_amount) }} 元
         </el-descriptions-item>
         <el-descriptions-item label="本年新增金额">
-          {{ formatAmount(summaryResult.current_year?.new_amount) }} 元
+          {{ prefs.fmt(summaryResult.current_year?.new_amount) }} 元
         </el-descriptions-item>
         <el-descriptions-item label="净累计">
           <span class="misstatement-summary__cumulative">
-            {{ formatAmount(summaryResult.cumulative_total) }} 元
+            {{ prefs.fmt(summaryResult.cumulative_total) }} 元
           </span>
         </el-descriptions-item>
       </el-descriptions>
@@ -47,9 +47,9 @@
         :closable="false"
       >
         <template #title>
-          错报评价：合计 {{ formatAmount(evaluation.total_amount) }} 元
+          错报评价：合计 {{ prefs.fmt(evaluation.total_amount) }} 元
           {{ evaluation.exceeds_materiality ? '超过' : '未超过' }}
-          重要性水平 {{ formatAmount(evaluation.materiality) }} 元
+          重要性水平 {{ prefs.fmt(evaluation.materiality) }} 元
         </template>
         <p>{{ evaluation.suggested_conclusion }}</p>
       </el-alert>
@@ -88,6 +88,7 @@ import { api } from '@/services/apiProxy'
 import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 import WorkpaperHtmlTable, { type ColumnDef, type RowData, type StandardHeader } from './WorkpaperHtmlTable.vue'
 import MaterialityIndicator from './MaterialityIndicator.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   /** 底稿 ID（GtMisstatementWorkpaper / GtWpRenderer 传入） */
@@ -204,10 +205,8 @@ const hasPriorYearData = computed(() => {
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
-function formatAmount(val: number | null | undefined): string {
-  if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 // ─── 阈值跨越检测 (Task 10.4) ────────────────────────────────────────────
 
@@ -225,7 +224,7 @@ function checkThresholdCrossing(newCumulative: number, pm: number | null | undef
   if (previousCumulative < pm && newCumulative >= pm) {
     ElNotification({
       title: '重要性阈值警告',
-      message: `累计未更正错报(${formatAmount(newCumulative)}元)已达到或超过重要性水平(${formatAmount(pm)}元)，请关注审计意见影响。`,
+      message: `累计未更正错报(${prefs.fmt(newCumulative)}元)已达到或超过重要性水平(${prefs.fmt(pm)}元)，请关注审计意见影响。`,
       type: 'warning',
       duration: 8000,
     })

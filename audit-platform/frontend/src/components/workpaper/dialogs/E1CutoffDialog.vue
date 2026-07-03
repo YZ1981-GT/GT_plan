@@ -30,7 +30,7 @@
       <el-table-column label="科目" prop="account_code" width="100" />
       <el-table-column label="金额" width="130">
         <template #default="{ row }">
-          <span :class="{ 'gt-cutoff-credit': row.amount < 0 }">{{ formatAmount(row.amount) }}</span>
+          <span :class="{ 'gt-cutoff-credit': row.amount < 0 }">{{ prefs.fmt(row.amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期间正确" width="120">
@@ -110,6 +110,7 @@ import ItemAttachment from '../ItemAttachment.vue'
 import AiConclusionButton from '../AiConclusionButton.vue'
 import { confirmLeave } from '@/utils/confirm'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   modelValue: boolean
@@ -149,10 +150,8 @@ const autoSampling = ref(false)
 const crossPeriodCount = computed(() => form.value.items.filter((it) => it.period_correct === false).length)
 const correctCount = computed(() => form.value.items.filter((it) => it.period_correct === true).length)
 
-function formatAmount(v: number | string): string {
-  const n = Number(v) || 0
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 async function loadData() {
   try {

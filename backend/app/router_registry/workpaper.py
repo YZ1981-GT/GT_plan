@@ -5,7 +5,7 @@
   生命周期: working_paper / workpaper_batch_status / wp_batch_ops / wp_progress / wp_prerequisite_status / wp_procedure_status
   复核:     wp_review / wp_review_status / wp_cell_annotations / review_records_global / wp_eqcr_evaluation
   渲染:     wp_render_config / wp_classification / wp_html_save / wp_xlsx_export / wp_index_resolve / wp_trace / wp_disclosure_sync
-  数据:     formula / wp_mapping / wp_data_rules / wp_prefill_context / wp_prefill_preview / wp_user_formulas / wp_cross_check / wp_dependencies / sampling / sampling_enhanced / aging_analysis / data_fetch_custom
+  数据:     formula / wp_mapping / wp_data_rules / wp_prefill_context / wp_prefill_preview / wp_user_formulas / wp_cross_check / wp_dependencies / sampling / sampling_enhanced / cutoff_sampling / voucher_sampling / aging_analysis / data_fetch_custom
   搜索:     wp_search / wp_version_search / global_search / wp_health_dashboard
   程序管理: wp_procedures / wp_procedure_trim / wp_step_mapping / wp_evidence
   AI与辅助: wp_ai / wp_ai_confirm / wp_chat / wp_explanation
@@ -131,6 +131,8 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.workpaper_summaries import router as workpaper_summaries
     from app.routers.wp_render_registry import router as wp_render_registry
     from app.routers.wp_onlyoffice_router import router as wp_onlyoffice
+    from app.routers.cutoff_sampling import router as cutoff_sampling
+    from app.routers.voucher_sampling import router as voucher_sampling
 
     groups = {
         # ── 6 大聚合组（design §7.1）──
@@ -138,7 +140,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
         "生命周期": [working_paper, wp_editor, wp_batch_domain, wp_relation_domain, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review_domain, wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync, wp_onlyoffice],
-        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export],
+        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],

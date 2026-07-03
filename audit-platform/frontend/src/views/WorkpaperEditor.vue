@@ -36,6 +36,11 @@
         <el-button text @click="goBack">← 返回</el-button>
         <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name">{{ displayWpName }}</span>
+        <div class="gt-wp-io-toolbar__actions">
+          <el-button size="small" @click="onShowVersions">
+            <el-icon><Clock /></el-icon> 版本历史
+          </el-button>
+        </div>
       </div>
 
       <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
@@ -137,6 +142,32 @@
         <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
           <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
         </el-badge>
+        <!-- 复核对话入口 -->
+        <el-popover
+          placement="bottom"
+          :width="260"
+          trigger="click"
+          popper-class="review-thread-popover"
+        >
+          <template #reference>
+            <el-badge :value="reviewThreadCount" :max="9" :hidden="reviewThreadCount === 0" type="warning">
+              <el-button size="small">📝 复核对话</el-button>
+            </el-badge>
+          </template>
+          <div class="review-thread-list">
+            <div v-if="reviewThreadList.length === 0" class="review-thread-empty">暂无活跃复核对话</div>
+            <div
+              v-for="item in reviewThreadList"
+              :key="item.section_id"
+              class="review-thread-item"
+              @click="onOpenReviewThread(item)"
+            >
+              <span class="review-thread-dot" :class="item.has_unread ? 'dot-red' : 'dot-blue'" />
+              <span class="review-thread-label">{{ item.section_id }}</span>
+              <span v-if="item.has_unread" class="review-thread-unread">未读</span>
+            </div>
+          </div>
+        </el-popover>
         <!-- AI 文档对话入口 -->
         <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
         <!-- 独立按钮组（刷新取数等） -->
@@ -272,6 +303,14 @@
     @jump="onVersionSearchJump"
   />
 
+  <!-- 版本链侧栏（field-level 快照时间线 + diff + 回滚） -->
+  <GtWpVersionTrail
+    ref="versionTrailRef"
+    :workpaper-id="wpId"
+    :project-id="projectId"
+    @rollback-completed="onVersionTrailRollbackCompleted"
+  />
+
   <AuditNavDialog
     :project-id="projectId"
     :wp-id="wpId"
@@ -382,6 +421,8 @@ import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
+import GtWpVersionTrail from '@/components/workpaper/version-trail/GtWpVersionTrail.vue'
+import { Clock } from '@element-plus/icons-vue'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
 const route = useRoute()
@@ -437,7 +478,35 @@ const htmlFormulaWpContext = computed(() => {
 const showStaleImpactPanel = ref(false)
 const showDocAiChat = ref(false)
 const showWpImportEnhanced = ref(false)
+
+// ─── 复核对话线程列表（工具栏 popover）──────────────────────────────────────
+const reviewThreadList = ref<{ section_id: string; has_unread: boolean }[]>([])
+const reviewThreadCount = computed(() => reviewThreadList.value.length)
+
+async function loadReviewThreadList() {
+  if (!wpId.value) return
+  try {
+    const res = await httpApi.get('/api/review-threads/active', {
+      params: { wp_id: wpId.value },
+      _silent: true,
+    } as any)
+    const data = res?.data?.data || res?.data || []
+    if (Array.isArray(data)) {
+      reviewThreadList.value = data
+    }
+  } catch { /* silent */ }
+}
+
+function onOpenReviewThread(item: { section_id: string }) {
+  // 触发 provide 下的 openReviewDialog（通过 eventBus）
+  eventBus.emit('review-dialog:open', {
+    wpId: wpId.value,
+    sectionId: item.section_id,
+    sectionLabel: item.section_id,
+  })
+}
 const univerEditorCoreRef = ref<InstanceType<typeof UniverEditorCore> | null>(null)
+const versionTrailRef = ref<InstanceType<typeof GtWpVersionTrail> | null>(null)
 
 function onWpImportEnhanced() {
   showWpImportEnhanced.value = false
@@ -670,7 +739,24 @@ function onDialogApplied(_sheet: string) {
 }
 
 function onShowVersions() {
-  showVersionDrawer.value = true
+  // 打开版本链侧栏（field-level 快照时间线）
+  versionTrailRef.value?.openDrawer()
+}
+
+/** 版本回滚完成后刷新底稿数据 */
+async function onVersionTrailRollbackCompleted() {
+  // 重新加载底稿详情
+  try {
+    const d = await getWorkpaper(projectId.value, wpId.value)
+    if (d) wpDetail.value = d
+  } catch { /* ignore */ }
+  // 通知子组件/事件总线刷新
+  eventBus.emit('workpaper-refresh')
+  eventBus.emit('workpaper:saved', {
+    projectId: projectId.value,
+    wpId: wpId.value,
+  } as WorkpaperSavedPayload)
+  ElMessage.success('底稿数据已刷新')
 }
 
 function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRef: string }) {
@@ -919,6 +1005,9 @@ onMounted(() => {
   // 加载项目元数据
   loadProjectMeta()
 
+  // 加载复核对话线程列表
+  loadReviewThreadList()
+
   // 订阅 workpaper:locate-cell 事件
   eventBus.on('workpaper:locate-cell', onLocateCellEvent)
 
@@ -998,7 +1087,7 @@ function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef:
   padding: 8px 16px; background: var(--gt-color-bg-light, #f8f7fc);
   border-bottom: 1px solid var(--gt-color-border, #e8e5f0);
 }
-.gt-wp-io-toolbar__actions { margin-left: auto; display: flex; gap: 8px; }
+.gt-wp-io-toolbar__actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
 .gt-wp-editor {
   display: flex; flex-direction: column; height: 100vh;
   background: var(--gt-color-bg);
@@ -1062,4 +1151,19 @@ function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef:
 .gt-audit-nav-dialog__actions { display: flex; gap: 4px; }
 .gt-audit-nav-dialog__actions .el-button { color: #fff !important; }
 .gt-audit-nav-dialog__actions .el-button:hover { background: rgba(255,255,255,0.15) !important; }
+
+/* 复核对话线程 popover */
+.review-thread-list { max-height: 240px; overflow-y: auto; }
+.review-thread-empty { text-align: center; color: #999; font-size: 13px; padding: 12px 0; }
+.review-thread-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; cursor: pointer; border-radius: 4px;
+  font-size: 13px; transition: background 0.15s;
+}
+.review-thread-item:hover { background: #f5f7fa; }
+.review-thread-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.review-thread-dot.dot-blue { background: #409eff; }
+.review-thread-dot.dot-red { background: #f56c6c; }
+.review-thread-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #303133; }
+.review-thread-unread { font-size: 11px; color: #f56c6c; flex-shrink: 0; }
 </style>

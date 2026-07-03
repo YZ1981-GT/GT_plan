@@ -15,6 +15,7 @@
  */
 import { ref, computed, reactive, watch, onMounted, onBeforeUnmount } from 'vue'
 import { api } from '@/services/apiProxy'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Types ───
 interface SheetRow {
@@ -228,10 +229,8 @@ const isVertical = computed(() =>
 )
 
 // ─── Methods: Formatting ───
-function formatAmount(val: number | null | undefined): string {
-  if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function formatPct(val: number | null | undefined): string {
   if (val == null) return '—'
@@ -552,7 +551,7 @@ onBeforeUnmount(() => {
       <div v-if="data" class="gt-analytical-review__meta">
         <span>{{ data.wp_code }} · {{ data.year }}年度</span>
         <span class="gt-analytical-review__materiality">
-          重要性水平: {{ formatAmount(data.materiality) }}
+          重要性水平: {{ prefs.fmt(data.materiality) }}
         </span>
         <el-button size="small" @click="isFullscreen = !isFullscreen">
           {{ isFullscreen ? '退出全屏' : '全屏' }}
@@ -593,9 +592,9 @@ onBeforeUnmount(() => {
                   <span :class="{ 'is-total': row.is_total_row }">{{ row.name }}</span>
                 </td>
                 <td class="col-row-num">{{ row.row_number }}</td>
-                <td class="col-amount">{{ formatAmount(row.prior) }}</td>
-                <td class="col-amount">{{ formatAmount(row.current) }}</td>
-                <td class="col-amount">{{ formatAmount(row.change) }}</td>
+                <td class="col-amount">{{ prefs.fmt(row.prior) }}</td>
+                <td class="col-amount">{{ prefs.fmt(row.current) }}</td>
+                <td class="col-amount">{{ prefs.fmt(row.change) }}</td>
                 <td class="col-pct">{{ formatPct(row.change_pct) }}</td>
                 <td class="col-status">
                   <span v-if="row.status === 'significant'" class="status-tag status-significant">显著</span>
@@ -650,9 +649,9 @@ onBeforeUnmount(() => {
                   <span :class="{ 'is-total': row.is_total_row }">{{ row.name }}</span>
                 </td>
                 <td class="col-row-num">{{ row.row_number }}</td>
-                <td class="col-amount">{{ formatAmount(row.prior) }}</td>
+                <td class="col-amount">{{ prefs.fmt(row.prior) }}</td>
                 <td class="col-pct">{{ formatPct(row.prior_weight_pct) }}</td>
-                <td class="col-amount">{{ formatAmount(row.current) }}</td>
+                <td class="col-amount">{{ prefs.fmt(row.current) }}</td>
                 <td class="col-pct">{{ formatPct(row.current_weight_pct) }}</td>
                 <td class="col-pct">{{ formatPct(row.weight_change_pct) }}</td>
                 <td class="col-status">

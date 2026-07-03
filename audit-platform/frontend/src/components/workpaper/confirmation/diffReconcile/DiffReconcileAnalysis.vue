@@ -83,6 +83,7 @@
 <script setup lang="ts">
 import { InfoFilled } from '@element-plus/icons-vue'
 import type { DiffAnalysisGroup } from './diffReconcileTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   analysisGroups: DiffAnalysisGroup[]
@@ -123,9 +124,11 @@ const TYPE_MAP: Record<string, { label: string; color: string }> = {
 function typeLabel(t: string): string { return TYPE_MAP[t]?.label ?? t }
 function typeColor(t: string): string { return TYPE_MAP[t]?.color ?? '' }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 </script>
 

@@ -6,20 +6,20 @@
 
 ## Tasks
 
-- [ ] 1. 数据库迁移 V096
-  - [ ] 1.1 创建 `backend/migrations/V096_create_workpaper_snapshots.sql`
+- [x] 1. 数据库迁移 V096
+  - [x] 1.1 创建 `backend/migrations/V096_create_workpaper_snapshots.sql`
     - CREATE TABLE IF NOT EXISTS workpaper_snapshots（id UUID PK、project_id FK projects(id)、workpaper_id FK working_papers(id)、user_id UUID NOT NULL、snapshot_type VARCHAR(50) NOT NULL、description TEXT、change_summary TEXT、data_json JSONB NOT NULL、item_count INTEGER NOT NULL DEFAULT 0、data_size_bytes INTEGER NOT NULL DEFAULT 0、created_at TIMESTAMP NOT NULL DEFAULT now()）
     - CREATE INDEX IF NOT EXISTS idx_wp_snapshots_wp_created ON workpaper_snapshots(workpaper_id, created_at DESC)
     - CREATE INDEX IF NOT EXISTS idx_wp_snapshots_project ON workpaper_snapshots(project_id)
     - _Requirements: 9.1, 9.6, 9.7_
 
-  - [ ] 1.2 在 `backend/app/models/audit_platform_models.py` 中添加 WorkpaperSnapshot ORM 模型
+  - [x] 1.2 在 `backend/app/models/audit_platform_models.py` 中添加 WorkpaperSnapshot ORM 模型
     - 定义所有列映射 + 类型注解（id, project_id, workpaper_id, user_id, snapshot_type, description, change_summary, data_json, item_count, data_size_bytes, created_at）
     - 添加 FK 关系（projects、working_papers）
     - _Requirements: 9.1_
 
-- [ ] 2. 实现 VersionTrailService 后端核心服务
-  - [ ] 2.1 创建 `backend/app/services/version_trail_service.py`
+- [x] 2. 实现 VersionTrailService 后端核心服务
+  - [x] 2.1 创建 `backend/app/services/version_trail_service.py`
     - 定义 Pydantic 模型：SnapshotCreate、SnapshotMeta、SnapshotDetail、DiffItem、DiffResult、CompareRequest
     - 实现 `create_snapshot(db, project_id, workpaper_id, user_id, snapshot_type, description, change_summary)`
       - SELECT item_id, conclusion, remark, wp_ref FROM checklist_responses WHERE wp_id = :workpaper_id
@@ -31,18 +31,18 @@
     - 实现 `create_snapshot_fire_and_forget` — try/except 包裹 create_snapshot，异常仅 logger.warning
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.5, 2.6, 9.1, 9.5_
 
-  - [ ] 2.2 实现 `list_snapshots(db, workpaper_id, project_id, page, page_size)`
+  - [x] 2.2 实现 `list_snapshots(db, workpaper_id, project_id, page, page_size)`
     - SELECT WHERE workpaper_id AND project_id ORDER BY created_at DESC
     - OFFSET/LIMIT 分页 + COUNT(*) 总数
     - 返回 (list[SnapshotMeta], total_count)
     - _Requirements: 3.1, 3.5, 10.5_
 
-  - [ ] 2.3 实现 `get_snapshot_detail(db, snapshot_id, project_id)`
+  - [x] 2.3 实现 `get_snapshot_detail(db, snapshot_id, project_id)`
     - SELECT WHERE id AND project_id（安全隔离）
     - 返回完整 SnapshotDetail 含 data_json
     - _Requirements: 11.3, 10.5_
 
-  - [ ] 2.4 实现 `compute_diff(db, version_a_id, version_b_id, project_id)` + `compute_diff_pure(data_a, data_b)`
+  - [x] 2.4 实现 `compute_diff(db, version_a_id, version_b_id, project_id)` + `compute_diff_pure(data_a, data_b)`
     - 读取两个快照 data_json
     - 以 item_id 为 key 构建 dict_a / dict_b
     - added = set(dict_b.keys()) - set(dict_a.keys())
@@ -53,7 +53,7 @@
     - 生成 summary 文本："新增X项，删除Y项，修改Z个字段"
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 11.5_
 
-  - [ ] 2.5 实现 `rollback_to_snapshot(db, project_id, workpaper_id, snapshot_id, user_id)`
+  - [x] 2.5 实现 `rollback_to_snapshot(db, project_id, workpaper_id, snapshot_id, user_id)`
     - 验证 snapshot 属于指定 project_id + workpaper_id
     - 读取目标快照 data_json
     - 在同一事务内：DELETE FROM checklist_responses WHERE wp_id = workpaper_id
@@ -61,14 +61,14 @@
     - 创建新快照 snapshot_type='rollback', description="回滚到{target_created_at}的版本"
     - _Requirements: 5.2, 5.3, 5.4, 10.3_
 
-  - [ ] 2.6 实现 `enforce_lifecycle(db, workpaper_id, max_snapshots=50)`
+  - [x] 2.6 实现 `enforce_lifecycle(db, workpaper_id, max_snapshots=50)`
     - COUNT(*) WHERE workpaper_id
     - 若 > max_snapshots → 查询最老的 non-manual 快照 → DELETE 直到 count <= max_snapshots
     - 返回被清理数量
     - _Requirements: 9.2, 9.3, 9.4_
 
-- [ ] 3. 实现版本链 API 端点
-  - [ ] 3.1 创建 `backend/app/routers/version_trail.py`
+- [x] 3. 实现版本链 API 端点
+  - [x] 3.1 创建 `backend/app/routers/version_trail.py`
     - `POST /api/projects/{pid}/workpapers/{wp_id}/versions` — 调用 create_snapshot → 返回 SnapshotMeta
     - `GET /api/projects/{pid}/workpapers/{wp_id}/versions?page=&page_size=` — 调用 list_snapshots → 返回 {items, total}
     - `GET /api/projects/{pid}/workpapers/{wp_id}/versions/{vid}` — 调用 get_snapshot_detail → 返回 SnapshotDetail
@@ -78,11 +78,11 @@
     - 注册到 router_registry
     - _Requirements: 5.6, 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
 
-- [ ] 4. Checkpoint - 后端服务验证
+- [x] 4. Checkpoint - 后端服务验证
   - Ensure migration runs, service methods work. Ask user if questions arise.
 
-- [ ] 5. 实现 useVersionTrail.ts composable
-  - [ ] 5.1 创建 `audit-platform/frontend/src/components/workpaper/composables/useVersionTrail.ts`（~300行）
+- [x] 5. 实现 useVersionTrail.ts composable
+  - [x] 5.1 创建 `audit-platform/frontend/src/components/workpaper/composables/useVersionTrail.ts`（~300行）
     - 定义 TypeScript 接口：SnapshotType、SnapshotMeta、DiffItem、DiffResult、UseVersionTrailOptions
     - 实现响应式状态：versions, totalCount, currentPage, loading, drawerVisible, diffResult, diffLoading, selectedVersions
     - 实现 `loadVersions(page?)` — GET /versions?page=&page_size=20
@@ -93,8 +93,8 @@
     - 实现 hasMore computed（currentPage * 20 < totalCount）
     - _Requirements: 3.1, 3.5, 4.1, 5.1, 5.5, 7.1, 7.3_
 
-- [ ] 6. 实现 GtWpVersionTrail.vue 时间线侧栏
-  - [ ] 6.1 创建 `audit-platform/frontend/src/components/workpaper/version-trail/GtWpVersionTrail.vue`（~350行）
+- [x] 6. 实现 GtWpVersionTrail.vue 时间线侧栏
+  - [x] 6.1 创建 `audit-platform/frontend/src/components/workpaper/version-trail/GtWpVersionTrail.vue`（~350行）
     - 使用 useVersionTrail composable
     - el-drawer（direction=rtl，width=520px，title="版本历史"）
     - 顶部操作栏：el-input（描述输入）+ "保存版本"按钮
@@ -108,8 +108,8 @@
     - defineEmits: 'rollback-completed'
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 5.1, 5.5, 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 7. 实现 VersionDiffPanel.vue diff 对比面板
-  - [ ] 7.1 创建 `audit-platform/frontend/src/components/workpaper/version-trail/VersionDiffPanel.vue`（~250行）
+- [x] 7. 实现 VersionDiffPanel.vue diff 对比面板
+  - [x] 7.1 创建 `audit-platform/frontend/src/components/workpaper/version-trail/VersionDiffPanel.vue`（~250行）
     - Props: diffResult, versionA, versionB
     - 顶部统计卡片：新增X | 删除Y | 修改Z | 未变W
     - el-table 展示 diff 列表：item_id | 字段 | 版本A值 | 版本B值 | 变更类型
@@ -118,108 +118,108 @@
     - 空状态：两版本完全相同时显示"无差异"
     - _Requirements: 4.5, 4.6_
 
-- [ ] 8. 底稿编辑器工具栏集成
-  - [ ] 8.1 在底稿编辑器 toolbar 中添加"版本历史"按钮（clock icon）
+- [x] 8. 底稿编辑器工具栏集成
+  - [x] 8.1 在底稿编辑器 toolbar 中添加"版本历史"按钮（clock icon）
     - 引入 GtWpVersionTrail 组件
     - 点击按钮 → 打开 drawer
     - 监听 @rollback-completed → 刷新底稿数据
     - 适配所有底稿类型（通过 workpaperId prop）
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 9. 自动快照钩子集成
-  - [ ] 9.1 cutoff-test-auto-sampling 集成
+- [x] 9. 自动快照钩子集成
+  - [x] 9.1 cutoff-test-auto-sampling 集成
     - 在 cutoff_sampling.py 的 fill 操作前调用 VersionTrailService.create_snapshot_fire_and_forget(snapshot_type='auto_sampling')
     - 传入 description 参数（提取条件摘要）
     - _Requirements: 2.1, 8.1_
 
-  - [ ] 9.2 voucher-sampling-engine 集成
+  - [x] 9.2 voucher-sampling-engine 集成
     - 在抽凭填充操作前调用 VersionTrailService.create_snapshot_fire_and_forget(snapshot_type='auto_sampling')
     - _Requirements: 2.1, 8.2_
 
-  - [ ] 9.3 Excel批量导入集成
+  - [x] 9.3 Excel批量导入集成
     - 在批量导入底稿数据前调用 create_snapshot_fire_and_forget(snapshot_type='auto_import')
     - _Requirements: 2.2_
 
-  - [ ] 9.4 复核签字集成
+  - [x] 9.4 复核签字集成
     - 在复核签字操作时调用 create_snapshot_fire_and_forget(snapshot_type='review_sign')
     - 传入 description（签字人姓名+角色）
     - _Requirements: 2.3_
 
-  - [ ] 9.5 状态变更集成
+  - [x] 9.5 状态变更集成
     - 在底稿状态变更时调用 create_snapshot_fire_and_forget(snapshot_type='status_change')
     - _Requirements: 2.4_
 
-- [ ] 10. cutoff/voucher 集成升级（before_data → 版本链）
-  - [ ] 10.1 修改 cutoff-test-auto-sampling 的 before_data 模式
+- [x] 10. cutoff/voucher 集成升级（before_data → 版本链）
+  - [x] 10.1 修改 cutoff-test-auto-sampling 的 before_data 模式
     - 原：在 composable 内保存 before_data 到 workpaper_extraction_log
     - 新：改为调用 VersionTrailService.createSnapshot API（snapshot_type='auto_sampling'）
     - 保持 workpaper_extraction_log 的 before_data 字段向后兼容（同时写入）
     - _Requirements: 8.1, 8.3_
 
-  - [ ] 10.2 修改 voucher-sampling-engine 的 before_data 模式
+  - [x] 10.2 修改 voucher-sampling-engine 的 before_data 模式
     - 同 10.1 逻辑
     - _Requirements: 8.2, 8.3_
 
-- [ ] 11. Checkpoint - 前端组件验证
+- [x] 11. Checkpoint - 前端组件验证
   - Ensure all frontend components render correctly, drawer opens, timeline shows. Ask user if questions arise.
 
-- [ ] 12. 后端 PBT 测试
-  - [ ]* 12.1 编写 Property 1 PBT：快照数据保真性
+- [x] 12. 后端 PBT 测试
+  - [x]* 12.1 编写 Property 1 PBT：快照数据保真性
     - **Property 1: 快照数据保真性**
     - 生成器：`st.lists(st.fixed_dictionaries({item_id: st.text(min_size=1,max_size=50), conclusion: st.one_of(st.none(), st.text(max_size=20)), remark: st.one_of(st.none(), st.text(max_size=500)), wp_ref: st.one_of(st.none(), st.text(max_size=20))}))`
     - 断言：create_snapshot 后读取 snapshot.data_json deep-equals 输入的 checklist_responses 集合
     - **Validates: Requirements 1.1, 1.2, 1.5**
 
-  - [ ]* 12.2 编写 Property 2 PBT：Diff 完备性
+  - [x]* 12.2 编写 Property 2 PBT：Diff 完备性
     - **Property 2: Diff 完备性**
     - 生成器：两组随机 checklist_responses 列表（item_id 可重叠可不重叠）
     - 断言：`set(added_ids) | set(deleted_ids) | set(modified_ids) | set(unchanged_ids) == set(all_ids_a) | set(all_ids_b)`
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
 
-  - [ ]* 12.3 编写 Property 3 PBT：Diff 互斥性
+  - [x]* 12.3 编写 Property 3 PBT：Diff 互斥性
     - **Property 3: Diff 互斥性**
     - 生成器：同 P2
     - 断言：四个集合（added/deleted/modified/unchanged）pairwise disjoint
     - **Validates: Requirements 4.2, 4.3, 4.4**
 
-  - [ ]* 12.4 编写 Property 4 PBT：回滚恢复保真性
+  - [x]* 12.4 编写 Property 4 PBT：回滚恢复保真性
     - **Property 4: 回滚恢复保真性**
     - 生成器：随机 data_json（快照内容）+ 随机当前 checklist_responses
     - 断言：rollback 后 SELECT checklist_responses WHERE wp_id deep-equals snapshot.data_json
     - **Validates: Requirements 5.2, 5.4**
 
-  - [ ]* 12.5 编写 Property 5 PBT：回滚创建新版本
+  - [x]* 12.5 编写 Property 5 PBT：回滚创建新版本
     - **Property 5: 回滚创建新版本**
     - 生成器：随机快照 + rollback 调用
     - 断言：rollback 后新增恰好 1 条 snapshot_type='rollback' 且 data_json == 目标快照 data_json
     - **Validates: Requirements 5.3**
 
-  - [ ]* 12.6 编写 Property 6 PBT：生命周期上界
+  - [x]* 12.6 编写 Property 6 PBT：生命周期上界
     - **Property 6: 生命周期上界**
     - 生成器：`st.integers(1,80)` 次 create + `st.sampled_from(['manual','auto_sampling','auto_import','review_sign','status_change'])` 类型
     - 断言：任何时刻 COUNT(*) WHERE snapshot_type != 'manual' <= 50
     - **Validates: Requirements 9.2, 9.3, 9.4**
 
-  - [ ]* 12.7 编写 Property 8 PBT：安全隔离性
+  - [x]* 12.7 编写 Property 8 PBT：安全隔离性
     - **Property 8: 安全隔离性**
     - 生成器：`st.uuids()` × 2 项目 + 随机快照分配
     - 断言：list_snapshots(project_a) 永不返回 project_b 的快照
     - **Validates: Requirements 10.5, 11.6, 12.3**
 
-- [ ] 13. 前端 PBT 测试
-  - [ ]* 13.1 编写 Property 7 PBT：不可变性
+- [x] 13. 前端 PBT 测试
+  - [x]* 13.1 编写 Property 7 PBT：不可变性
     - **Property 7: 不可变性**
     - 生成器：随机操作序列（create/list/diff/rollback）
     - 断言：任何操作序列后，已存在的快照 data_json 和 metadata 不被修改或删除（通过 mock API 验证请求中无 DELETE 或 PUT 到快照）
     - **Validates: Requirements 10.4**
 
-  - [ ]* 13.2 编写 Diff 纯函数前端 PBT（补充验证）
+  - [x]* 13.2 编写 Diff 纯函数前端 PBT（补充验证）
     - 生成器：`fc.array(fc.record({itemId: fc.string({minLength:1}), conclusion: fc.option(fc.string()), remark: fc.option(fc.string()), wpRef: fc.option(fc.string())}))` × 2
     - 断言：完备性 + 互斥性（前端如果有 diff 展示逻辑的辅助函数）
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.4**
 
-- [ ] 14. 后端集成测试
-  - [ ] 14.1 编写完整流程集成测试
+- [x] 14. 后端集成测试
+  - [x] 14.1 编写完整流程集成测试
     - 测试场景：创建手动快照 → 列表 → 详情 → 修改数据 → 再创建快照 → diff → 回滚 → 验证恢复
     - 测试安全隔离：项目A快照不可被项目B访问
     - 测试生命周期：创建51个auto快照验证purge
@@ -229,36 +229,36 @@
     - 测试2MB降级：构造大数据验证降级存储格式
     - _Requirements: 1.1, 2.5, 5.2, 5.6, 9.2, 9.5, 10.3, 10.5_
 
-- [ ] 15. 前端单元测试
-  - [ ] 15.1 编写 useVersionTrail.spec.ts 单元测试
+- [x] 15. 前端单元测试
+  - [x] 15.1 编写 useVersionTrail.spec.ts 单元测试
     - loadVersions 正确请求 API + 填充 versions 数组
     - createSnapshot 调用后刷新列表
     - compareDiff 填充 diffResult
     - rollback 调用确认弹窗 + emit
     - canRollback 根据角色计算
 
-  - [ ] 15.2 编写 GtWpVersionTrail.spec.ts 单元测试
+  - [x] 15.2 编写 GtWpVersionTrail.spec.ts 单元测试
     - 时间线渲染正确数量的节点
     - snapshot_type 颜色标签正确
     - 回滚按钮仅对有权限用户显示
 
-- [ ] 16. Checkpoint - 全部测试验证
+- [x] 16. Checkpoint - 全部测试验证
   - Ensure all tests pass (PBT + unit + integration). Ask user if questions arise.
 
-- [ ] 17. 路由注册与契约验证
-  - [ ] 17.1 注册 version_trail router 到 router_registry
+- [x] 17. 路由注册与契约验证
+  - [x] 17.1 注册 version_trail router 到 router_registry
     - 在 router_registry 对应分组中 import 并注册
     - 验证 `test_router_registry_completeness` 通过
     - _Requirements: 11.1_
 
-- [ ] 18. 回归测试
-  - [ ] 18.1 运行现有测试套件确保无回归
+- [x] 18. 回归测试
+  - [x] 18.1 运行现有测试套件确保无回归
     - `rtk python -m pytest backend/tests/ -k "checklist_response or version" -v --tb=short`
     - `rtk npx vitest run --reporter=verbose` (version-trail 相关测试)
     - 确认无回归
     - 如有失败修复后重跑
 
-- [ ] 19. Final checkpoint - 全部功能集成验证
+- [x] 19. Final checkpoint - 全部功能集成验证
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

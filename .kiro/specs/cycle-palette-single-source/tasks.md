@@ -31,7 +31,7 @@
   - 文件：`audit-platform/frontend/scripts/check-cycle-palette-single-source.mjs`、`package.json`
   - 需求 4
 
-- [ ] 10. 回归：前端 vitest 全绿 + Playwright 抽测工作台/全景图/依赖图/甘特图同一 D 循环同色
+- [x] 10. 回归：前端 vitest 全绿 + Playwright 抽测工作台/全景图/依赖图/甘特图同一 D 循环同色
   - 需求 2、3
 
-- [ ]* 11. 更新 `docs/平台全局体验与一致性建议.md` §1.1 标记完成
+- [x]* 11. 更新 `docs/平台全局体验与一致性建议.md` §1.1 标记完成

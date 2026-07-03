@@ -1082,3 +1082,118 @@ class DeliverableSectionState(Base, TimestampMixin):
             name="uq_deliverable_section",
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# WorkpaperExtractionLog 模型（cutoff-test-auto-sampling, V096）
+# ---------------------------------------------------------------------------
+
+
+class WorkpaperExtractionLog(Base):
+    """底稿提取日志 — 记录截止测试/抽凭引擎的执行留痕和填充前快照，支持撤销功能。"""
+
+    __tablename__ = "workpaper_extraction_log"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    workpaper_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("working_paper.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    extraction_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )
+    extraction_criteria: Mapped[dict] = mapped_column(
+        JSONB, nullable=False
+    )
+    total_matched: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False
+    )
+    filled_count: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False
+    )
+    fill_mode: Mapped[str] = mapped_column(
+        String(20), nullable=False
+    )
+    before_data: Mapped[dict | None] = mapped_column(
+        JSONB, nullable=True
+    )
+    is_undone: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_extraction_log_wp_created",
+            "workpaper_id", sa.text("created_at DESC"),
+        ),
+        Index(
+            "idx_extraction_log_project",
+            "project_id",
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# WorkpaperSnapshot 模型（workpaper-version-trail, V097）
+# ---------------------------------------------------------------------------
+
+
+class WorkpaperSnapshot(Base):
+    """底稿版本快照 — field-level 数据版本历史，支持时间线展示、diff 对比、回滚。"""
+
+    __tablename__ = "workpaper_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    workpaper_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("working_paper.id"), nullable=False
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    snapshot_type: Mapped[str] = mapped_column(
+        String(50), nullable=False
+    )
+    description: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    change_summary: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )
+    data_json: Mapped[dict] = mapped_column(
+        JSONB, nullable=False
+    )
+    item_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    data_size_bytes: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime, server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_wp_snapshots_wp_created",
+            "workpaper_id", sa.text("created_at DESC"),
+        ),
+        Index(
+            "idx_wp_snapshots_project",
+            "project_id",
+        ),
+    )

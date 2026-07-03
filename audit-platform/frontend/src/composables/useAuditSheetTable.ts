@@ -25,6 +25,7 @@ import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 import type { AuditSheetRow, AuditSheetHtmlData, AuditSheetSections, AuditSheetColumnDef } from '@/components/workpaper/auditSheetTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 export function useAuditSheetTable(options: {
   /** wpId 取值（getter，保持响应式） */
@@ -47,6 +48,7 @@ export function useAuditSheetTable(options: {
   emitSave: (data: AuditSheetHtmlData) => void
 }) {
   const { htmlData, isDynamicColumns, dynamicColumnDefs, auditSections, emitFieldChange, emitSave } = options
+  const prefs = useDisplayPrefsStore()
 
   // ─── 响应式表数据 ───
   const tableData = ref<AuditSheetRow[]>([])
@@ -197,7 +199,7 @@ export function useAuditSheetTable(options: {
     if (v == null || (typeof v === 'number' && Number.isNaN(v))) return '—'
     const n = typeof v === 'number' ? v : Number(v)
     if (!Number.isFinite(n)) return '—'
-    return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return prefs.fmt(n)
   }
 
   /** 变动率百分比：null 显示 — */

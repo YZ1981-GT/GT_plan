@@ -353,7 +353,7 @@
             <el-table-column label="当前值" width="100" align="right">
               <template #default="{ row }">
                 <span v-if="row.current_period_amount != null" style="font-size: var(--gt-font-size-xs); font-weight: 600; color: var(--gt-color-primary-dark); font-variant-numeric: tabular-nums;">
-                  {{ Number(row.current_period_amount).toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }}
+                  {{ prefs.fmt(row.current_period_amount) }}
                 </span>
                 <span v-else style="color: var(--gt-color-text-placeholder);">-</span>
               </template>
@@ -436,6 +436,7 @@ import FormulaEditDialog from './FormulaEditDialog.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -473,6 +474,7 @@ const visible = computed({
 
 // 路由器(用于外链节点跳转)
 const router = useRouter()
+const prefs = useDisplayPrefsStore()
 
 // ── 树形导航数据 ──
 const selectedNodeKey = ref('report_balance_sheet')

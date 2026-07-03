@@ -29,6 +29,7 @@ export interface CutoffSample {
   isCutoff: boolean            // 是否跨期（自动判定）
   conclusion: string           // 结论
   remark: string               // 备注
+  source?: '自动提取' | '手动添加'  // 数据来源标记
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -52,6 +53,7 @@ function createEmptySample(seq: number): CutoffSample {
     isCutoff: false,
     conclusion: '',
     remark: '',
+    source: '手动添加',
   }
 }
 
@@ -70,6 +72,7 @@ function parseSamples(jsonStr: string | null | undefined): CutoffSample[] {
       isCutoff: raw.isCutoff === true,
       conclusion: raw.conclusion || '',
       remark: raw.remark || '',
+      source: raw.source || undefined,
     }))
   } catch {
     return []
@@ -228,6 +231,7 @@ export function useD2Cutoff(options: UseD2BaseOptions) {
     addSample,
     removeSample,
     updateCell,
+    debounceSave,
   }
 }
 

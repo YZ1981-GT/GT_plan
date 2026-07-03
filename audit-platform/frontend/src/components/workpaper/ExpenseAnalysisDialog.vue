@@ -134,7 +134,7 @@
           <el-table :data="yoyTable" size="small" border max-height="240">
             <el-table-column label="费用类别" prop="category" min-width="120" />
             <el-table-column label="变化金额" width="140" align="right">
-              <template #default="{ row }">¥ {{ formatAmount(row.amount_change) }}</template>
+              <template #default="{ row }">¥ {{ prefs.fmt(row.amount_change) }}</template>
             </el-table-column>
             <el-table-column label="变化率" width="100" align="right">
               <template #default="{ row }">{{ formatRate(row.rate_change) }}</template>
@@ -151,7 +151,7 @@
           <el-table :data="budgetTable" size="small" border max-height="240">
             <el-table-column label="费用类别" prop="category" min-width="120" />
             <el-table-column label="差异金额" width="140" align="right">
-              <template #default="{ row }">¥ {{ formatAmount(row.variance_amount) }}</template>
+              <template #default="{ row }">¥ {{ prefs.fmt(row.variance_amount) }}</template>
             </el-table-column>
             <el-table-column label="差异率" width="100" align="right">
               <template #default="{ row }">{{ formatRate(row.variance_rate) }}</template>
@@ -222,6 +222,7 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -337,11 +338,8 @@ function removeCategory(index: number) {
   form.categories.splice(index, 1)
 }
 
-function formatAmount(n: number | undefined) {
-  if (n === undefined || n === null) return '0.00'
-  if (!Number.isFinite(n)) return String(n)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function formatRate(r: number | undefined) {
   if (r === undefined || r === null) return '—'

@@ -5,6 +5,7 @@
  * spec: gt-c-note-table-shrink Task 1
  */
 import type { SubClass, SubTableSchema, ColumnDefWithKey, RowData } from '../GtCNoteTable.types'
+import { formatAmount } from '@/utils/formatAmount'
 
 export function genRowId(): string {
   return `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
@@ -48,7 +49,7 @@ export function formatPercent(value: number | string | null | undefined): string
   if (value == null || value === '') return ''
   const num = typeof value === 'string' ? parseFloat(value) : value
   if (typeof num !== 'number' || isNaN(num)) return ''
-  return `${num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+  return `${formatAmount(num)}%`
 }
 
 /** Get the label column field for a sub-table (first readonly/label column) */

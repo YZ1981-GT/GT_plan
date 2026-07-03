@@ -61,6 +61,10 @@
 </template>
 
 <script setup lang="ts">
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+const prefs = useDisplayPrefsStore()
+
 // ─── Props ───
 const props = withDefaults(defineProps<{
   /** 公式字符串（如 "=SUM(K10:K20)" 或 "X+Y"） */
@@ -91,7 +95,7 @@ const props = withDefaults(defineProps<{
 function formatValue(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return '—'
   if (typeof value === 'number') {
-    return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+    return prefs.fmt(value)
   }
   return String(value)
 }

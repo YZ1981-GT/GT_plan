@@ -195,26 +195,26 @@
 
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="资产组">{{ result.cgu_id }}</el-descriptions-item>
-          <el-descriptions-item label="商誉账面价值">¥ {{ formatAmount(result.goodwill_book_value) }}</el-descriptions-item>
-          <el-descriptions-item label="其他资产账面价值">¥ {{ formatAmount(result.other_assets_book_value) }}</el-descriptions-item>
-          <el-descriptions-item label="总账面价值">¥ {{ formatAmount(result.total_book_value) }}</el-descriptions-item>
-          <el-descriptions-item label="未来现金流现值">¥ {{ formatAmount(result.present_value_of_cash_flows) }}</el-descriptions-item>
+          <el-descriptions-item label="商誉账面价值">¥ {{ prefs.fmt(result.goodwill_book_value) }}</el-descriptions-item>
+          <el-descriptions-item label="其他资产账面价值">¥ {{ prefs.fmt(result.other_assets_book_value) }}</el-descriptions-item>
+          <el-descriptions-item label="总账面价值">¥ {{ prefs.fmt(result.total_book_value) }}</el-descriptions-item>
+          <el-descriptions-item label="未来现金流现值">¥ {{ prefs.fmt(result.present_value_of_cash_flows) }}</el-descriptions-item>
           <el-descriptions-item label="可收回金额">
-            <span class="amt-highlight">¥ {{ formatAmount(result.recoverable_amount) }}</span>
+            <span class="amt-highlight">¥ {{ prefs.fmt(result.recoverable_amount) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="减值损失（合计）">
             <span :class="result.is_impaired ? 'amt-danger' : 'amt-safe'">
-              ¥ {{ formatAmount(result.impairment_loss) }}
+              ¥ {{ prefs.fmt(result.impairment_loss) }}
             </span>
           </el-descriptions-item>
           <el-descriptions-item label="商誉冲减">
             <span :class="Number(result.goodwill_writedown) > 0 ? 'amt-danger' : 'amt-safe'">
-              ¥ {{ formatAmount(result.goodwill_writedown) }}
+              ¥ {{ prefs.fmt(result.goodwill_writedown) }}
             </span>
           </el-descriptions-item>
           <el-descriptions-item label="其他资产冲减" :span="2">
             <span :class="Number(result.other_assets_writedown) > 0 ? 'amt-danger' : 'amt-safe'">
-              ¥ {{ formatAmount(result.other_assets_writedown) }}
+              ¥ {{ prefs.fmt(result.other_assets_writedown) }}
             </span>
             <span class="gt-form-unit" style="margin-left: 8px">
               （前端可按各资产账面比例细化拆分）
@@ -230,11 +230,11 @@
         >
           <el-table-column label="年份" prop="year" width="200" align="center" />
           <el-table-column label="现金流" width="160" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.cash_flow) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.cash_flow) }}</template>
           </el-table-column>
           <el-table-column label="折现因子" prop="discount_factor" width="120" align="right" />
           <el-table-column label="现值" width="160" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.present_value) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.present_value) }}</template>
           </el-table-column>
         </el-table>
 
@@ -248,24 +248,24 @@
           >
             <el-table-column label="资产名称" prop="name" min-width="160" />
             <el-table-column label="账面价值" min-width="140" align="right">
-              <template #default="{ row }">¥ {{ formatAmount(row.book_value) }}</template>
+              <template #default="{ row }">¥ {{ prefs.fmt(row.book_value) }}</template>
             </el-table-column>
             <el-table-column label="可收回金额" min-width="140" align="right">
               <template #default="{ row }">
-                <span v-if="row.recoverable_amount !== null">¥ {{ formatAmount(row.recoverable_amount) }}</span>
+                <span v-if="row.recoverable_amount !== null">¥ {{ prefs.fmt(row.recoverable_amount) }}</span>
                 <span v-else style="color: var(--el-text-color-secondary)">—</span>
               </template>
             </el-table-column>
             <el-table-column label="分摊减值" min-width="140" align="right">
               <template #default="{ row }">
                 <span :class="Number(row.allocated_impairment) > 0 ? 'amt-danger' : 'amt-safe'">
-                  ¥ {{ formatAmount(row.allocated_impairment) }}
+                  ¥ {{ prefs.fmt(row.allocated_impairment) }}
                 </span>
               </template>
             </el-table-column>
             <el-table-column label="分摊后账面" min-width="140" align="right">
               <template #default="{ row }">
-                <span class="amt-highlight">¥ {{ formatAmount(row.post_impairment_book_value) }}</span>
+                <span class="amt-highlight">¥ {{ prefs.fmt(row.post_impairment_book_value) }}</span>
               </template>
             </el-table-column>
           </el-table>
@@ -301,6 +301,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -408,11 +409,8 @@ const isFormValid = computed(() => {
   return form.cash_flows.some((cf) => cf > 0)
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function buildRequestBody(applySheet?: string) {
   const body: Record<string, any> = {
@@ -449,7 +447,7 @@ async function onAnalyze() {
     )
     result.value = resp
     if (resp?.is_impaired) {
-      ElMessage.warning(`分析完成：需计提减值 ¥${formatAmount(resp.impairment_loss)}`)
+      ElMessage.warning(`分析完成：需计提减值 ¥${prefs.fmt(resp.impairment_loss)}`)
     } else {
       ElMessage.success('分析完成：无需计提减值')
     }

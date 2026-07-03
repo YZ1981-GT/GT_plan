@@ -137,6 +137,7 @@ import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { findingApi } from '@/services/collaborationApi'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Finding {
   id: string
@@ -213,13 +214,11 @@ function dispositionLabel(treatment: string | null): string {
   return map[treatment || ''] || '-'
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatCurrency(amount: number): string {
   if (!amount) return '-'
-  return new Intl.NumberFormat('zh-CN', {
-    style: 'currency',
-    currency: 'CNY',
-    minimumFractionDigits: 2,
-  }).format(amount)
+  return prefs.fmt(amount)
 }
 
 async function loadFindings() {

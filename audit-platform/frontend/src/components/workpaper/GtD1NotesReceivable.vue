@@ -43,6 +43,22 @@
       :is-readonly="props.readonly ?? false"
       :sheet-name="props.sheetName"
     />
+    <D1TabDisclosure
+      v-else-if="currentSheet === 'disclosure-listed'"
+      variant="listed"
+      :all-responses="allResponses"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :is-readonly="props.readonly ?? false"
+    />
+    <D1TabDisclosure
+      v-else-if="currentSheet === 'disclosure-soe'"
+      variant="soe"
+      :all-responses="allResponses"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :is-readonly="props.readonly ?? false"
+    />
     <D1TabPolicyCheck
       v-else-if="currentSheet === 'D1-14'"
       :all-responses="allResponses"
@@ -137,7 +153,7 @@
       :sheet-name="props.sheetName"
     />
 
-    <!-- ═══ 尚未迁移的 sheet 走 OnlyOffice 降级（D1-5调整分录/D1-16） ═══ -->
+    <!-- ═══ 尚未迁移的 sheet 走 OnlyOffice 降级（D1-5 调整分录 / 底稿目录 / 分析提示等） ═══ -->
     <div v-else class="d1-fallback-sheet">
       <GtOnlyOfficeSheet
         :wp-id="props.wpId"
@@ -154,6 +170,7 @@ import { ref, computed, defineAsyncComponent, toRef, onMounted, onBeforeUnmount 
 import { useD1FormData } from './composables/useD1FormData'
 import { useD1NotesReceivable, type TabStatus } from './composables/useD1NotesReceivable'
 import { useD1Review } from './composables/useD1Review'
+import { resolveD1SheetCode } from './composables/useD1SheetRouting'
 import D1TabDisclosure from './d1/D1TabDisclosure.vue'
 import D1TabAdjudication from './d1/D1TabAdjudication.vue'
 import D1TabDetailCategory from './d1/D1TabDetailCategory.vue'
@@ -216,31 +233,8 @@ const review = useD1Review(
 
 // ─── Local UI State ──────────────────────────────────────────────────────────
 
-/** 从 sheetName prop 提取 sheet 编码（如 "应收票据审定表D1-1" → "D1-1"） */
-const currentSheet = computed<string>(() => {
-  const name = props.sheetName || ''
-  // 精确匹配：sheetName 末尾含 D1A 或 D1-N 编码（含两位数如 D1-14）
-  const m = name.match(/(D1(?:A|-\d+))\s*$/)
-  if (m) return m[1]
-  // 模糊匹配：按关键字（两位数编码需优先匹配，避免 D1-1 误匹配 D1-14）
-  if (name.includes('政策检查') || name.includes('D1-14')) return 'D1-14'
-  if (name.includes('测算表') || name.includes('D1-15')) return 'D1-15'
-  if (name.includes('业务模式') || name.includes('D1-6')) return 'D1-6'
-  if (name.includes('备查簿') || name.includes('D1-7')) return 'D1-7'
-  if (name.includes('背书') || name.includes('贴现明细') || name.includes('D1-8')) return 'D1-8'
-  if (name.includes('贴息') || name.includes('D1-9')) return 'D1-9'
-  if (name.includes('监盘') || name.includes('D1-10')) return 'D1-10'
-  if (name.includes('关联方') || name.includes('D1-11')) return 'D1-11'
-  if (name.includes('质押') || name.includes('D1-12')) return 'D1-12'
-  if (name.includes('转回') || name.includes('核销') || name.includes('D1-16')) return 'D1-16'
-  if (name.includes('检查表') || name.includes('D1-13')) return 'D1-13'
-  if (name.includes('审定表') || name.includes('D1-1')) return 'D1-1'
-  if (name.includes('按类别') || name.includes('D1-2')) return 'D1-2'
-  if (name.includes('按客户') || name.includes('D1-3')) return 'D1-3'
-  if (name.includes('坏账准备') || name.includes('D1-4')) return 'D1-4'
-  // 无匹配 → 走旧 el-tabs 路径
-  return ''
-})
+/** 从 sheetName prop 提取路由键 */
+const currentSheet = computed<string>(() => resolveD1SheetCode(props.sheetName || ''))
 
 /** displayPrefs 本地构建（供 D1-14/D1-15 子组件使用） */
 const localDisplayPrefs = computed(() => ({
@@ -272,10 +266,10 @@ const sheetDirectory = computed(() => {
     { code: 'D1-14', name: 'ECL会计政策一致性' },
     { code: 'D1-15', name: 'ECL测试数据' },
     { code: 'D1-16', name: '转回核销检查' },
-    { code: 'D1-17', name: '附注披露(上市公司)' },
-    { code: 'D1-18', name: '附注披露(国企)' },
-    { code: 'D1-19', name: '分析提示' },
-    { code: 'D1-20', name: '工作底稿目录' },
+    { code: 'disclosure-listed', name: '附注披露(上市公司)' },
+    { code: 'disclosure-soe', name: '附注披露(国企)' },
+    { code: 'analysis-hint', name: '业务模式分析提示' },
+    { code: 'directory', name: '工作底稿目录' },
   ]
   return sheets.map(s => {
     const statusMap: Record<string, string> = {

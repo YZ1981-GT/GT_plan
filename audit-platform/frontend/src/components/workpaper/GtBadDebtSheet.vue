@@ -180,6 +180,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import ImportPreviewDialog from './ImportPreviewDialog.vue'
 import AgingDictionaryDialog from './AgingDictionaryDialog.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface RowAmounts {
   [key: string]: string | null
@@ -249,6 +250,7 @@ const provisionMethods = ref<{ value: string; label: string }[]>([])
 const importDialogVisible = ref(false)
 const importParseResult = ref<any>(null)
 const agingDialogVisible = ref(false)
+const prefs = useDisplayPrefsStore()
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const menu = reactive<{
@@ -271,7 +273,7 @@ function numVal(v: string | null | undefined): number | undefined {
 function fmt(v: string | null | undefined): string {
   if (v === null || v === undefined || v === '') return ''
   const n = Number(v)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(n)
 }
 
 function isExpanded(pid: string): boolean {

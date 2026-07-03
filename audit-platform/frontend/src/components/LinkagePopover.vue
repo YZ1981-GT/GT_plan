@@ -5,6 +5,7 @@
  * 弹出面板显示分录摘要/底稿列表，点击跳转。
  */
 import { useRouter } from 'vue-router'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 export interface LinkageItem {
   id: string
@@ -20,6 +21,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const prefs = useDisplayPrefsStore()
 
 function onItemClick(item: LinkageItem) {
   if (props.type === 'adjustment') {
@@ -45,7 +47,7 @@ function onItemClick(item: LinkageItem) {
       <span class="linkage-item-label">{{ item.label }}</span>
       <span v-if="item.sublabel" class="linkage-item-sub">{{ item.sublabel }}</span>
       <span v-if="item.amount != null" class="linkage-item-amount">
-        {{ item.amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+        {{ prefs.fmt(item.amount) }}
       </span>
     </div>
   </div>

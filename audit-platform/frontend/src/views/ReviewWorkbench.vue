@@ -128,7 +128,7 @@
         <el-table-column label="提交人" prop="assigned_to" width="140" />
         <el-table-column label="提交时间" width="160">
           <template #default="{ row }">
-            {{ row.submitted_at ? new Date(row.submitted_at).toLocaleString('zh-CN') : '-' }}
+            {{ row.submitted_at ? prefs.fmtDateTime(row.submitted_at) : '-' }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -212,7 +212,7 @@
               <label>提交时间：</label>
               <span>
                 {{ selectedItem.submitted_at
-                  ? new Date(selectedItem.submitted_at).toLocaleString('zh-CN')
+                  ? prefs.fmtDateTime(selectedItem.submitted_at)
                   : '-' }}
               </span>
             </div>
@@ -407,9 +407,11 @@ import { api } from '@/services/apiProxy'
 import GtRowActions from '@/components/common/GtRowActions.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const route = useRoute()
 const router = useRouter()
+const prefs = useDisplayPrefsStore()
 
 const projectId = computed(() => route.params.projectId as string | undefined)
 const isGlobal = computed(() => !projectId.value)

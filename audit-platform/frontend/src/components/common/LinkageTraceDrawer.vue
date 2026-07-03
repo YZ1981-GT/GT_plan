@@ -112,6 +112,7 @@ import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import type { LinkageContract, LinkageStatus } from '@/types/linkageContract'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 export interface LinkageTraceDrawerProps {
   modelValue: boolean
@@ -235,11 +236,13 @@ function getStatusTagType(status: string): '' | 'success' | 'info' | 'warning' |
   return map[status] ?? 'info'
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(value: string | null | undefined): string {
   if (!value) return '—'
   const num = parseFloat(value)
   if (isNaN(num)) return value
-  return `¥${num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return prefs.fmt(num)
 }
 
 // ─── Actions ───────────────────────────────────────────────────────────

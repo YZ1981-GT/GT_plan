@@ -37,18 +37,18 @@
 
 ## 阶段三：存量迁移（分批，每批后验证）
 
-- [ ] 8. 批 1 迁移：TrialBalance.vue + ReviewWorkbench.vue 改用 `prefs.fmt`/`prefs.fmtDateTime`，删本地 formatAmount
+- [x] 8. 批 1 迁移：TrialBalance.vue + ReviewWorkbench.vue 改用 `prefs.fmt`/`prefs.fmtDateTime`，删本地 formatAmount
   - 需求 5
   - 验证：跑相关 vitest + Playwright 抽测单位切换跟随
 
-- [ ] 9. 批 2 迁移：components/workpaper 计算弹窗群（~20 个 *Dialog.vue）改用统一出口
+- [x] 9. 批 2 迁移：components/workpaper 计算弹窗群（~20 个 *Dialog.vue）改用统一出口
   - 需求 5
   - 验证：每个弹窗金额显示与迁移前一致
 
-- [ ] 10. 批 3 迁移：confirmation 组件群 + dashboard + 剩余 views，并从豁免清单移除已清理项
+- [x] 10. 批 3 迁移：confirmation 组件群 + dashboard + 剩余 views，并从豁免清单移除已清理项
   - 需求 5、6
 
-- [ ] 11. 全量回归：运行前端 vitest 全绿 + 守卫脚本豁免清单清零（或仅剩合理例外）+ Playwright 实测主表/弹窗单位切换一致
+- [x] 11. 全量回归：运行前端 vitest 全绿 + 守卫脚本豁免清单清零（或仅剩合理例外）+ Playwright 实测主表/弹窗单位切换一致
   - 需求 5、6
 
-- [ ]* 12. 更新 `docs/平台全局体验与一致性建议.md` §1.2/§7.3 标记本项完成
+- [x]* 12. 更新 `docs/平台全局体验与一致性建议.md` §1.2/§7.3 标记本项完成

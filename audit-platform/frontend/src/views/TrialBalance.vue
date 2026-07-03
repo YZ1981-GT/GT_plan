@@ -171,7 +171,7 @@
         立即刷新
       </el-button>
       <div v-if="latestAdjustmentAt" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-info); margin-left: 12px">
-        最新调整：{{ new Date(latestAdjustmentAt).toLocaleString('zh-CN') }}
+        最新调整：{{ displayPrefs.fmtDateTime(latestAdjustmentAt) }}
       </div>
     </div>
 
@@ -704,7 +704,6 @@ import { useCellComments } from '@/composables/useCellComments'
 import { useLazyEdit } from '@/composables/useLazyEdit'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
-import { fmtAmount } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import PresenceAvatars from '@/components/PresenceAvatars.vue'
@@ -1794,7 +1793,7 @@ function onTbSumCtxFormula() {
   if (!row) return
   // 查看该行的公式（从 report_config 加载的 formula 字段）
   const formula = row._formula || '无公式（通过映射关系取数）'
-  const detail = `【${row.row_code} ${row.row_name}】\n\n公式：${formula}\n\n未审数：${Number(row.unadjusted || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n审定数：${Number(row.audited || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
+  const detail = `【${row.row_code} ${row.row_name}】\n\n公式：${formula}\n\n未审数：${fmt(row.unadjusted)}\n审定数：${fmt(row.audited)}`
   ElMessageBox.alert(detail, '公式详情', {
     confirmButtonText: '确定',
     customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px' },
@@ -1814,17 +1813,17 @@ function onTbSumCtxDetail() {
       const prev = tbSummaryRows.value[i]
       if (prev.is_category || prev.is_total) break
       if (prev.unadjusted) {
-        detail += `  + ${prev.row_code} ${prev.row_name}：${Number(prev.unadjusted).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+        detail += `  + ${prev.row_code} ${prev.row_name}：${fmt(prev.unadjusted)}\n`
       }
     }
-    detail += `\n━━━━━━━━━━━━━━━━\n合计 = ${Number(row.unadjusted || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
+    detail += `\n━━━━━━━━━━━━━━━━\n合计 = ${fmt(row.unadjusted)}`
     ElMessageBox.alert(detail, '汇总明细', {
       confirmButtonText: '确定',
       customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px', maxHeight: '70vh', overflow: 'auto' },
     })
   } else {
     // 普通行：展示取数来源
-    const detail = `【${row.row_code} ${row.row_name}】\n\n取数来源：通过映射规则从科目明细汇总\n未审数 = Σ 映射到该行次的所有科目余额\n\n当前值：${Number(row.unadjusted || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
+    const detail = `【${row.row_code} ${row.row_name}】\n\n取数来源：通过映射规则从科目明细汇总\n未审数 = Σ 映射到该行次的所有科目余额\n\n当前值：${fmt(row.unadjusted)}`
     ElMessageBox.alert(detail, '取数明细', {
       confirmButtonText: '确定',
       customStyle: { whiteSpace: 'pre-wrap', fontFamily: "'Arial Narrow', monospace", fontSize: '12px' },
@@ -2100,9 +2099,9 @@ function _showNetProfitDetail() {
     const val = Math.abs(Number(r.unadjusted_amount || 0))
     if (val === 0) continue
     totalRevenue += val
-    detail += `  + ${r.standard_account_code} ${r.account_name}：${val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+    detail += `  + ${r.standard_account_code} ${r.account_name}：${fmt(val)}\n`
   }
-  detail += `  收入合计：${totalRevenue.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n\n`
+  detail += `  收入合计：${fmt(totalRevenue)}\n\n`
 
   // 费用/成本类
   detail += '━━ 费用/成本类（-）━━\n'
@@ -2112,14 +2111,14 @@ function _showNetProfitDetail() {
     const val = Math.abs(Number(r.unadjusted_amount || 0))
     if (val === 0) continue
     totalExpense += val
-    detail += `  - ${r.standard_account_code} ${r.account_name}：${val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+    detail += `  - ${r.standard_account_code} ${r.account_name}：${fmt(val)}\n`
   }
-  detail += `  费用合计：${totalExpense.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n\n`
+  detail += `  费用合计：${fmt(totalExpense)}\n\n`
 
   // 净利润
   const netProfit = Number(decSub(String(totalRevenue), String(totalExpense)))
   detail += '━━━━━━━━━━━━━━━━\n'
-  detail += `净利润 = 收入 - 费用 = ${netProfit.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+  detail += `净利润 = 收入 - 费用 = ${fmt(netProfit)}\n`
   detail += netProfit >= 0 ? '（盈利）' : '（亏损）'
 
   ElMessageBox.alert(detail, '净利润计算明细', {
@@ -2157,10 +2156,10 @@ function _showSubtotalDetail(row: any) {
     const dir = getDirection(r)
     // 负债/权益类：贷方加，借方减
     const sign = (catIsDebit && dir === '贷') || (!catIsDebit && dir === '借') ? '-' : '+'
-    detail += `  ${sign} ${r.standard_account_code} ${r.account_name}：${val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}（${dir}）\n`
+    detail += `  ${sign} ${r.standard_account_code} ${r.account_name}：${fmt(val)}（${dir}）\n`
   }
   detail += `\n━━━━━━━━━━━━━━━━\n`
-  detail += `${name} = ${Math.abs(Number(row.unadjusted_amount || 0)).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`
+  detail += `${name} = ${fmt(Math.abs(Number(row.unadjusted_amount || 0)))}`
 
   ElMessageBox.alert(detail, `${catLabel}类汇总明细`, {
     confirmButtonText: '确定',
@@ -2264,7 +2263,7 @@ function onTbCtxFormula() {
     // 普通科目行
     formulaDesc += `科目：${code} ${name}\n`
     formulaDesc += `方向：${dir}\n`
-    formulaDesc += `未审数：${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2 })}\n`
+    formulaDesc += `未审数：${fmt(Math.abs(val))}\n`
     formulaDesc += `\n取数公式：\n`
 
     const first = code.charAt(0)
@@ -2305,7 +2304,7 @@ function onTbCtxTrustScore() {
 function onTbCtxSum() {
   tbCtx.closeContextMenu()
   const sum = tbCtx.sumSelectedValues()
-  ElMessage.info(`选中 ${tbCtx.selectedCells.value.length} 格，合计：${fmtAmount(sum)}`)
+  ElMessage.info(`选中 ${tbCtx.selectedCells.value.length} 格，合计：${fmt(sum)}`)
 }
 
 function onTbCtxCompare() {
@@ -2313,7 +2312,7 @@ function onTbCtxCompare() {
   if (tbCtx.selectedCells.value.length < 2) return
   const vals = tbCtx.selectedCells.value.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
-  ElMessage.info(`差异：${fmtAmount(diff)}`)
+  ElMessage.info(`差异：${fmt(diff)}`)
 }
 
 function onTbCtxViewAdj() {

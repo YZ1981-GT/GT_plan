@@ -113,16 +113,16 @@
       <!-- 汇总指标 -->
       <el-descriptions :column="2" size="small" border style="margin-bottom: 12px">
         <el-descriptions-item label="利息费用合计">
-          <span class="gt-amt">¥ {{ formatAmount(result.total_interest_expense) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.total_interest_expense) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="票面利息合计">
-          <span class="gt-amt">¥ {{ formatAmount(result.total_coupon_payments) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.total_coupon_payments) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="摊销额合计">
-          <span class="gt-amt">¥ {{ formatAmount(result.total_amortization) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.total_amortization) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="最终摊余成本">
-          <span class="gt-amt">¥ {{ formatAmount(result.final_carrying_amount) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.final_carrying_amount) }}</span>
         </el-descriptions-item>
       </el-descriptions>
 
@@ -143,27 +143,27 @@
         <el-table-column prop="period" label="期数" width="60" align="center" />
         <el-table-column prop="opening_carrying" label="期初摊余成本" min-width="130" align="right">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.opening_carrying) }}</span>
+            <span class="gt-amt">{{ prefs.fmt(row.opening_carrying) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="interest_expense" label="利息费用" min-width="110" align="right">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.interest_expense) }}</span>
+            <span class="gt-amt">{{ prefs.fmt(row.interest_expense) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="coupon_payment" label="票面利息" min-width="110" align="right">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.coupon_payment) }}</span>
+            <span class="gt-amt">{{ prefs.fmt(row.coupon_payment) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="amortization" label="摊销额" min-width="110" align="right">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.amortization) }}</span>
+            <span class="gt-amt">{{ prefs.fmt(row.amortization) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="closing_carrying" label="期末摊余成本" min-width="130" align="right">
           <template #default="{ row }">
-            <span class="gt-amt">{{ formatAmount(row.closing_carrying) }}</span>
+            <span class="gt-amt">{{ prefs.fmt(row.closing_carrying) }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -197,6 +197,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -258,11 +259,7 @@ const isFormValid = computed(() => {
   )
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
 
 function buildRequestBody(applySheet?: string) {
   return {

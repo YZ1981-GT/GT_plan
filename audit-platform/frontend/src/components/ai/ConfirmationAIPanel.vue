@@ -173,6 +173,7 @@ import {
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { confirmationAI } from '@/services/aiApi'
 import type { ConfirmationAIResult } from '@/services/aiApi'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface AddressResult extends ConfirmationAIResult {
   address: string
@@ -259,13 +260,11 @@ function riskTagType(level: string): 'danger' | 'warning' | 'success' | 'info' {
   return map[level] || 'info'
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatCurrency(val: number | undefined | null): string {
   if (val == null) return '-'
-  return Number(val).toLocaleString('zh-CN', {
-    style: 'currency',
-    currency: 'CNY',
-    minimumFractionDigits: 2,
-  })
+  return prefs.fmt(val)
 }
 
 async function runAddressVerify() {

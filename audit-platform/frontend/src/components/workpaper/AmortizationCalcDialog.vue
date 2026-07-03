@@ -118,8 +118,8 @@
       <div class="amortization-result">
         <el-descriptions :column="3" size="small" border>
           <el-descriptions-item label="摊销方法">{{ methodLabel(result.method) }}</el-descriptions-item>
-          <el-descriptions-item label="累计摊销">¥ {{ formatAmount(result.total_amortization) }}</el-descriptions-item>
-          <el-descriptions-item label="剩余账面净值">¥ {{ formatAmount(result.remaining_book_value) }}</el-descriptions-item>
+          <el-descriptions-item label="累计摊销">¥ {{ prefs.fmt(result.total_amortization) }}</el-descriptions-item>
+          <el-descriptions-item label="剩余账面净值">¥ {{ prefs.fmt(result.remaining_book_value) }}</el-descriptions-item>
         </el-descriptions>
 
         <el-table
@@ -131,10 +131,10 @@
         >
           <el-table-column label="月份" prop="month" width="80" align="center" />
           <el-table-column label="当月摊销" width="140" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.amortization) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.amortization) }}</template>
           </el-table-column>
           <el-table-column label="累计摊销" width="140" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.accumulated) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.accumulated) }}</template>
           </el-table-column>
         </el-table>
 
@@ -172,6 +172,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -250,11 +251,7 @@ function methodLabel(m: string) {
   return map[m] || m
 }
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
 
 function endpointPath(): string {
   const seg = props.section.toLowerCase() // 'i1' | 'i4'

@@ -31,6 +31,7 @@ from app.services.review_checklist_service import (
     save_review_sign,
 )
 from app.services.review_rbac_guard import calc_unresolved_count, check_rbac, check_sign_lock
+from app.services.version_trail_service import VersionTrailService
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +139,16 @@ async def review_sign(
             )
 
     try:
+        # ── 版本链：复核签字前自动快照 ──
+        await VersionTrailService.create_snapshot_fire_and_forget(
+            db=db,
+            project_id=body.project_id,
+            workpaper_id=wp_id,
+            user_id=current_user.id,
+            snapshot_type="review_sign",
+            description=f"复核签字: {current_user.username}, action={body.action}",
+        )
+
         result = await save_review_sign(
             db,
             body.project_id,

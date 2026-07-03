@@ -138,6 +138,7 @@
  * Validates: Requirements 4.1, 4.2, 4.4, 5.5
  */
 import { computed } from 'vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 export interface CellSourceFormula {
   formulaId: string
@@ -243,10 +244,12 @@ function modeLabel(mode: string): string {
   return map[mode] || mode
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatValue(v: unknown): string {
   if (v === null || v === undefined) return '—'
   if (typeof v === 'number') {
-    return v.toLocaleString('zh-CN', { maximumFractionDigits: 2, minimumFractionDigits: 2 })
+    return prefs.fmt(v)
   }
   return String(v)
 }

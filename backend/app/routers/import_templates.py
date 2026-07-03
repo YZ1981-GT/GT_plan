@@ -539,7 +539,35 @@ async def _import_workpapers(
     rows: list[dict], project_id: UUID, year: int, user: User, db: AsyncSession,
 ) -> dict:
     from app.services.working_paper_service import WorkingPaperService
+    from app.services.version_trail_service import VersionTrailService
+
     svc = WorkingPaperService(db)
+
+    # ── 版本链：批量导入前为涉及的底稿创建自动快照 ──
+    wp_codes = list({str(row.get("底稿编码", "") or "") for row in rows if row.get("底稿编码")})
+    if wp_codes:
+        # 查找涉及的 workpaper_id（从 wp_index JOIN working_paper）
+        from sqlalchemy import text as sa_text
+        wp_id_result = await db.execute(
+            sa_text(
+                "SELECT wp.id FROM working_paper wp "
+                "JOIN wp_index wi ON wp.wp_index_id = wi.id "
+                "WHERE wi.wp_code = ANY(:codes) AND wp.project_id = :pid "
+                "LIMIT 10"
+            ),
+            {"codes": wp_codes, "pid": project_id},
+        )
+        wp_ids = [r[0] for r in wp_id_result.fetchall()]
+        for wp_id in wp_ids:
+            await VersionTrailService.create_snapshot_fire_and_forget(
+                db=db,
+                project_id=project_id,
+                workpaper_id=wp_id,
+                user_id=user.id,
+                snapshot_type="auto_import",
+                description=f"Excel批量导入: {len(rows)}行数据",
+            )
+
     imported, failed, failed_rows = 0, 0, []
     for i, row in enumerate(rows, 1):
         try:

@@ -76,6 +76,7 @@
 
 <script setup lang="ts">
 import { Loading, InfoFilled } from '@element-plus/icons-vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 export interface TraceReportLine {
   line_code: string
@@ -116,10 +117,12 @@ const emit = defineEmits<{
   'jump-to-tb': [accountCode?: string]
 }>()
 
+const prefs = useDisplayPrefsStore()
+
 /** 格式化金额 */
 function formatAmount(value: number | null | undefined): string {
   if (value == null) return '—'
-  return `¥${value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return prefs.fmt(value)
 }
 
 /** 格式化占比 */

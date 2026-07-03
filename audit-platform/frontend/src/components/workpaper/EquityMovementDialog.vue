@@ -158,22 +158,22 @@
       <el-divider content-position="left">期末余额</el-divider>
       <el-descriptions :column="2" size="small" border>
         <el-descriptions-item label="实收资本">
-          <span class="gt-amt">¥ {{ formatAmount(result.closing_balances.paid_in_capital) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.closing_balances.paid_in_capital) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="资本公积">
-          <span class="gt-amt">¥ {{ formatAmount(result.closing_balances.capital_reserve) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.closing_balances.capital_reserve) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="盈余公积">
-          <span class="gt-amt">¥ {{ formatAmount(result.closing_balances.surplus_reserve) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.closing_balances.surplus_reserve) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="未分配利润">
-          <span class="gt-amt">¥ {{ formatAmount(result.closing_balances.retained_earnings) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.closing_balances.retained_earnings) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="其他综合收益">
-          <span class="gt-amt">¥ {{ formatAmount(result.closing_balances.oci) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.closing_balances.oci) }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="其他权益工具">
-          <span class="gt-amt">¥ {{ formatAmount(result.closing_balances.other_equity_instruments) }}</span>
+          <span class="gt-amt">¥ {{ prefs.fmt(result.closing_balances.other_equity_instruments) }}</span>
         </el-descriptions-item>
       </el-descriptions>
 
@@ -227,6 +227,7 @@ import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -289,17 +290,13 @@ const form = reactive({
   oci_changes: 0,
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
 
 function formatChange(s: string | number) {
   const n = Number(s)
   if (!Number.isFinite(n)) return String(s)
   const prefix = n > 0 ? '+' : ''
-  return prefix + n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefix + prefs.fmt(n)
 }
 
 function buildRequestBody(applySheet?: string) {

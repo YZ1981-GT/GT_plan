@@ -153,6 +153,7 @@
 import { computed } from 'vue'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import type { SubTableRow } from './diffChecklistTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   /** 区块标识：b/c/f/g */
@@ -186,9 +187,11 @@ const descLabel = computed(() => {
   return '确认应付增加日期'
 })
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 </script>
 

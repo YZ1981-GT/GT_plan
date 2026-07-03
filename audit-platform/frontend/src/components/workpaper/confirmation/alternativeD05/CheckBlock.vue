@@ -138,6 +138,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ArrowRight, ArrowDown, Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import type { CheckRow, BlockType } from './alternativeD05Types'
 import type { BlockConfig, BlockColumnDef } from './blockColumnConfigs'
 
@@ -155,6 +156,7 @@ const emit = defineEmits<{
 }>()
 
 const collapsed = ref(false)
+const prefs = useDisplayPrefsStore()
 const selectedRowId = ref<string | null>(null)
 
 // ─── 分组列（分组表头 5 色轮转） ─────────────────────────────────────────────
@@ -210,7 +212,7 @@ function formatNumber(val: any): string {
   if (val == null || val === '') return ''
   const num = Number(val)
   if (isNaN(num)) return String(val)
-  return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(num)
 }
 </script>
 

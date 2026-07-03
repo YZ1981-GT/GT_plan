@@ -240,6 +240,7 @@
 import { ref, computed } from 'vue'
 import { Plus, Delete, Download, InfoFilled, WarningFilled, Link } from '@element-plus/icons-vue'
 import type { DiffReconcileRow, DiffSummaryBySubject } from './diffReconcileTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   rows: DiffReconcileRow[]
@@ -307,9 +308,11 @@ function getRowClassName({ row }: { row: DiffReconcileRow }) {
 
 // ─── 格式化工具 ──────────────────────────────────────────────────────────────
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 const DIFF_TYPE_MAP: Record<string, { label: string; color: string }> = {

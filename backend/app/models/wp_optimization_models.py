@@ -220,41 +220,10 @@ class EvidenceLink(Base):
 
 
 # ---------------------------------------------------------------------------
-# WorkpaperSnapshot 模型（底稿快照）
+# WorkpaperSnapshot 模型 — 已迁移到 audit_platform_models.py（V097 迁移）
+# 此处不再定义，避免 SQLAlchemy MetaData 冲突。
+# 使用: from app.models.audit_platform_models import WorkpaperSnapshot
 # ---------------------------------------------------------------------------
-
-
-class WorkpaperSnapshot(Base):
-    """底稿快照
-
-    关键时点的数据冻结副本。snapshot_data 存储公式单元格当前值。
-    签字时点快照绑定 bound_dataset_id，不可删除。
-    """
-
-    __tablename__ = "workpaper_snapshots"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
-    wp_id: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("working_paper.id"),
-        nullable=False,
-    )
-    trigger_event: Mapped[str] = mapped_column(String(50), nullable=False)
-    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=False
-    )
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
-    is_locked: Mapped[bool] = mapped_column(server_default=text("false"))
-    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
-        PG_UUID(as_uuid=True), nullable=True
-    )
-
-    __table_args__ = (
-        Index("idx_wp_snapshot", "wp_id"),
-    )
 
 
 # ---------------------------------------------------------------------------

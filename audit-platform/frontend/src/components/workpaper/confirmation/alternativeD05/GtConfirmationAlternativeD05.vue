@@ -337,6 +337,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeData } from './composables/useAlternativeData'
 import type { AlternativeCompany, BlockType, CheckRow } from './alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS } from './blockColumnConfigs'
@@ -367,6 +368,7 @@ const isNewFormat = computed(() => props.htmlData?._format === 'alternative-d05-
 
 // ─── 数据核心 ────────────────────────────────────────────────────────────────
 
+const prefs = useDisplayPrefsStore()
 const data = useAlternativeData({
   htmlData: () => props.htmlData,
   readonly: props.readonly,
@@ -713,7 +715,7 @@ function formatRatio(val: number | null): string {
 
 function formatAmount(val: number | undefined | null): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function ratioClass(val: number | null): string {

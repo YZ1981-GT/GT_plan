@@ -70,6 +70,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ArrowRight, ArrowDown } from '@element-plus/icons-vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface NoteSection {
   section_code: string
@@ -133,9 +134,11 @@ function expandAll() {
   collapsedSet.value = new Set()
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatTotalAmount(amount?: number): string {
   if (amount == null || amount === 0) return ''
-  return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(amount)
 }
 
 function statusTagType(status: string): 'info' | 'primary' | 'warning' | 'success' | 'danger' {

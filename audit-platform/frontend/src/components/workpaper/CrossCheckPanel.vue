@@ -9,6 +9,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useCrossCheck } from '@/composables/useCrossCheck'
 import type { CrossCheckResult } from '@/composables/useCrossCheck'
 import ConsistencyGatePanel from './ConsistencyGatePanel.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   projectId: string
@@ -65,10 +66,8 @@ function getSeverityType(ruleId: string) {
   }
 }
 
-function formatAmount(val: number | null): string {
-  if (val === null || val === undefined) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function getRuleDescription(ruleId: string): string {
   const rule = rules.value.find(r => r.rule_id === ruleId)
@@ -138,7 +137,7 @@ function getRuleDescription(ruleId: string): string {
           </div>
           <div class="result-right">
             <span v-if="item.difference !== null && item.status === 'fail'" class="diff-amount">
-              差异: {{ formatAmount(item.difference) }}
+              差异: {{ prefs.fmt(item.difference) }}
             </span>
             <el-icon class="expand-icon"><i class="el-icon-arrow-down" /></el-icon>
           </div>
@@ -149,21 +148,21 @@ function getRuleDescription(ruleId: string): string {
           <div class="detail-grid">
             <div class="detail-item">
               <span class="detail-label">左侧金额</span>
-              <span class="detail-value">{{ formatAmount(item.left_amount) }}</span>
+              <span class="detail-value">{{ prefs.fmt(item.left_amount) }}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">右侧金额</span>
-              <span class="detail-value">{{ formatAmount(item.right_amount) }}</span>
+              <span class="detail-value">{{ prefs.fmt(item.right_amount) }}</span>
             </div>
             <div class="detail-item">
               <span class="detail-label">差异</span>
               <span class="detail-value" :class="{ 'text-danger': item.status === 'fail' }">
-                {{ formatAmount(item.difference) }}
+                {{ prefs.fmt(item.difference) }}
               </span>
             </div>
             <div class="detail-item">
               <span class="detail-label">检查时间</span>
-              <span class="detail-value">{{ item.checked_at ? new Date(item.checked_at).toLocaleString('zh-CN') : '-' }}</span>
+              <span class="detail-value">{{ item.checked_at ? prefs.fmtDateTime(item.checked_at) : '-' }}</span>
             </div>
           </div>
           <div v-if="item.details?.formula" class="detail-formula">

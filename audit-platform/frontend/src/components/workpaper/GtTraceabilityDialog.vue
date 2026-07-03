@@ -154,6 +154,7 @@ import { Top, Bottom, InfoFilled, Refresh } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import type { ResolvedIndexRef } from '@/utils/parseIndexRef'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Types ───
 export type TraceSource = 'report' | 'disclosure' | 'workpaper'
@@ -201,6 +202,7 @@ const downstreamItems = ref<TraceItem[]>([])
 const downstreamLoading = ref(false)
 const downstreamError = ref('')
 const downstreamHasLoaded = ref(false)
+const prefs = useDisplayPrefsStore()
 
 // ─── Computed ───
 const visible = computed<boolean>({
@@ -253,7 +255,7 @@ function formatIndexRef(item: TraceItem): string {
 function formatValue(value: number | string | null | undefined): string {
   if (value === null || value === undefined) return '—'
   if (typeof value === 'number') {
-    return value.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+    return prefs.fmt(value)
   }
   return String(value)
 }

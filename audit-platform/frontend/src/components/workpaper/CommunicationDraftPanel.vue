@@ -61,7 +61,7 @@
         <el-table-column label="涉及科目" prop="affected_account" width="120" />
         <el-table-column label="金额(元)" prop="amount" width="120" align="right">
           <template #default="{ row }">
-            {{ formatAmount(row.amount) }}
+            {{ prefs.fmt(row.amount) }}
           </template>
         </el-table-column>
         <el-table-column label="错报类型" prop="misstatement_type" width="100">
@@ -79,7 +79,7 @@
             {{ draft.summary.total_count }} 项
           </el-descriptions-item>
           <el-descriptions-item label="累计金额">
-            {{ formatAmount(draft.summary.cumulative_amount) }} 元
+            {{ prefs.fmt(draft.summary.cumulative_amount) }} 元
           </el-descriptions-item>
           <el-descriptions-item label="占重要性比率">
             {{ draft.summary.ratio != null ? (draft.summary.ratio * 100).toFixed(1) + '%' : '—' }}
@@ -110,6 +110,7 @@ import { CopyDocument, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { api } from '@/services/apiProxy'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -160,10 +161,8 @@ const noMisstatements = ref(false)
 
 // ─── Methods ───────────────────────────────────────────────────────────────
 
-function formatAmount(val: number | null | undefined): string {
-  if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function typeLabel(type: string): string {
   switch (type) {
@@ -247,14 +246,14 @@ function buildDraftText(d: CommunicationDraft): string {
 
   for (const item of d.items) {
     text += `${item.seq}. ${item.description}\n`
-    text += `   涉及科目: ${item.affected_account}  金额: ${formatAmount(item.amount)}元\n`
+    text += `   涉及科目: ${item.affected_account}  金额: ${prefs.fmt(item.amount)}元\n`
     text += `   错报类型: ${typeLabel(item.misstatement_type)}\n`
     text += `   管理层原因: ${item.management_reason || '未说明'}\n\n`
   }
 
   if (d.summary) {
     text += '─'.repeat(50) + '\n'
-    text += `汇总: 共 ${d.summary.total_count} 项, 累计金额 ${formatAmount(d.summary.cumulative_amount)}元\n`
+    text += `汇总: 共 ${d.summary.total_count} 项, 累计金额 ${prefs.fmt(d.summary.cumulative_amount)}元\n`
     if (d.summary.ratio != null) {
       text += `占重要性水平比率: ${(d.summary.ratio * 100).toFixed(1)}%\n`
     }

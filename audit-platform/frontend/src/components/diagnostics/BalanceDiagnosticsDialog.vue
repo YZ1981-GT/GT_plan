@@ -90,6 +90,7 @@ import type {
   DiagnosticJumpTarget,
 } from '@/types/balance-diagnostics'
 import { CALIBER_LABELS } from '@/types/balance-diagnostics'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   modelValue: boolean
@@ -150,8 +151,10 @@ function getMappingStatusType(status: string): 'danger' | 'warning' | 'info' {
   return 'info'
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(val: number): string {
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function onJump(target: DiagnosticJumpTarget) {

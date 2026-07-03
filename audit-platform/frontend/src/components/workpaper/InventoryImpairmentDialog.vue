@@ -107,7 +107,7 @@
       </el-table>
       <div class="total-line">
         建议合计计提：
-        <span class="amt">¥ {{ formatAmount(result.total_suggested_provision) }}</span>
+        <span class="amt">¥ {{ prefs.fmt(result.total_suggested_provision) }}</span>
       </div>
     </div>
 
@@ -134,6 +134,7 @@ import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -205,11 +206,8 @@ function riskLabel(r: string) {
   return { high: '高', medium: '中', low: '低' }[r] || r
 }
 
-function formatAmount(s: string) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return s
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 async function onAnalyze() {
   // 过滤空行

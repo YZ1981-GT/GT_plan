@@ -127,6 +127,7 @@ import { reports as reportsApi, reportConfig as rcApi } from '@/services/apiPath
 import { handleApiError } from '@/utils/errorHandler'
 import { exportData, type ExcelColumn } from '@/composables/useExcelIO'
 import { useCellSelection } from '@/composables/useCellSelection'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 /* ── Props ── */
 const props = defineProps<{
@@ -138,6 +139,7 @@ const emit = defineEmits<{
   drill: [payload: { reportType: string; rowCode: string }]
 }>()
 
+const prefs = useDisplayPrefsStore()
 /* ── State ── */
 const loading = ref(false)
 const exporting = ref(false)
@@ -197,7 +199,7 @@ function onCtxSum() {
   const cells = cellSel.selectedCells.value
   const nums = cells.map(c => Number(c.value)).filter(n => !isNaN(n) && n !== 0)
   const sum = nums.reduce((s, n) => s + n, 0)
-  ElMessage.info(`选中 ${cells.length} 格，合计：${sum.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}`)
+  ElMessage.info(`选中 ${cells.length} 格，合计：${prefs.fmt(sum)}`)
   ctxMenu.value.visible = false
 }
 
@@ -207,7 +209,7 @@ function onCtxCompare() {
   const vals = cells.map(c => Number(c.value) || 0)
   const diff = vals[0] - vals[1]
   const pct = vals[1] !== 0 ? ((diff / Math.abs(vals[1])) * 100).toFixed(2) + '%' : '-'
-  ElMessage.info(`差异：${diff.toLocaleString('zh-CN', { maximumFractionDigits: 2 })}，变动率：${pct}`)
+  ElMessage.info(`差异：${prefs.fmt(diff)}，变动率：${pct}`)
   ctxMenu.value.visible = false
 }
 
@@ -336,7 +338,7 @@ async function fetchData() {
 
 function formatAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function formatChange(val: number | null | undefined): string {

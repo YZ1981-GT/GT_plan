@@ -84,6 +84,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface CellStyle {
   bold?: boolean
@@ -122,6 +123,7 @@ const props = withDefaults(defineProps<{
 }>(), { readonly: true })
 
 const cells = computed<Record<string, GridCell>>(() => props.htmlData?.cells ?? {})
+const prefs = useDisplayPrefsStore()
 const merged = computed<MergedRange[]>(() => props.htmlData?.merged_cells ?? [])
 const colWidths = computed<Record<string, number>>(() => props.htmlData?.col_widths ?? {})
 const maxRow = computed(() => props.htmlData?.max_row ?? 0)
@@ -158,7 +160,7 @@ function cellText(r: number, c: number): string {
   if (v == null || v === '') return isNumeric ? '-' : ''
   if (isNumeric && typeof v === 'number') {
     if (v === 0) return '-'
-    return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return prefs.fmt(v)
   }
   return String(v)
 }

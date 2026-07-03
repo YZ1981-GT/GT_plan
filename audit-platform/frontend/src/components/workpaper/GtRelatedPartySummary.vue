@@ -11,6 +11,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useProjectStore } from '@/stores/project'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId?: string
@@ -62,9 +63,8 @@ async function loadData() {
   }
 }
 
-function formatAmount(val: number): string {
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 onMounted(loadData)
 </script>
@@ -86,7 +86,7 @@ onMounted(loadData)
     <div v-else>
       <el-alert type="info" :closable="false" style="margin-bottom: 12px">
         <template #title>
-          共 {{ parties.length }} 个关联方，{{ totalCount }} 笔交易，合计 {{ formatAmount(totalAmount) }} 元
+          共 {{ parties.length }} 个关联方，{{ totalCount }} 笔交易，合计 {{ prefs.fmt(totalAmount) }} 元
         </template>
       </el-alert>
 
@@ -96,7 +96,7 @@ onMounted(loadData)
         <el-table-column prop="transaction_count" label="交易笔数" width="100" align="center" />
         <el-table-column label="交易金额" width="140" align="right">
           <template #default="{ row }">
-            {{ formatAmount(row.total_amount) }}
+            {{ prefs.fmt(row.total_amount) }}
           </template>
         </el-table-column>
       </el-table>

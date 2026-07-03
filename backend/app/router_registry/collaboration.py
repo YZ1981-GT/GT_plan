@@ -323,3 +323,11 @@ def register_collaboration_routers(app: FastAPI) -> None:
     )
     app.include_router(batch_export_progress_router, tags=["batch-export-progress"])
     app.include_router(batch_export_download_router, tags=["batch-export-progress"])
+
+    # ═══ §125. 复核对话 ═══
+    from app.routers.review_dialog import router as review_dialog_router
+    app.include_router(review_dialog_router, tags=["review-dialog"])
+
+    # ═══ §130. 底稿版本链（workpaper-version-trail） ═══
+    from app.routers.version_trail import router as version_trail_router
+    app.include_router(version_trail_router, tags=["version-trail"])

@@ -154,6 +154,7 @@
 import { ref } from 'vue'
 import { Plus, Delete, Download } from '@element-plus/icons-vue'
 import type { DiffChecklistCompany } from './diffChecklistTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   companies: DiffChecklistCompany[]
@@ -177,6 +178,7 @@ const emit = defineEmits<{
 
 const tableRef = ref()
 const selectedIds = ref<string[]>([])
+const prefs = useDisplayPrefsStore()
 
 function handleSelectionChange(selection: DiffChecklistCompany[]) {
   selectedIds.value = selection.map((c) => c._row_id!).filter(Boolean)
@@ -190,7 +192,7 @@ function handleCurrentChange(row: DiffChecklistCompany | null) {
 
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function statusTagType(status?: string): string {

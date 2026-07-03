@@ -49,6 +49,7 @@ export interface VoucherSampleRow {
   abnormalFlag: string         // 异常标记 (Y/N/'')
   conclusion: string           // 结论
   indexRef: string             // 索引号
+  source?: string              // 数据来源（"自动抽凭"/"手动添加"）
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -352,6 +353,7 @@ export function useD2VoucherCheck(options: UseD2BaseOptions) {
     updateParams,
     autoMarkCutoff,
     autoMarkAllCutoff,
+    debounceSave,
   }
 }
 

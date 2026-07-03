@@ -41,16 +41,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { DiffChecklistMetrics } from './diffChecklistTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 defineProps<{
   metrics: DiffChecklistMetrics
 }>()
 
 const expanded = ref(['dashboard'])
+const prefs = useDisplayPrefsStore()
 
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 </script>
 

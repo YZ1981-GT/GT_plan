@@ -560,10 +560,12 @@ import { handleApiError } from '@/utils/errorHandler'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
 import { useNavigationStack } from '@/composables/useNavigationStack'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{ project: any | null }>()
 const router = useRouter()
 const { push: navPush } = useNavigationStack()
+const prefs = useDisplayPrefsStore()
 const activeTab = ref('overview')
 const showTeamAssign = ref(false)
 const showAttUpload = ref(false)
@@ -957,10 +959,7 @@ function wpStatusType(s: string): 'success' | 'warning' | 'info' | 'danger' | un
 
 function fmtFinance(val: number | null): string {
   if (val === null || val === undefined) return '-'
-  const abs = Math.abs(val)
-  if (abs >= 1e8) return (val / 1e8).toFixed(2) + ' 亿'
-  if (abs >= 1e4) return (val / 1e4).toFixed(2) + ' 万'
-  return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function fmtPct(val: number | null): string {

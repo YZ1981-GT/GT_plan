@@ -66,6 +66,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface PrefillChange {
   sheet: string
@@ -103,7 +104,7 @@ function onSelectionChange(rows: PrefillChange[]) {
 
 function formatVal(v: number | null): string {
   if (v == null) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(v)
 }
 </script>
 

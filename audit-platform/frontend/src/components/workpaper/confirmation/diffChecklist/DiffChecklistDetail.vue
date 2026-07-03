@@ -203,12 +203,14 @@ import { InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { DiffChecklistCompany } from './diffChecklistTypes'
 import DetailSubTable from './DetailSubTable.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   company: DiffChecklistCompany | null
   readonly: boolean
 }>()
 
+const prefs = useDisplayPrefsStore()
 const emit = defineEmits<{
   (e: 'update', companyId: string, field: string, value: any): void
   (e: 'add-sub-row', companyId: string, section: 'b' | 'c' | 'f' | 'g'): void
@@ -254,7 +256,7 @@ function handleAiNote() {
 
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 
 function statusTagType(status?: string): string {

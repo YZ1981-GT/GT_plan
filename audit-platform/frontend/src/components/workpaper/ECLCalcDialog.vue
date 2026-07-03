@@ -99,7 +99,7 @@
       <el-table-column label="ECL（元）" min-width="160" align="right">
         <template #default="{ row }">
           <span :class="{ 'amt-current': row.stage === form.stage }">
-            ¥ {{ formatAmount(row.ecl) }}
+            ¥ {{ prefs.fmt(row.ecl) }}
           </span>
         </template>
       </el-table-column>
@@ -118,7 +118,7 @@
       <el-divider>计算结果（来自后端）</el-divider>
       <div class="ecl-result">
         <el-alert
-          :title="`Stage ${result.stage} ECL = ¥${formatAmount(result.ecl_amount)}`"
+          :title="`Stage ${result.stage} ECL = ¥${prefs.fmt(result.ecl_amount)}`"
           :type="result.monotonicity_check ? 'success' : 'warning'"
           show-icon
           :closable="false"
@@ -128,7 +128,7 @@
         <el-descriptions :column="2" size="small" border>
           <el-descriptions-item label="阶段">Stage {{ result.stage }}</el-descriptions-item>
           <el-descriptions-item label="ECL 金额">
-            <span class="amt-highlight">¥ {{ formatAmount(result.ecl_amount) }}</span>
+            <span class="amt-highlight">¥ {{ prefs.fmt(result.ecl_amount) }}</span>
           </el-descriptions-item>
           <el-descriptions-item label="使用公式" :span="2">
             <span class="formula-text">{{ result.formula_used }}</span>
@@ -175,6 +175,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -271,11 +272,7 @@ const isFormValid = computed(() => {
   return true
 })
 
-function formatAmount(s: string | number) {
-  const n = Number(s)
-  if (!Number.isFinite(n)) return String(s)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const prefs = useDisplayPrefsStore()
 
 function buildRequestBody(applySheet?: string): Record<string, any> {
   const body: Record<string, any> = {
@@ -300,7 +297,7 @@ async function onAnalyze() {
     )
     result.value = resp
     if (resp?.monotonicity_check) {
-      ElMessage.success(`计算完成：Stage ${resp.stage} ECL = ¥${formatAmount(resp.ecl_amount)}`)
+      ElMessage.success(`计算完成：Stage ${resp.stage} ECL = ¥${prefs.fmt(resp.ecl_amount)}`)
     } else {
       ElMessage.warning('计算完成但单调性校验未通过，请复核 PD 输入')
     }

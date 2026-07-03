@@ -97,6 +97,7 @@
 import { InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { ChecklistConclusion, ChecklistMaterialityConfig } from './diffChecklistTypes'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   globalNote: string
@@ -146,9 +147,11 @@ function handleAiFill() {
   ElMessage.success('已根据调节汇总数据生成说明及结论建议')
 }
 
+const prefs = useDisplayPrefsStore()
+
 function formatAmount(val?: number): string {
   if (val == null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return prefs.fmt(val)
 }
 </script>
 

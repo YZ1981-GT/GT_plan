@@ -19,4 +19,4 @@
 - [x] 5. 补注释：`stale_propagation_engine.py` 顶部声明唯一入口指向文档；`wp_formula_dependency.mark_stale_downstream` + `prefill_engine.mark_stale` 标注内部层
   - 需求 3
 
-- [ ]* 6. 更新 `docs/平台全局体验与一致性建议.md` §3.5 与 §7.2 标记死代码已删、分层已文档化
+- [x]* 6. 更新 `docs/平台全局体验与一致性建议.md` §3.5 与 §7.2 标记死代码已删、分层已文档化

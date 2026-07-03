@@ -6,6 +6,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { ref } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import MisstatementSummaryView from '@/components/workpaper/MisstatementSummaryView.vue'
 
 // Mock vue-router
@@ -47,6 +48,7 @@ vi.mock('@/services/apiProxy', () => ({
 describe('MisstatementSummaryView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    setActivePinia(createPinia())
   })
 
   const globalStubs = {

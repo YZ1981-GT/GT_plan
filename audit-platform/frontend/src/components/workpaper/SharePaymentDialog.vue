@@ -63,18 +63,18 @@
       <el-divider>计算结果</el-divider>
       <div class="bs-result">
         <el-descriptions :column="3" size="small" border>
-          <el-descriptions-item label="单份期权价值">¥ {{ formatAmount(result.option_value) }}</el-descriptions-item>
-          <el-descriptions-item label="公允价值总额">¥ {{ formatAmount(result.total_fair_value) }}</el-descriptions-item>
+          <el-descriptions-item label="单份期权价值">¥ {{ prefs.fmt(result.option_value) }}</el-descriptions-item>
+          <el-descriptions-item label="公允价值总额">¥ {{ prefs.fmt(result.total_fair_value) }}</el-descriptions-item>
           <el-descriptions-item label="LLM Stub">{{ result.is_llm_stub ? '是（待接入）' : '否' }}</el-descriptions-item>
         </el-descriptions>
 
         <el-table :data="result.annual_expense_schedule" size="small" border style="margin-top: 12px" max-height="200">
           <el-table-column label="年度" prop="year" width="80" align="center" />
           <el-table-column label="当年费用" width="150" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.expense) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.expense) }}</template>
           </el-table-column>
           <el-table-column label="累计费用" width="150" align="right">
-            <template #default="{ row }">¥ {{ formatAmount(row.cumulative) }}</template>
+            <template #default="{ row }">¥ {{ prefs.fmt(row.cumulative) }}</template>
           </el-table-column>
         </el-table>
       </div>
@@ -93,6 +93,7 @@ import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 interface Props {
   visible: boolean
@@ -132,10 +133,8 @@ const form = reactive({
 
 const isFormValid = computed(() => form.stock_price > 0 && form.exercise_price > 0 && form.volatility > 0 && form.time_to_maturity > 0)
 
-function formatAmount(n: number) {
-  if (!Number.isFinite(n)) return String(n)
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-}
+const prefs = useDisplayPrefsStore()
+
 
 function buildBody(applySheet?: string) {
   return { ...form, apply_to_sheet: applySheet || null }

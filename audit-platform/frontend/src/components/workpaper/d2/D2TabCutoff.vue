@@ -3,9 +3,12 @@
  * D2TabCutoff — 截止测试
  * 8列: 序号|发票号|收入日期|入账日期|金额|跨期判定|结论|备注
  * 自动跨期判定, 红色警告header, 底部汇总
+ * 集成 GtCutoffAutoSampling 自动提取（Task 11.1）
  */
-import { inject, toRef, type Ref } from 'vue'
-import { useD2Cutoff } from '../composables/useD2Cutoff'
+import { inject, toRef, computed, type Ref } from 'vue'
+import { useD2Cutoff, type CutoffSample } from '../composables/useD2Cutoff'
+import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
+import type { ExtractedVoucher, FillMode } from '../composables/useCutoffAutoSampling'
 
 const props = defineProps<{
   wpId: string
@@ -46,6 +49,7 @@ const {
   addSample,
   removeSample,
   updateCell,
+  debounceSave,
 } = useD2Cutoff({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -53,6 +57,72 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   bsDate: toRef(props, 'bsDate') as Ref<string>,
 })
+
+// ─── 年度计算（从bsDate提取，如 "2025-12-31" → 2025）─────────────────────────
+
+const year = computed(() => {
+  if (props.bsDate && props.bsDate.length >= 4) {
+    return parseInt(props.bsDate.slice(0, 4), 10)
+  }
+  return new Date().getFullYear() - 1
+})
+
+// ─── 自动提取填充处理 (Task 11.1) ──────────────────────────────────────────
+
+function generateRowId(): string {
+  return `ct-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+/**
+ * 将 ExtractedVoucher 映射为 CutoffSample
+ * 标记 source: "自动提取"
+ */
+function mapVoucherToSample(voucher: ExtractedVoucher, seq: number): CutoffSample {
+  const debit = voucher.debitAmount ? parseFloat(voucher.debitAmount) : 0
+  const credit = voucher.creditAmount ? parseFloat(voucher.creditAmount) : 0
+  const amount = debit > 0 ? debit : -credit
+  return {
+    rowId: generateRowId(),
+    seq,
+    invoiceNo: voucher.voucherNo || '',
+    revenueDate: voucher.voucherDate || '',
+    receivableDate: voucher.voucherDate || '',
+    amount,
+    isCutoff: voucher.cutoffStatus === '可能跨期',
+    conclusion: voucher.cutoffStatus || '',
+    remark: voucher.remark || '',
+    source: '自动提取',
+  }
+}
+
+/**
+ * 处理 GtCutoffAutoSampling @filled 事件
+ * 按 fillMode 合并到 samples，触发 debounce 保存
+ */
+function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMode: FillMode }): void {
+  const { samples: extracted, fillMode } = payload
+  const mapped = extracted.map((v, idx) => mapVoucherToSample(v, idx + 1))
+
+  if (fillMode === 'replace') {
+    // 替换模式：清空后填充
+    samples.value = mapped.map((s, i) => ({ ...s, seq: i + 1 }))
+  } else if (fillMode === 'merge') {
+    // 合并模式：按凭证号(invoiceNo)去重
+    const existingNos = new Set(samples.value.map(s => s.invoiceNo))
+    const newSamples = mapped.filter(s => !existingNos.has(s.invoiceNo))
+    const startSeq = samples.value.length + 1
+    newSamples.forEach((s, i) => { s.seq = startSeq + i })
+    samples.value.push(...newSamples)
+  } else {
+    // append 模式（默认）：追加到末尾
+    const startSeq = samples.value.length + 1
+    mapped.forEach((s, i) => { s.seq = startSeq + i })
+    samples.value.push(...mapped)
+  }
+
+  // 触发 debounce 2s 自动保存
+  debounceSave()
+}
 </script>
 
 <template>
@@ -70,6 +140,22 @@ const {
           { label: '在线编辑', value: 'online' },
         ]" size="small" />
       </div>
+    </div>
+
+    <!-- 自动提取面板 (Task 11.1) -->
+    <div v-if="!isReadonly" class="auto-extract-section">
+      <el-collapse>
+        <el-collapse-item title="自动提取凭证" name="auto-extract">
+          <GtCutoffAutoSampling
+            account-code="1122"
+            cutoff-direction="post_cutoff"
+            :workpaper-id="wpId"
+            :project-id="projectId"
+            :year="year"
+            @filled="handleAutoExtractFilled"
+          />
+        </el-collapse-item>
+      </el-collapse>
     </div>
 
     <!-- 跨期警告 -->
@@ -142,6 +228,13 @@ const {
       <el-table-column label="备注" min-width="100">
         <template #default="{ row }">{{ row.remark || '-' }}</template>
       </el-table-column>
+      <el-table-column label="来源" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.source === '自动提取'" type="success" size="small">自动提取</el-tag>
+          <el-tag v-else-if="row.source === '手动添加'" size="small">手动添加</el-tag>
+          <span v-else style="color:#909399">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="60" v-if="!isReadonly">
         <template #default="{ row }">
           <el-button type="danger" link size="small" @click="removeSample(row.rowId)">删除</el-button>
@@ -162,6 +255,8 @@ const {
 .d2-tab-cutoff { padding: 12px; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
+.auto-extract-section { margin-bottom: 12px; }
+.auto-extract-section :deep(.el-collapse-item__header) { font-size: 13px; font-weight: 500; }
 .cutoff-alert { margin-bottom: 12px; }
 .summary-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 10px;
