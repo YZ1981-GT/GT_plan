@@ -77,7 +77,7 @@ inclusion: always
 
 ### 活跃/待办
 - **🔵 D7合同负债**：三件套齐全待开发(25需求+31任务)
-- **🔵 F2存货(方案B三组拆分)**：f2-inventory-main三件套已创建(35sheet/20需求/12PBT/25任务组)；f2-inventory-valuation-impairment三件套已创建(13sheet/18需求/10PBT/16任务组)；f2-inventory-special三件套已创建(18sheet/22需求/12PBT/14任务组)
+- **🔵 F2存货(方案B三组拆分)**：✅f2-inventory-main全部完成；✅f2-inventory-valuation-impairment全部完成(19必做任务/44测试全绿/defineAsyncComponent lazy化/F2ValuationTestSheet通用组件+scoped slot)；✅f2-inventory-special全部完成(18sheet/22需求/12PBT全绿/94测试全通过/18任务组全完成)
 - **🔵 F3应付票据**：三件套已创建(10sheet/14需求/8PBT/10波次，贷方公式+利息测算+逾期风险)
 - **🔵 F4应付账款**：三件套已创建(12sheet/16需求/8PBT/10波次，两级审定+未入账反向截止+供应商融资3区域)
 - **🔵 F5营业成本**：三件套已创建(9sheet/14需求/10PBT/10波次，损益类公式+成本倒轧4区+数量核对+月度波动)
@@ -112,6 +112,10 @@ inclusion: always
 - **🔵 D2 refactor 待出 spec**：去el-tabs→sheetName分发+OO双模式+composable拆分+子目录重组（对齐D4标准）
 - **架构优化**：①拆 event_handlers.py ②前端 Top-5 巨型 Vue 拆分 ③services/ 按域建子包
 - 外部依赖：LLM embedding / 合并 UAT / GitHub 默认分支改 main / MinerU+OCR
+- **🟡 Unlimited-OCR 评估**：综合评估文档已升级为`docs/proposals/ai-infra-evaluation-2026-07.md`(OCR+Zvec+Embedding+MinerU+vLLM+GitHub Top20+部署方案+上线Checklist)
+- **🔴 单机OCR方案决策**：单机版用RapidOCR(pip install rapidocr-onnxruntime,50MB ONNX,CPU<1s/页)替代PaddleOCR Docker；有GPU用户选装Unlimited-OCR-NVFP4；云端保留Docker容器
+- **🟡 Zvec 向量数据库候选**：alibaba/zvec v0.5(进程内嵌入式,DiskANN+FTS+混合检索,pip install zvec)，替代ChromaDB做RAG/语义搜索，适合内网单机部署
+- **🟡 GitHub Top20 借鉴**：RAGFlow(分块+引用溯源UI+Reranker,P1)/Mem0(持久记忆→跨年度续审,P2-v3.0)/Browser-use(审计数据自动采集,P3-Electron后)
 
 ## 踩坑铁律（高频）
 
@@ -131,6 +135,8 @@ inclusion: always
 - **聚合包内独立sheet三端点wp_code必须一致**（config/WOPI/callback统一用sheet级解析）
 - **project_assignments列名是staff_id不是user_id**
 - **结构化章节数据不能存到textarea content**（用独立item_id分别存checklist_responses）
+- **CREATE TABLE IF NOT EXISTS 遇旧表列不同不报错但 CREATE INDEX 会炸**：迁移必须用 DO $$ + information_schema 检测列存在性再 ALTER 补齐/RENAME
+- **schema漂移修复模式**：`db_extra`类型漂移=DB有列/表但ORM未定义→在ORM模型中补齐列声明即可（不需要新迁移）；V033遗留列(`is_locked`/`bound_dataset_id`)已补入WorkpaperSnapshot；V095 `review_threads`表+`review_messages.thread_id`/`sender_role`已补入phase10_models
 
 ### 前端
 - **底稿编码→实际内容必须查源模板**：不能凭编码猜内容

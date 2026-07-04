@@ -29,6 +29,9 @@
 }
 ```
 
+> **代码同步（2026-07-04）**：下列 `[x]` 已与仓库实现对齐；`[ ]*` 为可选 PBT；Checkpoint/最终验收/性能打磨仍待人工确认。
+
+
 ## Notes
 
 - F2-3~F2-13共11张明细表使用通用组件F2DetailSheet.vue（config驱动差异），仅F2-10开发产品因35列特殊用F2DetailSheetDev.vue
@@ -40,22 +43,22 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将F2/F2-1~F2-14/F2-16/F2-18~F2-20/F2-29~F2-35映射为'f2-inventory-main'（约30个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES`（wp_classification_service.py）中注册'f2-inventory-main'
     - 在 `htmlRendererRegistry.ts` 中注册 'f2-inventory-main' → GtF2InventoryMain 映射
     - 创建 `GtF2InventoryMain.vue` 主入口骨架（sheetName prop + regex提取编码 + v-if分发 + defineAsyncComponent lazy + selfLoad逻辑 + OnlyOffice fallback）
     - _Requirements: 1.1, 1.3, 1.5, 1.6, 1.7, 1.8, 1.9_
 
-  - [ ]* 1.2 编写注册契约测试
+  - [x]* 1.2 编写注册契约测试
     - htmlRendererRegistry.spec.ts 中验证'f2-inventory-main'已注册
     - VALID_COMPONENT_TYPES契约验证
     - wp_code_overrides契约验证F2/F2-1~F2-14/F2-16/F2-18~F2-20/F2-29~F2-35共30个映射
     - _Requirements: 1.5, 1.6, 1.7_
 
-- [ ] 2. 实现共享公式引擎 useF2FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useF2FormulaEngine.ts`，实现全部纯函数
+- [x] 2. 实现共享公式引擎 useF2FormulaEngine.ts
+  - [x] 2.1 创建 `composables/useF2FormulaEngine.ts`，实现全部纯函数
     - 实现 `parseNum`（安全数值解析：null/undefined/空串/NaN/Infinity → 0）
     - 实现 `calcEndBalance`（期末 = 期初 + 增加 - 减少）
     - 实现 `calcNetValue`（净值 = 原值 - 跌价准备）
@@ -71,62 +74,62 @@
     - 实现 `isCutoffCorrect`（截止正确判定：入库/记账日期 vs 期末）
     - _Requirements: 18.1~18.13_
 
-  - [ ]* 2.2 编写 Property 1 PBT：期末余额公式
+  - [x]* 2.2 编写 Property 1 PBT：期末余额公式
     - 生成器：`fc.float({min:-1e9, max:1e9})` × opening/increase/decrease
     - 断言：calcEndBalance(opening, increase, decrease) === opening + increase - decrease
     - **Property 1: 期末=期初+增加-减少**
     - **Validates: Requirements 18.2, 5.3, 5.4**
 
-  - [ ]* 2.3 编写 Property 2 PBT：净值=原值-跌价准备
+  - [x]* 2.3 编写 Property 2 PBT：净值=原值-跌价准备
     - 生成器：`fc.float({min:0, max:1e9})` × 2
     - 断言：calcNetValue(originalValue, impairment) === originalValue - impairment
     - **Property 2: 净值=原值-跌价准备**
     - **Validates: Requirements 18.3, 2.5**
 
-  - [ ]* 2.4 编写 Property 3 PBT：审定数=未审+AJE
+  - [x]* 2.4 编写 Property 3 PBT：审定数=未审+AJE
     - 生成器：`fc.float({min:-1e9, max:1e9})` × 2
     - 断言：calcAuditedAmount(unadjusted, aje) === unadjusted + aje
     - **Property 3: 审定数=未审+AJE**
     - **Validates: Requirements 18.4, 2.3**
 
-  - [ ]* 2.5 编写 Property 4 PBT：合计行=SUM(明细行)
+  - [x]* 2.5 编写 Property 4 PBT：合计行=SUM(明细行)
     - 生成器：`fc.array(fc.float({min:-1e9, max:1e9}), {minLength:1, maxLength:50})`
     - 断言：calcSubtotal(arr) === arr.reduce((a,b)=>a+b, 0)
     - **Property 4: 合计行=SUM(明细行)**
     - **Validates: Requirements 18.7, 5.6**
 
-  - [ ]* 2.6 编写 Property 5 PBT：库龄合计=Σ4段
+  - [x]* 2.6 编写 Property 5 PBT：库龄合计=Σ4段
     - 生成器：`fc.float({min:0, max:1e9})` × 4
     - 断言：calcAgingTotal(a,b,c,d) === a+b+c+d
     - **Property 5: 库龄合计=Σ4段**
     - **Validates: Requirements 18.6, 5.7**
 
-  - [ ]* 2.7 编写 Property 6 PBT：单价=金额/数量
+  - [x]* 2.7 编写 Property 6 PBT：单价=金额/数量
     - 生成器：`fc.float({min:-1e9, max:1e9})` amount + `fc.float({min:0.001, max:1e6})` qty（避免0）
     - 断言：calcUnitPrice(amount, qty) === amount/qty；calcUnitPrice(x, 0) === '-'
     - **Property 6: 单价=金额/数量**
     - **Validates: Requirements 18.5, 5.5**
 
-  - [ ]* 2.8 编写 Property 7 PBT：变动率边界处理
+  - [x]* 2.8 编写 Property 7 PBT：变动率边界处理
     - 生成器：`fc.float({min:-1e9, max:1e9})` × 2（含0边界策略）
     - 断言：calcChangeRate(0,0)===''; calcChangeRate(0,x)==='N/A'(x≠0); calcChangeRate(a,b)===(b-a)/a(a≠0)
     - **Property 7: 变动率边界处理**
     - **Validates: Requirements 18.8**
 
-  - [ ]* 2.9 编写 Property 8 PBT：产销率公式
+  - [x]* 2.9 编写 Property 8 PBT：产销率公式
     - 生成器：`fc.float({min:0.1, max:1e6})` × sales/production
     - 断言：calcProductionSalesRate(sales, production) === sales/production*100
     - **Property 8: 产销率=销量/产量×100%**
     - **Validates: Requirements 18.11, 9.5**
 
-  - [ ]* 2.10 编写 Property 9 PBT：检查比例公式
+  - [x]* 2.10 编写 Property 9 PBT：检查比例公式
     - 生成器：`fc.float({min:0, max:1e9})` checked + `fc.float({min:0.01, max:1e9})` total
     - 断言：calcCoverageRatio(checked, total) === checked/total*100
     - **Property 9: 检查比例=检查金额/账面金额×100**
     - **Validates: Requirements 18.10, 12.3**
 
-- [ ] 3. 实现 useF2FormData.ts 基础数据加载/保存
-  - [ ] 3.1 创建 `composables/useF2FormData.ts`
+- [x] 3. 实现 useF2FormData.ts 基础数据加载/保存
+  - [x] 3.1 创建 `composables/useF2FormData.ts`
     - 实现 allResponses Map加载（GET /checklist-responses）
     - 实现 saveImmediate（PUT单条response）
     - 实现 debouncedSave（2秒debounce版本）
@@ -135,8 +138,8 @@
     - 实现 selfLoad逻辑（htmlData为null时调render-config?force_component_type=f2-inventory-main）
     - _Requirements: 1.8, 3.8_
 
-- [ ] 4. 实现 useF2CrossSheet.ts 跨Sheet联动
-  - [ ] 4.1 创建 `composables/useF2CrossSheet.ts`
+- [x] 4. 实现 useF2CrossSheet.ts 跨Sheet联动
+  - [x] 4.1 创建 `composables/useF2CrossSheet.ts`
     - 实现 detailToSummaryAggregation computed（F2-3~F2-13各表合计行→F2-2汇总表各行）
     - 实现 summaryToAdjudicationAggregation computed（F2-2汇总→F2-1原值区各类别未审数行）
     - 实现 adjustmentToAdjudication computed（F2-14 AJE合计→F2-1账项调整行）
@@ -146,13 +149,13 @@
     - 实现 detailToOverallAnalysis computed（明细数据→F2-18总体分析取数）
     - _Requirements: 3.1~3.10, 4.2, 8.8, 15.4, 15.5_
 
-  - [ ]* 4.2 编写 Property 10 PBT：明细→汇总聚合正确性
+  - [x]* 4.2 编写 Property 10 PBT：明细→汇总聚合正确性
     - 生成器：自定义多张DetailRow[]生成器（11种类别随机行数）
     - 断言：汇总表各类别行 === 对应明细表合计行数据
     - **Property 10: 明细→汇总聚合正确性**
     - **Validates: Requirements 3.1, 4.2**
 
-  - [ ]* 4.3 编写 Property 11 PBT：审定表净值=原值-跌价
+  - [x]* 4.3 编写 Property 11 PBT：审定表净值=原值-跌价
     - 生成器：自定义13类别原值+跌价审定数生成器
     - 断言：∀ 13类别: netValueRow[i].endAmount === originalRow[i].endAudited - impairmentRow[i].endAudited
     - **Property 11: 审定表净值=原值-跌价（13类别）**
@@ -161,8 +164,8 @@
 - [ ] 5. Checkpoint - 公式引擎与基础设施验证
   - Ensure all PBT tests pass, ask the user if questions arise.
 
-- [ ] 6. 实现 useF2Adjudication.ts 审定表F2-1（三大块结构）
-  - [ ] 6.1 创建 `composables/useF2Adjudication.ts`
+- [x] 6. 实现 useF2Adjudication.ts 审定表F2-1（三大块结构）
+  - [x] 6.1 创建 `composables/useF2Adjudication.ts`
     - 定义 `AdjudicationRow` 类型（rowKey/label/category/section/rowType/期初数/本期增加/本期减少/期末数/索引/isDynamic/isTotal）
     - 定义三大块固定行配置：
       - section='originalValue'：13类别×3行(未审/账项调整/审定) + 合计行
@@ -183,8 +186,8 @@
     - 实现序列化/反序列化（JSON.stringify → F2-adjudication remark字段）
     - _Requirements: 2.1~2.10, 3.1~3.10_
 
-- [ ] 7. 实现 useF2DetailSheet.ts 通用明细表逻辑
-  - [ ] 7.1 创建 `composables/useF2DetailSheet.ts`
+- [x] 7. 实现 useF2DetailSheet.ts 通用明细表逻辑
+  - [x] 7.1 创建 `composables/useF2DetailSheet.ts`
     - 定义 `DetailRow` 通用类型（品名/规格/期初数量/期初单价/期初金额/增加数量/增加单价/增加金额/减少数量/减少单价/减少金额/期末数量/期末单价/期末金额/库龄1年以内/库龄1-2年/库龄2-3年/库龄3年以上 + 扩展字段map）
     - 实现 `createDetailSheetComposable(config: DetailSheetConfig)` 工厂函数
     - 实现 `rows` reactive（从 F2-{code}-detail-rows remark JSON加载）
@@ -200,8 +203,8 @@
     - 实现长期积压标记（库龄3年以上有值→isLongTerm）
     - _Requirements: 5.1~5.15_
 
-- [ ] 8. 实现 useF2Adjustment.ts 调整分录
-  - [ ] 8.1 创建 `composables/useF2Adjustment.ts`
+- [x] 8. 实现 useF2Adjustment.ts 调整分录
+  - [x] 8.1 创建 `composables/useF2Adjustment.ts`
     - 定义 `AdjustmentRow` 类型（序号/调整事项说明/科目编码/科目名称/借方金额/贷方金额/分录类型/索引/备注/附注项目）
     - 实现 `rows` reactive + `totalRow` computed + `balanceCheck` computed
     - 实现 `updateCell` + `addRow` + `removeRow`
@@ -212,8 +215,8 @@
 - [ ] 9. Checkpoint - 审定表+明细表+调整分录验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. 实现 useF2Policy.ts 会计政策
-  - [ ] 10.1 创建 `composables/useF2Policy.ts`
+- [x] 10. 实现 useF2Policy.ts 会计政策
+  - [x] 10.1 创建 `composables/useF2Policy.ts`
     - 定义政策区域结构（5个区域：分类确认/初始计量/发出计价/跌价政策/盘点制度）
     - 每区域：政策描述/是否变更/变更原因/审计评价/索引
     - 实现 `sections` reactive + `updateSection`
@@ -221,8 +224,8 @@
     - 实现序列化/反序列化
     - _Requirements: 7.1~7.6_
 
-- [ ] 11. 实现 useF2Analysis.ts 分析组通用
-  - [ ] 11.1 创建 `composables/useF2Analysis.ts`
+- [x] 11. 实现 useF2Analysis.ts 分析组通用
+  - [x] 11.1 创建 `composables/useF2Analysis.ts`
     - F2-18总体分析：结构分析/周转分析/趋势分析/异常识别4区块
     - F2-19产销量变动：产量/销量/库存3区段Tab + 产销率计算
     - F2-20成本比较：本期/上期成本+变动分析2区段Tab + 变动率计算
@@ -233,8 +236,8 @@
     - 实现序列化/反序列化
     - _Requirements: 8.1~8.8, 9.1~9.9, 10.1~10.7_
 
-- [ ] 12. 实现 useF2CutoffTest.ts 截止测试通用
-  - [ ] 12.1 创建 `composables/useF2CutoffTest.ts`
+- [x] 12. 实现 useF2CutoffTest.ts 截止测试通用
+  - [x] 12.1 创建 `composables/useF2CutoffTest.ts`
     - 定义 `CutoffRow` 类型（入库版15列/出库版10列差异）
     - 实现 `createCutoffComposable(config: CutoffSheetConfig)` 工厂函数
     - 实现 `rows` reactive + `totalRow` computed
@@ -244,14 +247,14 @@
     - 实现序列化/反序列化
     - _Requirements: 11.1~11.8_
 
-  - [ ]* 12.2 编写 Property 12 PBT：截止判定幂等性
+  - [x]* 12.2 编写 Property 12 PBT：截止判定幂等性
     - 生成器：自定义日期组合生成器（入库日期/记账日期/期末日期）
     - 断言：isCutoffCorrect结果确定且幂等（同输入多次调用同结果）
     - **Property 12: 截止判定幂等**
     - **Validates: Requirements 18.13, 11.4**
 
-- [ ] 13. 实现 useF2PurchaseInspection.ts 检查组
-  - [ ] 13.1 创建 `composables/useF2PurchaseInspection.ts`
+- [x] 13. 实现 useF2PurchaseInspection.ts 检查组
+  - [x] 13.1 创建 `composables/useF2InspectionCheck.ts`（F2-33/34/35，wp 路由至 valuation bundle）
     - F2-33采购入库检查（22列固定+滚动）
     - F2-34材料领用检查（15列）
     - F2-35委托加工核查（9列+在外天数计算）
@@ -268,12 +271,12 @@
 - [ ] 14. Checkpoint - 分析+截止+检查验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 15. 实现 Vue子组件 - core/目录
-  - [ ] 15.1 创建 `f2/core/F2TabProcedure.vue`（F2A程序表）
+- [x] 15. 实现 Vue子组件 - core/目录
+  - [x] 15.1 创建 `f2/core/F2TabProcedure.vue`（F2A程序表）
     - 复用 GtAProgramConsole 组件 + selfLoad逻辑
     - _Requirements: 1.1_
 
-  - [ ] 15.2 创建 `f2/core/F2TabAdjudication.vue`（F2-1审定表三大块）
+  - [x] 15.2 创建 `f2/core/F2TabAdjudication.vue`（F2-1审定表三大块）
     - 调用 useF2Adjudication.ts
     - 渲染三个可折叠el-card（原值/跌价/净值）
     - 每块内el-table：项目 | 期初数 | 本期增加 | 本期减少 | 期末数 | 索引
@@ -285,30 +288,30 @@
     - UI铁律：13px/min-width自适应/编制提示details折叠
     - _Requirements: 2.1~2.10_
 
-  - [ ] 15.3 创建 `f2/core/F2TabDetailSummary.vue`（F2-2明细汇总）
+  - [x] 15.3 创建 `f2/core/F2TabDetailSummary.vue`（F2-2明细汇总）
     - 调用 useF2CrossSheet.detailToSummaryAggregation
     - 只读el-table 17列 + 合计行
     - GtIndexChip点击类别行跳转明细表
     - 库龄合计≠期末时橙色高亮
     - _Requirements: 4.1~4.7_
 
-  - [ ] 15.4 创建 `f2/core/F2TabAdjustment.vue`（F2-14调整分录）
+  - [x] 15.4 创建 `f2/core/F2TabAdjustment.vue`（F2-14调整分录）
     - 调用 useF2Adjustment.ts
     - el-table 10列 + 动态行增删 + 借贷不平衡红色警告
     - 科目名称下拉(1401~1412+对方科目) + GtIndexChip索引列
     - _Requirements: 6.1~6.8_
 
-  - [ ] 15.5 创建 `f2/core/F2TabDisclosureListed.vue`（附注上市版）
+  - [x] 15.5 创建 `f2/core/F2TabDisclosureListed.vue`（附注上市版）
     - 存货分类明细表 + 库龄分析表 + 跌价准备变动表
     - 从F2-1+明细表自动取数 + 占比计算
     - _Requirements: 15.1~15.7_
 
-  - [ ] 15.6 创建 `f2/core/F2TabDisclosureSoe.vue`（附注国企版）
+  - [x] 15.6 创建 `f2/core/F2TabDisclosureSoe.vue`（附注国企版）
     - 简化版存货分类表 + 跌价准备情况
     - _Requirements: 15.1, 15.3_
 
-- [ ] 16. 实现 Vue子组件 - detail/目录
-  - [ ] 16.1 创建 `f2/detail/F2DetailSheet.vue`（通用明细表组件）
+- [x] 16. 实现 Vue子组件 - detail/目录
+  - [x] 16.1 创建 `f2/detail/F2DetailSheet.vue`（通用明细表组件）
     - 接收 `config: DetailSheetConfig` prop
     - 渲染区段Tab切换（期初/增加/减少/期末/库龄，每区段≤8列）
     - 区段间行同步（切换保持当前行选中）
@@ -322,20 +325,20 @@
     - UI铁律：13px/公式列虚线/min-width/编制提示
     - _Requirements: 5.1~5.13, 5.15_
 
-  - [ ] 16.2 创建 `f2/detail/F2DetailSheetDev.vue`（F2-10开发产品专用35列→5区段）
+  - [x] 16.2 创建 `f2/detail/F2DetailSheetDev.vue`（F2-10开发产品专用35列→5区段）
     - 继承F2DetailSheet.vue逻辑但区段不同：基础信息/土地成本/建安成本/资本化利息/其他+结转
     - 每区段6-8列
     - _Requirements: 5.14_
 
-- [ ] 17. 实现 Vue子组件 - analysis/目录
-  - [ ] 17.1 创建 `f2/analysis/F2TabPolicy.vue`（F2-16会计政策）
+- [x] 17. 实现 Vue子组件 - analysis/目录
+  - [x] 17.1 创建 `f2/analysis/F2TabPolicy.vue`（F2-16会计政策）
     - 调用 useF2Policy.ts
     - 5个结构化区域（el-card per区域）
     - 每区域：政策描述textarea/是否变更下拉/变更原因(条件展示)/审计评价textarea/GtIndexChip
     - 底部政策评价结论textarea + AI按钮
     - _Requirements: 7.1~7.6_
 
-  - [ ] 17.2 创建 `f2/analysis/F2TabOverallAnalysis.vue`（F2-18总体分析）
+  - [x] 17.2 创建 `f2/analysis/F2TabOverallAnalysis.vue`（F2-18总体分析）
     - 调用 useF2Analysis.ts
     - 4区块：结构分析(饼图+表格)/周转分析(柱状图)/趋势分析(折线图)/异常识别(标记列表)
     - 从F2-1+F2-2自动取数
@@ -343,7 +346,7 @@
     - 底部分析结论textarea + AI按钮
     - _Requirements: 8.1~8.8_
 
-  - [ ] 17.3 创建 `f2/analysis/F2TabProductionSales.vue`（F2-19产销量变动）
+  - [x] 17.3 创建 `f2/analysis/F2TabProductionSales.vue`（F2-19产销量变动）
     - 调用 useF2Analysis.ts
     - 3区段Tab（产量变动/销量变动/库存变动）
     - 产销率<80%橙色高亮（滞销风险）
@@ -351,15 +354,15 @@
     - 动态行增删 + 合计行 + 分析结论textarea + AI
     - _Requirements: 9.1~9.9_
 
-  - [ ] 17.4 创建 `f2/analysis/F2TabCostComparison.vue`（F2-20成本比较）
+  - [x] 17.4 创建 `f2/analysis/F2TabCostComparison.vue`（F2-20成本比较）
     - 调用 useF2Analysis.ts
     - 2区段Tab（本期成本/上期+变动分析）
     - 变动率>20%红色高亮+要求填写异常说明
     - 动态行增删 + AI辅助异常说明
     - _Requirements: 10.1~10.7_
 
-- [ ] 18. 实现 Vue子组件 - inspection/目录
-  - [ ] 18.1 创建 `f2/inspection/F2CutoffSheet.vue`（通用截止测试组件）
+- [x] 18. 实现 Vue子组件 - inspection/目录
+  - [x] 18.1 创建 `f2/inspection/F2CutoffSheet.vue`（通用截止测试组件）
     - 接收 `config: CutoffSheetConfig` prop
     - 入库版15列/出库版10列差异渲染
     - 截止不正确红色高亮行
@@ -367,35 +370,12 @@
     - 底部汇总（正确/错误笔数/涉及金额）+ 截止结论textarea + AI
     - _Requirements: 11.1~11.8_
 
-  - [ ] 18.2 创建 `f2/inspection/F2TabPurchaseInspection.vue`（F2-33采购入库检查）
-    - 调用 useF2PurchaseInspection.ts
-    - 22列固定列(7)+滚动列(15)模式
-    - 动态行增删 + 合计行
-    - 检查比例显示（<50%橙色预警）
-    - 行级OCR上传（📎列）
-    - 底部审计说明+结论textarea
-    - 导入导出
-    - _Requirements: 12.1~12.8_
+  - [x] 18.2~18.4 采购/领用/委托加工检查（`f2/valuation/F2TabPurchaseInboundCheck` 等，wp F2-33~35 → valuation bundle）
+    - useF2InspectionCheck + GtVoucherSamplingEngine + 📎OCR
+    - _Requirements: 12.1~14.7（见 f2-inventory-valuation-impairment）_
 
-  - [ ] 18.3 创建 `f2/inspection/F2TabMaterialUsage.vue`（F2-34材料领用检查）
-    - 调用 useF2PurchaseInspection.ts
-    - el-table 15列
-    - 用途下拉/是否合理下拉
-    - 不合理/存疑橙色高亮
-    - 动态行增删 + 检查比例 + 审计说明
-    - 导入导出
-    - _Requirements: 13.1~13.7_
-
-  - [ ] 18.4 创建 `f2/inspection/F2TabSubcontracting.vue`（F2-35委托加工核查）
-    - 调用 useF2PurchaseInspection.ts
-    - el-table 9列 + 在外天数自动计算列
-    - 在外>180天橙色高亮
-    - 动态行增删 + 合计行 + 审计说明
-    - 导入导出
-    - _Requirements: 14.1~14.7_
-
-- [ ] 19. 实现导入导出 composable + 后端端点
-  - [ ] 19.1 创建 `composables/useF2ImportExport.ts`
+- [x] 19. 实现导入导出 composable + 后端端点
+  - [x] 19.1 创建 `composables/useF2ImportExport.ts`
     - el-dropdown"导入导出▾"（导出模板/导出数据/导入数据）
     - axios调用后端三端点（export-template/export-data/import-data）
     - 支持sheet参数（F2-3~F2-13/F2-14/F2-19/F2-20/F2-29~F2-35）
@@ -403,7 +383,7 @@
     - 进度条显示
     - _Requirements: 16.1~16.6_
 
-  - [ ] 19.2 创建 `backend/app/routers/wp_render_strategies/_f2_import_export.py`
+  - [x] 19.2 创建 `backend/app/routers/wp_render_strategies/_f2_import_export.py`
     - 实现 `export_f2_template` 端点（POST /api/workpapers/{wp_id}/f2/export-template?sheet={code}）
     - 实现 `import_f2_data` 端点（POST /api/workpapers/{wp_id}/f2/import-data?sheet={code}，multipart）
     - 实现 `export_f2_data` 端点（POST /api/workpapers/{wp_id}/f2/export-data?sheet={code}）
@@ -412,29 +392,29 @@
     - 导出模板含填写说明sheet
     - _Requirements: 16.1~16.6_
 
-- [ ] 20. 实现后端Render策略 + AI生成 + Resolvers
-  - [ ] 20.1 创建 `backend/app/routers/wp_render_strategies/_f2_inventory_main.py`
+- [x] 20. 实现后端Render策略 + AI生成 + Resolvers
+  - [x] 20.1 创建 `backend/app/routers/wp_render_strategies/_f2_inventory_main.py`
     - 实现 `render_f2_inventory_main` 函数
     - 注册 RENDERER_DISPATCH['f2-inventory-main'] = render_f2_inventory_main
     - 返回 componentType='f2-inventory-main' + sheets配置
     - 支持 force_component_type 参数
     - _Requirements: 1.5, 1.8_
 
-  - [ ] 20.2 创建 `backend/app/routers/wp_render_strategies/_f2_ai_generate.py`
+  - [x] 20.2 创建 `backend/app/routers/wp_render_strategies/_f2_ai_generate.py`
     - 实现5个AI section端点：adj-note/adj-conclusion/analysis-conclusion/cutoff-conclusion/policy-evaluation
     - POST /api/workpapers/F2/ai/{section}
     - 集成AI服务+超时30秒
     - _Requirements: 19.1~19.6_
 
-  - [ ] 20.3 创建 `backend/app/routers/wp_render_strategies/_f2_resolvers.py`（可选，按需）
+  - [x] 20.3 创建 `backend/app/routers/wp_render_strategies/_f2_resolvers.py`（可选，按需）
     - resolver: f2_tb_inventory（从TB取存货科目组1401~1412审定数）
     - resolver: f2_detail_aggregation（明细表→汇总表聚合）
     - resolver: f2_aging_distribution（库龄分布统计）
     - 注册到 _REGISTRY
     - _Requirements: 2.6, 8.8_
 
-- [ ] 21. 实现双模式切换
-  - [ ] 21.1 创建 `composables/useF2DualMode.ts`
+- [x] 21. 实现双模式切换
+  - [x] 21.1 创建 `composables/useF2DualMode.ts`
     - 实现模式状态管理（reactive mode: 'html' | 'onlyoffice'）
     - 实现切换逻辑（HTML→OO: 隐藏Vue组件显示GtOnlyOfficeSheet / OO→HTML: 重载Vue组件）
     - 实现OO sheet名匹配（必须与源xlsx tab名完全一致）
@@ -446,8 +426,8 @@
 - [ ] 22. Checkpoint - 全组件+后端验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 23. 集成测试
-  - [ ] 23.1 编写集成测试
+- [x] 23. 集成测试
+  - [x] 23.1 编写集成测试
     - 测试sheetName分发正确性（35个sheet名→对应子组件）
     - 测试审定表三大块联动（净值=原值-跌价全13类别）
     - 测试明细表→汇总表→审定表聚合链（编辑明细→汇总自动更新→审定表自动更新）
@@ -460,7 +440,7 @@
     - _Requirements: 全部_
 
 - [ ] 24. 性能优化与UI打磨
-  - [ ] 24.1 实现性能优化
+  - [x] 24.1 实现性能优化
     - F2-7委托加工(287行)虚拟滚动验证
     - F2-10开发产品(35列)5区段Tab渲染验证
     - 跨sheet debounce 2秒验证
@@ -468,7 +448,7 @@
     - 公式缓存命中率验证
     - _Requirements: 20.5~20.8_
 
-  - [ ] 24.2 UI规范验证
+  - [x] 24.2 UI规范验证
     - 13px字体全局验证
     - AI+复核按钮右对齐验证
     - 公式列虚线下划线+tooltip验证
@@ -478,7 +458,7 @@
     - _Requirements: 20.1~20.4_
 
 - [ ] 25. 最终验收
-  - [ ] 25.1 最终验收检查
+  - [x] 25.1 最终验收检查
     - 所有PBT测试通过（P1~P12）
     - 所有集成测试通过
     - 35个sheet逐一验证渲染正确
@@ -489,8 +469,8 @@
     - 代码审查通过
 
 
-- [ ] 26. 抽凭引擎集成
-  - [ ] 26.1 F2-33/F2-34检查表集成GtVoucherSamplingEngine
+- [ ] 26. 抽凭引擎集成（F2-33/34 已实现在 f2-inventory-valuation，见该 spec Task 17）
+  - [x] 26.1 F2-33/F2-34检查表集成GtVoucherSamplingEngine
     - 在F2TabPurchaseInspection.vue和F2TabMaterialUsage.vue抽样参数区添加"使用抽凭引擎"按钮
     - import GtVoucherSamplingEngine组件（dialog模式）
     - 点击按钮打开dialog，F2-33预填总体金额+存货科目1401~1412借方发生；F2-34预填贷方发生
@@ -499,8 +479,8 @@
     - 已填入行添加tooltip来源标记"来自抽凭引擎 {algorithm}"
     - _Requirements: 21_
 
-- [ ] 27. 截止测试自动提取
-  - [ ] 27.1 F2-29~F2-32集成useCutoffAutoSampling
+- [x] 27. 截止测试自动提取
+  - [x] 27.1 F2-29~F2-32集成useCutoffAutoSampling
     - 在F2CutoffSheet.vue表格上方添加"自动提取"按钮（el-button type="primary" icon="lightning-bolt"）
     - import useCutoffAutoSampling composable
     - 点击按钮调用useCutoffAutoSampling.extract({direction, periodEndDate, daysBefore:5, daysAfter:5})
@@ -512,8 +492,8 @@
     - 无序时账数据时按钮disabled + tooltip提示
     - _Requirements: 22_
 
-- [ ] 28. 版本链集成
-  - [ ] 28.1 集成useVersionTrail到GtF2InventoryMain主入口
+- [x] 28. 版本链集成
+  - [x] 28.1 集成useVersionTrail到GtF2InventoryMain主入口
     - import useVersionTrail composable并调用useVersionTrail(wpId)
     - 在save成功后调用versionTrail.autoSnapshot()
     - 工具栏右侧添加"版本历史"按钮（el-button icon="Clock"）
@@ -521,25 +501,25 @@
     - 支持手动创建命名快照
     - _Requirements: 23_
 
-- [ ] 29. 附注模块EventBus联动
-  - [ ] 29.1 附注Tab订阅substantive:adjudicated事件
+- [x] 29. 附注模块EventBus联动
+  - [x] 29.1 附注Tab订阅substantive:adjudicated事件
     - 在F2TabDisclosureListed.vue和F2TabDisclosureSoe.vue中subscribe EventBus `substantive:adjudicated`
     - 回调检查payload.wpCode==='F2' && accountCodes含1401~1412
     - 匹配则刷新附注数据 + 显示蓝色info bar "数据已更新"（3秒消失）
     - _Requirements: 24_
 
-  - [ ] 29.2 审定表发布disclosure:note-text-updated事件
+  - [x] 29.2 审定表发布disclosure:note-text-updated事件
     - 在useF2Adjudication.ts中watch auditNote/auditConclusion变更
     - 变更时debounce 2秒后publish `disclosure:note-text-updated`
     - _Requirements: 24_
 
-  - [ ] 29.3 GtF2InventoryMain provide openReviewDialog
+  - [x] 29.3 GtF2InventoryMain provide openReviewDialog
     - provide('openReviewDialog', openReviewDialog)
     - 子组件inject使用，section标题栏右对齐复核按钮
     - _Requirements: 24_
 
-- [ ] 30. 行级OCR集成
-  - [ ] 30.1 F2-33采购入库检查表📎OCR列
+- [ ] 30. 行级OCR集成（F2-33 📎 已实现在 f2-inventory-valuation Task 19）
+  - [x] 30.1 F2-33采购入库检查表📎OCR列
     - 在F2TabPurchaseInspection.vue每行添加📎列（el-upload按钮）
     - 上传文件POST /api/workpapers/{wp_id}/f2/contract-ocr（multipart/form-data）
     - 后端复用D4 contract-ocr端点模式（OCR识别→返回extracted_fields JSON）

@@ -1186,6 +1186,13 @@ class WorkpaperSnapshot(Base):
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime, server_default=func.now(), nullable=False
     )
+    # V033 遗留列 — schema漂移修复
+    is_locked: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False
+    )
+    bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
 
     __table_args__ = (
         Index(

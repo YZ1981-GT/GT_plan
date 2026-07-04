@@ -37,8 +37,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将F4A/F4-1~F4-9/附注披露(上市)/附注披露(国企)映射为'f4-accounts-payable'（12个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES`（wp_classification_service.py）中注册'f4-accounts-payable'
     - 在 `htmlRendererRegistry.ts` 中注册 'f4-accounts-payable' → GtF4AccountsPayable 映射
@@ -52,7 +52,7 @@
     - _Requirements: 1.3, 1.4, 1.5_
 
 - [ ] 2. 实现公式引擎 useF4FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useF4FormulaEngine.ts`，实现全部8个纯函数
+  - [x] 2.1 创建 `composables/useF4FormulaEngine.ts`，实现全部8个纯函数
     - 实现 `calcCreditBalance`（贷方余额 = 期初 + 贷方 - 借方）
     - 实现 `calcAdjustedAmount`（审定 = 未审 + AJE + RJE）
     - 实现 `calcAgingTotal`（账龄合计 = 各账龄段SUM）

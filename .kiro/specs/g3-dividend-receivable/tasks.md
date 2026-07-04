@@ -39,8 +39,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将G3A/G3-1~G3-5/附注披露(上市)/附注披露(国企)映射为'g3-dividend-receivable'（8个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES` 中注册'g3-dividend-receivable'
     - 在 `htmlRendererRegistry.ts` 中注册 'g3-dividend-receivable' → GtG3DividendReceivable 映射
@@ -54,7 +54,7 @@
     - _Requirements: 1.3, 1.4, 1.5_
 
 - [ ] 2. 实现公式引擎 useG3FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useG3FormulaEngine.ts`，实现全部8个纯函数
+  - [x] 2.1 创建 `composables/useG3FormulaEngine.ts`，实现全部8个纯函数
     - 实现 `calcDividend`（应收股利 = 持股数 × 每股股利，持股数<0→0）
     - 实现 `calcPayoutRatio`（实际分红率 = 分红总额 / 净利润 × 100%，净利润≤0→0）
     - 实现 `calcDebitBalance`（借方余额 = 期初 + 借方 - 贷方）

@@ -28,22 +28,22 @@ F0存货循环函证对齐D0架构：复用D0共享组件(7个componentType直�
     - 11个sheet的component_type和class_code准确反映真实模板
     - _Requirements: 1_
 
-- [ ] 2. 注册新componentType
-  - [ ] 2.1 VALID_COMPONENT_TYPES注册confirmation-alternative-f05/f06
+- [x] 2. 注册新componentType
+  - [x] 2.1 VALID_COMPONENT_TYPES注册confirmation-alternative-f05/f06
     - 在wp_classification_service.py的VALID_COMPONENT_TYPES中添加2个新类型
     - _Requirements: 4_
-  - [ ] 2.2 htmlRendererRegistry注册f05/f06
+  - [x] 2.2 htmlRendererRegistry注册f05/f06
     - 添加type union + registry entry + defineAsyncComponent import
     - _Requirements: 4_
-  - [ ] 2.3 后端RENDERER_DISPATCH注册f05/f06
+  - [x] 2.3 后端RENDERER_DISPATCH注册f05/f06
     - 复用confirmation通用renderer（返回checklist_responses snapshot）
     - _Requirements: 4_
-  - [ ] 2.4 更新htmlRendererRegistry.spec.ts
+  - [x] 2.4 更新htmlRendererRegistry.spec.ts
     - expected componentType列表添加confirmation-alternative-f05/f06
     - _Requirements: 4_
 
-- [ ] 3. 创建GtConfirmationAlternativeF05.vue
-  - [ ] 3.1 创建composable `useAlternativeF05Data.ts`
+- [x] 3. 创建GtConfirmationAlternativeF05.vue
+  - [x] 3.1 创建composable `useAlternativeF05Data.ts`
     - 定义4区块列配置（按xlsx实际列头：区块①15列/区块②13列/区块③13列/区块④15列）
     - 实现Master-Detail数据管理（按公司分组，每公司4区块独立行数据）
     - 实现余额汇总区（函证项目/年初余额/借方发生额/贷方发生额/期末余额 + 本期采购金额/付款比例/入库比例）
@@ -52,7 +52,7 @@ F0存货循环函证对齐D0架构：复用D0共享组件(7个componentType直�
     - 实现合计行计算（SUM金额列）
     - _Requirements: 2, 5_
 
-  - [ ] 3.2 创建组件 `alternativeF05/GtConfirmationAlternativeF05.vue`
+  - [x] 3.2 创建组件 `alternativeF05/GtConfirmationAlternativeF05.vue`
     - 多公司Master-Detail（el-tabs按公司+ElMessageBox.prompt新增公司）
     - 抽样参数区（6字段textarea表单）
     - 余额汇总区（2行表格：函证项目+本期采购）
@@ -63,8 +63,8 @@ F0存货循环函证对齐D0架构：复用D0共享组件(7个componentType直�
     - ~400行
     - _Requirements: 2_
 
-- [ ] 4. 创建GtConfirmationAlternativeF06.vue
-  - [ ] 4.1 创建composable `useAlternativeF06Data.ts`
+- [x] 4. 创建GtConfirmationAlternativeF06.vue
+  - [x] 4.1 创建composable `useAlternativeF06Data.ts`
     - 定义4区块列配置（按xlsx实际列头：区块①15列/区块②13列/区块③15列/区块④13列）
     - 实现Master-Detail数据管理（按公司分组，每公司4区块独立行数据）
     - 实现余额汇总区（函证项目应付票据+应付账款/年初/借方/贷方/期末 + 本期采购/入库比例/付款比例）
@@ -73,13 +73,13 @@ F0存货循环函证对齐D0架构：复用D0共享组件(7个componentType直�
     - 实现合计行计算
     - _Requirements: 3, 5_
 
-  - [ ] 4.2 创建组件 `alternativeF06/GtConfirmationAlternativeF06.vue`
+  - [x] 4.2 创建组件 `alternativeF06/GtConfirmationAlternativeF06.vue`
     - 多公司Master-Detail + 抽样参数区 + 余额汇总区 + 4区块宽表
     - 与F05结构一致，仅4区块列配置和标题不同
     - ~400行
     - _Requirements: 3_
 
-- [ ] 5. 导入导出端点
+- [ ]* 5. 导入导出端点
   - [ ] 5.1 创建后端 `_f0_import_export.py`
     - 实现 export-template（按sheet=F0-5/F0-6，4区块→4个sheet含列头+说明）
     - 实现 export-data（当前数据导出）
@@ -87,8 +87,8 @@ F0存货循环函证对齐D0架构：复用D0共享组件(7个componentType直�
     - 路径：`/api/workpapers/{wp_id}/f0/export-template?sheet=F0-5`
     - _Requirements: 5_
 
-- [ ] 6. 验证
-  - [ ] 6.1 运行注册契约测试确认无回归
+- [x] 6. 验证
+  - [x] 6.1 运行注册契约测试确认无回归
     - vitest run htmlRendererRegistry.spec.ts
     - _Requirements: 4_
   - [ ]* 6.2 编写F05/F06单元测试

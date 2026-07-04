@@ -38,8 +38,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将F5A/F5-1~F5-8映射为'f5-cost-of-sales'（9个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES`（wp_classification_service.py）中注册'f5-cost-of-sales'
     - 在 `htmlRendererRegistry.ts` 中注册 'f5-cost-of-sales' → GtF5CostOfSales 映射
@@ -53,7 +53,7 @@
     - _Requirements: 1.3, 1.4, 1.5_
 
 - [ ] 2. 实现公式引擎 useF5FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useF5FormulaEngine.ts`，实现全部12个纯函数
+  - [x] 2.1 创建 `composables/useF5FormulaEngine.ts`，实现全部12个纯函数
     - 实现 `calcAdjustedAmount`（审定 = 未审 + AJE + RJE，损益类发生额）
     - 实现 `calcChangeAmount`（变动额 = 本期 - 上期）
     - 实现 `calcChangeRate`（变动率 = (本期-上期)/上期 × 100，上期=0→'N/A'）

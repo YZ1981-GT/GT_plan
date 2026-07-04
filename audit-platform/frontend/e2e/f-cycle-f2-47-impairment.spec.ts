@@ -4,8 +4,8 @@
  * 锚定 spec f-cycle-workpapers Task 56
  *
  * 验证 F2-47 跌价准备测试底稿：
- * 1. F2-47 底稿存在且 render-config 返回 audit-sheet
- * 2. F2-47~F2-49 跌价准备测试系列全部为 audit-sheet
+ * 1. F2-47 底稿存在且 render-config 返回 f2-inventory-valuation-impairment
+ * 2. F2-47~F2-49 跌价准备测试系列全部为 f2-inventory-valuation-impairment
  * 3. accounting_estimate_b51 auto_data_source resolver 可被调用
  * 4. 底稿页面加载无严重 JS 错误
  *
@@ -43,7 +43,7 @@ async function getToken(request: APIRequestContext): Promise<string> {
 }
 
 test.describe('Task 56: F2-47 跌价准备测试 + B51 舞弊三因素联动面板', () => {
-  test('56.1 — F2-47 底稿存在且为 audit-sheet', async ({ request }) => {
+  test('56.1 — F2-47 底稿存在且为 f2-inventory-valuation-impairment', async ({ request }) => {
     test.setTimeout(20_000)
     const token = await getToken(request)
 
@@ -58,10 +58,10 @@ test.describe('Task 56: F2-47 跌价准备测试 + B51 舞弊三因素联动面�
     const rcBody = await rcResp.json()
     const rcData = rcBody?.data || rcBody
     const componentType = rcData.component_type || rcData.componentType
-    expect(componentType).toBe('audit-sheet')
+    expect(componentType).toBe('f2-inventory-valuation-impairment')
   })
 
-  test('56.2 — F2-47~F2-49 跌价准备测试系列全部为 audit-sheet', async ({ request }) => {
+  test('56.2 — F2-47~F2-49 跌价准备测试系列全部为 f2-inventory-valuation-impairment', async ({ request }) => {
     test.setTimeout(30_000)
     const token = await getToken(request)
 
@@ -77,7 +77,7 @@ test.describe('Task 56: F2-47 跌价准备测试 + B51 舞弊三因素联动面�
           const rcBody = await rcResp.json()
           const rcData = rcBody?.data || rcBody
           const ct = rcData.component_type || rcData.componentType
-          expect(ct, `${code} 应为 audit-sheet`).toBe('audit-sheet')
+          expect(ct, `${code} 应为 f2-inventory-valuation-impairment`).toBe('f2-inventory-valuation-impairment')
         }
       }
     }

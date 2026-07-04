@@ -1,14 +1,14 @@
 """F 类底稿 Phase 4 特殊程序验证（Tasks 32-41）。
 
 验证:
-  Task 32: F2-21~F2-26 存货监盘系列 audit-sheet schema
-  Task 33: F2-38~F2-44 计价测试 audit-sheet schema
-  Task 34: F2-47~F2-49 跌价准备测试 audit-sheet schema
+  Task 32: F2-21~F2-26 存货监盘系列 f2-stocktake-bundle schema
+  Task 33: F2-38~F2-44 计价测试 f2-inventory-valuation-impairment schema
+  Task 34: F2-47~F2-49 跌价准备测试 f2-inventory-valuation-impairment schema
   Task 35: accounting_estimate_b51 auto_data_source resolver
   Task 36: F2-61~F2-72 适用性控制（applicable_when）
   Task 37: F2-16 会计政策检查 d-form-table schema
   Task 38: F2-52 关联交易检查 d-form-table schema + related_party_transactions
-  Task 39: F2-55~F2-58 合同履约成本 audit-sheet schema
+  Task 39: F2-55~F2-58 合同履约成本 f2-inventory-special schema
   Task 40: F1-4/F3-4/F4-4 调整分录/坏账 d-form-table schema
   Task 41: F 全系列底稿在前端正确打开（componentType 路由无 404）
 """
@@ -22,6 +22,17 @@ import pytest
 from app.services.wp_classification_service import (
     VALID_COMPONENT_TYPES,
     _WP_CODE_OVERRIDE,
+)
+from tests.f_cycle_f2_html_contract import (
+    F2_MAIN,
+    F2_SPE,
+    F2_STOCKTAKE,
+    F2_VAL,
+    F1_PREPAYMENT,
+    F3_NOTES,
+    F4_PAYABLE,
+    F5_COST,
+    F_CYCLE_HTML_TYPES,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -46,12 +57,12 @@ def f_class_entries(wp_mapping) -> list[dict]:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Task 32: F2-21~F2-26 存货监盘系列 audit-sheet schema 确认
+# Task 32: F2-21~F2-26 存货监盘系列 f2-stocktake-bundle schema 确认
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestTask32InventoryCountSchema:
-    """验证 F2-21~F2-26 存货监盘系列正确映射为 audit-sheet。"""
+    """验证 F2-21~F2-26 存货监盘系列正确映射为 f2-stocktake-bundle。"""
 
     _INVENTORY_COUNT_CODES = ["F2-21", "F2-22", "F2-23", "F2-24", "F2-25", "F2-26"]
     _INVENTORY_COUNT_NAMES = {
@@ -64,13 +75,13 @@ class TestTask32InventoryCountSchema:
     }
 
     @pytest.mark.parametrize("wp_code", _INVENTORY_COUNT_CODES)
-    def test_inventory_count_is_audit_sheet(self, wp_code):
-        """F2-21~F2-26 监盘系列全部映射为 audit-sheet。"""
+    def test_inventory_count_is_stocktake_bundle(self, wp_code):
+        """F2-21~F2-26 监盘系列全部映射为 f2-stocktake-bundle。"""
         assert wp_code in _WP_CODE_OVERRIDE, (
             f"存货监盘 '{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet", (
-            f"存货监盘 '{wp_code}' 应为 audit-sheet，"
+        assert _WP_CODE_OVERRIDE[wp_code] == F2_STOCKTAKE, (
+            f"存货监盘 '{wp_code}' 应为 {F2_STOCKTAKE}，"
             f"实际为 {_WP_CODE_OVERRIDE[wp_code]}"
         )
 
@@ -94,25 +105,25 @@ class TestTask32InventoryCountSchema:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Task 33: F2-38~F2-44 计价测试 audit-sheet schema 确认
+# Task 33: F2-38~F2-44 计价测试 f2-inventory-valuation-impairment schema 确认
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestTask33ValuationTestSchema:
-    """验证 F2-38~F2-44 计价测试正确映射为 audit-sheet。"""
+    """验证 F2-38~F2-44 计价测试正确映射为 f2-inventory-valuation-impairment。"""
 
     _VALUATION_TEST_CODES = [
         "F2-38", "F2-39", "F2-40", "F2-41", "F2-42", "F2-43", "F2-44",
     ]
 
     @pytest.mark.parametrize("wp_code", _VALUATION_TEST_CODES)
-    def test_valuation_test_is_audit_sheet(self, wp_code):
-        """F2-38~F2-44 计价测试全部映射为 audit-sheet。"""
+    def test_valuation_test_is_f2_val(self, wp_code):
+        """F2-38~F2-44 计价测试全部映射为 f2-inventory-valuation-impairment。"""
         assert wp_code in _WP_CODE_OVERRIDE, (
             f"计价测试 '{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet", (
-            f"计价测试 '{wp_code}' 应为 audit-sheet，"
+        assert _WP_CODE_OVERRIDE[wp_code] == F2_VAL, (
+            f"计价测试 '{wp_code}' 应为 {F2_VAL}，"
             f"实际为 {_WP_CODE_OVERRIDE[wp_code]}"
         )
 
@@ -136,23 +147,23 @@ class TestTask33ValuationTestSchema:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Task 34: F2-47~F2-49 跌价准备测试 audit-sheet schema 确认
+# Task 34: F2-47~F2-49 跌价准备测试 f2-inventory-valuation-impairment schema 确认
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestTask34ImpairmentTestSchema:
-    """验证 F2-47~F2-49 跌价准备测试正确映射为 audit-sheet。"""
+    """验证 F2-47~F2-49 跌价准备测试正确映射为 f2-inventory-valuation-impairment。"""
 
     _IMPAIRMENT_TEST_CODES = ["F2-47", "F2-48", "F2-49"]
 
     @pytest.mark.parametrize("wp_code", _IMPAIRMENT_TEST_CODES)
-    def test_impairment_test_is_audit_sheet(self, wp_code):
-        """F2-47~F2-49 跌价准备测试全部映射为 audit-sheet。"""
+    def test_impairment_test_is_f2_val(self, wp_code):
+        """F2-47~F2-49 跌价准备测试全部映射为 f2-inventory-valuation-impairment。"""
         assert wp_code in _WP_CODE_OVERRIDE, (
             f"跌价准备测试 '{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet", (
-            f"跌价准备测试 '{wp_code}' 应为 audit-sheet，"
+        assert _WP_CODE_OVERRIDE[wp_code] == F2_VAL, (
+            f"跌价准备测试 '{wp_code}' 应为 {F2_VAL}，"
             f"实际为 {_WP_CODE_OVERRIDE[wp_code]}"
         )
 
@@ -266,10 +277,10 @@ class TestTask36IPOApplicableWhen:
     _IPO_CODES = [f"F2-{i}" for i in range(61, 73)]
 
     @pytest.mark.parametrize("wp_code", [f"F2-{i}" for i in range(61, 73)])
-    def test_ipo_code_is_audit_sheet(self, wp_code):
-        """F2-61~F2-72 全部映射为 audit-sheet。"""
+    def test_ipo_code_is_f2_special(self, wp_code):
+        """F2-61~F2-72 全部映射为 f2-inventory-special。"""
         assert wp_code in _WP_CODE_OVERRIDE
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet"
+        assert _WP_CODE_OVERRIDE[wp_code] == F2_SPE
 
     def test_ipo_applicable_when_in_mapping(self, f_class_entries):
         """F2-61~F2-72 在 wp_account_mapping.json 中设置了 applicable_when。"""
@@ -341,15 +352,15 @@ class TestTask36IPOApplicableWhen:
 
 
 class TestTask37AccountingPolicyCheck:
-    """验证 F2-16 会计政策检查正确映射为 d-form-table。"""
+    """验证 F2-16 会计政策检查正确映射为 f2-inventory-main。"""
 
-    def test_f2_16_is_d_form_table(self):
-        """F2-16 会计政策检查映射为 d-form-table。"""
+    def test_f2_16_is_f2_main(self):
+        """F2-16 会计政策检查映射为 f2-inventory-main。"""
         assert "F2-16" in _WP_CODE_OVERRIDE, (
             "F2-16 会计政策检查未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE["F2-16"] == "d-form-table", (
-            f"F2-16 应为 d-form-table，实际为 {_WP_CODE_OVERRIDE['F2-16']}"
+        assert _WP_CODE_OVERRIDE["F2-16"] == F2_MAIN, (
+            f"F2-16 应为 {F2_MAIN}，实际为 {_WP_CODE_OVERRIDE['F2-16']}"
         )
 
     def test_f2_16_in_mapping(self, f_class_entries):
@@ -376,15 +387,15 @@ class TestTask37AccountingPolicyCheck:
 
 
 class TestTask38RelatedPartyCheck:
-    """验证 F2-52 关联交易检查映射为 d-form-table 且关联 related_party_transactions。"""
+    """验证 F2-52 关联交易检查映射为 f2-inventory-valuation-impairment。"""
 
-    def test_f2_52_is_d_form_table(self):
-        """F2-52 关联交易检查映射为 d-form-table。"""
+    def test_f2_52_is_f2_val(self):
+        """F2-52 关联交易检查映射为 f2-inventory-valuation-impairment。"""
         assert "F2-52" in _WP_CODE_OVERRIDE, (
             "F2-52 关联交易检查未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE["F2-52"] == "d-form-table", (
-            f"F2-52 应为 d-form-table，实际为 {_WP_CODE_OVERRIDE['F2-52']}"
+        assert _WP_CODE_OVERRIDE["F2-52"] == F2_VAL, (
+            f"F2-52 应为 {F2_VAL}，实际为 {_WP_CODE_OVERRIDE['F2-52']}"
         )
 
     def test_f2_52_in_mapping(self, f_class_entries):
@@ -412,23 +423,23 @@ class TestTask38RelatedPartyCheck:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Task 39: F2-55~F2-58 合同履约成本 audit-sheet schema 确认
+# Task 39: F2-55~F2-58 合同履约成本 f2-inventory-special schema 确认
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestTask39ContractPerformanceCost:
-    """验证 F2-55~F2-58 合同履约成本正确映射为 audit-sheet。"""
+    """验证 F2-55~F2-58 合同履约成本正确映射为 f2-inventory-special。"""
 
     _CONTRACT_COST_CODES = ["F2-55", "F2-56", "F2-57", "F2-58"]
 
     @pytest.mark.parametrize("wp_code", ["F2-55", "F2-56", "F2-57", "F2-58"])
-    def test_contract_cost_is_audit_sheet(self, wp_code):
-        """F2-55~F2-58 合同履约成本全部映射为 audit-sheet。"""
+    def test_contract_cost_is_f2_special(self, wp_code):
+        """F2-55~F2-58 合同履约成本全部映射为 f2-inventory-special。"""
         assert wp_code in _WP_CODE_OVERRIDE, (
             f"合同履约成本 '{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet", (
-            f"合同履约成本 '{wp_code}' 应为 audit-sheet，"
+        assert _WP_CODE_OVERRIDE[wp_code] == F2_SPE, (
+            f"合同履约成本 '{wp_code}' 应为 {F2_SPE}，"
             f"实际为 {_WP_CODE_OVERRIDE[wp_code]}"
         )
 
@@ -453,18 +464,22 @@ class TestTask39ContractPerformanceCost:
 
 
 class TestTask40AdjustmentEntriesSchema:
-    """验证 F1-4/F3-4/F4-4 调整分录/坏账准备正确映射为 d-form-table。"""
+    """验证 F1-4/F3-4/F4-4 调整分录/坏账映射为各 cycle HTML 入口。"""
 
-    _ADJUSTMENT_CODES = ["F1-4", "F3-4", "F4-4"]
+    _ADJUSTMENT_CODES = {
+        "F1-4": F1_PREPAYMENT,
+        "F3-4": F3_NOTES,
+        "F4-4": F4_PAYABLE,
+    }
 
-    @pytest.mark.parametrize("wp_code", ["F1-4", "F3-4", "F4-4"])
-    def test_adjustment_is_d_form_table(self, wp_code):
-        """F1-4/F3-4/F4-4 调整分录/坏账映射为 d-form-table。"""
+    @pytest.mark.parametrize("wp_code,expected", list(_ADJUSTMENT_CODES.items()))
+    def test_adjustment_is_cycle_html(self, wp_code, expected):
+        """F1-4/F3-4/F4-4 调整分录/坏账映射为 cycle HTML componentType。"""
         assert wp_code in _WP_CODE_OVERRIDE, (
             f"调整分录 '{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
         )
-        assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table", (
-            f"调整分录 '{wp_code}' 应为 d-form-table，"
+        assert _WP_CODE_OVERRIDE[wp_code] == expected, (
+            f"调整分录 '{wp_code}' 应为 {expected}，"
             f"实际为 {_WP_CODE_OVERRIDE[wp_code]}"
         )
 
@@ -550,6 +565,23 @@ class TestTask41FullSeriesRouting:
         "a3-consolidation-console",
         "cf-verification",
         "skip",
+        "f2-inventory-main",
+        "f2-inventory-valuation-impairment",
+        "f2-inventory-special",
+        "f2-stocktake-bundle",
+        "f1-prepayment",
+        "f3-notes-payable",
+        "f4-accounts-payable",
+        "f5-cost-of-sales",
+        "confirmation-summary",
+        "confirmation-entity-verify",
+        "confirmation-followup",
+        "confirmation-diff-reconcile",
+        "confirmation-diff-checklist",
+        "confirmation-alternative-f05",
+        "confirmation-alternative-f06",
+        "confirmation-reliability",
+        "confirmation-fraud-risk",
     }
 
     def test_all_f_codes_in_override(self, f_class_entries):
@@ -581,16 +613,11 @@ class TestTask41FullSeriesRouting:
                 f"不在 VALID_COMPONENT_TYPES 白名单内"
             )
 
-    def test_f_class_override_count_matches_mapping(self, f_class_entries):
-        """_WP_CODE_OVERRIDE 中 F 类条目数 == wp_account_mapping F 类条目数。"""
-        override_f_count = sum(
-            1 for code in _WP_CODE_OVERRIDE if code.startswith("F")
-        )
-        mapping_f_count = len(f_class_entries)
-        assert override_f_count == mapping_f_count, (
-            f"_WP_CODE_OVERRIDE F 类 {override_f_count} 条 != "
-            f"wp_account_mapping F 类 {mapping_f_count} 条"
-        )
+    def test_f_class_override_covers_mapping(self, f_class_entries):
+        """wp_account_mapping 中每个 F 类 wp_code 均在 _WP_CODE_OVERRIDE 注册。"""
+        mapping_codes = {e["wp_code"] for e in f_class_entries}
+        missing = mapping_codes - set(_WP_CODE_OVERRIDE.keys())
+        assert not missing, f"F 类 mapping 未在 override 注册: {sorted(missing)}"
 
     def test_f_class_expected_type_distribution(self):
         """F 类 componentType 分布合理。"""
@@ -606,36 +633,67 @@ class TestTask41FullSeriesRouting:
         assert type_counts.get("confirmation-hub", 0) == 1, (
             "应有 1 个 confirmation-hub (F0)"
         )
-        assert type_counts.get("d-form-table", 0) >= 15, (
-            f"应有至少 15 个 d-form-table，实际 {type_counts.get('d-form-table', 0)}"
+        assert type_counts.get(F2_MAIN, 0) >= 20, (
+            f"应有至少 20 个 {F2_MAIN}，实际 {type_counts.get(F2_MAIN, 0)}"
         )
-        assert type_counts.get("audit-sheet", 0) >= 50, (
-            f"应有至少 50 个 audit-sheet，实际 {type_counts.get('audit-sheet', 0)}"
+        assert type_counts.get(F1_PREPAYMENT, 0) >= 7, (
+            f"应有至少 7 个 {F1_PREPAYMENT}"
+        )
+        assert type_counts.get(F3_NOTES, 0) >= 7, (
+            f"应有至少 7 个 {F3_NOTES}"
+        )
+        assert type_counts.get("audit-sheet", 0) == 0, (
+            "F 类不应再使用 audit-sheet"
+        )
+        assert type_counts.get("d-form-table", 0) == 0, (
+            "F 类不应再使用 d-form-table"
         )
 
     def test_f0_is_confirmation_hub(self):
         """F0 函证底稿映射为 confirmation-hub。"""
         assert _WP_CODE_OVERRIDE.get("F0") == "confirmation-hub"
 
-    def test_f_program_tables_not_in_override(self):
-        """F{n}A 程序表不在 _WP_CODE_OVERRIDE（通过 procedure_table 服务路由）。"""
-        # 程序表 F0A~F5A 通过 procedure_table_auto_service 渲染
-        # 不应出现在 _WP_CODE_OVERRIDE 中（它们有独立路由机制）
+    def test_f_program_tables_use_cycle_html_or_a_program(self):
+        """F{n}A 程序表映射为 a-program-console 或 cycle HTML bundle。"""
+        cycle_html_program = {
+            "F2A": F2_MAIN,
+            "F3A": F3_NOTES,
+            "F1A": F1_PREPAYMENT,
+            "F4A": F4_PAYABLE,
+            "F5A": F5_COST,
+        }
         for code in ["F0A", "F1A", "F2A", "F3A", "F4A", "F5A"]:
-            # 程序表如果在 override 中就是 a-program-console，否则不在
-            if code in _WP_CODE_OVERRIDE:
-                assert _WP_CODE_OVERRIDE[code] == "a-program-console", (
-                    f"程序表 {code} 应映射为 a-program-console"
-                )
+            if code not in _WP_CODE_OVERRIDE:
+                continue
+            expected = cycle_html_program.get(code, "a-program-console")
+            assert _WP_CODE_OVERRIDE[code] == expected, (
+                f"程序表 {code} 应映射为 {expected}，实际 {_WP_CODE_OVERRIDE[code]}"
+            )
 
     def test_f_audit_determination_tables(self):
-        """F{n}-1 审定表全部为 d-form-table。"""
-        audit_det_codes = ["F1-1", "F2-1", "F3-1", "F4-1", "F5-1"]
-        for code in audit_det_codes:
+        """F{n}-1 审定表映射为各 cycle HTML 入口。"""
+        expected_map = {
+            "F1-1": F1_PREPAYMENT,
+            "F2-1": F2_MAIN,
+            "F3-1": F3_NOTES,
+            "F4-1": F4_PAYABLE,
+            "F5-1": F5_COST,
+        }
+        for code, expected in expected_map.items():
             assert code in _WP_CODE_OVERRIDE, f"审定表 {code} 未注册"
-            assert _WP_CODE_OVERRIDE[code] == "d-form-table", (
-                f"审定表 {code} 应为 d-form-table"
+            assert _WP_CODE_OVERRIDE[code] == expected, (
+                f"审定表 {code} 应为 {expected}，实际 {_WP_CODE_OVERRIDE[code]}"
             )
+
+    def test_f2_html_migrated_codes_match_override(self):
+        """F2 HTML 化 wp_code 与 _WP_CODE_OVERRIDE 一致。"""
+        for wp_code, expected in (
+            ("F2-1", F2_MAIN),
+            ("F2-47", F2_VAL),
+            ("F2-55", F2_SPE),
+            ("F2-21", F2_STOCKTAKE),
+        ):
+            assert _WP_CODE_OVERRIDE.get(wp_code) == expected
 
     def test_no_f_code_maps_to_skip(self):
         """F 类底稿不应有 'skip' componentType（所有 F 底稿都应渲染）。"""

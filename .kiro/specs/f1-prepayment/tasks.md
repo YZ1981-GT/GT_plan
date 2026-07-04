@@ -42,8 +42,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将F1/F1-1/F1-2/F1-3/F1-4/F1-5/F1-6/F1-7映射为'f1-prepayment'
     - 在 `VALID_COMPONENT_TYPES`（wp_classification_service.py）中注册'f1-prepayment'
     - 在 `htmlRendererRegistry.ts` 中注册 'f1-prepayment' → GtF1Prepayment 映射
@@ -56,8 +56,8 @@
     - wp_code_overrides契约验证F1/F1-1~F1-7共8个映射
     - _Requirements: 1.5, 1.6, 1.7_
 
-- [ ] 2. 实现共享公式引擎 useF1FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useF1FormulaEngine.ts`，实现全部纯函数
+- [x] 2. 实现共享公式引擎 useF1FormulaEngine.ts
+  - [x] 2.1 创建 `composables/useF1FormulaEngine.ts`，实现全部纯函数
     - 实现 `parseNum`（安全数值解析：null/undefined/空串/NaN/Infinity → 0）
     - 实现 `calcEndUnadjustedDebit`（借方科目期末未审 = 期初审定 + 借方发生 - 贷方发生）
     - 实现 `calcAuditedAmount`（审定数 = 未审 + AJE + RJE）
@@ -413,8 +413,8 @@
     - 实现超时控制（30秒）
     - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8_
 
-- [ ] 19. 实现后端Render策略函数
-  - [ ] 19.1 创建 `backend/app/routers/wp_render_strategies/_f1_prepayment.py`
+- [x] 19. 实现后端Render策略函数
+  - [x] 19.1 创建 `backend/app/routers/wp_render_strategies/_f1_prepayment.py`
     - 实现 `render_f1_prepayment` 函数（Render策略）
     - 返回 componentType='f1-prepayment'
     - 支持 force_component_type 参数
@@ -422,7 +422,7 @@
     - _Requirements: 1.5, 1.8_
 
 - [ ] 20. 实现后端Auto Data Resolver
-  - [ ] 20.1 创建 `backend/app/routers/wp_render_strategies/_f1_resolvers.py`
+  - [x] 20.1 创建 `backend/app/services/auto_data_resolvers/_f1_prepaid.py`
     - 实现 `resolve_f1_auto_data` 函数（Auto Data Resolver）
     - 从试算平衡表自动获取科目1123数据
     - 从序时账自动获取预付账款明细数据
@@ -486,7 +486,7 @@
     - _Requirements: 22_
 
 - [ ] 27. 版本链集成
-  - [ ] 27.1 集成useVersionTrail到GtF1Prepayment主入口
+  - [x] 27.1 集成useVersionTrail到GtF1Prepayment主入口
     - import useVersionTrail composable并调用useVersionTrail(wpId)
     - 在每次save成功后调用versionTrail.autoSnapshot()
     - 工具栏右侧添加"版本历史"按钮（el-button icon="Clock"）

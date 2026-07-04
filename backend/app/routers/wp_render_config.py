@@ -65,6 +65,10 @@ _CONFIRMATION_COMPONENTS: set[str] = {
     "confirmation-diff-checklist",
     "confirmation-alternative-d05",
     "confirmation-alternative-d06",
+    "confirmation-alternative-f05",
+    "confirmation-alternative-f06",
+    "confirmation-diff-securities",
+    "confirmation-alternative-g06",
     "confirmation-reliability",
     "confirmation-fraud-risk",
 }
@@ -78,6 +82,10 @@ _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-diff-checklist": "diff-checklist-v1",
     "confirmation-alternative-d05": "alternative-d05-v1",
     "confirmation-alternative-d06": "alternative-d06-v1",
+    "confirmation-alternative-f05": "alternative-f05-v1",
+    "confirmation-alternative-f06": "alternative-f06-v1",
+    "confirmation-diff-securities": "diff-securities-v1",
+    "confirmation-alternative-g06": "alternative-g06-v1",
     "confirmation-reliability": "reliability-v1",
     "confirmation-fraud-risk": "fraud-risk-v1",
 }

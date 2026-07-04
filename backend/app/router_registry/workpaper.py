@@ -127,6 +127,24 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_render_strategies._d7_import_export import router as d7_import_export
     from app.routers.wp_render_strategies._d7_ai_generate import router as d7_ai_generate
     from app.routers.wp_render_strategies._e1_import_export import router as e1_import_export
+    from app.routers.wp_render_strategies._f1_import_export import router as f1_import_export
+    from app.routers.wp_render_strategies._f2_import_export import router as f2_import_export
+    from app.routers.wp_render_strategies._f2_inventory_main_ai import router as f2_ai_generate
+    from app.routers.wp_render_strategies._f2_contract_ocr import router as f2_contract_ocr
+    from app.routers.wp_render_strategies._f2_valuation_import_export import router as f2_val_import_export
+    from app.routers.wp_render_strategies._f2_valuation_ai import router as f2_val_ai_generate
+    from app.routers.wp_render_strategies._f2_special_import_export import router as f2_spe_import_export
+    from app.routers.wp_render_strategies._f2_stocktake_import_export import router as f2_st_import_export
+    from app.routers.wp_render_strategies._f2_stocktake_contract_ocr import router as f2_st_contract_ocr
+    from app.routers.wp_render_strategies._f2_stocktake_ai import router as f2_st_ai_generate
+    from app.routers.wp_render_strategies._f2_special_ai import router as f2_spe_ai_generate
+    from app.routers.wp_render_strategies._f2_special_contract_ocr import router as f2_spe_contract_ocr
+    from app.routers.wp_render_strategies._f2_valuation_contract_ocr import router as f2_val_contract_ocr
+    from app.routers.wp_render_strategies._f3_import_export import router as f3_import_export
+    from app.routers.wp_render_strategies._f3_notes_payable_ai import router as f3_ai_generate
+    from app.routers.wp_render_strategies._f3_contract_ocr import router as f3_contract_ocr
+    from app.routers.wp_render_strategies._f4_import_export import router as f4_import_export
+    from app.routers.wp_render_strategies._f5_import_export import router as f5_import_export
     from app.routers.issue_hints import router as issue_hints
     from app.routers.workpaper_summaries import router as workpaper_summaries
     from app.routers.wp_render_registry import router as wp_render_registry
@@ -140,11 +158,11 @@ def register_workpaper_routers(app: FastAPI) -> None:
         "生命周期": [working_paper, wp_editor, wp_batch_domain, wp_relation_domain, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review_domain, wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync, wp_onlyoffice],
-        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export],
+        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export, f1_import_export, f2_import_export, f2_val_import_export, f2_spe_import_export, f2_st_import_export, f3_import_export, f4_import_export, f5_import_export],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],
-        "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, b14_ai_generate, a171_ai_generate, a177_ai_generate, a176_docx_sync, d3_ai_generate, d4_ai_generate, d4_contract_ocr, d5_ai_generate, d6_ai_generate, d7_ai_generate],
+        "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, b14_ai_generate, a171_ai_generate, a177_ai_generate, a176_docx_sync, d3_ai_generate, d4_ai_generate, d4_contract_ocr, d5_ai_generate, d6_ai_generate, d7_ai_generate, f2_ai_generate, f2_contract_ocr, f2_val_ai_generate, f2_val_contract_ocr, f2_spe_ai_generate, f2_spe_contract_ocr, f2_st_ai_generate, f2_st_contract_ocr, f3_ai_generate, f3_contract_ocr],
         "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry],
         "科目工作包": [account_packages],
     }

@@ -7,7 +7,7 @@
 ## Tasks
 
 - [ ] 1. 注册四件套 + 后端render策略
-  - [ ] 1.1 注册componentType与wp_code映射
+  - [x] 1.1 注册componentType与wp_code映射
     - 在 `wp_code_overrides.json` 中新增7条映射（G4-9/G4-10/G4-11/G4-12/G4-13/参考-减值指引/参考-PD折算 → g4-bond-investment-ecl）
     - 在 `VALID_COMPONENT_TYPES` 中注册 'g4-bond-investment-ecl'
     - 在 `RENDERER_DISPATCH` 中注册 render_g4_bond_investment_ecl 策略函数

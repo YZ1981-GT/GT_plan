@@ -36,8 +36,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将F3A/F3-1~F3-7/附注披露(上市)/附注披露(国企)映射为'f3-notes-payable'（10个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES`（wp_classification_service.py）中注册'f3-notes-payable'
     - 在 `htmlRendererRegistry.ts` 中注册 'f3-notes-payable' → GtF3NotesPayable 映射
@@ -51,7 +51,7 @@
     - _Requirements: 1.3, 1.4, 1.5_
 
 - [ ] 2. 实现公式引擎 useF3FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useF3FormulaEngine.ts`，实现全部6个纯函数
+  - [x] 2.1 创建 `composables/useF3FormulaEngine.ts`，实现全部6个纯函数
     - 实现 `calcInterest`（应付利息 = 面值 × 利率/100 × 天数/360，面值<0或天数<0→0）
     - 实现 `calcOverdueDays`（逾期天数 = MAX(0, 当前日期timestamp - 到期日timestamp) / 86400000，取整）
     - 实现 `calcCreditBalance`（贷方余额 = 期初 + 贷方 - 借方）

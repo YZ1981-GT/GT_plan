@@ -41,8 +41,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将G1A/G1-1~G1-14/附注披露(上市)/附注披露(国企)映射为'g1-trading-financial-assets'（17个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES` 中注册'g1-trading-financial-assets'
     - 在 `htmlRendererRegistry.ts` 中注册 'g1-trading-financial-assets' → GtG1TradingFinancialAssets 映射
@@ -57,7 +57,7 @@
     - _Requirements: 1.3, 1.4, 1.5_
 
 - [ ] 2. 实现公式引擎 useG1FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useG1FormulaEngine.ts`，实现全部12个纯函数
+  - [x] 2.1 创建 `composables/useG1FormulaEngine.ts`，实现全部12个纯函数
     - 实现 `calcDebitBalance`（借方余额 = 期初 + 借方 - 贷方）
     - 实现 `calcAdjustedAmount`（审定 = 未审 + AJE + RJE）
     - 实现 `calcFairValue`（公允价值 = 数量 × 单位公允值，数量<0→0）
@@ -145,14 +145,14 @@
     - **Validates: Requirements 13.2, 3.5, 5.8**
 
 - [ ] 3. 实现 useG1FormData.ts 基础数据加载/保存
-  - [ ] 3.1 创建 `composables/useG1FormData.ts`
+  - [x] 3.1 创建 `composables/useG1FormData.ts`
     - 实现 allResponses Map加载（GET /checklist-responses）
     - 实现 saveImmediate / debouncedSave / saveBatch
     - 实现 selfLoad逻辑（htmlData为null时调render-config?force_component_type=g1-trading-financial-assets）
     - _Requirements: 1.6_
 
 - [ ] 4. 实现 core/ composable（审定表+明细表+调整）
-  - [ ] 4.1 创建 `composables/useG1Adjudication.ts`
+  - [x] 4.1 创建 `composables/useG1Adjudication.ts`
     - 定义多层结构类型（AdjudicationCategory + SubRow）
     - 5品种分组（股票/基金/债券/衍生/其他）× 3子层（成本/公允变动/处置损益）
     - 实现借方公式链：期末未审=期初审定+借方-贷方 → 审定=未审+AJE+RJE
@@ -173,7 +173,7 @@
     - _Requirements: 4.1~4.5_
 
 - [ ] 5. 实现 valuation/ + classification/ + inspection/ composable
-  - [ ] 5.1 创建 `composables/useG1FairValueTest.ts`（G1-6公允价值测试）
+  - [x] 5.1 创建 `composables/useG1FairValueTest.ts`（G1-6公允价值测试）
     - 定义 FairValueTestRow 类型（19列）
     - Level条件启用逻辑（Level1/2/3互斥启用列）
     - Level1公式：计算市值=持仓×报价, 差异=市值-账面
@@ -209,7 +209,7 @@
     - _Requirements: 12.1~12.12_
 
 - [ ] 6. 实现 Vue子组件
-  - [ ] 6.1 创建 `core/G1TabAdjudication.vue`（G1-1审定表多层结构）
+  - [x] 6.1 创建 `core/G1TabAdjudication.vue`（G1-1审定表多层结构）
     - 调用useG1Adjudication
     - 多层展开/折叠（品种→子层）+ el-table
     - 小计加粗 + 差异红色 + EventBus发布 + GtIndexChip
@@ -227,7 +227,7 @@
     - G1TabDisclosureSOE.vue
     - _Requirements: 6.1~6.4, 4.1~4.5_
 
-  - [ ] 6.4 创建 `valuation/G1TabFairValueTest.vue`（G1-6公允价值Level1-3）
+  - [x] 6.4 创建 `valuation/G1TabFairValueTest.vue`（G1-6公允价值Level1-3）
     - 调用useG1FairValueTest
     - Level下拉→条件启用/禁用列（其他Level列灰色禁用）
     - Level1公式列(市值+差异)虚线+tooltip
@@ -274,7 +274,7 @@
 
 - [ ] 9. 跨模块联动集成
   - [ ] 9.1 版本链集成
-    - 主入口集成useVersionTrail（autoSnapshot on save + "版本历史"按钮 + GtWpVersionTrail drawer）
+    - [x] 主入口集成useVersionTrail（autoSnapshot on save + "版本历史"按钮 + GtWpVersionTrail drawer）
     - provide('openReviewDialog', openReviewDialog)供子组件inject
     - _Requirements: 14.1, 14.5_
 

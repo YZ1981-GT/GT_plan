@@ -6,8 +6,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将G14A/G14-1/G14-2/G14-3/附注披露(上市)/附注披露(国企)/底稿目录映射为'g14-credit-impairment-loss'（7个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES` 中注册'g14-credit-impairment-loss'
     - 在 `htmlRendererRegistry.ts` 中注册 'g14-credit-impairment-loss' → GtG14CreditImpairmentLoss 映射
@@ -21,7 +21,7 @@
     - _Requirements: 1.3_
 
 - [ ] 2. 实现公式引擎 useG14FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useG14FormulaEngine.ts`，实现6个纯函数+parseNum
+  - [x] 2.1 创建 `composables/useG14FormulaEngine.ts`，实现6个纯函数+parseNum
     - 实现 `parseNum(v: unknown): number` — null/undefined/NaN/''→0
     - 实现 `calcAdjustedAmount(unadjusted, adjustment): number` — 审定=未审+调整
     - 实现 `calcNetImpairmentLoss(provision, reversal): number` — 净信用减值损失=计提-转回

@@ -61,6 +61,25 @@ class ReviewMessage(Base):
     reason_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     message_version: Mapped[int] = mapped_column(sa.Integer, server_default=text("1"))
     mentions: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # V095 扩展列 — schema漂移修复
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    sender_role: Mapped[str] = mapped_column(String(50), server_default=text("'assistant'"), nullable=False)
+
+
+class ReviewThread(Base):
+    """V095: 复核对话线程 — 每个底稿区域一个线程"""
+
+    __tablename__ = "review_threads"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    wp_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("working_paper.id"), nullable=False)
+    section_id: Mapped[str] = mapped_column(String(50), nullable=False)
+    thread_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'open'"), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
 
 
 # ── 论坛 ──────────────────────────────────────────────────

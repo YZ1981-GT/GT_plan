@@ -33,8 +33,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和overrides映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和overrides映射
     - 在 `wp_code_overrides.json` 中添加G0→confirmation-hub, G0A→a-program-console, G0-1→confirmation-summary, G0-2→confirmation-entity-verify, G0-3→confirmation-followup, G0-3S→confirmation-diff-securities, G0-4→confirmation-diff-reconcile, G0-6→confirmation-alternative-g06, G0-7→confirmation-reliability, G0-8→confirmation-fraud-risk（10条）
     - 在 `VALID_COMPONENT_TYPES` 中注册 'confirmation-diff-securities' 和 'confirmation-alternative-g06'
     - 在 `htmlRendererRegistry.ts` 中注册两个新componentType→Vue组件映射
@@ -42,14 +42,14 @@
     - 更新 account_package_registry.json 添加G0包（9 sheets按模板顺序）
     - _Requirements: 1.1~1.3, 4.1~4.5_
 
-  - [ ]* 1.2 编写注册契约测试
+  - [x]* 1.2 编写注册契约测试
     - htmlRendererRegistry.spec.ts 验证2个新componentType已注册
     - VALID_COMPONENT_TYPES契约验证
     - wp_code_overrides契约验证10条G0映射
     - _Requirements: 4.3, 4.4_
 
-- [ ] 2. 实现公式引擎 useG0FormulaEngine.ts
-  - [ ] 2.1 创建 `g0-confirmation/composables/useG0FormulaEngine.ts`，实现全部6个纯函数
+- [x] 2. 实现公式引擎 useG0FormulaEngine.ts
+  - [x] 2.1 创建 `g0-confirmation/composables/useG0FormulaEngine.ts`，实现全部6个纯函数
     - 实现 `calcQuantityDiff`（数量差异 = 回函持仓 - 账面持仓）
     - 实现 `calcFairValueDiff`（公允价值差异 = 回函公允值 - 账面公允值）
     - 实现 `calcMarketValueDiff`（市值差异 = 回函总市值 - 账面总市值）
@@ -106,8 +106,8 @@
     - **Property 8: 手续费越高→处置损益越低**
     - **Validates: Requirements 7.4**
 
-- [ ] 3. 实现 composable 数据管理
-  - [ ] 3.1 创建 `g0-confirmation/composables/useDiffSecuritiesData.ts`
+- [x] 3. 实现 composable 数据管理
+  - [x] 3.1 创建 `g0-confirmation/composables/useDiffSecuritiesData.ts`
     - Master-Detail结构（证券列表→选中证券→明细核对行）
     - 定义 SecuritiesDiffRow 类型（17列）
     - 实现CRUD + 差异公式自动计算 + 汇总统计
@@ -115,7 +115,7 @@
     - 实现loadAll/persistAll/序列化/反序列化
     - _Requirements: 2.1~2.12, 5.1_
 
-  - [ ] 3.2 创建 `g0-confirmation/composables/useAlternativeG06Data.ts`
+  - [x] 3.2 创建 `g0-confirmation/composables/useAlternativeG06Data.ts`
     - Master-Detail结构（投资项目列表→选中项目→4区块检查表）
     - 定义4区块行类型（HoldingCheckRow/DividendEvidenceRow/DisposalEvidenceRow/FairValueEvidenceRow）
     - 实现4区块独立CRUD + 各区块合计行
@@ -124,8 +124,8 @@
     - 实现loadAll/persistAll/序列化/反序列化
     - _Requirements: 3.1~3.13, 5.2_
 
-- [ ] 4. 实现 Vue 组件
-  - [ ] 4.1 创建 `GtConfirmationDiffSecurities.vue`（G0-3证券差异核对）
+- [x] 4. 实现 Vue 组件
+  - [x] 4.1 创建 `GtConfirmationDiffSecurities.vue`（G0-3证券差异核对）
     - 调用useDiffSecuritiesData
     - Master区（左侧证券列表 / el-select切换）
     - 差异汇总区（顶部卡片）
@@ -136,7 +136,7 @@
     - UI铁律：13px/公式列虚线/min-width/AI+复核按钮右对齐
     - _Requirements: 2.1~2.12_
 
-  - [ ] 4.2 创建 `GtConfirmationAlternativeG06.vue`（G0-6替代程序）
+  - [x] 4.2 创建 `GtConfirmationAlternativeG06.vue`（G0-6替代程序）
     - 调用useAlternativeG06Data
     - Master区（左侧投资项目列表 / el-select切换）
     - 余额汇总区 + 抽样参数区

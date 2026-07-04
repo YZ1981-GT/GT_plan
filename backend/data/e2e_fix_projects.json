@@ -1,5 +1,17 @@
 {
   "year": 2025,
+  "f2_e2e_wp_codes": [
+    "F2-1",
+    "F2-21",
+    "F2-22",
+    "F2-23",
+    "F2-24",
+    "F2-25",
+    "F2-26",
+    "F2-47",
+    "F2-55",
+    "F2-70"
+  ],
   "fixtures": {
     "FIX-B": {
       "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
@@ -18,9 +30,9 @@
       "warnings": []
     },
     "FIX-INT": {
-      "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
-      "project_name": "重庆和平药房连锁有限责任公司_2025",
-      "business_category": "A1",
+      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+      "project_name": "重药控股安徽有限公司_2025",
+      "business_category": "C",
       "ready": true,
       "missing_wp_codes": [],
       "warnings": []
@@ -32,14 +44,23 @@
       "ready": true,
       "missing_wp_codes": [],
       "warnings": []
+    },
+    "FIX-F": {
+      "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+      "project_name": "重庆和平药房连锁有限责任公司_2025",
+      "business_category": "IPO",
+      "ready": true,
+      "missing_wp_codes": [],
+      "warnings": []
     }
   },
   "env": {
     "TEST_PROJECT_ID": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_A": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_B": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
-    "TEST_PROJECT_ID_FIX_INT": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "TEST_PROJECT_ID_FIX_INT": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
     "TEST_PROJECT_ID_FIX_RP": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "TEST_PROJECT_ID_FIX_F": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "RUN_FULL_E2E": "1"
   },
   "playwright_hint": "set RUN_FULL_E2E=1 && set TEST_PROJECT_ID=<FIX-B或FIX-A ID> && npx playwright test e2e/"

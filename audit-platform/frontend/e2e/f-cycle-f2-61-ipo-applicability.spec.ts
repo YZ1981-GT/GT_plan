@@ -4,8 +4,8 @@
  * 锚定 spec f-cycle-workpapers Task 57
  *
  * 验证 F2-61 IPO 底稿适用性控制：
- * 1. F2-61 底稿存在且 render-config 返回 audit-sheet
- * 2. F2-61~F2-72 IPO 系列全部为 audit-sheet
+ * 1. F2-61 底稿存在且 render-config 返回 f2-inventory-special
+ * 2. F2-61~F2-72 IPO 系列全部为 f2-inventory-special
  * 3. 普通年审项目中 F2-61~F2-72 应标记为不适用
  * 4. render-config 应包含 applicable_when 或 applicability 字段
  *
@@ -42,7 +42,7 @@ async function getToken(request: APIRequestContext): Promise<string> {
 }
 
 test.describe('Task 57: F2-61 IPO 底稿适用性灰显（普通年审项目）', () => {
-  test('57.1 — F2-61 底稿存在且为 audit-sheet', async ({ request }) => {
+  test('57.1 — F2-61 底稿存在且为 f2-inventory-special', async ({ request }) => {
     test.setTimeout(20_000)
     const token = await getToken(request)
 
@@ -57,10 +57,10 @@ test.describe('Task 57: F2-61 IPO 底稿适用性灰显（普通年审项目）'
     const rcBody = await rcResp.json()
     const rcData = rcBody?.data || rcBody
     const componentType = rcData.component_type || rcData.componentType
-    expect(componentType).toBe('audit-sheet')
+    expect(componentType).toBe('f2-inventory-special')
   })
 
-  test('57.2 — F2-61~F2-72 IPO 系列全部为 audit-sheet', async ({ request }) => {
+  test('57.2 — F2-61~F2-72 IPO 系列全部为 f2-inventory-special', async ({ request }) => {
     test.setTimeout(60_000)
     const token = await getToken(request)
 
@@ -76,7 +76,7 @@ test.describe('Task 57: F2-61 IPO 底稿适用性灰显（普通年审项目）'
           const rcBody = await rcResp.json()
           const rcData = rcBody?.data || rcBody
           const ct = rcData.component_type || rcData.componentType
-          expect(ct, `${code} 应为 audit-sheet`).toBe('audit-sheet')
+          expect(ct, `${code} 应为 f2-inventory-special`).toBe('f2-inventory-special')
         }
       }
     }

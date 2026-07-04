@@ -51,7 +51,7 @@ const props = defineProps<Props>()
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
 const emit = defineEmits<{
-  (e: 'filled', payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void
+  (e: 'filled', payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode; method?: SamplingMethod }): void
   (e: 'phase-changed', payload: { phase: Phase }): void
 }>()
 
@@ -157,6 +157,7 @@ async function handleConfirmFill() {
       samples: result,
       phase: props.phase,
       fillMode: isFillModeRestricted.value ? 'append' : fillMode.value,
+      method: config.value.samplingMethod,
     })
     // 检查合规性
     checkCompliance()
@@ -284,7 +285,7 @@ const amountCoverageDisplay = computed(() => {
       stripe
       size="small"
       class="sampling-table"
-      empty-text="暂无抽凭数据，请点击"自动抽凭"开始"
+      empty-text='暂无抽凭数据，请点击「自动抽凭」开始'
     >
       <el-table-column prop="voucherNo" label="凭证号" min-width="100" show-overflow-tooltip />
       <el-table-column prop="voucherDate" label="日期" min-width="100" show-overflow-tooltip />

@@ -1,126 +1,177 @@
+<template>
+  <div class="f2-stocktake-bundle">
+    <div v-if="isLoading" class="loading"><el-skeleton :rows="6" animated /></div>
+    <template v-else>
+      <div class="toolbar">
+        <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions" size="small" @change="dualMode.onModeChange" />
+        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="projectId"
+        :sheet-name="props.sheetName || activeTab"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
+      <template v-else-if="singleSheetMode">
+        <component
+          :is="tabComponent(activeTab)"
+          :wp-id="props.wpId"
+          :project-id="projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+      </template>
+
+      <el-tabs v-else v-model="activeTab" class="stocktake-tabs">
+        <el-tab-pane label="监盘程序表" name="program" lazy>
+          <GtAProgramConsole
+            v-if="activeTab === 'program'"
+            :wp-id="props.wpId"
+            sheet-name="F2-21A"
+            :schema="{ columns: [], rows: [] }"
+            :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
+            :readonly="isReadonly"
+          />
+        </el-tab-pane>
+        <el-tab-pane v-for="t in dataTabs" :key="t.id" :label="t.label" :name="t.id" lazy>
+          <component
+            :is="tabComponent(t.id)"
+            v-if="activeTab === t.id"
+            :wp-id="props.wpId"
+            :project-id="projectId"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+          />
+        </el-tab-pane>
+      </el-tabs>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="projectId" />
+      <GtReviewDialog
+        v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
+        :key="reviewDialog.activationParams.value.sectionId"
+        v-bind="reviewDialog.activationParams.value"
+        @closed="reviewDialog.closeReviewDialog"
+      />
+    </template>
+  </div>
+</template>
+
 <script setup lang="ts">
 /**
- * GtF2StocktakeBundle — F2 存货监盘统一入口 (7 Tab)
- *
- * Tab 结构：程序表 F2-21A | 盘点问卷 F2-21 | 监盘计划 F2-22 |
- *           监盘小结 F2-23 | 账面核对 F2-24 | 抽盘汇总 F2-25 | 倒轧表 F2-26
- *
- * 子底稿使用 GtOnlyOfficeSheet 在线编辑（复杂 Excel 表格最适合原样编辑）。
- * 模式参照：GtB2Bundle
+ * GtF2StocktakeBundle — F2 存货监盘 HTML 入口 (F2-21A + F2-21~26)
  */
-import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, type Component } from 'vue'
 import { useRoute } from 'vue-router'
-import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
+import { useF2StocktakeFormData, type ChecklistResponse } from './composables/useF2StocktakeFormData'
+import { useF2StocktakeDualMode } from './composables/useF2StocktakeDualMode'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
+import F2TabStocktakeQuestionnaire from './f2/stocktake/F2TabStocktakeQuestionnaire.vue'
+import F2TabStocktakePlan from './f2/stocktake/F2TabStocktakePlan.vue'
+import F2TabStocktakeSummary from './f2/stocktake/F2TabStocktakeSummary.vue'
+import F2TabStocktakeReconcile from './f2/stocktake/F2TabStocktakeReconcile.vue'
+import F2TabStocktakeSampleResult from './f2/stocktake/F2TabStocktakeSampleResult.vue'
+import F2TabStocktakeRollforward from './f2/stocktake/F2TabStocktakeRollforward.vue'
 import GtAProgramConsole from './GtAProgramConsole.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 
 const props = defineProps<{
   wpId: string
   projectId?: string
+  wpCode?: string
   sheetName?: string
   readonly?: boolean
 }>()
 
 const route = useRoute()
-const active = ref('program')
-const wpIndex = ref<WpIndexItem[]>([])
-const loading = ref(false)
-
-const TABS = [
-  { id: 'program', label: '监盘程序表', wpCode: null },
-  { id: 'F2-21', label: '盘点计划问卷', wpCode: 'F2-21' },
-  { id: 'F2-22', label: '监盘计划', wpCode: 'F2-22' },
-  { id: 'F2-23', label: '监盘小结', wpCode: 'F2-23' },
-  { id: 'F2-24', label: '账面核对', wpCode: 'F2-24' },
-  { id: 'F2-25', label: '抽盘汇总', wpCode: 'F2-25' },
-  { id: 'F2-26', label: '倒轧表', wpCode: 'F2-26' },
-]
-
+const isLoading = ref(true)
+const isReadonly = computed(() => !!props.readonly)
 const projectId = computed(() => props.projectId || (route.params.projectId as string) || '')
 
-const wpIdMap = computed<Record<string, string>>(() => {
-  const map: Record<string, string> = {}
-  for (const item of wpIndex.value) {
-    if (item.wp_code && /^F2-2[1-6]$/.test(item.wp_code)) {
-      map[item.wp_code] = (item as any).wp_id || item.id
-    }
-  }
-  return map
+const formData = useF2StocktakeFormData({
+  wpId: toRef(props, 'wpId'),
+  projectId,
 })
 
-const visibleTabs = computed(() =>
-  TABS.filter(t => t.wpCode === null || !!wpIdMap.value[t.wpCode!])
-)
+const allResponses = computed(() => formData.allResponses.value)
 
-// sheetName 路由
-watch(() => props.sheetName, (v) => {
-  if (v && visibleTabs.value.some(t => t.id === v)) active.value = v
-})
-watch(() => route.query.sheet as string | undefined, (v) => {
-  if (v && visibleTabs.value.some(t => t.id === v)) active.value = v
+const dualMode = useF2StocktakeDualMode({
+  wpId: toRef(props, 'wpId'),
+  reloadAll: () => formData.loadAll(),
 })
 
-onMounted(async () => {
-  loading.value = true
-  try {
-    if (projectId.value) {
-      wpIndex.value = await getWpIndex(projectId.value)
-    }
-  } catch {
-    wpIndex.value = []
-  } finally {
-    loading.value = false
+const versionToolbar = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId,
+})
+const { versionTrailRef } = versionToolbar
+
+const wpIdRef = toRef(props, 'wpId')
+const reviewDialog = useF2ReviewDialogProvide({ wpId: wpIdRef, projectId })
+
+provide('reloadWorkpaperData', () => formData.loadAll())
+
+const dataTabs = [
+  { id: 'F2-21', label: '盘点问卷' },
+  { id: 'F2-22', label: '监盘计划' },
+  { id: 'F2-23', label: '监盘小结' },
+  { id: 'F2-24', label: '账面核对' },
+  { id: 'F2-25', label: '抽盘汇总' },
+  { id: 'F2-26', label: '倒轧表' },
+]
+
+const currentSheet = computed(() => {
+  const name = props.sheetName || props.wpCode || ''
+  const m = name.match(/(F2-21A|F2-2[1-6])/)
+  return m ? m[1] : 'F2-21A'
+})
+
+const singleSheetMode = computed(() => /^F2-2[1-6]$/.test(currentSheet.value))
+
+const activeTab = ref(singleSheetMode.value ? currentSheet.value : 'program')
+
+function tabComponent(id: string): Component {
+  const map: Record<string, Component> = {
+    'F2-21': F2TabStocktakeQuestionnaire,
+    'F2-22': F2TabStocktakePlan,
+    'F2-23': F2TabStocktakeSummary,
+    'F2-24': F2TabStocktakeReconcile,
+    'F2-25': F2TabStocktakeSampleResult,
+    'F2-26': F2TabStocktakeRollforward,
   }
-  const sheet = props.sheetName || (route.query.sheet as string)
-  if (sheet && visibleTabs.value.some(t => t.id === sheet)) {
-    active.value = sheet
+  return map[id] || F2TabStocktakeQuestionnaire
+}
+
+async function handleSave(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length) {
+    await formData.saveItemsFromEvent(items)
+    versionToolbar.scheduleAutoSnapshot()
   }
+}
+
+onMounted(() => {
+  window.addEventListener('f2-stocktake:save-items', handleSave)
+  void formData.loadAll().finally(() => { isLoading.value = false })
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('f2-stocktake:save-items', handleSave)
 })
 </script>
 
-<template>
-  <div class="f2-stocktake-bundle" v-loading="loading">
-    <el-tabs v-model="active">
-      <el-tab-pane
-        v-for="tab in visibleTabs"
-        :key="tab.id"
-        :label="tab.label"
-        :name="tab.id"
-        lazy
-      >
-        <!-- 程序表 -->
-        <GtAProgramConsole
-          v-if="tab.wpCode === null"
-          :wp-id="wpId"
-          :embedded="true"
-          :readonly="readonly"
-        />
-        <!-- 子底稿通过 GtOnlyOfficeSheet 在线编辑 -->
-        <GtOnlyOfficeSheet
-          v-else
-          :wp-id="wpIdMap[tab.wpCode!]"
-          :sheet-name="tab.wpCode!"
-          :readonly="readonly"
-        />
-      </el-tab-pane>
-    </el-tabs>
-  </div>
-</template>
-
 <style scoped>
-.f2-stocktake-bundle {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-.f2-stocktake-bundle :deep(.el-tabs) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-}
-.f2-stocktake-bundle :deep(.el-tabs__content) {
-  flex: 1;
-  overflow: auto;
-}
+.f2-stocktake-bundle { padding: 12px; height: 100%; display: flex; flex-direction: column; }
+.loading { padding: 24px; }
+.toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.stocktake-tabs { flex: 1; }
+.stocktake-tabs :deep(.el-tabs__content) { overflow: auto; }
 </style>

@@ -76,6 +76,37 @@ export type HtmlComponentType =
   | 'confirmation-diff-reconcile'
   | 'confirmation-alternative-d05'
   | 'confirmation-alternative-d06'
+  | 'confirmation-alternative-f05'
+  | 'confirmation-alternative-f06'
+  | 'confirmation-diff-securities'
+  | 'confirmation-alternative-g06'
+  | 'g14-credit-impairment-loss'
+  | 'g13-fair-value-changes'
+  | 'g12-net-hedge-gains'
+  | 'g11-investment-income'
+  | 'g10-trading-financial-liabilities'
+  | 'g9-other-noncurrent-financial'
+  | 'g8-other-equity-instruments'
+  | 'g7-long-term-equity-subsidiary'
+  | 'g7-long-term-equity-method'
+  | 'g7-long-term-equity-main'
+  | 'g6-other-bond-investment-ecl'
+  | 'g6-other-bond-investment-sppi'
+  | 'g6-other-bond-investment-main'
+  | 'g5-long-term-receivable'
+  | 'g4-bond-investment-ecl'
+  | 'g4-bond-investment-sppi'
+  | 'g4-bond-investment-main'
+  | 'g3-dividend-receivable'
+  | 'g2-interest-receivable'
+  | 'g1-trading-financial-assets'
+  | 'f5-cost-of-sales'
+  | 'f4-accounts-payable'
+  | 'f3-notes-payable'
+  | 'f2-inventory-valuation-impairment'
+  | 'f2-inventory-special'
+  | 'f2-inventory-main'
+  | 'f1-prepayment'
   | 'confirmation-diff-checklist'
   | 'confirmation-fraud-risk'
   | 'confirmation-reliability'
@@ -200,6 +231,10 @@ const GtConfirmationFollowup = defineAsyncComponent(() => import('./confirmation
 const GtConfirmationDiffReconcile = defineAsyncComponent(() => import('./confirmation/diffReconcile/GtConfirmationDiffReconcile.vue'))
 const GtConfirmationAlternativeD05 = defineAsyncComponent(() => import('./confirmation/alternativeD05/GtConfirmationAlternativeD05.vue'))
 const GtConfirmationAlternativeD06 = defineAsyncComponent(() => import('./confirmation/alternativeD06/GtConfirmationAlternativeD06.vue'))
+const GtConfirmationAlternativeF05 = defineAsyncComponent(() => import('./confirmation/alternativeF05/GtConfirmationAlternativeF05.vue'))
+const GtConfirmationAlternativeF06 = defineAsyncComponent(() => import('./confirmation/alternativeF06/GtConfirmationAlternativeF06.vue'))
+const GtConfirmationDiffSecurities = defineAsyncComponent(() => import('./g0-confirmation/diffSecurities/GtConfirmationDiffSecurities.vue'))
+const GtConfirmationAlternativeG06 = defineAsyncComponent(() => import('./g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue'))
 const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
@@ -219,6 +254,34 @@ const GtD1NotesReceivable = defineAsyncComponent(() => import('./GtD1NotesReceiv
 const GtD2AccountsReceivable = defineAsyncComponent(() => import('./GtD2AccountsReceivable.vue'))
 const GtA112DualChecklist = defineAsyncComponent(() => import('./GtA112DualChecklist.vue'))
 const GtA115DisclosureChecklist = defineAsyncComponent(() => import('./GtA115DisclosureChecklist.vue'))
+
+const GtF1Prepayment = defineAsyncComponent(() => import('./GtF1Prepayment.vue'))
+const GtF2InventoryMain = defineAsyncComponent(() => import('./GtF2InventoryMain.vue'))
+const GtF2InventorySpecial = defineAsyncComponent(() => import('./GtF2InventorySpecial.vue'))
+const GtF2InventoryValuation = defineAsyncComponent(() => import('./GtF2InventoryValuation.vue'))
+const GtF3NotesPayable = defineAsyncComponent(() => import('./GtF3NotesPayable.vue'))
+const GtF4AccountsPayable = defineAsyncComponent(() => import('./GtF4AccountsPayable.vue'))
+const GtF5CostOfSales = defineAsyncComponent(() => import('./GtF5CostOfSales.vue'))
+const GtG1TradingFinancialAssets = defineAsyncComponent(() => import('./GtG1TradingFinancialAssets.vue'))
+const GtG2InterestReceivable = defineAsyncComponent(() => import('./GtG2InterestReceivable.vue'))
+const GtG3DividendReceivable = defineAsyncComponent(() => import('./GtG3DividendReceivable.vue'))
+const GtG4BondInvestmentMain = defineAsyncComponent(() => import('./GtG4BondInvestmentMain.vue'))
+const GtG4BondInvestmentSppi = defineAsyncComponent(() => import('./GtG4BondInvestmentSppi.vue'))
+const GtG4BondInvestmentEcl = defineAsyncComponent(() => import('./GtG4BondInvestmentEcl.vue'))
+const GtG5LongTermReceivable = defineAsyncComponent(() => import('./GtG5LongTermReceivable.vue'))
+const GtG6OtherBondMain = defineAsyncComponent(() => import('./GtG6OtherBondMain.vue'))
+const GtG6OtherBondSppi = defineAsyncComponent(() => import('./GtG6OtherBondSppi.vue'))
+const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondEcl.vue'))
+const GtG7LongTermEquityMain = defineAsyncComponent(() => import('./GtG7LongTermEquityMain.vue'))
+const GtG7EquityMethod = defineAsyncComponent(() => import('./GtG7EquityMethod.vue'))
+const GtG7EquitySubsidiary = defineAsyncComponent(() => import('./GtG7EquitySubsidiary.vue'))
+const GtG8OtherEquityInstruments = defineAsyncComponent(() => import('./GtG8OtherEquityInstruments.vue'))
+const GtG9OtherNoncurrentFinancial = defineAsyncComponent(() => import('./GtG9OtherNoncurrentFinancial.vue'))
+const GtG10TradingFinancialLiabilities = defineAsyncComponent(() => import('./GtG10TradingFinancialLiabilities.vue'))
+const GtG11InvestmentIncome = defineAsyncComponent(() => import('./GtG11InvestmentIncome.vue'))
+const GtG12NetHedgeGains = defineAsyncComponent(() => import('./GtG12NetHedgeGains.vue'))
+const GtG13FairValueChanges = defineAsyncComponent(() => import('./GtG13FairValueChanges.vue'))
+const GtG14CreditImpairmentLoss = defineAsyncComponent(() => import('./GtG14CreditImpairmentLoss.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -611,6 +674,38 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     contextProps: 'standard',
   },
   {
+    componentType: 'confirmation-alternative-f05',
+    component: GtConfirmationAlternativeF05,
+    icon: '🔄',
+    label: '替代程序(预付及采购)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-alternative-f06',
+    component: GtConfirmationAlternativeF06,
+    icon: '🔄',
+    label: '替代程序(应付及采购)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-diff-securities',
+    component: GtConfirmationDiffSecurities,
+    icon: '📈',
+    label: '证券差异核对',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-alternative-g06',
+    component: GtConfirmationAlternativeG06,
+    icon: '🔄',
+    label: '替代程序(投资循环)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
     componentType: 'confirmation-diff-checklist',
     component: GtConfirmationDiffChecklist,
     icon: '📊',
@@ -919,6 +1014,222 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtD4OperatingRevenue.vue')),
     icon: '💹',
     label: 'D4 营业收入',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f1-prepayment',
+    component: GtF1Prepayment,
+    icon: '💳',
+    label: 'F1 预付账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f2-inventory-main',
+    component: GtF2InventoryMain,
+    icon: '📦',
+    label: 'F2 存货核心',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f2-inventory-special',
+    component: GtF2InventorySpecial,
+    icon: '📦',
+    label: 'F2 存货特殊',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f2-inventory-valuation-impairment',
+    component: GtF2InventoryValuation,
+    icon: '📦',
+    label: 'F2 计价减值',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f3-notes-payable',
+    component: GtF3NotesPayable,
+    icon: '📄',
+    label: 'F3 应付票据',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f4-accounts-payable',
+    component: GtF4AccountsPayable,
+    icon: '📋',
+    label: 'F4 应付账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'f5-cost-of-sales',
+    component: GtF5CostOfSales,
+    icon: '📊',
+    label: 'F5 营业成本',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g1-trading-financial-assets',
+    component: GtG1TradingFinancialAssets,
+    icon: '📈',
+    label: 'G1 交易性金融资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g2-interest-receivable',
+    component: GtG2InterestReceivable,
+    icon: '💰',
+    label: 'G2 应收利息',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g3-dividend-receivable',
+    component: GtG3DividendReceivable,
+    icon: '💰',
+    label: 'G3 应收股利',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g4-bond-investment-main',
+    component: GtG4BondInvestmentMain,
+    icon: '🏦',
+    label: 'G4 债权投资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g4-bond-investment-sppi',
+    component: GtG4BondInvestmentSppi,
+    icon: '🏦',
+    label: 'G4 SPPI',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g4-bond-investment-ecl',
+    component: GtG4BondInvestmentEcl,
+    icon: '🏦',
+    label: 'G4 ECL',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g5-long-term-receivable',
+    component: GtG5LongTermReceivable,
+    icon: '📑',
+    label: 'G5 长期应收款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g6-other-bond-investment-main',
+    component: GtG6OtherBondMain,
+    icon: '🏦',
+    label: 'G6 其他债权投资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g6-other-bond-investment-sppi',
+    component: GtG6OtherBondSppi,
+    icon: '🏦',
+    label: 'G6 SPPI',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g6-other-bond-investment-ecl',
+    component: GtG6OtherBondEcl,
+    icon: '🏦',
+    label: 'G6 ECL',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g7-long-term-equity-main',
+    component: GtG7LongTermEquityMain,
+    icon: '🏢',
+    label: 'G7 长期股权投资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g7-long-term-equity-method',
+    component: GtG7EquityMethod,
+    icon: '🏢',
+    label: 'G7 权益法',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g7-long-term-equity-subsidiary',
+    component: GtG7EquitySubsidiary,
+    icon: '🏢',
+    label: 'G7 子公司',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g8-other-equity-instruments',
+    component: GtG8OtherEquityInstruments,
+    icon: '📈',
+    label: 'G8 其他权益工具',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g9-other-noncurrent-financial',
+    component: GtG9OtherNoncurrentFinancial,
+    icon: '📈',
+    label: 'G9 其他非流动金融',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g10-trading-financial-liabilities',
+    component: GtG10TradingFinancialLiabilities,
+    icon: '📉',
+    label: 'G10 交易性金融负债',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g11-investment-income',
+    component: GtG11InvestmentIncome,
+    icon: '💹',
+    label: 'G11 投资收益',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g12-net-hedge-gains',
+    component: GtG12NetHedgeGains,
+    icon: '🛡️',
+    label: 'G12 套期收益',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g13-fair-value-changes',
+    component: GtG13FairValueChanges,
+    icon: '📊',
+    label: 'G13 公允价值变动',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'g14-credit-impairment-loss',
+    component: GtG14CreditImpairmentLoss,
+    icon: '⚠️',
+    label: 'G14 信用减值损失',
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },

@@ -1,4 +1,4 @@
-"""E2E 夹具项目种子脚本 — FIX-A / FIX-B / FIX-INT / FIX-RP
+"""E2E 夹具项目种子脚本 — FIX-A / FIX-B / FIX-INT / FIX-RP / FIX-F
 
 构造或校验 completion-phase E2E 所需的最小项目数据，输出 manifest JSON 供 Playwright 使用。
 
@@ -8,7 +8,7 @@
     python scripts/e2e/seed_fix_projects.py --fix --output data/e2e_fix_projects.json
 
 环境变量（可选，覆盖默认项目）:
-    TEST_PROJECT_ID_FIX_A / FIX_B / FIX_INT / FIX_RP
+    TEST_PROJECT_ID_FIX_A / FIX_B / FIX_INT / FIX_RP / FIX_F
 
 Spec: completion-phase-infra e2e-matrix.md E-FIX
 """
@@ -19,6 +19,7 @@ import asyncio
 import io
 import json
 import os
+import shutil
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -62,6 +63,31 @@ FIX_A_WP_CODES = [
 ]
 FIX_INT_WP_CODES = ["B60", "A16-2", "A11-3"]
 FIX_RP_WP_CODES = ["A7", "A7-1"]
+
+# F 循环 HTML E2E（与 e2e/f2-*.spec.ts 对齐）
+F2_E2E_WP_CODES = [
+    "F2-1",
+    "F2-21", "F2-22", "F2-23", "F2-24", "F2-25", "F2-26",
+    "F2-47",
+    "F2-55",
+    "F2-70",
+]
+
+# wp_code → backend/wp_templates/F 下源 xlsx（同码多底稿共用 bundle 文件）
+F2_WP_TEMPLATE_FILES: dict[str, str] = {
+    "F2-1": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+    "F2-21": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+    "F2-22": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+    "F2-23": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+    "F2-24": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+    "F2-25": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+    "F2-26": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+    "F2-47": "F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+    "F2-55": "F2-55至F2-58 合同履约成本.xlsx",
+    "F2-70": "F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+}
+
+WP_TEMPLATES_F = _BACKEND / "wp_templates" / "F"
 
 
 @dataclass
@@ -108,6 +134,14 @@ FIXTURES: list[FixtureSpec] = [
         required_wp_codes=FIX_RP_WP_CODES,
         env_var="TEST_PROJECT_ID_FIX_RP",
         seed_related_party=True,
+    ),
+    FixtureSpec(
+        fixture_id="FIX-F",
+        description="F 循环 E2E — 存货审定/监盘/跌价/履约/IPO",
+        required_wp_codes=F2_E2E_WP_CODES,
+        env_var="TEST_PROJECT_ID_FIX_F",
+        default_project_id=DEFAULT_FIX_B,
+        business_category="IPO",
     ),
 ]
 
@@ -277,6 +311,56 @@ async def _ensure_project_metadata(
     return actions
 
 
+def _resolve_wp_dest_path(project_id: UUID, code: str, file_path: str | None) -> Path:
+    """解析底稿磁盘路径（相对 backend cwd 的 storage/…）。"""
+    if file_path:
+        p = Path(file_path)
+        if p.is_file() or not p.is_absolute():
+            return p
+    return Path("storage") / "projects" / str(project_id) / "workpapers" / "F" / f"{code}.xlsx"
+
+
+def _copy_f2_template_to_dest(code: str, dest: Path) -> bool:
+    """从 wp_templates/F 复制 F2 E2E 模板；已有非空文件则跳过。"""
+    tpl_name = F2_WP_TEMPLATE_FILES.get(code)
+    if not tpl_name or not WP_TEMPLATES_F.is_dir():
+        return False
+    tpl_src = WP_TEMPLATES_F / tpl_name
+    if not tpl_src.is_file():
+        return False
+    if dest.is_file() and dest.stat().st_size > 1024:
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(tpl_src, dest)
+    return True
+
+
+async def _ensure_f2_e2e_template_files(db: AsyncSession, project_id: UUID) -> list[str]:
+    """已有 wp_index 但 xlsx 为空/缺失时，回填真实模板（供 import/export E2E）。"""
+    r = await db.execute(
+        sa.text(
+            """
+            SELECT wi.wp_code, wp.file_path
+            FROM wp_index wi
+            JOIN working_paper wp ON wp.wp_index_id = wi.id AND wp.is_deleted = false
+            WHERE wi.project_id = :pid AND wi.is_deleted = false
+              AND wi.wp_code = ANY(:codes)
+            """
+        ),
+        {"pid": str(project_id), "codes": F2_E2E_WP_CODES},
+    )
+    copied = 0
+    for wp_code, file_path in r.all():
+        if wp_code not in F2_WP_TEMPLATE_FILES:
+            continue
+        dest = _resolve_wp_dest_path(project_id, wp_code, file_path)
+        if _copy_f2_template_to_dest(wp_code, dest):
+            copied += 1
+    if copied:
+        return [f"回填 F2 模板 xlsx: {copied}/{len(F2_E2E_WP_CODES)}"]
+    return []
+
+
 async def _ensure_wp_codes(
     db: AsyncSession, project_id: UUID, missing: list[str], year: int
 ) -> list[str]:
@@ -334,6 +418,9 @@ async def _ensure_wp_codes(
                 src_path = str(lib_entry.get("file_path") or "")
                 ext = ".docx" if src_path.lower().endswith(".docx") else ".xlsx"
                 dest = cycle_dir / f"{code}{ext}"
+
+                if not _copy_f2_template_to_dest(code, dest) and not dest.exists():
+                    dest.write_bytes(b"")
 
                 wp_index = WpIndex(
                     project_id=project_id,
@@ -470,6 +557,9 @@ async def _resolve_project_id(
             return found
         return fix_b_id
 
+    if spec.fixture_id == "FIX-F":
+        return fix_b_id
+
     return fix_b_id
 
 
@@ -513,6 +603,8 @@ async def _process_fixture(
             )
             existing = await _existing_wp_codes(db, project_id)
             result.missing_wp_codes = [c for c in spec.required_wp_codes if c not in existing]
+        if spec.fixture_id == "FIX-F":
+            result.actions.extend(await _ensure_f2_e2e_template_files(db, project_id))
         if spec.seed_a17_ch01:
             result.actions.extend(await _seed_a17_ch01(db, project_id))
         if spec.seed_related_party:
@@ -523,9 +615,13 @@ async def _process_fixture(
     prefix_ok = True
     if spec.business_category and result.business_category and spec.fixture_id == "FIX-A":
         prefix_ok = result.business_category.upper().startswith(spec.business_category[0])
-    elif spec.business_category and result.business_category and spec.fixture_id == "FIX-B":
-        # FIX-B 以底稿齐备为主；同项目被 FIX-A 覆写为 A 类时仍可用
+    elif spec.fixture_id == "FIX-B":
+        # FIX-B 以底稿齐备为主；同项目被 FIX-F 覆写 business_category 时仍可用
         prefix_ok = True
+    elif spec.fixture_id == "FIX-F" and result.business_category:
+        prefix_ok = result.business_category in (
+            "IPO", "上市公司年审", "新三板", "重大资产重组", "B3",
+        )
 
     result.ready = len(result.missing_wp_codes) == 0 and prefix_ok
     if spec.fixture_id == "FIX-A" and result.business_category and not result.business_category.upper().startswith("A"):
@@ -561,8 +657,10 @@ def _build_manifest(results: list[FixtureResult]) -> dict:
     by_id = {r.fixture_id: r for r in results}
     fix_a = by_id.get("FIX-A")
     fix_b = by_id.get("FIX-B")
+    fix_f = by_id.get("FIX-F")
     return {
         "year": DEFAULT_YEAR,
+        "f2_e2e_wp_codes": F2_E2E_WP_CODES,
         "fixtures": {
             r.fixture_id: {
                 "project_id": r.project_id,
@@ -583,6 +681,10 @@ def _build_manifest(results: list[FixtureResult]) -> dict:
             ),
             "TEST_PROJECT_ID_FIX_RP": (
                 (by_id.get("FIX-RP") or FixtureResult("")).project_id or ""
+            ),
+            "TEST_PROJECT_ID_FIX_F": (
+                (fix_f.project_id if fix_f and fix_f.project_id else "")
+                or (fix_b.project_id if fix_b and fix_b.project_id else "")
             ),
             "RUN_FULL_E2E": "1",
         },

@@ -1,0 +1,149 @@
+<script setup lang="ts">
+/**
+ * F3TabDetail — F3-2 明细表（25列→3区段Tab）
+ * Spec: .kiro/specs/f3-notes-payable/ Task 6.2
+ */
+import { computed, toRef, inject, type Ref } from 'vue'
+import { useF3Detail, type F3NoteDetailRow, type F3DetailColumn } from '../composables/useF3Detail'
+import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
+
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  allResponses: Map<string, any>
+  isReadonly: boolean
+}>()
+
+const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
+function onImported() { reloadWorkpaperData?.() }
+
+function fmtAmount(v: number): string {
+  if (v === 0) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const {
+  activeSegment,
+  filteredRows,
+  subtotalRow,
+  searchQuery,
+  addRow,
+  removeRow,
+  updateCell,
+  rowClassName,
+  basicColumns,
+  infoColumns,
+  auditColumns,
+} = useF3Detail({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+const activeColumns = computed<F3DetailColumn[]>(() => {
+  if (activeSegment.value === 'basic') return basicColumns
+  if (activeSegment.value === 'detail') return infoColumns
+  return auditColumns
+})
+
+const DETAIL_SCROLL_THRESHOLD = 50
+const useDetailScroll = computed(() => filteredRows.value.length > DETAIL_SCROLL_THRESHOLD)
+
+function isFormulaCol(col: F3DetailColumn): boolean {
+  return !!col.formula || ['termDays', 'overdueDays', 'closingBalance', 'adjustedBalance', 'isOverdue'].includes(col.prop as string)
+}
+
+function displayValue(row: F3NoteDetailRow, prop: string): string {
+  const v = (row as any)[prop]
+  if (typeof v === 'number') return fmtAmount(v)
+  return v ?? ''
+}
+</script>
+
+<template>
+  <div class="f3-tab-detail">
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>25列拆为3区段Tab，区段间行同步。虚线列为公式列。逾期天数&gt;0 行橙色高亮。</p>
+      </div>
+    </details>
+
+    <div class="tab-toolbar">
+      <el-input v-model="searchQuery" placeholder="搜索出票人/收票人..." size="small" clearable style="width:200px" />
+      <el-button size="small" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+      <F3ImportExportToolbar
+        :wp-id="wpId"
+        :project-id="projectId"
+        sheet="F3-2"
+        :disabled="isReadonly"
+        @imported="onImported"
+      />
+    </div>
+
+    <el-tabs v-model="activeSegment" type="border-card" class="segment-tabs">
+      <el-tab-pane name="basic" label="基础信息(9列)" />
+      <el-tab-pane name="detail" label="票据详情(8列)" />
+      <el-tab-pane name="audit" label="审定调整(8列)" />
+    </el-tabs>
+
+    <div v-if="useDetailScroll" class="scroll-hint">共 {{ filteredRows.length }} 行 · 固定表头滚动</div>
+
+    <el-table
+      :data="filteredRows"
+      border
+      size="small"
+      :row-class-name="rowClassName"
+      :max-height="useDetailScroll ? 480 : undefined"
+      style="width: 100%; font-size: 13px; margin-top: 8px"
+    >
+      <el-table-column
+        v-for="col in activeColumns"
+        :key="col.prop"
+        :prop="col.prop"
+        :label="col.label"
+        :width="col.width"
+        :min-width="col.minWidth || 100"
+      >
+        <template #header>
+          <el-tooltip v-if="col.formula" :content="col.formula" placement="top">
+            <span class="formula-header">{{ col.label }}</span>
+          </el-tooltip>
+          <span v-else>{{ col.label }}</span>
+        </template>
+        <template #default="{ row }">
+          <el-input
+            v-if="col.editable && !isReadonly && col.prop !== 'seq'"
+            :model-value="(row as any)[col.prop]"
+            size="small"
+            @change="(v: any) => updateCell(row.rowId, col.prop as string, v)"
+          />
+          <span v-else :class="{ 'formula-cell': isFormulaCol(col) }">{{ displayValue(row, col.prop as string) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="70" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="danger" size="small" :disabled="isReadonly" @click="removeRow(row.rowId)">删</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <div class="subtotal-bar">
+      合计 — 面值: {{ fmtAmount(subtotalRow.faceValue) }} |
+      期末余额: {{ fmtAmount(subtotalRow.closingBalance) }} |
+      审定余额: {{ fmtAmount(subtotalRow.adjustedBalance) }}
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.f3-tab-detail { font-size: 13px; }
+.tab-toolbar { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.formula-cell { background: #f5f7fa; border-bottom: 1px dashed #c0c4cc; cursor: help; }
+.formula-header { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.overdue-row td) { background: #fdf6ec !important; }
+.subtotal-bar { margin-top: 8px; font-weight: 600; text-align: right; }
+.scroll-hint { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 8px; text-align: right; }
+.segment-tabs :deep(.el-tabs__content) { display: none; }
+</style>

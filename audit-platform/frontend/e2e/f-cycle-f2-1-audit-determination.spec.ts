@@ -4,7 +4,7 @@
  * 锚定 spec f-cycle-workpapers Task 54
  *
  * 验证 F2-1 存货审定表：
- * 1. F2-1 底稿存在且 render-config 返回 d-form-table
+ * 1. F2-1 底稿存在且 render-config 返回 f2-inventory-main
  * 2. 审定表页面加载无严重 JS 错误
  * 3. 审定表 schema YAML 存在（后端可读取结构）
  * 4. 审定表编辑后 trial_balance.audited_amount 回写确认
@@ -38,7 +38,7 @@ async function getToken(request: APIRequestContext): Promise<string> {
 }
 
 test.describe('Task 54: F2-1 审定表编辑 + 保存 + trial_balance 回写确认', () => {
-  test('54.1 — F2-1 底稿存在且为 d-form-table', async ({ request }) => {
+  test('54.1 — F2-1 底稿存在且为 f2-inventory-main', async ({ request }) => {
     test.setTimeout(20_000)
     const token = await getToken(request)
 
@@ -53,7 +53,7 @@ test.describe('Task 54: F2-1 审定表编辑 + 保存 + trial_balance 回写确�
     const rcBody = await rcResp.json()
     const rcData = rcBody?.data || rcBody
     const componentType = rcData.component_type || rcData.componentType
-    expect(componentType).toBe('d-form-table')
+    expect(componentType).toBe('f2-inventory-main')
   })
 
   test('54.2 — F2-1 审定表页面加载无严重错误', async ({ page, request }) => {

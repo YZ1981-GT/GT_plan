@@ -163,6 +163,7 @@ import { Close } from '@element-plus/icons-vue'
 import { useReviewDialog, type GtReviewDialogProps } from '@/composables/useReviewDialog'
 
 const props = defineProps<GtReviewDialogProps>()
+const emit = defineEmits<{ closed: [] }>()
 
 // ── Composable ──────────────────────────────────────────────────────────────
 const {
@@ -248,6 +249,10 @@ function getRoleColorClass(role: string): string {
 // ── Mount: auto open ────────────────────────────────────────────────────────
 onMounted(() => {
   openDialog()
+})
+
+watch(isOpen, (open, wasOpen) => {
+  if (wasOpen && !open) emit('closed')
 })
 </script>
 

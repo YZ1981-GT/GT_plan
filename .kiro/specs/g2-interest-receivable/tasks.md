@@ -38,8 +38,8 @@
 
 ## Tasks
 
-- [ ] 1. 组件注册与基础配置
-  - [ ] 1.1 注册componentType和映射
+- [x] 1. 组件注册与基础配置
+  - [x] 1.1 注册componentType和映射
     - 在 `wp_code_overrides.json` 中将G2A/G2-1~G2-8/附注披露(上市)/附注披露(国企)映射为'g2-interest-receivable'（11个wp_code条目）
     - 在 `VALID_COMPONENT_TYPES` 中注册'g2-interest-receivable'
     - 在 `htmlRendererRegistry.ts` 中注册 'g2-interest-receivable' → GtG2InterestReceivable 映射
@@ -53,7 +53,7 @@
     - _Requirements: 1.3, 1.4, 1.5_
 
 - [ ] 2. 实现公式引擎 useG2FormulaEngine.ts
-  - [ ] 2.1 创建 `composables/useG2FormulaEngine.ts`，实现全部10个纯函数
+  - [x] 2.1 创建 `composables/useG2FormulaEngine.ts`，实现全部10个纯函数
     - 实现 `calcInterest365`（应收利息 = 面值 × 利率/100 × 天数/365，面值<0或天数<0→0）
     - 实现 `calcAccruedDays`（计息天数 = 截止日timestamp - 起始日timestamp / 86400000，取整）
     - 实现 `calcDebitBalance`（借方余额 = 期初 + 借方 - 贷方）

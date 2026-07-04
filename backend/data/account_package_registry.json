@@ -544,6 +544,28 @@
       "known_conflicts": []
     },
     {
+      "account_package_id": "G0_investment_confirmation",
+      "cycle": "G", "account_code": null, "account_name": "投资循环函证",
+      "report_row": null, "note_section": null,
+      "mapping_status": "active", "industry": ["通用"],
+      "primary_wp_code": "G0", "control_panel_sheet": "G0A", "source_wp_codes": ["G0"],
+      "schema_refs": [], "generated_inventory_refs": ["generated/G0.yaml"],
+      "sheets": [
+        { "sheet_name": "函证程序表G0A", "sheet_type": "control_panel", "source_wp_code": "G0" },
+        { "sheet_name": "函证结果汇总表G0-1", "sheet_type": "procedure", "source_wp_code": "G0" },
+        { "sheet_name": "核实被函证单位信息G0-2", "sheet_type": "grid_table", "source_wp_code": "G0" },
+        { "sheet_name": "跟函函证过程控制G0-3", "sheet_type": "grid_table", "source_wp_code": "G0" },
+        { "sheet_name": "函证差异核对表G0-3（证券投资）", "sheet_type": "grid_table", "source_wp_code": "G0" },
+        { "sheet_name": "函证差异核对表G0-4(非证券投资)", "sheet_type": "grid_table", "source_wp_code": "G0" },
+        { "sheet_name": "替代程序检查表G0-6", "sheet_type": "grid_table", "source_wp_code": "G0" },
+        { "sheet_name": "邮件传真回函可靠性验证G0-7", "sheet_type": "procedure", "source_wp_code": "G0" },
+        { "sheet_name": "函证程序舞弊风险评价表G0-8", "sheet_type": "grid_table", "source_wp_code": "G0" }
+      ],
+      "external_cards": ["confirmation_summary"],
+      "downstream": ["report", "sign_off"],
+      "known_conflicts": []
+    },
+    {
       "account_package_id": "G1_trading_financial_assets",
       "cycle": "G", "account_code": "1101", "account_name": "交易性金融资产",
       "report_row": null, "note_section": null,

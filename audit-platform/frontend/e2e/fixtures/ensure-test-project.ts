@@ -1,45 +1,71 @@
 /**
  * ensure-test-project.ts — E2E Fixture: 确保测试项目存在
  *
- * 在 E2E 测试运行前调用，验证 PROJECT_ID 对应的项目存在且有必要底稿。
- * 项目 ID 优先读环境变量；本地默认 FIX-B（辽宁卫生）。
- *
- * 运行 seed:
- *   cd backend && python scripts/e2e/seed_fix_projects.py --fix
- *   → 输出 data/e2e_fix_projects.json 中的 env 块
- *
- * 用法：
- *   const fixture = await ensureTestProject(request)
- *   const fixA = await ensureFixtureProject(request, 'FIX-A')
+ * 项目 ID 优先级：环境变量 → backend/data/e2e_fix_projects.json → FIX-B 默认 UUID
  */
 import { type APIRequestContext } from '@playwright/test'
+import * as fs from 'node:fs'
+import * as path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
-/** FIX-B 默认：辽宁卫生 2025（completion-phase e2e-matrix） */
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+/** FIX-B 历史默认（本地 PG 可能与 seed 解析结果不同，manifest 优先） */
 export const DEFAULT_FIX_B_PROJECT_ID = '37814426-a29e-4fc2-9313-a59d229bf7b0'
 
-export type FixtureKind = 'FIX-A' | 'FIX-B' | 'FIX-INT' | 'FIX-RP'
+type E2eManifest = {
+  env?: Record<string, string>
+}
+
+function loadE2eManifest(): E2eManifest | null {
+  const manifestPath = path.resolve(__dirname, '../../../../backend/data/e2e_fix_projects.json')
+  try {
+    if (!fs.existsSync(manifestPath)) return null
+    return JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as E2eManifest
+  } catch {
+    return null
+  }
+}
+
+const MANIFEST = loadE2eManifest()
+
+export type FixtureKind = 'FIX-A' | 'FIX-B' | 'FIX-INT' | 'FIX-RP' | 'FIX-F'
+
+/** F2 HTML E2E 所需底稿（与 backend/scripts/e2e/seed_fix_projects.py 对齐） */
+export const F2_E2E_WP_CODES = [
+  'F2-1',
+  'F2-21', 'F2-22', 'F2-23', 'F2-24', 'F2-25', 'F2-26',
+  'F2-47', 'F2-55', 'F2-70',
+] as const
 
 const ENV_KEYS: Record<FixtureKind, string> = {
   'FIX-A': 'TEST_PROJECT_ID_FIX_A',
   'FIX-B': 'TEST_PROJECT_ID_FIX_B',
   'FIX-INT': 'TEST_PROJECT_ID_FIX_INT',
   'FIX-RP': 'TEST_PROJECT_ID_FIX_RP',
+  'FIX-F': 'TEST_PROJECT_ID_FIX_F',
 }
 
-/** 通用 TEST_PROJECT_ID；未设时回退 FIX-B */
+function manifestEnv(key: string): string | undefined {
+  const v = MANIFEST?.env?.[key]
+  return v && v.trim() ? v.trim() : undefined
+}
+
+/** 通用 TEST_PROJECT_ID；未设 env 时读 seed manifest */
 export const TEST_PROJECT_ID =
   process.env.TEST_PROJECT_ID ||
+  manifestEnv('TEST_PROJECT_ID') ||
   process.env.TEST_PROJECT_ID_FIX_B ||
+  manifestEnv('TEST_PROJECT_ID_FIX_B') ||
   DEFAULT_FIX_B_PROJECT_ID
 
 export function resolveFixtureProjectId(kind: FixtureKind): string {
   const key = ENV_KEYS[kind]
-  const fromEnv = process.env[key]
+  const fromEnv = process.env[key] || manifestEnv(key)
   if (fromEnv) return fromEnv
-  if (kind === 'FIX-B') return TEST_PROJECT_ID
+  if (kind === 'FIX-B' || kind === 'FIX-F') return TEST_PROJECT_ID
   return ''
 }
-
 export function projectBaseApi(projectId: string): string {
   return `/api/projects/${projectId}`
 }
@@ -146,12 +172,93 @@ export async function findWorkpaper(
   try {
     const resp = await request.get(`${projectBaseApi(projectId)}/working-papers`, {
       headers: { Authorization: `Bearer ${token}` },
+      params: { page_size: 500 },
     })
     const body = await resp.json()
-    const list = body?.data?.items || body?.items || body?.data || (Array.isArray(body) ? body : [])
-    const wp = list.find((w: any) => w.wp_code === wpCode)
+    const list = parseWorkingPaperList(body)
+    const wp = list.find((w: { wp_code?: string }) => w.wp_code === wpCode)
     return wp ? { exists: true, wpId: wp.id } : { exists: false }
   } catch {
     return { exists: false }
+  }
+}
+
+/** 解析 working-papers 列表（兼容 data 为 array 或 { items }） */
+export function parseWorkingPaperList(body: unknown): Array<{ id: string; wp_code?: string }> {
+  if (!body || typeof body !== 'object') return []
+  const b = body as Record<string, unknown>
+  const data = b.data
+  if (Array.isArray(data)) return data as Array<{ id: string; wp_code?: string }>
+  if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
+    return (data as { items: Array<{ id: string; wp_code?: string }> }).items
+  }
+  if (Array.isArray(b.items)) return b.items as Array<{ id: string; wp_code?: string }>
+  return []
+}
+
+/** render-config 正确路径（非 /projects/.../working-papers/...） */
+export function renderConfigApiUrl(wpId: string, sheetName?: string): string {
+  const base = `/api/workpapers/${wpId}/render-config`
+  return sheetName ? `${base}?sheet_name=${encodeURIComponent(sheetName)}` : base
+}
+
+export function sheetComponentTypes(rcData: Record<string, unknown>): string[] {
+  const sheets = (rcData.sheets as Array<{ componentType?: string; component_type?: string }>) ?? []
+  return sheets.map((s) => s.componentType ?? s.component_type).filter(Boolean) as string[]
+}
+
+export async function fetchRenderConfig(
+  request: APIRequestContext,
+  token: string,
+  wpId: string,
+): Promise<Record<string, unknown>> {
+  const resp = await request.get(renderConfigApiUrl(wpId), {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (resp.status() !== 200) {
+    throw new Error(`render-config ${resp.status()}: ${await resp.text()}`)
+  }
+  const body = await resp.json()
+  return (body?.data ?? body) as Record<string, unknown>
+}
+
+export async function expectHtmlDualModeOrContent(
+  page: import('@playwright/test').Page,
+  bodyHint: RegExp,
+) {
+  const { expect } = await import('@playwright/test')
+  const segmented = page.locator('.el-segmented')
+  let hasSeg = false
+  try {
+    await expect(segmented.first()).toBeVisible({ timeout: 20_000 })
+    hasSeg = true
+  } catch {
+    hasSeg = false
+  }
+  const bodyText = (await page.textContent('body')) || ''
+  expect(hasSeg || bodyHint.test(bodyText), `应显示 HTML 双模式或页面含 ${bodyHint}`).toBeTruthy()
+}
+/** 多 sheet 底稿默认打开「底稿目录」Tab，需切换到含 wpCode 的 HTML sheet（排除 F2-21A 等父码 Tab） */
+export async function clickWorkpaperSheetTab(page: import('@playwright/test').Page, wpCode: string) {
+  const fallbacks: Record<string, string[]> = {
+    'F2-1': ['F2-1', 'F2-8', 'F2-3'],
+  }
+  const labels = fallbacks[wpCode] ?? [wpCode]
+  for (const label of labels) {
+    const exact = label.match(/^F2-\d+$/)
+      ? new RegExp(`${label.replace('-', '\\-')}(?!\\d)`)
+      : label
+    let tab =
+      typeof exact === 'string'
+        ? page.getByRole('tab').filter({ hasText: exact })
+        : page.getByRole('tab', { name: exact })
+    if (label.match(/^F2-\d+$/)) {
+      tab = tab.filter({ hasNotText: `${label}A` })
+    }
+    if (await tab.count()) {
+      await tab.first().click({ timeout: 15_000 })
+      await page.waitForTimeout(2_500)
+      return
+    }
   }
 }
