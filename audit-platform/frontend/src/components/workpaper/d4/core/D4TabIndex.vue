@@ -8,7 +8,8 @@
  *
  * Requirements: 31.1-31.5
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, inject } from 'vue'
+import { resolveD4SheetLabel } from '../../composables/d4SheetLabels'
 
 const props = defineProps<{
   wpId: string
@@ -17,6 +18,7 @@ const props = defineProps<{
   isReadonly: boolean
   ipoGroupVisible: boolean
   hasExportBusiness: boolean
+  availableSheets?: Array<{ sheet_name?: string }>
 }>()
 
 // ─── 底稿目录数据 ─────────────────────────────────────────────────────
@@ -114,13 +116,11 @@ const progressPercent = computed(() => {
 
 // ─── 跳转 ────────────────────────────────────────────────────────────
 
-const emit = defineEmits<{
-  (e: 'navigate', group: string, tab: string): void
-}>()
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
 function navigateToSheet(row: IndexRow) {
-  if (!row.applicable) return
-  emit('navigate', row.group, row.tabName)
+  if (!row.applicable || !jumpToSection) return
+  jumpToSection(resolveD4SheetLabel(row.code, props.availableSheets))
 }
 </script>
 

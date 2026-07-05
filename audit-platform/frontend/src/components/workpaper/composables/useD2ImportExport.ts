@@ -18,16 +18,21 @@ import { ElMessage } from 'element-plus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** 支持导入导出的8个Sheet */
+/** 支持导入导出的9个Sheet */
 export type ImportableSheet =
+  | 'D2-1'
   | 'D2-2'
   | 'D2-3'
   | 'D2-4'
+  | 'D2-5'
   | 'D2-6'
   | 'D2-7'
+  | 'D2-8'
   | 'D2-9'
+  | 'D2-10'
   | 'D2-11'
   | 'D2-12'
+  | 'D2-13'
 
 export interface ImportResult {
   rowCount: number

@@ -12,13 +12,14 @@
  *
  * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5
  */
-import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, inject, type ComputedRef } from 'vue'
 import {
   parseNum,
   calculateTurnoverRate,
   calculateTurnoverDays,
 } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import type useD2CrossSheet from './useD2CrossSheet'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,34 @@ function parseAgingDistribution(jsonStr: string | null | undefined): AgingDistri
 
 export function useD2Analysis(options: UseD2BaseOptions) {
   const { allResponses, isReadonly } = options
+  const d2CrossSheet = inject<ReturnType<typeof useD2CrossSheet> | null>('d2CrossSheet', null)
+
+  function buildAgingFromCross(): AgingDistributionItem[] {
+    const bands = d2CrossSheet?.agingFromDetail.value.audited
+    if (!bands) return []
+    const items = [
+      { band: '1年以内', amount: bands.within1Year },
+      { band: '1-2年', amount: bands.y1to2 },
+      { band: '2-3年', amount: bands.y2to3 },
+      { band: '3-4年', amount: bands.y3to4 },
+      { band: '4-5年', amount: bands.y4to5 },
+      { band: '5年以上', amount: bands.over5 },
+    ]
+    const total = items.reduce((s, i) => s + i.amount, 0)
+    return items.map(i => ({ ...i, ratio: total ? i.amount / total : 0 }))
+  }
+
+  function buildTop5FromDetail(): number {
+    const rows = d2CrossSheet?.detailRows.value ?? []
+    if (!rows.length) return 0
+    const total = rows.reduce((s, r) => s + parseNum(r.currentAudited), 0)
+    if (total === 0) return 0
+    const top5 = [...rows]
+      .sort((a, b) => parseNum(b.currentAudited) - parseNum(a.currentAudited))
+      .slice(0, 5)
+      .reduce((s, r) => s + parseNum(r.currentAudited), 0)
+    return top5 / total
+  }
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -127,16 +156,20 @@ export function useD2Analysis(options: UseD2BaseOptions) {
 
     // 坏账率
     const badDebtBalance = parseNum(getVal(`${PREFIX}-auto-badDebtBalance`) ?? getVal(`${PREFIX}-manual-badDebtBalance`))
+      || (d2CrossSheet?.badDebtTotal.value.current ?? 0)
     const totalReceivable = parseNum(getVal(`${PREFIX}-auto-totalReceivable`) ?? getVal(`${PREFIX}-manual-totalReceivable`))
+      || (d2CrossSheet?.adjudicationForDisclosure.value.total.current ?? 0)
     const badDebtRate = totalReceivable === 0 ? 0 : badDebtBalance / totalReceivable
 
     // 前五大集中度
     const top5Concentration = parseNum(getVal(`${PREFIX}-auto-top5Concentration`) ?? getVal(`${PREFIX}-manual-top5Concentration`))
+      || buildTop5FromDetail()
 
     // 账龄分布
     const agingDistribution = parseAgingDistribution(
-      getVal(`${PREFIX}-auto-agingDistribution`) ?? getVal(`${PREFIX}-manual-agingDistribution`)
+      getVal(`${PREFIX}-auto-agingDistribution`) ?? getVal(`${PREFIX}-manual-agingDistribution`),
     )
+    const finalAging = agingDistribution.length ? agingDistribution : buildAgingFromCross()
 
     return {
       turnoverRate,
@@ -145,7 +178,7 @@ export function useD2Analysis(options: UseD2BaseOptions) {
       turnoverDaysChange,
       badDebtRate,
       top5Concentration,
-      agingDistribution,
+      agingDistribution: finalAging,
     }
   })
 
@@ -239,6 +272,8 @@ export function useD2Analysis(options: UseD2BaseOptions) {
    * payload: { wpCode: 'D2', indicator, changeRate, currentValue, priorValue }
    */
   let _lastPublishedTurnoverWarning = false
+  let _lastPublishedBadDebtWarning = false
+  const lastBadDebtRate = ref<number | null>(null)
 
   watch(
     () => indicators.value.turnoverDaysChange,
@@ -263,6 +298,31 @@ export function useD2Analysis(options: UseD2BaseOptions) {
       _lastPublishedTurnoverWarning = shouldWarn
     },
     { immediate: false }
+  )
+
+  watch(
+    () => indicators.value.badDebtRate,
+    (rate) => {
+      const prior = lastBadDebtRate.value
+      lastBadDebtRate.value = rate
+      if (prior === null || prior === 0) return
+      const change = (rate - prior) / prior
+      const shouldWarn = Math.abs(change) > TURNOVER_DAYS_WARNING_THRESHOLD
+      if (shouldWarn && !_lastPublishedBadDebtWarning) {
+        try {
+          window.dispatchEvent(new CustomEvent('analytical:significant-change', {
+            detail: {
+              wpCode: 'D2',
+              indicator: 'bad_debt_rate',
+              changeRate: change,
+              currentValue: rate,
+              priorValue: prior,
+            },
+          }))
+        } catch { /* silent */ }
+      }
+      _lastPublishedBadDebtWarning = shouldWarn
+    },
   )
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────

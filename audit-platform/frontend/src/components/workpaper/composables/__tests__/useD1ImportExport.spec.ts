@@ -78,7 +78,7 @@ describe('useD1ImportExport', () => {
       await exportTemplate()
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/workpapers/wp-123/d1-import-export/export-template',
+        '/api/workpapers/wp-123/d1/export-template',
         null,
         { params: { sheet: 'D1-10' }, responseType: 'blob' },
       )
@@ -98,7 +98,7 @@ describe('useD1ImportExport', () => {
       await exportTemplate()
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/workpapers/wp-123/d1-import-export/export-template',
+        '/api/workpapers/wp-123/d1/export-template',
         null,
         { params: { sheet: 'D1-12' }, responseType: 'blob' },
       )
@@ -119,7 +119,7 @@ describe('useD1ImportExport', () => {
       await exportData()
 
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/workpapers/wp-123/d1-import-export/export-data',
+        '/api/workpapers/wp-123/d1/export-data',
         null,
         { params: { sheet: 'D1-11' }, responseType: 'blob' },
       )
@@ -149,7 +149,7 @@ describe('useD1ImportExport', () => {
 
       // Verify FormData was sent
       const callArgs = mockPost.mock.calls[0]
-      expect(callArgs[0]).toBe('/api/workpapers/wp-123/d1-import-export/import-data')
+      expect(callArgs[0]).toBe('/api/workpapers/wp-123/d1/import-data')
       expect(callArgs[1]).toBeInstanceOf(FormData)
       expect(callArgs[2]).toEqual({
         params: { sheet: 'D1-13' },
@@ -226,7 +226,7 @@ describe('useD1ImportExport', () => {
 
       await exportTemplate()
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/workpapers/wp-A/d1-import-export/export-template',
+        '/api/workpapers/wp-A/d1/export-template',
         null,
         expect.anything(),
       )
@@ -235,7 +235,7 @@ describe('useD1ImportExport', () => {
       dynamicWpId.value = 'wp-B'
       await exportTemplate()
       expect(mockPost).toHaveBeenCalledWith(
-        '/api/workpapers/wp-B/d1-import-export/export-template',
+        '/api/workpapers/wp-B/d1/export-template',
         null,
         expect.anything(),
       )

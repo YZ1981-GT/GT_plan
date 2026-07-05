@@ -47,13 +47,13 @@
     - 创建 `GtG3DividendReceivable.vue` 主入口骨架（sheetName prop + regex提取编码 + v-if分发 + defineAsyncComponent lazy + selfLoad逻辑 + el-tabs 7 tabs + OnlyOffice fallback）
     - _Requirements: 1.1~1.8_
 
-  - [ ]* 1.2 编写注册契约测试
+  - [x]* 1.2 编写注册契约测试
     - htmlRendererRegistry.spec.ts 中验证'g3-dividend-receivable'已注册
     - VALID_COMPONENT_TYPES契约验证
     - wp_code_overrides契约验证8个映射条目
     - _Requirements: 1.3, 1.4, 1.5_
 
-- [ ] 2. 实现公式引擎 useG3FormulaEngine.ts
+- [x] 2. 实现公式引擎 useG3FormulaEngine.ts
   - [x] 2.1 创建 `composables/useG3FormulaEngine.ts`，实现全部8个纯函数
     - 实现 `calcDividend`（应收股利 = 持股数 × 每股股利，持股数<0→0）
     - 实现 `calcPayoutRatio`（实际分红率 = 分红总额 / 净利润 × 100%，净利润≤0→0）
@@ -65,75 +65,75 @@
     - 实现 `isDebitCreditBalanced`（|SUM(debits) - SUM(credits)| < 0.01）
     - _Requirements: 9.1~9.8_
 
-  - [ ]* 2.2 编写 Property 1 PBT：股利测算公式
+  - [x]* 2.2 编写 Property 1 PBT：股利测算公式
     - 生成器：`fc.nat({max:1e8})` shares + `fc.float({min:0, max:100})` dps
     - 断言：calcDividend(shares, dps) === shares × dps
     - **Property 1: 应收股利=持股数×每股股利**
     - **Validates: Requirements 9.1, 5.3, 5.5, 7.2**
 
-  - [ ]* 2.3 编写 Property 2 PBT：借方余额公式
+  - [x]* 2.3 编写 Property 2 PBT：借方余额公式
     - 生成器：`fc.float({min:0, max:1e9})` × opening/debit/credit
     - 断言：calcDebitBalance(opening, debit, credit) === opening + debit - credit
     - **Property 2: 借方余额=期初+借方-贷方**
     - **Validates: Requirements 9.3, 3.3**
 
-  - [ ]* 2.4 编写 Property 3 PBT：审定数公式
+  - [x]* 2.4 编写 Property 3 PBT：审定数公式
     - 生成器：`fc.float({min:-1e8, max:1e8})` × unadjusted/aje/rje
     - 断言：calcAdjustedAmount(unadjusted, aje, rje) === unadjusted + aje + rje
     - **Property 3: 审定=未审+AJE+RJE**
     - **Validates: Requirements 9.4, 3.4**
 
-  - [ ]* 2.5 编写 Property 4 PBT：逾期天数非负
+  - [x]* 2.5 编写 Property 4 PBT：逾期天数非负
     - 生成器：fc.date() × currentDate/dueDate
     - 断言：calcOverdueDays(currentDate, dueDate) ≥ 0
     - **Property 4: 逾期天数恒≥0**
     - **Validates: Requirements 9.5, 8.2**
 
-  - [ ]* 2.6 编写 Property 5 PBT：借贷平衡恒等
+  - [x]* 2.6 编写 Property 5 PBT：借贷平衡恒等
     - 生成器：`fc.array(fc.float({min:0, max:1e6}), {minLength:1, maxLength:20})` × debits/credits
     - 断言：isDebitCreditBalanced(debits, credits) ↔ (|SUM(debits)-SUM(credits)| < 0.01)
     - **Property 5: 借贷平衡**
     - **Validates: Requirements 9.8, 6.2**
 
-  - [ ]* 2.7 编写 Property 6 PBT：分红率与分红总额正比
+  - [x]* 2.7 编写 Property 6 PBT：分红率与分红总额正比
     - 生成器：`fc.float({min:0.01, max:1e8})` × d1/d2 + `fc.float({min:0.01, max:1e8})` netProfit
     - 断言：calcPayoutRatio(d1, netProfit) / calcPayoutRatio(d2, netProfit) ≈ d1/d2
     - **Property 6: 分红率与分红额成正比**
     - **Validates: Requirements 9.2, 5.4**
 
-  - [ ]* 2.8 编写 Property 7 PBT：股利与持股数正比
+  - [x]* 2.8 编写 Property 7 PBT：股利与持股数正比
     - 生成器：`fc.nat({min:1, max:1e8})` × s1/s2 + `fc.float({min:0.01, max:100})` dps
     - 断言：calcDividend(s1, dps) / calcDividend(s2, dps) ≈ s1/s2
     - **Property 7: 股利与持股成正比**
     - **Validates: Requirements 9.1, 5.3**
 
-  - [ ]* 2.9 编写 Property 8 PBT：净应收=应收-已收
+  - [x]* 2.9 编写 Property 8 PBT：净应收=应收-已收
     - 生成器：`fc.float({min:0, max:1e8})` × receivable/received
     - 断言：calcNetReceivable(receivable, received) === receivable - received
     - **Property 8: 净应收=应收股利-已收金额**
     - **Validates: Requirements 9.6, 5.6**
 
-  - [ ]* 2.10 编写 Property 9 PBT：权益份额公式
+  - [x]* 2.10 编写 Property 9 PBT：权益份额公式
     - 生成器：`fc.float({min:-1e9, max:1e9})` netAssets + `fc.float({min:0, max:100})` ratio
     - 断言：calcEquityShare(netAssets, ratio) === netAssets × ratio/100
     - **Property 9: 权益份额=净资产×持股比例/100**
     - **Validates: Requirements 9.7, 5.2**
 
-  - [ ]* 2.11 编写 Property 10 PBT：分红率非负
+  - [x]* 2.11 编写 Property 10 PBT：分红率非负
     - 生成器：`fc.float({min:0, max:1e8})` dividendTotal + `fc.float({min:0.01, max:1e8})` netProfit
     - 断言：calcPayoutRatio(dividendTotal, netProfit) ≥ 0
     - **Property 10: 净利润>0时分红率≥0**
     - **Validates: Requirements 9.2**
 
-- [ ] 3. 实现 useG3FormData.ts 基础数据加载/保存
-  - [ ] 3.1 创建 `composables/useG3FormData.ts`
+- [x] 3. 实现 useG3FormData.ts 基础数据加载/保存
+  - [x] 3.1 创建 `composables/useG3FormData.ts`
     - 实现 allResponses Map加载（GET /checklist-responses）
     - 实现 saveImmediate / debouncedSave / saveBatch
     - 实现 selfLoad逻辑
     - _Requirements: 1.6_
 
-- [ ] 4. 实现审定表 + 附注披露 composable
-  - [ ] 4.1 创建 `composables/useG3Adjudication.ts`
+- [x] 4. 实现审定表 + 附注披露 composable
+  - [x] 4.1 创建 `composables/useG3Adjudication.ts`
     - 定义 G3AdjudicationRow 类型（22列，含被投资方/持股比例/本期宣告/本期收回）
     - 行结构：按被投资方逐行（动态增删，新增弹ElMessageBox.prompt）+ 合计 + 试算表数 + 差异
     - 实现借方公式：期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)
@@ -141,41 +141,41 @@
     - EventBus发布 `substantive:adjudicated`(accountCode='1131')
     - _Requirements: 3.1~3.10_
 
-  - [ ]* 4.2 编写审定表单元测试
+  - [x]* 4.2 编写审定表单元测试
     - 验证借方余额公式方向（期初+宣告-收回）
     - 验证合计行汇总
     - 验证差异=审定-试算表数
     - _Requirements: 3.3~3.7_
 
-- [ ] 5. 实现明细表/测算检查/逾期 composable
-  - [ ] 5.1 创建 `composables/useG3Detail.ts`（G3-2明细表4区段逻辑）
+- [x] 5. 实现明细表/测算检查/逾期 composable
+  - [x] 5.1 创建 `composables/useG3Detail.ts`（G3-2明细表4区段逻辑）
     - 定义 DividendDetailRow 类型（33列分4区段）
     - 4区段列配置导出（被投资方8/持股9/分红8/应收8）
     - 公式链：权益份额=净资产×比例/100 / 分红总额=持股×DPS / 分红率=总额/净利润×100% / 应收=持股×DPS / 期末应收=应收-已收 / 逾期天数
     - 区段间行同步 + 动态行增删(弹名称输入) + 合计 + 逾期行橙色
     - _Requirements: 5.1~5.11_
 
-  - [ ] 5.2 创建 `composables/useG3CalcCheck.ts`（G3-4测算及检查2区段）
+  - [x] 5.2 创建 `composables/useG3CalcCheck.ts`（G3-4测算及检查2区段）
     - 定义 CalcCheckRow 类型（18列分2区段）
     - 2区段：股利测算(应收=持股×DPS, 差异=测算-入账) / 凭证检查(9列)
     - 区段间行同步 + 差异>100橙色 + 抽凭引擎集成(样本填入凭证检查区段)
     - 动态行增删 + 合计 + 来源tooltip
     - _Requirements: 7.1~7.10_
 
-  - [ ] 5.3 创建 `composables/useG3OverdueCheck.ts`（G3-5长期未收回）
+  - [x] 5.3 创建 `composables/useG3OverdueCheck.ts`（G3-5长期未收回）
     - 定义 OverdueDividendRow 类型（13列）
     - 逾期天数公式 + 风险高亮(>180红/>90橙) + 风险/可收回性下拉
     - 底部汇总 + 动态行增删
     - _Requirements: 8.1~8.8_
 
-- [ ] 6. 实现 Vue子组件
-  - [ ] 6.1 创建 `g3-dividend-receivable/G3TabAdjudication.vue`（G3-1审定表22列）
+- [x] 6. 实现 Vue子组件
+  - [x] 6.1 创建 `g3-dividend-receivable/G3TabAdjudication.vue`（G3-1审定表22列）
     - 调用useG3Adjudication
     - el-table（被投资方|持股比例|期初4列|期末4列|宣告|收回|备注|索引）
     - 合计加粗 + 差异红色 + EventBus + GtIndexChip + 动态行增删(弹名称)
     - _Requirements: 3.1~3.10_
 
-  - [ ] 6.2 创建 `g3-dividend-receivable/G3TabDetail.vue`（G3-2明细表 33列→4区段Tab）
+  - [x] 6.2 创建 `g3-dividend-receivable/G3TabDetail.vue`（G3-2明细表 33列→4区段Tab）
     - 调用useG3Detail
     - 4区段Tab切换（被投资方/持股/分红/应收）
     - 区段间行同步 + 逾期行橙色 + 分红率N/A处理
@@ -183,7 +183,7 @@
     - UI铁律：13px/公式列虚线/min-width
     - _Requirements: 5.1~5.11_
 
-  - [ ] 6.3 创建 `G3TabCalcCheck.vue`（G3-4测算及检查 2区段Tab）
+  - [x] 6.3 创建 `G3TabCalcCheck.vue`（G3-4测算及检查 2区段Tab）
     - 调用useG3CalcCheck
     - 2区段Tab（股利测算/凭证检查）+ 行同步
     - 股利测算公式列(持股×DPS)虚线+tooltip + 差异>100橙色
@@ -192,45 +192,45 @@
     - 已抽凭行来源tooltip
     - _Requirements: 7.1~7.10_
 
-  - [ ] 6.4 创建 `G3TabAdjustment.vue` + `G3TabOverdueCheck.vue` + 附注披露
+  - [x] 6.4 创建 `G3TabAdjustment.vue` + `G3TabOverdueCheck.vue` + 附注披露
     - G3-3调整分录（借贷平衡 + 动态行增删 + 导入导出）
     - G3-5长期未收回（逾期高亮 + 风险下拉 + 底部汇总 + AI结论 + 导入导出）
     - G3TabDisclosureListed.vue + G3TabDisclosureSOE.vue（EventBus subscribe/publish）
     - _Requirements: 6.1~6.4, 8.1~8.8, 4.1~4.4_
 
-- [ ] 7. Checkpoint - 公式引擎+组件验证
+- [x] 7. Checkpoint - 公式引擎+组件验证
   - Ensure all PBT tests pass (P1~P10), ask the user if questions arise.
 
-- [ ] 8. 实现后端 + 导入导出 + AI
-  - [ ] 8.1 创建后端3个py文件
+- [x] 8. 实现后端 + 导入导出 + AI
+  - [x] 8.1 创建后端3个py文件
     - `_g3_dividend_receivable.py`：render策略函数 + 注册RENDERER_DISPATCH['g3-dividend-receivable']
     - `_g3_dividend_receivable_import_export.py`：3端点（export-template/export-data/import-data）+ 5张动态行表格支持
     - `_g3_dividend_receivable_ai.py`：3个AI section端点 + 30秒超时
     - _Requirements: 1.3, 14.1~14.4_
 
-  - [ ] 8.2 创建 `composables/useG3ImportExport.ts` + `composables/useG3DualMode.ts`
+  - [x] 8.2 创建 `composables/useG3ImportExport.ts` + `composables/useG3DualMode.ts`
     - useG3ImportExport：el-dropdown"导入导出▾" + axios三端点 + 5张表参数
     - useG3DualMode：模式状态(html/onlyoffice) + 切换逻辑 + localStorage持久化
     - _Requirements: 14.1~14.4_
 
-- [ ] 9. 跨模块联动集成
-  - [ ] 9.1 版本链集成
+- [x] 9. 跨模块联动集成
+  - [x] 9.1 版本链集成
     - 主入口集成useVersionTrail（autoSnapshot on save + "版本历史"按钮 + GtWpVersionTrail drawer）
     - provide('openReviewDialog', openReviewDialog)供子组件inject
     - _Requirements: 13.1, 13.5_
 
-  - [ ] 9.2 附注EventBus集成
+  - [x] 9.2 附注EventBus集成
     - G3TabDisclosureListed.vue / G3TabDisclosureSOE.vue
     - subscribe `substantive:adjudicated`(accountCode='1131')自动刷新
     - publish `disclosure:note-text-updated` 联动附注模块
     - _Requirements: 4.1~4.4, 13.3_
 
-  - [ ] 9.3 抽凭引擎集成
+  - [x] 9.3 抽凭引擎集成
     - G3-4: GtVoucherSamplingEngine dialog集成（科目1131，样本填入凭证检查区段+来源tooltip）
     - _Requirements: 7.8~7.10, 13.2_
 
-- [ ] 10. 集成测试与验收
-  - [ ] 10.1 编写集成测试
+- [x] 10. 集成测试与验收
+  - [x] 10.1 编写集成测试
     - sheetName分发正确性（7个sheet→对应组件）
     - 借方余额公式链（期初+宣告-收回=期末→+AJE+RJE=审定）
     - 股利测算公式（持股数×每股股利）

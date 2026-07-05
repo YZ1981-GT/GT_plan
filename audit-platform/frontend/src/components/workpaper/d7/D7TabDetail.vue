@@ -1,22 +1,47 @@
 <template>
 <div class="d7-detail">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
+  <!-- 工具栏 -->
+  <div class="toolbar">
+    <el-input v-model="searchFilter" placeholder="搜索单位名称/合同名称..." size="small" style="width:240px" clearable />
+    <div class="toolbar-actions">
+      <el-button-group size="small">
+        <el-button @click="exportTemplate">导出模板</el-button>
+        <el-button @click="exportData">导出数据</el-button>
+        <el-upload
+          :show-file-list="false"
+          accept=".xlsx"
+          :before-upload="onImportFile"
+        >
+          <el-button :loading="importing">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">添加客户</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
+    </div>
   </div>
 
-  <template v-if="viewMode === 'structured'">
-    <!-- 工具栏 -->
-    <div class="toolbar">
-      <el-input v-model="searchFilter" placeholder="搜索单位名称/合同名称..." size="small" style="width:240px" clearable />
-      <div class="toolbar-actions">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">添加客户</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
-        <el-button size="small" :disabled="true">导出空模板</el-button>
-        <el-button size="small" :disabled="true">导入数据</el-button>
-      </div>
-    </div>
+  <div v-if="useVirtualScroll" class="virtual-toolbar">
+    <el-alert type="info" :closable="false" class="virtual-hint">
+      行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+    </el-alert>
+    <el-button size="small" @click="toggleBrowseMode">
+      {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+    </el-button>
+  </div>
+  <el-table-v2
+    v-if="useVirtualScroll && browseMode"
+    :columns="virtualColumns"
+    :data="browseRows"
+    :width="tableWidth"
+    :height="tableHeight"
+    :row-height="36"
+    :header-height="40"
+    :row-event-handlers="rowEventHandlers"
+    fixed
+    class="virtual-table"
+  />
 
+  <template v-if="!useVirtualScroll || !browseMode">
     <!-- 27列明细表 -->
     <el-table
       :data="displayRows"
@@ -204,6 +229,9 @@
       <div class="note-item">
         <label>期末变动分析：</label>
         <el-input v-model="detailNotes.explanation" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="分析合同负债明细本期增减变动原因..." />
+        <div class="note-actions">
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genDetailChange">🤖AI</el-button>
+        </div>
       </div>
       <div class="note-item">
         <label>合同履行情况：</label>
@@ -220,15 +248,10 @@
       <h4>审计结论</h4>
       <el-input v-model="detailNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="对合同负债明细的总结性结论..." />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
         <el-button size="small" @click="openReviewDialog('D7-2-note-conclusion')">💬复核</el-button>
       </div>
     </div>
   </template>
-
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -238,9 +261,14 @@
  * Task: 17.1
  * Requirements: 5.1-5.12, 6.1-6.7, 7.1-7.5, 17.2, 19.3, 20.1, 22.1-22.5
  */
-import { ref, computed, watch, inject, type Ref } from 'vue'
+import { ref, computed, watch, inject, toRef, type Ref } from 'vue'
 import { useD7Detail, NATURE_TYPES, RELATED_PARTY_TYPES, type DetailRow } from '../composables/useD7Detail'
 import type { ChecklistResponse } from '../composables/useD7FormData'
+import { useD7ImportExport } from '../composables/useD7ImportExport'
+import { useD7AiGenerate } from '../composables/useD7AiGenerate'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -254,13 +282,34 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD7ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D7-2',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+
+async function onImportFile(file: File) {
+  await importData(file)
+  return false
+}
+
+const relatedParties = computed(() => {
+  const json = props.allResponses.value.get('D7-6-rows')?.remark
+  if (!json) return [] as string[]
+  try {
+    const parsed = JSON.parse(json)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((r: { partyName?: string; companyName?: string }) => r.partyName || r.companyName || '')
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+})
 
 const {
   rows, totalRow, addRow, removeRow, updateCell, importFromAuxBalance, searchFilter, filteredRows,
@@ -270,10 +319,41 @@ const {
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+  relatedParties,
 })
 
 // Display rows: filtered data + total row
 const displayRows = computed(() => [...filteredRows.value, totalRow.value])
+
+const browseRows = filteredRows
+const browseRowCount = computed(() => filteredRows.value.length)
+
+function fmtBrowseAmt(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('contractName', '合同名称', 150),
+  virtualTextCol('companyName', '单位名称', 150),
+  virtualTextCol('natureType', '类型', 120),
+  virtualNumCol('priorUnadjusted', '期初未审', 110, fmtBrowseAmt),
+  virtualNumCol('endUnadjusted', '期末未审', 110, fmtBrowseAmt),
+  virtualNumCol('endAudited', '期末审定', 110, fmtBrowseAmt),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  rowEventHandlers,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 1400,
+})
 
 function isDataRow(row: DetailRow): boolean {
   return !row.rowId.startsWith('__')
@@ -305,12 +385,24 @@ watch(() => detailNotes.value.explanation, v => props.debouncedSave('D7-2-note-e
 watch(() => detailNotes.value.contract, v => props.debouncedSave('D7-2-note-contract', { remark: v }))
 watch(() => detailNotes.value.longTerm, v => props.debouncedSave('D7-2-note-longterm', { remark: v }))
 watch(() => detailNotes.value.conclusion, v => props.debouncedSave('D7-2-note-conclusion', { remark: v }))
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
+
+async function genDetailChange() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('detail-change', detailNotes.value.explanation, {
+    task: '合同负债明细变动分析',
+    rowCount: filteredRows.value.length,
+    endAuditedTotal: totalRow.value.endAudited,
+  }, 'AI · 变动分析')
+  if (text) detailNotes.value.explanation = text
+}
 </script>
 
 <style scoped>
 .d7-detail { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
-.oo-mode-placeholder { padding: 40px 0; }
+.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.virtual-hint { flex: 1; margin: 0; }
 
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .toolbar-actions { display: flex; gap: 8px; }

@@ -15,7 +15,7 @@
  * Requirements: 1.1-5.5, 11.1-11.5, 15.6
  */
 import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   useD1PolicyCheck,
   type PolicyConclusion,
@@ -23,7 +23,9 @@ import {
 } from '../composables/useD1PolicyCheck'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1AiGenerate } from '../composables/useD1AiGenerate'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -43,16 +45,8 @@ const props = withDefaults(defineProps<Props>(), {
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
-
-// ─── Dual Mode ───────────────────────────────────────────────────────────────
-
-const viewMode = ref<'structured' | 'onlyoffice'>('structured')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
-const isOOMode = computed(() => viewMode.value === 'onlyoffice')
+const wpIdImportRef = toRef(props, 'wpId') as unknown as Ref<string>
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdImportRef, 'D1-14')
 
 // ─── Save helpers ────────────────────────────────────────────────────────────
 
@@ -126,74 +120,34 @@ const pageNo = computed(() => props.allResponses?.get('D1-header-page-no')?.rema
 
 const auditObjectiveText = '检查公司应收票据坏账准备的会计政策是否符合《企业会计准则第22号——金融工具确认和计量》的规定，评价预期信用损失模型的适当性，核实会计政策在各期间是否一贯适用，并对政策合理性形成审计结论。'
 
-// ─── OO Health Check ─────────────────────────────────────────────────────────
+// ─── AI Generate ─────────────────────────────────────────────────────────────
 
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch {
-    ooHealthy.value = false
-  }
-}
+const wpIdRef = toRef(props, 'wpId')
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD1AiGenerate(wpIdRef)
 
-// ─── AI Health & Generate ────────────────────────────────────────────────────
-
-const aiAvailable = ref(false)
-const aiLoading = ref(false)
-
-async function checkAiHealth() {
-  try {
-    const res = await http.get('/api/ai/health', { _silent: true } as any)
-    const status = res.data?.data?.status ?? res.data?.status
-    aiAvailable.value = status === 'healthy' || status === 'degraded'
-  } catch {
-    aiAvailable.value = false
-  }
+function buildPolicyContext(): string {
+  return [
+    `【政策概述-公司描述】${policyOverviewLeft.value || '（未填写）'}`,
+    `【政策概述-核查意见】${policyOverviewRight.value || '（未填写）'}`,
+    `【ECL模型-组合评估】${eclModelPortfolio.value || '（未填写）'}`,
+    `【ECL模型-单项评估】${eclModelIndividual.value || '（未填写）'}`,
+    `【ECL模型-迁徙率法】${eclModelMigration.value || '（未填写）'}`,
+    `【ECL模型-核查意见】${eclModelRight.value || '（未填写）'}`,
+    `【政策变更】${policyChangeFlag.value === '是' ? `是。变更内容：${policyChangeContent.value || '（未填写）'}；变更原因：${policyChangeReason.value || '（未填写）'}` : '否'}`,
+    `【合理性评价】${policyConclusion.value || '（未选择）'}`,
+  ].join('\n')
 }
 
 async function generateConclusionWithAI() {
-  aiLoading.value = true
-  try {
-    // 收集各section文本+核查意见+变更flag+合理性评价
-    const context = [
-      `【政策概述-公司描述】${policyOverviewLeft.value || '（未填写）'}`,
-      `【政策概述-核查意见】${policyOverviewRight.value || '（未填写）'}`,
-      `【ECL模型-组合评估】${eclModelPortfolio.value || '（未填写）'}`,
-      `【ECL模型-单项评估】${eclModelIndividual.value || '（未填写）'}`,
-      `【ECL模型-迁徙率法】${eclModelMigration.value || '（未填写）'}`,
-      `【ECL模型-核查意见】${eclModelRight.value || '（未填写）'}`,
-      `【政策变更】${policyChangeFlag.value === '是' ? `是。变更内容：${policyChangeContent.value || '（未填写）'}；变更原因：${policyChangeReason.value || '（未填写）'}` : '否'}`,
-      `【合理性评价】${policyConclusion.value || '（未选择）'}`,
-    ].join('\n')
-
-    const res = await http.post(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
-      chapter: 14,
-      chapter_title: 'D1-14 应收票据坏账准备会计政策检查-审计结论',
-      guidance: guidanceContent,
-      existing_content: context,
-      knowledge_doc_ids: [],
-    }, { _silent: true } as any)
-
-    const text = res.data?.data?.content ?? res.data?.content ?? ''
-    if (!text) {
-      ElMessage.warning('AI未生成内容')
-      return
-    }
-
-    await ElMessageBox.confirm(
-      `AI生成的内容：\n\n${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`,
-      'AI辅助生成',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }
-    )
+  const text = await generateAndConfirm(
+    'policy-conclusion',
+    buildPolicyContext(),
+    { guidance: guidanceContent, currentConclusion: conclusionText.value },
+    'AI辅助生成',
+  )
+  if (text) {
     conclusionText.value = text
     saveConclusionText()
-  } catch (err: any) {
-    if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.warning('AI生成失败，请检查LLM服务是否可用')
-    }
-  } finally {
-    aiLoading.value = false
   }
 }
 
@@ -201,8 +155,6 @@ async function generateConclusionWithAI() {
 
 onMounted(() => {
   hydrate()
-  checkOoHealth()
-  checkAiHealth()
 })
 
 // ─── Review Dialog ───────────────────────────────────────────────────────────
@@ -234,25 +186,22 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
 
 <template>
   <div class="d1-policy-check">
-    <!-- Dual Mode Switch -->
-    <div class="mode-switch">
-      <el-segmented v-model="viewMode" :options="modeOptions" />
-    </div>
-
-    <!-- OnlyOffice Mode -->
-    <GtOnlyOfficeSheet
-      v-if="isOOMode"
-      :wp-id="wpId"
-      :project-id="projectId"
-      sheet-name="应收票据坏账准备会计政策检查D1-14"
-    />
-
-    <!-- Structured Mode -->
-    <div v-else>
+    <div>
       <!-- Loading Skeleton -->
       <el-skeleton v-if="isLoading" :rows="12" animated />
 
       <template v-else>
+        <div class="tab-header">
+          <h4>会计政策检查 D1-14</h4>
+          <GtReviewTrigger section-id="D1-policy-header" />
+          <div class="toolbar-right">
+            <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+            <el-button size="small" @click="onExportData">导出数据</el-button>
+            <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+              <el-button size="small">导入数据</el-button>
+            </el-upload>
+          </div>
+        </div>
         <!-- Section 1: 底稿抬头 -->
         <div class="section">
           <div class="header-block">
@@ -472,8 +421,23 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
   padding: 16px;
 }
 
-.mode-switch {
-  margin-bottom: 16px;
+.tab-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .section {

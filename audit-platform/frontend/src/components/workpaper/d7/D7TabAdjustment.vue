@@ -1,11 +1,5 @@
 <template>
 <div class="d7-adjustment">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 编制提示 -->
     <details class="editing-hints">
       <summary>📋 编制提示</summary>
@@ -20,6 +14,11 @@
     <div class="toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增调整分录</el-button>
       <el-button size="small" :disabled="isReadonly || selectedIds.length === 0" @click="handlePushToA13">推送至A13</el-button>
+      <el-button size="small" @click="exportTemplate">导出模板</el-button>
+      <el-button size="small" @click="exportData">导出数据</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+        <el-button size="small" :loading="importing">导入数据</el-button>
+      </el-upload>
     </div>
 
     <!-- 调整分录表 -->
@@ -102,11 +101,6 @@
         </span>
       </div>
     </div>
-  </template>
-
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -116,8 +110,9 @@
  * Task: 18.1
  * Requirements: 8.1-8.7, 20.1
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, inject, type Ref } from 'vue'
 import { useD7Adjustment, ADJUSTMENT_CATEGORIES, type AdjustmentRow } from '../composables/useD7Adjustment'
+import { useD7ImportExport } from '../composables/useD7ImportExport'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 
 const props = defineProps<{
@@ -129,14 +124,20 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 const CATEGORIES = ADJUSTMENT_CATEGORIES
 const selectedIds = ref<string[]>([])
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD7ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D7-3',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+
+async function onImportFile(file: File) {
+  await importData(file)
+  return false
+}
 
 const {
   rows, debitTotal, creditTotal, isBalanced, balanceDiff,
@@ -166,8 +167,6 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .d7-adjustment { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
-.oo-mode-placeholder { padding: 40px 0; }
 
 .editing-hints {
   margin-bottom: 16px;

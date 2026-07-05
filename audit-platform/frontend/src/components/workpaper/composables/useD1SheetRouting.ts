@@ -4,18 +4,24 @@
  * GtWpRenderer 传入完整中文 sheet 名（如「附注披露信息（上市公司）」），
  * 主入口 GtD1NotesReceivable 据此分发到 D1Tab* 子组件。
  */
+import { isSkipWorkpaperSheet } from './workpaperSkipSheets'
+
 export function resolveD1SheetCode(name: string): string {
+  if (isSkipWorkpaperSheet(name)) return 'skip'
+  if (name.includes('目录') || name.includes('底稿目录')) return 'directory'
+  if (name === 'D1' || /^D1\s/.test(name.trim())) return 'D1'
+
   const m = name.match(/(D1(?:A|-\d+))\s*$/)
   if (m) return m[1]
 
-  if (name.includes('附注') && name.includes('国企')) return 'disclosure-soe'
+  if (name.includes('附注') && name.includes('国企')) return '附注国企'
   if (name.includes('附注') && (name.includes('上市') || name.includes('上市公司'))) {
-    return 'disclosure-listed'
+    return '附注上市'
   }
 
   if (name.includes('政策检查') || name.includes('D1-14')) return 'D1-14'
   if (name.includes('测算表') || name.includes('D1-15')) return 'D1-15'
-  if (name.includes('分析提示')) return ''
+  if (name.includes('分析提示')) return 'analysis-hint'
   if (name.includes('业务模式') || name.includes('D1-6')) return 'D1-6'
   if (name.includes('备查簿') || name.includes('D1-7')) return 'D1-7'
   if (name.includes('背书') || name.includes('贴现明细') || name.includes('D1-8')) return 'D1-8'

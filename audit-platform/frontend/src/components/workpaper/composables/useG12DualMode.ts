@@ -1,0 +1,49 @@
+/**
+ * useG12DualMode — G12 HTML ↔ OnlyOffice
+ */
+import { ref, onMounted, type Ref } from 'vue'
+
+export type G12RenderMode = 'html' | 'onlyoffice'
+const STORAGE_PREFIX = 'g12-dual-mode:'
+
+export function useG12DualMode(options: { wpId: Ref<string>; reloadAll?: () => Promise<void> }) {
+  const currentMode = ref<G12RenderMode>('html')
+  const isOoAvailable = ref(false)
+  const modeOptions = [
+    { label: 'HTML', value: 'html' },
+    { label: 'OnlyOffice', value: 'onlyoffice' },
+  ]
+
+  function loadPersistedMode(): void {
+    try {
+      const saved = localStorage.getItem(STORAGE_PREFIX + options.wpId.value)
+      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+    } catch { /* ignore */ }
+  }
+
+  async function checkOOHealth(): Promise<boolean> {
+    try {
+      const response = await fetch('/api/workpapers/onlyoffice/health')
+      if (!response.ok) { isOoAvailable.value = false; return false }
+      const result = await response.json()
+      isOoAvailable.value = result.data?.healthy ?? result.healthy ?? false
+      return isOoAvailable.value
+    } catch {
+      isOoAvailable.value = false
+      return false
+    }
+  }
+
+  async function onModeChange(val: string | number | boolean): Promise<void> {
+    const target = val as G12RenderMode
+    if (target === currentMode.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    currentMode.value = target
+    try { localStorage.setItem(STORAGE_PREFIX + options.wpId.value, target) } catch { /* ignore */ }
+    if (target === 'html' && options.reloadAll) await options.reloadAll()
+  }
+
+  onMounted(() => { loadPersistedMode(); void checkOOHealth() })
+
+  return { currentMode, isOoAvailable, modeOptions, onModeChange, checkOOHealth }
+}

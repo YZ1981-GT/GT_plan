@@ -2,7 +2,7 @@
 
 component_type = "d2-accounts-receivable"
 
-与 D1 同理：前端 GtD2AccountsReceivable 为自加载组件（内部 el-tabs 承载各 sheet），
+与 D4 同理：前端 GtD2AccountsReceivable 为 sheetName 分发组件（外层 GtWpRenderer 目录行 chips 导航），
 本策略返回轻量 html_data，使 component_type 命中 RENDERER_DISPATCH，避免多 sheet
 dispatch 循环把 D2 各 sheet 重写成 onlyoffice-sheet。
 

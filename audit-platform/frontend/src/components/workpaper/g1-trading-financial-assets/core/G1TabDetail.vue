@@ -4,64 +4,72 @@
     <div class="toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">新增证券</el-button>
     </div>
-    <el-segmented v-model="detail.segment" :options="segments" size="small" class="segment-bar" />
+    <el-segmented v-model="detail.segment" :options="segmentOptions" size="small" class="segment-bar" />
 
     <el-table :data="detail.rows" border size="small" max-height="500">
-      <el-table-column prop="securityName" label="证券名称" width="120" fixed />
+      <el-table-column prop="securityName" label="证券名称" width="140" fixed />
 
-      <template v-if="detail.segment === 'basic'">
-        <el-table-column label="代码" width="90">
-          <template #default="{ row }">
-            <el-input v-model="row.securityCode" size="small" :disabled="isReadonly" @change="detail.updateRow(row.id, { securityCode: row.securityCode })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="类型" width="100">
-          <template #default="{ row }">
-            <el-select v-model="row.investType" size="small" :disabled="isReadonly" @change="detail.updateRow(row.id, { investType: row.investType })">
-              <el-option value="stock" label="股票" /><el-option value="fund" label="基金" />
-              <el-option value="bond" label="债券" /><el-option value="derivative" label="衍生" />
-            </el-select>
-          </template>
-        </el-table-column>
-        <el-table-column label="市场" width="90">
-          <template #default="{ row }">
-            <el-input v-model="row.market" size="small" :disabled="isReadonly" @change="detail.updateRow(row.id, { market: row.market })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="初始成本" width="110">
-          <template #default="{ row }">
-            <el-input-number v-model="row.initialCost" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { initialCost: row.initialCost })" />
-          </template>
-        </el-table-column>
-      </template>
-
-      <template v-else-if="detail.segment === 'holding'">
-        <el-table-column label="期初数量" width="100"><template #default="{ row }"><el-input-number v-model="row.openingQty" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { openingQty: row.openingQty })" /></template></el-table-column>
-        <el-table-column label="买入" width="90"><template #default="{ row }"><el-input-number v-model="row.boughtQty" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { boughtQty: row.boughtQty })" /></template></el-table-column>
-        <el-table-column label="卖出" width="90"><template #default="{ row }"><el-input-number v-model="row.soldQty" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { soldQty: row.soldQty })" /></template></el-table-column>
-        <el-table-column label="期末数量" width="100"><template #default="{ row }">{{ row.closingQty }}</template></el-table-column>
-        <el-table-column label="期末成本" width="110"><template #default="{ row }">{{ row.closingCost.toLocaleString() }}</template></el-table-column>
-      </template>
-
-      <template v-else-if="detail.segment === 'fv'">
-        <el-table-column label="单位公允" width="100"><template #default="{ row }"><el-input-number v-model="row.unitFv" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { unitFv: row.unitFv })" /></template></el-table-column>
-        <el-table-column label="期末公允" width="110"><template #default="{ row }">{{ row.closingFv.toLocaleString() }}</template></el-table-column>
-        <el-table-column label="Level" width="80"><template #default="{ row }"><el-select v-model="row.fvLevel" size="small" :disabled="isReadonly" @change="detail.updateRow(row.id, { fvLevel: row.fvLevel })"><el-option value="1" label="L1" /><el-option value="2" label="L2" /><el-option value="3" label="L3" /></el-select></template></el-table-column>
-        <el-table-column label="公允变动" width="100"><template #default="{ row }">{{ row.fvChange.toLocaleString() }}</template></el-table-column>
-      </template>
-
-      <template v-else-if="detail.segment === 'pl'">
-        <el-table-column label="处置收入" width="100"><template #default="{ row }"><el-input-number v-model="row.disposalProceeds" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { disposalProceeds: row.disposalProceeds })" /></template></el-table-column>
-        <el-table-column label="处置成本" width="100"><template #default="{ row }"><el-input-number v-model="row.disposalCost" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { disposalCost: row.disposalCost })" /></template></el-table-column>
-        <el-table-column label="已实现损益" width="110"><template #default="{ row }">{{ row.realizedGain.toLocaleString() }}</template></el-table-column>
-      </template>
-
-      <template v-else>
-        <el-table-column label="未审" width="100"><template #default="{ row }"><el-input-number v-model="row.unadjusted" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { unadjusted: row.unadjusted })" /></template></el-table-column>
-        <el-table-column label="AJE" width="90"><template #default="{ row }"><el-input-number v-model="row.aje" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { aje: row.aje })" /></template></el-table-column>
-        <el-table-column label="RJE" width="90"><template #default="{ row }"><el-input-number v-model="row.rje" size="small" :controls="false" :disabled="isReadonly" @change="detail.updateRow(row.id, { rje: row.rje })" /></template></el-table-column>
-        <el-table-column label="审定" width="110"><template #default="{ row }">{{ row.adjusted.toLocaleString() }}</template></el-table-column>
-      </template>
+      <el-table-column
+        v-for="col in currentColumns"
+        :key="String(col.prop)"
+        :label="col.label"
+        :width="col.width"
+      >
+        <template #default="{ row }">
+          <!-- 公式列（只读） -->
+          <span v-if="col.formula" class="formula-cell" :title="formulaHint(col.prop)">
+            {{ fmtCell(row[col.prop]) }}
+          </span>
+          <!-- 投资类型下拉 -->
+          <el-select
+            v-else-if="col.type === 'invest'"
+            v-model="row.investType"
+            size="small"
+            :disabled="isReadonly"
+            @change="detail.updateRow(row.id, { investType: row.investType })"
+          >
+            <el-option v-for="o in investOptions" :key="o.value" :value="o.value" :label="o.label" />
+          </el-select>
+          <!-- 公允价值来源 Level 下拉 -->
+          <el-select
+            v-else-if="col.type === 'level'"
+            v-model="row.fairValueSource"
+            size="small"
+            :disabled="isReadonly"
+            @change="detail.updateRow(row.id, { fairValueSource: row.fairValueSource })"
+          >
+            <el-option value="1" label="Level 1" />
+            <el-option value="2" label="Level 2" />
+            <el-option value="3" label="Level 3" />
+          </el-select>
+          <!-- 数值输入 -->
+          <el-input-number
+            v-else-if="col.type === 'number'"
+            v-model="row[col.prop]"
+            size="small"
+            :controls="false"
+            :disabled="isReadonly"
+            @change="detail.updateRow(row.id, { [col.prop]: row[col.prop] })"
+          />
+          <!-- 日期 -->
+          <el-input
+            v-else-if="col.type === 'date'"
+            v-model="row[col.prop]"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="YYYY-MM-DD"
+            @change="detail.updateRow(row.id, { [col.prop]: row[col.prop] })"
+          />
+          <!-- 文本 -->
+          <el-input
+            v-else
+            v-model="row[col.prop]"
+            size="small"
+            :disabled="isReadonly"
+            @change="detail.updateRow(row.id, { [col.prop]: row[col.prop] })"
+          />
+        </template>
+      </el-table-column>
 
       <el-table-column label="操作" width="60" fixed="right">
         <template #default="{ row }">
@@ -70,13 +78,27 @@
       </el-table-column>
     </el-table>
 
-    <div class="totals">期末成本合计: {{ detail.totals.closingCost.toLocaleString() }} | 公允价值: {{ detail.totals.closingFv.toLocaleString() }} | 审定: {{ detail.totals.adjusted.toLocaleString() }}</div>
+    <!-- 分类小计 + 总计 -->
+    <div class="totals">
+      <div v-for="st in detail.subtotalsByType" :key="st.investType" class="subtotal-line">
+        <span class="subtotal-label">{{ st.investLabel }}小计({{ st.count }})</span>
+        期末成本 {{ fmtCell(st.totals.closingCost) }} · 公允价值 {{ fmtCell(st.totals.closingFairValue) }} · 审定 {{ fmtCell(st.totals.adjusted) }}
+      </div>
+      <div class="grand-total">
+        <span class="subtotal-label">总计</span>
+        期末成本 {{ fmtCell(detail.grandTotal.closingCost) }} · 公允价值 {{ fmtCell(detail.grandTotal.closingFairValue) }} · 投资收益合计 {{ fmtCell(detail.grandTotal.totalIncome) }} · 审定 {{ fmtCell(detail.grandTotal.adjusted) }}
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
-import { useG1Detail } from '../../composables/useG1Detail'
+import { toRef, computed } from 'vue'
+import {
+  useG1Detail,
+  G1_INVEST_TYPE_OPTIONS,
+  type TradingDetailRow,
+} from '../../composables/useG1Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -91,13 +113,34 @@ const detail = useG1Detail({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const segments = [
-  { label: '基础信息', value: 'basic' },
-  { label: '持有明细', value: 'holding' },
-  { label: '公允价值', value: 'fv' },
-  { label: '损益', value: 'pl' },
-  { label: '审定调整', value: 'adj' },
-]
+const investOptions = G1_INVEST_TYPE_OPTIONS
+
+const segmentOptions = detail.segments.map((s) => ({ label: s.label, value: s.key }))
+
+const currentColumns = computed(() => {
+  const seg = detail.segments.find((s) => s.key === detail.segment.value)
+  // 基础信息区段的证券名称已作为 fixed 列展示，避免重复
+  return (seg?.columns ?? []).filter((c) => c.prop !== 'securityName')
+})
+
+const FORMULA_HINTS: Partial<Record<keyof TradingDetailRow, string>> = {
+  closingQuantity: '期末持有数量 = 期初 + 买入 - 卖出',
+  closingFairValue: '期末公允价值 = 期末持有数量 × 期末单位公允值',
+  fairValueChange: '公允价值变动 = 期末公允价值 - 期初公允价值',
+  realizedGain: '已实现损益 = 处置收入 - 处置成本',
+  totalIncome: '投资收益合计 = 已实现损益 + 利息/股利收入',
+  closingCost: '期末成本 = 期初成本 + 本期增加成本 - 本期减少成本',
+  adjusted: '审定余额 = 未审 + AJE + RJE',
+  variance: '差异 = 审定余额 - 期末公允价值',
+}
+
+function formulaHint(prop: keyof TradingDetailRow): string {
+  return FORMULA_HINTS[prop] ?? ''
+}
+
+function fmtCell(v: unknown): string {
+  return typeof v === 'number' ? v.toLocaleString() : String(v ?? '')
+}
 </script>
 
 <style scoped>
@@ -105,5 +148,9 @@ const segments = [
 .sheet-title { margin: 0 0 12px; }
 .toolbar { margin-bottom: 8px; }
 .segment-bar { margin-bottom: 12px; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
+.subtotal-line { padding: 2px 0; }
+.subtotal-label { font-weight: 600; margin-right: 8px; }
+.grand-total { margin-top: 6px; padding-top: 6px; border-top: 1px solid #dcdfe6; font-weight: 600; color: #303133; }
 </style>

@@ -1,11 +1,5 @@
 <template>
 <div class="d5-disclosure">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 版本切换（上市公司版 / 国企版） -->
     <div class="variant-toolbar" v-if="showListed && showSoe">
       <el-segmented
@@ -252,12 +246,6 @@
         </details>
       </div>
     </template>
-  </template>
-
-  <!-- OnlyOffice占位 -->
-  <div v-else class="onlyoffice-placeholder">
-    <el-empty description="在线编辑模式（OnlyOffice）" />
-  </div>
 </div>
 </template>
 
@@ -290,14 +278,6 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD5CrossSheet>
 }>()
-
-// ─── Mode ────────────────────────────────────────────────────────────────────
-
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -436,7 +416,4 @@ function fmtAmount(val: number | null | undefined): string {
   line-height: 1.6;
 }
 
-.onlyoffice-placeholder {
-  padding: 40px 0;
-}
 </style>

@@ -3,9 +3,14 @@
  * D2TabRelatedParty — 关联方D2-6
  * 12列表 + 添加关联方 + 从D2-2导入 + 合计行
  */
-import { inject, toRef, type Ref } from 'vue'
+import { inject, toRef, computed, type Ref } from 'vue'
 import { useD2RelatedParty } from '../composables/useD2RelatedParty'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 
 const props = defineProps<{
   wpId: string
@@ -14,11 +19,11 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-6',
+)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -35,7 +40,6 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-relatedparty-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 
 const {
   rows,
@@ -50,31 +54,76 @@ const {
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+const browseRows = computed(() =>
+  rows.value.map(r => ({
+    debtorName: r.debtorName,
+    relationType: r.relationType,
+    endBalance: r.endBalance,
+    bookValue: r.bookValue,
+  })),
+)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('debtorName', '关联方名称', 140),
+  virtualTextCol('relationType', '关联关系', 120),
+  virtualNumCol('endBalance', '期末余额', 110, (v) => displayPrefs.fmtAmount(Number(v) || 0)),
+  virtualNumCol('bookValue', '账面价值', 110, (v) => displayPrefs.fmtAmount(Number(v) || 0)),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 900,
+})
 </script>
 
 <template>
   <div class="d2-tab-related-party">
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">添加关联方</el-button>
         <el-button size="small" :disabled="isReadonly" @click="importFromDetail">从D2-2导入</el-button>
       </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
-      </div>
     </div>
 
-    <el-table :data="rows" border size="small" style="width: 100%">
+    <div v-if="useVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ browseRows.length }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
+      </el-alert>
+      <el-button size="small" @click="toggleBrowseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
+    <el-table-v2
+      v-if="useVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="browseRows"
+      :width="tableWidth"
+      :height="tableHeight"
+      :row-height="36"
+      :header-height="40"
+      fixed
+      class="virtual-table"
+    />
+
+    <el-table v-if="!useVirtualScroll || !browseMode" :data="rows" border size="small" style="width: 100%">
       <el-table-column label="关联方名称" min-width="140">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
           <span v-else>{{ row.debtorName || '-' }}</span>
+          <GtReviewDot row-prefix="D2-relatedparty" :row-key="row.rowId" />
         </template>
       </el-table-column>
       <el-table-column label="关联关系" width="120">
@@ -133,6 +182,9 @@ const {
 .d2-tab-related-party { padding: 12px; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
+.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.virtual-hint { flex: 1; min-width: 200px; margin: 0; }
+.virtual-table { margin-bottom: 12px; }
 .total-bar {
   display: flex; gap: 24px; align-items: center; padding: 8px 12px; margin-top: 8px;
   background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px; font-weight: 600;

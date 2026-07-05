@@ -22,7 +22,7 @@
  *
  * Requirements: 7.1-7.6, 8.1-8.6, 9.1-9.5, 14.1-14.5, 18.1-18.5, 18.7
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD1PledgeCheck } from '../composables/useD1PledgeCheck'
 import {
@@ -31,8 +31,9 @@ import {
   type PledgeRow,
 } from '../composables/d1InspectionFormulas'
 import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -55,25 +56,6 @@ const injectedDisplayPrefs = inject<{ fmtAmount: (v: number) => string }>('displ
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const isOOMode = computed(() => editorMode.value === 'oo')
-const ooSheetName = computed(() => props.sheetName || '应收票据质押检查表D1-12')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -163,24 +145,10 @@ const GUIDANCE_TEXTS = [
 
 <template>
   <div class="d1-tab-pledge-check">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
-    </div>
-
-    <!-- OnlyOffice mode -->
-    <GtOnlyOfficeSheet
-      v-if="isOOMode"
-      :wp-id="wpId"
-      :sheet-name="ooSheetName"
-      :project-id="projectId"
-    />
-
-    <!-- HTML mode -->
-    <template v-if="!isOOMode">
+      <div class="tab-header">
+        <h4>质押检查 D1-12</h4>
+        <GtReviewTrigger section-id="D1-pledge-header" />
+      </div>
       <!-- 审计目标 -->
       <el-alert
         type="info"
@@ -229,6 +197,7 @@ const GUIDANCE_TEXTS = [
               >
                 <el-option v-for="o in NOTE_TYPE_OPTIONS" :key="o" :label="o" :value="o" />
               </el-select>
+              <GtReviewDot row-prefix="D1-pledge" :row-key="row.id" />
             </template>
           </el-table-column>
 
@@ -599,13 +568,24 @@ const GUIDANCE_TEXTS = [
         <summary>📋 编制提示</summary>
         <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
       </details>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .d1-tab-pledge-check {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {

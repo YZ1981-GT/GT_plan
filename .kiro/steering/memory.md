@@ -17,6 +17,8 @@ inclusion: always
 - **🔴 底稿导入导出统一规范**：el-dropdown"导入导出▾"(导出模板/导出数据/导入数据)，复用`useXImportExport`composable(后端三端点)。多区块分sheet导出。动态行表格才需要导入导出
 - **🔴 D~N底稿跨模块联动标准（6大集成）**：①版本链(useVersionTrail主入口集成+autoSnapshot) ②抽凭引擎(检查表GtVoucherSamplingEngine dialog→样本填入) ③截止自动提取(useCutoffAutoSampling→序时账±5天) ④附注EventBus(subscribe substantive:adjudicated刷新+publish disclosure:note-text-updated) ⑤行级OCR(📎列POST contract-ocr→ElMessageBox确认→merge) ⑥复核对话(主入口provide openReviewDialog→子组件inject→section标题栏右侧按钮)
 - **不要考虑轻量**：要考虑针对性、联动性、美观性、实操性、易懂性；审计UI要有逻辑追溯能力
+- **🔴 G4复盘改进方向（业务层）**：①附注自动从审定表/明细表抓数(EventBus不够,需主动拉取) ②G4-4利率合理性校验(effectiveRate与couponRate差>200bp告警+IRR反推) ③到期日预警+逾期检测(关联ECL Stage升级信号) ④跨底稿勾稽面板(G4-1↔G4-2合计/G4-ecl减值↔G4-1减值小计) ⑤截止测试改为跨期利息检查(非序时账模式)
+- **🔴 G类开发效率改进**：①任务颗粒度压缩(PBT合并/Checkpoint去掉/验证合并,71→35) ②composable工厂化(DualMode/FormData/ImportExport参数化) ③render策略工厂化(create_cycle_render_strategy) ④并发3+stagger 5s ⑤代码预生成脚本(generate_g_cycle_spec.py)
 - **动态行新增交互**：需命名的动态行必须先弹ElMessageBox.prompt输入名称确认后再创建
 - **复杂底稿填报说明**：多步骤底稿顶部增加蓝色渐变引导区(序号步骤,2列grid)
 - **源模板红字内容融入**：嵌入对应功能区域上方作为"方法论上下文"(琥珀色左边线+浅黄背景)
@@ -79,24 +81,29 @@ inclusion: always
 ### 活跃/待办
 - **🔵 D7合同负债**：三件套齐全待开发(25需求+31任务)
 - **🔵 F2存货(方案B三组拆分)**：✅f2-inventory-main全部完成；✅f2-inventory-valuation-impairment全部完成(19必做任务/44测试全绿/defineAsyncComponent lazy化/F2ValuationTestSheet通用组件+scoped slot)；✅f2-inventory-special全部完成(18sheet/22需求/12PBT全绿/94测试全通过/18任务组全完成)
-- **🔵 F3应付票据**：三件套已创建(10sheet/14需求/8PBT/10波次，贷方公式+利息测算+逾期风险)
+- **✅ F3应付票据**：全部完成(10sheet/14需求/8PBT/10波次/79测试全绿，主入口+9子组件+10composable+后端3py+导入导出7sheet spec+6大集成)
 - **🔵 F4应付账款**：三件套已创建(12sheet/16需求/8PBT/10波次，两级审定+未入账反向截止+供应商融资3区域)
-- **🔵 F5营业成本**：三件套已创建(9sheet/14需求/10PBT/10波次，损益类公式+成本倒轧4区+数量核对+月度波动)
+- **✅ F5营业成本**：全部完成(9sheet/14需求/10PBT/10波次全绿)。主入口sheetName v-if分发8专属组件(F5-1审定/F5-2月度2区段/F5-3其他成本/F5-4调整/F5-5比较/F5-6数量核对+OCR/F5-7成本倒轧4区/F5-8重大调整+抽凭)+F5A/未迁移OO兜底；useF5CosOfFormulaEngine 12纯函数；后端render+import_export(6sheet)+AI(5section)+contract-ocr全注册；44测试全绿(15契约+13PBT+6审定+10集成)。命名沿用CosOf/CosSal前缀。EventBus substantive:adjudicated(6401)→F5-7校验区消费
 - **🔵 G0投资循环函证**：三件套已创建(9sheet/7需求/8PBT/7波次，复用D0+新建证券差异核对+投资替代程序29列)
-- **🔵 G1交易性金融资产**：三件套已创建(16sheet/16需求/12PBT/10波次，sheetName v-if+公允价值Level1-3+SPPI+证券监盘+衍生工具)
-- **🔵 G2应收利息**：三件套已创建(10sheet/15需求/10PBT/10波次，利息365天+ECL三阶段+103行检查表)
-- **🔵 G3应收股利**：三件套已创建(7sheet/9需求/10PBT/10波次，股利测算+33列4区段+分红率)
-- **🔵 G4债权投资(三组拆分,三件套齐全待开发)**：g4-bond-investment-main(8sheet/11需求/13PBT/52任务)；g4-bond-investment-sppi(4sheet/9需求/13PBT/25任务)；g4-bond-investment-ecl(7sheet/11需求/14PBT/37任务)
+- **✅ G1交易性金融资产**：全部完成(16sheet/16需求/12PBT/10波次/75集成测试全绿，主入口sheetName v-if分发+15子组件(core/valuation/classification/inspection)+15composable+后端3py+useG1TraFinFormulaEngine 12纯函数+公允价值Level1-3+SPPI+证券监盘+衍生工具+6大集成)
+- **✅ G2应收利息**：全部完成(10sheet/15需求/10PBT/10波次/61测试全绿，主入口sheetName v-if分发+9子组件+2附注+11composable+后端3py+useG2IntRecFormulaEngine 10纯函数+利息365天+ECL三阶段+103行借贷区块+逾期阶段转移+6大集成+双模式)
+- **✅ G3应收股利**：全部完成(7sheet/9需求/10PBT/10波次/39任务全绿，主入口sheetName分发+G3-1审定表+G3-2明细33列4区段+G3-3调整分录+G3-4测算2区段+G3-5逾期检查+附注+后端3py+useG3FormulaEngine 8函数+10PBT+52前端+23后端集成测试)
+- **✅ G4债权投资-main**：全部完成(8sheet/11需求/13PBT/71任务全绿，主入口sheetName v-if分发+8子组件(core7+measurement1)+useG4MainFormulaEngine 14纯函数+三层审定表+44列5区段Tab+实际利率法双section+附注130行虚拟滚动+导入导出3表9端点+AI 4section+6大集成+76测试+27pytest+20 E2E)
+- **✅ G4债权投资-sppi**：全部完成(4sheet/9需求/13PBT/45任务全绿，主入口sheetName分发+4子组件(classification2+inspection2)+useG4SppiFormulaEngine 12函数+业务模式问卷chip+SPPI三步法+证券盘点+倒轧3区段Tab+后端3py+38单元测试)
+- **✅ G4债权投资-ecl**：全部完成(7sheet/11需求/14PBT/25必做任务全绿，主入口sheetName v-if分发+7子组件(impairment4+voucher1+reference2)+8composable+后端3py+useG4EclFormulaEngine 14纯函数+三阶段Stage判定+ECL公式链⑥=⑤×②A+①×(②A-②)+凭证OCR+抽凭引擎+借贷平衡+转回校验+导入导出4表9端点+AI 5section+6大集成+18PBT全绿)。复盘修复：useG4EclStageClassification补齐5个缺失方法(init/updateCheckValue/updateCompanyStage/updateAuditStage/updateDiscrepancyNote)+G4TabStageClassification.vue修复3处展开行数据绑定(checks.xxx→sectionXxxChecks)
+- **✅ G6其他债权投资-main**：全部完成(43/43任务全绿，主入口+8子组件+4composable+后端4py+useG6MainFormulaEngine 10函数+14PBT+45单元+五大集成+导入导出3表9端点+AI 2section)
+- **✅ G6其他债权投资-sppi**：全部完成(45/45任务全绿，主入口sheetName v-if分发+6子组件(fair-value/interest/classification×2/inspection×2)+10composable+后端3py+useG6SppiFormulaEngine 6纯函数+6PBT+SPPI六section80行+业务模式三section问卷+利息实际利率法分组+公允价值Level1-3+盘点倒轧2区段Tab+导入导出4表12端点+AI 4section+版本链+复核对话+141测试全绿)
 - **🔵 G5长期应收款**：三件套齐全待开发(16sheet/18需求/18PBT/design+tasks已完成)
-- **🔵 G8其他权益工具投资**：三件套齐全待开发(10sheet/13需求/8PBT/15任务8波次)
-- **🔵 G9其他非流动金融资产**：三件套齐全待开发(10sheet/10需求/8PBT/21任务9波次,L3调节10因子+混合计量3分组)
-- **🔵 G10交易性金融负债**：三件套齐全待开发(12sheet/10需求/6PBT/17任务10波次,贷方公式+衍生78行5section+分类检查)
-- **🔵 G11投资收益**：三件套齐全待开发(9sheet/9需求/7PBT/12任务7波次,损益类+收益率分析+calcReturnRate)
+- **✅ G8其他权益工具投资**：全部完成(10sheet/CAS22适当性+Level3+OCI凭证/E2E 23+前端29+后端8)
+- **✅ G9其他非流动金融资产**：全部完成(AJE/RJE回写+满列UI+AI结论+虚拟滚动+validate/E2E，前端26+后端9测试)
+- **✅ G10交易性金融负债**：全部完成(12sheet/10需求/6PBT/17任务全绿，审定24行×3组+validate-formulas API，前端29+后端10测试，E2E 23 passed)
+- **✅ G11投资收益**：全部完成(9sheet/9需求/7PBT/12任务7波次全绿)
 - **🔵 G12净敞口套期收益**：三件套齐全待开发(9sheet/6需求/7PBT/15任务9波次,套期有效性+净敞口79行+calcHedgeIneffectiveness)
 - **🔵 G13公允价值变动收益**：三件套齐全待开发(6sheet/4需求/6PBT/8任务6波次，最简洁)
 - **🔵 G14信用减值损失**：三件套齐全待开发(6sheet/4需求/7PBT/8任务6波次，坏账滚动)
+- **✅ G6其他债权投资-ecl**：全部完成(39/39任务全绿，主入口sheetName v-if分发+5子组件(impairment4+voucher1)+8composable+后端3py+useG6EclFormulaEngine 8纯函数+三阶段Stage判定+ECL公式链⑥=⑤×②A+①×(②A-②)+凭证OCR+抽凭引擎+借贷平衡+转回校验+导入导出3表9端点+AI 4section+6PBT+33单元+16组件逻辑+20集成测试)
 - **🔵 G6/G7三组拆分(三件套齐全待开发)**：
-  - G6其他债权投资：main(8sheet/7需求/8PBT/11任务8波次,77行8层审定+33列3Tab+ECL公式链)/sppi(6sheet/7需求/10PBT/14任务6波次,SPPI80行6section+业务模式chip+利息实际利率法)/ecl(5sheet/6需求/10PBT/11任务6波次,三阶段转置+ECL链+7项凭证核对)
+  - G6其他债权投资：main(8sheet/7需求/8PBT/11任务8波次,77行8层审定+33列3Tab+ECL公式链)/sppi(6sheet/7需求/10PBT/14任务6波次,SPPI80行6section+业务模式chip+利息实际利率法)/~~ecl~~✅已完成
   - G7长期股权投资：main(7sheet/6需求/9PBT/12任务7波次,97行5组审定+54列5Tab+355行附注)/equity-method(8sheet/7需求/9PBT/11任务7波次,权益法测算★+内部交易顺逆流+减值MAX)/subsidiary(7sheet/7需求/8PBT/13任务10波次,CAS33控制六要素+同控/非同控+处置一揽子)
 - **🔵 G13公允价值变动收益**：requirements已创建(8sheet/4需求/6PBT，最简单损益+交叉勾稽)待design+tasks
 - **🔵 G14信用减值损失**：requirements已创建(8sheet/4需求/7PBT，借方费用+ECL汇总勾稽)待design+tasks
@@ -168,6 +175,7 @@ inclusion: always
 - **Bundle wpIdMap必须用item.wp_id不能用item.id**
 - **D~N专属组件必须有RENDERER_DISPATCH注册**（否则被onlyoffice-sheet吞掉）
 - **D~N专属组件不能有内部el-tabs**：接sheetName prop用v-if分发
+- **🔴 专属组件复盘3查（F5血泪）**：①双模式别漏——主入口HTML sheet顶部必须放el-segmented(HTML/OO)+useXDualMode，否则Req双模式回归且composable变死代码 ②EventBus跨表值(如审定成本)必须持久化到checklist_responses(独立item_id)+render策略回读seed，只靠同会话事件刷新后丢失 ③TB自动取数字段(只读)必须真接线：render策略查tb_balance(get_active_filter)→html_data返回→FormData提取→组件watch seed setTbValues，光有setter没人调=假只读手填
 - **account_package_registry sheets顺序=目录行顺序**
 - **导入导出composable必须用http(axios)不能用原生fetch**（无Authorization header→401）
 - **StreamingResponse中文文件名必须RFC5987编码**

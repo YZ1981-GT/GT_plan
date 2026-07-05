@@ -142,27 +142,33 @@ describe('9.3 审定表计算测试', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('9.4 程序表测试', () => {
-  it('PROCEDURE_STEPS_CONFIG has 8 steps', () => {
-    expect(PROCEDURE_STEPS_CONFIG.length).toBe(8)
+  it('PROCEDURE_STEPS_CONFIG has 13 steps', () => {
+    expect(PROCEDURE_STEPS_CONFIG.length).toBe(13)
   })
 
   it('step names match expected', () => {
     const names = PROCEDURE_STEPS_CONFIG.map(s => s.stepName)
     expect(names).toEqual([
-      '获取明细', '核对总账', '票据验真', '到期分析',
-      '背书贴现', '减值评估', '披露检查', '结论',
+      '获取明细', '核对总账', '备查簿核对', '票据验真', '到期分析',
+      '背书贴现', '减值评估', '监盘核查', 'ECL政策', 'ECL测试',
+      '质押检查', '披露检查', '结论',
     ])
   })
 
-  it('first 7 steps are required, last is optional', () => {
-    for (let i = 0; i < 7; i++) {
-      expect(PROCEDURE_STEPS_CONFIG[i].isRequired).toBe(true)
-    }
-    expect(PROCEDURE_STEPS_CONFIG[7].isRequired).toBe(false)
+  it('11 required steps, 质押检查与结论为可选', () => {
+    const requiredCount = PROCEDURE_STEPS_CONFIG.filter(s => s.isRequired).length
+    expect(requiredCount).toBe(11)
+    expect(PROCEDURE_STEPS_CONFIG[10].stepName).toBe('质押检查')
+    expect(PROCEDURE_STEPS_CONFIG[10].isRequired).toBe(false)
+    expect(PROCEDURE_STEPS_CONFIG[12].stepName).toBe('结论')
+    expect(PROCEDURE_STEPS_CONFIG[12].isRequired).toBe(false)
   })
 
   it('canReview logic: all required steps completed → true', () => {
-    const statuses: string[] = ['已完成', '已完成', '不适用', '已完成', '已完成', '已完成', '已完成', '未开始']
+    const statuses: string[] = [
+      '已完成', '已完成', '不适用', '已完成', '已完成', '已完成', '已完成',
+      '已完成', '已完成', '已完成', '未开始', '已完成', '未开始',
+    ]
     const canReview = PROCEDURE_STEPS_CONFIG.every((step, i) => {
       if (!step.isRequired) return true
       return statuses[i] === '已完成' || statuses[i] === '不适用'
@@ -171,7 +177,10 @@ describe('9.4 程序表测试', () => {
   })
 
   it('canReview logic: one required step incomplete → false', () => {
-    const statuses: string[] = ['已完成', '执行中', '已完成', '已完成', '已完成', '已完成', '已完成', '已完成']
+    const statuses: string[] = [
+      '已完成', '执行中', '已完成', '已完成', '已完成', '已完成', '已完成',
+      '已完成', '已完成', '已完成', '未开始', '已完成', '未开始',
+    ]
     const canReview = PROCEDURE_STEPS_CONFIG.every((step, i) => {
       if (!step.isRequired) return true
       return statuses[i] === '已完成' || statuses[i] === '不适用'
@@ -655,7 +664,10 @@ describe('9.15 保存行为测试', () => {
 
 describe('9.16 复核签字测试', () => {
   it('canReview: all required steps "已完成" or "不适用" → true', () => {
-    const statuses = ['已完成', '已完成', '不适用', '已完成', '已完成', '已完成', '已完成', '未开始']
+    const statuses = [
+      '已完成', '已完成', '不适用', '已完成', '已完成', '已完成', '已完成',
+      '已完成', '已完成', '已完成', '未开始', '已完成', '未开始',
+    ]
     const canReview = PROCEDURE_STEPS_CONFIG.every((step, i) => {
       if (!step.isRequired) return true
       return statuses[i] === '已完成' || statuses[i] === '不适用'
@@ -664,7 +676,10 @@ describe('9.16 复核签字测试', () => {
   })
 
   it('canReview: mixed states → false', () => {
-    const statuses = ['已完成', '执行中', '已完成', '未开始', '已完成', '已完成', '已完成', '已完成']
+    const statuses = [
+      '已完成', '执行中', '已完成', '未开始', '已完成', '已完成', '已完成',
+      '已完成', '已完成', '已完成', '未开始', '已完成', '未开始',
+    ]
     const canReview = PROCEDURE_STEPS_CONFIG.every((step, i) => {
       if (!step.isRequired) return true
       return statuses[i] === '已完成' || statuses[i] === '不适用'
@@ -673,7 +688,10 @@ describe('9.16 复核签字测试', () => {
   })
 
   it('pendingItems returns incomplete step names', () => {
-    const statuses = ['已完成', '执行中', '已完成', '未开始', '已完成', '已完成', '已完成', '已完成']
+    const statuses = [
+      '已完成', '执行中', '已完成', '未开始', '已完成', '已完成', '已完成',
+      '已完成', '执行中', '未开始', '未开始', '未开始', '未开始',
+    ]
     const pending: string[] = []
     PROCEDURE_STEPS_CONFIG.forEach((step, i) => {
       if (!step.isRequired) return
@@ -681,7 +699,7 @@ describe('9.16 复核签字测试', () => {
         pending.push(step.stepName)
       }
     })
-    expect(pending).toEqual(['核对总账', '到期分析'])
+    expect(pending).toEqual(['核对总账', '票据验真', 'ECL政策', 'ECL测试', '披露检查'])
   })
 })
 

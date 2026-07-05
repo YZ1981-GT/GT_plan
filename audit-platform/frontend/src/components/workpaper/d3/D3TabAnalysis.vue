@@ -12,7 +12,16 @@
 
   <!-- 区块一：借方发生额分析 -->
   <div class="analysis-card">
-    <h4 class="card-title">(一) 借方发生额分析</h4>
+    <div class="card-header-row">
+      <h4 class="card-title">(一) 借方发生额分析</h4>
+      <el-button-group size="small">
+        <el-button @click="onExportDebitTemplate">借方模板</el-button>
+        <el-button @click="onExportDebitData">借方导出</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportDebitFile">
+          <el-button :disabled="isReadonly">借方导入</el-button>
+        </el-upload>
+      </el-button-group>
+    </div>
     <el-table :data="debitTableData" size="small" border stripe>
       <el-table-column prop="label" label="项目" width="180" />
       <el-table-column label="金额" width="130" align="right">
@@ -29,7 +38,16 @@
 
   <!-- 区块二：贷方发生额分析 -->
   <div class="analysis-card">
-    <h4 class="card-title">(二) 贷方发生额分析</h4>
+    <div class="card-header-row">
+      <h4 class="card-title">(二) 贷方发生额分析</h4>
+      <el-button-group size="small">
+        <el-button @click="onExportCreditTemplate">贷方模板</el-button>
+        <el-button @click="onExportCreditData">贷方导出</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportCreditFile">
+          <el-button :disabled="isReadonly">贷方导入</el-button>
+        </el-upload>
+      </el-button-group>
+    </div>
     <el-table :data="creditTableData" size="small" border stripe>
       <el-table-column prop="label" label="项目" width="180" />
       <el-table-column label="金额" width="130" align="right">
@@ -76,11 +94,19 @@
 
   <!-- 区块四：审计说明 -->
   <div class="analysis-card">
-    <h4 class="card-title">三、审计说明</h4>
+    <h4 class="card-title section-header-row">
+      三、审计说明
+      <GtReviewTrigger section-id="D3-analysis-header" />
+    </h4>
     <div class="note-block">
       <div class="note-label">
         分析性复核说明
-        <el-button size="small" :disabled="true" title="AI功能暂未开放">🤖AI</el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || !aiAvailable || aiLoading"
+          :loading="aiLoading"
+          @click="genAnalysisNote"
+        >🤖AI</el-button>
       </div>
       <el-input
         v-model="auditNote"
@@ -102,11 +128,14 @@
 import { computed, type Ref } from 'vue'
 import { isChangeRateExceeding } from '../composables/useD3FormulaEngine'
 import { useD3Analysis } from '../composables/useD3Analysis'
+import { useD3AiGenerate } from '../composables/useD3AiGenerate'
+import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -134,6 +163,27 @@ const {
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(props.wpId)
+
+const debitImportExport = useD3TabImportExport(props.wpId, 'D3-4-debit')
+const creditImportExport = useD3TabImportExport(props.wpId, 'D3-4-credit')
+const onExportDebitTemplate = debitImportExport.onExportTemplate
+const onExportDebitData = debitImportExport.onExportData
+const onImportDebitFile = debitImportExport.onImportFile
+const onExportCreditTemplate = creditImportExport.onExportTemplate
+const onExportCreditData = creditImportExport.onExportData
+const onImportCreditFile = creditImportExport.onImportFile
+
+async function genAnalysisNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('analysis-note', auditNote.value, {
+    task: '预收账款分析性复核说明',
+    top5Count: top5Debtors.value.length,
+    top5ConcentrationWarning: top5ConcentrationWarning.value || '',
+  }, 'AI · 分析性复核')
+  if (text) auditNote.value = text
+}
 
 // Build table data for debit/credit including total + diff rows
 const debitTableData = computed(() => {
@@ -167,7 +217,10 @@ function isRateHigh(rate: number | '' | 'N/A'): boolean {
 <style scoped>
 .d3-analysis { padding: 16px; }
 .analysis-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.card-header-row .card-title { margin-bottom: 0; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #303133; }
+.section-header-row { display: flex; align-items: center; gap: 8px; }
 .diff-red { color: #f56c6c; font-weight: 600; }
 .rate-exceed { color: #f56c6c; font-weight: 600; }
 .note-block { margin-top: 8px; }

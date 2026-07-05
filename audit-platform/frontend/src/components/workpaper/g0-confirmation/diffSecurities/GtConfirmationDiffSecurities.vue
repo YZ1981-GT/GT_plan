@@ -28,10 +28,15 @@
       </div>
 
       <div class="gt-confirmation-diff-securities__toolbar">
-        <el-button v-if="!readonly" type="primary" size="small" @click="handleAdd">新增行</el-button>
-        <el-button v-if="!readonly" type="success" size="small" :disabled="!data.isDirty.value" @click="handleSave">
-          保存
-        </el-button>
+        <span class="gt-confirmation-diff-securities__section-title">证券投资函证差异核对</span>
+        <div class="gt-confirmation-diff-securities__toolbar-right">
+          <el-button v-if="!readonly" type="primary" size="small" @click="handleAdd">新增行</el-button>
+          <el-button v-if="!readonly" type="success" size="small" :disabled="!data.isDirty.value" @click="handleSave">
+            保存
+          </el-button>
+          <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+          <GtReviewTrigger section-id="G0-3S-securities-diff" label="复核" />
+        </div>
       </div>
 
       <el-table
@@ -154,6 +159,10 @@
       </el-table>
 
       <div class="gt-confirmation-diff-securities__conclusion">
+        <div class="gt-confirmation-diff-securities__conclusion-header">
+          <span>审计说明与结论</span>
+          <GtReviewTrigger section-id="G0-3S-conclusion" label="复核" />
+        </div>
         <el-form label-width="80px" size="small" :disabled="readonly">
           <el-form-item label="审计说明">
             <el-input v-model="data.auditNote.value" type="textarea" :rows="2" @change="markDirty" />
@@ -164,27 +173,59 @@
         </el-form>
       </div>
     </template>
+
+    <!-- 版本链抽屉 -->
+    <GtWpVersionTrail
+      v-if="wpId"
+      ref="versionTrailRef"
+      :workpaper-id="wpId"
+      :project-id="projectId || ''"
+    />
+
+    <!-- 复核对话 -->
+    <GtReviewDialog
+      v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
+      :key="reviewDialog.activationParams.value.sectionId"
+      v-bind="reviewDialog.activationParams.value"
+      @closed="reviewDialog.closeReviewDialog"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, toRef, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useDiffSecuritiesData } from './composables/useDiffSecuritiesData'
 import type { SecuritiesDiffRow } from './diffSecuritiesTypes'
+import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
+import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../../GtGridSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
+const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 
 const props = defineProps<{
   htmlData: any
   readonly: boolean
   wpId?: string
+  projectId?: string
 }>()
 
 const emit = defineEmits<{ (e: 'save', payload: any): void }>()
 
 const htmlDataRef = computed(() => props.htmlData)
 const isNewFormat = computed(() => props.htmlData?._format === 'diff-securities-v1')
+
+const wpIdRef = computed(() => props.wpId ?? '')
+const projectIdRef = computed(() => props.projectId ?? '')
+
+// ─── 版本链集成（autoSnapshot on save + 版本历史抽屉）───────────────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef } = versionToolbar
+
+// ─── 复核对话 provide（供 section 标题栏 GtReviewTrigger inject）─────────────
+const reviewDialog = useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const data = useDiffSecuritiesData({
   htmlData: () => props.htmlData,
@@ -202,6 +243,7 @@ function handleAdd() {
 function handleSave() {
   emit('save', data.buildPayload())
   data.isDirty.value = false
+  versionToolbar.scheduleAutoSnapshot()
   ElMessage.success('已保存')
 }
 
@@ -226,10 +268,31 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
 .gt-confirmation-diff-securities__toolbar {
   margin-bottom: 8px;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.gt-confirmation-diff-securities__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.gt-confirmation-diff-securities__toolbar-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 .gt-confirmation-diff-securities__conclusion {
   margin-top: 16px;
+}
+.gt-confirmation-diff-securities__conclusion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: var(--el-text-color-primary);
 }
 .formula-cell {
   border-bottom: 1px dashed #c0c4cc;

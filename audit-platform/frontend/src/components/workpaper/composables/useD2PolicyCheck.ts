@@ -14,6 +14,7 @@
  * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { calculateExpectedLossRate } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -27,56 +28,95 @@ export interface PolicyParagraph {
   conclusion: 'Y' | 'N' | 'NA' | ''  // 结论
 }
 
+/** D2-8 历史损失率矩阵行（9列：3年余额+3年损失+3年损失率） */
+export interface PolicyHistoricalRow {
+  rowId: string
+  agingBand: string
+  balanceY1: number
+  balanceY2: number
+  balanceY3: number
+  lossY1: number
+  lossY2: number
+  lossY3: number
+}
+
+/** D2-8 迁徙率矩阵行 */
+export interface PolicyMigrationRow {
+  rowId: string
+  agingBand: string
+  year1Rate: number
+  year2Rate: number
+  year3Rate: number
+}
+
+export interface PolicyHistoricalDisplayRow extends PolicyHistoricalRow {
+  lossRateY1: number
+  lossRateY2: number
+  lossRateY3: number
+  avgLossRate: number
+}
+
+export interface PolicyMigrationDisplayRow extends PolicyMigrationRow {
+  avgRate: number
+  expectedLossRate: number
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'D2-policy-paragraphs'
+const HISTORICAL_MATRIX_KEY = 'D2-policy-historical-matrix'
+const MIGRATION_MATRIX_KEY = 'D2-policy-migration-matrix'
 
-/** 默认6个政策检查段落 */
+const DEFAULT_AGING_BANDS = [
+  '1年以内', '1-2年', '2-3年', '3-4年', '4-5年', '5年以上',
+]
+
+/** 默认6个政策检查段落（对齐 D2-8 源模板） */
 const DEFAULT_PARAGRAPHS: PolicyParagraph[] = [
   {
-    paragraphId: 'p1',
-    title: '应收账款确认条件',
-    policyDescription: '企业应当在履行了合同中的履约义务，即在客户取得相关商品或服务控制权时确认收入及应收账款。',
+    paragraphId: 'ecl-model',
+    title: 'ECL模型说明',
+    policyDescription: '企业采用预期信用损失（ECL）模型对应收账款计提坏账准备，应说明所采用的简化方法或一般方法，以及模型输入参数（违约概率、违约损失率、违约风险敞口）的确定依据。',
     actualSituation: '',
     auditorEvaluation: '',
     conclusion: '',
   },
   {
-    paragraphId: 'p2',
-    title: '坏账准备计提政策',
-    policyDescription: '企业应当以预期信用损失为基础，对应收账款进行减值会计处理并确认损失准备。',
+    paragraphId: 'credit-risk-increase',
+    title: '信用风险显著增加判断标准',
+    policyDescription: '企业应建立并披露判断信用风险是否显著增加的标准，通常包括：逾期天数、内部/external信用评级变化、宏观经济指标恶化、债务人财务状况恶化等。',
     actualSituation: '',
     auditorEvaluation: '',
     conclusion: '',
   },
   {
-    paragraphId: 'p3',
-    title: '应收账款终止确认',
-    policyDescription: '企业转移了应收账款所有权上几乎所有的风险和报酬的，应当终止确认该应收账款。',
+    paragraphId: 'impairment-indicators',
+    title: '减值迹象识别',
+    policyDescription: '企业应识别并评估表明应收账款已发生信用减值的客观证据，如：债务人发生重大财务困难、破产、重组、长期逾期且无合理还款计划等。',
     actualSituation: '',
     auditorEvaluation: '',
     conclusion: '',
   },
   {
-    paragraphId: 'p4',
-    title: '应收账款列报与披露',
-    policyDescription: '应收账款应当按照扣除坏账准备后的净额列示。按欠款方归集的期末余额前五名的应收账款情况应予披露。',
+    paragraphId: 'estimate-change',
+    title: '会计估计变更',
+    policyDescription: '如本期变更坏账准备计提方法、账龄组合划分或预期信用损失率，应说明变更原因、影响金额及是否属于会计估计变更或会计政策变更。',
     actualSituation: '',
     auditorEvaluation: '',
     conclusion: '',
   },
   {
-    paragraphId: 'p5',
-    title: '外币应收账款折算',
-    policyDescription: '以外币计价的应收账款，在资产负债表日应当按照期末即期汇率折算，差额计入财务费用。',
+    paragraphId: 'peer-comparison',
+    title: '同行业比较',
+    policyDescription: '应将本企业应收账款坏账准备计提比例、账龄结构与同行业可比公司进行比较，分析差异合理性，关注显著偏离行业水平的计提政策。',
     actualSituation: '',
     auditorEvaluation: '',
     conclusion: '',
   },
   {
-    paragraphId: 'p6',
-    title: '关联方应收账款',
-    policyDescription: '关联方之间的应收账款应单独披露，并说明交易的定价政策及其公允性。',
+    paragraphId: 'ecl-rate-method',
+    title: '预期信用损失率确定方法',
+    policyDescription: '企业应说明各账龄段/组合的预期信用损失率确定方法，包括历史损失率法、迁徙率法、前瞻性调整等，并披露前瞻性信息的来源与权重。',
     actualSituation: '',
     auditorEvaluation: '',
     conclusion: '',
@@ -105,6 +145,68 @@ function parseParagraphs(jsonStr: string | null | undefined): PolicyParagraph[] 
   }
 }
 
+function generateRowId(): string {
+  return `policy-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function createDefaultHistoricalRows(): PolicyHistoricalRow[] {
+  return DEFAULT_AGING_BANDS.map(band => ({
+    rowId: generateRowId(),
+    agingBand: band,
+    balanceY1: 0, balanceY2: 0, balanceY3: 0,
+    lossY1: 0, lossY2: 0, lossY3: 0,
+  }))
+}
+
+function createDefaultMigrationRows(): PolicyMigrationRow[] {
+  return DEFAULT_AGING_BANDS.map(band => ({
+    rowId: generateRowId(),
+    agingBand: band,
+    year1Rate: 0, year2Rate: 0, year3Rate: 0,
+  }))
+}
+
+function parseHistoricalRows(jsonStr: string | null | undefined): PolicyHistoricalRow[] {
+  if (!jsonStr) return createDefaultHistoricalRows()
+  try {
+    const parsed = JSON.parse(jsonStr)
+    if (!Array.isArray(parsed) || parsed.length === 0) return createDefaultHistoricalRows()
+    return parsed.map((raw: any) => ({
+      rowId: raw.rowId || generateRowId(),
+      agingBand: raw.agingBand || '',
+      balanceY1: Number(raw.balanceY1) || 0,
+      balanceY2: Number(raw.balanceY2) || 0,
+      balanceY3: Number(raw.balanceY3) || 0,
+      lossY1: Number(raw.lossY1) || 0,
+      lossY2: Number(raw.lossY2) || 0,
+      lossY3: Number(raw.lossY3) || 0,
+    }))
+  } catch {
+    return createDefaultHistoricalRows()
+  }
+}
+
+function parseMigrationRows(jsonStr: string | null | undefined): PolicyMigrationRow[] {
+  if (!jsonStr) return createDefaultMigrationRows()
+  try {
+    const parsed = JSON.parse(jsonStr)
+    if (!Array.isArray(parsed) || parsed.length === 0) return createDefaultMigrationRows()
+    return parsed.map((raw: any) => ({
+      rowId: raw.rowId || generateRowId(),
+      agingBand: raw.agingBand || '',
+      year1Rate: Number(raw.year1Rate) || 0,
+      year2Rate: Number(raw.year2Rate) || 0,
+      year3Rate: Number(raw.year3Rate) || 0,
+    }))
+  } catch {
+    return createDefaultMigrationRows()
+  }
+}
+
+function calcLossRate(loss: number, balance: number): number {
+  return balance === 0 ? 0 : loss / balance
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2PolicyCheck(options: UseD2BaseOptions) {
@@ -113,25 +215,43 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
   // ─── State ─────────────────────────────────────────────────────────────
 
   const paragraphs = ref<PolicyParagraph[]>(DEFAULT_PARAGRAPHS.map(p => ({ ...p })))
+  const historicalRows = ref<PolicyHistoricalRow[]>(createDefaultHistoricalRows())
+  const migrationRows = ref<PolicyMigrationRow[]>(createDefaultMigrationRows())
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let matrixDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
   // ─── Load from allResponses ────────────────────────────────────────────
 
   function loadData(): void {
     const resp = allResponses.value.get(STORAGE_KEY)
     paragraphs.value = parseParagraphs(resp?.remark)
+    historicalRows.value = parseHistoricalRows(allResponses.value.get(HISTORICAL_MATRIX_KEY)?.remark)
+    migrationRows.value = parseMigrationRows(allResponses.value.get(MIGRATION_MATRIX_KEY)?.remark)
   }
 
   watch(
     () => allResponses.value.get(STORAGE_KEY)?.remark,
     () => {
-      // Only reload on initial
       const isInitial = paragraphs.value.every(p => !p.actualSituation && !p.auditorEvaluation && !p.conclusion)
-      if (isInitial) {
-        loadData()
-      }
+      if (isInitial) loadData()
     },
-    { immediate: true }
+    { immediate: true },
+  )
+
+  watch(
+    () => allResponses.value.get(HISTORICAL_MATRIX_KEY)?.remark,
+    (v) => {
+      if (v) historicalRows.value = parseHistoricalRows(v)
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => allResponses.value.get(MIGRATION_MATRIX_KEY)?.remark,
+    (v) => {
+      if (v) migrationRows.value = parseMigrationRows(v)
+    },
+    { immediate: true },
   )
 
   // ─── Computed ──────────────────────────────────────────────────────────
@@ -150,6 +270,25 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
   const hasNonCompliant: ComputedRef<boolean> = computed(() => {
     return paragraphs.value.some(p => p.conclusion === 'N')
   })
+
+  const historicalDisplayRows: ComputedRef<PolicyHistoricalDisplayRow[]> = computed(() =>
+    historicalRows.value.map(row => {
+      const lossRateY1 = calcLossRate(row.lossY1, row.balanceY1)
+      const lossRateY2 = calcLossRate(row.lossY2, row.balanceY2)
+      const lossRateY3 = calcLossRate(row.lossY3, row.balanceY3)
+      const rates = [lossRateY1, lossRateY2, lossRateY3].filter(r => r > 0)
+      const avgLossRate = rates.length ? rates.reduce((a, b) => a + b, 0) / rates.length : 0
+      return { ...row, lossRateY1, lossRateY2, lossRateY3, avgLossRate }
+    }),
+  )
+
+  const migrationDisplayRows: ComputedRef<PolicyMigrationDisplayRow[]> = computed(() =>
+    migrationRows.value.map(row => {
+      const rates = [row.year1Rate, row.year2Rate, row.year3Rate]
+      const avgRate = rates.reduce((a, b) => a + b, 0) / 3
+      return { ...row, avgRate, expectedLossRate: calculateExpectedLossRate(rates) }
+    }),
+  )
 
   // ─── Update Paragraph ──────────────────────────────────────────────────
 
@@ -173,6 +312,51 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
       paragraph.auditorEvaluation = value
       debounceSave()
     }
+  }
+
+  function updateHistoricalCell(rowId: string, field: keyof PolicyHistoricalRow, value: number): void {
+    if (isReadonly.value) return
+    const row = historicalRows.value.find(r => r.rowId === rowId)
+    if (!row || field === 'rowId' || field === 'agingBand') return
+    ;(row as any)[field] = value
+    debounceMatrixSave()
+  }
+
+  function updateMigrationCell(rowId: string, field: keyof PolicyMigrationRow, value: number): void {
+    if (isReadonly.value) return
+    const row = migrationRows.value.find(r => r.rowId === rowId)
+    if (!row || field === 'rowId' || field === 'agingBand') return
+    ;(row as any)[field] = value
+    debounceMatrixSave()
+  }
+
+  function debounceMatrixSave(): void {
+    if (matrixDebounceTimer) clearTimeout(matrixDebounceTimer)
+    matrixDebounceTimer = setTimeout(() => {
+      matrixDebounceTimer = null
+      flushMatrixSave()
+    }, 2000)
+  }
+
+  function flushMatrixSave(): void {
+    const histJson = JSON.stringify(historicalRows.value)
+    const migJson = JSON.stringify(migrationRows.value)
+    allResponses.value.set(HISTORICAL_MATRIX_KEY, {
+      item_id: HISTORICAL_MATRIX_KEY, conclusion: null, remark: histJson,
+    })
+    allResponses.value.set(MIGRATION_MATRIX_KEY, {
+      item_id: MIGRATION_MATRIX_KEY, conclusion: null, remark: migJson,
+    })
+    try {
+      window.dispatchEvent(new CustomEvent('d2:save-items', {
+        detail: {
+          items: [
+            { item_id: HISTORICAL_MATRIX_KEY, conclusion: null, remark: histJson },
+            { item_id: MIGRATION_MATRIX_KEY, conclusion: null, remark: migJson },
+          ],
+        },
+      }))
+    } catch { /* silent */ }
   }
 
   // ─── Serialization & Save ──────────────────────────────────────────────
@@ -220,16 +404,25 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
       debounceTimer = null
       flushSave()
     }
+    if (matrixDebounceTimer) {
+      clearTimeout(matrixDebounceTimer)
+      matrixDebounceTimer = null
+      flushMatrixSave()
+    }
   })
 
   // ─── Return ────────────────────────────────────────────────────────────
 
   return {
     paragraphs,
+    historicalDisplayRows,
+    migrationDisplayRows,
     completedCount,
     totalCount,
     hasNonCompliant,
     updateParagraph,
+    updateHistoricalCell,
+    updateMigrationCell,
   }
 }
 

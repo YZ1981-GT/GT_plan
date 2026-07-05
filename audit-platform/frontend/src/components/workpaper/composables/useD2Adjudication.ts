@@ -22,6 +22,18 @@ import {
 } from './useD2FormulaEngine'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
 
+const BALANCE_TOLERANCE = 0.01
+
+function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
+  if (!jsonStr) return []
+  try {
+    const parsed = JSON.parse(jsonStr)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface UseD2BaseOptions {
@@ -512,6 +524,43 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     return Math.abs(changeRate) > 0.3
   }
 
+  /** D2-2 明细合计 vs D2-1 原值三分类审定合计 */
+  const detailCrossValidation = computed((): string | null => {
+    const rows = detailRows.value
+    if (!rows.length) return null
+    const d2_2_total = rows.reduce((s, r) => s + parseNum(r.currentAudited), 0)
+    const grossRows = adjudicationRows.value.filter(r => r.rowKey !== 'total')
+    const d2_1_total = grossRows.reduce((s, r) => s + r.currentAudited, 0)
+    const diff = d2_1_total - d2_2_total
+    if (Math.abs(diff) > BALANCE_TOLERANCE) {
+      return `D2-1原值合计(${d2_1_total.toFixed(2)}) 与 D2-2明细合计(${d2_2_total.toFixed(2)}) 差异 ${diff.toFixed(2)}`
+    }
+    return null
+  })
+
+  /** D2-3 坏账准备 vs D2-9 ECL 应计提合计 */
+  const eclCrossValidation = computed((): string | null => {
+    let bdTotal = 0
+    for (const key of ['D2-bd-individual-rows', 'D2-bd-aging-rows', 'D2-bd-customer-rows']) {
+      const rows = safeParseRows<{ isFixed?: boolean; currentAudited?: number }>(
+        allResponses.value.get(key)?.remark,
+      )
+      const fixed = rows.find(r => r.isFixed)
+      if (fixed) bdTotal += parseNum(fixed.currentAudited)
+    }
+    if (bdTotal === 0) return null
+    const eclRows = safeParseRows<{ shouldProvision?: number }>(
+      allResponses.value.get('D2-ecl-single-rows')?.remark,
+    )
+    if (!eclRows.length) return null
+    const eclTotal = eclRows.reduce((s, r) => s + parseNum(r.shouldProvision), 0)
+    const diff = bdTotal - eclTotal
+    if (Math.abs(diff) > BALANCE_TOLERANCE) {
+      return `D2-3坏账准备合计(${bdTotal.toFixed(2)}) 与 D2-9应计提合计(${eclTotal.toFixed(2)}) 差异 ${diff.toFixed(2)}`
+    }
+    return null
+  })
+
   // ─── EventBus Registration ─────────────────────────────────────────────
 
   function registerEventListeners(): void {
@@ -559,6 +608,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     updateCell,
     publishAdjudicated,
     isChangeRateWarning,
+    detailCrossValidation,
+    eclCrossValidation,
 
     // SUMIF状态
     sumifStatus,

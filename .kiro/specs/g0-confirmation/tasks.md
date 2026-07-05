@@ -58,49 +58,49 @@
     - 实现 `hasDifference`（有差异 = |数量差异|>0 OR |公允价值差异|>0.01）
     - _Requirements: 7.1~7.6_
 
-  - [ ]* 2.2 编写 Property 1 PBT：数量差异公式
+  - [x]* 2.2 编写 Property 1 PBT：数量差异公式
     - 生成器：`fc.integer({min:-1e6, max:1e6})` × confirmed/booked
     - 断言：calcQuantityDiff(confirmed, booked) === confirmed - booked
     - **Property 1: 数量差异=回函持仓-账面持仓**
     - **Validates: Requirements 2.5, 7.1**
 
-  - [ ]* 2.3 编写 Property 2 PBT：公允价值差异公式
+  - [x]* 2.3 编写 Property 2 PBT：公允价值差异公式
     - 生成器：`fc.float({min:-1e8, max:1e8})` × confirmedFV/bookedFV
     - 断言：calcFairValueDiff(confirmedFV, bookedFV) === confirmedFV - bookedFV
     - **Property 2: 公允价值差异=回函-账面**
     - **Validates: Requirements 2.6, 7.2**
 
-  - [ ]* 2.4 编写 Property 3 PBT：市值差异公式
+  - [x]* 2.4 编写 Property 3 PBT：市值差异公式
     - 生成器：`fc.float({min:0, max:1e9})` × confirmedMV/bookedMV
     - 断言：calcMarketValueDiff(confirmedMV, bookedMV) === confirmedMV - bookedMV
     - **Property 3: 市值差异=回函市值-账面市值**
     - **Validates: Requirements 2.7, 7.3**
 
-  - [ ]* 2.5 编写 Property 4 PBT：处置损益公式
+  - [x]* 2.5 编写 Property 4 PBT：处置损益公式
     - 生成器：`fc.float({min:0, max:1e8})` × proceeds/cost/fee
     - 断言：calcDisposalGain(proceeds, cost, fee) === proceeds - cost - fee
     - **Property 4: 处置损益=成交-成本-手续费**
     - **Validates: Requirements 3.13, 7.4**
 
-  - [ ]* 2.6 编写 Property 5 PBT：股利差异恒等
+  - [x]* 2.6 编写 Property 5 PBT：股利差异恒等
     - 生成器：`fc.float({min:0, max:1e7})` × declared/received/tax
     - 断言：calcDividendDiff(declared, received, tax) === declared - received - tax
     - **Property 5: 股利差异=应收-实收-税**
     - **Validates: Requirements 7.5**
 
-  - [ ]* 2.7 编写 Property 6 PBT：差异判定对称性
-    - 生成器：`fc.float({min:-1e8, max:1e8})` × a/b
-    - 断言：hasDifference(a, b) === hasDifference(b, a)
-    - **Property 6: 差异判定对称**
+  - [x]* 2.7 编写 Property 6 PBT：差异判定定义一致性
+    - 生成器：`fc.float({min:-1e8, max:1e8})` × qtyDiff/fvDiff
+    - 断言：hasDifference(qtyDiff, fvDiff) === (Math.abs(qtyDiff) > 0 || Math.abs(fvDiff) > 0.01)
+    - **Property 6: 差异判定定义一致性**
     - **Validates: Requirements 7.6**
 
-  - [ ]* 2.8 编写 Property 7 PBT：零差异恒等
+  - [x]* 2.8 编写 Property 7 PBT：零差异恒等
     - 生成器：`fc.float({min:-1e8, max:1e8})` v
     - 断言：calcQuantityDiff(v, v) === 0 ∧ calcFairValueDiff(v, v) === 0 ∧ calcMarketValueDiff(v, v) === 0
     - **Property 7: 自身与自身差异=0**
     - **Validates: Requirements 7.1~7.3**
 
-  - [ ]* 2.9 编写 Property 8 PBT：处置损益与手续费反比
+  - [x]* 2.9 编写 Property 8 PBT：处置损益与手续费反比
     - 生成器：`fc.float({min:0, max:1e8})` proceeds/cost + `fc.float`排序fee1>fee2
     - 断言：calcDisposalGain(proceeds, cost, fee1) < calcDisposalGain(proceeds, cost, fee2)
     - **Property 8: 手续费越高→处置损益越低**
@@ -151,30 +151,30 @@
     - _Requirements: 3.1~3.13_
 
 - [ ] 5. 后端实现
-  - [ ] 5.1 创建后端3个py文件
+  - [x] 5.1 创建后端3个py文件
     - `_g0_confirmation.py`：2个render策略函数 + 注册RENDERER_DISPATCH
     - `_g0_confirmation_import_export.py`：3端点（export-template/export-data/import-data）
     - `_g0_confirmation_ai.py`：2个AI section端点
     - _Requirements: 4.5, 5.3~5.6_
 
-  - [ ] 5.2 创建 `useG0ImportExport.ts` + `useG0DualMode.ts`
+  - [x] 5.2 创建 `useG0ImportExport.ts` + `useG0DualMode.ts`
     - useG0ImportExport：el-dropdown"导入导出▾" + axios三端点
     - useG0DualMode：模式状态(html/onlyoffice) + 切换逻辑 + localStorage持久化
     - _Requirements: 5.3~5.6_
 
 - [ ] 6. 跨模块联动集成
-  - [ ] 6.1 版本链 + 复核集成
+  - [x] 6.1 版本链 + 复核集成
     - 两个新建组件主入口集成useVersionTrail（autoSnapshot on save + "版本历史"按钮 + drawer）
     - provide('openReviewDialog', openReviewDialog)供子组件inject
     - _Requirements: 6.1~6.4_
 
-  - [ ] 6.2 行级OCR + 反向联动
+  - [x] 6.2 行级OCR + 反向联动
     - G0-6: 📎OCR列POST contract-ocr→证券信息识别→确认弹窗→merge
     - G0-6: 从confirmation-hub的G0-1获取未回函项目列表（EventBus/API）
     - _Requirements: 3.8, 3.9_
 
 - [ ] 7. 集成测试与验收
-  - [ ] 7.1 编写集成测试
+  - [x] 7.1 编写集成测试
     - wp_code_overrides映射正确性（10条G0→对应componentType）
     - G0-3(证券)差异三维公式（数量/公允价值/市值）
     - G0-6处置损益公式（成交-成本-手续费）

@@ -15,13 +15,15 @@ import {
   calculateDifference,
   calculatePledgeRatio,
   determineCutoff,
-  sumif,
+  sumifLegacy as sumif,
+} from '../composables/useD2FormulaEngine'
+import {
   getTabStatusFromResponses,
   PROCEDURE_STEPS_CONFIG,
   AGING_BANDS_CONFIG,
   ADJUDICATION_ROWS_CONFIG,
   TAB_NAMES,
-} from '../composables/useD2AccountsReceivable'
+} from '../composables/d2Constants'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 9.1 注册契约测试

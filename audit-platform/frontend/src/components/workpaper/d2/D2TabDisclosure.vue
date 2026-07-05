@@ -6,7 +6,7 @@
  */
 import { computed, inject, toRef, type Ref } from 'vue'
 import { useD2Disclosure, type DisclosureVersion } from '../composables/useD2Disclosure'
-import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 
 const props = defineProps<{
   wpId: string
@@ -15,17 +15,10 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
-
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 })
 
-// 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
@@ -36,7 +29,6 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-disclosure-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 
 const {
   activeVersion,
@@ -76,17 +68,7 @@ const tableType = computed({
 <template>
   <div class="d2-tab-disclosure">
     <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
-      </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
-      </div>
+      <div class="toolbar-left" />
     </div>
 
     <!-- 版本切换 -->
@@ -115,17 +97,25 @@ const tableType = computed({
     </el-alert>
 
     <!-- 各区块渲染 -->
-    <div v-for="section in sections" :key="section.sectionId" class="section-block">
-      <div class="section-header">
-        <span class="section-title">{{ section.title }}</span>
-        <el-button v-if="!isReadonly" size="small" type="primary" link @click="addRow(section.sectionId)">+ 添加行</el-button>
-      </div>
+    <el-card
+      v-for="section in sections"
+      :key="section.sectionId"
+      class="section-card"
+      shadow="hover"
+    >
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">{{ section.title }}</span>
+          <el-button v-if="!isReadonly" size="small" type="primary" link @click="addRow(section.sectionId)">+ 添加行</el-button>
+        </div>
+      </template>
 
       <el-table :data="[...section.rows, section.totalRow]" border size="small" style="width: 100%">
         <el-table-column label="项目" min-width="140">
           <template #default="{ row }">
             <el-input v-if="row.isEditable && !isReadonly" :model-value="row.label" size="small" @change="(v: string) => updateCell(section.sectionId, row.rowId, 'label', v)" />
             <span v-else :style="{ fontWeight: !row.isEditable ? '600' : 'normal' }">{{ row.label || '-' }}</span>
+            <GtReviewDot v-if="row.rowId" row-prefix="D2-disclosure" :row-key="row.rowId" />
           </template>
         </el-table-column>
         <el-table-column label="金额" width="130" align="right">
@@ -156,7 +146,7 @@ const tableType = computed({
           </template>
         </el-table-column>
       </el-table>
-    </div>
+    </el-card>
   </div>
 </template>
 
@@ -166,8 +156,8 @@ const tableType = computed({
 .toolbar-left { display: flex; gap: 8px; }
 .version-switcher { margin-bottom: 12px; display: flex; align-items: center; }
 .inconsistency-alert { margin-bottom: 8px; }
-.section-block { margin-bottom: 16px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.section-card { margin-bottom: 16px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; }
 .section-title { font-weight: 600; font-size: 14px; }
 .cross-sheet-cell { background-color: #e6f7ff; padding: 2px 4px; border-radius: 2px; }
 </style>

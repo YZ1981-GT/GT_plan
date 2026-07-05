@@ -1,11 +1,5 @@
 <template>
 <div class="d5-detail">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 工具栏 -->
     <div class="detail-toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
@@ -20,11 +14,42 @@
       <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">
         从余额表导入
       </el-button>
-      <el-button size="small" :disabled="true">导出空模板</el-button>
-      <el-button size="small" :disabled="true">导入数据</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="exportTemplate">导出空模板</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="exportData">导出数据</el-button>
+      <el-upload
+        :show-file-list="false"
+        accept=".xlsx"
+        :auto-upload="false"
+        :disabled="isReadonly || importing"
+        @change="(f: any) => onImportFile(f.raw || f)"
+      >
+        <el-button size="small" :disabled="isReadonly || importing">导入数据</el-button>
+      </el-upload>
     </div>
 
+    <div v-if="useVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+      </el-alert>
+      <el-button size="small" @click="toggleBrowseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
+    <el-table-v2
+      v-if="useVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="browseRows"
+      :width="tableWidth"
+      :height="tableHeight"
+      :row-height="36"
+      :header-height="40"
+      :row-event-handlers="rowEventHandlers"
+      fixed
+      class="virtual-table"
+    />
+
     <!-- 明细表主体 -->
+    <div v-if="!useVirtualScroll || !browseMode">
     <el-table
       :data="displayRows"
       size="small"
@@ -309,6 +334,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <!-- 审计说明区域 -->
     <div class="audit-notes-section">
@@ -321,16 +347,15 @@
         placeholder="对明细表本期变动的分析说明..."
       />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || !aiAvailable || aiLoading"
+          :loading="aiLoading"
+          @click="genDetailNote"
+        >🤖AI</el-button>
         <el-button size="small" @click="openReview('D5-detail-note')">💬 复核</el-button>
       </div>
     </div>
-  </template>
-
-  <!-- OnlyOffice占位 -->
-  <div v-else class="onlyoffice-placeholder">
-    <el-empty description="在线编辑模式（OnlyOffice）" />
-  </div>
 </div>
 </template>
 
@@ -346,9 +371,14 @@
  * Task: 14.1
  * Requirements: 4.1-4.9, 5.1-5.7, 10.9
  */
-import { ref, computed, inject, watch, type Ref } from 'vue'
+import { ref, computed, inject, watch, toRef, type Ref } from 'vue'
 import { useD5Detail } from '../composables/useD5Detail'
 import type { ChecklistResponse } from '../composables/useD5FormData'
+import { useD5ImportExport } from '../composables/useD5ImportExport'
+import { useD5AiGenerate } from '../composables/useD5AiGenerate'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -367,14 +397,18 @@ const props = defineProps<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
-// ─── Mode ────────────────────────────────────────────────────────────────────
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD5ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D5-2',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+async function onImportFile(file: File) {
+  await importData(file)
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -397,6 +431,37 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+function fmtAmount(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const browseRows = rows
+const browseRowCount = computed(() => rows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('category', '类别', 100),
+  virtualTextCol('itemName', '明细项目', 120),
+  virtualNumCol('priorUnadjusted', '期初未审', 100, fmtAmount),
+  virtualNumCol('endUnadjusted', '期末未审', 100, fmtAmount),
+  virtualNumCol('endAudited', '期末审定', 100, fmtAmount),
+  virtualTextCol('remark', '备注', 120),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  rowEventHandlers,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 1400,
+})
+
 // ─── Audit Notes ─────────────────────────────────────────────────────────────
 
 const auditExplanation = ref('')
@@ -410,6 +475,17 @@ watch(
 watch(auditExplanation, (val) => {
   props.debouncedSave('D5-2-note-explanation', { remark: val })
 })
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
+
+async function genDetailNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('detail-change', auditExplanation.value, {
+    task: '应收款项融资明细表变动分析',
+    rowCount: rows.value.length,
+  }, 'AI · 明细变动分析')
+  if (text) auditExplanation.value = text
+}
 
 // ─── Display Rows (含小计行+合计行) ──────────────────────────────────────────
 
@@ -477,14 +553,6 @@ const displayRows = computed<DisplayRow[]>(() => {
   return result
 })
 
-// ─── Formatting Helpers ──────────────────────────────────────────────────────
-
-function fmtAmount(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
-  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
 function openReview(sectionId: string) {
   openReviewDialog(sectionId)
 }
@@ -497,6 +565,17 @@ function openReview(sectionId: string) {
 
 .mode-toolbar {
   margin-bottom: 12px;
+}
+
+.virtual-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.virtual-hint {
+  flex: 1;
 }
 
 .detail-toolbar {
@@ -538,9 +617,5 @@ function openReview(sectionId: string) {
   display: flex;
   gap: 8px;
   margin-top: 8px;
-}
-
-.onlyoffice-placeholder {
-  padding: 40px 0;
 }
 </style>

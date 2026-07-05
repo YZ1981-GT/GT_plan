@@ -9,11 +9,13 @@
  * 固定行结构：按单项计提（可展开子行）+ 按组合计提（可展开子行）+ 小计
  * ECL差异警告（小计行旁黄色 el-alert）
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1BadDebt, type BadDebtRow } from '../composables/useD1BadDebt'
 import type { ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -30,24 +32,6 @@ const props = defineProps<{
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const ooSheetName = computed(() => props.sheetName || '坏账准备D1-4')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
 })
 
 // ─── ECL Test Total (from allResponses or default 0) ─────────────────────────
@@ -120,92 +104,25 @@ function isParentRow(row: BadDebtRow): boolean {
 
 // ─── Import/Export ───────────────────────────────────────────────────────────
 
-const SHEET_CODE = 'D1-4'
-
-async function exportTemplate() {
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d1/export-template`,
-      null,
-      { params: { sheet: SHEET_CODE }, responseType: 'blob' }
-    )
-    const blob = new Blob([res.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${SHEET_CODE}_模板.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function exportData() {
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d1/export-data`,
-      null,
-      { params: { sheet: SHEET_CODE }, responseType: 'blob' }
-    )
-    const blob = new Blob([res.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${SHEET_CODE}_数据.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-async function handleImportFile(file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d1/import-data`,
-      formData,
-      { params: { sheet: SHEET_CODE }, headers: { 'Content-Type': 'multipart/form-data' } }
-    )
-    const data = res.data?.data ?? res.data
-    ElMessage.success(`成功导入${data.imported_count}行数据`)
-    if (data.warning) ElMessage.warning(data.warning)
-  } catch (e: any) {
-    const errData = e?.response?.data?.data ?? e?.response?.data
-    if (e?.response?.status === 400 && errData?.invalid_columns?.length) {
-      ElMessage.error(`列名不匹配: ${errData.invalid_columns.join(', ')}`)
-    } else {
-      ElMessage.error('导入失败')
-    }
-  }
-}
+const wpIdRef = toRef(props, 'wpId')
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-4')
 </script>
 
 <template>
   <div class="d1-tab-bad-debt">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
+    <div class="tab-header">
+      <h4>坏账准备 D1-4</h4>
+      <GtReviewTrigger section-id="D1-baddebt-header" />
     </div>
-
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="ooSheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML mode -->
-    <template v-if="editorMode === 'html'">
     <!-- Toolbar -->
     <div class="table-toolbar">
       <el-button-group size="small">
-        <el-button @click="exportTemplate">导出模板</el-button>
-        <el-button @click="exportData">导出数据</el-button>
+        <el-button @click="onExportTemplate">导出模板</el-button>
+        <el-button @click="onExportData">导出数据</el-button>
         <el-upload
           :show-file-list="false"
           accept=".xlsx"
-          :auto-upload="false"
-          :on-change="(f: any) => handleImportFile(f.raw)"
+          :before-upload="onImportFile"
           style="display:inline-block"
         >
           <el-button size="small">导入数据</el-button>
@@ -254,6 +171,7 @@ async function handleImportFile(file: File) {
           </template>
           <template v-else-if="isParentRow(row)">
             <span style="font-weight: 600">{{ row.label }}</span>
+            <GtReviewDot row-prefix="D1-baddebt" :row-key="row.rowId" />
           </template>
           <template v-else>
             <div class="sub-row-cell">
@@ -265,6 +183,7 @@ async function handleImportFile(file: File) {
                 :disabled="isReadonly"
                 @change="(v: string) => updateCell(row.rowId, 'label', v as any)"
               />
+              <GtReviewDot row-prefix="D1-baddebt" :row-key="row.rowId" />
               <el-button
                 v-if="!isReadonly"
                 type="danger"
@@ -451,7 +370,6 @@ async function handleImportFile(file: File) {
         </template>
       </el-table-column>
     </el-table>
-    </template>
   </div>
 </template>
 
@@ -460,16 +378,16 @@ async function handleImportFile(file: File) {
   padding: 12px;
 }
 
-.mode-switcher {
+.tab-header {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.oo-disabled-hint {
-  cursor: help;
-  font-size: 14px;
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .table-toolbar {

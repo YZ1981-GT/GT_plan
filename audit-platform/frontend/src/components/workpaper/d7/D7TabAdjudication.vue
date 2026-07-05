@@ -1,11 +1,12 @@
 <template>
 <div class="d7-adjudication">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
+    <div class="toolbar">
+      <el-button size="small" @click="exportTemplate">导出模板</el-button>
+      <el-button size="small" @click="exportData">导出数据</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+        <el-button size="small" :loading="importing">导入数据</el-button>
+      </el-upload>
+    </div>
     <!-- 交叉验证警告 -->
     <el-alert
       v-if="crossValidationWarning"
@@ -202,7 +203,7 @@
         <label>变动分析：<GtIndexChip wp-code="D7-2" label="→D7-2" /></label>
         <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="分析合同负债本期变动原因..." />
         <div class="note-actions">
-          <el-button size="small" :disabled="true">🤖AI</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genExplanation">🤖AI</el-button>
           <el-button size="small" @click="openReview('D7-1-note-explanation')">💬复核</el-button>
         </div>
       </div>
@@ -210,7 +211,7 @@
         <label>账龄分析：<GtIndexChip wp-code="D7-5" label="→D7-5" /></label>
         <el-input v-model="auditNotes.agingExplanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="分析账龄超过1年合同负债的原因及合理性..." />
         <div class="note-actions">
-          <el-button size="small" :disabled="true">🤖AI</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genAgingExplanation">🤖AI</el-button>
           <el-button size="small" @click="openReview('D7-1-note-aging-explanation')">💬复核</el-button>
         </div>
       </div>
@@ -218,17 +219,11 @@
         <label>CAS14区分说明：<GtIndexChip wp-code="D3" label="→D3 预收账款" /></label>
         <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="对合同负债与预收账款的区分结论..." />
         <div class="note-actions">
-          <el-button size="small" :disabled="true">🤖AI</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genConclusion">🤖AI</el-button>
           <el-button size="small" @click="openReview('D7-1-note-conclusion')">💬复核</el-button>
         </div>
       </div>
     </div>
-  </template>
-
-  <!-- OO模式 -->
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -239,9 +234,11 @@
  * Task: 16.1
  * Requirements: 2.1-2.9, 3.4, 3.6, 4.1-4.7, 17.1-17.3, 19.1, 20.1, 21.1-21.5, 22.1-22.4
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { useD7Adjudication, type AdjudicationRow } from '../composables/useD7Adjudication'
+import { useD7ImportExport } from '../composables/useD7ImportExport'
+import { useD7AiGenerate } from '../composables/useD7AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD7FormulaEngine'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 import type useD7CrossSheet from '../composables/useD7CrossSheet'
@@ -259,13 +256,19 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useD7CrossSheet>
 }>()
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD7ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D7-1',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+
+async function onImportFile(file: File) {
+  await importData(file)
+  return false
+}
 
 const {
   natureRows,
@@ -283,6 +286,36 @@ const {
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
 })
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
+
+async function genExplanation() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-change-analysis', auditNotes.value.explanation, {
+    task: '合同负债本期变动分析',
+    trialBalanceDiff: trialBalanceDiff.value,
+    crossValidationWarning: crossValidationWarning.value || '',
+  }, 'AI · 变动分析')
+  if (text) auditNotes.value.explanation = text
+}
+
+async function genAgingExplanation() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-aging-reason', auditNotes.value.agingExplanation, {
+    task: '账龄超过1年合同负债原因分析',
+  }, 'AI · 账龄分析')
+  if (text) auditNotes.value.agingExplanation = text
+}
+
+async function genConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-conclusion', auditNotes.value.conclusion, {
+    task: 'CAS14合同负债与预收账款区分结论',
+    trialBalanceAmount: trialBalanceAmount.value,
+    trialBalanceDiff: trialBalanceDiff.value,
+  }, 'AI · CAS14区分结论')
+  if (text) auditNotes.value.conclusion = text
+}
 
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -330,8 +363,7 @@ function openReview(sectionId: string) {
 
 <style scoped>
 .d7-adjudication { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
-.oo-mode-placeholder { padding: 40px 0; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 
 .editing-hints {
   margin-bottom: 16px;

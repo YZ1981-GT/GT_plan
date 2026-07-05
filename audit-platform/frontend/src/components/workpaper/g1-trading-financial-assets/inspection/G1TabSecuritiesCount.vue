@@ -1,0 +1,115 @@
+<template>
+  <div class="g1-sec-count">
+    <div class="section-head">
+      <h3 class="sheet-title">G1-11 有价证券监盘表</h3>
+      <div class="head-actions">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addRow()">新增监盘行</el-button>
+        <el-button size="small" @click="openReviewDialog('G1-11-conclusion')">💬复核</el-button>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      监盘证券：<b>{{ sc.rows.value.length }}</b> 项 ·
+      差异项：<b :class="{ warn: sc.diffCount.value > 0 }">{{ sc.diffCount.value }}</b>
+    </div>
+
+    <el-table :data="sc.rows.value" border size="small" max-height="500"
+      :row-class-name="rowClass">
+      <el-table-column
+        v-for="col in sc.columns"
+        :key="String(col.prop)"
+        :label="col.label"
+        :width="col.width"
+        :align="col.type === 'number' ? 'right' : 'left'"
+        :fixed="col.prop === 'securityName' ? 'left' : undefined"
+      >
+        <template #default="{ row, $index }">
+          <span v-if="col.prop === 'seq'">{{ $index + 1 }}</span>
+          <span v-else-if="col.formula" class="formula-cell"
+            :class="{ 'diff-warn': sc.isDiffAbnormal(row) }" :title="'盘点差异 = 盘点数量 - 账面数量'">
+            {{ fmtNum(row[col.prop]) }}
+          </span>
+          <el-input-number
+            v-else-if="col.type === 'number'"
+            v-model="row[col.prop]"
+            size="small"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width: 100%"
+            @change="sc.updateRow(row.id, { [col.prop]: row[col.prop] })"
+          />
+          <el-input
+            v-else
+            v-model="row[col.prop]"
+            size="small"
+            :disabled="isReadonly"
+            @change="sc.updateRow(row.id, { [col.prop]: row[col.prop] })"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="60" fixed="right">
+        <template #default="{ row }">
+          <el-button v-if="!isReadonly" size="small" type="danger" link @click="sc.removeRow(row.id)">删</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>审计结论</template>
+      <el-input v-model="sc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly" placeholder="对有价证券监盘的复核结论..." />
+    </el-card>
+
+    <details class="prep-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>盘点差异 = 盘点数量 - 账面数量，差异不为 0 时橙色高亮，需说明差异原因。</li>
+        <li>实物证券应实地监盘，电子证券应取得托管机构对账单核对。</li>
+      </ul>
+    </details>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { toRef, inject } from 'vue'
+import { useG1SecuritiesCount, type G1SecuritiesCountRow } from '../../composables/useG1SecuritiesCount'
+import type { ChecklistResponse } from '../../composables/useF1FormData'
+
+const props = defineProps<{
+  allResponses: Map<string, ChecklistResponse>
+  isReadonly: boolean
+  debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+}>()
+
+const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+const sc = useG1SecuritiesCount({
+  allResponses: toRef(props, 'allResponses'),
+  debouncedSave: props.debouncedSave,
+  isReadonly: toRef(props, 'isReadonly'),
+})
+
+function rowClass({ row }: { row: G1SecuritiesCountRow }): string {
+  return sc.isDiffAbnormal(row) ? 'diff-row' : ''
+}
+
+function fmtNum(v: unknown): string {
+  return typeof v === 'number' ? v.toLocaleString() : String(v ?? '')
+}
+</script>
+
+<style scoped>
+.g1-sec-count { padding: 12px; font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; }
+.stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
+.stats-bar .warn { color: #e6a23c; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.diff-warn { color: #e6a23c; font-weight: 600; }
+.conclusion-card { margin-top: 12px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; }
+.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+:deep(.diff-row) { background: #fdf6ec; }
+</style>

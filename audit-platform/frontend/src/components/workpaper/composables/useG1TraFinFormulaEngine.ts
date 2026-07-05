@@ -58,8 +58,10 @@ export function calcClosingQuantity(opening: number, buy: number, sell: number):
   return v < 0 ? 0 : v
 }
 
-export function isDebitCreditBalanced(debits: number, credits: number): boolean {
-  return Math.abs(debits - credits) < 0.01
+export function isDebitCreditBalanced(debits: number[], credits: number[]): boolean {
+  const d = debits.reduce((s, v) => s + v, 0)
+  const c = credits.reduce((s, v) => s + v, 0)
+  return Math.abs(d - c) < 0.01
 }
 
 export function calcFairValueChange(endFv: number, beginFv: number): number {

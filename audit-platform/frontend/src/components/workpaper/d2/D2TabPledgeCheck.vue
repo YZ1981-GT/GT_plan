@@ -6,6 +6,8 @@
  */
 import { inject, toRef, type Ref } from 'vue'
 import { useD2PledgeCheck } from '../composables/useD2PledgeCheck'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import GtReviewDot from '../GtReviewDot.vue'
 
 const props = defineProps<{
   wpId: string
@@ -14,11 +16,11 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-12',
+)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -35,7 +37,6 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-pledge-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 
 const {
   pledgeRows,
@@ -59,15 +60,11 @@ const {
   <div class="d2-tab-pledge">
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
-      </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
       </div>
     </div>
 
@@ -92,6 +89,7 @@ const {
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
             <span v-else>{{ row.debtorName || '-' }}</span>
+            <GtReviewDot row-prefix="D2-pledge" :row-key="row.rowId" />
           </template>
         </el-table-column>
         <el-table-column label="质押金额" width="120" align="right">
@@ -140,6 +138,7 @@ const {
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
             <span v-else>{{ row.debtorName || '-' }}</span>
+            <GtReviewDot row-prefix="D2-pledge" :row-key="row.rowId" />
           </template>
         </el-table-column>
         <el-table-column label="保理金额" width="120" align="right">

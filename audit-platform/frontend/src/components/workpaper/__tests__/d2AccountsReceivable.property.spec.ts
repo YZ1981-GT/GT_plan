@@ -16,10 +16,12 @@ import {
   calculateDifference,
   calculatePledgeRatio,
   determineCutoff,
-  sumif,
+  sumifLegacy as sumif,
+} from '../composables/useD2FormulaEngine'
+import {
   getTabStatusFromResponses,
   PROCEDURE_STEPS_CONFIG,
-} from '../composables/useD2AccountsReceivable'
+} from '../composables/d2Constants'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

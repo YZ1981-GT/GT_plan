@@ -3,9 +3,9 @@
  *
  * 锚定 spec d-cycle-workpapers Task 43
  *
- * 验证 D2A 应收账款程序表：
- * 1. 底稿页面正常加载（a-program-console 渲染）
- * 2. 程序表步骤渲染
+ * 验证 D2A 应收账款程序表（D2TabProcedure）：
+ * 1. 底稿页面正常加载（d2-tab-procedure 渲染）
+ * 2. 程序步骤卡片渲染
  * 3. ref_index chip 渲染
  * 4. auto_data_source 面板（risk_for_cycle + control_test_result_for_cycle）
  *
@@ -62,9 +62,9 @@ test.describe('Task 43: D2A 应收账款程序表打开+风险/控制测试联�
 
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
 
-    // 等待程序表组件渲染
+    // 等待 D2 程序表组件渲染
     await page.waitForSelector(
-      '.gt-wp-editor, .gt-a-program-console, .gt-wp-editor-loading',
+      '.gt-wp-editor, .d2-tab-procedure, .d2-accounts-receivable, .gt-wp-editor-loading',
       { timeout: 15_000 },
     )
     await page.waitForTimeout(5_000)
@@ -78,10 +78,10 @@ test.describe('Task 43: D2A 应收账款程序表打开+风险/控制测试联�
     const errorBoundary = page.locator('.gt-error-boundary, [class*="error-boundary"]')
     expect(await errorBoundary.count(), 'ErrorBoundary 不应出现').toBe(0)
 
-    // 验证程序表行渲染（D2A 应有至少 3 行步骤）
-    const tableRows = page.locator('.el-table__row')
-    const rowCount = await tableRows.count()
-    expect(rowCount, 'D2A 程序表应渲染至少 3 行步骤').toBeGreaterThanOrEqual(3)
+    // 验证程序步骤卡片渲染（D2A 应有至少 3 个步骤卡片）
+    const stepCards = page.locator('.d2-tab-procedure .el-card, .d2-tab-procedure .step-card')
+    const cardCount = await stepCards.count()
+    expect(cardCount, 'D2A 程序表应渲染至少 3 个步骤').toBeGreaterThanOrEqual(3)
 
     // 验证无严重 console errors
     const criticalErrors = consoleErrors.filter((e) =>

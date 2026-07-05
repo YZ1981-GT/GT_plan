@@ -1140,7 +1140,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
   {
     componentType: 'g6-other-bond-investment-main',
     component: GtG6OtherBondMain,
-    icon: '🏦',
+    icon: '📊',
     label: 'G6 其他债权投资',
     emits: ['save', 'completed'],
     contextProps: 'standard',
@@ -1148,7 +1148,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
   {
     componentType: 'g6-other-bond-investment-sppi',
     component: GtG6OtherBondSppi,
-    icon: '🏦',
+    icon: '🔬',
     label: 'G6 SPPI',
     emits: ['save', 'completed'],
     contextProps: 'standard',
@@ -1254,7 +1254,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtD5ReceivablesFinancing.vue')),
     icon: '📈',
     label: 'D5 应收款项融资',
-    emits: ['save', 'completed'],
+    emits: ['save', 'completed', 'jump-to-section'],
     contextProps: 'standard',
   },
   {
@@ -1262,7 +1262,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtD6ContractAssets.vue')),
     icon: '📋',
     label: 'D6 合同资产',
-    emits: ['save', 'completed'],
+    emits: ['save', 'completed', 'jump-to-section'],
     contextProps: 'standard',
   },
   {
@@ -1270,7 +1270,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtD7ContractLiabilities.vue')),
     icon: '📋',
     label: 'D7 合同负债',
-    emits: ['save', 'completed'],
+    emits: ['save', 'completed', 'jump-to-section'],
     contextProps: 'standard',
   },
   {

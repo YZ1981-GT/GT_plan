@@ -2,12 +2,19 @@
   <div class="g8-other-equity-instruments">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div class="g8-other-equity-instruments-toolbar">
+      <div v-if="currentSheet !== '底稿目录'" class="g8-toolbar">
+        <el-segmented
+          v-if="isHtmlSheet"
+          v-model="dualMode.currentMode.value"
+          :options="dualMode.modeOptions"
+          size="small"
+          @change="dualMode.onModeChange"
+        />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
       </div>
 
       <GtOnlyOfficeSheet
-        v-if="currentSheet === 'G8A'"
+        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -15,13 +22,98 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <CycleTabAdjudication
-        v-else-if="adjudicationConfig"
-        :config="adjudicationConfig"
-        :all-responses="formData.allResponses.value"
+      <G8TabProcedure
+        v-else-if="currentSheet === 'G8A'"
+        :html-data="props.htmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
-        :debounced-save="formData.debouncedSave"
       />
+
+      <G8TabAdjudication
+        v-else-if="currentSheet === 'G8-1'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <G8TabDetail
+        v-else-if="currentSheet === 'G8-2'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G8TabAdjustment
+        v-else-if="currentSheet === 'G8-3'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G8TabFairValueTest
+        v-else-if="currentSheet === 'G8-4'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G8TabDesignationCheck
+        v-else-if="currentSheet === 'G8-5'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <G8TabVoucherCheck
+        v-else-if="currentSheet === 'G8-6'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G8TabDisclosureListed
+        v-else-if="currentSheet === '附注上市'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <G8TabDisclosureSOE
+        v-else-if="currentSheet === '附注国企'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <div v-else-if="currentSheet === '底稿目录'" class="g-cycle-tab-index-page">
+        <G8TabDirectory
+          :all-responses="formData.allResponses.value"
+          :available-sheets="availableSheets"
+        />
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="props.wpCode"
+          :html-data="props.htmlData"
+          :available-sheets="availableSheets"
+        />
+      </div>
 
       <GtGridSheet
         v-else-if="useGridFallback"
@@ -44,12 +136,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-import { useG8OthEquFormData } from './composables/useG8OthEquFormData'
+/**
+ * GtG8OtherEquityInstruments — G8 其他权益工具投资底稿主入口
+ */
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide } from 'vue'
+import { useG8FormData } from './composables/useG8FormData'
+import { useG8DualMode } from './composables/useG8DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
-import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { extractG8SheetCode } from './composables/g8SheetLabels'
+import { G8_ACCOUNT_CODE } from './composables/g8Constants'
+import { parseNum } from './composables/useG8FormulaEngine'
+import type { ChecklistResponse } from './composables/useF1FormData'
 
+const G8TabProcedure = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabProcedure.vue'))
+const G8TabAdjudication = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabAdjudication.vue'))
+const G8TabDetail = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDetail.vue'))
+const G8TabAdjustment = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabAdjustment.vue'))
+const G8TabFairValueTest = defineAsyncComponent(() => import('./g8-other-equity-instruments/valuation/G8TabFairValueTest.vue'))
+const G8TabDesignationCheck = defineAsyncComponent(() => import('./g8-other-equity-instruments/valuation/G8TabDesignationCheck.vue'))
+const G8TabVoucherCheck = defineAsyncComponent(() => import('./g8-other-equity-instruments/voucher/G8TabVoucherCheck.vue'))
+const G8TabDisclosureListed = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDisclosureListed.vue'))
+const G8TabDisclosureSOE = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDisclosureSOE.vue'))
+const G8TabDirectory = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDirectory.vue'))
+const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
@@ -65,29 +175,55 @@ const props = defineProps<{
 
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
-const formData = useG8OthEquFormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+const formData = useG8FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const { versionTrailRef } = versionToolbar
+const reviewProvide = useWorkpaperReviewProvide({ wpId: wpIdRef })
+provide('openReviewDialog', reviewProvide.openReviewDialog)
 
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
-  const m = name.match(/(G8A|G8-\d+)/)
-  return m ? m[1] : ''
+const currentSheet = computed(() => extractG8SheetCode(props.sheetName || props.wpCode || ''))
+
+const HTML_SHEETS = new Set(['G8A', 'G8-1', 'G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6', '附注上市', '附注国企', '底稿目录'])
+const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
+const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.value)
+
+const availableSheets = computed(() => {
+  const sheets = formData.renderMeta.value?.sheets
+  return Array.isArray(sheets) ? sheets : []
 })
 
-const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
-const useGridFallback = computed(() => {
-  const code = currentSheet.value
-  return !!code && code !== 'G8A' && !adjudicationConfig.value && !code.startsWith('附注')
+const dualMode = useG8DualMode({ wpId: wpIdRef, reloadAll: () => formData.loadAll() })
+
+function onDebouncedSave(id: string, d: Partial<ChecklistResponse>) {
+  formData.debouncedSave(id, d)
+  versionToolbar.scheduleAutoSnapshot()
+}
+
+function handleG8Adjudicated(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
+  if (detail?.accountCode !== G8_ACCOUNT_CODE) return
+  const amount = parseNum(detail.adjudicatedAmount)
+  void formData.writebackTB(amount)
+}
+
+async function reloadAll() {
+  await formData.loadAll()
+}
+
+onMounted(async () => {
+  window.addEventListener('substantive:adjudicated', handleG8Adjudicated)
+  await formData.loadAll()
+  isLoading.value = false
 })
 
-onMounted(async () => { await formData.loadAll(); isLoading.value = false })
+onBeforeUnmount(() => {
+  window.removeEventListener('substantive:adjudicated', handleG8Adjudicated)
+})
 </script>
 
 <style scoped>
 .g8-other-equity-instruments { padding: 12px; }
 .loading-container { padding: 24px; }
-.g8-other-equity-instruments-toolbar { margin-bottom: 8px; }
+.g8-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 </style>

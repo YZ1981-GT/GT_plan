@@ -2,7 +2,10 @@
 <div class="d3-voucher-check">
   <!-- 抽样参数区 -->
   <div class="sampling-params-card">
-    <h4 class="card-title">抽样参数</h4>
+    <h4 class="card-title section-header-row">
+      抽样参数
+      <GtReviewTrigger section-id="D3-vc-header" />
+    </h4>
     <div class="params-grid">
       <div class="param-item">
         <span class="param-label">测试总体</span>
@@ -44,14 +47,35 @@
     <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'">异常率：{{ anomalyRate.toFixed(1) }}%</el-tag>
     <GtIndexChip target="voucher-sampling-engine" label="抽凭引擎" />
     <el-button-group size="small" style="margin-left: auto">
-      <el-button @click="exportTemplate('D3-7')">导出模板</el-button>
-      <el-button @click="exportData('D3-7')">导出数据</el-button>
-      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="(file: any) => handleImport(file, 'D3-7')">
+      <el-button @click="onExportTemplate">导出模板</el-button>
+      <el-button @click="onExportData">导出数据</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
         <el-button>导入数据</el-button>
       </el-upload>
     </el-button-group>
   </div>
 
+  <div v-if="useVirtualScroll" class="virtual-toolbar">
+    <el-alert type="info" :closable="false" class="virtual-hint">
+      行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
+    </el-alert>
+    <el-button size="small" @click="toggleBrowseMode">
+      {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+    </el-button>
+  </div>
+  <el-table-v2
+    v-if="useVirtualScroll && browseMode"
+    :columns="virtualColumns"
+    :data="browseRows"
+    :width="tableWidth"
+    :height="tableHeight"
+    :row-height="36"
+    :header-height="40"
+    fixed
+    class="virtual-table"
+  />
+
+  <template v-if="!useVirtualScroll || !browseMode">
   <!-- (1) 本期增减变动 -->
   <div class="vc-section">
     <div class="section-header">
@@ -275,6 +299,7 @@
       </el-table-column>
     </el-table>
   </div>
+  </template>
 
   <!-- D3-2 Z列合计交叉验证 -->
   <el-alert
@@ -286,10 +311,6 @@
     style="margin: 12px 0"
   />
 
-  <!-- 复核入口 -->
-  <div class="review-actions">
-    <el-button size="small" @click="openReview">💬 复核</el-button>
-  </div>
 </div>
 </template>
 
@@ -298,12 +319,17 @@
  * D3TabVoucherCheck.vue — D3-7 凭证检查表
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import { useD3VoucherCheck } from '../composables/useD3VoucherCheck'
+import { useD3TabImportExport } from '../composables/useD3TabImportExport'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -313,8 +339,6 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
-
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
 const {
   samplingParams,
@@ -339,6 +363,50 @@ const {
 const progressPct = computed(() => {
   if (!samplingParams.value.targetSampleSize) return 0
   return Math.min(100, Math.round((samplingParams.value.currentSampleSize / samplingParams.value.targetSampleSize) * 100))
+})
+
+function fmtAmt(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const browseRows = computed(() => [
+  ...currentChangeRows.value.map(r => ({
+    section: '本期',
+    customerName: r.customerName,
+    voucherNo: r.voucherNo,
+    debit: r.debitAmount,
+    credit: r.creditAmount,
+  })),
+  ...postPeriodRows.value.map(r => ({
+    section: '期后',
+    customerName: r.customerName,
+    voucherNo: r.voucherNo,
+    debit: r.debitAmount,
+    credit: r.creditAmount,
+  })),
+])
+
+const browseRowCount = computed(() => browseRows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('section', '区块', 70),
+  virtualTextCol('customerName', '客户名称', 130),
+  virtualTextCol('voucherNo', '凭证号', 90),
+  virtualNumCol('debit', '借方', 100, fmtAmt),
+  virtualNumCol('credit', '贷方', 100, fmtAmt),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 960,
 })
 
 // ─── D3-2 Z列合计交叉验证 ───────────────────────────────────────────────────
@@ -367,53 +435,22 @@ const postPeriodCrossValidation = computed(() => {
   return `D3-2期后结转（Z列）合计 ${d32ZTotal.toLocaleString()} 元 ≠ D3-7期后结转贷方合计 ${d37Total.toLocaleString()} 元，差额 ${diff.toLocaleString()} 元`
 })
 
-function openReview() {
-  openReviewDialog('D3-vc-review')
-}
-
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-import http from '@/utils/http'
-import { ElMessage } from 'element-plus'
-
-async function exportTemplate(sheet: string) {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId.value}/d3/export-template`, null, { params: { sheet }, responseType: 'blob' } as any)
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a'); a.href = url; a.download = `${sheet}_模板.xlsx`; a.click()
-    window.URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function exportData(sheet: string) {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId.value}/d3/export-data`, null, { params: { sheet }, responseType: 'blob' } as any)
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a'); a.href = url; a.download = `${sheet}_数据.xlsx`; a.click()
-    window.URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-async function handleImport(file: File, sheet: string): Promise<boolean> {
-  const formData = new FormData(); formData.append('file', file)
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId.value}/d3/import-data`, formData, { params: { sheet }, headers: { 'Content-Type': 'multipart/form-data' } } as any)
-    const data = res.data?.data ?? res.data
-    if (data.ok) ElMessage.success(`成功导入 ${data.imported_count} 行数据${data.warning ? '（' + data.warning + '）' : ''}`)
-    else ElMessage.error(`导入失败：${(data.errors || []).join('；')}`)
-  } catch { ElMessage.error('导入数据失败') }
-  return false
-}
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-7')
 </script>
 
 <style scoped>
 .d3-voucher-check { padding: 16px; }
 .sampling-params-card { padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
+.section-header-row { display: flex; align-items: center; gap: 8px; }
 .params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .param-item { display: flex; align-items: center; gap: 8px; }
 .param-label { font-size: 12px; color: #909399; white-space: nowrap; min-width: 60px; }
 .sampling-progress { display: flex; align-items: center; font-size: 12px; color: #606266; }
 .summary-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.virtual-hint { flex: 1; min-width: 200px; margin: 0; }
+.virtual-table { margin-bottom: 12px; }
 .vc-section { margin-bottom: 20px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-header h4 { font-size: 14px; font-weight: 600; }

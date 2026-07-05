@@ -1,11 +1,12 @@
 <template>
 <div class="d7-analysis">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
+    <div class="toolbar">
+      <el-button size="small" @click="exportTemplate">导出模板</el-button>
+      <el-button size="small" @click="exportData">导出数据</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+        <el-button size="small" :loading="importing">导入数据</el-button>
+      </el-upload>
+    </div>
     <!-- (一) 借方发生额分析 -->
     <div class="analysis-card">
       <h4 class="card-title">(一) 借方发生额分析</h4>
@@ -125,21 +126,16 @@
       <h4>审计说明</h4>
       <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="对借贷方发生额构成及Top10客户的分析..." />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genAnalysisNote">🤖AI</el-button>
       </div>
     </div>
     <div class="audit-notes-section">
       <h4>审计结论</h4>
       <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="分析程序结论..." />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genAnalysisConclusion">🤖AI</el-button>
       </div>
     </div>
-  </template>
-
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -150,8 +146,10 @@
  * Task: 19.1
  * Requirements: 9.1-9.10, 19.2, 20.1
  */
-import { ref, computed, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useD7Analysis } from '../composables/useD7Analysis'
+import { useD7ImportExport } from '../composables/useD7ImportExport'
+import { useD7AiGenerate } from '../composables/useD7AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD7FormulaEngine'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 
@@ -168,12 +166,6 @@ const props = defineProps<{
   crossSheet: any
 }>()
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 const {
   debitRows, debitTotal, debitDiff,
   creditRows, creditTotal, creditDiff,
@@ -189,6 +181,46 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
 })
+
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD7ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D7-4',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+
+async function onImportFile(file: File) {
+  await importData(file)
+  return false
+}
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
+
+async function genAnalysisNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('analysis-note', auditNotes.value.explanation, {
+    task: '合同负债分析性复核说明',
+    debitTotal: debitTotal.value,
+    creditTotal: creditTotal.value,
+    debitDiff: debitDiff.value,
+    creditDiff: creditDiff.value,
+    top10Concentration: top10Concentration.value,
+    isHighConcentration: isHighConcentration.value,
+  }, 'AI · 分析性复核说明')
+  if (text) auditNotes.value.explanation = text
+}
+
+async function genAnalysisConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('analysis-note', auditNotes.value.conclusion, {
+    task: '合同负债分析程序结论',
+    debitDiff: debitDiff.value,
+    creditDiff: creditDiff.value,
+    top10Concentration: top10Concentration.value,
+  }, 'AI · 分析程序结论')
+  if (text) auditNotes.value.conclusion = text
+}
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -208,8 +240,7 @@ function isRateExceed(rate: number | '' | 'N/A'): boolean {
 
 <style scoped>
 .d7-analysis { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
-.oo-mode-placeholder { padding: 40px 0; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 
 .analysis-card { margin-bottom: 20px; padding: 16px; border: 1px solid #ebeef5; border-radius: 8px; }
 .card-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #303133; }

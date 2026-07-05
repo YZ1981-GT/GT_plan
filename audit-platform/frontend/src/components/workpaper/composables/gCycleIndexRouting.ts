@@ -1,0 +1,63 @@
+/**
+ * G12/G13/G14「底稿目录」Tab 路由：b-index sheet → 循环 HTML 目录组件（D4TabIndex 同级体验）
+ */
+export const GCYCLE_INDEX_WP_CODES = ['G12', 'G13', 'G14'] as const
+export type GCycleIndexWpCode = (typeof GCYCLE_INDEX_WP_CODES)[number]
+
+export const GCYCLE_INDEX_COMPONENT_MAP: Record<GCycleIndexWpCode, string> = {
+  G12: 'g12-net-hedge-gains',
+  G13: 'g13-fair-value-changes',
+  G14: 'g14-credit-impairment-loss',
+}
+
+export function isGCycleIndexWpCode(wpCode: string): wpCode is GCycleIndexWpCode {
+  return (GCYCLE_INDEX_WP_CODES as readonly string[]).includes(wpCode)
+}
+
+/** b-index + G12/G13/G14 → 委托到循环目录组件 */
+export function isCycleDelegatedIndexSheet(sheetComponentType: string, wpCode: string): boolean {
+  return sheetComponentType === 'b-index' && isGCycleIndexWpCode(wpCode)
+}
+
+export function resolveCycleIndexComponentType(sheetComponentType: string, wpCode: string): string {
+  if (isCycleDelegatedIndexSheet(sheetComponentType, wpCode)) {
+    return GCYCLE_INDEX_COMPONENT_MAP[wpCode as GCycleIndexWpCode]
+  }
+  return sheetComponentType
+}
+
+export interface CycleArchitectureSheet {
+  sheet_name?: string
+  componentType?: string
+  component_type?: string
+}
+
+/** b-index html_data 无 navigation_rows 时，从 render-config sheets 构造架构树数据 */
+export function buildCycleArchitectureHtmlData(
+  htmlData: Record<string, unknown> | undefined,
+  availableSheets?: CycleArchitectureSheet[],
+  wpCode?: string,
+): Record<string, unknown> {
+  const base = htmlData ? { ...htmlData } : {}
+  const rows = base.navigation_rows
+  if (Array.isArray(rows) && rows.length > 0) return base
+  if (!availableSheets?.length) return base
+
+  return {
+    ...base,
+    navigation_rows: availableSheets
+      .filter(s => (s.componentType ?? s.component_type) !== 'b-index')
+      .map((s, i) => {
+        const name = s.sheet_name || ''
+        const m = name.match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)
+        return {
+          seq: i + 1,
+          content: name,
+          sheet_name: name,
+          index_ref: m ? m[1] : (wpCode ?? ''),
+          component_type: s.componentType ?? s.component_type ?? 'skip',
+          no_print: false,
+        }
+      }),
+  }
+}

@@ -12,7 +12,7 @@
  */
 import { computed, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
-import { PROCEDURE_STEPS_CONFIG } from './useD1NotesReceivable'
+import { PROCEDURE_STEPS_CONFIG } from './d1Constants'
 
 export type SaveFn = (items: ChecklistItem[]) => Promise<void>
 

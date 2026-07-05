@@ -20,11 +20,17 @@
  *
  * Requirements: 4.1-4.8, 5.1-5.6, 6.1-6.5, 12.1, 16.1-16.6
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1MemoReconciliation, type MemoRow } from '../composables/useD1MemoReconciliation'
 import type { ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
+import { useWorkpaperWideTable } from '../composables/useWorkpaperWideTable'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -46,24 +52,6 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
 
 // 复核对话（Task 19 预留）：仅当 provider 存在时展示 💬 按钮
 const openReviewDialog = inject<any>('openReviewDialog', null)
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const ooSheetName = computed(() => props.sheetName || '备查簿核对D1-7')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -172,6 +160,39 @@ const tableData = computed<MemoRow[]>(() => [
   grandTotal.value,
 ])
 
+const dataRowCount = computed(() => bankRows.value.length + commercialRows.value.length)
+const browseRows = computed(() => tableData.value.filter(r => r.rowType !== 'summary'))
+const browseRowCount = computed(() => browseRows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('noteType', '票据类型', 130),
+  virtualTextCol('noteNumber', '票据号', 170),
+  virtualTextCol('endorser', '前手', 120),
+  virtualNumCol('amount', '金额', 120, displayPrefs.fmtAmount),
+  virtualTextCol('status', '状态', 110),
+  virtualNumCol('endingBalance', '年末余额', 120, displayPrefs.fmtAmount),
+  virtualNumCol('auditedNotes', '审定应收票据', 130, displayPrefs.fmtAmount),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  rowEventHandlers,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 1400,
+})
+
+const columnCount = ref(31)
+const { useLargeTable, tableMaxHeight, wrapperStyle, minTableWidth } = useWorkpaperWideTable({
+  rowCount: dataRowCount,
+  columnCount,
+})
+
 function getRowClass({ row }: { row: MemoRow }): string {
   return row.rowType === 'summary' ? 'is-summary' : ''
 }
@@ -220,58 +241,8 @@ const ledgerError = computed(() => crossSheetStatus.value === 'error')
 
 // ─── Import/Export ───────────────────────────────────────────────────────────
 
-const SHEET_CODE = 'D1-7'
-
-async function exportTemplate() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/export-template`, null, {
-      params: { sheet: SHEET_CODE },
-      responseType: 'blob',
-    })
-    triggerDownload(res.data, `${SHEET_CODE}_模板.xlsx`)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function exportData() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/export-data`, null, {
-      params: { sheet: SHEET_CODE },
-      responseType: 'blob',
-    })
-    triggerDownload(res.data, `${SHEET_CODE}_数据.xlsx`)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-function triggerDownload(data: BlobPart, filename: string) {
-  const blob = new Blob([data])
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-async function handleImportFile(file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/import-data`, formData, {
-      params: { sheet: SHEET_CODE },
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    const data = res.data?.data ?? res.data
-    ElMessage.success(`成功导入${data.imported_count}行数据`)
-    if (data.warning) ElMessage.warning(data.warning)
-  } catch (e: any) {
-    const errData = e?.response?.data?.data ?? e?.response?.data
-    if (e?.response?.status === 400 && errData?.invalid_columns?.length) {
-      ElMessage.error(`列名不匹配: ${errData.invalid_columns.join(', ')}`)
-    } else {
-      ElMessage.error('导入失败')
-    }
-  }
-}
+const wpIdRef = toRef(props, 'wpId')
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-7')
 
 // ─── Review ────────────────────────────────────────────────────────────────────
 
@@ -297,21 +268,10 @@ const GUIDANCE_TEXTS = [
 
 <template>
   <div class="d1-tab-memo-reconciliation">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
-    </div>
-
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="ooSheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML mode -->
-    <template v-if="editorMode === 'html'">
+      <div class="tab-header">
+        <h4>备查簿核对 D1-7</h4>
+        <GtReviewTrigger section-id="D1-memo-header" />
+      </div>
       <!-- 审计目标 -->
       <el-alert
         type="info"
@@ -343,13 +303,12 @@ const GUIDANCE_TEXTS = [
       <!-- Toolbar -->
       <div class="table-toolbar">
         <el-button-group size="small">
-          <el-button @click="exportTemplate">导出模板</el-button>
-          <el-button @click="exportData">导出数据</el-button>
+          <el-button @click="onExportTemplate">导出模板</el-button>
+          <el-button @click="onExportData">导出数据</el-button>
           <el-upload
             :show-file-list="false"
             accept=".xlsx"
-            :auto-upload="false"
-            :on-change="(f: any) => handleImportFile(f.raw)"
+            :before-upload="onImportFile"
             style="display:inline-block"
           >
             <el-button size="small">导入数据</el-button>
@@ -366,7 +325,40 @@ const GUIDANCE_TEXTS = [
       </div>
 
       <!-- 31列宽表 -->
-      <el-table :data="tableData" border size="small" :row-class-name="getRowClass" class="memo-table" @cell-contextmenu="onCellContextMenu">
+      <el-alert v-if="useLargeTable && !useVirtualScroll" type="info" :closable="false" show-icon class="large-table-hint">
+        行数较多，已启用固定高度滚动浏览（{{ dataRowCount }} 行）
+      </el-alert>
+      <div v-if="useVirtualScroll" class="virtual-toolbar">
+        <el-alert type="info" :closable="false" class="virtual-hint">
+          行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+        </el-alert>
+        <el-button size="small" @click="toggleBrowseMode">
+          {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+        </el-button>
+      </div>
+      <el-table-v2
+        v-if="useVirtualScroll && browseMode"
+        :columns="virtualColumns"
+        :data="browseRows"
+        :width="tableWidth"
+        :height="tableHeight"
+        :row-height="36"
+        :header-height="40"
+        :row-event-handlers="rowEventHandlers"
+        fixed
+        class="virtual-table"
+      />
+      <div v-if="!useVirtualScroll || !browseMode" :style="wrapperStyle">
+        <el-table
+          :data="tableData"
+          border
+          size="small"
+          :row-class-name="getRowClass"
+          class="memo-table"
+          :max-height="tableMaxHeight"
+          :style="{ minWidth: minTableWidth }"
+          @cell-contextmenu="onCellContextMenu"
+        >
         <!-- 票据类型（fixed left） -->
         <el-table-column label="票据类型" width="130" fixed="left">
           <template #default="{ row }: { row: MemoRow }">
@@ -384,6 +376,7 @@ const GUIDANCE_TEXTS = [
               <el-option v-for="o in NOTE_TYPE_OPTIONS" :key="o" :label="o" :value="o" />
             </el-select>
             <span v-else>{{ row.noteType }}</span>
+            <GtReviewDot v-if="row.rowType !== 'summary'" row-prefix="D1-memo" :row-key="row.rowId" />
           </template>
         </el-table-column>
 
@@ -628,6 +621,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
         </el-table-column>
       </el-table>
+      </div>
 
       <!-- 核对区 -->
       <div class="section-title">核对区（备查簿 ↔ 明细账D1-2）</div>
@@ -733,13 +727,24 @@ const GUIDANCE_TEXTS = [
         <summary>📋 编制提示</summary>
         <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
       </details>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .d1-tab-memo-reconciliation {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {
@@ -786,6 +791,10 @@ const GUIDANCE_TEXTS = [
   gap: 12px;
   flex-wrap: wrap;
 }
+
+.virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.virtual-hint { margin-bottom: 0; flex: 1; }
+.virtual-table { margin-bottom: 8px; }
 
 .memo-table {
   width: 100%;

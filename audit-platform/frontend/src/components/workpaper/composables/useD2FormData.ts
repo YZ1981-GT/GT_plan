@@ -124,6 +124,21 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     }
   }
 
+  /** 子 composable 通过 d2:save-items 事件批量保存 */
+  async function saveItemsFromEvent(items: ChecklistResponse[]): Promise<void> {
+    if (!items.length) return
+    for (const item of items) {
+      if (item?.item_id) {
+        allResponses.value.set(item.item_id, {
+          item_id: item.item_id,
+          conclusion: item.conclusion ?? null,
+          remark: item.remark ?? null,
+        })
+      }
+    }
+    await doSave(items.filter(i => i?.item_id))
+  }
+
   // ─── Helper 方法 ─────────────────────────────────────────────────────────
 
   /** 获取单个字段 */
@@ -195,6 +210,7 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     loadAll,
     saveImmediate,
     saveDebouncedText,
+    saveItemsFromEvent,
     flushPendingSave,
     getField,
     setFieldImmediate,

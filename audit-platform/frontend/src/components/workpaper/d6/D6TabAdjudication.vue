@@ -1,14 +1,8 @@
 <template>
 <div class="d6-adjudication">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
+  <el-skeleton v-if="!blocks.length" :rows="8" animated />
 
-  <!-- 加载状态 -->
-  <el-skeleton v-if="viewMode === 'structured' && !blocks.length" :rows="8" animated />
-
-  <template v-if="viewMode === 'structured'">
+  <template v-if="blocks.length">
     <!-- 编制提示 -->
     <details class="editing-hints">
       <summary>📋 编制提示</summary>
@@ -240,7 +234,7 @@
           placeholder="分析合同资产本期变动原因..."
         />
         <div class="note-actions">
-          <el-button size="small" :disabled="true">🤖AI</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genExplanation">🤖AI</el-button>
           <el-button size="small" @click="openReview('D6-1-note-explanation')">💬复核</el-button>
         </div>
       </div>
@@ -255,7 +249,7 @@
           placeholder="结合D6-8 ECL测算结果评价坏账计提充分性..."
         />
         <div class="note-actions">
-          <el-button size="small" :disabled="true">🤖AI</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genImpairmentEval">🤖AI</el-button>
           <el-button size="small" @click="openReview('D6-1-note-impairmentEval')">💬复核</el-button>
         </div>
       </div>
@@ -270,7 +264,7 @@
           placeholder="分析长期挂账合同资产的原因及期后结转情况..."
         />
         <div class="note-actions">
-          <el-button size="small" :disabled="true">🤖AI</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genLongTermReason">🤖AI</el-button>
           <el-button size="small" @click="openReview('D6-1-note-longTermReason')">💬复核</el-button>
         </div>
       </div>
@@ -287,16 +281,11 @@
         placeholder="对合同资产审定结果的总结性结论..."
       />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genConclusion">🤖AI</el-button>
         <el-button size="small" @click="openReview('D6-1-note-conclusion')">💬复核</el-button>
       </div>
     </div>
   </template>
-
-  <!-- OO 在线编辑模式 -->
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -314,9 +303,10 @@
  * Task: 16.1
  * Requirements: 2.1-2.10, 4.1-4.7, 26.1-26.6
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { useD6Adjudication, type AdjudicationBlock, type AdjudicationRow } from '../composables/useD6Adjudication'
+import { useD6AiGenerate } from '../composables/useD6AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD6FormulaEngine'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
@@ -337,12 +327,6 @@ const props = defineProps<{
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
-
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -365,6 +349,45 @@ const {
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
 })
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD6AiGenerate(toRef(props, 'wpId'))
+
+async function genExplanation() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-change-analysis', auditNotes.value.explanation, {
+    task: '合同资产本期变动分析',
+    trialBalanceDiff: trialBalanceDiff.value,
+    netValueValidationDiff: netValueValidation.value.diff,
+  }, 'AI · 变动分析')
+  if (text) auditNotes.value.explanation = text
+}
+
+async function genImpairmentEval() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('ecl-note', auditNotes.value.impairmentEval, {
+    task: '合同资产坏账计提充分性评价',
+    trialBalanceAmount: trialBalanceAmount.value,
+  }, 'AI · 计提充分性评价')
+  if (text) auditNotes.value.impairmentEval = text
+}
+
+async function genLongTermReason() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-aging-reason', auditNotes.value.longTermReason, {
+    task: '长期挂账合同资产原因分析',
+  }, 'AI · 长期挂账分析')
+  if (text) auditNotes.value.longTermReason = text
+}
+
+async function genConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-conclusion', auditNotes.value.conclusion, {
+    task: '合同资产审定审计结论',
+    trialBalanceAmount: trialBalanceAmount.value,
+    trialBalanceDiff: trialBalanceDiff.value,
+  }, 'AI · 审计结论')
+  if (text) auditNotes.value.conclusion = text
+}
 
 // ─── Display Helpers ─────────────────────────────────────────────────────────
 
@@ -421,10 +444,6 @@ function openReview(sectionId: string) {
 
 .mode-toolbar {
   margin-bottom: 12px;
-}
-
-.oo-mode-placeholder {
-  padding: 40px 0;
 }
 
 .editing-hints {

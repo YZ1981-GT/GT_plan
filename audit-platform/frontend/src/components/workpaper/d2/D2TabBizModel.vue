@@ -5,6 +5,9 @@
  */
 import { inject, toRef, type Ref } from 'vue'
 import { useD2BizModel } from '../composables/useD2BizModel'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
   wpId: string
@@ -16,11 +19,6 @@ const props = defineProps<{
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 })
-
-// 复核对话集成 (Task 47.1)
-const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
-
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 
 const {
   judgments,
@@ -37,6 +35,12 @@ const {
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-13',
+)
 </script>
 
 <template>
@@ -46,10 +50,11 @@ const {
         <el-tag type="info" size="small">业务模式判定 (CAS 22)</el-tag>
       </div>
       <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
       </div>
     </div>
 
@@ -73,7 +78,10 @@ const {
         shadow="hover"
         class="qa-card"
       >
-        <div class="qa-question">{{ j.question }}</div>
+        <div class="qa-question">
+          {{ j.question }}
+          <GtReviewTrigger :section-id="`D2-bizmodel-judgment-${j.questionId}`" />
+        </div>
         <div class="qa-answer">
           <el-radio-group
             :model-value="j.answer"
@@ -108,6 +116,7 @@ const {
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.groupName" size="small" @change="(v: string) => updateGroup(row.rowId, 'groupName', v)" />
             <span v-else>{{ row.groupName || '-' }}</span>
+            <GtReviewDot row-prefix="D2-bizmodel-group" :row-key="row.rowId" />
           </template>
         </el-table-column>
         <el-table-column label="业务模式" width="140">
@@ -144,6 +153,7 @@ const {
 <style scoped>
 .d2-tab-bizmodel { padding: 12px; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; }
 .recommend-alert { margin-bottom: 16px; }
 .qa-cards { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
 .qa-card { }

@@ -90,7 +90,7 @@ export const CYCLE_ADJUDICATION_CONFIGS: Record<string, CycleAdjudicationConfig>
   },
   'G8-1': {
     sheetCode: 'G8-1',
-    accountCode: '1504',
+    accountCode: '1503',
     accountLabel: '其他权益工具投资',
     direction: 'debit',
     rows: [
@@ -100,7 +100,7 @@ export const CYCLE_ADJUDICATION_CONFIGS: Record<string, CycleAdjudicationConfig>
   },
   'G9-1': {
     sheetCode: 'G9-1',
-    accountCode: '1505',
+    accountCode: '1504',
     accountLabel: '其他非流动金融资产',
     direction: 'debit',
     rows: [{ rowKey: 'total', label: '合计' }],

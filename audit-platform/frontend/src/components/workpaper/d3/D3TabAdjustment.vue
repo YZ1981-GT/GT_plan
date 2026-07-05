@@ -6,6 +6,14 @@
     <el-button size="small" :disabled="isReadonly || selectedRowIds.length === 0" @click="pushToA13">
       推送至A13（{{ selectedRowIds.length }}条）
     </el-button>
+    <el-button-group size="small" style="margin-left: auto">
+      <el-button @click="onExportTemplate">导出模板</el-button>
+      <el-button @click="onExportData">导出数据</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+        <el-button :disabled="isReadonly">导入数据</el-button>
+      </el-upload>
+    </el-button-group>
+    <GtReviewTrigger section-id="D3-aje-header" />
   </div>
 
   <!-- 调整分录表 -->
@@ -114,7 +122,9 @@
  */
 import { computed, ref, type Ref } from 'vue'
 import { useD3Adjustment } from '../composables/useD3Adjustment'
+import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import type { ChecklistResponse } from '../composables/useD3FormData'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -145,6 +155,8 @@ const {
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-3')
 
 function onSelectionChange(selection: any[]) {
   selectedRowIds.value = selection.map((r: any) => r.rowId)

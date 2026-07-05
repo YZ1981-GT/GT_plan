@@ -1,7 +1,7 @@
 /**
  * useG1Adjudication — G1-1 审定表（投资品种 × 损益分类）
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, watch, type Ref } from 'vue'
 import {
   parseNum,
   calcAuditedAmount,
@@ -9,7 +9,11 @@ import {
   calcChangeRate,
   calcSubtotal,
 } from './useG1TraFinFormulaEngine'
+import { calcG1FvChangeAuditedTotal } from './gCycleExternalCross'
 import type { ChecklistResponse } from './useF1FormData'
+
+/** 科目：交易性金融资产 */
+export const G1_ACCOUNT_CODE = '1501'
 
 export const G1_INVEST_TYPES = [
   { rowKey: 'stock', label: '股票' },
@@ -116,7 +120,47 @@ export function useG1Adjudication(opts: {
 
   const rows = computed(() => buildRows(opts.allResponses.value))
   const totalRow = computed(() => subtotal(rows.value))
+  const fvChangeTotal = computed(() => calcG1FvChangeAuditedTotal(rows.value))
   const trialBalanceDiff = computed(() => totalRow.value.currentAudited - trialBalanceAmount.value)
+
+  // ─── EventBus: publish substantive:adjudicated（科目1501）───────────────────
+  // 审定数变更 → 发布事件供附注披露组件刷新 + trial_balance 联动（Req 3.9, 14.3）
+  function publishAdjudicated(): void {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('substantive:adjudicated', {
+          detail: {
+            wpCode: 'G1',
+            accountCode: G1_ACCOUNT_CODE,
+            auditedAmount: totalRow.value.currentAudited,
+            priorAudited: totalRow.value.priorAudited,
+          },
+        }),
+      )
+    } catch {
+      /* EventBus publish 失败不阻塞编辑 */
+    }
+  }
+
+  // 本期审定合计变化时自动发布（含用户编辑与异步加载回填）
+  watch(
+    () => totalRow.value.currentAudited,
+    () => { publishAdjudicated() },
+  )
+
+  function publishFvChangeForCross(): void {
+    try {
+      window.dispatchEvent(
+        new CustomEvent('g-cycle:source-fv', {
+          detail: { source: 'G1', amount: fvChangeTotal.value },
+        }),
+      )
+    } catch {
+      /* EventBus publish 失败不阻塞编辑 */
+    }
+  }
+
+  watch(() => fvChangeTotal.value, () => { publishFvChangeForCross() })
 
   function updateField(
     investKey: string,
@@ -140,5 +184,6 @@ export function useG1Adjudication(opts: {
     auditNote,
     conclusion,
     updateField,
+    publishAdjudicated,
   }
 }

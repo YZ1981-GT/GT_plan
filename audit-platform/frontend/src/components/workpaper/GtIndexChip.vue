@@ -12,7 +12,7 @@
 -->
 <template>
   <!-- Invalid ref: render as plain text, no chip styling -->
-  <span v-if="!parsed" class="gt-index-chip--plain">{{ value }}</span>
+  <span v-if="!parsed" class="gt-index-chip--plain">{{ refValue }}</span>
 
   <!-- Multi-target (value contains /): show dropdown menu on hover -->
   <el-dropdown
@@ -78,7 +78,13 @@ import { BUNDLE_SHEET_ALIASES } from './bundleSheetAliases'
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
-  value: string
+  value?: string
+  /** @deprecated 历史误用；解析优先级低于 value / wpCode / target */
+  label?: string
+  /** 简写：等价于 value（部分 Tab 误传 wp-code） */
+  wpCode?: string
+  /** 简写：等价于 value（部分 Tab 误传 target） */
+  target?: string
   validate?: boolean
   contextProjectId?: string
   /** 为 true 时 click 仅 emit 不自动导航（供弹窗模式使用） */
@@ -91,6 +97,12 @@ const props = withDefaults(defineProps<{
   validate: true,
   preventNavigate: false,
   disabled: false,
+})
+
+/** 归一化索引文本，避免 value 未传时 .includes 抛错 */
+const refValue = computed(() => {
+  const raw = props.value ?? props.wpCode ?? props.target ?? props.label ?? ''
+  return typeof raw === 'string' ? raw : ''
 })
 
 const emit = defineEmits<{
@@ -121,18 +133,18 @@ const isCrossProject = computed(() => {
 })
 
 const isMultiTarget = computed(() => {
-  return props.value.includes('/')
+  return refValue.value.includes('/')
 })
 
 const multiTargets = computed(() => {
   if (!isMultiTarget.value) return []
-  return props.value.split('/').map(t => t.trim()).filter(Boolean)
+  return refValue.value.split('/').map(t => t.trim()).filter(Boolean)
 })
 
 const displayText = computed(() => {
-  if (!parsed.value) return props.value
+  if (!parsed.value) return refValue.value
   // For multi-target, show original value
-  if (isMultiTarget.value) return props.value
+  if (isMultiTarget.value) return refValue.value
   const { ns, target } = parsed.value
   // For strict mode refs, show namespace:target
   if (ns === 'Note' || ns === 'TB' || ns === 'Adj' || ns === 'Att' ||
@@ -227,7 +239,7 @@ async function resolveRef() {
       empty?: boolean
     }>('/api/wp-index-resolve', {
       params: {
-        ref: props.value,
+        ref: refValue.value,
         project_id: projectId.value || undefined,
       },
     })
@@ -443,7 +455,7 @@ function init() {
     const firstTarget = multiTargets.value[0]
     parsed.value = firstTarget ? parseIndexRef(firstTarget) : null
   } else {
-    parsed.value = parseIndexRef(props.value)
+    parsed.value = parseIndexRef(refValue.value)
   }
   if (parsed.value) {
     resolveRef()
@@ -453,7 +465,7 @@ function init() {
 onMounted(init)
 
 // Re-parse and re-validate when value changes
-watch(() => props.value, () => {
+watch(refValue, () => {
   resolveStatus.value = 'pending'
   trimReason.value = ''
   init()

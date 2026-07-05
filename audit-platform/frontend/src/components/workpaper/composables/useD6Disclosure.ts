@@ -245,6 +245,42 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     persistGroupedDetails()
   }
 
+  function updateGroupName(groupIndex: number, name: string): void {
+    groupedDetails.value = groupedDetails.value.map((g, idx) =>
+      idx === groupIndex ? { ...g, groupName: name } : g,
+    )
+    persistGroupedDetails()
+  }
+
+  function updateGroupedCell(groupIndex: number, rowId: string, field: string, value: any): void {
+    const NUMERIC_FIELDS = ['balance', 'provision', 'lossRate']
+    groupedDetails.value = groupedDetails.value.map((g, idx) => {
+      if (idx !== groupIndex) return g
+      return {
+        ...g,
+        rows: g.rows.map(r => {
+          if (r.rowId !== rowId) return r
+          const updated = { ...r }
+          if (NUMERIC_FIELDS.includes(field)) {
+            updated[field] = parseNum(value)
+          } else {
+            updated[field] = value
+          }
+          return updated
+        }),
+      }
+    })
+    persistGroupedDetails()
+  }
+
+  function removeGroupedRow(groupIndex: number, rowId: string): void {
+    groupedDetails.value = groupedDetails.value.map((g, idx) => {
+      if (idx !== groupIndex) return g
+      return { ...g, rows: g.rows.filter(r => r.rowId !== rowId) }
+    })
+    persistGroupedDetails()
+  }
+
   // ─── Note Texts (说明文本 + EventBus) ────────────────────────────────
 
   const noteTexts = ref<Record<string, string>>({})
@@ -315,6 +351,9 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     groupedDetails,
     addGroup,
     addGroupedDetailRow,
+    updateGroupName,
+    updateGroupedCell,
+    removeGroupedRow,
     noteTexts,
   }
 }

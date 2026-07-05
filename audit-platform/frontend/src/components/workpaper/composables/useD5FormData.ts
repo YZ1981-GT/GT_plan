@@ -52,7 +52,7 @@ export function useD5FormData(options: UseD5FormDataOptions) {
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
-        if (r.item_id?.startsWith('D5-')) {
+        if (r.item_id?.startsWith('D5-') || r.item_id?.startsWith('D5-proc')) {
           map.set(r.item_id, {
             item_id: r.item_id,
             conclusion: r.conclusion ?? null,

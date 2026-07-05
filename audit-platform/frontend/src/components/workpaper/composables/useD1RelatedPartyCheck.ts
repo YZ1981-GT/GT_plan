@@ -366,7 +366,7 @@ export function useD1RelatedPartyCheck(options: UseD1RelatedPartyCheckOptions) {
     formData.append('file', file)
     try {
       const res = await http.post(
-        `/api/workpapers/${wpId.value}/d1-import-export/import-data`,
+        `/api/workpapers/${wpId.value}/d1/import-data`,
         formData,
         {
           params: { sheet: 'D1-11' },

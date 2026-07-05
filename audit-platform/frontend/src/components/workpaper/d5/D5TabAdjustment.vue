@@ -1,11 +1,5 @@
 <template>
 <div class="d5-adjustment">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 编制提示折叠 -->
     <details class="guidance-hint">
       <summary>📋 编制提示</summary>
@@ -30,6 +24,13 @@
       >
         推送至A13
       </el-button>
+      <el-button-group size="small" style="margin-left: auto">
+        <el-button @click="onExportTemplate">导出模板</el-button>
+        <el-button @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button :disabled="isReadonly">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
     </div>
 
     <!-- 调整分录表 -->
@@ -195,12 +196,6 @@
         <template v-else>✗ 不平衡：差额 {{ fmtAmount(balanceDiff) }}</template>
       </span>
     </div>
-  </template>
-
-  <!-- OnlyOffice占位 -->
-  <div v-else class="onlyoffice-placeholder">
-    <el-empty description="在线编辑模式（OnlyOffice）" />
-  </div>
 </div>
 </template>
 
@@ -218,6 +213,7 @@
  */
 import { ref, computed, type Ref } from 'vue'
 import { useD5Adjustment } from '../composables/useD5Adjustment'
+import { useD5TabImportExport } from '../composables/useD5TabImportExport'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -230,14 +226,6 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
-
-// ─── Mode ────────────────────────────────────────────────────────────────────
-
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -259,6 +247,9 @@ const {
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { onExportTemplate, onExportData, onImportFile } = useD5TabImportExport(wpIdRef, 'D5-3')
 
 // ─── Selection ───────────────────────────────────────────────────────────────
 
@@ -336,7 +327,4 @@ function fmtAmount(val: number | null | undefined): string {
   color: #f56c6c;
 }
 
-.onlyoffice-placeholder {
-  padding: 40px 0;
-}
 </style>

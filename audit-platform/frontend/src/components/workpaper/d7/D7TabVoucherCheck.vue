@@ -1,11 +1,5 @@
 <template>
 <div class="d7-voucher-check">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 抽样参数区 -->
     <div class="sampling-params-card">
       <h4 class="card-title">抽样参数</h4>
@@ -46,6 +40,27 @@
       </div>
     </div>
 
+    <div v-if="useVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
+      </el-alert>
+      <el-button size="small" @click="toggleBrowseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
+    <el-table-v2
+      v-if="useVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="browseRows"
+      :width="tableWidth"
+      :height="tableHeight"
+      :row-height="36"
+      :header-height="40"
+      fixed
+      class="virtual-table"
+    />
+
+    <template v-if="!useVirtualScroll || !browseMode">
     <!-- (1) 本期增减变动检查 -->
     <div class="check-block">
       <h4 class="card-title">(1) 本期增减变动检查</h4>
@@ -163,12 +178,25 @@
         </el-table-column>
       </el-table>
     </div>
+    </template>
 
     <!-- 底部汇总 -->
     <div class="summary-section">
       <span>已检查：<strong>{{ checkedCount }}</strong> 笔</span>
       <span>异常：<strong class="abnormal-count">{{ abnormalCount }}</strong> 笔</span>
       <span>异常率：<strong :class="{ 'abnormal-count': abnormalRate > 0 }">{{ (abnormalRate * 100).toFixed(1) }}%</strong></span>
+      <el-button-group v-if="!isReadonly" size="small" style="margin-left: auto">
+        <el-button @click="periodImport.exportTemplate">导出本期模板</el-button>
+        <el-button @click="periodImport.exportData">导出本期数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="periodImport.importing" @change="(f: any) => onPeriodImport(f.raw || f)">
+          <el-button :disabled="periodImport.importing">导入本期</el-button>
+        </el-upload>
+        <el-button @click="postImport.exportTemplate">导出期后模板</el-button>
+        <el-button @click="postImport.exportData">导出期后数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="postImport.importing" @change="(f: any) => onPostImport(f.raw || f)">
+          <el-button :disabled="postImport.importing">导入期后</el-button>
+        </el-upload>
+      </el-button-group>
     </div>
 
     <!-- 审计说明/结论 -->
@@ -186,11 +214,6 @@
         <el-button size="small" @click="openReview('D7-7-note-conclusion')">💬复核</el-button>
       </div>
     </div>
-  </template>
-
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -201,8 +224,12 @@
  * Task: 22.1
  * Requirements: 12.1-12.9, 18.5, 19.4, 20.1, 21.1-21.3
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useD7VoucherCheck } from '../composables/useD7VoucherCheck'
+import { useD7ImportExport } from '../composables/useD7ImportExport'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 
 // @ts-ignore
@@ -218,14 +245,21 @@ const props = defineProps<{
   crossSheet: any
 }>()
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 function openReview(sectionId: string) { openReviewDialog(sectionId) }
+
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const onReload = () => reloadWorkpaperData?.() ?? Promise.resolve()
+const periodImport = useD7ImportExport({ wpId: wpIdRef, sheetCode: 'D7-7-period', sheetLabel: '本期变动', onImported: onReload })
+const postImport = useD7ImportExport({ wpId: wpIdRef, sheetCode: 'D7-7-post', sheetLabel: '期后结转', onImported: onReload })
+
+async function onPeriodImport(file: File) {
+  await periodImport.importData(file)
+}
+async function onPostImport(file: File) {
+  await postImport.importData(file)
+}
 
 const {
   samplingParams, periodChangeRows, postTransferRows,
@@ -253,12 +287,49 @@ function fmtAmt(val: number | null | undefined): string {
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+const browseRows = computed(() => [
+  ...periodChangeRows.value.map(r => ({
+    section: '本期',
+    customerName: r.customerName,
+    voucherNo: r.voucherNo,
+    debit: r.debitAmount,
+    credit: r.creditAmount,
+  })),
+  ...postTransferRows.value.map(r => ({
+    section: '期后',
+    customerName: r.customerName,
+    voucherNo: r.voucherNo,
+    debit: r.debitAmount,
+    credit: r.creditAmount,
+  })),
+])
+
+const browseRowCount = computed(() => browseRows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('section', '区块', 70),
+  virtualTextCol('customerName', '客户名称', 130),
+  virtualTextCol('voucherNo', '凭证号', 90),
+  virtualNumCol('debit', '借方', 100, fmtAmt),
+  virtualNumCol('credit', '贷方', 100, fmtAmt),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 960,
+})
 </script>
 
 <style scoped>
 .d7-voucher-check { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
-.oo-mode-placeholder { padding: 40px 0; }
 
 .sampling-params-card {
   padding: 16px;
@@ -271,6 +342,9 @@ function fmtAmt(val: number | null | undefined): string {
 .param-item { display: flex; flex-direction: column; gap: 4px; }
 .param-item label { font-size: 12px; color: #909399; }
 .progress-bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; }
+.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.virtual-hint { flex: 1; min-width: 200px; margin: 0; }
+.virtual-table { margin-bottom: 12px; }
 
 .check-block { margin-bottom: 20px; }
 .abnormal-count { color: #f56c6c; }

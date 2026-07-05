@@ -1,167 +1,141 @@
 <template>
   <div class="d3-prepaid-accounts">
-    <!-- 加载状态 -->
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
     </div>
 
     <template v-else>
-      <!-- 顶部工具栏：双模式切换 -->
-      <div class="d3-header-toolbar">
-        <el-segmented
-          v-model="dualMode.currentMode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="dualMode.onModeChange"
-        />
-        <el-tooltip v-if="dualMode.ooHealthy.value === false" content="OnlyOffice服务不可用" placement="top">
-          <el-tag size="small" type="warning">OO不可用</el-tag>
-        </el-tooltip>
+      <div v-if="showModeToolbar" class="d3-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
-      <!-- OnlyOffice 模式 -->
-      <template v-if="dualMode.currentMode.value === 'onlyoffice' && dualMode.ooConfig.value">
-        <GtOnlyOfficeSheet
-          :config="dualMode.ooConfig.value"
-          @document-ready="dualMode.onDocumentReady"
-        />
-      </template>
+      <GtOnlyOfficeSheet
+        v-if="renderMode === 'onlyoffice'"
+        :key="ooSheetName"
+        :wp-id="props.wpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="onOoFallback"
+      />
 
-      <!-- HTML 结构化视图 -->
       <template v-else>
-        <el-tabs v-model="activeTab" type="border-card" class="d3-tabs">
-          <!-- Tab 1: D3A 程序表 -->
-          <el-tab-pane name="procedure" label="D3A 程序表" lazy>
-            <component :is="D3TabProcedure" v-if="activeTab === 'procedure'" />
-          </el-tab-pane>
+        <D3TabIndex
+          v-if="currentSheet === 'directory' || currentSheet === 'D3' || currentSheet === 'skip'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          :available-sheets="availableSheets"
+          :applicable-standards="applicableStandards"
+        />
 
-          <!-- Tab 2: D3-1 审定表 -->
-          <el-tab-pane name="adjudication" label="D3-1 审定表" lazy>
-            <D3TabAdjudication
-              v-if="activeTab === 'adjudication'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
+        <D3TabProcedure
+          v-else-if="currentSheet === 'D3A'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :html-data="props.htmlData"
+          :is-readonly="isReadonly"
+        />
 
-          <!-- Tab 3: D3-2 明细表 -->
-          <el-tab-pane name="detail" label="D3-2 明细表" lazy>
-            <D3TabDetail
-              v-if="activeTab === 'detail'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-            />
-          </el-tab-pane>
+        <D3TabAdjudication
+          v-else-if="currentSheet === 'D3-1'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+        <D3TabDetail
+          v-else-if="currentSheet === 'D3-2'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+        <D3TabAdjustment
+          v-else-if="currentSheet === 'D3-3'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+        <D3TabAnalysis
+          v-else-if="currentSheet === 'D3-4'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+        <D3TabLongTerm
+          v-else-if="currentSheet === 'D3-5'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+        <D3TabRelatedParty
+          v-else-if="currentSheet === 'D3-6'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+        <D3TabVoucherCheck
+          v-else-if="currentSheet === 'D3-7'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+        <D3TabDisclosureListed
+          v-else-if="currentSheet === '附注上市'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+        <D3TabDisclosureSoe
+          v-else-if="currentSheet === '附注国企'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
 
-          <!-- Tab 4: D3-3 调整分录 -->
-          <el-tab-pane name="adjustment" label="D3-3 调整分录" lazy>
-            <D3TabAdjustment
-              v-if="activeTab === 'adjustment'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 5: D3-4 分析表 -->
-          <el-tab-pane name="analysis" label="D3-4 分析表" lazy>
-            <D3TabAnalysis
-              v-if="activeTab === 'analysis'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 6: D3-5 长期检查 -->
-          <el-tab-pane name="longterm" label="D3-5 长期检查" lazy>
-            <D3TabLongTerm
-              v-if="activeTab === 'longterm'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 7: D3-6 关联方 -->
-          <el-tab-pane name="related-party" label="D3-6 关联方" lazy>
-            <D3TabRelatedParty
-              v-if="activeTab === 'related-party'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 8: D3-7 凭证检查 -->
-          <el-tab-pane name="voucher-check" label="D3-7 凭证检查" lazy>
-            <D3TabVoucherCheck
-              v-if="activeTab === 'voucher-check'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 9: 附注 -->
-          <el-tab-pane name="disclosure" label="附注" lazy>
-            <div v-if="activeTab === 'disclosure'" class="disclosure-container">
-              <el-segmented
-                v-model="disclosureVariant"
-                :options="disclosureOptions"
-                size="small"
-                style="margin-bottom: 12px"
-              />
-              <D3TabDisclosureListed
-                v-if="disclosureVariant === 'listed'"
-                :all-responses="allResponses"
-                :wp-id="wpIdRef"
-                :project-id="projectIdRef"
-                :is-readonly="isReadonly"
-                :save-immediate="saveImmediate"
-                :debounced-save="debouncedSave"
-                :cross-sheet="crossSheet"
-              />
-              <D3TabDisclosureSoe
-                v-if="disclosureVariant === 'soe'"
-                :all-responses="allResponses"
-                :wp-id="wpIdRef"
-                :project-id="projectIdRef"
-                :is-readonly="isReadonly"
-                :save-immediate="saveImmediate"
-                :debounced-save="debouncedSave"
-                :cross-sheet="crossSheet"
-              />
-            </div>
-          </el-tab-pane>
-        </el-tabs>
+        <D3TabIndex
+          v-else
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          :available-sheets="availableSheets"
+          :applicable-standards="applicableStandards"
+        />
       </template>
     </template>
   </div>
@@ -169,21 +143,23 @@
 
 <script setup lang="ts">
 /**
- * GtD3PrepaidAccounts.vue — D3 预收账款底稿主入口
+ * GtD3PrepaidAccounts.vue — D3 预收账款底稿主入口（比照 D4 架构）
  *
- * el-tabs 9个tab-pane：D3A程序表 → D3-1审定表 → D3-2明细表 → D3-3调整分录
- * → D3-4分析表 → D3-5长期检查 → D3-6关联方 → D3-7凭证检查 → 附注
- *
- * 科目覆盖：2203 预收账款（贷方科目/负债类）
- * selfLoad: 当 htmlData prop 为 null 时自行调 render-config 加载数据。
+ * 由外层 GtWpRenderer 的 sheetName 控制当前 sheet，不再使用内部 el-tabs。
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
-import http from '@/utils/http'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
 import { useD3FormData } from './composables/useD3FormData'
 import { useD3CrossSheet } from './composables/useD3CrossSheet'
-import { useD3DualMode } from './composables/useD3DualMode'
-
-// ─── Async sub-components ────────────────────────────────────────────────────
+import { useD3EntryDualMode, type D3RenderMode } from './composables/useD3EntryDualMode'
+import { resolveD3SheetCode } from './composables/useD3SheetRouting'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useD3ReviewThreads } from './composables/useD3ReviewThreads'
+import { useD3EventBus } from './composables/useD3EventBus'
+import { resolveD3SheetLabel } from './composables/d3SheetLabels'
+import D3TabIndex from './d3/D3TabIndex.vue'
+import D3TabProcedure from './d3/D3TabProcedure.vue'
+import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
 const D3TabAdjudication = defineAsyncComponent(() => import('./d3/D3TabAdjudication.vue'))
 const D3TabDetail = defineAsyncComponent(() => import('./d3/D3TabDetail.vue'))
@@ -194,148 +170,167 @@ const D3TabRelatedParty = defineAsyncComponent(() => import('./d3/D3TabRelatedPa
 const D3TabVoucherCheck = defineAsyncComponent(() => import('./d3/D3TabVoucherCheck.vue'))
 const D3TabDisclosureListed = defineAsyncComponent(() => import('./d3/D3TabDisclosureListed.vue'))
 const D3TabDisclosureSoe = defineAsyncComponent(() => import('./d3/D3TabDisclosureSoe.vue'))
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-
-// D3A 程序表复用 a-program-console 逻辑
-const D3TabProcedure = defineAsyncComponent(() => import('./d3/D3TabAdjudication.vue')
-  .then(() => ({ template: '<el-empty description="D3A 程序表（复用 a-program-console）" />' }) as any)
-  .catch(() => ({ template: '<el-empty description="D3A 程序表加载中..." />' }) as any)
-)
-
-// ─── Props / Emits ───────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
   projectId: string
   wpCode?: string
+  sheetName?: string
   year?: number
   htmlData?: any
   readonly?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
+  (e: 'jump-to-section', sheetName: string): void
 }>()
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
 const isLoading = ref(true)
-const activeTab = ref('adjudication')
-const disclosureVariant = ref<'listed' | 'soe'>('listed')
 const applicableStandards = ref('')
 
 const isReadonly = computed(() => !!props.readonly)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 
-/** 附注切换选项：根据 applicable_standards 自动判断 */
-const disclosureOptions = computed(() => {
-  const std = applicableStandards.value.toLowerCase()
-  const opts: Array<{ label: string; value: string; disabled?: boolean }> = []
-  const showListed = std.includes('listed') || !std
-  const showSoe = std.includes('soe') || !std
-  if (showListed) opts.push({ label: '上市公司', value: 'listed' })
-  if (showSoe) opts.push({ label: '国企', value: 'soe' })
-  if (opts.length === 0) {
-    opts.push({ label: '上市公司', value: 'listed' })
-    opts.push({ label: '国企', value: 'soe' })
-  }
-  return opts
-})
-
-// ─── useD3FormData ───────────────────────────────────────────────────────────
-
 const {
   allResponses,
   loadAll,
   saveImmediate,
+  saveBatch,
   debouncedSave,
 } = useD3FormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
 })
 
-// ─── useD3CrossSheet ─────────────────────────────────────────────────────────
-
 const crossSheet = useD3CrossSheet({ allResponses })
+useD3EventBus(allResponses, debouncedSave)
 
-// ─── useD3DualMode ───────────────────────────────────────────────────────────
+const wpIdRefForReview = toRef(props, 'wpId')
+const projectIdRefForReview = toRef(props, 'projectId')
+useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
 
-const dualMode = useD3DualMode({ wpId: wpIdRef, activeTab })
+const { getThreadDot, getRowDot } = useD3ReviewThreads(wpIdRefForReview)
+provide('d3GetThreadDot', getThreadDot)
+provide('d3GetRowDot', getRowDot)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
+useWorkpaperEntryInjections({
+  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
+  reloadFn: () => loadAll(),
+})
+provide('d3CrossSheet', crossSheet)
 
-function openReviewDialog(sectionId: string): void {
-  console.log('[D3] openReviewDialog:', sectionId)
+const currentSheet = computed(() => resolveD3SheetCode(props.sheetName || 'D3'))
+
+const availableSheets = computed(() =>
+  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
+)
+
+const KNOWN_HTML_SHEETS = new Set([
+  'directory', 'D3', 'D3A',
+  'D3-1', 'D3-2', 'D3-3', 'D3-4', 'D3-5', 'D3-6', 'D3-7',
+  '附注上市', '附注国企',
+])
+
+const showModeToolbar = computed(() => KNOWN_HTML_SHEETS.has(currentSheet.value))
+
+const dualMode = useD3EntryDualMode({
+  wpId: toRef(props, 'wpId'),
+  currentSheet,
+  availableSheets,
+  reloadAllResponses: () => loadAll(),
+})
+
+const ooSheetName = computed(() =>
+  dualMode.resolveOoSheetName() || props.sheetName || 'D3-1',
+)
+
+const renderMode = computed({
+  get: () => dualMode.mode.value,
+  set: (v: D3RenderMode) => { void dualMode.switchMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: 'HTML精美化', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
+
+function onOoFallback(): void {
+  void dualMode.switchMode('html')
 }
 
-provide('openReviewDialog', openReviewDialog)
+async function saveImmediateBatch(
+  items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
+): Promise<void> {
+  await saveBatch(items.map(item => ({
+    itemId: item.item_id,
+    data: { conclusion: item.conclusion, remark: item.remark },
+  })))
+}
 
-// ─── selfLoad ────────────────────────────────────────────────────────────────
+provide('displayPrefs', {
+  fmtAmount: (v: number) => {
+    if (v === 0) return '-'
+    const abs = Math.abs(v).toLocaleString('zh-CN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    return v < 0 ? `(${abs})` : abs
+  },
+  fmtPercent: (v: number) => (v * 100).toFixed(2) + '%',
+})
 
-async function selfLoad() {
-  if (props.htmlData) {
-    // 从 props 提供的数据初始化（render-config已返回）
-    if (props.htmlData.applicable_standards || props.htmlData.project_context?.applicable_standards) {
-      applicableStandards.value = props.htmlData.applicable_standards || props.htmlData.project_context?.applicable_standards || ''
+async function selfLoad(): Promise<void> {
+  if (props.htmlData?.responses_snapshot) {
+    const map = new Map<string, any>()
+    for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) {
+      map.set(k, v)
     }
-    await loadAll()
+    allResponses.value = map as any
     isLoading.value = false
     return
   }
 
-  // 当 htmlData 为空时（bundle 内嵌场景），自行加载
-  try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { params: { force_component_type: 'd3-prepaid-accounts' }, _silent: true } as any,
-    )
-    const renderData = res.data?.data ?? res.data
-    if (renderData?.sheets?.[0]?.html_data?.project_context) {
-      applicableStandards.value = renderData.sheets[0].html_data.project_context.applicable_standards || ''
-    }
-  } catch (err) {
-    console.warn('[GtD3PrepaidAccounts] selfLoad render-config failed:', err)
+  if (props.htmlData?.applicable_standards || props.htmlData?.project_context?.applicable_standards) {
+    applicableStandards.value =
+      props.htmlData.applicable_standards
+      || props.htmlData.project_context?.applicable_standards
+      || ''
   }
 
-  await loadAll()
-  isLoading.value = false
+  try {
+    await loadAll()
+  } catch (err) {
+    console.warn('[GtD3PrepaidAccounts] selfLoad failed:', err)
+  } finally {
+    isLoading.value = false
+  }
 }
 
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
-
-onMounted(async () => {
-  await selfLoad()
-  // 非阻塞检查 OO 健康状态
-  dualMode.checkOOHealth()
-})
+onMounted(() => { void selfLoad() })
 </script>
 
 <style scoped>
 .d3-prepaid-accounts {
   padding: 12px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
-
 .loading-container {
   padding: 24px;
 }
-
-.d3-header-toolbar {
+.d3-mode-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-radius: 6px;
-}
-
-.d3-tabs {
-  min-height: 400px;
-}
-
-.disclosure-container {
-  padding: 8px 0;
 }
 </style>

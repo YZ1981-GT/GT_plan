@@ -8,11 +8,14 @@
  * 渲染 el-table：票据种类|期初未审|期初AJE|期初RJE|期初审定|本期增加|本期减少|期末未审|期末AJE|期末RJE|期末审定
  * 预设银行承兑/商业承兑固定行（不可删除）+ 动态行增删 + 小计行自动SUM
  */
-import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1DetailCategory, type CategoryRow } from '../composables/useD1DetailCategory'
 import type { ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
+import { useD1VirtualBrowse } from '../composables/useD1VirtualBrowse'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -29,24 +32,6 @@ const props = defineProps<{
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const ooSheetName = computed(() => props.sheetName || '原值明细按类别D1-2')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
 })
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -68,6 +53,9 @@ const {
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+const rowCount = computed(() => rows.value.length)
+const { useLargeTable, tableMaxHeight } = useD1VirtualBrowse(rowCount)
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -101,92 +89,25 @@ function isCellEditable(row: CategoryRow, field: string): boolean {
 
 // ─── Import/Export ───────────────────────────────────────────────────────────
 
-const SHEET_CODE = 'D1-2'
-
-async function exportTemplate() {
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d1/export-template`,
-      null,
-      { params: { sheet: SHEET_CODE }, responseType: 'blob' }
-    )
-    const blob = new Blob([res.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${SHEET_CODE}_模板.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function exportData() {
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d1/export-data`,
-      null,
-      { params: { sheet: SHEET_CODE }, responseType: 'blob' }
-    )
-    const blob = new Blob([res.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${SHEET_CODE}_数据.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-async function handleImportFile(file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/d1/import-data`,
-      formData,
-      { params: { sheet: SHEET_CODE }, headers: { 'Content-Type': 'multipart/form-data' } }
-    )
-    const data = res.data?.data ?? res.data
-    ElMessage.success(`成功导入${data.imported_count}行数据`)
-    if (data.warning) ElMessage.warning(data.warning)
-  } catch (e: any) {
-    const errData = e?.response?.data?.data ?? e?.response?.data
-    if (e?.response?.status === 400 && errData?.invalid_columns?.length) {
-      ElMessage.error(`列名不匹配: ${errData.invalid_columns.join(', ')}`)
-    } else {
-      ElMessage.error('导入失败')
-    }
-  }
-}
+const wpIdRef = toRef(props, 'wpId')
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-2')
 </script>
 
 <template>
   <div class="d1-tab-detail-category">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
+    <div class="tab-header">
+      <h4>原值明细按类别 D1-2</h4>
+      <GtReviewTrigger section-id="D1-detail-cat-header" />
     </div>
-
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="ooSheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML mode -->
-    <template v-if="editorMode === 'html'">
     <!-- Toolbar -->
     <div class="table-toolbar">
       <el-button-group size="small">
-        <el-button @click="exportTemplate">导出模板</el-button>
-        <el-button @click="exportData">导出数据</el-button>
+        <el-button @click="onExportTemplate">导出模板</el-button>
+        <el-button @click="onExportData">导出数据</el-button>
         <el-upload
           :show-file-list="false"
           accept=".xlsx"
-          :auto-upload="false"
-          :on-change="(f: any) => handleImportFile(f.raw)"
+          :before-upload="onImportFile"
           style="display:inline-block"
         >
           <el-button size="small">导入数据</el-button>
@@ -203,11 +124,15 @@ async function handleImportFile(file: File) {
     </div>
 
     <!-- Main Table -->
+    <el-alert v-if="useLargeTable" type="info" :closable="false" show-icon class="large-table-hint">
+      行数较多，已启用固定高度滚动浏览（{{ rowCount }} 行）
+    </el-alert>
     <el-table
       :data="getTableData()"
       border
       size="small"
       :row-class-name="getRowClass"
+      :max-height="tableMaxHeight"
     >
       <!-- 票据种类 -->
       <el-table-column label="票据种类" width="160" fixed>
@@ -217,6 +142,7 @@ async function handleImportFile(file: File) {
           </template>
           <template v-else-if="row.isFixed">
             <span>{{ row.category }}</span>
+            <GtReviewDot row-prefix="D1-cat" :row-key="row.rowId" />
           </template>
           <template v-else>
             <div class="category-cell">
@@ -227,6 +153,7 @@ async function handleImportFile(file: File) {
                 :disabled="isReadonly"
                 @change="(v: string) => updateCell(row.rowId, 'category', v)"
               />
+              <GtReviewDot row-prefix="D1-cat" :row-key="row.rowId" />
               <el-button
                 v-if="!isReadonly"
                 type="danger"
@@ -368,13 +295,24 @@ async function handleImportFile(file: File) {
         </template>
       </el-table-column>
     </el-table>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .d1-tab-detail-category {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {

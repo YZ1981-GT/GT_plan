@@ -3,8 +3,14 @@
  * D2TabDetail — 明细表D2-2 (39列宽表)
  * 横向滚动, 固定前2列, 关联方橙色背景, 搜索过滤, 虚拟滚动>30行
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, h, inject, ref, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useD2Detail, type DetailRow } from '../composables/useD2Detail'
+import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
   wpId: string
@@ -14,11 +20,11 @@ const props = defineProps<{
   relatedParties: string[]
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-2',
+)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -35,8 +41,6 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-detail-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
-
 const {
   rows,
   filteredRows,
@@ -46,6 +50,7 @@ const {
   removeRow,
   updateCell,
   useVirtualScroll,
+  importFromAuxBalance,
 } = useD2Detail({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -54,8 +59,98 @@ const {
   relatedParties: toRef(props, 'relatedParties') as Ref<string[]>,
 })
 
+const browseMode = ref(true)
+const tableWidth = ref(1200)
+
+const virtualColumns = computed<VirtualColumn[]>(() => {
+  const fmt = (v: unknown) => displayPrefs.fmtAmount(Number(v) || 0)
+  const numCol = (key: keyof DetailRow, title: string, w = 110): VirtualColumn => ({
+    key: String(key),
+    dataKey: String(key),
+    title,
+    width: w,
+    align: 'right',
+    cellRenderer: ({ cellData }) => h('span', {}, fmt(cellData)),
+  })
+  return [
+    { key: 'seq', dataKey: 'seq', title: '序号', width: 60, align: 'center' },
+    { key: 'customerName', dataKey: 'customerName', title: '客户名称', width: 160 },
+    { key: 'companyCode', dataKey: 'companyCode', title: '公司代码', width: 90 },
+    { key: 'relationType', dataKey: 'relationType', title: '关联方类型', width: 120 },
+    numCol('priorAudited', '期初审定', 110),
+    numCol('currentUnadjusted', '期末未审', 110),
+    numCol('currentAudited', '期末审定', 110),
+    { key: 'creditRiskClassification', dataKey: 'creditRiskClassification', title: '信用风险组合', width: 130 },
+    {
+      key: 'isConfirmation',
+      dataKey: 'isConfirmation',
+      title: '函证',
+      width: 60,
+      align: 'center',
+      cellRenderer: ({ cellData }) => h('span', {}, cellData ? '是' : '-'),
+    },
+  ]
+})
+
+const { rowEventHandlers } = useVirtualTable({
+  rows: filteredRows,
+  columns: virtualColumns,
+  width: tableWidth,
+  height: 560,
+  onRowDblclick: () => { browseMode.value = false },
+})
+
 const RELATION_OPTIONS = ['非关联方', '控股股东', '实际控制人', '其他关联方']
 const CREDIT_RISK_OPTIONS = ['单项计提', '账龄组合', '客户类型组合']
+
+const AGING_BANDS = [
+  { label: '1年内', prior: 'priorAging1Year', current: 'currentAging1Year', audited: 'auditedAging1Year' },
+  { label: '1-2年', prior: 'priorAging1to2', current: 'currentAging1to2', audited: 'auditedAging1to2' },
+  { label: '2-3年', prior: 'priorAging2to3', current: 'currentAging2to3', audited: 'auditedAging2to3' },
+  { label: '3-4年', prior: 'priorAging3to4', current: 'currentAging3to4', audited: 'auditedAging3to4' },
+  { label: '4-5年', prior: 'priorAging4to5', current: 'currentAging4to5', audited: 'auditedAging4to5' },
+  { label: '5年以上', prior: 'priorAgingOver5', current: 'currentAgingOver5', audited: 'auditedAgingOver5' },
+] as const
+
+const { generateAndConfirm, aiAvailable } = useD2AiGenerate(toRef(props, 'wpId'))
+const importing = ref(false)
+const detailNote = ref('')
+
+function loadDetailNote(): void {
+  detailNote.value = props.allResponses.get('D2-detail-audit-note')?.remark || ''
+}
+loadDetailNote()
+
+async function handleImportFromAux(): Promise<void> {
+  if (props.isReadonly) return
+  importing.value = true
+  try {
+    const result = await importFromAuxBalance(props.projectId)
+    ElMessage.success(`导入完成：新增 ${result.added} 行，更新 ${result.updated} 行`)
+  } catch {
+    ElMessage.error('从余额表导入失败')
+  } finally {
+    importing.value = false
+  }
+}
+
+function saveDetailNote(): void {
+  props.allResponses.set('D2-detail-audit-note', { item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value })
+  window.dispatchEvent(new CustomEvent('d2:save-items', {
+    detail: { items: [{ item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value }] },
+  }))
+}
+
+async function onAiDetailNote(): Promise<void> {
+  const content = await generateAndConfirm('detail-note', detailNote.value, {
+    rowCount: rows.value.length,
+    totalAudited: totalRow.value.currentAudited,
+  }, 'AI 生成明细表说明')
+  if (content) {
+    detailNote.value = content
+    saveDetailNote()
+  }
+}
 
 function getRowClassName({ row }: { row: DetailRow }): string {
   if (row.relationType && row.relationType !== '非关联方') return 'related-party-row'
@@ -73,9 +168,14 @@ function handleEdit(row: DetailRow, field: string, value: any) {
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
+        <el-button size="small" type="success" :disabled="isReadonly" :loading="importing" @click="handleImportFromAux">
+          从余额表导入
+        </el-button>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
           添加客户
         </el-button>
@@ -86,22 +186,37 @@ function handleEdit(row: DetailRow, field: string, value: any) {
           placeholder="搜索客户名称..."
           size="small"
           clearable
-          style="width: 200px; margin-right: 12px"
+          style="width: 200px"
         />
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
       </div>
     </div>
 
-    <!-- 虚拟滚动提示 -->
-    <el-tag v-if="useVirtualScroll" type="info" size="small" class="virtual-hint">
-      当前{{ rows.length }}行，已启用虚拟滚动
-    </el-tag>
+    <!-- 虚拟滚动：速览 / 编辑切换 -->
+    <div v-if="useVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ filteredRows.length }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+      </el-alert>
+      <el-button size="small" @click="browseMode = !browseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
 
-    <!-- 主表 -->
+    <el-table-v2
+      v-if="useVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="filteredRows"
+      :width="tableWidth"
+      :height="560"
+      :row-height="36"
+      :header-height="40"
+      :row-event-handlers="rowEventHandlers"
+      fixed
+      class="virtual-table"
+    />
+
+    <!-- 主表（编辑模式或 ≤30 行） -->
     <el-table
+      v-else
       :data="filteredRows"
       border
       stripe
@@ -110,7 +225,11 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       :max-height="600"
       style="width: 100%"
     >
-      <el-table-column type="index" label="序号" width="60" fixed />
+      <el-table-column label="序号" width="68" fixed>
+        <template #default="{ $index, row }">
+          {{ $index + 1 }}<GtReviewDot row-prefix="D2-detail" :row-key="row.rowId" />
+        </template>
+      </el-table-column>
       <el-table-column prop="customerName" label="客户名称" width="160" fixed>
         <template #default="{ row }">
           <el-input
@@ -120,6 +239,17 @@ function handleEdit(row: DetailRow, field: string, value: any) {
             @change="(v: string) => handleEdit(row, 'customerName', v)"
           />
           <span v-else>{{ row.customerName }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="公司代码" width="90" fixed>
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.companyCode"
+            size="small"
+            @change="(v: string) => handleEdit(row, 'companyCode', v)"
+          />
+          <span v-else>{{ row.companyCode || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -154,6 +284,13 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </template>
       </el-table-column>
 
+      <!-- 期初审定账龄 -->
+      <el-table-column label="期初审定账龄" align="center">
+        <el-table-column v-for="band in AGING_BANDS" :key="'p-' + band.prior" :label="band.label" width="95" align="right">
+          <template #default="{ row }">{{ displayPrefs.fmtAmount(row[band.prior]) }}</template>
+        </el-table-column>
+      </el-table-column>
+
       <!-- 本期发生 -->
       <el-table-column label="借方发生" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.debitOccurrence) }}</template>
@@ -164,11 +301,22 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <el-table-column label="期末余额" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.endBalance) }}</template>
       </el-table-column>
+      <el-table-column label="重分类" width="100" align="right">
+        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.reclassification) }}</template>
+      </el-table-column>
 
-      <!-- 期末 -->
+      <!-- 期末未审 -->
       <el-table-column label="期末未审" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</template>
       </el-table-column>
+
+      <!-- 期末未审账龄 -->
+      <el-table-column label="期末未审账龄" align="center">
+        <el-table-column v-for="band in AGING_BANDS" :key="'c-' + band.current" :label="band.label" width="95" align="right">
+          <template #default="{ row }">{{ displayPrefs.fmtAmount(row[band.current]) }}</template>
+        </el-table-column>
+      </el-table-column>
+
       <el-table-column label="期末AJE" width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentAje) }}</template>
       </el-table-column>
@@ -179,6 +327,23 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         <template #default="{ row }">
           <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
         </template>
+      </el-table-column>
+
+      <!-- 期末审定账龄 -->
+      <el-table-column label="期末审定账龄" align="center">
+        <el-table-column v-for="band in AGING_BANDS" :key="'a-' + band.audited" :label="band.label" width="95" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row[band.audited]"
+              :controls="false"
+              size="small"
+              class="aging-input"
+              @change="(v: number) => handleEdit(row, band.audited, v ?? 0)"
+            />
+            <span v-else class="audited-aging">{{ displayPrefs.fmtAmount(row[band.audited]) }}</span>
+          </template>
+        </el-table-column>
       </el-table-column>
 
       <!-- 信用风险组合方式 -->
@@ -193,6 +358,21 @@ function handleEdit(row: DetailRow, field: string, value: any) {
             <el-option v-for="opt in CREDIT_RISK_OPTIONS" :key="opt" :label="opt" :value="opt" />
           </el-select>
           <span v-else>{{ row.creditRiskClassification }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="组合名称" width="110">
+        <template #default="{ row }">{{ row.groupName || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="函证" width="60" align="center">
+        <template #default="{ row }">
+          <el-tag
+            v-if="row.isConfirmation"
+            :class="{ 'confirmation-auto': (row as any)._confirmationAutoMarked }"
+            type="success"
+            size="small"
+          >是</el-tag>
+          <span v-else>-</span>
         </template>
       </el-table-column>
 
@@ -221,6 +401,22 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <span class="total-value">期末审定: {{ displayPrefs.fmtAmount(totalRow.currentAudited as number) }}</span>
       <span class="total-value">期后回款: {{ displayPrefs.fmtAmount(totalRow.postPayment as number) }}</span>
     </div>
+    <!-- 审计说明 -->
+    <div class="audit-note-block">
+      <div class="audit-note-header">
+        <span>审计说明</span>
+        <GtReviewTrigger section-id="D2-detail-audit-note" />
+        <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiDetailNote">🤖 AI生成</el-button>
+      </div>
+      <el-input
+        v-model="detailNote"
+        type="textarea"
+        :rows="3"
+        :disabled="isReadonly"
+        placeholder="明细表编制说明..."
+        @change="saveDetailNote"
+      />
+    </div>
   </div>
 </template>
 
@@ -229,8 +425,11 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .toolbar-right { display: flex; align-items: center; }
-.virtual-hint { margin-bottom: 8px; }
+.virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.virtual-hint { margin-bottom: 0; flex: 1; }
+.virtual-table { margin-bottom: 8px; }
 :deep(.related-party-row) { background-color: #fff7e6 !important; }
+.aging-input { width: 100%; }
 .total-bar {
   display: flex; gap: 24px; align-items: center;
   padding: 8px 12px; margin-top: 8px;
@@ -239,4 +438,8 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 }
 .total-label { font-weight: 600; }
 .total-value { color: #606266; }
+.audited-aging { background: #e6f7ff; padding: 1px 4px; border-radius: 2px; }
+.confirmation-auto { background: #b7eb8f !important; border-color: #52c41a !important; color: #135200 !important; }
+.audit-note-block { margin-top: 16px; }
+.audit-note-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
 </style>

@@ -6,7 +6,7 @@
 - POST /api/workpapers/{wp_id}/d7/import-data?sheet={sheet_code}      解析xlsx写入
 - POST /api/workpapers/{wp_id}/d7/import-aux-balance                  从tb_aux_balance科目2205导入
 
-支持sheets: D7-2, D7-5, D7-6
+支持sheets: D7-2, D7-5, D7-6, D7-7-period, D7-7-post
 """
 
 from __future__ import annotations
@@ -37,9 +37,37 @@ router = APIRouter(tags=["d7-import-export"])
 
 _ROW_LIMIT = 500
 
-_SUPPORTED_SHEETS: set[str] = {"D7-2", "D7-5", "D7-6"}
+_SUPPORTED_SHEETS: set[str] = {"D7-1", "D7-2", "D7-3", "D7-4", "D7-5", "D7-6", "D7-7-period", "D7-7-post"}
+
+_D7_1_ROWS: list[tuple[str, str, str]] = [
+    ("nature", "revenue", "预收货款"),
+    ("nature", "development", "开发项目预收款"),
+    ("nature", "engineering", "预收工程款"),
+    ("nature", "other", "其他"),
+    ("nature", "non-current-deduction", "减：计入其他非流动负债的合同负债"),
+    ("aging", "within-1-year", "1年以内(含1年)"),
+    ("aging", "1-to-2-years", "1至2年(含2年)"),
+    ("aging", "2-to-3-years", "2至3年(含3年)"),
+    ("aging", "over-3-years", "3年以上"),
+    ("aging", "trial-balance", "试算平衡表数"),
+]
+_D7_1_FIELDS: list[tuple[str, str, bool]] = [
+    ("priorUnadjusted", "期初未审", False),
+    ("priorAje", "期初AJE", False),
+    ("priorRje", "期初RJE", False),
+    ("currentUnadjusted", "期末未审", False),
+    ("currentAje", "期末AJE", False),
+    ("currentRje", "期末RJE", False),
+    ("reasonAnalysis", "原因分析", True),
+]
 
 _SHEET_HEADERS: dict[str, list[str]] = {
+    "D7-1": [
+        "区块", "行键", "项目",
+        "期初未审", "期初AJE", "期初RJE",
+        "期末未审", "期末AJE", "期末RJE",
+        "原因分析",
+    ],
     "D7-2": [
         "序号", "合同名称", "单位名称", "公司代码", "关联关系", "类型(款项性质)",
         "期初未审数", "期初AJE", "期初RJE", "期初审定数",
@@ -53,16 +81,39 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "客户名称", "期末余额", "账龄", "经济业务说明",
         "未结转原因", "至审计日结转金额", "处理计划", "备注",
     ],
+    "D7-3": [
+        "调整事项说明", "类别", "报表项目", "科目名称", "附注项目", "占位/对应项",
+        "借方调整金额", "贷方调整金额", "索引", "备注",
+    ],
+    "D7-4": [
+        "记录类型", "项目", "金额", "数据来源", "备注",
+    ],
     "D7-6": [
         "关联方名称", "关联关系", "期初余额", "借方发生", "贷方发生", "期末余额",
         "发生时间及账龄", "未结转原因", "至审计日结转金额", "处理计划", "备注",
+    ],
+    "D7-7-period": [
+        "客户名称", "日期", "凭证号", "业务内容", "对方科目", "对方明细",
+        "借方金额", "贷方金额", "支持性文件",
+        "核对内容1", "核对内容2", "核对内容3", "核对内容4", "核对内容5",
+        "索引号", "是否异常", "备注说明",
+    ],
+    "D7-7-post": [
+        "客户名称", "日期", "凭证号", "业务内容", "对方科目", "对方明细",
+        "贷方金额", "支持性文件",
+        "核对内容1", "核对内容2", "核对内容3", "核对内容4", "核对内容5",
+        "索引号", "是否异常", "备注说明",
     ],
 }
 
 _SHEET_ITEM_ID: dict[str, str] = {
     "D7-2": "D7-2-rows",
+    "D7-3": "D7-3-rows",
+    "D7-4": "D7-4-debit-rows",
     "D7-5": "D7-5-rows",
     "D7-6": "D7-6-rows",
+    "D7-7-period": "D7-7-period-rows",
+    "D7-7-post": "D7-7-post-rows",
 }
 
 
@@ -76,6 +127,120 @@ def _validate_sheet(sheet_code: str) -> None:
             400,
             f"不支持的sheet: {sheet_code}。支持: {sorted(_SUPPORTED_SHEETS)}",
         )
+
+
+async def _fetch_d7_response_map(wp_id: str, db: AsyncSession, prefix: str) -> dict[str, str]:
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.text(
+            "SELECT item_id, remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
+        ),
+        {"wp_id": wp_id, "prefix": f"{prefix}%"},
+    )
+    return {row.item_id: (row.remark or "") for row in result.fetchall()}
+
+
+async def _upsert_d7_cell(db: AsyncSession, wp_id: str, item_id: str, remark: str) -> None:
+    import sqlalchemy as sa
+
+    await db.execute(
+        sa.text("""
+            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            ON CONFLICT (wp_id, item_id)
+            DO UPDATE SET remark = :remark, updated_at = NOW()
+        """),
+        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark},
+    )
+
+
+async def _export_d7_1_data(wp_id: str, db: AsyncSession) -> StreamingResponse:
+    responses = await _fetch_d7_response_map(wp_id, db, "D7-1-adj-")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "D7-1"
+    ws.append(_SHEET_HEADERS["D7-1"])
+    ws.freeze_panes = "A2"
+    for block, row_key, label in _D7_1_ROWS:
+        values = [block, row_key, label]
+        for field_key, _header, is_text in _D7_1_FIELDS:
+            if row_key == "trial-balance":
+                if field_key == "priorUnadjusted":
+                    raw = responses.get("D7-1-adj-aging-trial-balance-priorAudited", "")
+                    values.append(_safe_float(raw) if raw else 0.0)
+                elif field_key == "currentUnadjusted":
+                    raw = responses.get("D7-1-adj-aging-trial-balance-currentAudited", "")
+                    values.append(_safe_float(raw) if raw else 0.0)
+                else:
+                    values.append("" if is_text else 0.0)
+                continue
+            item_id = f"D7-1-adj-{block}-{row_key}-{field_key}"
+            raw = responses.get(item_id, "")
+            values.append(raw if is_text else (_safe_float(raw) if raw else 0.0))
+        ws.append(values)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    encoded_filename = quote("D7-1_数据.xlsx")
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+    )
+
+
+async def _import_d7_1_data(wp_id: str, ws: Any, actual_headers: list[str], db: AsyncSession) -> dict[str, Any]:
+    rows_data: list[dict[str, Any]] = []
+    row_count = 0
+    truncated = False
+    valid = {(b, rk) for b, rk, _ in _D7_1_ROWS}
+
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if all(v is None for v in row):
+            continue
+        row_count += 1
+        if row_count > _ROW_LIMIT:
+            truncated = True
+            break
+        block = _safe_str(_col_val(row, actual_headers, "区块"))
+        row_key = _safe_str(_col_val(row, actual_headers, "行键"))
+        if (block, row_key) not in valid:
+            continue
+        parsed: dict[str, Any] = {"block": block, "rowKey": row_key}
+        for field_key, header, is_text in _D7_1_FIELDS:
+            val = _col_val(row, actual_headers, header)
+            parsed[field_key] = _safe_str(val) if is_text else _safe_float(val)
+        rows_data.append(parsed)
+
+    field_count = 0
+    for row_data in rows_data:
+        block = row_data.get("block", "")
+        row_key = row_data.get("rowKey", "")
+        if row_key == "trial-balance":
+            prior = _safe_float(row_data.get("priorUnadjusted"))
+            current = _safe_float(row_data.get("currentUnadjusted"))
+            await _upsert_d7_cell(db, wp_id, "D7-1-adj-aging-trial-balance-priorAudited", str(prior))
+            await _upsert_d7_cell(db, wp_id, "D7-1-adj-aging-trial-balance-currentAudited", str(current))
+            field_count += 2
+            continue
+        for field_key, _header, is_text in _D7_1_FIELDS:
+            val = row_data.get(field_key)
+            if val is None:
+                continue
+            item_id = f"D7-1-adj-{block}-{row_key}-{field_key}"
+            remark = str(val) if is_text else str(_safe_float(val))
+            await _upsert_d7_cell(db, wp_id, item_id, remark)
+            field_count += 1
+
+    await db.commit()
+    result: dict[str, Any] = {"ok": True, "imported_count": len(rows_data), "field_count": field_count}
+    if truncated:
+        result["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
+        result["truncated"] = True
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -101,6 +266,9 @@ async def d7_export_template(
     ws.freeze_panes = "A2"
     for col_idx in range(1, len(headers) + 1):
         ws.column_dimensions[chr(64 + min(col_idx, 26))].width = 16
+    if sheet == "D7-1":
+        for block, row_key, label in _D7_1_ROWS:
+            ws.append([block, row_key, label, *[None] * (len(headers) - 3)])
 
     if include_guidance:
         guidance = _get_d7_guidance_text(sheet)
@@ -138,21 +306,43 @@ async def d7_export_data(
 
     import sqlalchemy as sa
 
-    item_id = _SHEET_ITEM_ID[sheet]
-    result = await db.execute(
-        sa.text(
-            "SELECT remark FROM checklist_responses "
-            "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-        ),
-        {"wp_id": wp_id, "item_id": item_id},
-    )
-    row = result.fetchone()
+    if sheet == "D7-1":
+        return await _export_d7_1_data(wp_id, db)
+
     rows_data: list[dict] = []
-    if row and row.remark:
-        try:
-            rows_data = json.loads(row.remark)
-        except (json.JSONDecodeError, TypeError):
-            pass
+    if sheet == "D7-4":
+        for item_id, row_type in [("D7-4-debit-rows", "debit"), ("D7-4-credit-rows", "credit")]:
+            result = await db.execute(
+                sa.text(
+                    "SELECT remark FROM checklist_responses "
+                    "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+                ),
+                {"wp_id": wp_id, "item_id": item_id},
+            )
+            row = result.fetchone()
+            if row and row.remark:
+                try:
+                    parsed = json.loads(row.remark)
+                    if isinstance(parsed, list):
+                        for r in parsed:
+                            rows_data.append({**r, "_rowType": row_type})
+                except (json.JSONDecodeError, TypeError):
+                    pass
+    else:
+        item_id = _SHEET_ITEM_ID[sheet]
+        result = await db.execute(
+            sa.text(
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+            ),
+            {"wp_id": wp_id, "item_id": item_id},
+        )
+        row = result.fetchone()
+        if row and row.remark:
+            try:
+                rows_data = json.loads(row.remark)
+            except (json.JSONDecodeError, TypeError):
+                pass
 
     wb = Workbook()
     ws = wb.active
@@ -219,6 +409,11 @@ async def d7_import_data(
     if errors:
         raise HTTPException(400, detail=errors)
 
+    if sheet == "D7-1":
+        result = await _import_d7_1_data(wp_id, ws, actual_headers, db)
+        wb.close()
+        return result
+
     # 解析数据行
     rows_data: list[dict] = []
     truncated = False
@@ -238,18 +433,32 @@ async def d7_import_data(
     # 写入 checklist_responses
     import sqlalchemy as sa
 
-    item_id = _SHEET_ITEM_ID[sheet]
-    remark_json = json.dumps(rows_data, ensure_ascii=False)
-
-    await db.execute(
-        sa.text("""
-            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :wp_id, :item_id, :remark, NOW())
-            ON CONFLICT (wp_id, item_id)
-            DO UPDATE SET remark = :remark, updated_at = NOW()
-        """),
-        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
-    )
+    if sheet == "D7-4":
+        debit_rows = [r for r in rows_data if _safe_str(r.get("_rowType")).lower() != "credit"]
+        credit_rows = [r for r in rows_data if _safe_str(r.get("_rowType")).lower() == "credit"]
+        for item_id, payload in [("D7-4-debit-rows", debit_rows), ("D7-4-credit-rows", credit_rows)]:
+            remark_json = json.dumps(payload, ensure_ascii=False)
+            await db.execute(
+                sa.text("""
+                    INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
+                    VALUES (:id, :wp_id, :item_id, :remark, NOW())
+                    ON CONFLICT (wp_id, item_id)
+                    DO UPDATE SET remark = :remark, updated_at = NOW()
+                """),
+                {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+            )
+    else:
+        item_id = _SHEET_ITEM_ID[sheet]
+        remark_json = json.dumps(rows_data, ensure_ascii=False)
+        await db.execute(
+            sa.text("""
+                INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
+                VALUES (:id, :wp_id, :item_id, :remark, NOW())
+                ON CONFLICT (wp_id, item_id)
+                DO UPDATE SET remark = :remark, updated_at = NOW()
+            """),
+            {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+        )
     await db.commit()
 
     result_data: dict[str, Any] = {"ok": True, "imported_count": len(rows_data), "errors": []}
@@ -418,6 +627,45 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_str(data.get("reason")), _safe_float(data.get("auditDateTransfer")),
             _safe_str(data.get("plan")), _safe_str(data.get("remark")),
         ]
+    elif sheet == "D7-3":
+        return [
+            _safe_str(data.get("description")), _safe_str(data.get("category")),
+            _safe_str(data.get("reportItem")), _safe_str(data.get("accountName")),
+            _safe_str(data.get("noteItem")), _safe_str(data.get("placeholder")),
+            _safe_float(data.get("debitAmount")), _safe_float(data.get("creditAmount")),
+            _safe_str(data.get("indexRef")), _safe_str(data.get("remark")),
+        ]
+    elif sheet == "D7-4":
+        return [
+            _safe_str(data.get("_rowType")), _safe_str(data.get("item")),
+            _safe_float(data.get("amount")), _safe_str(data.get("dataSource")),
+            _safe_str(data.get("remark")),
+        ]
+    elif sheet == "D7-7-period":
+        check_items = data.get("checkItems") or [False] * 5
+        return [
+            _safe_str(data.get("customerName")), _safe_str(data.get("date")),
+            _safe_str(data.get("voucherNo")), _safe_str(data.get("businessContent")),
+            _safe_str(data.get("counterAccount")), _safe_str(data.get("counterDetail")),
+            _safe_float(data.get("debitAmount")), _safe_float(data.get("creditAmount")),
+            _safe_str(data.get("supportDocs")),
+            *["Y" if c else "" for c in (list(check_items) + [False] * 5)[:5]],
+            _safe_str(data.get("indexRef")),
+            "是" if data.get("isAbnormal") else "",
+            _safe_str(data.get("remark")),
+        ]
+    elif sheet == "D7-7-post":
+        check_items = data.get("checkItems") or [False] * 5
+        return [
+            _safe_str(data.get("customerName")), _safe_str(data.get("date")),
+            _safe_str(data.get("voucherNo")), _safe_str(data.get("businessContent")),
+            _safe_str(data.get("counterAccount")), _safe_str(data.get("counterDetail")),
+            _safe_float(data.get("creditAmount")), _safe_str(data.get("supportDocs")),
+            *["Y" if c else "" for c in (list(check_items) + [False] * 5)[:5]],
+            _safe_str(data.get("indexRef")),
+            "是" if data.get("isAbnormal") else "",
+            _safe_str(data.get("remark")),
+        ]
     else:  # D7-6
         return [
             _safe_str(data.get("partyName")), _safe_str(data.get("relationship")),
@@ -483,6 +731,72 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
             "auditDateTransfer": _safe_float(_col_val(row, actual_headers, "至审计日结转金额")),
             "plan": _safe_str(_col_val(row, actual_headers, "处理计划")),
             "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+        }
+    elif sheet == "D7-3":
+        return {
+            "rowId": str(uuid4()),
+            "description": _safe_str(_col_val(row, actual_headers, "调整事项说明")),
+            "category": _safe_str(_col_val(row, actual_headers, "类别")) or "账项调整",
+            "reportItem": _safe_str(_col_val(row, actual_headers, "报表项目")),
+            "accountName": _safe_str(_col_val(row, actual_headers, "科目名称")),
+            "noteItem": _safe_str(_col_val(row, actual_headers, "附注项目")),
+            "placeholder": _safe_str(_col_val(row, actual_headers, "占位/对应项")),
+            "debitAmount": _safe_float(_col_val(row, actual_headers, "借方调整金额")),
+            "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方调整金额")),
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引")),
+            "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+        }
+    elif sheet == "D7-4":
+        return {
+            "rowId": str(uuid4()),
+            "_rowType": _safe_str(_col_val(row, actual_headers, "记录类型")).lower() or "debit",
+            "item": _safe_str(_col_val(row, actual_headers, "项目")),
+            "amount": _safe_float(_col_val(row, actual_headers, "金额")),
+            "dataSource": _safe_str(_col_val(row, actual_headers, "数据来源")),
+            "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+        }
+    elif sheet == "D7-7-period":
+        check_items = [
+            _safe_str(_col_val(row, actual_headers, f"核对内容{i}")).upper() in ("Y", "是", "TRUE", "1")
+            for i in range(1, 6)
+        ]
+        abnormal_raw = _safe_str(_col_val(row, actual_headers, "是否异常"))
+        return {
+            "rowId": str(uuid4()),
+            "customerName": _safe_str(_col_val(row, actual_headers, "客户名称")),
+            "date": _safe_str(_col_val(row, actual_headers, "日期")),
+            "voucherNo": _safe_str(_col_val(row, actual_headers, "凭证号")),
+            "businessContent": _safe_str(_col_val(row, actual_headers, "业务内容")),
+            "counterAccount": _safe_str(_col_val(row, actual_headers, "对方科目")),
+            "counterDetail": _safe_str(_col_val(row, actual_headers, "对方明细")),
+            "debitAmount": _safe_float(_col_val(row, actual_headers, "借方金额")),
+            "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方金额")),
+            "supportDocs": _safe_str(_col_val(row, actual_headers, "支持性文件")),
+            "checkItems": check_items,
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
+            "isAbnormal": abnormal_raw in ("是", "Y", "TRUE", "1", "true"),
+            "remark": _safe_str(_col_val(row, actual_headers, "备注说明")),
+        }
+    elif sheet == "D7-7-post":
+        check_items = [
+            _safe_str(_col_val(row, actual_headers, f"核对内容{i}")).upper() in ("Y", "是", "TRUE", "1")
+            for i in range(1, 6)
+        ]
+        abnormal_raw = _safe_str(_col_val(row, actual_headers, "是否异常"))
+        return {
+            "rowId": str(uuid4()),
+            "customerName": _safe_str(_col_val(row, actual_headers, "客户名称")),
+            "date": _safe_str(_col_val(row, actual_headers, "日期")),
+            "voucherNo": _safe_str(_col_val(row, actual_headers, "凭证号")),
+            "businessContent": _safe_str(_col_val(row, actual_headers, "业务内容")),
+            "counterAccount": _safe_str(_col_val(row, actual_headers, "对方科目")),
+            "counterDetail": _safe_str(_col_val(row, actual_headers, "对方明细")),
+            "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方金额")),
+            "supportDocs": _safe_str(_col_val(row, actual_headers, "支持性文件")),
+            "checkItems": check_items,
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
+            "isAbnormal": abnormal_raw in ("是", "Y", "TRUE", "1", "true"),
+            "remark": _safe_str(_col_val(row, actual_headers, "备注说明")),
         }
     else:  # D7-6
         opening = _safe_float(_col_val(row, actual_headers, "期初余额"))
@@ -553,6 +867,19 @@ _D7_SHEET_GUIDANCE: dict[str, list[str]] = {
         "1. 从D7-2筛选关联关系≠非关联方的客户导入",
         "2. 关联关系列选择8种：实际控制人/控股股东等",
         "3. 期末余额=期初+贷方-借方（贷方科目，自动计算）",
+    ],
+    "D7-7-period": [
+        "D7-7 凭证检查 — 本期增减变动 编制说明",
+        "",
+        "1. 填写抽样选取的本期合同负债增减凭证样本。",
+        "2. 核对内容1~5列填 Y 表示已核对。",
+        "3. 是否异常列填「是」标记异常样本。",
+    ],
+    "D7-7-post": [
+        "D7-7 凭证检查 — 期后结转 编制说明",
+        "",
+        "1. 填写期后结转/冲减合同负债的凭证样本。",
+        "2. 贷方金额为期后结转金额，将联动 D7-2 期后结转列。",
     ],
 }
 

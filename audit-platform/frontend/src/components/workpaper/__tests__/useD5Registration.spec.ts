@@ -26,6 +26,7 @@ describe('D5 应收款项融资 — 注册契约测试', () => {
       expect(entry?.label).toBe('D5 应收款项融资')
       expect(entry?.emits).toContain('save')
       expect(entry?.emits).toContain('completed')
+      expect(entry?.emits).toContain('jump-to-section')
       expect(entry?.contextProps).toBe('standard')
       expect(entry?.component).toBeDefined()
     })
@@ -81,6 +82,10 @@ describe('D5 应收款项融资 — 注册契约测试', () => {
 
     it('D5-4 映射为 d5-receivables-financing', () => {
       expect(overrides['D5-4']).toBe('d5-receivables-financing')
+    })
+
+    it('D5A 映射为 d5-receivables-financing', () => {
+      expect(overrides['D5A']).toBe('d5-receivables-financing')
     })
   })
 })

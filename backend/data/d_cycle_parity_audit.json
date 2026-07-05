@@ -1,0 +1,1771 @@
+{
+  "cycles": {
+    "D1": {
+      "xlsx_sheet_count": 21,
+      "xlsx_codes": [
+        "D1-1",
+        "D1-10",
+        "D1-11",
+        "D1-12",
+        "D1-13",
+        "D1-14",
+        "D1-15",
+        "D1-16",
+        "D1-2",
+        "D1-3",
+        "D1-4",
+        "D1-5",
+        "D1-6",
+        "D1-7",
+        "D1-8",
+        "D1-9",
+        "D1A",
+        "directory",
+        "业务模式提示",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [
+        "D1-1",
+        "D1-10",
+        "D1-11",
+        "D1-12",
+        "D1-13",
+        "D1-14",
+        "D1-15",
+        "D1-16",
+        "D1-2",
+        "D1-3",
+        "D1-4",
+        "D1-5",
+        "D1-6",
+        "D1-7",
+        "D1-8",
+        "D1-9",
+        "D1A",
+        "附注上市",
+        "附注国企"
+      ],
+      "html_routes": [
+        "D1",
+        "D1-1",
+        "D1-10",
+        "D1-11",
+        "D1-12",
+        "D1-13",
+        "D1-14",
+        "D1-15",
+        "D1-16",
+        "D1-2",
+        "D1-3",
+        "D1-4",
+        "D1-5",
+        "D1-6",
+        "D1-7",
+        "D1-8",
+        "D1-9",
+        "D1A",
+        "directory",
+        "disclosure-listed",
+        "disclosure-soe",
+        "skip"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": true,
+        "review_provide": false,
+        "entry_injections": false,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": true,
+        "review_provide": false,
+        "entry_injections": false,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [],
+        "index_not_routed": [
+          "附注上市",
+          "附注国企"
+        ],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 3,
+      "tabs_total": 19,
+      "browse_tabs": [
+        "D1TabEndorsementDetail.vue",
+        "D1TabMemoReconciliation.vue",
+        "D1TabSamplingVouching.vue"
+      ],
+      "sheets": [
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 29,
+          "max_col": 8
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据审计程序表D1A",
+          "code": "D1A",
+          "max_row": 35,
+          "max_col": 14
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "审定表D1-1",
+          "code": "D1-1",
+          "max_row": 35,
+          "max_col": 15
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "附注披露信息（上市公司）",
+          "code": "附注上市",
+          "max_row": 119,
+          "max_col": 14
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "附注披露信息（国企）",
+          "code": "附注国企",
+          "max_row": 89,
+          "max_col": 16
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "原值明细表（按类别）D1-2",
+          "code": "D1-2",
+          "max_row": 36,
+          "max_col": 11
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "原值明细表（按客户）D1-3",
+          "code": "D1-3",
+          "max_row": 44,
+          "max_col": 16
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "坏账准备明细表D1-4",
+          "code": "D1-4",
+          "max_row": 30,
+          "max_col": 14
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "调整分录汇总表D1-5",
+          "code": "D1-5",
+          "max_row": 25,
+          "max_col": 10
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据业务模式分析D1-6",
+          "code": "D1-6",
+          "max_row": 44,
+          "max_col": 12
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据备查簿核对D1-7",
+          "code": "D1-7",
+          "max_row": 45,
+          "max_col": 31
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据贴现、票据已背书未到期明细表D1-8",
+          "code": "D1-8",
+          "max_row": 38,
+          "max_col": 30
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据贴息检查表D1-9",
+          "code": "D1-9",
+          "max_row": 35,
+          "max_col": 13
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据监盘D1-10",
+          "code": "D1-10",
+          "max_row": 35,
+          "max_col": 15
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "关联方关系及交易检查表D1-11",
+          "code": "D1-11",
+          "max_row": 32,
+          "max_col": 16
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据质押检查表D1-12",
+          "code": "D1-12",
+          "max_row": 24,
+          "max_col": 16
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据检查表D1-13",
+          "code": "D1-13",
+          "max_row": 54,
+          "max_col": 17
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据坏账准备会计政策检查D1-14",
+          "code": "D1-14",
+          "max_row": 42,
+          "max_col": 19
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据坏账准备测试表D1-15",
+          "code": "D1-15",
+          "max_row": 33,
+          "max_col": 11
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "坏账准备转回、核销检查表D1-16",
+          "code": "D1-16",
+          "max_row": 28,
+          "max_col": 8
+        },
+        {
+          "file": "D1 应收票据.xlsx",
+          "sheet_name": "应收票据业务模式分析提示",
+          "code": "业务模式提示",
+          "max_row": 31,
+          "max_col": 7
+        }
+      ],
+      "index_rows": [
+        {
+          "seq": 1,
+          "name": "应收票据审计程序表",
+          "code": "D1A",
+          "group": "核心",
+          "tabKey": "procedure",
+          "applicable": true
+        },
+        {
+          "seq": 2,
+          "name": "应收票据审定表",
+          "code": "D1-1",
+          "group": "核心",
+          "tabKey": "adjudication",
+          "applicable": true
+        },
+        {
+          "seq": 3,
+          "name": "原值明细表（按类别）",
+          "code": "D1-2",
+          "group": "核心",
+          "tabKey": "detail-category",
+          "applicable": true
+        },
+        {
+          "seq": 4,
+          "name": "原值明细表（按客户）",
+          "code": "D1-3",
+          "group": "核心",
+          "tabKey": "detail-customer",
+          "applicable": true
+        },
+        {
+          "seq": 5,
+          "name": "坏账准备计算表",
+          "code": "D1-4",
+          "group": "核心",
+          "tabKey": "bad-debt",
+          "applicable": true
+        },
+        {
+          "seq": 6,
+          "name": "调整分录汇总",
+          "code": "D1-5",
+          "group": "核心",
+          "tabKey": "adjustment",
+          "applicable": true
+        },
+        {
+          "seq": 7,
+          "name": "业务模式分析",
+          "code": "D1-6",
+          "group": "分析",
+          "tabKey": "business-model",
+          "applicable": true
+        },
+        {
+          "seq": 8,
+          "name": "备查簿核对",
+          "code": "D1-7",
+          "group": "检查",
+          "tabKey": "memo",
+          "applicable": true
+        },
+        {
+          "seq": 9,
+          "name": "贴现背书明细",
+          "code": "D1-8",
+          "group": "检查",
+          "tabKey": "endorsement",
+          "applicable": true
+        },
+        {
+          "seq": 10,
+          "name": "贴息检查",
+          "code": "D1-9",
+          "group": "检查",
+          "tabKey": "interest",
+          "applicable": true
+        },
+        {
+          "seq": 11,
+          "name": "票据监盘",
+          "code": "D1-10",
+          "group": "检查",
+          "tabKey": "inventory",
+          "applicable": true
+        },
+        {
+          "seq": 12,
+          "name": "关联方检查",
+          "code": "D1-11",
+          "group": "检查",
+          "tabKey": "related-party",
+          "applicable": true
+        },
+        {
+          "seq": 13,
+          "name": "质押检查",
+          "code": "D1-12",
+          "group": "检查",
+          "tabKey": "pledge",
+          "applicable": true
+        },
+        {
+          "seq": 14,
+          "name": "一般检查表",
+          "code": "D1-13",
+          "group": "检查",
+          "tabKey": "sampling",
+          "applicable": true
+        },
+        {
+          "seq": 15,
+          "name": "ECL会计政策一致性",
+          "code": "D1-14",
+          "group": "ECL",
+          "tabKey": "ecl-policy",
+          "applicable": true
+        },
+        {
+          "seq": 16,
+          "name": "ECL测试数据",
+          "code": "D1-15",
+          "group": "ECL",
+          "tabKey": "ecl-test",
+          "applicable": true
+        },
+        {
+          "seq": 17,
+          "name": "转回核销检查",
+          "code": "D1-16",
+          "group": "检查",
+          "tabKey": "writeoff",
+          "applicable": true
+        },
+        {
+          "seq": 18,
+          "name": "附注披露（上市公司）",
+          "code": "附注上市",
+          "group": "披露",
+          "tabKey": "disclosure-listed",
+          "applicable": true
+        },
+        {
+          "seq": 19,
+          "name": "附注披露（国企）",
+          "code": "附注国企",
+          "group": "披露",
+          "tabKey": "disclosure-soe",
+          "applicable": true
+        }
+      ],
+      "parity_score": {
+        "structure_gaps": 2,
+        "shell_features_matched": "5/7"
+      }
+    },
+    "D2": {
+      "xlsx_sheet_count": 27,
+      "xlsx_codes": [
+        "D2-1",
+        "D2-10",
+        "D2-11",
+        "D2-12",
+        "D2-13",
+        "D2-2",
+        "D2-3",
+        "D2-4",
+        "D2-5",
+        "D2-6",
+        "D2-7",
+        "D2-8",
+        "D2-9",
+        "D2A",
+        "GT_Custom",
+        "directory",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [],
+      "html_routes": [
+        "D2",
+        "D2-1",
+        "D2-10",
+        "D2-11",
+        "D2-12",
+        "D2-13",
+        "D2-2",
+        "D2-3",
+        "D2-4",
+        "D2-5",
+        "D2-6",
+        "D2-7",
+        "D2-8",
+        "D2-9",
+        "D2A",
+        "截止测试",
+        "目录",
+        "附注上市",
+        "附注国企"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": false,
+        "review_provide": false,
+        "entry_injections": false,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": false,
+        "review_provide": false,
+        "entry_injections": false,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [],
+        "index_not_routed": [],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 0,
+      "tabs_total": 16,
+      "browse_tabs": [],
+      "sheets": [
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 19,
+          "max_col": 8
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "应收账款实质性程序表D2A",
+          "code": "D2A",
+          "max_row": 44,
+          "max_col": 10
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "审定表D2-1",
+          "code": "D2-1",
+          "max_row": 62,
+          "max_col": 13
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "附注披露信息(上市公司）D2-1",
+          "code": "附注上市",
+          "max_row": 134,
+          "max_col": 9
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "附注披露信息（国企）D2-1",
+          "code": "附注国企",
+          "max_row": 102,
+          "max_col": 10
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "附注披露信息(上市公司)",
+          "code": "附注上市",
+          "max_row": 181,
+          "max_col": 9
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "附注披露信息(国企)",
+          "code": "附注国企",
+          "max_row": 138,
+          "max_col": 11
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "明细表D2-2",
+          "code": "D2-2",
+          "max_row": 35,
+          "max_col": 39
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "坏账准备明细表D2-3",
+          "code": "D2-3",
+          "max_row": 41,
+          "max_col": 14
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "调整分录汇总表D2-4",
+          "code": "D2-4",
+          "max_row": 25,
+          "max_col": 10
+        },
+        {
+          "file": "D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        },
+        {
+          "file": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "附注披露信息(上市公司）D2-1",
+          "code": "附注上市",
+          "max_row": 134,
+          "max_col": 9
+        },
+        {
+          "file": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "附注披露信息（国企）D2-1",
+          "code": "附注国企",
+          "max_row": 102,
+          "max_col": 10
+        },
+        {
+          "file": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "应收账款分析表D2-5",
+          "code": "D2-5",
+          "max_row": 54,
+          "max_col": 9
+        },
+        {
+          "file": "D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 25,
+          "max_col": 8
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "附注披露信息(上市公司）D2-1",
+          "code": "附注上市",
+          "max_row": 134,
+          "max_col": 9
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "附注披露信息（国企）D2-1",
+          "code": "附注国企",
+          "max_row": 102,
+          "max_col": 10
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "关联方及交易检查表D2-6",
+          "code": "D2-6",
+          "max_row": 31,
+          "max_col": 14
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "应收账款检查表D2-7",
+          "code": "D2-7",
+          "max_row": 52,
+          "max_col": 17
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "坏账准备计提会计政策检查D2-8",
+          "code": "D2-8",
+          "max_row": 46,
+          "max_col": 22
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "应收坏账准备测算D2-9",
+          "code": "D2-9",
+          "max_row": 50,
+          "max_col": 14
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "预期信用损失的计量测试D2-10",
+          "code": "D2-10",
+          "max_row": 110,
+          "max_col": 10
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "坏账准备转回（收回）、核销检查表D2-11",
+          "code": "D2-11",
+          "max_row": 29,
+          "max_col": 8
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "应收账款质押出售情况检查表D2-12",
+          "code": "D2-12",
+          "max_row": 43,
+          "max_col": 12
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "应收账款业务模式分析D2-13",
+          "code": "D2-13",
+          "max_row": 30,
+          "max_col": 5
+        },
+        {
+          "file": "D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        }
+      ],
+      "index_rows": [],
+      "parity_score": {
+        "structure_gaps": 0,
+        "shell_features_matched": "4/7"
+      }
+    },
+    "D3": {
+      "xlsx_sheet_count": 12,
+      "xlsx_codes": [
+        "D3-1",
+        "D3-2",
+        "D3-3",
+        "D3-4",
+        "D3-5",
+        "D3-6",
+        "D3-7",
+        "D3A",
+        "GT_Custom",
+        "directory",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [],
+      "html_routes": [
+        "D3",
+        "D3-1",
+        "D3-2",
+        "D3-3",
+        "D3-4",
+        "D3-5",
+        "D3-6",
+        "D3-7",
+        "D3A",
+        "directory",
+        "skip",
+        "附注上市",
+        "附注国企"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": true,
+        "review_provide": false,
+        "entry_injections": false,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": true,
+        "review_provide": false,
+        "entry_injections": false,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [],
+        "index_not_routed": [],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 1,
+      "tabs_total": 11,
+      "browse_tabs": [
+        "D3TabDetail.vue"
+      ],
+      "sheets": [
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 19,
+          "max_col": 8
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "预收账款实质性程序表D3A",
+          "code": "D3A",
+          "max_row": 28,
+          "max_col": 10
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "审定表D3-1",
+          "code": "D3-1",
+          "max_row": 30,
+          "max_col": 12
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "附注披露信息(上市公司)",
+          "code": "附注上市",
+          "max_row": 26,
+          "max_col": 5
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "附注披露信息(国企)",
+          "code": "附注国企",
+          "max_row": 24,
+          "max_col": 4
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "预收账款明细表D3-2",
+          "code": "D3-2",
+          "max_row": 39,
+          "max_col": 27
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "调整分录汇总表D3-3",
+          "code": "D3-3",
+          "max_row": 23,
+          "max_col": 10
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "预收账款分析表D3-4",
+          "code": "D3-4",
+          "max_row": 38,
+          "max_col": 9
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "账龄1年以上的预收账款检查表D3-5",
+          "code": "D3-5",
+          "max_row": 22,
+          "max_col": 8
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "关联关系及交易检查表D3-6",
+          "code": "D3-6",
+          "max_row": 34,
+          "max_col": 12
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "预收账款检查表D3-7",
+          "code": "D3-7",
+          "max_row": 48,
+          "max_col": 18
+        },
+        {
+          "file": "D3 预收账款.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        }
+      ],
+      "index_rows": [],
+      "parity_score": {
+        "structure_gaps": 0,
+        "shell_features_matched": "5/7"
+      }
+    },
+    "D4": {
+      "xlsx_sheet_count": 48,
+      "xlsx_codes": [
+        "D4-1",
+        "D4-10",
+        "D4-11",
+        "D4-12",
+        "D4-13",
+        "D4-14",
+        "D4-15",
+        "D4-16",
+        "D4-17",
+        "D4-18",
+        "D4-19",
+        "D4-2",
+        "D4-20",
+        "D4-21",
+        "D4-22",
+        "D4-22A",
+        "D4-23",
+        "D4-24",
+        "D4-25",
+        "D4-26",
+        "D4-27",
+        "D4-28",
+        "D4-29",
+        "D4-3",
+        "D4-30",
+        "D4-31",
+        "D4-31T",
+        "D4-32",
+        "D4-33",
+        "D4-34",
+        "D4-35",
+        "D4-36",
+        "D4-4",
+        "D4-5",
+        "D4-6",
+        "D4-7",
+        "D4-8",
+        "D4-9",
+        "D4A",
+        "GT_Custom",
+        "directory",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [],
+      "html_routes": [
+        "D4",
+        "D4-1",
+        "D4-10",
+        "D4-11",
+        "D4-12",
+        "D4-13",
+        "D4-14",
+        "D4-15",
+        "D4-16",
+        "D4-17",
+        "D4-18",
+        "D4-19",
+        "D4-2",
+        "D4-20",
+        "D4-21",
+        "D4-22",
+        "D4-22A",
+        "D4-23",
+        "D4-24",
+        "D4-25",
+        "D4-26",
+        "D4-27",
+        "D4-28",
+        "D4-29",
+        "D4-3",
+        "D4-30",
+        "D4-31",
+        "D4-31T",
+        "D4-32",
+        "D4-33",
+        "D4-34",
+        "D4-35",
+        "D4-36",
+        "D4-4",
+        "D4-5",
+        "D4-6",
+        "D4-7",
+        "D4-8",
+        "D4-9",
+        "D4A",
+        "skip",
+        "应收口径",
+        "附注上市",
+        "附注国企"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [],
+        "index_not_routed": [],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 1,
+      "tabs_total": 42,
+      "browse_tabs": [
+        "D4TabRevenueDetail.vue"
+      ],
+      "sheets": [
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 19,
+          "max_col": 8
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "营业收入审计程序表D4A",
+          "code": "D4A",
+          "max_row": 43,
+          "max_col": 15
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "主营业务收入审计程序表D4A（修订前）",
+          "code": "D4A",
+          "max_row": 229,
+          "max_col": 13
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "营业收入审定表D4-1",
+          "code": "D4-1",
+          "max_row": 80,
+          "max_col": 9
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "附注披露信息（上市公司）",
+          "code": "附注上市",
+          "max_row": 85,
+          "max_col": 9
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "附注披露信息（国企）",
+          "code": "附注国企",
+          "max_row": 72,
+          "max_col": 19
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "主营业务收入明细表D4-2",
+          "code": "D4-2",
+          "max_row": 32,
+          "max_col": 22
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "其他业务收入明细表D4-3",
+          "code": "D4-3",
+          "max_row": 34,
+          "max_col": 14
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "营业收入调整分录汇总D4-4",
+          "code": "D4-4",
+          "max_row": 23,
+          "max_col": 10
+        },
+        {
+          "file": "D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        },
+        {
+          "file": "D4-5 营业收入-会计政策（Leap-常规程序）.xlsx",
+          "sheet_name": "营业收入会计政策检查D4-5",
+          "code": "D4-5",
+          "max_row": 59,
+          "max_col": 5
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 23,
+          "max_col": 7
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "重要指标分析D4-6",
+          "code": "D4-6",
+          "max_row": 29,
+          "max_col": 10
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "毛利率分析表D4-7",
+          "code": "D4-7",
+          "max_row": 32,
+          "max_col": 23
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "重要产品毛利分析D4-8",
+          "code": "D4-8",
+          "max_row": 40,
+          "max_col": 24
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "重要客户结构分析D4-9",
+          "code": "D4-9",
+          "max_row": 62,
+          "max_col": 19
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "重要客户销售价格分析D4-10",
+          "code": "D4-10",
+          "max_row": 49,
+          "max_col": 20
+        },
+        {
+          "file": "D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+          "sheet_name": "产品销售价格分析D4-11",
+          "code": "D4-11",
+          "max_row": 27,
+          "max_col": 15
+        },
+        {
+          "file": "D4-12 营业收入-合同检查（Leap-常规程序）.xlsx",
+          "sheet_name": "合同检查表D4-12",
+          "code": "D4-12",
+          "max_row": 57,
+          "max_col": 11
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 27,
+          "max_col": 7
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "营业收入账面金额与ERP系统核对记录D4-13",
+          "code": "D4-13",
+          "max_row": 19,
+          "max_col": 5
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "营业收入发生检查表D4-14",
+          "code": "D4-14",
+          "max_row": 52,
+          "max_col": 37
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "营业收入完整性检查表D4-15",
+          "code": "D4-15",
+          "max_row": 34,
+          "max_col": 17
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "出口收入电子口岸系统核对D4-16",
+          "code": "D4-16",
+          "max_row": 21,
+          "max_col": 11
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "营业收入截止测试（账到单据）D4-17",
+          "code": "D4-17",
+          "max_row": 43,
+          "max_col": 11
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "营业收入截止测试（单据到账）D4-18",
+          "code": "D4-18",
+          "max_row": 43,
+          "max_col": 11
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "销售折扣与折让检查D4-19",
+          "code": "D4-19",
+          "max_row": 36,
+          "max_col": 16
+        },
+        {
+          "file": "D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+          "sheet_name": "销售退货检查表 D4-20",
+          "code": "D4-20",
+          "max_row": 61,
+          "max_col": 15
+        },
+        {
+          "file": "D4-21营业收入-关联方检查（Leap-常规程序）.xlsx",
+          "sheet_name": "关联方销售情况及价格分析D4-21",
+          "code": "D4-21",
+          "max_row": 49,
+          "max_col": 18
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 29,
+          "max_col": 7
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "程序表D4-22A",
+          "code": "D4-22A",
+          "max_row": 37,
+          "max_col": 11
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "重要指标分析表D4-22",
+          "code": "D4-22",
+          "max_row": 30,
+          "max_col": 8
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "收入与开具发票金额比较分析D4-23",
+          "code": "D4-23",
+          "max_row": 32,
+          "max_col": 13
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "第三方回款检查D4-24",
+          "code": "D4-24",
+          "max_row": 27,
+          "max_col": 14
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "经销商检查D4-25",
+          "code": "D4-25",
+          "max_row": 29,
+          "max_col": 17
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "境外销售收入检查D4-26",
+          "code": "D4-26",
+          "max_row": 34,
+          "max_col": 19
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "识别未披露的关联方D4-27",
+          "code": "D4-27",
+          "max_row": 41,
+          "max_col": 19
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "客户信息核查清单D4-28",
+          "code": "D4-28",
+          "max_row": 36,
+          "max_col": 24
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "客户信息检查表D4-29",
+          "code": "D4-29",
+          "max_row": 76,
+          "max_col": 13
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "客户访谈记录汇总表D4-30",
+          "code": "D4-30",
+          "max_row": 38,
+          "max_col": 221
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "客户访谈记录 D4-31",
+          "code": "D4-31",
+          "max_row": 63,
+          "max_col": 10
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "访谈记录与核对示例",
+          "code": "D4-31T",
+          "max_row": 67,
+          "max_col": 232
+        },
+        {
+          "file": "D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+          "sheet_name": "客户、供应商等资金流水检查D4-32",
+          "code": "D4-32",
+          "max_row": 52,
+          "max_col": 9
+        },
+        {
+          "file": "D4-33至D4-36 其他业务收入.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 19,
+          "max_col": 6
+        },
+        {
+          "file": "D4-33至D4-36 其他业务收入.xlsx",
+          "sheet_name": "其他业务毛利率分析表D4-33",
+          "code": "D4-33",
+          "max_row": 31,
+          "max_col": 13
+        },
+        {
+          "file": "D4-33至D4-36 其他业务收入.xlsx",
+          "sheet_name": "其他业务收入合同测算表D4-34",
+          "code": "D4-34",
+          "max_row": 29,
+          "max_col": 11
+        },
+        {
+          "file": "D4-33至D4-36 其他业务收入.xlsx",
+          "sheet_name": "其他业务收入检查表D4-35",
+          "code": "D4-35",
+          "max_row": 36,
+          "max_col": 34
+        },
+        {
+          "file": "D4-33至D4-36 其他业务收入.xlsx",
+          "sheet_name": "其他业务收入截止性测试D4-36",
+          "code": "D4-36",
+          "max_row": 59,
+          "max_col": 13
+        }
+      ],
+      "index_rows": [],
+      "parity_score": {
+        "structure_gaps": 0,
+        "shell_features_matched": "7/7"
+      }
+    },
+    "D5": {
+      "xlsx_sheet_count": 8,
+      "xlsx_codes": [
+        "D5-1",
+        "D5-2",
+        "D5-3",
+        "D5-4",
+        "D5A",
+        "directory",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [],
+      "html_routes": [
+        "D5",
+        "D5-1",
+        "D5-2",
+        "D5-3",
+        "D5-4",
+        "D5A",
+        "skip",
+        "附注上市",
+        "附注国企"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [],
+        "index_not_routed": [],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 1,
+      "tabs_total": 7,
+      "browse_tabs": [
+        "D5TabDetail.vue"
+      ],
+      "sheets": [
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 19,
+          "max_col": 8
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "应收款项融资审计程序表D5A",
+          "code": "D5A",
+          "max_row": 23,
+          "max_col": 10
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "审定表D5",
+          "code": "D5-1",
+          "max_row": 18,
+          "max_col": 12
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "附注披露信息（上市公司）",
+          "code": "附注上市",
+          "max_row": 43,
+          "max_col": 7
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "附注披露信息（国企）",
+          "code": "附注国企",
+          "max_row": 18,
+          "max_col": 7
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "应收款项融资明细表D5-2",
+          "code": "D5-2",
+          "max_row": 26,
+          "max_col": 17
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "调整分录汇总表D5-3",
+          "code": "D5-3",
+          "max_row": 29,
+          "max_col": 10
+        },
+        {
+          "file": "D5 应收款项融资.xlsx",
+          "sheet_name": "应收款项融资公允价值测算表D5-4",
+          "code": "D5-4",
+          "max_row": 26,
+          "max_col": 13
+        }
+      ],
+      "index_rows": [],
+      "parity_score": {
+        "structure_gaps": 0,
+        "shell_features_matched": "7/7"
+      }
+    },
+    "D6": {
+      "xlsx_sheet_count": 15,
+      "xlsx_codes": [
+        "D6-1",
+        "D6-2",
+        "D6-3",
+        "D6-4",
+        "D6-5",
+        "D6-6",
+        "D6-7",
+        "D6-8",
+        "D6-9",
+        "D6A",
+        "D7A",
+        "GT_Custom",
+        "directory",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [],
+      "html_routes": [
+        "D6",
+        "D6-1",
+        "D6-2",
+        "D6-3",
+        "D6-4",
+        "D6-5",
+        "D6-6",
+        "D6-7",
+        "D6-8",
+        "D6-9",
+        "D6A",
+        "skip",
+        "附注上市",
+        "附注国企"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [
+          "D7A"
+        ],
+        "index_not_routed": [],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 6,
+      "tabs_total": 12,
+      "browse_tabs": [
+        "D6TabDetail.vue",
+        "D6TabEclCalculation.vue",
+        "D6TabImpairmentDetail.vue",
+        "D6TabInspection.vue",
+        "D6TabRelatedParty.vue",
+        "D6TabWriteoffCheck.vue"
+      ],
+      "sheets": [
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 22,
+          "max_col": 8
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "合同资产实质性程序表 D6A",
+          "code": "D6A",
+          "max_row": 33,
+          "max_col": 10
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "合同资产实质性程序表 D7A（原）",
+          "code": "D7A",
+          "max_row": 104,
+          "max_col": 13
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "审定表D6-1",
+          "code": "D6-1",
+          "max_row": 43,
+          "max_col": 13
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "附注披露信息(上市公司）",
+          "code": "附注上市",
+          "max_row": 89,
+          "max_col": 11
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "附注披露信息（国企）",
+          "code": "附注国企",
+          "max_row": 37,
+          "max_col": 10
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "明细表D6-2",
+          "code": "D6-2",
+          "max_row": 38,
+          "max_col": 32
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "合同资产减值准备明细表D6-3",
+          "code": "D6-3",
+          "max_row": 29,
+          "max_col": 14
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "调整分录汇总表D6-4",
+          "code": "D6-4",
+          "max_row": 25,
+          "max_col": 10
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "关联关系及交易检查D6-5",
+          "code": "D6-5",
+          "max_row": 30,
+          "max_col": 14
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "合同资产检查表D6-6",
+          "code": "D6-6",
+          "max_row": 58,
+          "max_col": 17
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "合同资产减值准备会计政策检查D6-7",
+          "code": "D6-7",
+          "max_row": 58,
+          "max_col": 18
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "减值准备测算D6-8",
+          "code": "D6-8",
+          "max_row": 48,
+          "max_col": 15
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "减值准备转回、核销检查表D6-9",
+          "code": "D6-9",
+          "max_row": 30,
+          "max_col": 8
+        },
+        {
+          "file": "D6 合同资产.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        }
+      ],
+      "index_rows": [],
+      "parity_score": {
+        "structure_gaps": 1,
+        "shell_features_matched": "7/7"
+      }
+    },
+    "D7": {
+      "xlsx_sheet_count": 13,
+      "xlsx_codes": [
+        "D7-1",
+        "D7-2",
+        "D7-3",
+        "D7-4",
+        "D7-5",
+        "D7-6",
+        "D7-7",
+        "D7A",
+        "GT_Custom",
+        "directory",
+        "附注上市",
+        "附注国企"
+      ],
+      "index_codes": [],
+      "html_routes": [
+        "D7",
+        "D7-1",
+        "D7-2",
+        "D7-3",
+        "D7-4",
+        "D7-5",
+        "D7-6",
+        "D7-7",
+        "D7A",
+        "skip",
+        "附注上市",
+        "附注国企"
+      ],
+      "features_vs_d4": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": true,
+        "import_export": true,
+        "ai_generate": true,
+        "get_row_dot": true
+      },
+      "feature_detail": {
+        "entry_dual_mode": true,
+        "review_provide": true,
+        "entry_injections": true,
+        "browse_mode_any": false,
+        "import_export": false,
+        "ai_generate": false,
+        "get_row_dot": true
+      },
+      "gaps": {
+        "xlsx_not_in_frontend": [],
+        "index_not_routed": [],
+        "index_not_in_xlsx": []
+      },
+      "tabs_with_browse_mode": 4,
+      "tabs_total": 10,
+      "browse_tabs": [
+        "D7TabDetail.vue",
+        "D7TabLongTerm.vue",
+        "D7TabRelatedParty.vue",
+        "D7TabVoucherCheck.vue"
+      ],
+      "sheets": [
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "底稿目录",
+          "code": "directory",
+          "max_row": 22,
+          "max_col": 8
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "合同负债实质性程序表 D7A",
+          "code": "D7A",
+          "max_row": 29,
+          "max_col": 10
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "合同负债实质性程序表 D8A（原）",
+          "code": null,
+          "max_row": 66,
+          "max_col": 12
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "审定表D7-1",
+          "code": "D7-1",
+          "max_row": 32,
+          "max_col": 12
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "附注披露信息(上市公司)",
+          "code": "附注上市",
+          "max_row": 37,
+          "max_col": 5
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "附注披露信息(国企)",
+          "code": "附注国企",
+          "max_row": 26,
+          "max_col": 5
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "明细表D7-2",
+          "code": "D7-2",
+          "max_row": 41,
+          "max_col": 27
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "调整分录汇总表D7-3",
+          "code": "D7-3",
+          "max_row": 23,
+          "max_col": 10
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "合同负债分析表D7-4",
+          "code": "D7-4",
+          "max_row": 43,
+          "max_col": 8
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "账龄1年以上合同负债检查表D7-5",
+          "code": "D7-5",
+          "max_row": 22,
+          "max_col": 8
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "关联方关系及交易检查表D7-6",
+          "code": "D7-6",
+          "max_row": 31,
+          "max_col": 11
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "合同负债检查表D7-7",
+          "code": "D7-7",
+          "max_row": 48,
+          "max_col": 21
+        },
+        {
+          "file": "D7 合同负债.xlsx",
+          "sheet_name": "GT_Custom",
+          "code": "GT_Custom",
+          "max_row": 8,
+          "max_col": 2
+        }
+      ],
+      "index_rows": [],
+      "parity_score": {
+        "structure_gaps": 0,
+        "shell_features_matched": "7/7"
+      }
+    }
+  },
+  "d4_benchmark": {
+    "entry_dual_mode": true,
+    "review_provide": true,
+    "entry_injections": true,
+    "browse_mode_any": false,
+    "import_export": false,
+    "ai_generate": false,
+    "get_row_dot": true
+  },
+  "summary": {}
+}

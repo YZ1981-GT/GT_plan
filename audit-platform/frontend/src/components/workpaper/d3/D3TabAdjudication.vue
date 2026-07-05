@@ -1,5 +1,14 @@
 <template>
 <div class="d3-adjudication">
+  <div class="import-export-bar">
+    <el-button-group size="small">
+      <el-button @click="onExportTemplate">导出模板</el-button>
+      <el-button @click="onExportData">导出数据</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+        <el-button :disabled="isReadonly">导入数据</el-button>
+      </el-upload>
+    </el-button-group>
+  </div>
   <el-skeleton :loading="!sections.length" :rows="8" animated>
     <template #default>
       <!-- 交叉验证警告 -->
@@ -103,12 +112,21 @@
 
       <!-- 审计说明区域 -->
       <div class="audit-notes-section">
-        <h4>审计说明</h4>
+        <h4 class="section-header-row">
+          审计说明
+          <GtReviewTrigger section-id="D3-adj-header" />
+        </h4>
         <!-- (1) 超1年原因 -->
         <div class="note-block">
           <div class="note-label">
             (1) 账龄超过1年的预收账款未结转原因
             <GtIndexChip target="D3-5" label="→D3-5长期检查" />
+            <el-button
+              size="small"
+              :disabled="isReadonly || !aiAvailable || aiLoading"
+              :loading="aiLoading"
+              @click="genAgingReason"
+            >🤖AI</el-button>
           </div>
           <el-input
             v-model="auditNotes.agingReason"
@@ -122,7 +140,12 @@
         <div class="note-block">
           <div class="note-label">
             (2) 重大变动分析
-            <el-button size="small" :disabled="true" title="AI功能暂未开放">🤖AI</el-button>
+            <el-button
+              size="small"
+              :disabled="isReadonly || !aiAvailable || aiLoading"
+              :loading="aiLoading"
+              @click="genChangeAnalysis"
+            >🤖AI</el-button>
           </div>
           <el-input
             v-model="auditNotes.changeAnalysis"
@@ -145,7 +168,10 @@
 
       <!-- 审计结论 -->
       <div class="audit-conclusion-section">
-        <h4>审计结论</h4>
+        <h4 class="section-header-row">
+          审计结论
+          <GtReviewTrigger section-id="D3-adj-conclusion" />
+        </h4>
         <el-input
           v-model="auditNotes.conclusion"
           type="textarea"
@@ -154,8 +180,12 @@
           placeholder="对预收账款审定结果的总结性结论..."
         />
         <div class="conclusion-actions">
-          <el-button size="small" :disabled="true">🤖AI生成结论</el-button>
-          <el-button size="small" @click="openReview">💬 复核</el-button>
+          <el-button
+            size="small"
+            :disabled="isReadonly || !aiAvailable || aiLoading"
+            :loading="aiLoading"
+            @click="genConclusion"
+          >🤖AI生成结论</el-button>
         </div>
       </div>
     </template>
@@ -168,14 +198,17 @@
  * D3TabAdjudication.vue — D3-1 审定表
  * 双区块(按性质+按账龄) + 变动率高亮 + 跨sheet取数 + 审计说明/结论
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { isChangeRateExceeding } from '../composables/useD3FormulaEngine'
 import { useD3Adjudication } from '../composables/useD3Adjudication'
+import { useD3AiGenerate } from '../composables/useD3AiGenerate'
+import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 
 // @ts-ignore - GtIndexChip may not have type declarations
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -206,6 +239,39 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-1')
+
+async function genAgingReason() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-aging-reason', auditNotes.value.agingReason, {
+    task: '账龄超过1年的预收账款未结转原因说明',
+    crossValidationWarning: crossValidationWarning.value || '',
+  }, 'AI · 账龄超1年原因')
+  if (text) auditNotes.value.agingReason = text
+}
+
+async function genChangeAnalysis() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-change-analysis', auditNotes.value.changeAnalysis, {
+    task: '预收账款重大变动分析',
+    trialBalanceDiff: trialBalanceDiff.value,
+    crossValidationWarning: crossValidationWarning.value || '',
+  }, 'AI · 变动分析')
+  if (text) auditNotes.value.changeAnalysis = text
+}
+
+async function genConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-conclusion', auditNotes.value.conclusion, {
+    task: '预收账款审定审计结论',
+    trialBalanceAmount: trialBalanceAmount.value,
+    trialBalanceDiff: trialBalanceDiff.value,
+  }, 'AI · 审计结论')
+  if (text) auditNotes.value.conclusion = text
+}
+
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
 function fmtAmount(val: number | null | undefined): string {
@@ -235,13 +301,11 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
   openReviewDialog(`D3-adj-${row.rowKey}`)
 }
 
-function openReview() {
-  openReviewDialog('D3-adj-conclusion')
-}
 </script>
 
 <style scoped>
 .d3-adjudication { padding: 16px; }
+.import-export-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .adj-section { margin-bottom: 24px; }
 .section-title { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: #303133; }
 .subtotal-label { font-weight: 700; }
@@ -253,6 +317,7 @@ function openReview() {
 .tb-diff-row { display: flex; gap: 24px; padding: 8px 12px; background: #fafafa; border-radius: 4px; margin: 12px 0; font-size: 13px; }
 .audit-notes-section, .audit-conclusion-section { margin-top: 20px; }
 .audit-notes-section h4, .audit-conclusion-section h4 { font-size: 14px; margin-bottom: 12px; }
+.section-header-row { display: flex; align-items: center; gap: 8px; }
 .note-block { margin-bottom: 16px; }
 .note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; color: #606266; }
 .conclusion-actions { display: flex; gap: 8px; margin-top: 8px; }

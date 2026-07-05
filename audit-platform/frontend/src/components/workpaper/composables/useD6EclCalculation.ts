@@ -320,6 +320,13 @@ export function useD6EclCalculation(options: UseD6EclCalculationOptions) {
     persistGroups()
   }
 
+  function updateGroupName(groupId: string, name: string): void {
+    agingGroups.value = agingGroups.value.map(g =>
+      g.groupId === groupId ? { ...g, groupName: name } : g,
+    )
+    persistGroups()
+  }
+
   function updateAgingCell(groupId: string, rowId: string, field: string, value: any): void {
     const NUMERIC_FIELDS = ['auditedBalance', 'lossRate', 'bookBalance']
     agingGroups.value = agingGroups.value.map(g => {
@@ -379,6 +386,7 @@ export function useD6EclCalculation(options: UseD6EclCalculationOptions) {
     agingGroupTotals,
     addAgingGroup,
     removeAgingGroup,
+    updateGroupName,
     updateAgingCell,
     grandTotal,
     diffAlert,

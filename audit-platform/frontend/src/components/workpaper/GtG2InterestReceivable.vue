@@ -3,11 +3,20 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div class="g2-interest-receivable-toolbar">
+        <el-segmented
+          v-if="isHtmlSheet"
+          v-model="dualMode.currentMode.value"
+          :options="dualMode.modeOptions"
+          size="small"
+          @change="dualMode.onModeChange"
+        />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
-        v-if="currentSheet === 'G2A'"
+        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -15,20 +24,99 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <CycleTabAdjudication
-        v-else-if="adjudicationConfig"
-        :config="adjudicationConfig"
-        :all-responses="formData.allResponses.value"
+      <!-- G2A 程序表 → OnlyOffice（复用 a-program-console） -->
+      <GtOnlyOfficeSheet
+        v-else-if="currentSheet === 'G2A'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || ''"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
+      <!-- G2-1 审定表 -->
+      <G2TabAdjudication
+        v-else-if="currentSheet === 'G2-1'"
+        :all-responses="allResponsesRef"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
       />
 
-      <GtGridSheet
-        v-else-if="useGridFallback"
-        :html-data="props.htmlData || formData.getSheet(currentSheet)"
-        :readonly="isReadonly"
+      <!-- G2-2 明细表 -->
+      <G2TabDetail
+        v-else-if="currentSheet === 'G2-2'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
       />
 
+      <!-- G2-3 坏账准备明细 -->
+      <G2TabBadDebtDetail
+        v-else-if="currentSheet === 'G2-3'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- G2-4 调整分录 → OnlyOffice（简单表格） -->
+      <GtOnlyOfficeSheet
+        v-else-if="currentSheet === 'G2-4'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || ''"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
+      <!-- G2-5 利息测算表 -->
+      <G2TabInterestCalc
+        v-else-if="currentSheet === 'G2-5'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- G2-6 长期未收回检查 -->
+      <G2TabOverdueCheck
+        v-else-if="currentSheet === 'G2-6'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- G2-7 坏账准备测算（2区段Tab） -->
+      <G2TabECLCalc
+        v-else-if="currentSheet === 'G2-7'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- G2-8 凭证检查表（借方/贷方区块） -->
+      <G2TabVoucherCheck
+        v-else-if="currentSheet === 'G2-8'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- 附注披露(上市) -->
+      <G2TabDisclosureListed
+        v-else-if="currentSheet === '附注上市'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- 附注披露(国企) -->
+      <G2TabDisclosureSOE
+        v-else-if="currentSheet === '附注国企'"
+        :all-responses="allResponsesRef"
+        :is-readonly="isReadonly"
+        :debounced-save="formData.debouncedSave"
+      />
+
+      <!-- 兜底：未迁移 sheet → OnlyOffice -->
       <GtOnlyOfficeSheet
         v-else
         :wp-id="props.wpId"
@@ -44,15 +132,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+/**
+ * GtG2InterestReceivable.vue — G2 应收利息底稿主入口
+ *
+ * Spec: .kiro/specs/g2-interest-receivable/ Task 1.1, 9.1~9.3
+ * sheetName 分发到 G2 专属子组件（G2-1~G2-8 + 附注），G2A/G2-4/未迁移走 OnlyOffice
+ * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog')
+ * EventBus：监听 g2:save-items 持久化 + substantive:adjudicated(1132)
+ */
+import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import { useG2IntRecFormData } from './composables/useG2IntRecFormData'
+import { useG2DualMode } from './composables/useG2DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
-import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
+import type { ChecklistResponse } from './composables/useF1FormData'
 
-const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+const G2TabAdjudication = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabAdjudication.vue'))
+const G2TabDetail = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabDetail.vue'))
+const G2TabBadDebtDetail = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabBadDebtDetail.vue'))
+const G2TabInterestCalc = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabInterestCalc.vue'))
+const G2TabOverdueCheck = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabOverdueCheck.vue'))
+const G2TabECLCalc = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabECLCalc.vue'))
+const G2TabVoucherCheck = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabVoucherCheck.vue'))
+const G2TabDisclosureListed = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabDisclosureListed.vue'))
+const G2TabDisclosureSOE = defineAsyncComponent(() => import('./g2-interest-receivable/G2TabDisclosureSOE.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -65,9 +169,11 @@ const props = defineProps<{
 
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
-const formData = useG2IntRecFormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+const projectIdRef = computed(() => props.projectId)
+const formData = useG2IntRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
+const allResponsesRef = computed(() => formData.allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
 const { versionTrailRef } = versionToolbar
 
 const currentSheet = computed(() => {
@@ -77,17 +183,63 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
-const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
-const useGridFallback = computed(() => {
-  const code = currentSheet.value
-  return !!code && code !== 'G2A' && !adjudicationConfig.value && !code.startsWith('附注')
+/** G2-1~G2-8 + 附注 为 HTML 专属组件（支持双模式） */
+const isHtmlSheet = computed(() => {
+  const s = currentSheet.value
+  return /^G2-[1-8]$/.test(s) || s.startsWith('附注')
 })
 
-onMounted(async () => { await formData.loadAll(); isLoading.value = false })
+const dualMode = useG2DualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
+
+// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
+function openReviewDialog(sectionId: string): void {
+  console.log('[G2] openReviewDialog:', sectionId)
+}
+provide('openReviewDialog', openReviewDialog)
+provide('reloadWorkpaperData', () => formData.loadAll())
+
+// ─── 监听 g2:save-items → 保存 + autoSnapshot ───────────────────────────────
+async function handleG2SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    versionToolbar.scheduleAutoSnapshot()
+  }
+}
+
+// ─── 监听 substantive:adjudicated(1132) → 附注刷新 ──────────────────────────
+function handleAdjudicated(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; adjudicatedAmount: number }>).detail
+  if (d?.accountCode === '1132') {
+    void formData.saveImmediate('G2-1-adjudicated-amount', {
+      item_id: 'G2-1-adjudicated-amount',
+      conclusion: String(d.adjudicatedAmount),
+      remark: null,
+    })
+  }
+}
+
+onMounted(async () => {
+  window.addEventListener('g2:save-items', handleG2SaveItems)
+  window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  await formData.loadAll()
+  isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g2:save-items', handleG2SaveItems)
+  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+})
 </script>
 
 <style scoped>
 .g2-interest-receivable { padding: 12px; }
 .loading-container { padding: 24px; }
-.g2-interest-receivable-toolbar { margin-bottom: 8px; }
+.g2-interest-receivable-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
 </style>

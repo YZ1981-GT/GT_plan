@@ -25,6 +25,28 @@ const props = defineProps<{
 
 // ─── 复核对话注入 ─────────────────────────────────────────────────────
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const reloadWorkpaperData = inject<(() => Promise<void> | void) | null>('reloadWorkpaperData', null)
+
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const projectIdRef = computed(() => props.projectId) as unknown as Ref<string>
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+})
+
+async function onExportTemplate(): Promise<void> {
+  await exportTemplate('D4-1')
+}
+
+async function onExportData(): Promise<void> {
+  await exportData('D4-1')
+}
+
+async function onImportFile(file: File): Promise<boolean> {
+  const result = await importData('D4-1', file)
+  if (result && reloadWorkpaperData) await reloadWorkpaperData()
+  return false
+}
 
 // ─── 金额格式化 ───────────────────────────────────────────────────────
 function fmtAmount(v: number): string {
@@ -152,6 +174,16 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 
 <template>
   <div class="d4-tab-adjudication">
+    <div class="import-export-bar">
+      <el-button-group size="small">
+        <el-button @click="onExportTemplate">导出模板</el-button>
+        <el-button @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button :disabled="isReadonly || importing">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
+    </div>
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -469,6 +501,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 .d4-tab-adjudication {
   padding: 12px;
 }
+.import-export-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .d4-tab-adjudication :deep(.el-table) {
   --el-table-font-size: 13px;
   font-size: 13px;

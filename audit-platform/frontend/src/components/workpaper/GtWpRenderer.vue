@@ -54,10 +54,11 @@
       </el-alert>
 
       <!-- 编制信息表头（workpaper 级，所有 sheet 共享）
-           b-index sheet 自带等价编制信息块（GtBIndex 内置），此处跳过避免重复
+           b-index sheet 自带等价编制信息块（GtBIndex 内置），此处跳过避免重复；
+           G12/G13/G14 底稿目录 Tab 委托到循环 HTML 目录组件，需显示统一表头
            index-no-override：传当前 sheet 级索引号（如 D1A），表头右上角随 sheet 切换更新 -->
       <GtWpPreparationHeader
-        v-if="componentType !== 'b-index' && componentType !== 'a1-dashboard'"
+        v-if="showWorkpaperPreparationHeader"
         :wp-id="wpId"
         :readonly="readonly"
         :index-no-override="activeSheetIndexNo"
@@ -223,6 +224,10 @@ import {
   getSheetIcon as registryGetSheetIcon,
   getContextPropsStrategy,
 } from '@/components/workpaper/htmlRendererRegistry'
+import {
+  isCycleDelegatedIndexSheet,
+  resolveCycleIndexComponentType,
+} from '@/components/workpaper/composables/gCycleIndexRouting'
 
 // ─── Sub-components (placeholder fallback) ───
 // HTML 类型路由由 htmlRendererRegistry 管理（lazy load 自动）
@@ -435,6 +440,21 @@ const componentType = computed<WpComponentType>(() => {
   return (activeSheet.value?.componentType as WpComponentType) ?? 'skip'
 })
 
+/** G12/G13/G14 底稿目录 Tab：b-index → 循环 HTML 目录（D4TabIndex 同级） */
+const isCycleDelegatedIndex = computed(() =>
+  isCycleDelegatedIndexSheet(componentType.value, renderConfig.value?.wp_code ?? ''),
+)
+
+const effectiveRendererComponentType = computed<WpComponentType>(() =>
+  resolveCycleIndexComponentType(componentType.value, renderConfig.value?.wp_code ?? '') as WpComponentType,
+)
+
+const showWorkpaperPreparationHeader = computed(
+  () =>
+    (componentType.value !== 'b-index' && componentType.value !== 'a1-dashboard')
+    || isCycleDelegatedIndex.value,
+)
+
 /**
  * C-附注披露无 schema 的只读网格兜底判定。
  * GtCNoteTable 是 schema 驱动；当某附注披露 sheet 无配套 schema.sub_tables 时，
@@ -478,7 +498,7 @@ const noRendererGridFallback = computed<boolean>(() => {
     if (isGridOnly) return true
   }
   // 无注册表组件 → 走兜底
-  const entry = getRendererEntry(componentType.value)
+  const entry = getRendererEntry(effectiveRendererComponentType.value)
   if (entry) return false
   return hasGridCells.value
 })
@@ -489,12 +509,12 @@ const noRendererGridFallback = computed<boolean>(() => {
 const rendererEntry = computed(() =>
   cNoteGridFallback.value || noRendererGridFallback.value || (isOnlyOfficeSheet.value && !onlyOfficeFallback.value)
     ? undefined
-    : getRendererEntry(componentType.value),
+    : getRendererEntry(effectiveRendererComponentType.value),
 )
 
 /** D 子模式需要 form-type prop；custom 需要项目上下文 */
 const extraComponentProps = computed<Record<string, unknown>>(() => {
-  const ct = componentType.value
+  const ct = effectiveRendererComponentType.value
   const strategy = getContextPropsStrategy(ct)
 
   switch (strategy) {

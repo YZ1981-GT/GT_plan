@@ -1,19 +1,40 @@
 <template>
 <div class="d7-related-party">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 工具栏 -->
     <div class="toolbar">
+      <el-button-group size="small">
+        <el-button @click="exportTemplate">导出模板</el-button>
+        <el-button @click="exportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button :loading="importing">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">添加关联方</el-button>
       <el-button size="small" :disabled="isReadonly" @click="importFromD72">从D7-2导入</el-button>
     </div>
 
+    <div v-if="useVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
+      </el-alert>
+      <el-button size="small" @click="toggleBrowseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
+    <el-table-v2
+      v-if="useVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="browseRows"
+      :width="tableWidth"
+      :height="tableHeight"
+      :row-height="36"
+      :header-height="40"
+      fixed
+      class="virtual-table"
+    />
+
     <!-- 11列表格 -->
-    <el-table :data="rows" size="small" border max-height="500">
+    <el-table v-if="!useVirtualScroll || !browseMode" :data="rows" size="small" border max-height="500">
       <el-table-column label="关联方名称" min-width="150">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.partyName" size="small" @change="(v: string) => updateCell(row.rowId, 'partyName', v)" />
@@ -103,7 +124,7 @@
       <h4>审计说明</h4>
       <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="对关联方合同负债的分析说明..." />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genRelatedPartyNote">🤖AI</el-button>
         <el-button size="small" @click="openReview('D7-6-note-explanation')">💬复核</el-button>
       </div>
     </div>
@@ -114,11 +135,6 @@
         <el-button size="small" @click="openReview('D7-6-note-conclusion')">💬复核</el-button>
       </div>
     </div>
-  </template>
-
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -128,8 +144,13 @@
  * Task: 21.1
  * Requirements: 11.1-11.9, 19.3, 20.1, 21.1-21.3
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useD7RelatedParty, RELATIONSHIP_OPTIONS } from '../composables/useD7RelatedParty'
+import { useD7ImportExport } from '../composables/useD7ImportExport'
+import { useD7AiGenerate } from '../composables/useD7AiGenerate'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 
 // @ts-ignore
@@ -144,14 +165,22 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 function openReview(sectionId: string) { openReviewDialog(sectionId) }
+
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD7ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D7-6',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+
+async function onImportFile(file: File) {
+  await importData(file)
+  return false
+}
 
 const {
   rows, totalRow, addRow, removeRow, updateCell, importFromD72, auditNotes,
@@ -163,18 +192,54 @@ const {
   debouncedSave: props.debouncedSave,
 })
 
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
+
+async function genRelatedPartyNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('related-party-note', auditNotes.value.explanation, {
+    task: '关联方合同负债分析说明',
+    rowCount: rows.value.length,
+    endBalanceTotal: totalRow.value.endBalance,
+    auditDateTransferTotal: totalRow.value.auditDateTransfer,
+  }, 'AI · 关联方审计说明')
+  if (text) auditNotes.value.explanation = text
+}
+
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+const browseRows = computed(() => rows.value)
+const browseRowCount = computed(() => rows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('partyName', '关联方名称', 160),
+  virtualTextCol('relationship', '关联关系', 120),
+  virtualNumCol('endBalance', '期末余额', 110, fmtAmt),
+  virtualNumCol('auditDateTransfer', '至审计日结转', 120, fmtAmt),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 920,
+})
 </script>
 
 <style scoped>
 .d7-related-party { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
-.oo-mode-placeholder { padding: 40px 0; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.virtual-hint { flex: 1; min-width: 200px; margin: 0; }
+.virtual-table { margin-bottom: 12px; }
 
 .auto-calc { background: #f5f7fa; padding: 2px 6px; border-radius: 2px; color: #909399; }
 

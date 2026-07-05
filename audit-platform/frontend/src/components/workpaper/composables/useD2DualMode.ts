@@ -21,7 +21,8 @@ export type D2RenderMode = 'html' | 'onlyoffice'
 
 export interface UseD2DualModeOptions {
   wpId: Ref<string>
-  activeTab: Ref<string>
+  /** 当前 sheet 编码，如 D2-1 / D2-2 / 附注上市 */
+  currentSheet: Ref<string>
   reloadAllResponses: () => Promise<void>
 }
 
@@ -34,7 +35,7 @@ export interface OOConfig {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2DualMode(options: UseD2DualModeOptions) {
-  const { wpId, activeTab, reloadAllResponses } = options
+  const { wpId, currentSheet, reloadAllResponses } = options
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -85,7 +86,7 @@ export function useD2DualMode(options: UseD2DualModeOptions) {
     if (target === 'onlyoffice') {
       // 获取 OO 配置
       try {
-        const sheetName = getSheetNameFromTab(activeTab.value)
+        const sheetName = getSheetNameFromCode(currentSheet.value)
         const response = await fetch(
           `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`
         )
@@ -109,29 +110,33 @@ export function useD2DualMode(options: UseD2DualModeOptions) {
   // ─── Helpers ───────────────────────────────────────────────────────────
 
   /**
-   * 将 Tab name 映射到 xlsx 中的 sheet name
+   * 将 sheet 编码映射到 xlsx sheet 名
    */
-  function getSheetNameFromTab(tab: string): string {
-    const TAB_SHEET_MAP: Record<string, string> = {
-      'directory': 'D2-目录',
-      'procedure': 'D2A',
-      'adjudication': 'D2-1',
-      'detail-d2-2': 'D2-2',
-      'bad-debt': 'D2-3',
-      'adjustment': 'D2-4',
-      'analysis': 'D2-5',
-      'related-party': 'D2-6',
-      'general-check': 'D2-7',
-      'policy-check': 'D2-8',
-      'ecl-calculation': 'D2-9',
-      'ecl-measurement': 'D2-10',
-      'writeoff-check': 'D2-11',
-      'factoring': 'D2-12',
-      'bizmodel-check': 'D2-13',
-      'disclosure': 'D2-14',
-      'cutoff-test': 'D2-17',
+  function getSheetNameFromCode(code: string): string {
+    const SHEET_MAP: Record<string, string> = {
+      D2: 'D2',
+      目录: 'D2',
+      D2A: 'D2A',
+      'D2-1': 'D2-1',
+      'D2-2': 'D2-2',
+      'D2-3': 'D2-3',
+      'D2-4': 'D2-4',
+      'D2-5': 'D2-5',
+      'D2-6': 'D2-6',
+      'D2-7': 'D2-7',
+      'D2-8': 'D2-8',
+      'D2-9': 'D2-9',
+      'D2-10': 'D2-10',
+      'D2-11': 'D2-11',
+      'D2-12': 'D2-12',
+      'D2-13': 'D2-13',
+      附注上市: '附注披露信息(上市公司)',
+      附注国企: '附注披露信息(国企)',
+      截止测试: '截止测试',
     }
-    return TAB_SHEET_MAP[tab] || 'D2-1'
+    if (SHEET_MAP[code]) return SHEET_MAP[code]
+    if (code.includes('截止')) return code
+    return code
   }
 
   /**
@@ -163,7 +168,7 @@ export function useD2DualMode(options: UseD2DualModeOptions) {
     switchMode,
     checkOOHealth,
     getDisabledTooltip,
-    getSheetNameFromTab,
+    getSheetNameFromCode,
   }
 }
 

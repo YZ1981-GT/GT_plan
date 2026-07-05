@@ -120,34 +120,27 @@ const SHEET_CODE_MAP: Record<string, string> = {
 
 ```typescript
 interface G14AdjudicationData {
-  groups: G14AdjudicationGroup[]       // 按减值来源科目分组
+  rows: G14AdjudicationRow[]           // 固定9类 + 合计
   trialBalanceAmount: number           // 试算表取数(科目6702)
   variance: number                     // 差异=审定-试算表
-}
-
-interface G14AdjudicationGroup {
-  groupName: string
-  // "应收账款信用减值损失" / "其他应收款信用减值损失" /
-  // "应收票据信用减值损失" / "应收款项融资信用减值损失" /
-  // "债权投资信用减值损失" / "其他债权投资信用减值损失" /
-  // "长期应收款信用减值损失" / "应收利息信用减值损失" / "合计"
-  rows: G14AdjudicationRow[]
-  subtotal: G14AdjudicationTotals
+  auditNote: string
+  auditConclusion: string
 }
 
 interface G14AdjudicationRow {
-  id: string
-  item: string                         // 项目名称（减值来源科目）
-  currentUnadjusted: number            // 本期未审数
-  currentAdjustment: number            // 本期调整数（AJE+RJE）
+  rowKey: string
+  label: string                        // 应收票据坏账损失 / … / 其他（固定9类）
+  currentUnadjusted: number            // 本期未审（自G14-2同步，只读）
+  currentAdjustment: number            // 本期调整（自G14-2同步，只读）
   currentAudited: number               // 公式: 未审 + 调整
-  priorUnadjusted: number              // 上期未审数
-  priorAdjustment: number              // 上期调整数
+  priorUnadjusted: number              // 上期未审（G14-1录入）
+  priorAdjustment: number              // 上期调整（G14-1录入）
   priorAudited: number                 // 公式: 未审 + 调整
   changeAmount: number                 // 公式: 本期审定 - 上期审定
   changeRate: number | null            // 公式: (本期-上期)/|上期|, 上期=0时null
-  reasonAnalysis: string               // |变动率|>20%时必填(橙色高亮)
-  indexRef: string                     // 索引(GtIndexChip)
+  reasonAnalysis: string               // |变动率|>30%时必填(橙色高亮)
+  changeRateHighlight: boolean
+  reasonRequired: boolean
 }
 
 interface G14AdjudicationTotals {
@@ -162,39 +155,37 @@ interface G14AdjudicationTotals {
 
 ```typescript
 interface G14DetailRow {
-  id: string
-  seq: number
-  sourceAccount: string                // 来源科目名称
-  sourceAccountCode: string            // 来源科目代码(D1/D5/G2/G4/G5/G6)
-  assessedAsset: string                // 被评估资产
-  provisionMethod: '组合' | '单项'     // 计提方式(下拉)
-  openingProvision: number             // 期初坏账准备
+  rowKey: string
+  label: string                        // 项目（固定9类）
+  provisionAccount: string             // 对应减值准备科目
+  currentUnadjusted: number            // 本期未审
+  currentAdjustment: number            // 本期调整
+  currentAudited: number               // 公式: 未审+调整
+  openingProvision: number             // 期初余额
   currentProvision: number             // 本期计提
-  currentReversal: number              // 本期转回
-  currentWriteoff: number              // 本期核销
-  closingProvision: number             // 期末坏账准备
-  netImpairmentLoss: number            // 公式: 本期计提 - 本期转回
-  priorImpairmentLoss: number          // 上期信用减值损失
-  sourceIndex: string                  // 源科目索引(GtIndexChip)
-  crossVerification: 'consistent' | 'inconsistent' | 'pending'  // 交叉验证结论(下拉)
-  rollForwardBalanced: boolean         // 公式: 期末 === 期初+计提-转回-核销（容差0.01）
+  currentReversal: number              // 本期转回（可负数）
+  currentWriteoff: number              // 本期转销
+  closingProvision: number             // 期末余额
+  profitLoss: number                   // 计入损益 = 计提+转回
+  reconciled: boolean                  // 核对: 审定=计入损益
+  rollForwardBalanced: boolean         // 滚动: 期初+计提-转回-转销=期末
+  indexRef: string                     // 索引号(GtIndexChip)
 }
 ```
 
 ### G14-3 调整分录数据模型（24行×10列）
 
 ```typescript
-interface G14AdjustmentEntry {
-  id: string
-  seq: number
-  entryType: 'AJE' | 'RJE'            // 分录类型
-  date: string                         // 日期
-  summary: string                      // 摘要
-  accountCode: string                  // 科目编码
+interface G14AdjustmentRow {
+  rowId: string
+  description: string                  // 调整事项说明
+  category: string                     // 类别（报表调整/账项调整/重分类调整/其他）
+  reportItem: string                   // 报表项目
   accountName: string                  // 科目名称
-  debitAmount: number                  // 借方金额
-  creditAmount: number                 // 贷方金额
-  preparedBy: string                   // 编制人
+  noteItem: string                     // 附注项目
+  debitAmount: number                  // 借方调整金额
+  creditAmount: number                 // 贷方调整金额
+  indexRef: string                     // 索引
   remark: string                       // 备注
 }
 ```

@@ -26,6 +26,7 @@ describe('D6 合同资产 — 注册契约测试', () => {
       expect(entry?.label).toBe('D6 合同资产')
       expect(entry?.emits).toContain('save')
       expect(entry?.emits).toContain('completed')
+      expect(entry?.emits).toContain('jump-to-section')
       expect(entry?.contextProps).toBe('standard')
       expect(entry?.component).toBeDefined()
     })
@@ -101,6 +102,10 @@ describe('D6 合同资产 — 注册契约测试', () => {
 
     it('D6-9 映射为 d6-contract-assets', () => {
       expect(overrides['D6-9']).toBe('d6-contract-assets')
+    })
+
+    it('D6A 映射为 d6-contract-assets', () => {
+      expect(overrides['D6A']).toBe('d6-contract-assets')
     })
   })
 })

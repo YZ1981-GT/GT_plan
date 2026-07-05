@@ -14,7 +14,7 @@
  *
  * Requirements: 20.2
  */
-import { type Ref } from 'vue'
+import { inject, type Ref } from 'vue'
 import http from '@/utils/http'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -80,15 +80,16 @@ function triggerBlobDownload(blob: Blob, filename: string): void {
  */
 export function useD1ImportExport(options: UseD1ImportExportOptions) {
   const { wpId, sheetCode, sheetLabel } = options
+  const reloadWorkpaperData = inject<(() => Promise<void> | void) | null>('reloadWorkpaperData', null)
 
   /**
    * 导出空白模板 xlsx
-   * POST /api/workpapers/{wpId}/d1-import-export/export-template?sheet={sheetCode}
+   * POST /api/workpapers/{wpId}/d1/export-template?sheet={sheetCode}
    * 触发下载：{sheetCode}_{sheetLabel}模板.xlsx
    */
   async function exportTemplate(): Promise<void> {
     const res = await http.post(
-      `/api/workpapers/${wpId.value}/d1-import-export/export-template`,
+      `/api/workpapers/${wpId.value}/d1/export-template`,
       null,
       { params: { sheet: sheetCode }, responseType: 'blob' },
     )
@@ -98,12 +99,12 @@ export function useD1ImportExport(options: UseD1ImportExportOptions) {
 
   /**
    * 导出当前数据 xlsx
-   * POST /api/workpapers/{wpId}/d1-import-export/export-data?sheet={sheetCode}
+   * POST /api/workpapers/{wpId}/d1/export-data?sheet={sheetCode}
    * 触发下载：{sheetCode}_{sheetLabel}数据.xlsx
    */
   async function exportData(): Promise<void> {
     const res = await http.post(
-      `/api/workpapers/${wpId.value}/d1-import-export/export-data`,
+      `/api/workpapers/${wpId.value}/d1/export-data`,
       null,
       { params: { sheet: sheetCode }, responseType: 'blob' },
     )
@@ -113,7 +114,7 @@ export function useD1ImportExport(options: UseD1ImportExportOptions) {
 
   /**
    * 导入 xlsx 数据
-   * POST /api/workpapers/{wpId}/d1-import-export/import-data?sheet={sheetCode}
+   * POST /api/workpapers/{wpId}/d1/import-data?sheet={sheetCode}
    * Content-Type: multipart/form-data
    *
    * @param file - 用户选择的 xlsx 文件
@@ -124,7 +125,7 @@ export function useD1ImportExport(options: UseD1ImportExportOptions) {
     formData.append('file', file)
     try {
       const res = await http.post(
-        `/api/workpapers/${wpId.value}/d1-import-export/import-data`,
+        `/api/workpapers/${wpId.value}/d1/import-data`,
         formData,
         {
           params: { sheet: sheetCode },
@@ -133,11 +134,13 @@ export function useD1ImportExport(options: UseD1ImportExportOptions) {
       )
       // 后端可能返回 {data: {rows, row_count, field_count}} 或直接 {rows, row_count, field_count}
       const data = res.data?.data ?? res.data
-      return {
+      const result: ImportResult = {
         success: true,
-        rowCount: data?.row_count ?? 0,
+        rowCount: data?.imported_count ?? data?.row_count ?? 0,
         fieldCount: data?.field_count ?? 0,
       }
+      if (result.success && reloadWorkpaperData) await reloadWorkpaperData()
+      return result
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || '导入失败'
       return {

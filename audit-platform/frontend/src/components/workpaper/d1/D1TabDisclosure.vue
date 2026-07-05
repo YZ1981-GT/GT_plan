@@ -8,7 +8,7 @@
  * 通过 variant='listed'|'soe' 区分上市/国企版本。
  * 每个子节用 el-card 折叠卡片渲染对应 el-table。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { ElMessage } from 'element-plus'
 import { Lock, Delete, Plus } from '@element-plus/icons-vue'
@@ -19,7 +19,6 @@ import {
 } from '../composables/useD1Disclosure'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -35,18 +34,7 @@ const props = withDefaults(defineProps<{
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
 const collapsedSections = ref<Record<string, boolean>>({})
-
-// Sheet name for OnlyOffice
-const sheetName = computed(() =>
-  props.variant === 'listed' ? '附注披露信息（上市公司）' : '附注披露信息（国企）'
-)
 
 // Note textareas per section
 const sectionNotes = ref<Record<string, string>>({})
@@ -54,18 +42,6 @@ const sectionNotes = ref<Record<string, string>>({})
 function toggleSection(key: string) {
   collapsedSections.value[key] = !collapsedSections.value[key]
 }
-
-// OO health check
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health')
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch {
-    ooHealthy.value = false
-  }
-}
-
-onMounted(() => { checkOoHealth() })
 
 // ─── Persistence (debounced) ─────────────────────────────────────────────────
 
@@ -211,7 +187,6 @@ function onNoteChange(sectionKey: string, value: string) {
         {{ variant === 'listed' ? '上市公司版' : '国企版' }}
       </el-tag>
       <GtIndexChip value="附注全文" :context-project-id="projectId" />
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
       <div class="d1-disclosure__toolbar">
         <el-button-group size="small">
           <el-button @click="exportTemplate">导出模板</el-button>
@@ -229,15 +204,8 @@ function onNoteChange(sectionKey: string, value: string) {
       </div>
     </div>
 
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="sheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML structured view -->
-    <template v-if="editorMode === 'html'">
-      <el-skeleton v-if="isLoading" :rows="10" animated />
-      <template v-else>
+    <el-skeleton v-if="isLoading" :rows="10" animated />
+    <template v-else>
         <!-- Top guidance -->
         <details class="guidance-fold">
           <summary>📋 编制提示</summary>
@@ -783,7 +751,6 @@ function onNoteChange(sectionKey: string, value: string) {
           </div>
         </el-card>
       </template>
-    </template>
   </div>
 </template>
 

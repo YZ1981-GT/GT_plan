@@ -36,7 +36,7 @@ router = APIRouter(tags=["d4-import-export"])
 _ROW_LIMIT = 500
 
 _SUPPORTED_SHEETS: set[str] = {
-    "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
+    "D4-1", "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
     "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19", "D4-20",
     "D4-20-provision", "D4-20-current", "D4-20-post",
     "D4-21", "D4-22", "D4-23", "D4-24", "D4-25", "D4-26", "D4-27",
@@ -45,6 +45,11 @@ _SUPPORTED_SHEETS: set[str] = {
 }
 
 _SHEET_HEADERS: dict[str, list[str]] = {
+    "D4-1": [
+        "区块", "行键", "项目",
+        "本期未审", "本期AJE", "本期RJE",
+        "上期未审", "上期AJE", "上期RJE",
+    ],
     "D4-2": [
         "产品/服务", "1月", "2月", "3月", "4月", "5月", "6月",
         "7月", "8月", "9月", "10月", "11月", "12月",
@@ -515,8 +520,9 @@ async def d4_export_data(
     import sqlalchemy as sa
 
     item_id = f"{sheet}-rows"
-    # D4-6 uses a different item_id key
-    if sheet == "D4-6":
+    if sheet == "D4-1":
+        item_id = "D4-1-adj-rows"
+    elif sheet == "D4-6":
         item_id = "D4-6-indicators-v2"
     elif sheet == "D4-7":
         item_id = "D4-7-products"
@@ -566,7 +572,9 @@ async def d4_export_data(
 
     # 写入数据行
     for data_row in rows_data:
-        if sheet == "D4-2":
+        if sheet == "D4-1":
+            row_values = _export_d4_1_row(data_row)
+        elif sheet == "D4-2":
             months = data_row.get("months", [0] * 12)
             period_total = sum(_safe_float(m) for m in months)
             audit_adj = _safe_float(data_row.get("auditAdjustment"))
@@ -808,7 +816,9 @@ async def d4_import_data(
             truncated = True
             break
 
-        if sheet == "D4-2":
+        if sheet == "D4-1":
+            row_dict = _parse_d4_1_row(row, actual_headers, expected_headers)
+        elif sheet == "D4-2":
             row_dict = _parse_d4_2_row(row, actual_headers, expected_headers)
         elif sheet == "D4-3":
             row_dict = _parse_d4_3_row(row, actual_headers, expected_headers)
@@ -829,6 +839,8 @@ async def d4_import_data(
         else:
             row_dict = _parse_generic_row(row, actual_headers)
 
+        if not row_dict:
+            continue
         rows_data.append(row_dict)
 
     wb.close()
@@ -873,8 +885,9 @@ async def d4_import_data(
     from uuid import uuid4
 
     item_id = f"{sheet}-rows"
-    # D4-6 uses a different item_id key
-    if sheet == "D4-6":
+    if sheet == "D4-1":
+        item_id = "D4-1-adj-rows"
+    elif sheet == "D4-6":
         item_id = "D4-6-indicators-v2"
     elif sheet == "D4-7":
         item_id = "D4-7-products"
@@ -993,6 +1006,68 @@ def _parse_d4_2_row(row: tuple, actual_headers: list[str], expected_headers: lis
         "priorAdjustment": _safe_float(_col_val("上期调整")),
         "remark": _safe_str(_col_val("备注")),
         # 自动计算列（未审合计/本期审定/上期审定/变动率）导入时忽略，前端重算
+    }
+
+
+_D4_1_SECTION_BY_LABEL: dict[str, str] = {
+    "主营业务收入": "main-revenue",
+    "其他业务收入": "other-revenue",
+}
+_D4_1_SECTION_LABEL: dict[str, str] = {
+    "main-revenue": "主营业务收入",
+    "other-revenue": "其他业务收入",
+}
+
+
+def _export_d4_1_row(data: dict) -> list:
+    section = data.get("sectionKey", "main-revenue")
+    return [
+        _D4_1_SECTION_LABEL.get(section, section),
+        _safe_str(data.get("rowKey")),
+        _safe_str(data.get("label")),
+        _safe_float(data.get("currentUnadjusted")),
+        _safe_float(data.get("currentAje")),
+        _safe_float(data.get("currentRje")),
+        _safe_float(data.get("priorUnadjusted")),
+        _safe_float(data.get("priorAje")),
+        _safe_float(data.get("priorRje")),
+    ]
+
+
+def _parse_d4_1_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    section_label = _safe_str(_col_val("区块"))
+    row_key = _safe_str(_col_val("行键"))
+    label = _safe_str(_col_val("项目"))
+    if not row_key and not label:
+        return {}
+
+    section_key = _D4_1_SECTION_BY_LABEL.get(section_label, "main-revenue")
+    if not row_key:
+        row_key = f"row-{uuid4().hex[:8]}"
+
+    return {
+        "rowKey": row_key,
+        "label": label or row_key,
+        "isFixed": False,
+        "sectionKey": section_key,
+        "currentUnadjusted": _safe_float(_col_val("本期未审")),
+        "currentAje": _safe_float(_col_val("本期AJE")),
+        "currentRje": _safe_float(_col_val("本期RJE")),
+        "priorUnadjusted": _safe_float(_col_val("上期未审")),
+        "priorAje": _safe_float(_col_val("上期AJE")),
+        "priorRje": _safe_float(_col_val("上期RJE")),
+        "isFromCrossSheet": False,
     }
 
 

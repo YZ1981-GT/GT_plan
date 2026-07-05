@@ -240,6 +240,7 @@ export async function expectHtmlDualModeOrContent(
 }
 /** 多 sheet 底稿默认打开「底稿目录」Tab，需切换到含 wpCode 的 HTML sheet（排除 F2-21A 等父码 Tab） */
 export async function clickWorkpaperSheetTab(page: import('@playwright/test').Page, wpCode: string) {
+  await page.getByRole('tab').first().waitFor({ state: 'visible', timeout: 20_000 })
   const fallbacks: Record<string, string[]> = {
     'F2-1': ['F2-1', 'F2-8', 'F2-3'],
   }
@@ -261,4 +262,98 @@ export async function clickWorkpaperSheetTab(page: import('@playwright/test').Pa
       return
     }
   }
+  throw new Error(`未找到 sheet Tab: ${wpCode}`)
+}
+
+/** 切换到「底稿目录」Tab */
+export async function clickWorkpaperDirectoryTab(page: import('@playwright/test').Page) {
+  const tab = page.getByRole('tab').filter({ hasText: /底稿目录/ })
+  if (await tab.count()) {
+    await tab.first().click({ timeout: 15_000 })
+    await page.waitForTimeout(2_500)
+  }
+}
+
+/** 底稿目录页点击索引 Chip 跳转（G*-dir 清单 或 b-index 底稿架构卡片） */
+export async function clickDirectoryIndexChip(
+  page: import('@playwright/test').Page,
+  cycle: 'g12' | 'g13' | 'g14',
+  code: string,
+) {
+  const dirRoot = page.locator(`[data-testid="${cycle}-directory"]`)
+  if (await dirRoot.count()) {
+    await dirRoot.first().waitFor({ state: 'visible', timeout: 20_000 })
+    const chipByTestId = dirRoot.locator(`[data-testid="${cycle}-dir-chip-${code}"]`)
+    const chip = (await chipByTestId.count())
+      ? chipByTestId
+      : dirRoot.locator('.gt-index-chip').filter({ hasText: code })
+    await chip.first().click({ timeout: 15_000 })
+    await page.waitForTimeout(2_500)
+    return
+  }
+
+  const chip = page.locator(`[data-testid="${cycle}-dir-chip-${code}"]`)
+  if (await chip.count()) {
+    await chip.first().click({ timeout: 15_000 })
+  } else {
+    const archCard = page
+      .locator('.gt-b-arch__card:visible')
+      .filter({ has: page.locator('.gt-index-chip').filter({ hasText: code }) })
+    if (await archCard.count()) {
+      await archCard.first().click({ timeout: 15_000 })
+    } else {
+      const fallback = page.locator(`.${cycle}-dir .gt-index-chip`).filter({ hasText: code })
+      await fallback.first().click({ timeout: 15_000 })
+    }
+  }
+  await page.waitForTimeout(2_500)
+}
+
+/** 附注披露 sheet Tab（上市公司 / 国企） */
+export async function clickDisclosureSheetTab(
+  page: import('@playwright/test').Page,
+  variant: 'listed' | 'soe',
+) {
+  const variantHint = variant === 'listed' ? /上市/ : /国企/
+  const tab = page.getByRole('tab').filter({ hasText: /附注/ }).filter({ hasText: variantHint })
+  await tab.first().click({ timeout: 15_000 })
+  await page.waitForTimeout(2_500)
+}
+
+/** 断言附注披露表 tbody 行数（含合计行） */
+export async function expectDisclosureTableRows(
+  page: import('@playwright/test').Page,
+  testId: string,
+  expectedCount: number,
+) {
+  const { expect } = await import('@playwright/test')
+  const rows = page.locator(`[data-testid="${testId}"] tbody tr`)
+  await expect(rows).toHaveCount(expectedCount, { timeout: 15_000 })
+}
+
+/** 断言明细表可见列头（当前 Tab） */
+export async function expectDetailColumnHeaders(
+  page: import('@playwright/test').Page,
+  testId: string,
+  headers: string[],
+) {
+  const { expect } = await import('@playwright/test')
+  const table = page.locator(`[data-testid="${testId}"]`)
+  for (const h of headers) {
+    await expect(table.locator('th').filter({ hasText: h }).first()).toBeVisible({ timeout: 10_000 })
+  }
+}
+
+/** 切换 G13/G14 明细表 segmented Tab */
+export async function clickDetailSegmentTab(
+  page: import('@playwright/test').Page,
+  testId: 'g13-detail-tab' | 'g14-detail-tab',
+  label: string | RegExp,
+) {
+  const seg = page.locator(`[data-testid="${testId}"]`)
+  const item = typeof label === 'string'
+    ? seg.getByText(label, { exact: true })
+    : seg.locator('.el-segmented__item').filter({ hasText: label })
+  await item.first().click({ timeout: 10_000 })
+  await page.waitForTimeout(800)
 }

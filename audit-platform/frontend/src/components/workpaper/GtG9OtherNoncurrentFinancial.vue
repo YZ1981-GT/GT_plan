@@ -2,12 +2,19 @@
   <div class="g9-other-noncurrent-financial">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div class="g9-other-noncurrent-financial-toolbar">
+      <div v-if="currentSheet !== '底稿目录'" class="g9-toolbar">
+        <el-segmented
+          v-if="isHtmlSheet"
+          v-model="dualMode.currentMode.value"
+          :options="dualMode.modeOptions"
+          size="small"
+          @change="dualMode.onModeChange"
+        />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
       </div>
 
       <GtOnlyOfficeSheet
-        v-if="currentSheet === 'G9A'"
+        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -15,13 +22,99 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <CycleTabAdjudication
-        v-else-if="adjudicationConfig"
-        :config="adjudicationConfig"
-        :all-responses="formData.allResponses.value"
+      <G9TabProcedure
+        v-else-if="currentSheet === 'G9A'"
+        :html-data="props.htmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
-        :debounced-save="formData.debouncedSave"
       />
+
+      <G9TabAdjudication
+        v-else-if="currentSheet === 'G9-1'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <G9TabDetail
+        v-else-if="currentSheet === 'G9-2'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G9TabAdjustment
+        v-else-if="currentSheet === 'G9-3'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G9TabFairValueTest
+        v-else-if="currentSheet === 'G9-4'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G9TabL3Reconciliation
+        v-else-if="currentSheet === 'G9-5'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G9TabVoucherCheck
+        v-else-if="currentSheet === 'G9-6'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
+      />
+
+      <G9TabDisclosureListed
+        v-else-if="currentSheet === '附注上市'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <G9TabDisclosureSOE
+        v-else-if="currentSheet === '附注国企'"
+        :all-responses="formData.allResponses.value"
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :debounced-save="onDebouncedSave"
+      />
+
+      <div v-else-if="currentSheet === '底稿目录'" class="g-cycle-tab-index-page">
+        <G9TabDirectory
+          :all-responses="formData.allResponses.value"
+          :available-sheets="availableSheets"
+        />
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="props.wpCode"
+          :html-data="props.htmlData"
+          :available-sheets="availableSheets"
+        />
+      </div>
 
       <GtGridSheet
         v-else-if="useGridFallback"
@@ -44,12 +137,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-import { useG9OthNcfFormData } from './composables/useG9OthNcfFormData'
+/**
+ * GtG9OtherNoncurrentFinancial — G9 其他非流动金融资产底稿主入口
+ */
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide } from 'vue'
+import { useG9FormData } from './composables/useG9FormData'
+import { useG9DualMode } from './composables/useG9DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
-import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { extractG9SheetCode } from './composables/g9SheetLabels'
+import { G9_ACCOUNT_CODE } from './composables/g9Constants'
+import { parseNum } from './composables/useG9FormulaEngine'
+import type { ChecklistResponse } from './composables/useF1FormData'
 
+const G9TabProcedure = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabProcedure.vue'))
+const G9TabAdjudication = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabAdjudication.vue'))
+const G9TabDetail = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDetail.vue'))
+const G9TabAdjustment = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabAdjustment.vue'))
+const G9TabFairValueTest = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/valuation/G9TabFairValueTest.vue'))
+const G9TabL3Reconciliation = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/valuation/G9TabL3Reconciliation.vue'))
+const G9TabVoucherCheck = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/voucher/G9TabVoucherCheck.vue'))
+const G9TabDisclosureListed = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDisclosureListed.vue'))
+const G9TabDisclosureSOE = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDisclosureSOE.vue'))
+const G9TabDirectory = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDirectory.vue'))
+const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
@@ -65,29 +176,55 @@ const props = defineProps<{
 
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
-const formData = useG9OthNcfFormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+const formData = useG9FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const { versionTrailRef } = versionToolbar
+const reviewProvide = useWorkpaperReviewProvide({ wpId: wpIdRef })
+provide('openReviewDialog', reviewProvide.openReviewDialog)
 
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
-  const m = name.match(/(G9A|G9-\d+)/)
-  return m ? m[1] : ''
+const currentSheet = computed(() => extractG9SheetCode(props.sheetName || props.wpCode || ''))
+
+const HTML_SHEETS = new Set(['G9A', 'G9-1', 'G9-2', 'G9-3', 'G9-4', 'G9-5', 'G9-6', '附注上市', '附注国企', '底稿目录'])
+const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
+const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.value)
+
+const availableSheets = computed(() => {
+  const sheets = formData.renderMeta.value?.sheets
+  return Array.isArray(sheets) ? sheets : []
 })
 
-const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
-const useGridFallback = computed(() => {
-  const code = currentSheet.value
-  return !!code && code !== 'G9A' && !adjudicationConfig.value && !code.startsWith('附注')
+const dualMode = useG9DualMode({ wpId: wpIdRef, reloadAll: () => formData.loadAll() })
+
+function onDebouncedSave(id: string, d: Partial<ChecklistResponse>) {
+  formData.debouncedSave(id, d)
+  versionToolbar.scheduleAutoSnapshot()
+}
+
+function handleG9Adjudicated(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
+  if (detail?.accountCode !== G9_ACCOUNT_CODE) return
+  const amount = parseNum(detail.adjudicatedAmount)
+  void formData.writebackTB(amount)
+}
+
+async function reloadAll() {
+  await formData.loadAll()
+}
+
+onMounted(async () => {
+  window.addEventListener('substantive:adjudicated', handleG9Adjudicated)
+  await formData.loadAll()
+  isLoading.value = false
 })
 
-onMounted(async () => { await formData.loadAll(); isLoading.value = false })
+onBeforeUnmount(() => {
+  window.removeEventListener('substantive:adjudicated', handleG9Adjudicated)
+})
 </script>
 
 <style scoped>
 .g9-other-noncurrent-financial { padding: 12px; }
 .loading-container { padding: 24px; }
-.g9-other-noncurrent-financial-toolbar { margin-bottom: 8px; }
+.g9-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 </style>

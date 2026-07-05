@@ -56,7 +56,7 @@ export function useD7FormData(options: UseD7FormDataOptions) {
       const responses: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? res.data ?? [])
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
-        if (r.item_id?.startsWith('D7-') || r.item_id?.startsWith('D7A-') || r.item_id?.startsWith('D7-note-')) {
+        if (r.item_id?.startsWith('D7-') || r.item_id?.startsWith('D7A-') || r.item_id?.startsWith('D7-note-') || r.item_id?.startsWith('D7-proc')) {
           map.set(r.item_id, {
             item_id: r.item_id,
             conclusion: r.conclusion ?? null,

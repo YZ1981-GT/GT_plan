@@ -54,7 +54,7 @@ export function useD6FormData(options: UseD6FormDataOptions) {
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
-        if (r.item_id?.startsWith('D6-') || r.item_id?.startsWith('D6A-')) {
+        if (r.item_id?.startsWith('D6-') || r.item_id?.startsWith('D6A-') || r.item_id?.startsWith('D6-proc')) {
           map.set(r.item_id, {
             item_id: r.item_id,
             conclusion: r.conclusion ?? null,

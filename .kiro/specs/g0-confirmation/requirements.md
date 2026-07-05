@@ -154,7 +154,7 @@ G0投资循环函证，覆盖科目：交易性金融资产/债权投资/长期�
 
 **P5: 股利差异恒等** — ∀ declared, received, tax ∈ ℝ≥0: calcDividendDiff(declared, received, tax) === declared - received - tax
 
-**P6: 差异判定对称性** — ∀ a, b ∈ ℝ: hasDifference(a, b) === hasDifference(b, a) 当且仅当差异阈值对称
+**P6: 差异判定定义一致性** — ∀ qtyDiff ∈ ℝ, fvDiff ∈ ℝ: hasDifference(qtyDiff, fvDiff) === (|qtyDiff|>0 ∨ |fvDiff|>0.01)
 
 **P7: 零差异恒等** — ∀ v ∈ ℝ: calcQuantityDiff(v, v) === 0 ∧ calcFairValueDiff(v, v) === 0 ∧ calcMarketValueDiff(v, v) === 0
 

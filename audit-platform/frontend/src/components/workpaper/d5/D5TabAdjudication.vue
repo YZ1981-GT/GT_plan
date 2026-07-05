@@ -1,11 +1,14 @@
 <template>
 <div class="d5-adjudication">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
+    <div class="import-export-bar">
+      <el-button-group size="small">
+        <el-button @click="onExportTemplate">导出模板</el-button>
+        <el-button @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button :disabled="isReadonly">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
+    </div>
     <!-- 审定表主体 -->
     <el-table
       :data="rows"
@@ -141,7 +144,12 @@
         placeholder="分析应收款项融资本期变动原因，结合公允价值测算评价合理性..."
       />
       <div class="note-actions">
-        <el-button size="small" :disabled="true" title="AI功能暂未开放">🤖AI</el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || !aiAvailable || aiLoading"
+          :loading="aiLoading"
+          @click="genExplanation"
+        >🤖AI</el-button>
       </div>
     </div>
 
@@ -156,16 +164,15 @@
         placeholder="对应收款项融资审定结果的总结性结论..."
       />
       <div class="conclusion-actions">
-        <el-button size="small" :disabled="true">🤖AI生成结论</el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || !aiAvailable || aiLoading"
+          :loading="aiLoading"
+          @click="genConclusion"
+        >🤖AI生成结论</el-button>
         <el-button size="small" @click="openReview('D5-adj-conclusion')">💬 复核</el-button>
       </div>
     </div>
-  </template>
-
-  <!-- OnlyOffice 在线编辑模式占位 -->
-  <div v-else class="onlyoffice-placeholder">
-    <el-empty description="在线编辑模式（OnlyOffice）" />
-  </div>
 </div>
 </template>
 
@@ -180,10 +187,12 @@
  * Task: 13.1
  * Requirements: 2.1-2.8, 3.4, 3.6, 3.7, 10.4-10.6
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useD5FormulaEngine'
 import { useD5Adjudication } from '../composables/useD5Adjudication'
+import { useD5AiGenerate } from '../composables/useD5AiGenerate'
+import { useD5TabImportExport } from '../composables/useD5TabImportExport'
 import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 
@@ -206,14 +215,6 @@ const props = defineProps<{
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-// ─── Mode ────────────────────────────────────────────────────────────────────
-
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 const {
@@ -231,6 +232,30 @@ const {
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
+
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { onExportTemplate, onExportData, onImportFile } = useD5TabImportExport(wpIdRef, 'D5-1')
+
+async function genExplanation() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-change-analysis', auditNotes.value.explanation, {
+    task: '应收款项融资本期变动分析',
+    trialBalanceDiff: trialBalanceDiff.value,
+  }, 'AI · 变动分析')
+  if (text) auditNotes.value.explanation = text
+}
+
+async function genConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('adj-conclusion', auditNotes.value.conclusion, {
+    task: '应收款项融资审定审计结论',
+    trialBalanceAmount: trialBalanceAmount.value,
+    trialBalanceDiff: trialBalanceDiff.value,
+  }, 'AI · 审计结论')
+  if (text) auditNotes.value.conclusion = text
+}
 
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
 
@@ -278,6 +303,12 @@ function openReview(sectionId: string) {
 <style scoped>
 .d5-adjudication {
   padding: 16px;
+}
+
+.import-export-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
 .mode-toolbar {
@@ -359,9 +390,6 @@ function openReview(sectionId: string) {
   margin-top: 8px;
 }
 
-.onlyoffice-placeholder {
-  padding: 40px 0;
-}
 
 /* OCI行特殊浅蓝背景 */
 :deep(.el-table__row) {

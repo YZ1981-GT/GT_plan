@@ -6,7 +6,7 @@
 - POST /api/workpapers/{wp_id}/d3/import-data?sheet={sheet_code}      解析xlsx写入
 - POST /api/workpapers/{wp_id}/d3/import-aux-balance                  从辅助余额表导入
 
-支持sheets: D3-2, D3-5, D3-6, D3-7
+支持sheets: D3-1, D3-2, D3-3, D3-4-debit, D3-4-credit, D3-5, D3-6, D3-7
 """
 
 from __future__ import annotations
@@ -36,9 +36,50 @@ router = APIRouter(tags=["d3-import-export"])
 
 _ROW_LIMIT = 500
 
-_SUPPORTED_SHEETS: set[str] = {"D3-2", "D3-5", "D3-6", "D3-7"}
+_SUPPORTED_SHEETS: set[str] = {
+    "D3-1", "D3-2", "D3-3", "D3-4-debit", "D3-4-credit", "D3-5", "D3-6", "D3-7",
+}
+
+_D3_1_SECTION_LABELS: dict[str, str] = {
+    "by-nature": "按性质分类",
+    "by-aging": "按账龄分类",
+}
+_D3_1_SECTION_BY_LABEL: dict[str, str] = {v: k for k, v in _D3_1_SECTION_LABELS.items()}
+
+_D3_1_ROWS: list[tuple[str, str, str]] = [
+    ("by-nature", "fixed-asset-sales", "预收销售固定资产款"),
+    ("by-nature", "land-use-right", "预收销售土地使用权款"),
+    ("by-nature", "contract-invalid", "合同不成立时已收取的对价"),
+    ("by-nature", "other", "其他"),
+    ("by-aging", "within-1-year", "1年以内"),
+    ("by-aging", "1-to-2-years", "1至2年"),
+    ("by-aging", "2-to-3-years", "2至3年"),
+    ("by-aging", "over-3-years", "3年以上"),
+]
+
+_D3_1_FIELDS: list[tuple[str, str, bool]] = [
+    ("priorUnadjusted", "期初未审", False),
+    ("priorAje", "期初AJE", False),
+    ("priorRje", "期初RJE", False),
+    ("currentUnadjusted", "期末未审", False),
+    ("currentAje", "期末AJE", False),
+    ("currentRje", "期末RJE", False),
+    ("reasonAnalysis", "原因分析", True),
+]
 
 _SHEET_HEADERS: dict[str, list[str]] = {
+    "D3-1": [
+        "区块", "行键", "项目",
+        "期初未审", "期初AJE", "期初RJE",
+        "期末未审", "期末AJE", "期末RJE",
+        "原因分析",
+    ],
+    "D3-3": [
+        "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
+        "借方调整金额", "贷方调整金额", "索引", "备注",
+    ],
+    "D3-4-debit": ["行键", "项目", "金额", "来源", "备注"],
+    "D3-4-credit": ["行键", "项目", "金额", "来源", "备注"],
     "D3-2": [
         "对方单位名称", "公司代码", "款项性质", "关联方类型",
         "期初未审余额", "期初账项调整", "期初重分类调整",
@@ -64,9 +105,12 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
 }
 
-# item_id 映射
+# item_id 映射（JSON 数组类 sheet）
 _SHEET_ITEM_ID: dict[str, str] = {
     "D3-2": "D3-det-rows",
+    "D3-3": "D3-aje-rows",
+    "D3-4-debit": "D3-ana-debit-rows",
+    "D3-4-credit": "D3-ana-credit-rows",
     "D3-5": "D3-lt-rows",
     "D3-6": "D3-rp-rows",
     "D3-7": "D3-vc-post-rows",
@@ -108,6 +152,15 @@ async def d3_export_template(
     for col_idx in range(1, len(headers) + 1):
         ws.column_dimensions[chr(64 + min(col_idx, 26))].width = 16
 
+    if sheet == "D3-1":
+        for section, row_key, label in _D3_1_ROWS:
+            ws.append([
+                _D3_1_SECTION_LABELS[section],
+                row_key,
+                label,
+                *[None] * (len(headers) - 3),
+            ])
+
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -135,6 +188,9 @@ async def d3_export_data(
 
     import sqlalchemy as sa
 
+    if sheet == "D3-1":
+        return await _stream_d3_1_export(wp_id, db, headers, sheet)
+
     item_id = _SHEET_ITEM_ID[sheet]
     result = await db.execute(
         sa.text(
@@ -160,6 +216,12 @@ async def d3_export_data(
     for data_row in rows_data:
         if sheet == "D3-2":
             row_values = _export_d3_2_row(data_row)
+        elif sheet == "D3-3":
+            row_values = _export_d3_3_row(data_row)
+        elif sheet == "D3-4-debit":
+            row_values = _export_d3_4_row(data_row)
+        elif sheet == "D3-4-credit":
+            row_values = _export_d3_4_row(data_row)
         elif sheet == "D3-5":
             row_values = _export_d3_5_row(data_row)
         elif sheet == "D3-6":
@@ -234,8 +296,19 @@ async def d3_import_data(
             truncated = True
             break
 
+        if sheet == "D3-1":
+            row_dict = _parse_d3_1_row(row, actual_headers)
+            if row_dict:
+                rows_data.append(row_dict)
+            continue
         if sheet == "D3-2":
             row_dict = _parse_d3_2_row(row, actual_headers)
+        elif sheet == "D3-3":
+            row_dict = _parse_d3_3_row(row, actual_headers)
+        elif sheet == "D3-4-debit":
+            row_dict = _parse_d3_4_row(row, actual_headers)
+        elif sheet == "D3-4-credit":
+            row_dict = _parse_d3_4_row(row, actual_headers)
         elif sheet == "D3-5":
             row_dict = _parse_d3_5_row(row, actual_headers)
         elif sheet == "D3-6":
@@ -243,12 +316,28 @@ async def d3_import_data(
         else:
             row_dict = _parse_d3_7_row(row, actual_headers)
 
+        if not row_dict:
+            continue
         rows_data.append(row_dict)
 
     wb.close()
 
     # 写入 checklist_responses
     import sqlalchemy as sa
+
+    if sheet == "D3-1":
+        field_count = await _persist_d3_1_rows(wp_id, rows_data, db)
+        await db.commit()
+        result_data: dict[str, Any] = {
+            "ok": True,
+            "imported_count": len(rows_data),
+            "field_count": field_count,
+            "errors": errors,
+        }
+        if truncated:
+            result_data["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
+            result_data["truncated"] = True
+        return result_data
 
     item_id = _SHEET_ITEM_ID[sheet]
     remark_json = json.dumps(rows_data, ensure_ascii=False)
@@ -567,3 +656,188 @@ def _parse_d3_7_row(row: tuple, actual_headers: list[str]) -> dict:
         "isAbnormal": _safe_str(_col_val(row, actual_headers, "是否异常")),
         "remark": _safe_str(_col_val(row, actual_headers, "备注说明")),
     }
+
+
+def _parse_d3_3_row(row: tuple, actual_headers: list[str]) -> dict:
+    return {
+        "rowId": str(uuid4()),
+        "description": _safe_str(_col_val(row, actual_headers, "调整事项说明")),
+        "category": _safe_str(_col_val(row, actual_headers, "类别")) or "账项调整",
+        "reportItem": _safe_str(_col_val(row, actual_headers, "报表项目")),
+        "accountName": _safe_str(_col_val(row, actual_headers, "科目名称")),
+        "noteItem": _safe_str(_col_val(row, actual_headers, "附注项目")),
+        "placeholder": "",
+        "debitAmount": _safe_float(_col_val(row, actual_headers, "借方调整金额")),
+        "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方调整金额")),
+        "indexRef": _safe_str(_col_val(row, actual_headers, "索引")),
+        "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+    }
+
+
+def _parse_d3_4_row(row: tuple, actual_headers: list[str]) -> dict | None:
+    row_key = _safe_str(_col_val(row, actual_headers, "行键"))
+    label = _safe_str(_col_val(row, actual_headers, "项目"))
+    if not row_key and not label:
+        return None
+    if row_key in ("debit-total", "debit-diff", "credit-total", "credit-diff"):
+        return None
+    return {
+        "rowKey": row_key or label,
+        "label": label or row_key,
+        "amount": _safe_float(_col_val(row, actual_headers, "金额")),
+        "source": _safe_str(_col_val(row, actual_headers, "来源")),
+        "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+    }
+
+
+def _export_d3_3_row(data: dict) -> list:
+    return [
+        _safe_str(data.get("description")),
+        _safe_str(data.get("category")),
+        _safe_str(data.get("reportItem")),
+        _safe_str(data.get("accountName")),
+        _safe_str(data.get("noteItem")),
+        _safe_float(data.get("debitAmount")),
+        _safe_float(data.get("creditAmount")),
+        _safe_str(data.get("indexRef")),
+        _safe_str(data.get("remark")),
+    ]
+
+
+def _export_d3_4_row(data: dict) -> list:
+    return [
+        _safe_str(data.get("rowKey")),
+        _safe_str(data.get("label")),
+        _safe_float(data.get("amount")),
+        _safe_str(data.get("source")),
+        _safe_str(data.get("remark")),
+    ]
+
+
+async def _fetch_response_map(
+    wp_id: str,
+    db: AsyncSession,
+    prefix: str,
+) -> dict[str, str]:
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.text(
+            "SELECT item_id, remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
+        ),
+        {"wp_id": wp_id, "prefix": f"{prefix}%"},
+    )
+    return {row.item_id: (row.remark or "") for row in result.fetchall()}
+
+
+async def _upsert_response(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+    remark: str,
+) -> None:
+    import sqlalchemy as sa
+
+    await db.execute(
+        sa.text("""
+            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            ON CONFLICT (wp_id, item_id)
+            DO UPDATE SET remark = :remark, updated_at = NOW()
+        """),
+        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark},
+    )
+
+
+async def _stream_d3_1_export(
+    wp_id: str,
+    db: AsyncSession,
+    headers: list[str],
+    sheet: str,
+) -> StreamingResponse:
+    responses = await _fetch_response_map(wp_id, db, "D3-adj-")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.append(headers)
+    ws.freeze_panes = "A2"
+
+    for section, row_key, label in _D3_1_ROWS:
+        row_values = [
+            _D3_1_SECTION_LABELS[section],
+            row_key,
+            label,
+        ]
+        for field_key, _header, is_text in _D3_1_FIELDS:
+            item_id = f"D3-adj-{section}-{row_key}-{field_key}"
+            raw = responses.get(item_id, "")
+            if is_text:
+                row_values.append(raw)
+            else:
+                row_values.append(_safe_float(raw) if raw else 0.0)
+        ws.append(row_values)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    from urllib.parse import quote
+    encoded_filename = quote(f"{sheet}_数据.xlsx")
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+    )
+
+
+def _parse_d3_1_row(row: tuple, actual_headers: list[str]) -> dict | None:
+    section_label = _safe_str(_col_val(row, actual_headers, "区块"))
+    row_key = _safe_str(_col_val(row, actual_headers, "行键"))
+    label = _safe_str(_col_val(row, actual_headers, "项目"))
+    if not row_key and not label:
+        return None
+
+    section = _D3_1_SECTION_BY_LABEL.get(section_label, "")
+    if not section and row_key:
+        for sec, rk, _lbl in _D3_1_ROWS:
+            if rk == row_key:
+                section = sec
+                break
+    if not row_key:
+        for sec, rk, lbl in _D3_1_ROWS:
+            if lbl == label:
+                section = sec
+                row_key = rk
+                break
+    if not section or not row_key:
+        return None
+
+    parsed: dict[str, Any] = {"section": section, "rowKey": row_key, "label": label}
+    for field_key, header, is_text in _D3_1_FIELDS:
+        val = _col_val(row, actual_headers, header)
+        parsed[field_key] = _safe_str(val) if is_text else _safe_float(val)
+    return parsed
+
+
+async def _persist_d3_1_rows(
+    wp_id: str,
+    rows_data: list[dict],
+    db: AsyncSession,
+) -> int:
+    field_count = 0
+    for row in rows_data:
+        section = row.get("section", "")
+        row_key = row.get("rowKey", "")
+        if not section or not row_key:
+            continue
+        for field_key, _header, is_text in _D3_1_FIELDS:
+            val = row.get(field_key)
+            if val is None or (not is_text and val == ""):
+                continue
+            item_id = f"D3-adj-{section}-{row_key}-{field_key}"
+            remark = str(val) if is_text else str(_safe_float(val))
+            await _upsert_response(db, wp_id, item_id, remark)
+            field_count += 1
+    return field_count

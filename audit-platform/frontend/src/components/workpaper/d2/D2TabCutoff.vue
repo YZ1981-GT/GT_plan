@@ -8,6 +8,7 @@
 import { inject, toRef, computed, type Ref } from 'vue'
 import { useD2Cutoff, type CutoffSample } from '../composables/useD2Cutoff'
 import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 import type { ExtractedVoucher, FillMode } from '../composables/useCutoffAutoSampling'
 
 const props = defineProps<{
@@ -16,12 +17,6 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   bsDate: string
-}>()
-
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
 }>()
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
@@ -39,7 +34,6 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-cutoff-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 
 const {
   samples,
@@ -129,16 +123,7 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
   <div class="d2-tab-cutoff">
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample">添加样本</el-button>
-      </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
       </div>
     </div>
 
@@ -165,7 +150,11 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
 
     <!-- 主表 -->
     <el-table :data="samples" border size="small" style="width: 100%">
-      <el-table-column type="index" label="序号" width="60" />
+      <el-table-column label="序号" width="68">
+        <template #default="{ $index, row }">
+          {{ $index + 1 }}<GtReviewDot row-prefix="D2-cutoff" :row-key="row.rowId" />
+        </template>
+      </el-table-column>
       <el-table-column label="发票号" width="120">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.invoiceNo" size="small" @change="(v: string) => updateCell(row.rowId, 'invoiceNo', v)" />

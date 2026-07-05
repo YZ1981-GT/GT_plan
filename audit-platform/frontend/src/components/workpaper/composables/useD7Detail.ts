@@ -19,6 +19,7 @@ import {
   calcCreditEndBalance,
   calcSubtotal,
 } from './useD7FormulaEngine'
+import { matchRelatedPartyPure } from './useD3Detail'
 import type { ChecklistResponse } from './useD7FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export interface UseD7DetailOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId: Ref<string>
   projectId: Ref<string>
+  relatedParties?: Ref<string[]>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -192,6 +194,18 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
 
 export function useD7Detail(options: UseD7DetailOptions) {
   const { allResponses, debouncedSave, wpId, projectId } = options
+  const relatedParties = options.relatedParties ?? ref<string[]>([])
+
+  function resolveRelatedPartyType(companyName: string): string {
+    const matched = matchRelatedPartyPure(companyName, relatedParties.value)
+    if (matched === '非关联方') return '非关联方'
+    if ((RELATED_PARTY_TYPES as readonly string[]).includes(matched)) return matched
+    return '其他关联方'
+  }
+
+  function matchRelatedParty(name: string): string {
+    return resolveRelatedPartyType(name)
+  }
 
   // ─── Reactive rows ───────────────────────────────────────────────────
 
@@ -275,6 +289,10 @@ export function useD7Detail(options: UseD7DetailOptions) {
       ;(row as any)[field] = value
     }
 
+    if (field === 'companyName') {
+      row.relatedPartyType = resolveRelatedPartyType(String(value ?? ''))
+    }
+
     const newRows = [...rows.value]
     newRows[idx] = recalcRow(row)
     rows.value = newRows
@@ -307,7 +325,7 @@ export function useD7Detail(options: UseD7DetailOptions) {
         const key = `${contractName}||${companyName}`
 
         if (!existingMap.has(key)) {
-          const newRow = normalizeRow({
+          const newRow = recalcRow(normalizeRow({
             rowId: generateRowId(),
             contractName,
             companyName,
@@ -315,8 +333,9 @@ export function useD7Detail(options: UseD7DetailOptions) {
             priorUnadjusted: item.priorUnadjusted ?? item.prior_unadjusted ?? item.begin_balance ?? 0,
             debitAmount: item.debitAmount ?? item.debit_amount ?? 0,
             creditAmount: item.creditAmount ?? item.credit_amount ?? 0,
-          })
-          existingMap.set(key, recalcRow(newRow))
+            relatedPartyType: resolveRelatedPartyType(companyName),
+          }))
+          existingMap.set(key, newRow)
           newCount++
         }
       }
@@ -331,8 +350,7 @@ export function useD7Detail(options: UseD7DetailOptions) {
 
   // ─── 关联方自动匹配 ──────────────────────────────────────────────────
 
-  // Stub: In real impl, this would fuzzy-match against project related_parties
-  // For now, users manually select from dropdown
+  // 编辑单位名称时通过 relatedParties 列表模糊匹配关联关系
 
   // ─── onConfirmationCompleted ─────────────────────────────────────────
 
@@ -402,6 +420,7 @@ export function useD7Detail(options: UseD7DetailOptions) {
     importFromAuxBalance,
     searchFilter,
     filteredRows,
+    matchRelatedParty,
   }
 }
 

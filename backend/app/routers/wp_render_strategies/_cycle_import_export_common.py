@@ -9,11 +9,16 @@ from typing import Any, Callable
 from uuid import uuid4
 
 import sqlalchemy as sa
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
 
 ROW_LIMIT = 500
 
@@ -27,7 +32,18 @@ def is_numeric_field_key(key: str) -> bool:
         return True
     if key.endswith(("Amt", "Qty", "Balance", "Total", "Rate", "Days", "Coef", "Share", "Pct")):
         return True
+    # G1 交易性金融资产等强数值语义后缀（避免 sppiResult 之类枚举被误判，故不含 Result）
+    if key.endswith(("Quantity", "Cost", "Value", "Gain", "Income", "Price", "Diff", "Fee")):
+        return True
     if "Amount" in key or "Balance" in key:
+        return True
+    # G1 专属数值字段（后缀无法覆盖：公允变动/调整分录/审定等）
+    if key in {
+        "quantity", "initialCost", "unitFairValue", "fairValueChange", "cumulativeFVChange",
+        "fvChangeInPL", "disposalProceeds", "unadjusted", "aje", "rje", "adjusted", "variance",
+        "debit", "credit", "dividendPerShare", "dividendIncome", "margin", "notionalAmount",
+        "quoteValue", "bookValue", "marketValue", "countDayQuantity", "countDayAmount",
+    }:
         return True
     return key in {
         "faceValue", "termDays", "overdueDays", "concentration", "debitAmount", "creditAmount",
@@ -44,6 +60,17 @@ def is_numeric_field_key(key: str) -> bool:
         "currentRevenue", "currentCost", "currentGross", "currentMargin", "priorRevenue", "priorCost",
         "priorGross", "priorMargin", "revenueChange", "revenueChangeRate", "costChange", "costChangeRate",
         "marginChange", "relatedRevenue", "costRate",
+        # G14 信用减值损失明细
+        "currentUnadjusted", "currentAdjustment", "openingProvision", "currentProvision",
+        "currentReversal", "currentWriteoff", "closingProvision",
+        # G12 净敞口套期收益
+        "instrumentOpeningFV", "instrumentClosingFV", "instrumentFVChange",
+        "itemOpeningFV", "itemClosingFV", "itemFVChange",
+        "hedgeRatio", "profitLossAmount", "ineffectiveness",
+        "priorUnadjusted", "priorAdjustment",
+        # G11 投资收益
+        "currentIncome", "currentOpening", "currentClosing", "priorOpening", "priorClosing",
+        "creditAmount",
     }
 
 
@@ -247,15 +274,8 @@ def create_cycle_import_export_router(
     specs: dict[str, dict[str, Any]],
     storage_field: str = "conclusion",
     header_row: int = 2,
-) -> "APIRouter":
+) -> APIRouter:
     """根据 sheet 规格表生成三端点导入导出 router（D4 模式）."""
-    from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-    from fastapi.responses import StreamingResponse
-
-    from app.core.database import get_db
-    from app.deps import get_current_user
-    from app.models.core import User
-
     router = APIRouter(tags=[tag])
     supported = set(specs.keys())
 

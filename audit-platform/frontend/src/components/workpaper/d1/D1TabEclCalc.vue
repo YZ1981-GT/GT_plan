@@ -11,13 +11,15 @@
  * Requirements: 6.1-9.5, 11.1-11.5, 13.1-13.7, 15.1-15.7, 16.1-16.4
  */
 import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { useD1EclCalc, formatAmountDisplay } from '../composables/useD1EclCalc'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
 import GtIndexChip from '../GtIndexChip.vue'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -27,7 +29,6 @@ interface Props {
   projectId: string
   allResponses: Map<string, any>
   isReadonly?: boolean
-  displayPrefs: any
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -36,23 +37,16 @@ const props = withDefaults(defineProps<Props>(), {
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
+const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
+  fmtAmount: (v: number) =>
+    v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+})
+
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 // ─── Format Helper ───────────────────────────────────────────────────────────
 
-const fmtAmount = computed(() =>
-  props.displayPrefs?.fmtAmount ?? ((n: number) => n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
-)
-
-// ─── Dual Mode ───────────────────────────────────────────────────────────────
-
-const viewMode = ref<'structured' | 'onlyoffice'>('structured')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
-const isOOMode = computed(() => viewMode.value === 'onlyoffice')
+const fmtAmount = computed(() => displayPrefs.fmtAmount)
 
 // ─── Save helpers ────────────────────────────────────────────────────────────
 
@@ -137,32 +131,12 @@ async function handleImport(event: Event) {
   }
 }
 
-// ─── OO Health Check ─────────────────────────────────────────────────────────
+// ─── AI Generate ─────────────────────────────────────────────────────────────
 
-async function checkOoHealth() {
-  try {
-    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch {
-    ooHealthy.value = false
-  }
-}
-
-// ─── AI Health & Generate ────────────────────────────────────────────────────
-
-const aiAvailable = ref(false)
+const wpIdRef = toRef(props, 'wpId')
+const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
 const aiLoadingNote = ref(false)
 const aiLoadingConclusion = ref(false)
-
-async function checkAiHealth() {
-  try {
-    const res = await http.get('/api/ai/health', { _silent: true } as any)
-    const status = res.data?.data?.status ?? res.data?.status
-    aiAvailable.value = status === 'healthy' || status === 'degraded'
-  } catch {
-    aiAvailable.value = false
-  }
-}
 
 function buildEclContext(): string {
   // 收集差异汇总+重要性+各行最大差异
@@ -192,32 +166,15 @@ function buildEclContext(): string {
 async function generateAuditNoteWithAI() {
   aiLoadingNote.value = true
   try {
-    const context = buildEclContext()
-
-    const res = await http.post(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
-      chapter: 15,
-      chapter_title: 'D1-15 应收票据坏账准备测算表-审计说明',
-      guidance: guidanceContent,
-      existing_content: context,
-      knowledge_doc_ids: [],
-    }, { _silent: true } as any)
-
-    const text = res.data?.data?.content ?? res.data?.content ?? ''
-    if (!text) {
-      ElMessage.warning('AI未生成内容')
-      return
-    }
-
-    await ElMessageBox.confirm(
-      `AI生成的内容：\n\n${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`,
-      'AI辅助生成',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }
+    const text = await generateAndConfirm(
+      'ecl-audit-note',
+      buildEclContext(),
+      { guidance: guidanceContent },
+      'AI · 审计说明',
     )
-    auditNote.value = text
-    saveAuditNote()
-  } catch (err: any) {
-    if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.warning('AI生成失败，请检查LLM服务是否可用')
+    if (text) {
+      auditNote.value = text
+      saveAuditNote()
     }
   } finally {
     aiLoadingNote.value = false
@@ -227,32 +184,15 @@ async function generateAuditNoteWithAI() {
 async function generateAuditConclusionWithAI() {
   aiLoadingConclusion.value = true
   try {
-    const context = buildEclContext() + `\n【审计说明】${auditNote.value || '（未填写）'}`
-
-    const res = await http.post(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
-      chapter: 15,
-      chapter_title: 'D1-15 应收票据坏账准备测算表-审计结论',
-      guidance: guidanceContent,
-      existing_content: context,
-      knowledge_doc_ids: [],
-    }, { _silent: true } as any)
-
-    const text = res.data?.data?.content ?? res.data?.content ?? ''
-    if (!text) {
-      ElMessage.warning('AI未生成内容')
-      return
-    }
-
-    await ElMessageBox.confirm(
-      `AI生成的内容：\n\n${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`,
-      'AI辅助生成',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }
+    const text = await generateAndConfirm(
+      'ecl-audit-conclusion',
+      buildEclContext() + `\n【审计说明】${auditNote.value || '（未填写）'}`,
+      { guidance: guidanceContent },
+      'AI · 审计结论',
     )
-    auditConclusion.value = text
-    saveAuditConclusion()
-  } catch (err: any) {
-    if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.warning('AI生成失败，请检查LLM服务是否可用')
+    if (text) {
+      auditConclusion.value = text
+      saveAuditConclusion()
     }
   } finally {
     aiLoadingConclusion.value = false
@@ -263,8 +203,6 @@ async function generateAuditConclusionWithAI() {
 
 onMounted(() => {
   hydrate()
-  checkOoHealth()
-  checkAiHealth()
 })
 
 // ─── Review Dialog ───────────────────────────────────────────────────────────
@@ -298,7 +236,6 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
   <div class="ecl-calc-table">
     <!-- Dual Mode Switch + Toolbar -->
     <div class="toolbar">
-      <el-segmented v-model="viewMode" :options="modeOptions" />
       <div style="flex:1" />
       <el-button size="small" @click="exportTemplate">导出模板</el-button>
       <el-button size="small" @click="exportData">导出数据</el-button>
@@ -310,20 +247,15 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
       <input type="file" ref="fileInput" accept=".xlsx" hidden @change="handleImport" />
     </div>
 
-    <!-- OnlyOffice Mode -->
-    <GtOnlyOfficeSheet
-      v-if="isOOMode"
-      :wp-id="wpId"
-      :project-id="projectId"
-      sheet-name="应收票据坏账准备测算表D1-15"
-    />
-
-    <!-- Structured Mode -->
-    <div v-else>
+    <div>
       <!-- Loading Skeleton -->
       <el-skeleton v-if="isLoading" :rows="12" animated />
 
       <template v-else>
+        <div class="tab-header">
+          <h4>坏账准备测算 D1-15</h4>
+          <GtReviewTrigger section-id="D1-ecl-header" />
+        </div>
         <!-- Section 1: 按组合计提 -->
         <el-divider content-position="left">一、按组合计提坏账准备测算</el-divider>
         <el-table :data="portfolioRows" border size="small" class="ecl-table">
@@ -335,6 +267,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
                 placeholder="债务人"
                 @input="(val: string) => updateRow('portfolio', $index, 'debtor', val)"
               />
+              <GtReviewDot row-prefix="D1-ecl" :row-key="String(row.id)" />
             </template>
           </el-table-column>
           <el-table-column label="B 审定余额" min-width="130" align="right">
@@ -438,6 +371,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
                 placeholder="债务人"
                 @input="(val: string) => updateRow('individual', $index, 'debtor', val)"
               />
+              <GtReviewDot row-prefix="D1-ecl" :row-key="String(row.id)" />
             </template>
           </el-table-column>
           <el-table-column label="B 审定余额" min-width="130" align="right">
@@ -644,6 +578,18 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
 <style scoped>
 .ecl-calc-table {
   padding: 16px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .toolbar {

@@ -2,6 +2,7 @@
  * D2 应收账款子组件导出
  * 15个Tab组件，对应D2底稿22个有效sheet
  */
+export { default as D2TabIndex } from './D2TabIndex.vue'
 export { default as D2TabAdjudication } from './D2TabAdjudication.vue'
 export { default as D2TabDetail } from './D2TabDetail.vue'
 export { default as D2TabBadDebt } from './D2TabBadDebt.vue'

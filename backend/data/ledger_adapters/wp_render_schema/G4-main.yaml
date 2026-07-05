@@ -1,0 +1,442 @@
+# backend/data/wp_render_schema/G4-main.yaml
+# G4 债权投资(main组) — 专属组件渲染 schema
+# componentType: g4-bond-investment-main
+# 科目 1501 债权投资（借方/资产类，以摊余成本计量 CAS22 AC类）
+# Template: G4 债权投资.xlsx（1022KB，19sheet三组拆分，本schema覆盖main组8sheet）
+# 修订: 2026-07-15 初始创建
+
+wp_code: G4-main
+wp_name: 债权投资底稿(main组)
+component_type: g4-bond-investment-main
+template_path: backend/wp_templates/G/G4 债权投资.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '1501'
+    name: 债权投资
+  - code: '150101'
+    name: 债权投资—成本
+  - code: '150102'
+    name: 债权投资—利息调整
+  - code: '150103'
+    name: 债权投资—应计利息
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 1: 底稿目录 (27行×8列)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  底稿目录:
+    code: 底稿目录
+    group: core
+    dimensions: "27×8"
+    component_type: g4-bond-investment-main
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+        - { field: methodology_note, label: 关于工作底稿与审计程序索引号对应的说明, type: static_text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+        rows: 27
+    cross_refs:
+      - ref_id: CW-G4-DIR-001
+        target_wp: G4A
+        description: '目录索引 → G4A 实质性程序表'
+      - ref_id: CW-G4-DIR-002
+        target_wp: G4-1
+        description: '目录索引 → G4-1 审定表'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 2: 债权投资实质性程序表G4A (41行×10列)
+  # ═══════════════════════════════════════════════════════════════════════════
+  债权投资实质性程序表G4A:
+    code: G4A
+    group: core
+    dimensions: "41×10"
+    component_type: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+    rows: 41
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: true
+    cross_refs:
+      - ref_id: CW-G4A-001
+        target_wp: G4-1
+        description: 'G4A 程序表索引 → G4-1 审定表'
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 3: 审定表G4-1 (46行×11列, 三层结构+一年内到期)
+  # ═══════════════════════════════════════════════════════════════════════════
+  审定表G4-1:
+    code: G4-1
+    group: core
+    dimensions: "46×11"
+    component_type: g4-bond-investment-main
+    class_code: F-审定表
+    account_code: '1501'
+    direction: debit
+    columns:
+      - { field: item, label: 项目, type: text, width: 160, readonly: true }
+      - { field: opening_unadjusted, label: 期初未审数, type: number, auto_source: trial_balance.opening_balance }
+      - { field: opening_aje, label: 期初账项调整, type: number }
+      - { field: opening_rje, label: 期初重分类调整, type: number }
+      - { field: opening_adjusted, label: 期初审定数, type: number, formula: "opening_unadjusted + opening_aje + opening_rje" }
+      - { field: closing_unadjusted, label: 期末未审数, type: number, formula: "opening_adjusted + debit - credit" }
+      - { field: closing_aje, label: 期末账项调整, type: number }
+      - { field: closing_rje, label: 期末重分类调整, type: number }
+      - { field: closing_adjusted, label: 期末审定数, type: number, formula: "closing_unadjusted + closing_aje + closing_rje" }
+      - { field: change_amount, label: 变动额, type: number, formula: "closing_adjusted - opening_adjusted" }
+      - { field: change_rate, label: 变动率, type: percent, formula: "(closing_adjusted - opening_adjusted) / opening_adjusted" }
+    sections:
+      - name: 一、债权投资原值
+        rows:
+          - { item: 单项计提, type: data }
+          - { item: 按组合计提, type: data }
+          - { item: 小计, type: subtotal, formula: "SUM(单项计提, 按组合计提)" }
+          - { item: "减：一年内到期", type: data }
+      - name: 二、债权投资减值准备
+        rows:
+          - { item: 单项计提, type: data }
+          - { item: 按组合计提, type: data }
+          - { item: 小计, type: subtotal, formula: "SUM(单项计提, 按组合计提)" }
+      - name: 三、债权投资摊余成本（净值）
+        rows:
+          - { item: 摊余成本合计, type: formula, formula: "原值小计 - 减值小计" }
+      - name: 附加：一年内到期非流动资产
+        rows:
+          - { item: 一年内到期列报数, type: data }
+    formulas:
+      - { name: calcDebitBalance, target: closing_unadjusted, expr: "opening_adjusted + debit - credit" }
+      - { name: calcAdjustedAmount, target: closing_adjusted, expr: "closing_unadjusted + closing_aje + closing_rje" }
+      - { name: calcAmortizedCost, target: net_value, expr: "原值小计 - 减值小计" }
+      - { name: calcChangeRate, target: change_rate, expr: "(closing - opening) / opening, null if opening=0" }
+    highlights:
+      - { condition: "|change_rate| > 0.20", style: orange, require_field: reason_analysis }
+      - { condition: "variance != 0", style: red }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: closing_adjusted
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1501', adjudicatedAmount}" }
+    cross_refs:
+      - ref_id: CW-G4-1-001
+        target_wp: G4-2
+        description: '审定表 ← G4-2 明细表合计'
+        direction: inbound
+      - ref_id: CW-G4-1-002
+        target_wp: G4-3
+        description: '审定表账项调整 ← G4-3 调整分录'
+        severity: required
+        direction: inbound
+      - ref_id: CW-G4-1-003
+        target_wp: G4-4
+        description: '利息收入合计比对 ← G4-4 利息测算'
+        direction: inbound
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 4: 附注披露信息（上市公司）(130行×11列, 虚拟滚动)
+  # ═══════════════════════════════════════════════════════════════════════════
+  附注披露信息（上市公司）:
+    code: 附注披露信息（上市公司）
+    group: core
+    dimensions: "130×11"
+    component_type: g4-bond-investment-main
+    class_code: C-附注披露
+    virtual_scroll: true
+    columns:
+      - { field: item, label: 项目, type: text, width: 200 }
+      - { field: ending_cost, label: 期末余额—成本, type: number }
+      - { field: ending_interest_adj, label: 期末余额—利息调整, type: number }
+      - { field: ending_accrued_interest, label: 期末余额—应计利息, type: number }
+      - { field: ending_impairment, label: 期末余额—减值准备, type: number }
+      - { field: ending_book_value, label: 期末余额—账面价值, type: number, formula: "cost + interest_adj + accrued_interest - impairment" }
+      - { field: prior_cost, label: 上年年末余额—成本, type: number }
+      - { field: prior_interest_adj, label: 上年年末余额—利息调整, type: number }
+      - { field: prior_accrued_interest, label: 上年年末余额—应计利息, type: number }
+      - { field: prior_impairment, label: 上年年末余额—减值准备, type: number }
+      - { field: prior_book_value, label: 上年年末余额—账面价值, type: number, formula: "cost + interest_adj + accrued_interest - impairment" }
+    rows: 130
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode='1501'" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{accountCode:'1501', text}" }
+    ai_sections:
+      - { id: disclosure-text-listed, label: 附注文本(上市), position: section_title_right }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 5: 附注披露信息（国企）(71行×7列, 虚拟滚动)
+  # ═══════════════════════════════════════════════════════════════════════════
+  附注披露信息（国企）:
+    code: 附注披露信息（国企）
+    group: core
+    dimensions: "71×7"
+    component_type: g4-bond-investment-main
+    class_code: C-附注披露
+    virtual_scroll: true
+    columns:
+      - { field: item, label: 项目, type: text, width: 200 }
+      - { field: ending_balance, label: 期末数—余额, type: number }
+      - { field: ending_impairment, label: 期末数—减值准备, type: number }
+      - { field: ending_book_value, label: 期末数—账面价值, type: number, formula: "ending_balance - ending_impairment" }
+      - { field: prior_balance, label: 期初数—余额, type: number }
+      - { field: prior_impairment, label: 期初数—减值准备, type: number }
+      - { field: prior_book_value, label: 期初数—账面价值, type: number, formula: "prior_balance - prior_impairment" }
+    rows: 71
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode='1501'" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{accountCode:'1501', text}" }
+    ai_sections:
+      - { id: disclosure-text-soe, label: 附注文本(国企), position: section_title_right }
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 6: 明细表G4-2 (44行×44列, 超宽表→5区段Tab)
+  # ═══════════════════════════════════════════════════════════════════════════
+  明细表G4-2:
+    code: G4-2
+    group: core
+    dimensions: "44×44"
+    component_type: g4-bond-investment-main
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 500
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: invest_category, label: 投资种类, type: text, width: 100 }
+          - { field: invest_project, label: 投资项目, type: text, width: 150 }
+          - { field: face_value, label: 面值, type: number, width: 100 }
+          - { field: coupon_rate, label: 票面利率, type: percent, width: 80 }
+          - { field: effective_rate, label: 实际利率, type: percent, width: 80 }
+          - { field: maturity_date, label: 到期日, type: date, width: 100 }
+      - name: 期初余额
+        tab_index: 1
+        columns:
+          - { field: opening_cost, label: 期初成本, type: number, width: 100 }
+          - { field: opening_interest_adj, label: 期初利息调整, type: number, width: 100 }
+          - { field: opening_accrued_interest, label: 期初应计利息, type: number, width: 100 }
+          - { field: opening_subtotal, label: 期初小计, type: number, width: 100, formula: "opening_cost + opening_interest_adj + opening_accrued_interest" }
+          - { field: opening_impairment, label: 期初减值准备, type: number, width: 100 }
+          - { field: opening_amortized_cost, label: 期初摊余成本, type: number, width: 110, formula: "opening_subtotal - opening_impairment" }
+          - { field: opening_one_year_deduct, label: "减：期初一年内到期", type: number, width: 120 }
+          - { field: opening_adjustment, label: 期初调整数, type: number, width: 100 }
+          - { field: opening_adjusted, label: 期初审定数, type: number, width: 100 }
+          - { field: opening_remark, label: 备注, type: text, width: 100 }
+      - name: 本期变动
+        tab_index: 2
+        columns:
+          - { field: period_cost_change, label: 本期成本变动, type: number, width: 110 }
+          - { field: period_interest_adj_change, label: 本期利息调整变动, type: number, width: 120 }
+          - { field: period_accrued_interest_change, label: 本期应计利息变动, type: number, width: 120 }
+          - { field: period_change_subtotal, label: 本期变动小计, type: number, width: 110, formula: "period_cost_change + period_interest_adj_change + period_accrued_interest_change" }
+      - name: 期末余额+减值
+        tab_index: 3
+        columns:
+          - { field: closing_cost, label: 期末成本, type: number, width: 100, formula: "opening_cost + period_cost_change" }
+          - { field: closing_interest_adj, label: 期末利息调整, type: number, width: 100, formula: "opening_interest_adj + period_interest_adj_change" }
+          - { field: closing_accrued_interest, label: 期末应计利息, type: number, width: 100, formula: "opening_accrued_interest + period_accrued_interest_change" }
+          - { field: closing_subtotal, label: 期末小计, type: number, width: 100, formula: "closing_cost + closing_interest_adj + closing_accrued_interest" }
+          - { field: closing_impairment, label: 减值准备期末数, type: number, width: 110 }
+          - { field: stage_classification, label: 阶段划分, type: select, width: 80, options: [Stage1, Stage2, Stage3] }
+          - { field: credit_combine_method, label: 信用组合方式, type: text, width: 100 }
+          - { field: credit_combine_name, label: 信用组合名称, type: text, width: 100 }
+          - { field: impairment_adjusted, label: 减值准备审定, type: number, width: 100 }
+          - { field: closing_remark, label: 备注, type: text, width: 100 }
+      - name: 摊余成本+审定
+        tab_index: 4
+        columns:
+          - { field: amortized_cost, label: 摊余成本, type: number, width: 100, formula: "closing_subtotal - closing_impairment" }
+          - { field: one_year_balance, label: "减：一年内到期账面余额", type: number, width: 130 }
+          - { field: one_year_impairment, label: "减：一年内到期减值", type: number, width: 120 }
+          - { field: one_year_subtotal, label: 一年内到期小计, type: number, width: 110, formula: "one_year_balance - one_year_impairment" }
+          - { field: book_value, label: 期末账面价值, type: number, width: 110, formula: "amortized_cost - one_year_subtotal" }
+          - { field: correspondence_status, label: 发函情况, type: text, width: 80 }
+          - { field: audit_adjustment, label: 审定调整, type: number, width: 100 }
+          - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+    data_classification:
+      - { name: "一、一年内到期债权投资", condition: "maturity_date <= balance_sheet_date + 1年", report_line: 其他流动资产 }
+      - { name: "二、到期超过一年债权投资", condition: "maturity_date > balance_sheet_date + 1年", report_line: 债权投资 }
+    formulas:
+      - { name: calcBalanceSubtotal, target: opening_subtotal, expr: "cost + interestAdj + accruedInterest" }
+      - { name: calcAmortizedCost, target: opening_amortized_cost, expr: "subtotal - impairment" }
+      - { name: calcPeriodEndComponent, target: closing_cost, expr: "opening + change" }
+      - { name: calcOneYearMaturity, target: one_year_subtotal, expr: "balance - impairment" }
+      - { name: calcBookValue, target: book_value, expr: "amortizedCost - oneYearSubtotal" }
+    summary_rows:
+      - { type: category_subtotal, group_by: invest_category }
+      - { type: grand_total }
+    import_export: true
+    add_row_prompt: invest_project
+    cross_refs:
+      - ref_id: CW-G4-2-001
+        target_wp: G4-1
+        description: '明细表合计 → G4-1 审定表'
+        direction: outbound
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 7: 调整分录汇总G4-3 (22行×10列)
+  # ═══════════════════════════════════════════════════════════════════════════
+  调整分录汇总G4-3:
+    code: G4-3
+    group: core
+    dimensions: "22×10"
+    component_type: g4-bond-investment-main
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: entry_type, label: 分录类型, type: select, width: 80, options: [AJE, RJE] }
+      - { field: entry_date, label: 日期, type: date, width: 100 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: debit_amount, label: 借方金额, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方金额, type: number, width: 100 }
+      - { field: preparer, label: 编制人, type: text, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    rows: 22
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    highlights:
+      - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
+    import_export: true
+    add_row_prompt: summary
+    writeback:
+      target: G4-1
+      fields: [closing_aje, closing_rje]
+      aggregation: sum_by_entry_type
+    cross_refs:
+      - ref_id: CW-G4-3-001
+        target_wp: G4-1
+        description: 'AJE/RJE汇总 → G4-1 审定表账项调整'
+        severity: required
+        direction: outbound
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # Sheet 8: 利息测算表G4-4 (49行×11列, 实际利率法双section分组)
+  # ═══════════════════════════════════════════════════════════════════════════
+  利息测算表G4-4:
+    code: G4-4
+    group: measurement
+    dimensions: "49×11"
+    component_type: g4-bond-investment-main
+    class_code: G-测算
+    dynamic_rows: true
+    dual_section: true
+    sections:
+      - name: "(一) 确定初始入账价值"
+        section_index: 0
+        per_project: true
+        columns:
+          - { field: invest_project, label: 投资项目, type: text, width: 120 }
+          - { field: face_value_total, label: 面值总额, type: number, width: 100 }
+          - { field: initial_date, label: 初始计量日, type: date, width: 100 }
+          - { field: maturity_date, label: 到期日, type: date, width: 100 }
+          - { field: purchase_price, label: 购买对价, type: number, width: 100 }
+          - { field: transaction_cost, label: 交易费用, type: number, width: 80 }
+          - { field: initial_carrying, label: 初始入账价值, type: number, width: 110, formula: "purchase_price + transaction_cost" }
+          - { field: coupon_rate, label: 票面利率, type: percent, width: 80 }
+          - { field: effective_rate, label: 实际利率, type: percent, width: 80, precision: 4 }
+      - name: "(二) 计算利息收入"
+        section_index: 1
+        per_project: true
+        multi_row: true
+        columns:
+          - { field: period_end_date, label: 截止日, type: date, width: 100 }
+          - { field: opening_book_total, label: 期初账面总额, type: number, width: 110 }
+          - { field: opening_impairment, label: 期初减值准备余额, type: number, width: 120 }
+          - { field: opening_amortized_cost, label: 期初摊余成本余额, type: number, width: 130, formula: "opening_book_total - opening_impairment" }
+          - { field: effective_interest, label: 实际利息收入, type: number, width: 110, formula: "opening_amortized_cost * effective_rate * days / 365" }
+          - { field: cash_inflow, label: 现金流入, type: number, width: 100, formula: "face_value_total * coupon_rate * days / 365" }
+          - { field: principal_repaid, label: 已收回的本金, type: number, width: 110 }
+          - { field: ending_book_total, label: 期末账面总额, type: number, width: 110, formula: "opening_book_total + effective_interest - cash_inflow - principal_repaid" }
+          - { field: accrual_days, label: 计息天数, type: number, width: 80 }
+          - { field: impairment_stage, label: 减值阶段, type: select, width: 80, options: [Stage1, Stage2, Stage3] }
+    formulas:
+      - { name: calcInitialCarryingAmount, target: initial_carrying, expr: "purchasePrice + transactionCost" }
+      - { name: calcEffectiveInterest, target: effective_interest, expr: "amortizedCost * effectiveRate * days / 365" }
+      - { name: calcCashInflow, target: cash_inflow, expr: "faceValue * couponRate * days / 365" }
+      - { name: calcEndingBalance, target: ending_book_total, expr: "opening + interest - cashInflow - principalRepaid" }
+    comparison:
+      target_wp: G4-1
+      target_field: interest_income_adjusted
+      tolerance: 0.01
+      highlight: red
+    import_export: true
+    add_row_prompt: invest_project
+    ai_sections:
+      - { id: interest-conclusion, label: 审计结论, position: bottom }
+    footer:
+      - { type: audit_conclusion, ai_enabled: true }
+      - { type: preparation_guidance, collapsible: true }
+    cross_refs:
+      - ref_id: CW-G4-4-001
+        target_wp: G4-1
+        description: '利息收入合计 → G4-1 审定表比对'
+        direction: outbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI Section 清单
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ai_sections:
+  - { id: adjudication-analysis, label: 审定分析, sheet: G4-1 }
+  - { id: interest-conclusion, label: 利息测算结论, sheet: G4-4 }
+  - { id: disclosure-text, label: 附注文本, sheet: "附注披露信息（上市公司）/附注披露信息（国企）" }
+  - { id: overall-opinion, label: 总体意见, sheet: all }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 导入导出配置（3张动态行表）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import_export:
+  composable: useG4MainImportExport
+  sheets:
+    - { code: G4-2, name: 明细表, multi_sheet_export: true, tab_count: 5 }
+    - { code: G4-3, name: 调整分录 }
+    - { code: G4-4, name: 利息测算表 }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 双模式 + 六大集成
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dual_mode:
+  composable: useG4MainDualMode
+  storage_key: g4-main-mode
+  default: html
+
+integrations:
+  version_trail: { composable: useVersionTrail, auto_snapshot: true }
+  voucher_sampling: { sheet: G4A, mode: dialog }
+  cutoff_auto_sampling: { composable: useCutoffAutoSampling }
+  event_bus:
+    subscribe: ["substantive:adjudicated"]
+    publish: ["substantive:adjudicated", "disclosure:note-text-updated"]
+  ocr: false
+  review_dialog: { provide: openReviewDialog, position: section_title_right }

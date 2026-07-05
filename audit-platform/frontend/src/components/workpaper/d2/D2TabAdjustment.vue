@@ -5,6 +5,8 @@
  */
 import { ref, inject, toRef, type Ref } from 'vue'
 import { useD2Adjustment, type AdjustmentEntry } from '../composables/useD2Adjustment'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import GtReviewDot from '../GtReviewDot.vue'
 
 const props = defineProps<{
   wpId: string
@@ -13,11 +15,11 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-4',
+)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -34,7 +36,6 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-adjustment-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 const selectedRows = ref<string[]>([])
 
 const {
@@ -67,9 +68,11 @@ function handlePushToA13() {
   <div class="d2-tab-adjustment">
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addEntry">
           新增调整分录
         </el-button>
@@ -79,12 +82,6 @@ function handlePushToA13() {
           :disabled="selectedRows.length === 0"
           @click="handlePushToA13"
         >推送至A13</el-button>
-      </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
       </div>
     </div>
 
@@ -105,6 +102,7 @@ function handlePushToA13() {
             @change="(v: string) => updateEntry(row.rowId, 'description', v)"
           />
           <span v-else>{{ row.description || '-' }}</span>
+          <GtReviewDot row-prefix="D2-adjustment" :row-key="row.rowId" />
         </template>
       </el-table-column>
       <el-table-column label="类别" width="90">

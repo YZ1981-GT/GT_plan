@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
 
-export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
+export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<string>; onAfterSave?: () => void }) {
   const isLoading = ref(false)
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
@@ -60,6 +60,7 @@ export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<st
       project_id: opts.projectId.value,
       items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
     })
+    opts.onAfterSave?.()
   }
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {

@@ -17,12 +17,14 @@
  *
  * Requirements: 1.1-1.6, 2.1-2.8, 3.1-3.5, 12.1, 16.1-16.6
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1BusinessMode, type BusinessModeRow } from '../composables/useD1BusinessMode'
 import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -39,24 +41,6 @@ const props = defineProps<{
 
 // 复核对话（Task 19 预留）：仅当 provider 存在时展示 💬 按钮
 const openReviewDialog = inject<any>('openReviewDialog', null)
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const ooSheetName = computed(() => props.sheetName || '业务模式分析D1-6')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -110,58 +94,8 @@ const GUIDANCE_TEXTS = [
 
 // ─── Import/Export ───────────────────────────────────────────────────────────
 
-const SHEET_CODE = 'D1-6'
-
-async function exportTemplate() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/export-template`, null, {
-      params: { sheet: SHEET_CODE },
-      responseType: 'blob',
-    })
-    triggerDownload(res.data, `${SHEET_CODE}_模板.xlsx`)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function exportData() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/export-data`, null, {
-      params: { sheet: SHEET_CODE },
-      responseType: 'blob',
-    })
-    triggerDownload(res.data, `${SHEET_CODE}_数据.xlsx`)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-function triggerDownload(data: BlobPart, filename: string) {
-  const blob = new Blob([data])
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-async function handleImportFile(file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/import-data`, formData, {
-      params: { sheet: SHEET_CODE },
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    const data = res.data?.data ?? res.data
-    ElMessage.success(`成功导入${data.imported_count}行数据`)
-    if (data.warning) ElMessage.warning(data.warning)
-  } catch (e: any) {
-    const errData = e?.response?.data?.data ?? e?.response?.data
-    if (e?.response?.status === 400 && errData?.invalid_columns?.length) {
-      ElMessage.error(`列名不匹配: ${errData.invalid_columns.join(', ')}`)
-    } else {
-      ElMessage.error('导入失败')
-    }
-  }
-}
+const wpIdRef = toRef(props, 'wpId')
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-6')
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -182,21 +116,10 @@ function isEmptyResults(results: string[]): boolean {
 
 <template>
   <div class="d1-tab-business-mode">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
-    </div>
-
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="ooSheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML mode -->
-    <template v-if="editorMode === 'html'">
+      <div class="tab-header">
+        <h4>业务模式分析 D1-6</h4>
+        <GtReviewTrigger section-id="D1-business-mode-header" />
+      </div>
       <!-- 审计目标 -->
       <el-alert
         type="info"
@@ -210,13 +133,12 @@ function isEmptyResults(results: string[]): boolean {
       <!-- Toolbar -->
       <div class="table-toolbar">
         <el-button-group size="small">
-          <el-button @click="exportTemplate">导出模板</el-button>
-          <el-button @click="exportData">导出数据</el-button>
+          <el-button @click="onExportTemplate">导出模板</el-button>
+          <el-button @click="onExportData">导出数据</el-button>
           <el-upload
             :show-file-list="false"
             accept=".xlsx"
-            :auto-upload="false"
-            :on-change="(f: any) => handleImportFile(f.raw)"
+            :before-upload="onImportFile"
             style="display:inline-block"
           >
             <el-button size="small">导入数据</el-button>
@@ -233,6 +155,7 @@ function isEmptyResults(results: string[]): boolean {
             <div class="combo-name-cell">
               <span v-if="row.isFixed" class="lock-icon" title="固定行，不可删除">🔒</span>
               <span class="combo-name-text">{{ row.combinationName }}</span>
+              <GtReviewDot row-prefix="D1-business-mode" :row-key="row.rowId" />
             </div>
           </template>
         </el-table-column>
@@ -428,13 +351,24 @@ function isEmptyResults(results: string[]): boolean {
         <summary>📋 编制提示</summary>
         <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
       </details>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .d1-tab-business-mode {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {

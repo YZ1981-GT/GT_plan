@@ -5,22 +5,25 @@
  * D2-9: 8列 + 合计 + 差异高亮
  * D2-10: 折现法 + 迁徙率矩阵
  */
-import { ref, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { useD2Ecl, type EclSingleRow, type MigrationRateRow, type EclDiscountRow } from '../composables/useD2Ecl'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import type { ImportableSheet } from '../composables/useD2ImportExport'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-}>()
+  /** D2-9 单项测算 | D2-10 计量测试；默认展示双 Tab */
+  eclFocus?: 'D2-9' | 'D2-10' | 'both'
+}>(), {
+  eclFocus: 'both',
+})
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -37,8 +40,21 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-ecl-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
-const activeTab = ref('single')
+const activeTab = ref(props.eclFocus === 'D2-10' ? 'measurement' : 'single')
+const showEclTabs = computed(() => props.eclFocus === 'both')
+
+/** D2-9/D2-10 均支持 xlsx 导入导出 */
+const eclImportSheet = computed((): ImportableSheet | null => {
+  if (props.eclFocus === 'D2-10') return 'D2-10'
+  if (props.eclFocus === 'D2-9') return 'D2-9'
+  return activeTab.value === 'single' ? 'D2-9' : 'D2-10'
+})
+
+const { onExportTemplate, onExportData, onImportFile, importExportEnabled } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  eclImportSheet,
+)
 
 const {
   singleRows,
@@ -70,22 +86,19 @@ function fmtPct(v: number): string {
 <template>
   <div class="d2-tab-ecl">
     <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
+      <div v-if="importExportEnabled" class="toolbar-left">
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
       </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
-      </div>
+      <div v-else class="toolbar-left" />
     </div>
 
-    <el-tabs v-model="activeTab">
+    <el-tabs v-model="activeTab" :class="{ 'single-mode': !showEclTabs }">
       <!-- D2-9 单项ECL -->
-      <el-tab-pane label="单项ECL (D2-9)" name="single">
+      <el-tab-pane v-if="eclFocus !== 'D2-10'" label="单项ECL (D2-9)" name="single">
         <div class="section-actions">
           <el-button size="small" type="primary" :disabled="isReadonly" @click="addSingleRow">添加债务人</el-button>
           <el-button size="small" :disabled="isReadonly" @click="importFromDetail">从D2-2导入单项计提</el-button>
@@ -96,6 +109,7 @@ function fmtPct(v: number): string {
             <template #default="{ row }">
               <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
               <span v-else>{{ row.debtorName }}</span>
+              <GtReviewDot row-prefix="D2-ecl" :row-key="row.rowId" />
             </template>
           </el-table-column>
           <el-table-column label="审定余额" width="120" align="right">
@@ -136,10 +150,16 @@ function fmtPct(v: number): string {
       </el-tab-pane>
 
       <!-- D2-10 计量测试 -->
-      <el-tab-pane label="计量测试 (D2-10)" name="measurement">
+      <el-tab-pane v-if="eclFocus !== 'D2-9'" label="计量测试 (D2-10)" name="measurement">
         <!-- 迁徙率变动警告 -->
         <el-alert v-if="migrationChangeWarning" type="warning" :closable="false" class="migration-alert">
-          {{ migrationChangeWarning }}
+          <span>{{ migrationChangeWarning }}</span>
+          <GtIndexChip
+            v-if="jumpToSection"
+            label="D2-8"
+            class="warn-chip"
+            @click="jumpToSection('坏账准备计提会计政策检查D2-8')"
+          />
         </el-alert>
 
         <!-- 折现法区域 -->
@@ -200,6 +220,7 @@ function fmtPct(v: number): string {
 
 <style scoped>
 .d2-tab-ecl { padding: 12px; }
+.d2-tab-ecl :deep(.single-mode > .el-tabs__header) { display: none; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .section-actions { margin-bottom: 10px; display: flex; gap: 8px; }
@@ -209,6 +230,7 @@ function fmtPct(v: number): string {
 }
 .total-label { font-weight: 700; }
 .migration-alert { margin-bottom: 12px; }
+.warn-chip { margin-left: 8px; vertical-align: middle; }
 .sub-section { margin-bottom: 20px; }
 .sub-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .sub-title { font-weight: 600; font-size: 14px; }

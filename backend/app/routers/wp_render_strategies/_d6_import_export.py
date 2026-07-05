@@ -37,7 +37,9 @@ router = APIRouter(tags=["d6-import-export"])
 
 _ROW_LIMIT = 500
 
-_SUPPORTED_SHEETS: set[str] = {"D6-2", "D6-3", "D6-5", "D6-8"}
+_SUPPORTED_SHEETS: set[str] = {
+    "D6-2", "D6-3", "D6-5", "D6-6-period", "D6-6-post", "D6-8", "D6-9-reversal", "D6-9-writeoff",
+}
 
 _SHEET_HEADERS: dict[str, list[str]] = {
     "D6-2": [
@@ -60,8 +62,28 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "坏账准备", "账面价值", "发生时间及账龄", "未结转原因",
         "至审计日结转金额", "处理计划", "索引号", "备注",
     ],
+    "D6-6-period": [
+        "客户名称", "日期", "凭证号", "业务内容", "对方科目", "对方明细",
+        "借方金额", "贷方金额", "支持性文件",
+        "核对内容1", "核对内容2", "核对内容3", "核对内容4", "核对内容5",
+        "索引号", "是否异常", "备注说明",
+    ],
+    "D6-6-post": [
+        "客户名称", "日期", "凭证号", "业务内容", "对方科目", "对方明细",
+        "贷方金额", "支持性文件",
+        "核对内容1", "核对内容2", "核对内容3", "核对内容4", "核对内容5",
+        "索引号", "是否异常", "备注说明",
+    ],
     "D6-8": [
         "债务人名称", "审定余额", "损失率", "应计提", "账面余额", "差异", "依据", "索引号",
+    ],
+    "D6-9-reversal": [
+        "客户名称", "转回原因", "收回方式", "原确定依据",
+        "转回金额", "转回前累计准备", "合理性分析", "索引号",
+    ],
+    "D6-9-writeoff": [
+        "客户名称", "核销金额", "核销原因", "核销程序",
+        "是否关联方", "合理性分析", "索引号", "备注",
     ],
 }
 
@@ -69,7 +91,11 @@ _SHEET_ITEM_ID: dict[str, str] = {
     "D6-2": "D6-2-rows",
     "D6-3": "D6-3-rows",
     "D6-5": "D6-5-rows",
+    "D6-6-period": "D6-6-block1-rows",
+    "D6-6-post": "D6-6-block2-rows",
     "D6-8": "D6-8-single-rows",
+    "D6-9-reversal": "D6-9-reversal-rows",
+    "D6-9-writeoff": "D6-9-writeoff-rows",
 }
 
 
@@ -444,6 +470,43 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_float(data.get("postSettlement")), _safe_str(data.get("plan")),
             _safe_str(data.get("indexRef")), _safe_str(data.get("remark")),
         ]
+    elif sheet == "D6-6-period":
+        return [
+            _safe_str(data.get("customerName")), _safe_str(data.get("date")),
+            _safe_str(data.get("voucherNo")), _safe_str(data.get("businessContent")),
+            _safe_str(data.get("counterAccount")), _safe_str(data.get("counterDetail")),
+            _safe_float(data.get("debitAmount")), _safe_float(data.get("creditAmount")),
+            _safe_str(data.get("supportDoc")),
+            _safe_str(data.get("check1")), _safe_str(data.get("check2")), _safe_str(data.get("check3")),
+            _safe_str(data.get("check4")), _safe_str(data.get("check5")),
+            _safe_str(data.get("indexRef")), _safe_str(data.get("isAbnormal")),
+            _safe_str(data.get("remark")),
+        ]
+    elif sheet == "D6-6-post":
+        return [
+            _safe_str(data.get("customerName")), _safe_str(data.get("date")),
+            _safe_str(data.get("voucherNo")), _safe_str(data.get("businessContent")),
+            _safe_str(data.get("counterAccount")), _safe_str(data.get("counterDetail")),
+            _safe_float(data.get("creditAmount")), _safe_str(data.get("supportDoc")),
+            _safe_str(data.get("check1")), _safe_str(data.get("check2")), _safe_str(data.get("check3")),
+            _safe_str(data.get("check4")), _safe_str(data.get("check5")),
+            _safe_str(data.get("indexRef")), _safe_str(data.get("isAbnormal")),
+            _safe_str(data.get("remark")),
+        ]
+    elif sheet == "D6-9-reversal":
+        return [
+            _safe_str(data.get("customerName")), _safe_str(data.get("reason")),
+            _safe_str(data.get("recoveryMethod")), _safe_str(data.get("originalBasis")),
+            _safe_float(data.get("reversalAmount")), _safe_float(data.get("priorProvisionAmount")),
+            _safe_str(data.get("reasonabilityAnalysis")), _safe_str(data.get("indexRef")),
+        ]
+    elif sheet == "D6-9-writeoff":
+        return [
+            _safe_str(data.get("customerName")), _safe_float(data.get("writeoffAmount")),
+            _safe_str(data.get("writeoffReason")), _safe_str(data.get("writeoffProcedure")),
+            _safe_str(data.get("isRelatedParty")), _safe_str(data.get("reasonabilityAnalysis")),
+            _safe_str(data.get("indexRef")), _safe_str(data.get("remark")),
+        ]
     else:  # D6-8
         return [
             _safe_str(data.get("debtorName")), _safe_float(data.get("auditedBalance")),
@@ -536,6 +599,71 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
             "unsettledReason": _safe_str(_col_val(row, actual_headers, "未结转原因")),
             "postSettlement": _safe_float(_col_val(row, actual_headers, "至审计日结转金额")),
             "plan": _safe_str(_col_val(row, actual_headers, "处理计划")),
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
+            "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+        }
+    elif sheet == "D6-6-period":
+        return {
+            "rowId": str(uuid4()),
+            "customerName": _safe_str(_col_val(row, actual_headers, "客户名称")),
+            "date": _safe_str(_col_val(row, actual_headers, "日期")),
+            "voucherNo": _safe_str(_col_val(row, actual_headers, "凭证号")),
+            "businessContent": _safe_str(_col_val(row, actual_headers, "业务内容")),
+            "counterAccount": _safe_str(_col_val(row, actual_headers, "对方科目")),
+            "counterDetail": _safe_str(_col_val(row, actual_headers, "对方明细")),
+            "debitAmount": _safe_float(_col_val(row, actual_headers, "借方金额")),
+            "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方金额")),
+            "supportDoc": _safe_str(_col_val(row, actual_headers, "支持性文件")),
+            "check1": _safe_str(_col_val(row, actual_headers, "核对内容1")),
+            "check2": _safe_str(_col_val(row, actual_headers, "核对内容2")),
+            "check3": _safe_str(_col_val(row, actual_headers, "核对内容3")),
+            "check4": _safe_str(_col_val(row, actual_headers, "核对内容4")),
+            "check5": _safe_str(_col_val(row, actual_headers, "核对内容5")),
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
+            "isAbnormal": _safe_str(_col_val(row, actual_headers, "是否异常")) or "否",
+            "remark": _safe_str(_col_val(row, actual_headers, "备注说明")),
+        }
+    elif sheet == "D6-6-post":
+        return {
+            "rowId": str(uuid4()),
+            "customerName": _safe_str(_col_val(row, actual_headers, "客户名称")),
+            "date": _safe_str(_col_val(row, actual_headers, "日期")),
+            "voucherNo": _safe_str(_col_val(row, actual_headers, "凭证号")),
+            "businessContent": _safe_str(_col_val(row, actual_headers, "业务内容")),
+            "counterAccount": _safe_str(_col_val(row, actual_headers, "对方科目")),
+            "counterDetail": _safe_str(_col_val(row, actual_headers, "对方明细")),
+            "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方金额")),
+            "supportDoc": _safe_str(_col_val(row, actual_headers, "支持性文件")),
+            "check1": _safe_str(_col_val(row, actual_headers, "核对内容1")),
+            "check2": _safe_str(_col_val(row, actual_headers, "核对内容2")),
+            "check3": _safe_str(_col_val(row, actual_headers, "核对内容3")),
+            "check4": _safe_str(_col_val(row, actual_headers, "核对内容4")),
+            "check5": _safe_str(_col_val(row, actual_headers, "核对内容5")),
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
+            "isAbnormal": _safe_str(_col_val(row, actual_headers, "是否异常")) or "否",
+            "remark": _safe_str(_col_val(row, actual_headers, "备注说明")),
+        }
+    elif sheet == "D6-9-reversal":
+        return {
+            "rowId": str(uuid4()),
+            "customerName": _safe_str(_col_val(row, actual_headers, "客户名称")),
+            "reason": _safe_str(_col_val(row, actual_headers, "转回原因")),
+            "recoveryMethod": _safe_str(_col_val(row, actual_headers, "收回方式")),
+            "originalBasis": _safe_str(_col_val(row, actual_headers, "原确定依据")),
+            "reversalAmount": _safe_float(_col_val(row, actual_headers, "转回金额")),
+            "priorProvisionAmount": _safe_float(_col_val(row, actual_headers, "转回前累计准备")),
+            "reasonabilityAnalysis": _safe_str(_col_val(row, actual_headers, "合理性分析")),
+            "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
+        }
+    elif sheet == "D6-9-writeoff":
+        return {
+            "rowId": str(uuid4()),
+            "customerName": _safe_str(_col_val(row, actual_headers, "客户名称")),
+            "writeoffAmount": _safe_float(_col_val(row, actual_headers, "核销金额")),
+            "writeoffReason": _safe_str(_col_val(row, actual_headers, "核销原因")),
+            "writeoffProcedure": _safe_str(_col_val(row, actual_headers, "核销程序")),
+            "isRelatedParty": _safe_str(_col_val(row, actual_headers, "是否关联方")) or "否",
+            "reasonabilityAnalysis": _safe_str(_col_val(row, actual_headers, "合理性分析")),
             "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
             "remark": _safe_str(_col_val(row, actual_headers, "备注")),
         }

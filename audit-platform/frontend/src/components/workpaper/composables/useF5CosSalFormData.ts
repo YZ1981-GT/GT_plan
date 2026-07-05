@@ -7,6 +7,10 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   const isLoading = ref(false)
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+  /** F5-7 成本倒轧 TB 自动取数（1401/1404/1405 期初期末，来自 render 策略） */
+  const rollforwardTb = ref<Record<string, number>>({})
+  /** F5-7 校验区审定营业成本回退值（来自 render 策略持久化读取） */
+  const adjudicatedCogs = ref<number>(0)
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const itemPrefix = 'F5-'
 
@@ -38,7 +42,18 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
           } as any)
           const data = res?.data ?? res
           for (const s of data?.sheets ?? data?.data?.sheets ?? []) {
-            sheetCache.value[s.sheet_name || s.name || 'default'] = s.html_data ?? s
+            const hd = s.html_data ?? s
+            sheetCache.value[s.sheet_name || s.name || 'default'] = hd
+            // render 策略在各 F5 sheet 的 html_data 中携带 rollforward_tb / adjudicated_cogs
+            if (hd && typeof hd === 'object') {
+              if (hd.rollforward_tb && typeof hd.rollforward_tb === 'object') {
+                rollforwardTb.value = hd.rollforward_tb
+              }
+              if (hd.adjudicated_cogs != null && hd.adjudicated_cogs !== '') {
+                const n = Number(hd.adjudicated_cogs)
+                if (Number.isFinite(n)) adjudicatedCogs.value = n
+              }
+            }
           }
         })(),
       ])
@@ -67,9 +82,25 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     }, 2000))
   }
 
+  /** 批量保存多个 item（一次 PUT 提交，用于导入/整表提交） */
+  async function saveBatch(items: Array<{ item_id: string } & Partial<ChecklistResponse>>) {
+    if (!items.length) return
+    for (const it of items) {
+      const existing = allResponses.value.get(it.item_id) || { item_id: it.item_id, conclusion: null, remark: null }
+      allResponses.value.set(it.item_id, { ...existing, ...it })
+    }
+    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
+      project_id: opts.projectId.value,
+      items: items.map((it) => {
+        const r = allResponses.value.get(it.item_id)!
+        return { item_id: it.item_id, conclusion: r.conclusion, remark: r.remark }
+      }),
+    })
+  }
+
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
   onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
 
-  return { isLoading, sheetCache, allResponses, loadAll, getSheet, saveImmediate, debouncedSave }
+  return { isLoading, sheetCache, allResponses, rollforwardTb, adjudicatedCogs, loadAll, getSheet, saveImmediate, debouncedSave, saveBatch }
 }

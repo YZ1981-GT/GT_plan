@@ -5,7 +5,9 @@
  */
 import { ref, inject, toRef, type Ref } from 'vue'
 import { useD2BadDebt, type BadDebtRow } from '../composables/useD2BadDebt'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 
 const props = defineProps<{
   wpId: string
@@ -14,11 +16,11 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-3',
+)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -35,7 +37,7 @@ function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   openReviewDialog(`D2-baddebt-${rowKey}-${field}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 const eclTestTotal = ref(0)
 
 const {
@@ -69,21 +71,24 @@ const sections: Array<{ category: Category; title: string; rows: Ref<BadDebtRow[
   <div class="d2-tab-bad-debt">
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
       </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
       </div>
     </div>
 
     <!-- ECL差异警告 -->
     <el-alert v-if="eclWarning" type="warning" :closable="false" class="ecl-alert">
-      {{ eclWarning }}
+      <span>{{ eclWarning }}</span>
+      <GtIndexChip
+        v-if="jumpToSection"
+        label="D2-9"
+        class="ecl-chip"
+        @click="jumpToSection('应收坏账准备测算D2-9')"
+      />
     </el-alert>
 
     <!-- 三分类区块 -->
@@ -110,6 +115,7 @@ const sections: Array<{ category: Category; title: string; rows: Ref<BadDebtRow[
               @change="(v: string) => updateCell(row.rowId, 'label', v as any)"
             />
             <span v-else :style="{ fontWeight: row.isFixed ? '600' : 'normal' }">{{ row.label }}</span>
+            <GtReviewDot row-prefix="D2-baddebt" :row-key="row.rowId" />
           </template>
         </el-table-column>
 
@@ -185,6 +191,7 @@ const sections: Array<{ category: Category; title: string; rows: Ref<BadDebtRow[
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .ecl-alert { margin-bottom: 12px; }
+.ecl-chip { margin-left: 8px; vertical-align: middle; }
 .section-block { margin-bottom: 16px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .section-title { font-weight: 600; font-size: 14px; }

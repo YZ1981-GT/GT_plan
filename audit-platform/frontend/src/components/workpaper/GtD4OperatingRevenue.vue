@@ -7,24 +7,40 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <div v-if="showModeToolbar" class="d4-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="renderMode === 'onlyoffice'"
+        :key="ooSheetName"
+        :wp-id="props.wpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="onOoFallback"
+      />
+
+      <template v-else>
       <!-- D4 主sheet (fallback) -->
       <D4TabIndex
-        v-if="currentSheet === 'D4'"
+        v-if="currentSheet === 'D4' || currentSheet === 'skip'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :all-responses="allResponses"
         :is-readonly="isReadonly"
         :ipo-group-visible="crossSheet.ipoGroupVisible.value"
         :has-export-business="crossSheet.hasExportBusiness.value"
+        :available-sheets="availableSheets"
       />
       <!-- 程序表 D4A -->
-      <GtAProgramConsole
+      <D4TabProcedure
         v-else-if="currentSheet === 'D4A' || currentSheet === '应收口径'"
         :wp-id="props.wpId"
-        sheet-name="D4A"
-        :schema="{ columns: [], rows: [] }"
-        :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
-        :readonly="isReadonly"
+        :project-id="props.projectId"
+        :html-data="props.htmlData"
+        :is-readonly="isReadonly"
       />
       <!-- D4-1 审定表 -->
       <D4TabAdjudication v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
@@ -91,7 +107,9 @@
         :is-readonly="isReadonly"
         :ipo-group-visible="crossSheet.ipoGroupVisible.value"
         :has-export-business="crossSheet.hasExportBusiness.value"
+        :available-sheets="availableSheets"
       />
+      </template>
     </template>
   </div>
 </template>
@@ -111,11 +129,18 @@
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
 import { useD4FormData } from './composables/useD4FormData'
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
+import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
+import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
+import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
 // Core
 import D4TabIndex from './d4/core/D4TabIndex.vue'
+import D4TabProcedure from './d4/core/D4TabProcedure.vue'
 const D4TabAdjudication = defineAsyncComponent(() => import('./d4/core/D4TabAdjudication.vue'))
 const D4TabRevenueDetail = defineAsyncComponent(() => import('./d4/core/D4TabRevenueDetail.vue'))
 const D4TabOtherRevenue = defineAsyncComponent(() => import('./d4/core/D4TabOtherRevenue.vue'))
@@ -169,9 +194,6 @@ const D4TabOtherContract = defineAsyncComponent(() => import('./d4/other/D4TabOt
 const D4TabOtherCheck = defineAsyncComponent(() => import('./d4/other/D4TabOtherCheck.vue'))
 const D4TabOtherCutoff = defineAsyncComponent(() => import('./d4/other/D4TabOtherCutoff.vue'))
 
-// Program console (shared)
-const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
-
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
 const props = defineProps<{
@@ -184,9 +206,10 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
+  (e: 'jump-to-section', sheetName: string): void
 }>()
 
 // ─── Composables ─────────────────────────────────────────────────────────────
@@ -216,23 +239,82 @@ const isLoading = ref(true)
  */
 const currentSheet = computed(() => {
   const name = props.sheetName || 'D4'
+  if (isSkipWorkpaperSheet(name)) return 'skip'
+  if (name.includes('访谈记录与核对')) return 'D4-31T'
   // 提取末尾的D4编码（D4/D4A/D4-1/D4-22A等格式）
   const match = name.match(/D4(?:-\d+)?[A-Z]?$|D4$|D0-5$/)
   if (match) return match[0]
   // 附注特殊匹配
   if (name.includes('上市')) return '附注上市'
-  if (name.includes('国企')) return '附注国企'
+  if (name.includes('国企') || name.includes('国有')) return '附注国企'
   return name
 })
 
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
+const availableSheets = computed(() =>
+  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
+)
 
-function openReviewDialog(sectionId: string): void {
-  // 复核对话全局注入（实际实现由 GtReviewDialog 提供）
-  console.log('[D4] openReviewDialog:', sectionId)
+const wpIdRefForReview = toRef(props, 'wpId')
+const projectIdRefForReview = toRef(props, 'projectId')
+useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
+
+const { getThreadDot, getRowDot } = useD4ReviewThreads(wpIdRefForReview)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
+
+useWorkpaperEntryInjections({
+  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
+  reloadFn: () => formData.loadAll(),
+})
+
+const KNOWN_HTML_SHEETS = new Set([
+  'D4', 'D4A', 'D4-1', 'D4-2', 'D4-3', 'D4-4', 'D4-5', 'D4-6', 'D4-7', 'D4-8', 'D4-9', 'D4-10', 'D4-11',
+  'D4-12', 'D4-13', 'D4-14', 'D4-15', 'D4-16', 'D4-17', 'D4-18', 'D4-19', 'D4-20', 'D4-21',
+  'D4-22A', 'D4-22', 'D4-23', 'D4-24', 'D4-25', 'D4-26', 'D4-27', 'D4-28', 'D4-29', 'D4-30', 'D4-31', 'D4-31T', 'D4-32',
+  'D4-33', 'D4-34', 'D4-35', 'D4-36', '附注上市', '附注国企',
+])
+
+const showModeToolbar = computed(() =>
+  currentSheet.value !== 'skip' && KNOWN_HTML_SHEETS.has(currentSheet.value),
+)
+
+const dualMode = useD4EntryDualMode({
+  wpId: toRef(props, 'wpId'),
+  currentSheet,
+  availableSheets,
+  reloadAllResponses: () => formData.loadAll(),
+})
+
+const ooSheetName = computed(() =>
+  dualMode.resolveOoSheetName() || props.sheetName || 'D4-1',
+)
+
+const renderMode = computed({
+  get: () => dualMode.mode.value,
+  set: (v: D4RenderMode) => { void dualMode.switchMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: 'HTML精美化', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
+
+function onOoFallback(): void {
+  void dualMode.switchMode('html')
 }
 
-provide('openReviewDialog', openReviewDialog)
+async function saveImmediateBatch(
+  items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
+): Promise<void> {
+  await formData.saveBatch(items.map(item => ({
+    itemId: item.item_id,
+    data: { conclusion: item.conclusion, remark: item.remark },
+  })))
+}
 
 
 
@@ -272,5 +354,12 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.d4-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 </style>

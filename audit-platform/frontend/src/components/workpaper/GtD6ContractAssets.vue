@@ -1,167 +1,187 @@
 <template>
   <div class="d6-contract-assets">
-    <!-- 加载状态 -->
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 程序表 D6A -->
-      <D6TabProcedure
-        v-if="currentSheet === 'D6A' || currentSheet === 'D6'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
+      <div v-if="showModeToolbar" class="d6-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="renderMode === 'onlyoffice'"
+        :key="ooSheetName"
+        :wp-id="props.wpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="onOoFallback"
       />
-      <!-- 审定表 D6-1 -->
-      <D6TabAdjudication
-        v-else-if="currentSheet === 'D6-1'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-        :cross-sheet="crossSheet"
-      />
-      <!-- 明细表 D6-2 -->
-      <D6TabDetail
-        v-else-if="currentSheet === 'D6-2'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-      />
-      <!-- 减值准备明细 D6-3 -->
-      <D6TabImpairmentDetail
-        v-else-if="currentSheet === 'D6-3'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-        :cross-sheet="crossSheet"
-      />
-      <!-- 调整分录 D6-4 -->
-      <D6TabAdjustment
-        v-else-if="currentSheet === 'D6-4'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-      />
-      <!-- 关联方检查 D6-5 -->
-      <D6TabRelatedParty
-        v-else-if="currentSheet === 'D6-5'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-      />
-      <!-- 检查表 D6-6 -->
-      <D6TabInspection
-        v-else-if="currentSheet === 'D6-6'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-      />
-      <!-- 减值政策 D6-7 -->
-      <D6TabPolicyCheck
-        v-else-if="currentSheet === 'D6-7'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-      />
-      <!-- 减值测算 D6-8 -->
-      <D6TabEclCalculation
-        v-else-if="currentSheet === 'D6-8'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-        :cross-sheet="crossSheet"
-      />
-      <!-- 转回核销 D6-9 -->
-      <D6TabWriteoffCheck
-        v-else-if="currentSheet === 'D6-9'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-      />
-      <!-- 附注披露（上市） -->
-      <D6TabDisclosure
-        v-else-if="currentSheet === '附注上市'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :debounced-save="debouncedSave"
-        :cross-sheet="crossSheet"
-        variant="listed"
-      />
-      <!-- 附注披露（国企） -->
-      <D6TabDisclosure
-        v-else-if="currentSheet === '附注国企'"
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :debounced-save="debouncedSave"
-        :cross-sheet="crossSheet"
-        variant="soe"
-      />
-      <!-- Fallback: 默认显示审定表 -->
-      <D6TabAdjudication
-        v-else
-        :wp-id="wpId"
-        :project-id="projectId"
-        :is-readonly="isReadonly"
-        :all-responses="allResponses"
-        :save-immediate="saveImmediate"
-        :debounced-save="debouncedSave"
-        :cross-sheet="crossSheet"
-      />
+
+      <template v-else>
+        <D6TabIndex
+          v-if="currentSheet === 'D6' || currentSheet === 'skip'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          :available-sheets="availableSheets"
+        />
+
+        <D6TabProcedure
+          v-else-if="currentSheet === 'D6A'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :html-data="props.htmlData"
+          :is-readonly="isReadonly"
+        />
+
+        <D6TabAdjudication
+          v-else-if="currentSheet === 'D6-1'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <D6TabDetail
+          v-else-if="currentSheet === 'D6-2'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <D6TabImpairmentDetail
+          v-else-if="currentSheet === 'D6-3'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <D6TabAdjustment
+          v-else-if="currentSheet === 'D6-4'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <D6TabRelatedParty
+          v-else-if="currentSheet === 'D6-5'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <D6TabInspection
+          v-else-if="currentSheet === 'D6-6'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <D6TabPolicyCheck
+          v-else-if="currentSheet === 'D6-7'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <D6TabEclCalculation
+          v-else-if="currentSheet === 'D6-8'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <D6TabWriteoffCheck
+          v-else-if="currentSheet === 'D6-9'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <D6TabDisclosure
+          v-else-if="currentSheet === '附注上市'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+          variant="listed"
+        />
+
+        <D6TabDisclosure
+          v-else-if="currentSheet === '附注国企'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :all-responses="allResponses"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+          variant="soe"
+        />
+
+        <D6TabIndex
+          v-else
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          :available-sheets="availableSheets"
+        />
+      </template>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * GtD6ContractAssets.vue — D6 合同资产底稿主入口
- *
- * 由外层 GtWpRenderer 的 sheet 目录行控制当前显示的 sheet。
- * 组件接收 sheetName prop，按 v-if 分发到对应子组件。
- * 不使用内部 el-tabs（GtWpRenderer 已提供 sheet 目录 tabs）。
- *
- * 科目：1402 合同资产（借方/资产类）
- * 核心公式：期末=期初+借方-贷方；净值=原值-坏账准备；应计提=余额×损失率
- * selfLoad: htmlData 为 null 时自行调 render-config
+ * GtD6ContractAssets.vue — D6 合同资产底稿主入口（比照 D5）
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
-import http from '@/utils/http'
+import { computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { useD6FormData } from './composables/useD6FormData'
+import { useD6CrossSheet } from './composables/useD6CrossSheet'
+import { useD6EntryDualMode, type D6RenderMode } from './composables/useD6EntryDualMode'
+import { resolveD6SheetCode } from './composables/useD6SheetRouting'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useD6ReviewThreads } from './composables/useD6ReviewThreads'
+import D6TabIndex from './d6/D6TabIndex.vue'
+import D6TabProcedure from './d6/D6TabProcedure.vue'
+import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
-// ─── Lazy Sub-Components ─────────────────────────────────────────────────────
-
-const D6TabProcedure = defineAsyncComponent(() => import('./d6/D6TabProcedure.vue'))
 const D6TabAdjudication = defineAsyncComponent(() => import('./d6/D6TabAdjudication.vue'))
 const D6TabDetail = defineAsyncComponent(() => import('./d6/D6TabDetail.vue'))
 const D6TabImpairmentDetail = defineAsyncComponent(() => import('./d6/D6TabImpairmentDetail.vue'))
@@ -173,8 +193,6 @@ const D6TabEclCalculation = defineAsyncComponent(() => import('./d6/D6TabEclCalc
 const D6TabWriteoffCheck = defineAsyncComponent(() => import('./d6/D6TabWriteoffCheck.vue'))
 const D6TabDisclosure = defineAsyncComponent(() => import('./d6/D6TabDisclosure.vue'))
 
-// ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -185,115 +203,94 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
+  (e: 'jump-to-section', sheetName: string): void
 }>()
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
 const isReadonly = computed(() => !!props.readonly)
-const wpId = computed(() => props.wpId)
-const projectId = computed(() => props.projectId)
-const isLoading = ref(false)
-const allResponses = ref<Map<string, any>>(new Map())
 
-/** 当前激活的 sheet（由外层 GtWpRenderer 通过 sheetName prop 控制）。
- * GtWpRenderer 传入完整 sheet_name（如"合同资产审定表D6-1"），
- * 需提取编码部分来匹配子组件。 */
-const currentSheet = computed(() => {
-  const name = props.sheetName || 'D6-1'
-  // 提取末尾 D6 编码（D6/D6A/D6-1~D6-9）
-  const match = name.match(/D6(?:A|-\d+)?$/)
-  if (match) return match[0]
-  // 附注特殊匹配
-  if (name.includes('上市')) return '附注上市'
-  if (name.includes('国企')) return '附注国企'
-  return name
+const {
+  allResponses,
+  isLoading,
+  loadAll,
+  saveImmediate,
+  debouncedSave,
+  saveBatch,
+} = useD6FormData({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  htmlData: toRef(props, 'htmlData'),
 })
 
-// ─── Cross-Sheet placeholder（后续 task 4 实现完整 useD6CrossSheet） ─────────
+const crossSheet = useD6CrossSheet({ allResponses })
 
-const crossSheet = computed(() => ({
-  originalValueAggregation: computed(() => ({})),
-  impairmentAggregation: computed(() => ({})),
-  blockTotals: computed(() => ({
-    block1: { subtotal: 0, deduction: 0, total: 0 },
-    block2: { subtotal: 0, deduction: 0, total: 0 },
-    block3: { subtotal: 0, deduction: 0, total: 0 },
-  })),
-  netValueRows: computed(() => []),
-  eclReferenceValues: computed(() => ({ single: 0, groups: {}, total: 0 })),
-  adjustmentTotals: computed(() => ({ ajeTotal: 0, rjeTotal: 0 })),
-  netValueValidation: computed(() => ({ isValid: true, diff: 0 })),
-}))
+const currentSheet = computed(() => resolveD6SheetCode(props.sheetName || 'D6'))
 
-// ─── Data Loading ────────────────────────────────────────────────────────────
+const availableSheets = computed(() =>
+  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
+)
 
-/** selfLoad: 当 htmlData prop 为 null（bundle 内嵌场景），自行调 render-config 加载数据 */
-async function loadAll() {
-  isLoading.value = true
-  try {
-    // 尝试从 htmlData 获取已有 responses
-    if (props.htmlData?.responses) {
-      const map = new Map<string, any>()
-      for (const r of props.htmlData.responses) {
-        map.set(r.item_id, r)
-      }
-      allResponses.value = map
-    } else {
-      // selfLoad: 调 render-config 获取数据
-      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'd6-contract-assets' },
-      })
-      const data = res.data?.data || res.data
-      if (data?.sheets?.[0]?.html_data?.responses) {
-        const map = new Map<string, any>()
-        for (const r of data.sheets[0].html_data.responses) {
-          map.set(r.item_id, r)
-        }
-        allResponses.value = map
-      }
-    }
-  } catch (err) {
-    console.error('[D6] loadAll failed:', err)
-  } finally {
-    isLoading.value = false
-  }
+const wpIdRefForReview = toRef(props, 'wpId')
+const projectIdRefForReview = toRef(props, 'projectId')
+useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
+
+const { getThreadDot, getRowDot } = useD6ReviewThreads(wpIdRefForReview)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
+
+useWorkpaperEntryInjections({
+  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
+  reloadFn: () => loadAll(),
+})
+
+const KNOWN_HTML_SHEETS = new Set([
+  'D6', 'D6A', 'D6-1', 'D6-2', 'D6-3', 'D6-4', 'D6-5', 'D6-6', 'D6-7', 'D6-8', 'D6-9',
+  '附注上市', '附注国企',
+])
+
+const showModeToolbar = computed(() =>
+  currentSheet.value !== 'skip' && KNOWN_HTML_SHEETS.has(currentSheet.value),
+)
+
+const dualMode = useD6EntryDualMode({
+  wpId: toRef(props, 'wpId'),
+  currentSheet,
+  availableSheets,
+  reloadAllResponses: () => loadAll(),
+})
+
+const ooSheetName = computed(() =>
+  dualMode.resolveOoSheetName() || props.sheetName || '底稿目录',
+)
+
+const renderMode = computed({
+  get: () => dualMode.mode.value,
+  set: (v: D6RenderMode) => { void dualMode.switchMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: 'HTML精美化', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
+
+function onOoFallback(): void {
+  void dualMode.switchMode('html')
 }
 
-/** 保存单条 response（立即） */
-async function saveImmediate(itemId: string, data: Partial<any>) {
-  try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses/${itemId}`, data)
-    // 更新本地 map
-    const existing = allResponses.value.get(itemId) || { item_id: itemId }
-    allResponses.value.set(itemId, { ...existing, ...data })
-  } catch (err) {
-    console.error('[D6] saveImmediate failed:', itemId, err)
-  }
+async function saveImmediateBatch(
+  items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
+): Promise<void> {
+  await saveBatch(items.map(item => ({
+    itemId: item.item_id,
+    data: { conclusion: item.conclusion, remark: item.remark },
+  })))
 }
-
-/** debounced 保存（2s 延迟） */
-let _saveTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
-function debouncedSave(itemId: string, data: Partial<any>) {
-  const existing = _saveTimers.get(itemId)
-  if (existing) clearTimeout(existing)
-  _saveTimers.set(itemId, setTimeout(() => {
-    saveImmediate(itemId, data)
-    _saveTimers.delete(itemId)
-  }, 2000))
-}
-
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
-
-function openReviewDialog(sectionId: string): void {
-  console.log('[D6] openReviewDialog:', sectionId)
-}
-
-provide('openReviewDialog', openReviewDialog)
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   await loadAll()
@@ -307,5 +304,12 @@ onMounted(async () => {
 
 .loading-container {
   padding: 24px;
+}
+
+.d6-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 </style>

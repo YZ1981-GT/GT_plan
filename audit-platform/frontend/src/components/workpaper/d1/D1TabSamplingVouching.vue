@@ -25,7 +25,7 @@
  *
  * Requirements: 10.1-10.4, 11.1-11.4, 12.1-12.6, 13.1-13.5, 14.1-14.5, 18.1-18.4, 18.7
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1SamplingVouching } from '../composables/useD1SamplingVouching'
 import {
@@ -38,8 +38,13 @@ import {
   type VouchingRow,
 } from '../composables/d1InspectionFormulas'
 import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useWorkpaperWideTable } from '../composables/useWorkpaperWideTable'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -62,25 +67,6 @@ const injectedDisplayPrefs = inject<{ fmtAmount: (v: number) => string }>('displ
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const isOOMode = computed(() => editorMode.value === 'oo')
-const ooSheetName = computed(() => props.sheetName || '应收票据检查表D1-13')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -123,6 +109,37 @@ const {
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+const columnCount = ref(12)
+const vouchingRowCount = computed(() => vouchingRows.value.length)
+const browseRows = computed(() => vouchingRows.value)
+const browseRowCount = computed(() => browseRows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('noteType', '票据类型', 130),
+  virtualTextCol('noteNo', '票据号码', 140),
+  virtualTextCol('drawer', '出票人', 100),
+  virtualTextCol('acceptor', '承兑人', 100),
+  virtualNumCol('amount', '金额', 110, injectedDisplayPrefs.fmtAmount),
+  virtualTextCol('maturityDate', '到期日', 120),
+  virtualTextCol('existenceCheck', '存在性验证', 120),
+  virtualTextCol('accuracyCheck', '准确性验证', 130),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  rowEventHandlers,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 1400,
+})
+
+const { tableMaxHeight } = useWorkpaperWideTable({ rowCount: vouchingRowCount, columnCount })
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -174,24 +191,10 @@ const GUIDANCE_TEXTS = [
 
 <template>
   <div class="d1-tab-sampling-vouching">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
-    </div>
-
-    <!-- OnlyOffice mode -->
-    <GtOnlyOfficeSheet
-      v-if="isOOMode"
-      :wp-id="wpId"
-      :sheet-name="ooSheetName"
-      :project-id="projectId"
-    />
-
-    <!-- HTML mode -->
-    <template v-if="!isOOMode">
+      <div class="tab-header">
+        <h4>抽样凭证 D1-13</h4>
+        <GtReviewTrigger section-id="D1-sampling-header" />
+      </div>
       <!-- 审计目标 -->
       <el-alert
         type="info"
@@ -345,12 +348,33 @@ const GUIDANCE_TEXTS = [
       </div>
 
       <!-- 凭证核对明细 el-table 12列 -->
+      <div v-if="useVirtualScroll" class="virtual-toolbar">
+        <el-alert type="info" :closable="false" class="virtual-hint">
+          行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+        </el-alert>
+        <el-button size="small" @click="toggleBrowseMode">
+          {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+        </el-button>
+      </div>
+      <el-table-v2
+        v-if="useVirtualScroll && browseMode"
+        :columns="virtualColumns"
+        :data="browseRows"
+        :width="tableWidth"
+        :height="tableHeight"
+        :row-height="36"
+        :header-height="40"
+        :row-event-handlers="rowEventHandlers"
+        fixed
+        class="virtual-table"
+      />
       <el-table
+        v-if="!useVirtualScroll || !browseMode"
         :data="vouchingRows"
         border
         size="small"
         :row-class-name="getVouchingRowClass"
-        max-height="500"
+        :max-height="tableMaxHeight"
         class="vouching-table"
         style="width: 100%"
       >
@@ -375,6 +399,7 @@ const GUIDANCE_TEXTS = [
             >
               <el-option v-for="o in NOTE_TYPE_OPTIONS" :key="o" :label="o" :value="o" />
             </el-select>
+            <GtReviewDot row-prefix="D1-sampling" :row-key="row.id" />
           </template>
         </el-table-column>
 
@@ -704,13 +729,24 @@ const GUIDANCE_TEXTS = [
         <summary>📋 编制提示</summary>
         <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
       </details>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .d1-tab-sampling-vouching {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {
@@ -804,6 +840,10 @@ const GUIDANCE_TEXTS = [
   margin-bottom: 12px;
   gap: 12px;
 }
+
+.virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.virtual-hint { margin-bottom: 0; flex: 1; }
+.virtual-table { margin-bottom: 8px; }
 
 /* ─── 凭证核对明细表 ─── */
 .vouching-table {

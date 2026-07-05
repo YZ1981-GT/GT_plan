@@ -19,7 +19,14 @@ export interface ProjectContext {
   applicable_standards?: string[]
   entity_name?: string
   audit_period_end?: string
+  bs_date?: string
   [key: string]: any
+}
+
+/** 动态行 JSON：优先 remark，兼容历史 conclusion */
+export function readRowJson(resp: ChecklistResponse | undefined): string | null {
+  if (!resp) return null
+  return resp.remark ?? resp.conclusion ?? null
 }
 
 export interface UseF3FormDataOptions {
@@ -33,6 +40,7 @@ export function useF3FormData(options: UseF3FormDataOptions) {
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const isLoading = ref(false)
   const projectContext = ref<ProjectContext>({})
+  const sheetCache = ref<Record<string, any>>({})
 
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const _pendingItems = new Set<string>()
@@ -68,6 +76,7 @@ export function useF3FormData(options: UseF3FormDataOptions) {
         applicable_standards: ctx.applicable_standards ?? [],
         entity_name: ctx.entity_name ?? undefined,
         audit_period_end: ctx.audit_period_end ?? undefined,
+        bs_date: ctx.bs_date ?? undefined,
         ...ctx,
       }
     } catch {
@@ -78,10 +87,15 @@ export function useF3FormData(options: UseF3FormDataOptions) {
   async function selfLoad(): Promise<void> {
     if (!wpId.value) return
     try {
-      await api.get(
+      const res = await api.get(
         `/api/workpapers/${wpId.value}/render-config?force_component_type=f3-notes-payable`,
         { _silent: true } as any,
       )
+      const data = res?.data ?? res
+      const sheets = data?.sheets ?? data?.data?.sheets ?? []
+      for (const s of sheets) {
+        sheetCache.value[s.sheet_name || s.name || 'default'] = s.html_data ?? s
+      }
     } catch {
       // selfLoad 失败不阻塞
     }
@@ -94,6 +108,10 @@ export function useF3FormData(options: UseF3FormDataOptions) {
     } finally {
       isLoading.value = false
     }
+  }
+
+  function getSheet(name: string) {
+    return sheetCache.value[name] ?? { rows: [] }
   }
 
   async function _doSave(items: ChecklistResponse[]): Promise<void> {
@@ -220,7 +238,9 @@ export function useF3FormData(options: UseF3FormDataOptions) {
     allResponses,
     isLoading,
     projectContext,
+    sheetCache,
     loadAll,
+    getSheet,
     saveImmediate,
     saveBatch,
     saveItemsFromEvent,

@@ -1,11 +1,5 @@
 <template>
 <div class="d7-disclosure">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- 上市/国企版切换 -->
     <div class="variant-toolbar">
       <el-segmented v-model="activeVariant" :options="variantOptions" size="small" />
@@ -122,11 +116,6 @@
         </div>
       </div>
     </template>
-  </template>
-
-  <div v-else class="oo-mode-placeholder">
-    <el-empty description="OnlyOffice 在线编辑模式（待OO服务就绪后启用）" />
-  </div>
 </div>
 </template>
 
@@ -137,7 +126,7 @@
  * Task: 23.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6, 19.5, 20.1
  */
-import { ref, computed, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { useD7Disclosure, type DisclosureSection, type DisclosureRow } from '../composables/useD7Disclosure'
 import type { ChecklistResponse } from '../composables/useD7FormData'
@@ -155,12 +144,6 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useD7CrossSheet>
   variant?: 'listed' | 'soe'
 }>()
-
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
 
 const variantOptions = [
   { label: '上市公司版', value: 'listed' },
@@ -228,9 +211,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .d7-disclosure { padding: 16px; }
-.mode-toolbar { margin-bottom: 12px; }
 .variant-toolbar { margin-bottom: 16px; }
-.oo-mode-placeholder { padding: 40px 0; }
 
 .disclosure-card {
   margin-bottom: 20px;

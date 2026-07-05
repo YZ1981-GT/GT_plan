@@ -6,7 +6,7 @@
 - POST /api/workpapers/{wp_id}/d5/import-data?sheet={sheet_code}      解析xlsx写入
 - POST /api/workpapers/{wp_id}/d5/import-aux-balance                  从辅助余额表导入
 
-支持sheets: D5-2, D5-4
+支持sheets: D5-1, D5-2, D5-3, D5-4
 """
 
 from __future__ import annotations
@@ -36,9 +36,34 @@ router = APIRouter(tags=["d5-import-export"])
 
 _ROW_LIMIT = 500
 
-_SUPPORTED_SHEETS: set[str] = {"D5-2", "D5-4"}
+_SUPPORTED_SHEETS: set[str] = {"D5-1", "D5-2", "D5-3", "D5-4"}
+
+_D5_1_ROWS: list[tuple[str, str]] = [
+    ("notes-receivable", "应收票据"),
+    ("accounts-receivable", "应收账款"),
+    ("oci-change", "减：其他综合收益-公允价值变动"),
+    ("trial-balance", "试算平衡表数"),
+]
+
+_D5_1_FIELDS: list[tuple[str, str, bool]] = [
+    ("priorUnadjusted", "期初未审", False),
+    ("priorAje", "期初AJE", False),
+    ("priorRje", "期初RJE", False),
+    ("currentUnadjusted", "期末未审", False),
+    ("currentAje", "期末AJE", False),
+    ("currentRje", "期末RJE", False),
+]
 
 _SHEET_HEADERS: dict[str, list[str]] = {
+    "D5-1": [
+        "行键", "项目",
+        "期初未审", "期初AJE", "期初RJE",
+        "期末未审", "期末AJE", "期末RJE",
+    ],
+    "D5-3": [
+        "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
+        "借方调整金额", "贷方调整金额", "索引", "备注",
+    ],
     "D5-2": [
         "类别", "明细项目", "期初未审", "期初AJE", "期初RJE", "期初审定",
         "OCI减值", "本期增加", "本期减少", "期末余额", "重分类",
@@ -50,9 +75,10 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
 }
 
-# item_id 映射
+# item_id 映射（JSON 数组类 sheet）
 _SHEET_ITEM_ID: dict[str, str] = {
     "D5-2": "D5-2-rows",
+    "D5-3": "D5-3-rows",
     "D5-4": "D5-4-rows",
 }
 
@@ -93,6 +119,10 @@ async def d5_export_template(
     for col_idx in range(1, len(headers) + 1):
         ws.column_dimensions[chr(64 + min(col_idx, 26))].width = 16
 
+    if sheet == "D5-1":
+        for row_key, label in _D5_1_ROWS:
+            ws.append([row_key, label, *[None] * (len(headers) - 2)])
+
     # 添加编制说明 sheet
     if include_guidance:
         guidance = _get_d5_guidance_text(sheet)
@@ -131,6 +161,9 @@ async def d5_export_data(
 
     import sqlalchemy as sa
 
+    if sheet == "D5-1":
+        return await _stream_d5_1_export(wp_id, db, headers, sheet)
+
     item_id = _SHEET_ITEM_ID[sheet]
     result = await db.execute(
         sa.text(
@@ -156,6 +189,8 @@ async def d5_export_data(
     for data_row in rows_data:
         if sheet == "D5-2":
             row_values = _export_d5_2_row(data_row)
+        elif sheet == "D5-3":
+            row_values = _export_d5_3_row(data_row)
         else:  # D5-4
             row_values = _export_d5_4_row(data_row)
         ws.append(row_values)
@@ -229,8 +264,16 @@ async def d5_import_data(
             truncated = True
             break
 
+        if sheet == "D5-1":
+            row_dict = _parse_d5_1_row(row, actual_headers)
+            if row_dict:
+                rows_data.append(row_dict)
+            continue
+
         if sheet == "D5-2":
             row_dict = _parse_d5_2_row(row, actual_headers)
+        elif sheet == "D5-3":
+            row_dict = _parse_d5_3_row(row, actual_headers)
         else:
             row_dict = _parse_d5_4_row(row, actual_headers)
 
@@ -240,6 +283,15 @@ async def d5_import_data(
 
     # 写入 checklist_responses
     import sqlalchemy as sa
+
+    if sheet == "D5-1":
+        field_count = await _persist_d5_1_rows(wp_id, rows_data, db)
+        await db.commit()
+        result_data: dict[str, Any] = {"ok": True, "imported_count": len(rows_data), "field_count": field_count, "errors": []}
+        if truncated:
+            result_data["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
+            result_data["truncated"] = True
+        return result_data
 
     item_id = _SHEET_ITEM_ID[sheet]
     remark_json = json.dumps(rows_data, ensure_ascii=False)
@@ -505,6 +557,140 @@ def _parse_d5_4_row(row: tuple, actual_headers: list[str]) -> dict:
         "fvHierarchy": _safe_str(_col_val(row, actual_headers, "层次")) or "第二层次",
         "remark": _safe_str(_col_val(row, actual_headers, "备注")),
     }
+
+
+def _parse_d5_3_row(row: tuple, actual_headers: list[str]) -> dict:
+    return {
+        "rowId": str(uuid4()),
+        "description": _safe_str(_col_val(row, actual_headers, "调整事项说明")),
+        "category": _safe_str(_col_val(row, actual_headers, "类别")) or "账项调整",
+        "reportItem": _safe_str(_col_val(row, actual_headers, "报表项目")),
+        "accountName": _safe_str(_col_val(row, actual_headers, "科目名称")),
+        "noteItem": _safe_str(_col_val(row, actual_headers, "附注项目")),
+        "placeholder": "",
+        "debitAmount": _safe_float(_col_val(row, actual_headers, "借方调整金额")),
+        "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方调整金额")),
+        "indexRef": _safe_str(_col_val(row, actual_headers, "索引")),
+        "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+    }
+
+
+def _export_d5_3_row(data: dict) -> list:
+    return [
+        _safe_str(data.get("description")),
+        _safe_str(data.get("category")),
+        _safe_str(data.get("reportItem")),
+        _safe_str(data.get("accountName")),
+        _safe_str(data.get("noteItem")),
+        _safe_float(data.get("debitAmount")),
+        _safe_float(data.get("creditAmount")),
+        _safe_str(data.get("indexRef")),
+        _safe_str(data.get("remark")),
+    ]
+
+
+async def _fetch_d5_response_map(wp_id: str, db: AsyncSession, prefix: str) -> dict[str, str]:
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.text(
+            "SELECT item_id, remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix"
+        ),
+        {"wp_id": wp_id, "prefix": f"{prefix}%"},
+    )
+    return {row.item_id: (row.remark or "") for row in result.fetchall()}
+
+
+async def _upsert_d5_response(db: AsyncSession, wp_id: str, item_id: str, remark: str) -> None:
+    import sqlalchemy as sa
+
+    await db.execute(
+        sa.text("""
+            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            ON CONFLICT (wp_id, item_id)
+            DO UPDATE SET remark = :remark, updated_at = NOW()
+        """),
+        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark},
+    )
+
+
+async def _stream_d5_1_export(
+    wp_id: str,
+    db: AsyncSession,
+    headers: list[str],
+    sheet: str,
+) -> StreamingResponse:
+    responses = await _fetch_d5_response_map(wp_id, db, "D5-1-adj-")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.append(headers)
+    ws.freeze_panes = "A2"
+
+    for row_key, label in _D5_1_ROWS:
+        row_values = [row_key, label]
+        for field_key, _header, is_text in _D5_1_FIELDS:
+            item_id = f"D5-1-adj-{row_key}-{field_key}"
+            raw = responses.get(item_id, "")
+            if is_text:
+                row_values.append(raw)
+            else:
+                row_values.append(_safe_float(raw) if raw else 0.0)
+        ws.append(row_values)
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    from urllib.parse import quote
+    encoded_filename = quote(f"{sheet}_数据.xlsx")
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+    )
+
+
+def _parse_d5_1_row(row: tuple, actual_headers: list[str]) -> dict | None:
+    row_key = _safe_str(_col_val(row, actual_headers, "行键"))
+    label = _safe_str(_col_val(row, actual_headers, "项目"))
+    if not row_key and not label:
+        return None
+    if row_key in ("subtotal", "fv-total", "difference"):
+        return None
+    if not row_key:
+        for rk, lbl in _D5_1_ROWS:
+            if lbl == label:
+                row_key = rk
+                break
+    if row_key not in {rk for rk, _ in _D5_1_ROWS}:
+        return None
+
+    parsed: dict[str, Any] = {"rowKey": row_key, "label": label}
+    for field_key, header, is_text in _D5_1_FIELDS:
+        val = _col_val(row, actual_headers, header)
+        parsed[field_key] = _safe_str(val) if is_text else _safe_float(val)
+    return parsed
+
+
+async def _persist_d5_1_rows(wp_id: str, rows_data: list[dict], db: AsyncSession) -> int:
+    field_count = 0
+    for row in rows_data:
+        row_key = row.get("rowKey", "")
+        if not row_key:
+            continue
+        for field_key, _header, is_text in _D5_1_FIELDS:
+            val = row.get(field_key)
+            if val is None or (not is_text and val == ""):
+                continue
+            item_id = f"D5-1-adj-{row_key}-{field_key}"
+            remark = str(val) if is_text else str(_safe_float(val))
+            await _upsert_d5_response(db, wp_id, item_id, remark)
+            field_count += 1
+    return field_count
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

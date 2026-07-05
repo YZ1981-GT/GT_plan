@@ -57,19 +57,20 @@ G14信用减值损失底稿专属HTML精美组件构建。将现有通用渲染�
 #### Acceptance Criteria
 
 2.1 THE G14A SHALL 复用a-program-console（22行×10列+抽凭+截止）
-2.2 THE G14-1审定表 SHALL 36行×11列：项目|本期(未审|调整|审定)|上期(未审|调整|审定)|变动额|变动率|原因分析|索引
-2.3 THE G14-1 SHALL 按减值来源科目分组：
-   - 应收账款信用减值损失
-   - 其他应收款信用减值损失
-   - 应收票据信用减值损失
-   - 应收款项融资信用减值损失
-   - 债权投资信用减值损失
-   - 其他债权投资信用减值损失
-   - 长期应收款信用减值损失
-   - 应收利息信用减值损失
+2.2 THE G14-1审定表 SHALL 36行×11列（xlsx实读）：项目|本期(未审|调整|审定)|上期(未审|调整|审定)|变动额|变动率|原因分析
+2.3 THE G14-1 SHALL 固定9类减值来源行（与G14-2一一对应）+合计+试算平衡表数+差异数：
+   - 应收票据坏账损失
+   - 应收账款坏账损失
+   - 应收款项融资坏账损失
+   - 其他应收款坏账损失
+   - 债权投资减值损失
+   - 其他债权投资减值损失
+   - 长期应收款坏账损失
+   - 财务担保预计损失
+   - 其他
    - 合计
-2.4 THE G14-1 SHALL 损益类公式（借方费用类：审定=未审+调整）+trial_balance取数(6702)+EventBus发布(accountCode='6702')
-2.5 WHEN |变动率|>20% SHALL 橙色高亮+原因分析必填
+2.4 THE G14-1本期数 SHALL 自G14-2明细同步（未审/调整/审定）；上期数独立录入；损益类公式（审定=未审+调整）+trial_balance取数(6702)+EventBus发布(accountCode='6702')
+2.5 WHEN |变动率|>30% SHALL 橙色高亮+原因分析必填（与模板编制说明一致）
 2.6 THE 附注(上市18行×5列/国企15行×7列) SHALL EventBus联动+AI辅助
 
 ### Requirement 3: 明细表G14-2
@@ -78,13 +79,13 @@ G14信用减值损失底稿专属HTML精美组件构建。将现有通用渲染�
 
 #### Acceptance Criteria
 
-3.1 THE G14-2 SHALL 36行×13列：来源科目|来源科目代码|被评估资产|计提方式(组合/单项)|期初坏账准备|本期计提|本期转回|本期核销|期末坏账准备|本期信用减值损失(公式)|上期信用减值损失|源科目索引|交叉验证结论(下拉)
-3.2 THE Formula_Engine SHALL 计算本期信用减值损失 = 本期计提 - 本期转回（即净计提额）
-3.3 THE Formula_Engine SHALL 验证：期末坏账准备 = 期初 + 本期计提 - 本期转回 - 本期核销
-3.4 WHEN 坏账准备滚动不平衡时（|期初+计提-转回-核销-期末| > 0.01）, THE 系统 SHALL 红色高亮
-3.5 THE G14-2 SHALL 按来源科目分组小计+总计
-3.6 THE G14-2 SHALL 总计信用减值损失应与G14-1审定表合计一致，不一致时红色提示
-3.7 THE G14-2 SHALL 支持动态行增删+导入导出
+3.1 THE G14-2 SHALL 36行×13列（xlsx实读）：项目|本期(未审|调整|审定)|对应科目|对应科目-减值准备(期初|计提|转回|转销|期末|计入损益)|核对|索引号
+3.2 THE Formula_Engine SHALL 计入损益 = 本期计提 + 本期转回（转回常以负数录入，等价于计提-转回）
+3.3 THE Formula_Engine SHALL 验证：期末 = 期初 + 计提 - 转回 - 转销；核对列验证审定数=计入损益
+3.4 WHEN 坏账准备滚动不平衡时（|期初+计提-转回-转销-期末| > 0.01）, THE 系统 SHALL 红色高亮期末余额
+3.5 THE G14-2 SHALL 固定9类行+合计（与G14-1行项目一致）
+3.6 THE G14-2合计审定数 SHALL 与G14-1合计一致（经同步）；计入损益合计不一致时红色提示
+3.7 THE G14-2 SHALL 支持导入导出（固定行结构，无动态增删）
 
 ### Requirement 4: 调整分录G14-3 + 公式引擎+联动+UI
 
@@ -92,8 +93,8 @@ G14信用减值损失底稿专属HTML精美组件构建。将现有通用渲染�
 
 #### Acceptance Criteria
 
-4.1 THE G14-3 SHALL 24行×10列标准AJE/RJE+借贷平衡+回写审定表+动态行增删+导入导出
-4.2 THE Formula_Engine SHALL：calcAdjustedAmount / calcNetImpairmentLoss / calcProvisionRollForward / calcChangeRate / isDebitCreditBalanced / parseNum（6个纯函数）
+4.1 THE G14-3 SHALL 22行×10列调整事项汇总表（与D3调整分录模块同构）：调整事项说明|类别|报表项目|科目名称|附注项目|借方调整金额|贷方调整金额|索引|备注+借贷平衡+同步至G14-2明细
+4.2 THE Formula_Engine SHALL：calcAdjustedAmount / calcNetImpairmentLoss / calcProvisionRollForward / calcChangeRate / isDebitCreditBalanced / calcVariance / parseNum（7个纯函数）
 4.3 THE calcNetImpairmentLoss(provision, reversal) SHALL 返回 provision - reversal（净计提=计提-转回）
 4.4 THE calcProvisionRollForward(opening, provision, reversal, writeoff) SHALL 返回 opening + provision - reversal - writeoff（坏账准备滚动）
 4.5 THE 5大集成 SHALL（版本链/抽凭/截止/附注EventBus/复核，无OCR因无凭证检查表）

@@ -6,7 +6,12 @@
  */
 import { inject, toRef, computed, type Ref } from 'vue'
 import { useD2VoucherCheck } from '../composables/useD2VoucherCheck'
+import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
 import type { VoucherSampleRow } from '../composables/useD2VoucherCheck'
@@ -19,11 +24,11 @@ const props = defineProps<{
   bsDate: string
 }>()
 
-const emit = defineEmits<{
-  (e: 'export-template'): void
-  (e: 'export-data'): void
-  (e: 'import-data'): void
-}>()
+const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
+  toRef(props, 'wpId') as Ref<string>,
+  toRef(props, 'projectId') as Ref<string>,
+  'D2-7',
+)
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -45,7 +50,6 @@ function handleContextMenuReview(row: any): void {
   openReviewDialog(`D2-voucher-abnormal-${row?.seq ?? 'unknown'}`)
 }
 
-const viewMode = defineModel<'structured' | 'online'>('viewMode', { default: 'structured' })
 
 const {
   params,
@@ -65,6 +69,38 @@ const {
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   bsDate: toRef(props, 'bsDate') as Ref<string>,
+})
+
+const browseRows = computed(() =>
+  samples.value.map(r => ({
+    voucherNo: r.voucherNo,
+    voucherDate: r.voucherDate,
+    amount: r.amount,
+    counterparty: r.counterparty,
+    abstract: r.abstract,
+  })),
+)
+
+const browseRowCount = computed(() => browseRows.value.length)
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('voucherNo', '凭证号', 100),
+  virtualTextCol('voucherDate', '凭证日期', 100),
+  virtualNumCol('amount', '金额', 110, (v) => displayPrefs.fmtAmount(Number(v) || 0)),
+  virtualTextCol('counterparty', '交易对手', 120),
+  virtualTextCol('abstract', '摘要', 160),
+])
+
+const {
+  browseMode,
+  useVirtualScroll,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 900,
 })
 
 // ─── 年度计算（从bsDate提取，如 "2025-12-31" → 2025）─────────────────────────
@@ -166,17 +202,13 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
   <div class="d2-tab-voucher">
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" @click="emit('export-template')">导出模板</el-button>
-        <el-button size="small" @click="emit('export-data')">导出数据</el-button>
-        <el-button size="small" @click="emit('import-data')">导入数据</el-button>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample">添加样本</el-button>
         <el-button size="small" :disabled="isReadonly" @click="autoMarkAllCutoff">自动标记跨期</el-button>
-      </div>
-      <div class="toolbar-right">
-        <el-segmented v-model="viewMode" :options="[
-          { label: '结构化视图', value: 'structured' },
-          { label: '在线编辑', value: 'online' },
-        ]" size="small" />
       </div>
     </div>
 
@@ -221,9 +253,33 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
       <el-progress :percentage="Math.min(progress.ratio * 100, 100)" :stroke-width="8" style="flex:1; margin-left: 12px" />
     </div>
 
+    <div v-if="useVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
+      </el-alert>
+      <el-button size="small" @click="toggleBrowseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
+    <el-table-v2
+      v-if="useVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="browseRows"
+      :width="tableWidth"
+      :height="tableHeight"
+      :row-height="36"
+      :header-height="40"
+      fixed
+      class="virtual-table"
+    />
+
     <!-- 凭证明细表 -->
-    <el-table :data="samples" border size="small" :max-height="450" style="width: 100%">
-      <el-table-column type="index" label="序号" width="55" />
+    <el-table v-if="!useVirtualScroll || !browseMode" :data="samples" border size="small" :max-height="450" style="width: 100%">
+      <el-table-column label="序号" width="55">
+        <template #default="{ $index, row }">
+          {{ $index + 1 }}<GtReviewDot row-prefix="D2-voucher" :row-key="String(row.rowId || row.seq)" />
+        </template>
+      </el-table-column>
       <el-table-column label="凭证号" width="100">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCell(row.rowId, 'voucherNo', v)" />
@@ -289,6 +345,9 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
 .params-card { margin-bottom: 12px; }
 .sampling-engine-collapse { margin-bottom: 12px; }
 .progress-bar { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; }
+.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.virtual-hint { flex: 1; min-width: 200px; margin: 0; }
+.virtual-table { margin-bottom: 12px; }
 .summary-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 10px;
   background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px;

@@ -21,6 +21,7 @@ import http from '@/utils/http'
 
 /** 支持导入导出的D4 Sheet */
 export type D4ImportableSheet =
+  | 'D4-1'
   | 'D4-2'
   | 'D4-3'
   | 'D4-6'

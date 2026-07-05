@@ -16,7 +16,7 @@
  * Requirements: 1.1-1.5, 2.1-2.6, 3.1-3.4, 4.1-4.5, 5.1-5.6, 6.1-6.4,
  *              7.1-7.5, 8.1-8.6, 9.1, 9.4, 12.1-12.7
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useD1WriteoffCheck,
@@ -27,8 +27,10 @@ import {
 } from '../composables/useD1WriteoffCheck'
 import { formatNegativeAmount } from '../composables/d1InspectionFormulas'
 import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -51,25 +53,6 @@ const injectedDisplayPrefs = inject<{ fmtAmount: (v: number) => string }>('displ
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const isOOMode = computed(() => editorMode.value === 'oo')
-const ooSheetName = computed(() => props.sheetName || '坏账准备转回核销检查D1-16')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -168,16 +151,10 @@ async function onSyncWriteoffToD14() {
 
 // ─── P1: AI辅助生成 ─────────────────────────────────────────────────────────
 
+const wpIdRef = toRef(props, 'wpId')
+const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
 const aiLoadingNote = ref(false)
 const aiLoadingConclusion = ref(false)
-const aiAvailable = ref(true)
-
-onMounted(async () => {
-  // AI 可用性检测（复用a171端点存在性即可，不额外检查LLM）
-  try {
-    await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-  } catch { /* AI可用性不影响主流程 */ }
-})
 
 function buildWriteoffContext(): string {
   const lines: string[] = []
@@ -202,57 +179,35 @@ function buildWriteoffContext(): string {
 async function generateAuditNoteWithAI() {
   aiLoadingNote.value = true
   try {
-    const context = buildWriteoffContext()
-    const res = await http.post(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
-      chapter: 16,
-      chapter_title: 'D1-16 坏账准备转回/核销检查表-审计说明',
-      guidance: '根据转回和核销检查数据，生成审计说明。包括：转回/核销笔数和金额、与D1-4核对结果、是否存在异常（转回超原计提、核销超计提）、需关注事项。',
-      existing_content: context,
-      knowledge_doc_ids: [],
-    }, { _silent: true } as any)
-
-    const text = res.data?.data?.content ?? res.data?.content ?? ''
-    if (!text) { ElMessage.warning('AI未生成内容'); return }
-
-    await ElMessageBox.confirm(
-      `AI生成的内容：\n\n${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`,
-      'AI辅助生成',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    const text = await generateAndConfirm(
+      'writeoff-audit-note',
+      buildWriteoffContext(),
+      {
+        guidance: '根据转回和核销检查数据，生成审计说明。包括：转回/核销笔数和金额、与D1-4核对结果、是否存在异常（转回超原计提、核销超计提）、需关注事项。',
+      },
+      'AI · 审计说明',
     )
-    saveAuditNote(text)
-  } catch (err: any) {
-    if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.warning('AI生成失败，请检查LLM服务是否可用')
-    }
-  } finally { aiLoadingNote.value = false }
+    if (text) saveAuditNote(text)
+  } finally {
+    aiLoadingNote.value = false
+  }
 }
 
 async function generateAuditConclusionWithAI() {
   aiLoadingConclusion.value = true
   try {
-    const context = buildWriteoffContext() + `\n【审计说明】${auditNote.value || '（未填写）'}`
-    const res = await http.post(`/api/workpapers/${props.wpId}/a171/ai-generate`, {
-      chapter: 16,
-      chapter_title: 'D1-16 坏账准备转回/核销检查表-审计结论',
-      guidance: '根据审计说明和校验结果，生成审计结论。结论应明确表述：转回是否合理/核销程序是否完整/与D1-4是否一致/是否需要调整。',
-      existing_content: context,
-      knowledge_doc_ids: [],
-    }, { _silent: true } as any)
-
-    const text = res.data?.data?.content ?? res.data?.content ?? ''
-    if (!text) { ElMessage.warning('AI未生成内容'); return }
-
-    await ElMessageBox.confirm(
-      `AI生成的内容：\n\n${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`,
-      'AI辅助生成',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    const text = await generateAndConfirm(
+      'writeoff-audit-conclusion',
+      buildWriteoffContext() + `\n【审计说明】${auditNote.value || '（未填写）'}`,
+      {
+        guidance: '根据审计说明和校验结果，生成审计结论。结论应明确表述：转回是否合理/核销程序是否完整/与D1-4是否一致/是否需要调整。',
+      },
+      'AI · 审计结论',
     )
-    saveAuditConclusion(text)
-  } catch (err: any) {
-    if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.warning('AI生成失败，请检查LLM服务是否可用')
-    }
-  } finally { aiLoadingConclusion.value = false }
+    if (text) saveAuditConclusion(text)
+  } finally {
+    aiLoadingConclusion.value = false
+  }
 }
 
 // ─── 编制提示 ────────────────────────────────────────────────────────────────────
@@ -268,27 +223,14 @@ const GUIDANCE_TEXTS = [
 
 <template>
   <div class="d1-tab-writeoff-check">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
-    </div>
-
     <!-- Loading skeleton -->
     <el-skeleton v-if="isLoading" :rows="8" animated />
 
-    <!-- OnlyOffice mode -->
-    <GtOnlyOfficeSheet
-      v-if="isOOMode"
-      :wp-id="wpId"
-      :sheet-name="ooSheetName"
-      :project-id="projectId"
-    />
-
-    <!-- HTML Structured mode -->
-    <template v-if="!isOOMode && !isLoading">
+    <template v-if="!isLoading">
+      <div class="tab-header">
+        <h4>转回核销检查 D1-16</h4>
+        <GtReviewTrigger section-id="D1-writeoff-header" />
+      </div>
       <!-- ═══════════════════════════════════════════════════════════════════ -->
       <!-- Section 1: 转回检查 -->
       <!-- ═══════════════════════════════════════════════════════════════════ -->
@@ -317,6 +259,7 @@ const GUIDANCE_TEXTS = [
                 :disabled="isReadonly"
                 @change="(v: string) => updateReversalRow(row.id, 'unitName', v || '')"
               />
+              <GtReviewDot row-prefix="D1-writeoff" :row-key="row.id" />
             </template>
           </el-table-column>
 
@@ -565,6 +508,7 @@ const GUIDANCE_TEXTS = [
                 :disabled="isReadonly"
                 @change="(v: string) => updateWriteoffRow(row.id, 'unitName', v || '')"
               />
+              <GtReviewDot row-prefix="D1-writeoff" :row-key="row.id" />
             </template>
           </el-table-column>
 
@@ -793,6 +737,18 @@ const GUIDANCE_TEXTS = [
 <style scoped>
 .d1-tab-writeoff-check {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {

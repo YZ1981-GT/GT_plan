@@ -392,3 +392,209 @@ def test_d1_9_validate_columns_detects_missing(extra_cols: list[str]) -> None:
     assert missing, "应检测到缺失列"
     for col in removed:
         assert col in missing, f"Expected '{col}' to be detected as missing"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D1-13 抽样凭证核对 — 多section Round-Trip
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from app.routers.wp_render_strategies._d1_import_export import (  # noqa: E402
+    _export_d1_13_row,
+    _export_d1_13_population_row,
+    _export_d1_13_specific_row,
+    _parse_d1_13_row,
+    _parse_d1_13_population_row,
+    _parse_d1_13_specific_row,
+    _is_d1_13_section_marker,
+    _D1_13_SECTION_POPULATION,
+    _D1_13_SECTION_SPECIFIC,
+    _D1_13_SECTION_VOUCHING,
+    _D1_13_POPULATION_HEADERS,
+    _D1_13_SPECIFIC_HEADERS,
+    _SHEET_HEADERS,
+)
+
+
+_d1_13_vouching_row_st = st.fixed_dictionaries({
+    "id": st.uuids().map(str),
+    "seq": st.integers(min_value=1, max_value=100),
+    "noteType": st.sampled_from(["银行承兑汇票", "商业承兑汇票"]),
+    "noteNo": _text_st,
+    "drawer": _text_st,
+    "acceptor": _text_st,
+    "amount": _amount_st,
+    "maturityDate": _date_st,
+    "existenceCheck": st.sampled_from(["已核实", "未核实", "不适用", ""]),
+    "accuracyCheck": st.sampled_from(["金额一致", "金额不一致", "不适用", ""]),
+    "appropriatenessCheck": st.sampled_from(["恰当", "不恰当", "不适用", ""]),
+    "remark": st.text(min_size=0, max_size=20, alphabet=st.characters(categories=("L", "N"))),
+    "indexRef": st.text(min_size=0, max_size=10, alphabet=st.characters(categories=("L", "N"))),
+})
+
+_d1_13_population_st = st.fixed_dictionaries({
+    "populationDesc": _text_st,
+    "totalCount": st.integers(min_value=0, max_value=10000),
+    "totalAmount": _amount_st,
+    "sampleSize": st.integers(min_value=0, max_value=500),
+    "actualDrawn": st.integers(min_value=0, max_value=500),
+    "sampleCalcRef": st.text(min_size=0, max_size=10, alphabet=st.characters(categories=("L", "N"))),
+})
+
+
+@settings(max_examples=5)
+@given(population=_d1_13_population_st)
+def test_d1_13_population_export_import_round_trip(population: dict) -> None:
+    """D1-13 抽样总体标量 export → import round-trip preserves population fields."""
+    headers = _D1_13_POPULATION_HEADERS
+    exported = _export_d1_13_population_row(population)
+    assert len(exported) == len(headers)
+
+    imported = _parse_d1_13_population_row(tuple(exported), headers)
+
+    assert imported["populationDesc"] == population["populationDesc"].strip()
+    assert abs(imported["totalCount"] - float(population["totalCount"])) < 1e-6
+    assert abs(imported["totalAmount"] - float(population["totalAmount"])) < 1e-6
+    assert abs(imported["sampleSize"] - float(population["sampleSize"])) < 1e-6
+    assert abs(imported["actualDrawn"] - float(population["actualDrawn"])) < 1e-6
+    assert imported["sampleCalcRef"] == population["sampleCalcRef"].strip()
+
+
+@settings(max_examples=5)
+@given(rows=st.lists(_d1_13_vouching_row_st, min_size=1, max_size=5))
+def test_d1_13_vouching_export_import_round_trip(rows: list[dict]) -> None:
+    """D1-13 凭证核对明细 export → import round-trip preserves key fields."""
+    headers = _SHEET_HEADERS["D1-13"]
+
+    for i, original in enumerate(rows, start=1):
+        exported = _export_d1_13_row(original, i)
+        assert len(exported) == len(headers)
+
+        imported = _parse_d1_13_row(tuple(exported), headers, i)
+
+        assert imported["noteType"] == original["noteType"]
+        assert imported["noteNo"] == original["noteNo"]
+        assert imported["drawer"] == original["drawer"]
+        assert imported["acceptor"] == original["acceptor"]
+        assert abs(imported["amount"] - float(original["amount"])) < 1e-6
+        assert imported["existenceCheck"] == original["existenceCheck"]
+        assert imported["accuracyCheck"] == original["accuracyCheck"]
+        assert imported["appropriatenessCheck"] == original["appropriatenessCheck"]
+        assert imported["id"] != ""
+
+
+@settings(max_examples=5)
+@given(
+    description=_text_st,
+    amount=_amount_st,
+    reason=_text_st,
+)
+def test_d1_13_specific_sample_round_trip(description: str, amount: float, reason: str) -> None:
+    """D1-13 特定样本 description 经「票据号码」列 round-trip。"""
+    headers = _D1_13_SPECIFIC_HEADERS
+    original = {"description": description, "amount": amount, "reason": reason}
+
+    exported = _export_d1_13_specific_row(original, 1)
+    imported = _parse_d1_13_specific_row(tuple(exported), headers, 1)
+
+    assert imported["description"] == description.strip()
+    assert abs(imported["amount"] - amount) < 1e-6
+    assert imported["reason"] == reason.strip()
+    assert imported["id"] != ""
+
+
+def test_d1_13_template_has_multi_section_markers() -> None:
+    """D1-13 模板应含四个 section 分隔行。"""
+    wb = _create_template_wb("D1-13")
+    ws = wb.active
+
+    markers = []
+    for row in ws.iter_rows(values_only=True):
+        first = row[0] if row else None
+        if first and isinstance(first, str):
+            marker = _is_d1_13_section_marker(row)
+            if marker:
+                markers.append(marker)
+
+    assert markers == ["population", "specific", "vouching", "conclusion"]
+
+
+def test_is_d1_13_section_marker_detects_sections() -> None:
+    """_is_d1_13_section_marker 识别各 section 分隔符。"""
+    assert _is_d1_13_section_marker((_D1_13_SECTION_POPULATION,)) == "population"
+    assert _is_d1_13_section_marker((_D1_13_SECTION_SPECIFIC,)) == "specific"
+    assert _is_d1_13_section_marker((_D1_13_SECTION_VOUCHING,)) == "vouching"
+    assert _is_d1_13_section_marker(("客户A", 100)) is None
+
+
+def test_d1_13_multi_section_workbook_parse() -> None:
+    """构建多 section xlsx 并验证 population + vouching 行解析逻辑。"""
+    from openpyxl import Workbook
+
+    population = {
+        "populationDesc": "期末在库票据",
+        "totalCount": 120,
+        "totalAmount": 5000000.0,
+        "sampleSize": 25,
+        "actualDrawn": 25,
+        "sampleCalcRef": "SAM-001",
+    }
+    vouching = {
+        "seq": 1,
+        "noteType": "银行承兑汇票",
+        "noteNo": "NO-001",
+        "drawer": "甲公司",
+        "acceptor": "某银行",
+        "amount": 100000.0,
+        "maturityDate": "2025-12-31",
+        "existenceCheck": "已核实",
+        "accuracyCheck": "金额一致",
+        "appropriatenessCheck": "恰当",
+        "remark": "",
+        "indexRef": "D1-13-1",
+    }
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append([_D1_13_SECTION_POPULATION])
+    ws.append(_D1_13_POPULATION_HEADERS)
+    ws.append(_export_d1_13_population_row(population))
+    ws.append([_D1_13_SECTION_VOUCHING])
+    ws.append(_SHEET_HEADERS["D1-13"])
+    ws.append(_export_d1_13_row(vouching, 1))
+
+    parsed_pop: dict = {}
+    parsed_vouching: list[dict] = []
+    current_section: str | None = None
+    current_headers: list[str] = []
+    vouching_seq = 0
+
+    for row in ws.iter_rows(values_only=True):
+        if all(v is None for v in row):
+            continue
+        marker = _is_d1_13_section_marker(row)
+        if marker == "population":
+            current_section = "population"
+            current_headers = _D1_13_POPULATION_HEADERS
+            continue
+        if marker == "vouching":
+            current_section = "vouching"
+            current_headers = _SHEET_HEADERS["D1-13"]
+            continue
+        if not current_section:
+            continue
+        first = str(row[0]).strip() if row[0] is not None else ""
+        if first in _D1_13_POPULATION_HEADERS or first in _SHEET_HEADERS["D1-13"]:
+            current_headers = [str(c).strip() if c else "" for c in row if c is not None]
+            continue
+        if current_section == "population" and not parsed_pop:
+            parsed_pop = _parse_d1_13_population_row(row, current_headers)
+        elif current_section == "vouching":
+            vouching_seq += 1
+            parsed_vouching.append(_parse_d1_13_row(row, current_headers, vouching_seq))
+
+    assert parsed_pop["populationDesc"] == population["populationDesc"]
+    assert parsed_pop["totalCount"] == population["totalCount"]
+    assert abs(parsed_pop["totalAmount"] - population["totalAmount"]) < 1e-6
+    assert len(parsed_vouching) == 1
+    assert parsed_vouching[0]["noteNo"] == vouching["noteNo"]
+    assert abs(parsed_vouching[0]["amount"] - vouching["amount"]) < 1e-6

@@ -1,11 +1,5 @@
 <template>
 <div class="d5-fair-value">
-  <!-- 双模式切换 -->
-  <div class="mode-toolbar">
-    <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
-  </div>
-
-  <template v-if="viewMode === 'structured'">
     <!-- OCI差异提示 -->
     <el-alert
       v-if="ociDiffMessage"
@@ -21,6 +15,17 @@
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
         添加测算行
       </el-button>
+      <el-button size="small" :disabled="isReadonly" @click="exportTemplate">导出模板</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="exportData">导出数据</el-button>
+      <el-upload
+        :show-file-list="false"
+        accept=".xlsx"
+        :auto-upload="false"
+        :disabled="isReadonly || importing"
+        @change="(f: any) => onImportFile(f.raw || f)"
+      >
+        <el-button size="small" :disabled="isReadonly || importing">导入数据</el-button>
+      </el-upload>
       <div class="default-rate-config">
         <span class="rate-label">全表默认贴现利率：</span>
         <el-input-number
@@ -256,7 +261,12 @@
         placeholder="评价市场贴现利率选取依据的合理性，说明公允价值层次判定依据..."
       />
       <div class="note-actions">
-        <el-button size="small" :disabled="true">🤖AI</el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || !aiAvailable || aiLoading"
+          :loading="aiLoading"
+          @click="genFairValueNote"
+        >🤖AI</el-button>
       </div>
     </div>
 
@@ -271,12 +281,6 @@
         placeholder="对公允价值测算结果的总结性结论..."
       />
     </div>
-  </template>
-
-  <!-- OnlyOffice占位 -->
-  <div v-else class="onlyoffice-placeholder">
-    <el-empty description="在线编辑模式（OnlyOffice）" />
-  </div>
 </div>
 </template>
 
@@ -292,9 +296,11 @@
  * Task: 15.1
  * Requirements: 6.1-6.10, 10.7
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { useD5FairValue, FV_HIERARCHY_TOOLTIP } from '../composables/useD5FairValue'
 import type { ChecklistResponse } from '../composables/useD5FormData'
+import { useD5ImportExport } from '../composables/useD5ImportExport'
+import { useD5AiGenerate } from '../composables/useD5AiGenerate'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -315,14 +321,18 @@ const props = defineProps<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
-// ─── Mode ────────────────────────────────────────────────────────────────────
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+const { importing, exportTemplate, exportData, importData } = useD5ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D5-4',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
 
-const viewMode = ref('structured')
-const modeOptions = [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+async function onImportFile(file: File) {
+  await importData(file)
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -345,6 +355,18 @@ const {
   periodEnd: computed(() => props.periodEnd) as unknown as Ref<string>,
   defaultDiscountRate: computed(() => props.defaultDiscountRate) as unknown as Ref<number>,
 })
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
+
+async function genFairValueNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('fair-value-note', auditNotes.value.explanation, {
+    task: '公允价值测算审计说明（贴现利率合理性+层次判定）',
+    rowCount: rows.value.length,
+    ociDiffMessage: ociDiffMessage.value || '',
+  }, 'AI · 公允价值说明')
+  if (text) auditNotes.value.explanation = text
+}
 
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
 
@@ -442,7 +464,4 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
   margin-top: 8px;
 }
 
-.onlyoffice-placeholder {
-  padding: 40px 0;
-}
 </style>

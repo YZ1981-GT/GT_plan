@@ -12,6 +12,15 @@
 
     <!-- 新格式：alternative-g06-v1 -->
     <template v-else>
+      <!-- 工具栏 -->
+      <div class="gt-confirmation-alternative-g06__toolbar">
+        <span class="gt-confirmation-alternative-g06__title">G0-6 投资循环替代程序</span>
+        <div class="gt-confirmation-alternative-g06__toolbar-right">
+          <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+          <GtReviewTrigger section-id="G0-6-alternative" label="复核" />
+        </div>
+      </div>
+
       <!-- 顶部说明 -->
       <div class="gt-confirmation-alternative-g06__header-tip">
         <el-alert type="info" :closable="true" show-icon>
@@ -250,9 +259,12 @@
               :rows="getBlockRows(selectedCompany, bt)"
               :totals="data.getBlockTotal(selectedCompany, bt)"
               :readonly="readonly"
+              :enable-ocr="true"
+              :ocr-loading-row-id="ocrLoadingRowId"
               @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
               @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
+              @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
           </div>
 
@@ -260,17 +272,19 @@
           <div class="detail-section">
             <div class="detail-section__header">
               <span>四、审计说明与结论</span>
-              <el-button
-                v-if="!readonly"
-                type="primary"
-                size="small"
-                plain
-                :loading="aiLoading"
-                style="margin-left: auto"
-                @click="handleAiFill"
-              >
-                AI 智能填充
-              </el-button>
+              <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+                <el-button
+                  v-if="!readonly"
+                  type="primary"
+                  size="small"
+                  plain
+                  :loading="aiLoading"
+                  @click="handleAiFill"
+                >
+                  AI 智能填充
+                </el-button>
+                <GtReviewTrigger section-id="G0-6-conclusion" label="复核" />
+              </div>
             </div>
             <el-form
               :model="selectedCompany.conclusion || {}"
@@ -320,16 +334,37 @@
 
     <!-- 隐藏文件选择器 -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
+
+    <!-- 版本链抽屉 -->
+    <GtWpVersionTrail
+      v-if="wpId"
+      ref="versionTrailRef"
+      :workpaper-id="wpId"
+      :project-id="projectId || ''"
+    />
+
+    <!-- 复核对话 -->
+    <GtReviewDialog
+      v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
+      :key="reviewDialog.activationParams.value.sectionId"
+      v-bind="reviewDialog.activationParams.value"
+      @closed="reviewDialog.closeReviewDialog"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeG06Data } from './composables/useAlternativeG06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../../confirmation/alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_G06 } from './blockColumnConfigsG06'
+import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
+import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件
 import AlternativeD05Dashboard from '../../confirmation/alternativeD05/AlternativeD05Dashboard.vue'
@@ -338,6 +373,8 @@ import AlternativeD05Master from '../../confirmation/alternativeD05/AlternativeD
 import CheckBlock from '../../confirmation/alternativeD05/CheckBlock.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../../GtGridSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
+const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 
 const props = defineProps<{
   htmlData: any
@@ -347,6 +384,16 @@ const props = defineProps<{
   wpCode?: string
   year?: string
 }>()
+
+const wpIdRef = computed(() => props.wpId ?? '')
+const projectIdRef = computed(() => props.projectId ?? '')
+
+// ─── 版本链集成（autoSnapshot on save + 版本历史抽屉）───────────────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef } = versionToolbar
+
+// ─── 复核对话 provide（供 section 标题栏 GtReviewTrigger inject）─────────────
+const reviewDialog = useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const emit = defineEmits<{
   (e: 'save', payload: any): void
@@ -405,8 +452,73 @@ function handleDeleteCompany(companyId: string) {
   data.deleteCompany(companyId)
 }
 
-function handleImportG01() {
-  ElMessage.info('从 G0-1 带入功能待跨底稿引用 API 接入后启用')
+/**
+ * 反向联动：从 confirmation-hub 的 G0-1 函证结果汇总获取未回函项目，
+ * 带入 G0-6 替代程序作为待检查公司清单。
+ * 通过 wp-id-by-code 解析同项目 G0-1 的 wp_id → render-config 取 confirmation-v1 行数据。
+ */
+async function handleImportG01() {
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文，无法从 G0-1 带入')
+    return
+  }
+  try {
+    // 1. 解析同项目 G0-1 的 wp_id
+    const idRes = await api.get<{ wp_id: string }>('/api/custom-query/wp-id-by-code', {
+      params: { project_id: props.projectId, wp_code: 'G0-1' },
+      _silent: true,
+    } as any)
+    const g01WpId = (idRes as any)?.wp_id
+    if (!g01WpId) {
+      ElMessage.info('未找到 G0-1 函证结果汇总底稿')
+      return
+    }
+
+    // 2. 取 G0-1 render-config，提取 confirmation-v1 行数据
+    const cfg = await api.get<any>(`/api/workpapers/${g01WpId}/render-config`, { _silent: true } as any)
+    const sheets = cfg?.sheets ?? []
+    let rows: any[] = []
+    for (const sheet of sheets) {
+      const hd = sheet?.html_data ?? sheet?.htmlData
+      if (hd?._format === 'confirmation-v1' && Array.isArray(hd.rows)) {
+        rows = hd.rows
+        break
+      }
+    }
+    if (rows.length === 0) {
+      ElMessage.info('G0-1 暂无函证数据')
+      return
+    }
+
+    // 3. 过滤未回函项目（match_status === '未回函' 或 is_replied === false）
+    const unreplied = rows.filter(
+      (r) => r.match_status === '未回函' || (r.is_replied === false && r.match_status !== '相符'),
+    )
+    if (unreplied.length === 0) {
+      ElMessage.info('G0-1 暂无未回函项目')
+      return
+    }
+
+    // 4. 映射为 G0-6 公司清单并去重导入
+    const imported: Partial<AlternativeCompany>[] = unreplied.map((r) => ({
+      entity_name: r.entity_name || '',
+      confirm_index: r.confirm_index,
+      _source: 'auto',
+      balance: {
+        item_name: r.account_type || '交易性金融资产',
+        investment_type: r.account_type || '交易性金融资产',
+        closing_balance: Number(r.amount) || 0,
+      },
+    }))
+    data.importCompanies(imported)
+    ElMessage.success(`已从 G0-1 带入 ${imported.length} 个未回函项目`)
+  } catch (e: any) {
+    if (e?.response?.status === 404) {
+      ElMessage.info('未找到 G0-1 函证结果汇总底稿')
+    } else {
+      ElMessage.warning('从 G0-1 带入失败：' + (e?.message || '未知错误'))
+    }
+  }
 }
 
 const importFileInput = ref<HTMLInputElement | null>(null)
@@ -660,6 +772,84 @@ function handleAiFill() {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
+  versionToolbar.scheduleAutoSnapshot()
+}
+
+// ─── 行级 OCR：上传证券单据 → contract-ocr 识别 → 确认 → merge 填入当前行 ────
+const ocrLoadingRowId = ref<string | null>(null)
+
+/** OCR 识别字段 → 各区块行字段的映射（证券信息） */
+const OCR_FIELD_MAP: Record<BlockType, Record<string, string>> = {
+  block1: {
+    date: 'stmt_date', 对账单日期: 'stmt_date',
+    holding_variety: 'holding_variety', 持仓品种: 'holding_variety', 品种: 'holding_variety',
+    quantity: 'holding_qty', 数量: 'holding_qty', holding_qty: 'holding_qty',
+    amount: 'market_value', 市值: 'market_value', market_value: 'market_value',
+  },
+  block2: {
+    date: 'dividend_announce_date', 分红公告日期: 'dividend_announce_date',
+    amount: 'received_amount', 到账金额: 'received_amount', received_amount: 'received_amount',
+    dividend_receivable: 'dividend_receivable', 应收股利: 'dividend_receivable',
+  },
+  block3: {
+    date: 'trade_confirm_date', 交易确认单日期: 'trade_confirm_date',
+    quantity: 'sell_qty', 卖出数量: 'sell_qty',
+    price: 'trade_price', 成交价: 'trade_price',
+    amount: 'trade_amount', 成交金额: 'trade_amount', trade_amount: 'trade_amount',
+    fee: 'fee', 手续费: 'fee',
+  },
+  block4: {
+    date: 'quote_date', 报价日期: 'quote_date',
+    amount: 'quote_value', 报价值: 'quote_value', quote_value: 'quote_value',
+    quote_source: 'quote_source', 报价来源: 'quote_source',
+  },
+}
+
+async function handleRowOcr(blockType: BlockType, rowId: string, file: File): Promise<void> {
+  if (!selectedCompany.value || !props.wpId) return
+  ocrLoadingRowId.value = rowId
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await http.post(
+      `/api/workpapers/${props.wpId}/d4/contract-ocr`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
+    )
+    const fields: Record<string, any> = (res.data?.data ?? res.data)?.extracted_fields || {}
+    if (!Object.keys(fields).length) {
+      ElMessage.info('OCR完成，未识别到可填充字段')
+      return
+    }
+    // 映射识别字段 → 当前区块行字段
+    const map = OCR_FIELD_MAP[blockType]
+    const patch: Record<string, any> = {}
+    for (const [ocrKey, val] of Object.entries(fields)) {
+      const target = map[ocrKey]
+      if (target && val != null && String(val).trim() !== '') {
+        patch[target] = val
+      }
+    }
+    if (Object.keys(patch).length === 0) {
+      ElMessage.info('OCR完成，识别字段无法匹配本区块')
+      return
+    }
+    const preview = Object.entries(patch)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('，')
+    await ElMessageBox.confirm(`识别到证券信息：\n${preview}\n是否填入当前行？`, 'OCR识别结果', {
+      confirmButtonText: '填入',
+      cancelButtonText: '取消',
+    })
+    for (const [field, val] of Object.entries(patch)) {
+      data.updateBlockField(selectedCompany.value._company_id!, blockType, rowId, field, val)
+    }
+    ElMessage.success('已填入识别结果')
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.warning('OCR识别失败')
+  } finally {
+    ocrLoadingRowId.value = null
+  }
 }
 
 function markDirty() {
@@ -704,6 +894,26 @@ defineExpose({
 
 .gt-confirmation-alternative-g06__header-tip {
   margin-bottom: 12px;
+}
+
+.gt-confirmation-alternative-g06__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.gt-confirmation-alternative-g06__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.gt-confirmation-alternative-g06__toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .gt-confirmation-alternative-g06__detail {

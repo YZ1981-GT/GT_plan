@@ -120,6 +120,28 @@ export function sumif<T extends Record<string, any>>(
     .reduce((sum, row) => sum + (parseNum(row[valueField]) || 0), 0)
 }
 
+/** D2-1 审定表 legacy 行结构（AI/S/Z/AA 列名） */
+export interface LegacySumifRow {
+  AI: string
+  S: number
+  Z: number
+  AA: number
+}
+
+/**
+ * Legacy SUMIF：按 AI 分类列聚合 S/Z/AA 数值列
+ * 供 monolith 测试与 D2-1 旧模板兼容；新代码请用 4 参 sumif。
+ */
+export function sumifLegacy(
+  rows: LegacySumifRow[],
+  classification: string,
+  valueColumn: 'S' | 'Z' | 'AA',
+): number {
+  return rows
+    .filter(row => row.AI === classification)
+    .reduce((sum, row) => sum + (parseNum(row[valueColumn]) || 0), 0)
+}
+
 // ─── ECL 迁徙率公式 ─────────────────────────────────────────────────────────
 
 /**

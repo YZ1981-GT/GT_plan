@@ -62,6 +62,10 @@ export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
     apiPrefix: 'f5',
     sheets: ['F5-2', 'F5-3', 'F5-4', 'F5-5', 'F5-6', 'F5-8'],
   },
+  g0: {
+    apiPrefix: 'g0',
+    sheets: ['G0-3S', 'G0-6'],
+  },
 }
 
 export const COMPOUND_IMPORT_EXPORT: Record<string, CompoundImportExportGroup[]> = {

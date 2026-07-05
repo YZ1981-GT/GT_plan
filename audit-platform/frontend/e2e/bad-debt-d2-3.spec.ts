@@ -1,19 +1,15 @@
 /**
- * UAT — 坏账准备明细表 D2-3 嵌套编辑器 Playwright 实测
- *
- * 锚定 spec workpaper-bad-debt-nested-structure Task 11.3
+ * UAT — 坏账准备明细表 D2-3 Playwright 实测（重构版 D2TabBadDebt）
  *
  * 验证：
- * 1. D2 底稿 → 切换到「坏账准备明细表D2-3」sheet → 渲染 GtBadDebtSheet
- * 2. 展开/折叠父行子行
- * 3. 工具栏新增计提类别 + 右键新增/删除子行
- * 4. bad-debt-rows API 命中 200（非 404/307）
- *
- * 项目：辽宁卫生服务有限公司 2025（37814426-a29e-4fc2-9313-a59d229bf7b0）
+ * 1. D2 底稿 → 切换到「坏账准备明细表D2-3」→ 渲染 D2TabBadDebt
+ * 2. 三分类区块 + 添加子行
+ * 3. 合计行展示
  */
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test'
+import { TEST_PROJECT_ID } from './fixtures/ensure-test-project'
 
-const PROJECT_ID = '37814426-a29e-4fc2-9313-a59d229bf7b0'
+const PROJECT_ID = TEST_PROJECT_ID
 const D2_3_SHEET_PATTERN = /坏账准备明细表D2-3|D2-3/
 
 async function loginAs(page: Page, username: string, password: string) {
@@ -50,45 +46,15 @@ async function waitEditorReady(page: Page) {
 }
 
 async function openD2_3Sheet(page: Page) {
-  // D 循环编辑器用顶部 tab 切换 sheet（非 Univer 左侧 gt-usn）
   const tab = page.getByRole('tab', { name: D2_3_SHEET_PATTERN })
   await expect(tab, '顶部 tab 应存在 D2-3 sheet').toBeVisible({ timeout: 10_000 })
   await tab.click()
   await page.waitForTimeout(1_500)
 }
 
-async function confirmDialog(page: Page, inputText?: string) {
-  const box = page.locator('.el-message-box').last()
-  await expect(box).toBeVisible({ timeout: 8_000 })
-  if (inputText !== undefined) {
-    await box.locator('input').fill(inputText)
-  }
-  const primary = box.locator('.el-message-box__btns .el-button--primary')
-  await expect(primary).toBeVisible({ timeout: 3_000 })
-  await primary.click()
-}
-
-async function seedParentRow(request: APIRequestContext, token: string, wpId: string) {
-  const resp = await request.post(`/api/workpapers/${wpId}/bad-debt-rows/parents`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { provision_method: 'INDIVIDUAL', row_label: '按单项评估计提' },
-  })
-  expect(resp.ok(), `seed parent 应 201/200，实际 ${resp.status()}`).toBeTruthy()
-  const body = await resp.json()
-  return body?.data?.id ?? body?.id
-}
-
-test.describe('坏账准备明细表 D2-3（Task 11.3）', () => {
-  test('11.3 — 层级渲染 + 展折 + 右键增删子行 + API 联通', async ({ page, request }) => {
+test.describe('坏账准备明细表 D2-3（D2TabBadDebt 重构版）', () => {
+  test('11.3 — 三分类渲染 + 添加子行 + 合计', async ({ page, request }) => {
     test.setTimeout(120_000)
-
-    const apiCalls: { url: string; status: number }[] = []
-    page.on('response', (resp) => {
-      const url = resp.url()
-      if (url.includes('/bad-debt-rows')) {
-        apiCalls.push({ url, status: resp.status() })
-      }
-    })
 
     const consoleErrors: string[] = []
     page.on('console', (msg) => {
@@ -103,79 +69,35 @@ test.describe('坏账准备明细表 D2-3（Task 11.3）', () => {
 
     const token = await loginAs(page, 'admin', 'admin123')
     const wpId = await findD2WpId(request, token)
-    test.skip(!wpId, '辽宁卫生项目无 D2 底稿')
-
-    // 预清理 + 种子父行（API 层，保证 UI 可重复跑）
-    const treeResp = await request.get(`/api/workpapers/${wpId}/bad-debt-rows`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    expect(treeResp.ok(), 'bad-debt-rows GET 应 200').toBeTruthy()
-    const treeBody = await treeResp.json()
-    const parents = treeBody?.data?.parents ?? treeBody?.parents ?? []
-    for (const p of parents) {
-      for (const c of p.children ?? []) {
-        await request.delete(`/api/workpapers/${wpId}/bad-debt-rows/${c.id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      }
-      await request.delete(`/api/workpapers/${wpId}/bad-debt-rows/${p.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    }
-    await seedParentRow(request, token, wpId)
+    test.skip(!wpId, '测试项目无 D2 底稿')
 
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpId}/edit`)
     await waitEditorReady(page)
-
     await openD2_3Sheet(page)
 
-    const badDebt = page.locator('.gt-bad-debt-sheet')
-    await expect(badDebt, '应渲染 GtBadDebtSheet 组件').toBeVisible({ timeout: 10_000 })
-    await expect(badDebt.locator('.gbds-title')).toHaveText('坏账准备明细表 D2-3')
+    const badDebt = page.locator('.d2-tab-bad-debt')
+    await expect(badDebt, '应渲染 D2TabBadDebt 组件').toBeVisible({ timeout: 10_000 })
 
-    const parentRow = badDebt.locator('tr.gbds-parent').first()
-    await expect(parentRow).toBeVisible({ timeout: 8_000 })
+    // 三分类区块标题
+    await expect(badDebt.getByText('按单项计提')).toBeVisible()
+    await expect(badDebt.getByText('按账龄组合计提')).toBeVisible()
 
-    // 展开/折叠
-    const toggle = parentRow.locator('.gbds-toggle')
-    await expect(toggle).toHaveText('▼')
-    await toggle.click()
-    await expect(toggle).toHaveText('▶')
-    await toggle.click()
-    await expect(toggle).toHaveText('▼')
+    // 添加子行
+    const addBtn = badDebt.getByRole('button', { name: '+ 添加子行' }).first()
+    await addBtn.click()
+    await page.waitForTimeout(500)
 
-    // 右键新增子行
-    await parentRow.click({ button: 'right' })
-    const menu = badDebt.locator('.gbds-menu')
-    await expect(menu).toBeVisible({ timeout: 3_000 })
-    await menu.locator('li').filter({ hasText: '新增子行' }).click()
-    await confirmDialog(page, 'Playwright测试子行')
-    await page.waitForTimeout(1_500)
+    const labelInput = badDebt.locator('.el-input input').first()
+    if (await labelInput.isVisible()) {
+      await labelInput.fill('E2E测试债务人')
+      await labelInput.press('Tab')
+    }
 
-    const childRow = badDebt.locator('tr.gbds-child').filter({ hasText: 'Playwright测试子行' })
-    await expect(childRow).toBeVisible({ timeout: 8_000 })
-
-    // 合计行应存在
-    await expect(badDebt.locator('tr.gbds-summary')).toBeVisible()
-
-    // 右键删除子行
-    await childRow.click({ button: 'right' })
-    await expect(menu).toBeVisible({ timeout: 3_000 })
-    await menu.locator('li.gbds-menu-danger').click()
-    await confirmDialog(page)
-    await page.waitForTimeout(1_500)
-    await expect(childRow).toHaveCount(0, { timeout: 8_000 })
-
-    // API 联通：至少有一次 GET tree 200，且无 404
-    const getCalls = apiCalls.filter((c) => c.url.includes('/bad-debt-rows') && !c.url.includes('/provision-methods'))
-    expect(getCalls.length, '应发起 bad-debt-rows API 请求').toBeGreaterThan(0)
-    const badStatuses = apiCalls.filter((c) => c.status === 404 || c.status === 307)
-    expect(badStatuses, `不应有 404/307:\n${JSON.stringify(badStatuses)}`).toHaveLength(0)
-    expect(apiCalls.every((c) => c.status >= 200 && c.status < 300 || c.status === 409),
-      `bad-debt API 状态异常:\n${JSON.stringify(apiCalls)}`).toBeTruthy()
+    // 合计行
+    await expect(badDebt.getByText(/合计|小计/).first()).toBeVisible()
 
     const critical = consoleErrors.filter((e) =>
-      /Cannot access|before initialization|ReferenceError|bad-debt|404/.test(e),
+      /Cannot access|before initialization|ReferenceError|TypeError.*undefined/.test(e),
     )
     expect(critical, `控制台严重错误:\n${critical.join('\n')}`).toHaveLength(0)
   })

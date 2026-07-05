@@ -19,7 +19,7 @@
  *
  * Requirements: 7.1-7.5, 8.1-8.5, 9.1-9.4, 12.1, 16.1-16.6, 17.1-17.5
  */
-import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useD1EndorsementDetail,
@@ -27,8 +27,14 @@ import {
 } from '../composables/useD1EndorsementDetail'
 import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormData'
 import type { MemoRow } from '../composables/useD1MemoReconciliation'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
+import { useWorkpaperWideTable } from '../composables/useWorkpaperWideTable'
+import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol, virtualSelectCol } from '../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -50,24 +56,6 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
 
 // 复核对话（Task 19 预留）：仅当 provider 存在时展示 💬 按钮
 const openReviewDialog = inject<any>('openReviewDialog', null)
-
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const ooSheetName = computed(() => props.sheetName || '贴现背书明细D1-8')
-
-onMounted(async () => {
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -134,9 +122,58 @@ const COLS: ColDesc[] = [
   { field: 'indexRef', label: '索引号', width: 160, type: 'index' },
 ]
 
+const virtualColumns = computed<VirtualColumn[]>(() =>
+  COLS.map((col) => {
+    const key = String(col.field)
+    if (col.type === 'number') return virtualNumCol(key, col.label, col.width, displayPrefs.fmtAmount)
+    if (col.type === 'select') return virtualSelectCol(key, col.label, col.width)
+    return virtualTextCol(key, col.label, col.width)
+  }),
+)
+
+const tabBrowseRows = computed(() => {
+  const n = Math.max(discountRows.value.length, endorseRows.value.length)
+  return Array.from({ length: n }, (_, i) => ({ i }))
+})
+
+const {
+  browseMode,
+  useVirtualScroll,
+  rowEventHandlers,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: tabBrowseRows,
+  virtualColumns,
+  tableWidth: 1400,
+})
+
+function sectionBrowseRows(data: EndorsementRow[]): EndorsementRow[] {
+  return data.filter(r => r.rowType !== 'summary')
+}
+
+function sectionBrowseRowCount(data: EndorsementRow[]): number {
+  return sectionBrowseRows(data).length
+}
+
 // ─── Table Configs (两表由同一数组驱动) ──────────────────────────────────────
 
 type TableKey = 'discount' | 'endorse'
+
+const columnCount = ref(COLS.length)
+const discountRowCount = computed(() => discountRows.value.length)
+const endorseRowCount = computed(() => endorseRows.value.length)
+const discountTableLayout = useWorkpaperWideTable({ rowCount: discountRowCount, columnCount })
+const endorseTableLayout = useWorkpaperWideTable({ rowCount: endorseRowCount, columnCount })
+
+function tableLayoutFor(key: TableKey) {
+  return key === 'discount' ? discountTableLayout : endorseTableLayout
+}
+
+const wpIdRef = toRef(props, 'wpId')
+const discountIe = useD1TabImportExport(wpIdRef, 'D1-8')
+const endorseIe = useD1TabImportExport(wpIdRef, 'D1-8T')
 
 const tableConfigs = computed(() => [
   {
@@ -146,6 +183,7 @@ const tableConfigs = computed(() => [
     add: addDiscountRow,
     remove: removeDiscountRow,
     importMemo: () => doImport('discount'),
+    ie: discountIe,
   },
   {
     key: 'endorse' as TableKey,
@@ -154,6 +192,7 @@ const tableConfigs = computed(() => [
     add: addEndorseRow,
     remove: removeEndorseRow,
     importMemo: () => doImport('endorse'),
+    ie: endorseIe,
   },
 ])
 
@@ -212,61 +251,6 @@ function doImport(table: TableKey) {
   ElMessage.success('已从备查簿D1-7导入')
 }
 
-// ─── Import/Export ───────────────────────────────────────────────────────────
-
-const SHEET_CODE = 'D1-8'
-
-async function exportTemplate() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/export-template`, null, {
-      params: { sheet: SHEET_CODE },
-      responseType: 'blob',
-    })
-    triggerDownload(res.data, `${SHEET_CODE}_模板.xlsx`)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function exportData() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/export-data`, null, {
-      params: { sheet: SHEET_CODE },
-      responseType: 'blob',
-    })
-    triggerDownload(res.data, `${SHEET_CODE}_数据.xlsx`)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-function triggerDownload(data: BlobPart, filename: string) {
-  const blob = new Blob([data])
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = filename
-  a.click()
-  URL.revokeObjectURL(url)
-}
-
-async function handleImportFile(file: File) {
-  const formData = new FormData()
-  formData.append('file', file)
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d1/import-data`, formData, {
-      params: { sheet: SHEET_CODE },
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    const data = res.data?.data ?? res.data
-    ElMessage.success(`成功导入${data.imported_count}行数据`)
-    if (data.warning) ElMessage.warning(data.warning)
-  } catch (e: any) {
-    const errData = e?.response?.data?.data ?? e?.response?.data
-    if (e?.response?.status === 400 && errData?.invalid_columns?.length) {
-      ElMessage.error(`列名不匹配: ${errData.invalid_columns.join(', ')}`)
-    } else {
-      ElMessage.error('导入失败')
-    }
-  }
-}
-
 // ─── Review ────────────────────────────────────────────────────────────────────
 
 function onReview(sectionId: string) {
@@ -291,21 +275,10 @@ const GUIDANCE_TEXTS = [
 
 <template>
   <div class="d1-tab-endorsement-detail">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
-    </div>
-
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="ooSheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML mode -->
-    <template v-if="editorMode === 'html'">
+      <div class="tab-header">
+        <h4>贴现背书明细 D1-8</h4>
+        <GtReviewTrigger section-id="D1-endorsement-header" />
+      </div>
       <!-- 审计目标 -->
       <el-alert
         type="info"
@@ -316,38 +289,57 @@ const GUIDANCE_TEXTS = [
         class="audit-objective"
       />
 
-      <!-- Toolbar -->
-      <div class="table-toolbar">
-        <el-button-group size="small">
-          <el-button @click="exportTemplate">导出模板</el-button>
-          <el-button @click="exportData">导出数据</el-button>
-          <el-upload
-            :show-file-list="false"
-            accept=".xlsx"
-            :auto-upload="false"
-            :on-change="(f: any) => handleImportFile(f.raw)"
-            style="display:inline-block"
-          >
-            <el-button size="small">导入数据</el-button>
-          </el-upload>
-        </el-button-group>
-      </div>
-
       <!-- 两张检查表（结构一致，由 tableConfigs 驱动） -->
       <template v-for="cfg in tableConfigs" :key="cfg.key">
         <div class="section-title">{{ cfg.title }}</div>
+        <div class="table-toolbar">
+          <el-button-group size="small">
+            <el-button @click="cfg.ie.onExportTemplate">导出模板</el-button>
+            <el-button @click="cfg.ie.onExportData">导出数据</el-button>
+            <el-upload
+              :show-file-list="false"
+              accept=".xlsx"
+              :before-upload="cfg.ie.onImportFile"
+              style="display:inline-block"
+            >
+              <el-button size="small">导入数据</el-button>
+            </el-upload>
+          </el-button-group>
+        </div>
         <div class="sub-toolbar">
           <el-button size="small" :disabled="isReadonly" @click="cfg.add()">+ 添加行</el-button>
           <el-button size="small" :disabled="isReadonly" @click="cfg.importMemo()">
             从备查簿导入
           </el-button>
         </div>
+        <div v-if="useVirtualScroll" class="virtual-toolbar">
+          <el-alert type="info" :closable="false" class="virtual-hint">
+            行数较多（{{ sectionBrowseRowCount(cfg.data) }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+          </el-alert>
+          <el-button size="small" @click="toggleBrowseMode">
+            {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+          </el-button>
+        </div>
+        <el-table-v2
+          v-if="useVirtualScroll && browseMode"
+          :columns="virtualColumns"
+          :data="sectionBrowseRows(cfg.data)"
+          :width="tableWidth"
+          :height="tableHeight"
+          :row-height="36"
+          :header-height="40"
+          :row-event-handlers="rowEventHandlers"
+          fixed
+          class="virtual-table"
+        />
         <el-table
+          v-if="!useVirtualScroll || !browseMode"
           :data="cfg.data"
           border
           size="small"
           :row-class-name="getRowClass"
           class="endorse-table"
+          :max-height="tableLayoutFor(cfg.key).tableMaxHeight"
           @cell-contextmenu="onCellContextMenu"
         >
           <el-table-column
@@ -440,6 +432,7 @@ const GUIDANCE_TEXTS = [
                 <span v-if="col.type === 'number'" v-html="fmtAmount(row[col.field] as number)" />
                 <span v-else>{{ row[col.field] }}</span>
               </template>
+              <GtReviewDot v-if="col.field === 'noteType' && row.rowType !== 'summary'" row-prefix="D1-endorsement" :row-key="row.rowId" />
             </template>
           </el-table-column>
         </el-table>
@@ -492,13 +485,24 @@ const GUIDANCE_TEXTS = [
         <summary>📋 编制提示</summary>
         <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
       </details>
-    </template>
   </div>
 </template>
 
 <style scoped>
 .d1-tab-endorsement-detail {
   padding: 12px;
+}
+
+.tab-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .mode-switcher {
@@ -537,6 +541,10 @@ const GUIDANCE_TEXTS = [
   gap: 8px;
   margin-bottom: 8px;
 }
+
+.virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.virtual-hint { margin-bottom: 0; flex: 1; }
+.virtual-table { margin-bottom: 8px; }
 
 .endorse-table {
   width: 100%;

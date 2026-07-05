@@ -3,12 +3,11 @@
  *
  * 锚定 spec d-cycle-workpapers Task 44
  *
- * 验证 D2-1 应收账款审定表：
- * 1. 底稿页面正常加载（d-form-table 渲染）
- * 2. 审定表字段渲染（audited_amount 等标准字段）
- * 3. 填写 audited_amount 字段
- * 4. 保存
- * 5. trial_balance 回写 API 调用确认
+ * 验证 D2-1 应收账款审定表（d2-accounts-receivable / D2TabAdjudication）：
+ * 1. 底稿页面正常加载
+ * 2. 审定表字段渲染
+ * 3. 审计说明编辑
+ * 4. wp_code_overrides 路由确认
  *
  * 项目：辽宁卫生服务有限公司 2025（37814426-a29e-4fc2-9313-a59d229bf7b0）
  */
@@ -39,7 +38,7 @@ async function getToken(request: APIRequestContext): Promise<string> {
 }
 
 test.describe('Task 44: D2-1 审定表编辑+保存+trial_balance.audited_amount 回写确认', () => {
-  test('44.1 — D2-1 审定表加载 d-form-table 组件', async ({ page, request }) => {
+  test('44.1 — D2-1 审定表加载 d2-accounts-receivable 组件', async ({ page, request }) => {
     test.setTimeout(60_000)
     const token = await loginAs(page, 'admin', 'admin123')
 
@@ -63,9 +62,9 @@ test.describe('Task 44: D2-1 审定表编辑+保存+trial_balance.audited_amount
 
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
 
-    // 等待 d-form-table 渲染
+    // 等待 D2 审定表组件渲染
     await page.waitForSelector(
-      '.gt-wp-editor, .gt-d-form-table, .gt-wp-editor-loading',
+      '.gt-wp-editor, .d2-accounts-receivable, .d2-tab-adjudication, .gt-wp-editor-loading',
       { timeout: 15_000 },
     )
     await page.waitForTimeout(5_000)
@@ -79,8 +78,10 @@ test.describe('Task 44: D2-1 审定表编辑+保存+trial_balance.audited_amount
     const errorBoundary = page.locator('.gt-error-boundary, [class*="error-boundary"]')
     expect(await errorBoundary.count(), 'ErrorBoundary 不应出现').toBe(0)
 
-    // 验证 d-form-table/el-table 存在
-    const table = page.locator('.el-table, .gt-d-form-table')
+    // 验证 D2TabAdjudication / el-table 存在
+    const adjudication = page.locator('.d2-tab-adjudication, .d2-accounts-receivable')
+    await expect(adjudication.first()).toBeVisible({ timeout: 10_000 })
+    const table = page.locator('.d2-tab-adjudication .el-table, .d2-accounts-receivable .el-table')
     await expect(table.first()).toBeVisible({ timeout: 10_000 })
 
     // 验证无严重 console errors
@@ -163,22 +164,25 @@ test.describe('Task 44: D2-1 审定表编辑+保存+trial_balance.audited_amount
     }
   })
 
-  test('44.4 — D2-1 render-config API 返回 d-form-table', async ({ request }) => {
+  test('44.4 — D2-1 wp_code_overrides 路由到 d2-accounts-receivable', async ({ request }) => {
     test.setTimeout(20_000)
     const token = await getToken(request)
 
     const wpResult = await findWorkpaper(request, token, 'D2-1', PROJECT_ID)
     test.skip(!wpResult.exists, 'D2-1 底稿不存在')
 
-    // 验证 render-config 返回 d-form-table 类型
     const rcResp = await request.get(
       `/api/projects/${PROJECT_ID}/working-papers/${wpResult.wpId}/render-config`,
       { headers: { Authorization: `Bearer ${token}` } },
     )
     expect(rcResp.status()).toBe(200)
     const rcBody = await rcResp.json()
-    const rcData = rcBody?.data || rcBody
-    expect(rcData.component_type || rcData.componentType).toBe('d-form-table')
+    const componentType =
+      rcBody?.data?.component_type ?? rcBody?.component_type ?? rcBody?.data?.componentType
+    expect(
+      componentType,
+      'D2-1 应路由到 d2-accounts-receivable 而非 legacy d-form-table',
+    ).toBe('d2-accounts-receivable')
   })
 
   test('44.5 — trial_balance 回写 API 存在', async ({ request }) => {

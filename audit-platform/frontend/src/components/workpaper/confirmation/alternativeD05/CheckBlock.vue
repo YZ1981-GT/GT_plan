@@ -121,6 +121,25 @@
               </template>
             </el-table-column>
           </template>
+
+          <!-- 行级 OCR 附件列 -->
+          <el-table-column v-if="enableOcr && !readonly" label="📎OCR" width="70" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-upload
+                :show-file-list="false"
+                :auto-upload="false"
+                accept=".jpg,.jpeg,.png,.pdf"
+                :on-change="(f: any) => onOcrFileChange(row, f)"
+              >
+                <el-button
+                  size="small"
+                  text
+                  :loading="ocrLoadingRowId === row._row_id"
+                  title="上传证券对账单/交易单据，OCR识别后填入本行"
+                >📎</el-button>
+              </el-upload>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
 
@@ -147,13 +166,24 @@ const props = defineProps<{
   rows: CheckRow[]
   totals: Record<string, number>
   readonly: boolean
+  /** 开启行级 OCR 附件列（📎），上传后 emit('ocr-upload', rowId, file） */
+  enableOcr?: boolean
+  /** 正在 OCR 识别的行 id（显示 loading） */
+  ocrLoadingRowId?: string | null
 }>()
 
 const emit = defineEmits<{
   (e: 'add-row'): void
   (e: 'delete-row', rowId: string): void
   (e: 'update-field', rowId: string, field: string, value: any): void
+  (e: 'ocr-upload', rowId: string, file: File): void
 }>()
+
+function onOcrFileChange(row: CheckRow, uploadFile: any): void {
+  const file: File | undefined = uploadFile?.raw ?? uploadFile
+  if (!file || !row._row_id) return
+  emit('ocr-upload', row._row_id, file)
+}
 
 const collapsed = ref(false)
 const prefs = useDisplayPrefsStore()

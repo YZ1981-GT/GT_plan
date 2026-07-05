@@ -18,7 +18,9 @@ import {
 } from '../composables/useD1Adjudication'
 import { isChangeRateExceeding } from '../composables/useD1FormulaEngine'
 import type { ChecklistResponse } from '../composables/useD1FormData'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
+import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -38,6 +40,8 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
 })
 
 const openReviewDialog = inject<((params: { sectionId: string; sectionLabel: string; relatedData?: Record<string, unknown> }) => void) | null>('openReviewDialog', null)
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-1')
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -70,38 +74,11 @@ const {
 // ─── Loading & Active Threads ────────────────────────────────────────────────
 
 const loading = ref(true)
-const activeThreads = ref<Record<string, 'blue' | 'red'>>({})
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)
 
-// ─── Dual Mode (HTML ↔ OnlyOffice) ──────────────────────────────────────────
-
-const editorMode = ref<'html' | 'oo'>('html')
-const ooHealthy = ref(true)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'oo', disabled: !ooHealthy.value },
-])
-
-const ooSheetName = computed(() => props.sheetName || '审定表D1-1')
-
-onMounted(async () => {
+onMounted(() => {
   loading.value = false
-  // Check OO health
-  try {
-    const health = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    ooHealthy.value = health.data?.data?.healthy ?? health.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-  // Load active review threads
-  try {
-    const res = await http.get(`/api/review-threads/active`, { params: { wp_id: props.wpId }, _silent: true } as any)
-    const threads = res?.data?.data || res?.data || []
-    if (Array.isArray(threads)) {
-      for (const t of threads) {
-        activeThreads.value[t.section_id] = t.has_unread ? 'red' : 'blue'
-      }
-    }
-  } catch { /* silent */ }
 })
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -190,50 +167,21 @@ async function handleAiConclusion() {
   finally { aiConclusionLoading.value = false }
 }
 
-// ─── Review Dialog Shortcuts ─────────────────────────────────────────────────
-
-function openNoteReview() {
-  if (!openReviewDialog) return
-  openReviewDialog({
-    sectionId: 'D1-adj-audit-note',
-    sectionLabel: 'D1-1 审计说明',
-    relatedData: { note: auditNote.value },
-  })
-}
-
-function openConclusionReview() {
-  if (!openReviewDialog) return
-  openReviewDialog({
-    sectionId: 'D1-adj-audit-conclusion',
-    sectionLabel: 'D1-1 审计结论',
-    relatedData: { conclusion: auditConclusion.value },
-  })
-}
-
-// ─── Thread Dots ─────────────────────────────────────────────────────────────
-
-function getThreadDot(sectionId: string): 'blue' | 'red' | null {
-  return activeThreads.value[sectionId] || null
-}
 </script>
 
 <template>
   <div class="d1-tab-adjudication">
-    <!-- Mode Switcher -->
-    <div class="mode-switcher">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-      <el-tooltip v-if="!ooHealthy" content="OnlyOffice服务不可用" placement="top">
-        <span class="oo-disabled-hint">⚠️</span>
-      </el-tooltip>
+    <div class="tab-header">
+      <h4>审定表 D1-1</h4>
+      <GtReviewTrigger section-id="D1-adjudication-header" />
+      <div class="toolbar-right">
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
+      </div>
     </div>
-
-    <!-- OnlyOffice mode -->
-    <template v-if="editorMode === 'oo'">
-      <GtOnlyOfficeSheet :wp-id="wpId" :sheet-name="ooSheetName" :project-id="projectId" />
-    </template>
-
-    <!-- HTML mode -->
-    <template v-if="editorMode === 'html'">
     <!-- Loading skeleton -->
     <el-skeleton v-if="loading" :rows="12" animated />
 
@@ -248,7 +196,12 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
           :row-class-name="getRowClass"
           @cell-contextmenu="handleCellContextMenu"
         >
-          <el-table-column label="项目" prop="label" width="140" fixed />
+          <el-table-column label="项目" prop="label" width="140" fixed>
+            <template #default="{ row }">
+              {{ row.label }}
+              <GtReviewDot v-if="row.rowKey" row-prefix="D1-adj" :row-key="row.rowKey" />
+            </template>
+          </el-table-column>
 
           <!-- 期初 -->
           <el-table-column label="期初未审" width="110" align="right">
@@ -396,10 +349,7 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
 
       <!-- 1.审计说明 -->
       <div class="audit-note-section">
-        <h4 class="section-title">
-          1.审计说明
-          <span v-if="getThreadDot('D1-adj-audit-note')" :class="['thread-dot', getThreadDot('D1-adj-audit-note')]" />
-        </h4>
+        <h4 class="section-title">1.审计说明</h4>
         <p class="auto-description">{{ autoChangeDescription }}</p>
         <div class="note-area">
           <span class="red-label">主要原因（比例超过30%的）：</span>
@@ -414,7 +364,7 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
             />
             <div class="note-actions">
               <el-button size="small" :loading="aiNoteLoading" :disabled="isReadonly" @click="handleAiNote">🤖AI</el-button>
-              <el-button size="small" @click="openNoteReview">💬</el-button>
+              <GtReviewTrigger section-id="D1-adj-audit-note" />
             </div>
           </div>
         </div>
@@ -422,10 +372,7 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
 
       <!-- 2.审计结论 -->
       <div class="audit-conclusion-section">
-        <h4 class="section-title">
-          2.审计结论
-          <span v-if="getThreadDot('D1-adj-audit-conclusion')" :class="['thread-dot', getThreadDot('D1-adj-audit-conclusion')]" />
-        </h4>
+        <h4 class="section-title">2.审计结论</h4>
         <div class="note-input-row">
           <el-input
             v-model="auditConclusion"
@@ -437,11 +384,10 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
           />
           <div class="note-actions">
             <el-button size="small" :loading="aiConclusionLoading" :disabled="isReadonly" @click="handleAiConclusion">🤖AI</el-button>
-            <el-button size="small" @click="openConclusionReview">💬</el-button>
+            <GtReviewTrigger section-id="D1-adj-audit-conclusion" />
           </div>
         </div>
       </div>
-    </template>
     </template>
   </div>
 </template>
@@ -451,16 +397,23 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
   padding: 12px;
 }
 
-.mode-switcher {
+.tab-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.oo-disabled-hint {
-  cursor: help;
-  font-size: 14px;
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tab-header h4 {
+  margin: 0;
+  font-size: 15px;
 }
 
 .section-block {
@@ -568,21 +521,4 @@ function getThreadDot(sectionId: string): 'blue' | 'red' | null {
   gap: 4px;
 }
 
-/* 复核线程圆点 */
-.thread-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-
-.thread-dot.blue {
-  background-color: #409eff;
-}
-
-.thread-dot.red {
-  background-color: #f56c6c;
-}
 </style>

@@ -233,6 +233,27 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
     }
   }
 
+  function updateSampleCell(block: 1 | 2, rowId: string, field: string, value: any): void {
+    const NUMERIC_FIELDS = ['debitAmount', 'creditAmount']
+    const mapRow = (r: InspectionSampleRow): InspectionSampleRow => {
+      if (r.rowId !== rowId) return r
+      const updated = { ...r }
+      if (NUMERIC_FIELDS.includes(field)) {
+        ;(updated as any)[field] = parseNum(value)
+      } else {
+        ;(updated as any)[field] = value
+      }
+      return updated
+    }
+    if (block === 1) {
+      block1Rows.value = block1Rows.value.map(mapRow)
+      persistBlock1()
+    } else {
+      block2Rows.value = block2Rows.value.map(mapRow)
+      persistBlock2()
+    }
+  }
+
   // ─── Check Ratio Summary ─────────────────────────────────────────────
 
   /**
@@ -319,6 +340,7 @@ export function useD6Inspection(options: UseD6InspectionOptions) {
     block2Rows,
     addSample,
     removeSample,
+    updateSampleCell,
     checkRatioSummary,
     auditNotes,
   }

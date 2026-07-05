@@ -14,6 +14,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4RevenueDetail, type RevenueDetailRow } from '../../composables/useD4RevenueDetail'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useWorkpaperBrowseMode } from '../../composables/useWorkpaperBrowseMode'
+import { virtualTextCol, virtualNumCol } from '../../composables/virtualColumnHelpers'
+import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -67,8 +70,34 @@ function handleImportUpload(file: File): boolean {
   return false // 阻止 el-upload 自动上传
 }
 
-// ─── 虚拟滚动阈值 ────────────────────────────────────────────────────
-const useVirtualScroll = computed(() => filteredRows.value.length > 30)
+// ─── 虚拟滚动 / browseMode ───────────────────────────────────────────
+const browseRows = filteredRows
+const browseRowCount = computed(() => filteredRows.value.length)
+
+function fmtBrowseAmt(v: number): string {
+  if (v === 0) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const virtualColumns = computed<VirtualColumn[]>(() => [
+  virtualTextCol('product', '产品/服务', 140),
+  virtualNumCol('periodTotal', '本期未审合计', 110, fmtBrowseAmt),
+  virtualNumCol('audited', '本期审定', 110, fmtBrowseAmt),
+  virtualTextCol('remark', '备注', 120),
+])
+
+const {
+  browseMode,
+  useVirtualScroll: useBrowseVirtualScroll,
+  rowEventHandlers,
+  tableWidth,
+  tableHeight,
+  toggleBrowseMode,
+} = useWorkpaperBrowseMode({
+  rows: browseRows,
+  virtualColumns,
+  tableWidth: 1400,
+})
 
 // ─── 样式判断 ─────────────────────────────────────────────────────────
 function getRateCellClass(rate: number | '' | 'N/A'): string {
@@ -211,25 +240,37 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
       </div>
     </div>
 
-    <!-- 虚拟滚动提示 -->
-    <el-alert
-      v-if="useVirtualScroll"
-      type="info"
-      :closable="false"
-      class="virtual-hint"
-    >
-      行数较多（{{ filteredRows.length }}行），已启用虚拟滚动优化
-    </el-alert>
+    <!-- 虚拟滚动 / browseMode -->
+    <div v-if="useBrowseVirtualScroll" class="virtual-toolbar">
+      <el-alert type="info" :closable="false" class="virtual-hint">
+        行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式 · 双击行可切换编辑
+      </el-alert>
+      <el-button size="small" @click="toggleBrowseMode">
+        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+      </el-button>
+    </div>
+    <el-table-v2
+      v-if="useBrowseVirtualScroll && browseMode"
+      :columns="virtualColumns"
+      :data="browseRows"
+      :width="tableWidth"
+      :height="tableHeight"
+      :row-height="36"
+      :header-height="40"
+      :row-event-handlers="rowEventHandlers"
+      fixed
+      class="virtual-table"
+    />
 
     <!-- 主表（22列宽表） -->
-    <div class="table-wrapper">
+    <div v-if="!useBrowseVirtualScroll || !browseMode" class="table-wrapper">
       <el-table
         :data="[...filteredRows, subtotalRow]"
         border
         size="small"
         :row-class-name="getRowClassName"
         style="width: 100%"
-        :max-height="useVirtualScroll ? 600 : undefined"
+        :max-height="600"
       >
         <!-- A: 项目（产品/服务） -->
         <el-table-column prop="product" label="产品/服务" width="140" fixed>
@@ -557,6 +598,17 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 .audit-note-section {
   margin-bottom: 16px;
 }
+.virtual-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.virtual-hint {
+  flex: 1;
+}
+
 .note-header {
   display: flex;
   justify-content: space-between;
