@@ -97,59 +97,59 @@ L2应付利息底稿专属组件`l2-interest-payable`（8 sheet/1 xlsx/~100+公�
   - 负债类单区块+按来源分类小计+TB回写
   - _Requirements: 2.1-2.7_
 
-- [ ] 4.3 创建 L2TabDetail.vue 明细表L2-2
+- [x] 4.3 创建 L2TabDetail.vue 明细表L2-2
   - 27列区段Tab+计提核对(接收L1/L3)+动态行+导入导出
   - _Requirements: 3.1-3.5, 4.1-4.5_
 
-- [ ] 4.4 创建 L2TabInterestCheck.vue 检查表L2-4
+- [x] 4.4 创建 L2TabInterestCheck.vue 检查表L2-4
   - 计提核对清单+结论区+AI辅助
   - _Requirements: 5.1-5.2_
 
-- [ ] 4.5 创建 L2TabAdjustment.vue + L2TabDisclosureListed/Soe.vue
+- [x] 4.5 创建 L2TabAdjustment.vue + L2TabDisclosureListed/Soe.vue
   - 调整借贷平衡 + 附注上市/国企切换
   - _Requirements: 5.3-5.5_
 
 ### Phase 5: 后端
 
-- [ ] 5.1 创建 l2_interest_payable_renderer.py
+- [x] 5.1 创建 l2_interest_payable_renderer.py
   - RENDERER_DISPATCH注册 + 负债类公式验证
   - _Requirements: 1.6_
 
-- [ ] 5.2 创建 l2_interest_payable.py 路由
+- [x] 5.2 创建 l2_interest_payable.py 路由
   - 导出模板/导出数据/导入数据 + 计提核对API
   - _Requirements: 6.5_
 
-- [ ] 5.3 创建 l2_interest_payable_service.py
+- [x] 5.3 创建 l2_interest_payable_service.py
   - 计提核对+按来源汇总
   - _Requirements: 4.4, 6.1-6.2_
 
 ### Phase 6: 集成
 
-- [ ] 6.1 EventBus集成
+- [x] 6.1 EventBus集成
   - publish 'substantive:adjudicated' / 'adjustment:created'
   - subscribe 'l1:interest-calculated' / 'l3:interest-calculated' + 附注刷新
   - _Requirements: 2.6, 4.1-4.2_
 
-- [ ] 6.2 跨底稿联动
+- [x] 6.2 跨底稿联动
   - L1/L3利息测算 → L2计提核对（cross_wp_ref + GtIndexChip）
   - L2本期计提 → L8财务费用
   - L2审定 → TB回写(2231)
   - _Requirements: 4.1-4.6_
 
-- [ ] 6.3 版本链+复核对话集成
+- [x] 6.3 版本链+复核对话集成
   - useVersionTrail(autoSnapshot) + provide openReviewDialog
   - _Requirements: 6.6_
 
 ### Phase 7: 测试
 
-- [ ] 7.1 单元测试：useL2FormulaEngine + useL2AccrualEngine
+- [x] 7.1 单元测试：useL2FormulaEngine + useL2AccrualEngine
   - 负债类方向 + 计提差异 + 按来源汇总
   - _Requirements: P1-P5_
 
-- [ ] 7.2 集成测试：L1/L3→L2计提核对 + L2→L8联动
+- [x] 7.2 集成测试：L1/L3→L2计提核对 + L2→L8联动
   - _Requirements: 4.1-4.6_
 
-- [ ] 7.3 Playwright E2E
+- [x] 7.3 Playwright E2E
   - 完整流程：打开L2→审定→明细→计提核对→检查表→保存
   - _Requirements: 全部_
 

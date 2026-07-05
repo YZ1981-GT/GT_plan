@@ -120,28 +120,14 @@ export function useL2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // 订阅 mitt eventBus（L1 已注册类型）
   eventBus.on('l1:interest-calculated', onL1InterestCalculated as any)
 
-  // ─── EventBus 订阅：l3:interest-calculated（CustomEvent fallback） ─────
+  // ─── EventBus 订阅：l3:interest-calculated（mitt 类型安全） ─────────────
 
-  /**
-   * L3 尚未在 mitt Events 类型中注册，使用 window CustomEvent 监听。
-   * L3 开发完成后可迁移到 mitt 类型安全订阅。
-   */
-  function onL3InterestCalculated(event: Event): void {
-    const detail = (event as CustomEvent)?.detail
-    if (detail && typeof detail.totalInterest === 'number') {
-      l3InterestData.value = {
-        wpCode: detail.wpCode || 'L3',
-        totalInterest: detail.totalInterest,
-        financialExpenseInterest: detail.financialExpenseInterest ?? detail.totalInterest,
-        byContract: detail.byContract ?? [],
-        timestamp: detail.timestamp ?? Date.now(),
-      }
-    }
+  function onL3InterestCalculated(payload: L3InterestPayload): void {
+    l3InterestData.value = payload
   }
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('l3:interest-calculated', onL3InterestCalculated)
-  }
+  // L3 已在 mitt Events 类型中注册（l2-interest-payable Task 6.1）
+  eventBus.on('l3:interest-calculated', onL3InterestCalculated as any)
 
   // ─── 1. adjudicationVsDetail — 审定表L2-1合计 vs 明细表L2-2合计 ────────
 
@@ -245,10 +231,7 @@ export function useL2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   onScopeDispose(() => {
     // 取消 mitt eventBus 订阅
     eventBus.off('l1:interest-calculated', onL1InterestCalculated as any)
-    // 取消 window CustomEvent 监听
-    if (typeof window !== 'undefined') {
-      window.removeEventListener('l3:interest-calculated', onL3InterestCalculated)
-    }
+    eventBus.off('l3:interest-calculated', onL3InterestCalculated as any)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────

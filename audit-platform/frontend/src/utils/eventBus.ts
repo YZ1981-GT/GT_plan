@@ -394,6 +394,25 @@ export type Events = {
     timestamp: number
   }
 
+  // L3 长期借款利息测算联动 L2/L8（l2-interest-payable Task 6.1）
+  'l3:interest-calculated': {
+    wpCode: string
+    totalInterest: number
+    financialExpenseInterest: number
+    byContract: Array<{ contractNo: string; interest: number }>
+    timestamp: number
+  }
+
+  // L2 应付利息计提核对联动 L8 财务费用（l2-interest-payable Task 6.1）
+  'l2:accrual-calculated': {
+    wpCode: string
+    /** L2 本期计提利息合计（L8 利息支出取数来源） */
+    totalAccrued: number
+    /** 按来源分类：短期借款/长期借款/应付债券 */
+    bySource: Array<{ source: string; amount: number }>
+    timestamp: number
+  }
+
   // consol-phase1-arch-lock 需求 4.3: 后端返回 423 合并锁定 → 刷新前端锁定态
   'consol-lock:detected': { projectId?: string }
 

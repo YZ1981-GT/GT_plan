@@ -23,6 +23,7 @@ import {
   calcLiabilityEndBalance,
   calcSubtotal,
 } from './useL2FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useL2FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -50,13 +51,6 @@ export interface AdjudicationRow {
   audited: number
   /** 是否可编辑 */
   isEditable: boolean
-}
-
-export interface AdjustmentPayload {
-  wpCode: string
-  entryType: 'AJE' | 'RJE'
-  amount: number
-  accountCode?: string
 }
 
 export interface UseL2AdjudicationOptions {
@@ -160,8 +154,6 @@ function buildSubtotalRow(rows: AdjudicationRow[]): AdjudicationRow {
 export function useL2Adjudication(options: UseL2AdjudicationOptions) {
   const { allResponses, wpId, projectId, saveField, debouncedSave, writebackTB } = options
 
-  const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
-
   // Session-level AJE/RJE accumulated from EventBus adjustment:created events
   const eventAjeAccum = ref(0)
   const eventRjeAccum = ref(0)
@@ -226,30 +218,22 @@ export function useL2Adjudication(options: UseL2AdjudicationOptions) {
 
   // ─── onAdjustmentCreated（EventBus监听） ───────────────────────────────
 
-  function onAdjustmentCreated(payload: AdjustmentPayload): void {
-    if (payload.wpCode !== 'L2') return
-    if (payload.entryType === 'AJE') {
-      eventAjeAccum.value += payload.amount
-    } else if (payload.entryType === 'RJE') {
-      eventRjeAccum.value += payload.amount
-    }
+  /**
+   * 处理 adjustment:created 事件
+   * mitt Events 中 'adjustment:created' 为 void 类型，这里重新加载明细数据来同步
+   */
+  function onAdjustmentCreated(): void {
+    // adjustment:created 事件触发时，从 allResponses 重新计算即可
+    // 因为 useL2Adjustment.persistEntries() 已经将最新数据写入 allResponses
+    // rows computed 会自动响应 allResponses 变化
   }
 
-  // ─── EventBus Registration ─────────────────────────────────────────────
+  // ─── EventBus Registration（mitt 类型安全） ────────────────────────────
 
-  const adjustmentHandler = (e: Event) => {
-    const detail = (e as CustomEvent).detail
-    if (detail) onAdjustmentCreated(detail)
-  }
-  if (typeof window !== 'undefined') {
-    window.addEventListener('adjustment:created', adjustmentHandler)
-    eventListeners.push({ event: 'adjustment:created', handler: adjustmentHandler })
-  }
+  eventBus.on('adjustment:created', onAdjustmentCreated)
 
   onBeforeUnmount(() => {
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
-    }
+    eventBus.off('adjustment:created', onAdjustmentCreated)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────

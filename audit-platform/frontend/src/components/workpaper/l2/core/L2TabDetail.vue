@@ -31,7 +31,10 @@
     <!-- ═══ 计提核对指示器（接收L1/L3） ═══ -->
     <div class="accrual-check-bar">
       <div class="accrual-check-item">
-        <span class="accrual-label">L1/L3计提核对：</span>
+        <span class="accrual-label">计提核对：</span>
+        <GtIndexChip value="L1" context="L1短期借款利息测算" class="cross-chip" />
+        <GtIndexChip value="L3" context="L3长期借款利息测算" class="cross-chip" />
+        <span class="accrual-arrow">→</span>
         <template v-if="isInterestDataReady">
           <span :class="accrualCheckClass">
             <template v-if="accrualVsL1L3.isConsistent">
@@ -45,6 +48,8 @@
         <template v-else>
           <span class="accrual-pending">⏳ 待L1/L3利息测算完成</span>
         </template>
+        <span class="accrual-arrow">→</span>
+        <GtIndexChip value="L8" context="L8财务费用-利息支出" class="cross-chip" />
       </div>
       <div class="accrual-check-item">
         <span class="accrual-label">L1测算：</span>
@@ -609,13 +614,14 @@
  *
  * 科目：2231 应付利息（贷方/负债类！）
  */
-import { computed, inject, toRef, ref } from 'vue'
+import { computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus, ArrowDown, MagicStick, WarningFilled } from '@element-plus/icons-vue'
 import { useL2FormData } from '../../composables/useL2FormData'
 import { useL2Detail, SOURCE_OPTIONS, type DetailRow, type AreaGroup } from '../../composables/useL2Detail'
 import { useL2CrossSheet } from '../../composables/useL2CrossSheet'
 import { useL2ImportExport } from '../../composables/useL2ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -756,9 +762,6 @@ function handleRemoveRow(rowId: string): void {
 
 // ─── 导入导出 ────────────────────────────────────────────────────────────────
 
-/** 隐藏的 file input ref */
-const fileInputRef = ref<HTMLInputElement | null>(null)
-
 async function handleImportExportCommand(command: string): Promise<void> {
   switch (command) {
     case 'exportTemplate':
@@ -898,6 +901,16 @@ function fmtAmount(val: number | null | undefined): string {
 .accrual-pending {
   color: #e6a23c;
   font-style: italic;
+}
+
+.cross-chip {
+  margin: 0 2px;
+}
+
+.accrual-arrow {
+  color: #909399;
+  font-size: 12px;
+  margin: 0 2px;
 }
 
 /* ─── 工具栏 ─── */

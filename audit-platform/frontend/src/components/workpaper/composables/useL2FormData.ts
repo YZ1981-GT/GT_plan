@@ -19,6 +19,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -222,12 +223,13 @@ export function useL2FormData(options: UseL2FormDataOptions) {
         account_code: '2231',
         audited_amount: auditedAmount,
       })
-      // 发布 EventBus 通知审定数变更
-      try {
-        window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-          detail: { wpCode: 'L2', accountCode: '2231', auditedAmount },
-        }))
-      } catch { /* EventBus publish 失败不阻塞 */ }
+      // 发布 mitt EventBus 通知审定数变更（附注等组件订阅刷新）
+      eventBus.emit('substantive:adjudicated', {
+        accountCode: '2231',
+        auditedAmount,
+        wpCode: 'L2',
+        timestamp: Date.now(),
+      })
     } catch {
       ElMessage.warning('审定数回写失败，请手动确认试算表数据')
     }

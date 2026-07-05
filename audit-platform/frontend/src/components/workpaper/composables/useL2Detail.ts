@@ -22,6 +22,7 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { calcLiabilityEndBalance, calcSubtotal } from './useL2FormulaEngine'
 import type { ChecklistResponse } from './useL2FormData'
 
@@ -68,6 +69,7 @@ export interface UseL2DetailOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
   projectId: Ref<string>
+  wpCode?: Ref<string>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   saveField: (itemId: string, value: { conclusion?: string; remark?: string }) => Promise<void>
 }
@@ -202,7 +204,7 @@ export function createEmptyRow(source?: string): DetailRow {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useL2Detail(options: UseL2DetailOptions) {
-  const { allResponses, wpId, projectId, debouncedSave, saveField } = options
+  const { allResponses, wpId, projectId, wpCode, debouncedSave, saveField } = options
 
   // ─── Reactive rows ─────────────────────────────────────────────────────
 
@@ -293,6 +295,37 @@ export function useL2Detail(options: UseL2DetailOptions) {
   const overdueTotal: ComputedRef<number> = computed(() => {
     return calcSubtotal(overdueRows.value.map(r => r.endBalance))
   })
+
+  // ─── L2→L8 联动：发布 l2:accrual-calculated 事件 ───────────────────────
+
+  /**
+   * 当明细行 accrued（本期计提）变化时，广播总计提额供 L8 财务费用订阅。
+   * 事件载荷：totalAccrued + bySource 分类。
+   * Requirements: 4.6 (L2→L8联动)
+   */
+  watch(
+    () => rows.value.map(r => r.accrued),
+    () => {
+      const totalAccrued = calcSubtotal(rows.value.map(r => r.accrued))
+      const bySource: Array<{ source: string; amount: number }> = []
+      const sourceMap: Record<string, number> = {}
+      for (const row of rows.value) {
+        if (!row.source) continue
+        sourceMap[row.source] = (sourceMap[row.source] || 0) + row.accrued
+      }
+      for (const [source, amount] of Object.entries(sourceMap)) {
+        bySource.push({ source, amount })
+      }
+
+      eventBus.emit('l2:accrual-calculated', {
+        wpCode: wpCode?.value || 'L2',
+        totalAccrued,
+        bySource,
+        timestamp: Date.now(),
+      })
+    },
+    { deep: true },
+  )
 
   // ─── addRow ────────────────────────────────────────────────────────────
 

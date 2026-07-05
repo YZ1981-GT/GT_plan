@@ -17,6 +17,7 @@
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { calcSubtotal } from './useL2FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useL2FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -282,24 +283,9 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
    * 发布 adjustment:created EventBus 事件
    * L2-1 审定表监听此事件以累加 AJE/RJE
    */
-  function publishAdjustmentCreated(entry: AdjustmentEntry): void {
-    // 对应付利息科目(2231)的净调整额
-    const amount = entry.accountCode === '2231'
-      ? (entry.creditAmount - entry.debitAmount)
-      : 0
-
-    if (amount === 0) return
-
-    try {
-      window.dispatchEvent(new CustomEvent('adjustment:created', {
-        detail: {
-          wpCode: 'L2',
-          entryType: entry.entryType,
-          amount,
-          accountCode: entry.accountCode,
-        },
-      }))
-    } catch { /* EventBus publish 失败不阻塞 */ }
+  function publishAdjustmentCreated(_entry: AdjustmentEntry): void {
+    // 使用 mitt eventBus 发布（payload 为 void 类型，符合 Events 定义）
+    eventBus.emit('adjustment:created')
   }
 
   // ─── submitAdjustment（提交/同步） ─────────────────────────────────────
