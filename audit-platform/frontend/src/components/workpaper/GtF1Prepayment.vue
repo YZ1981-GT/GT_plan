@@ -33,7 +33,13 @@
         <el-tabs v-model="activeTab" type="border-card" class="f1-tabs">
           <!-- Tab 1: F1A 程序表 -->
           <el-tab-pane name="procedure" label="F1A 程序表" lazy>
-            <component :is="F1TabProcedure" v-if="activeTab === 'procedure'" />
+            <F1TabProcedure
+              v-if="activeTab === 'procedure'"
+              :wp-id="wpIdRef"
+              :project-id="projectIdRef"
+              :html-data="htmlData"
+              :is-readonly="isReadonly"
+            />
           </el-tab-pane>
 
           <!-- Tab 2: F1-1 审定表 -->
@@ -217,11 +223,7 @@ const F1TabDisclosureSoe = defineAsyncComponent(() => import('./f1/F1TabDisclosu
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
-// F1A 程序表复用 a-program-console 逻辑
-const F1TabProcedure = defineAsyncComponent(() => import('./f1/F1TabAdjudication.vue')
-  .then(() => ({ template: '<el-empty description="F1A 程序表（复用 a-program-console）" />' }) as any)
-  .catch(() => ({ template: '<el-empty description="F1A 程序表加载中..." />' }) as any)
-)
+const F1TabProcedure = defineAsyncComponent(() => import('./f1/F1TabProcedure.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

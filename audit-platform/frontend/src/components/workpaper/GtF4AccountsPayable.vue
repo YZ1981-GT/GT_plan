@@ -3,6 +3,13 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div class="f4-accounts-payable-toolbar">
+        <el-segmented
+          v-if="isHtmlSheet"
+          v-model="dualMode.currentMode.value"
+          :options="dualMode.modeOptions"
+          size="small"
+          @change="dualMode.onModeChange"
+        />
         <CycleImportExportDropdown
           v-if="importExportCtx"
           :wp-id="props.wpId"
@@ -13,15 +20,25 @@
           @imported="onImported"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
-        v-if="currentSheet === 'F4A'"
+        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+      />
+
+      <CycleTabProcedure
+        v-else-if="currentSheet === 'F4A'"
+        sheet-code="F4A"
+        :html-data="props.htmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
       />
 
       <CycleTabAdjudication
@@ -61,8 +78,10 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import { useF4AccPayFormData } from './composables/useF4AccPayFormData'
+import { useF4DualMode } from './composables/useF4DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import CycleImportExportDropdown from './shared/CycleImportExportDropdown.vue'
 import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
 import { isImportExportSheet, resolveImportExportSheet } from './shared/cycleImportExportRegistry'
@@ -96,6 +115,18 @@ const currentSheet = computed(() => {
 })
 
 const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
+
+const isHtmlSheet = computed(() => {
+  const s = currentSheet.value
+  return s === 'F4A' || !!adjudicationConfig.value || s.startsWith('附注')
+})
+
+const dualMode = useF4DualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
+
 const importExportCtx = computed(() =>
   isImportExportSheet('f4', currentSheet.value)
     ? resolveImportExportSheet('f4', currentSheet.value)

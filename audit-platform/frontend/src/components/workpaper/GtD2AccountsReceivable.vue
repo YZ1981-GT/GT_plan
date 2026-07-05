@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="d2-accounts-receivable">
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
@@ -285,7 +285,7 @@ const renderMode = computed({
 })
 
 const renderModeOptions = computed(() => [
-  { label: 'HTML精美化', value: 'html' as const },
+  { label: '结构化视图', value: 'html' as const },
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,

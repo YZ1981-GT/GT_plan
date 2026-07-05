@@ -4,7 +4,7 @@
   职责：
   - el-table 展示 15 列控制点清单
   - 命名下拉选项（认定/控制属性/控制频率/测试方法/是否识别偏差）
-  - 动态增删控制点行（ElMessageBox.prompt 命名）
+  - 动态增删控制点行（emit add-request → parent Dialog）
   - 样本规模建议 tooltip（useSampleSizeEngine）
   - 索引号列 GtIndexChip → ctrl-{m} 子页导航
 
@@ -365,6 +365,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate', view: string): void
+  (e: 'add-request'): void
 }>()
 
 // ─── 命名区域下拉常量（源模板选项清单列表） ──────────────────────────────────
@@ -483,24 +484,8 @@ function onSampleSizeChange(index: number, value: number | null) {
 
 // ─── 动态增删 ────────────────────────────────────────────────────────────────
 
-async function handleAddControlPoint() {
-  try {
-    const { value } = await ElMessageBox.prompt(
-      '请输入控制点名称',
-      '新增控制点',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        inputPattern: /\S+/,
-        inputErrorMessage: '控制点名称不能为空',
-      },
-    )
-    if (value?.trim()) {
-      props.addControlPoint(value.trim())
-    }
-  } catch {
-    // 用户取消
-  }
+function handleAddControlPoint() {
+  emit('add-request')
 }
 
 function handleRemoveControlPoint(index: number) {

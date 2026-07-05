@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG4SppiDualMode — G4 债权投资(SPPI组) HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g4-bond-investment-sppi/ Task 1.4 / Req 8.6
@@ -25,8 +25,8 @@ export function useG4SppiDualMode(options: UseG4SppiDualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

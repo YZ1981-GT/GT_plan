@@ -64,6 +64,9 @@ from ._g5_long_term_receivable import render as render_g5_long_term_receivable
 from ._g6_other_bond_investment_main import render as render_g6_other_bond_investment_main
 from ._g6_other_bond_investment_sppi import render as render_g6_other_bond_investment_sppi
 from ._g6_other_bond_investment_ecl import render as render_g6_other_bond_investment_ecl
+from ._g7_long_term_equity_main import render as render_g7_long_term_equity_main
+from ._g7_long_term_equity_method import render as render_g7_long_term_equity_method
+from ._g7_long_term_equity_subsidiary import render as render_g7_long_term_equity_subsidiary
 from ._g8_other_equity_instruments import render as render_g8_other_equity_instruments
 from ._g9_other_noncurrent_financial import render as render_g9_other_noncurrent_financial
 from ._g10_trading_financial_liabilities import render as render_g10_trading_financial_liabilities
@@ -71,8 +74,12 @@ from ._g11_investment_income import render as render_g11_investment_income
 from ._g12_net_hedge_gains import render as render_g12_net_hedge_gains
 from ._g13_fair_value_changes import render as render_g13_fair_value_changes
 from ._g14_credit_impairment_loss import render as render_g14_credit_impairment_loss
+from ._h10_asset_disposal_income import render as render_h10_asset_disposal_income
 from ._e1_monetary_fund import render as render_e1_monetary_fund
 from ._g0_confirmation import render_g0_diff_securities, render_g0_alternative
+from ._h0_confirmation import render_h0_alternative
+from ._c1_entity_level_control import render as render_c1_entity_level_control
+from ._c_control_test import render as render_c_control_test
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -137,6 +144,9 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "g6-other-bond-investment-main": render_g6_other_bond_investment_main,
     "g6-other-bond-investment-sppi": render_g6_other_bond_investment_sppi,
     "g6-other-bond-investment-ecl": render_g6_other_bond_investment_ecl,
+    "g7-long-term-equity-main": render_g7_long_term_equity_main,
+    "g7-long-term-equity-method": render_g7_long_term_equity_method,
+    "g7-long-term-equity-subsidiary": render_g7_long_term_equity_subsidiary,
     "g8-other-equity-instruments": render_g8_other_equity_instruments,
     "g9-other-noncurrent-financial": render_g9_other_noncurrent_financial,
     "g10-trading-financial-liabilities": render_g10_trading_financial_liabilities,
@@ -144,6 +154,10 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "g12-net-hedge-gains": render_g12_net_hedge_gains,
     "g13-fair-value-changes": render_g13_fair_value_changes,
     "g14-credit-impairment-loss": render_g14_credit_impairment_loss,
+    "h10-asset-disposal-income": render_h10_asset_disposal_income,
     "confirmation-diff-securities": render_g0_diff_securities,
     "confirmation-alternative-g06": render_g0_alternative,
+    "confirmation-alternative-h05": render_h0_alternative,
+    "c1-entity-level-control": render_c1_entity_level_control,
+    "c-control-test": render_c_control_test,
 }

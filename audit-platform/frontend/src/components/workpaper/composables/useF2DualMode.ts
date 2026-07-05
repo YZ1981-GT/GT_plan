@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useF2DualMode — F2 HTML ↔ OnlyOffice 双模式（比照 useD4DualMode / useF3DualMode）
  */
 import { ref, onMounted, type Ref } from 'vue'
@@ -23,8 +23,8 @@ export function useF2DualMode(options: UseF2DualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

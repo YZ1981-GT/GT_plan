@@ -44,9 +44,10 @@
     <template v-else>
     <!-- ─── 顶部：进度条 + 工具栏 ─── -->
     <div class="gt-a-program-console__header">
-      <!-- 进度条 -->
+      <!-- 进度条（循环 *A 程序表对齐 D4A：仅保留状态标签，隐藏灰色进度条） -->
       <div class="gt-a-program-console__progress">
         <el-progress
+          v-if="!cycleSheetMode"
           :percentage="progressPercentage"
           :stroke-width="18"
           :text-inside="true"
@@ -84,7 +85,7 @@
 
       <!-- 工具栏：类别筛选 + 批量操作 -->
       <div class="gt-a-program-console__toolbar">
-        <div v-if="!hideCategories" class="gt-a-program-console__filters">
+        <div v-if="!hideCategories && !cycleSheetMode" class="gt-a-program-console__filters">
           <el-radio-group v-model="activeCategory" size="small">
             <el-radio-button label="">全部</el-radio-button>
             <el-radio-button
@@ -521,6 +522,7 @@ import { useWpOnboardingGuide } from '@/composables/useWpOnboardingGuide'
 import { useAProgramReview } from '@/composables/useAProgramReview'
 import { useAProgramData } from '@/composables/useAProgramData'
 import { useAProgramPopups } from '@/composables/useAProgramPopups'
+import { normalizeAProgramRows } from '@/components/workpaper/composables/parseProgramSubSteps'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
 import { isReviewRoleRef } from '@/components/workpaper/reviewWpResolve'
 
@@ -584,9 +586,12 @@ const props = withDefaults(defineProps<{
   htmlData: AProgramHtmlData
   readonly?: boolean
   hideCategories?: boolean
+  /** 循环底稿 *A 程序表（D4A 样式）：隐藏类别筛选/类别列/五项认定列 */
+  cycleSheetMode?: boolean
 }>(), {
   readonly: false,
   hideCategories: false,
+  cycleSheetMode: false,
 })
 
 const emit = defineEmits<{
@@ -724,8 +729,21 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 initData()
 
+function syncCycleExpandKeys() {
+  if (!props.cycleSheetMode) return
+  const firstWithSteps = programs.value.find(p => p.sub_steps && p.sub_steps.length > 0)
+  if (firstWithSteps && expandedRowKeys.value.length === 0) {
+    expandedRowKeys.value = [firstWithSteps.id]
+  }
+}
+
 watch(() => props.htmlData, () => {
   initData()
+  syncCycleExpandKeys()
+}, { deep: true })
+
+watch(programs, () => {
+  syncCycleExpandKeys()
 }, { deep: true })
 
 // ─── Self-load: 当 htmlData.programs 为空时从 render-config 加载 ───
@@ -738,7 +756,7 @@ async function selfLoad() {
     )
     const data = res?.sheets?.[0]?.html_data
     if (data?.programs?.length) {
-      programs.value = data.programs.map((p: any, i: number) => ({
+      programs.value = normalizeAProgramRows(data.programs.map((p: any, i: number) => ({
         id: p.id || `row-${i + 1}`,
         program_no: p.program_no ?? i + 1,
         program_desc: p.program_desc || '',
@@ -751,13 +769,14 @@ async function selfLoad() {
         sub_steps: p.sub_steps || [],
         assertions: p.assertions || {},
         phase: p.phase || '',
-      }))
+      }))) as typeof programs.value
     }
   } catch { /* silent — 降级显示空态 */ }
 }
 
 onMounted(() => {
   selfLoad()
+  syncCycleExpandKeys()
 })
 
 // ─── Computed ───
@@ -797,9 +816,10 @@ const progressPercentage = computed(() => {
   return Math.round((done / total) * 100)
 })
 
-/** 当任意程序行有非空 assertions 时显示认定列，否则隐藏（A1 等总括程序表无认定列） */
+/** 当任意程序行有非空 assertions 时显示认定列（循环 *A 程序表强制隐藏，对齐 D4A） */
 const hasAssertions = computed(() =>
-  programs.value.some(p => p.assertions && Object.values(p.assertions).some(Boolean))
+  !props.cycleSheetMode
+  && programs.value.some(p => p.assertions && Object.values(p.assertions).some(Boolean))
 )
 
 /** 阶段分组标签映射 */
@@ -854,9 +874,10 @@ const gridFallback = computed(() => {
   return props.htmlData?.grid_fallback ?? null
 })
 
-/** 当任意程序行有非空类别时显示类别列 */
+/** 当任意程序行有非空类别时显示类别列（循环 *A 程序表强制隐藏，对齐 D4A） */
 const hasCategory = computed(() =>
-  programs.value.some(p => p.program_category && p.program_category.trim() !== '')
+  !props.cycleSheetMode
+  && programs.value.some(p => p.program_category && p.program_category.trim() !== '')
 )
 
 // ─── Methods ───

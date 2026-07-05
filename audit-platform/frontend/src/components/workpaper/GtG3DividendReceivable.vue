@@ -24,14 +24,14 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- G3A 程序表 → OnlyOffice -->
-      <GtOnlyOfficeSheet
+      <!-- G3A 程序表（对齐 D4A） -->
+      <CycleTabProcedure
         v-else-if="currentSheet === 'G3A'"
+        sheet-code="G3A"
+        :html-data="props.htmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
-        :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
-        style="height: calc(100vh - 180px)"
+        :is-readonly="isReadonly"
       />
 
       <CycleTabAdjudication
@@ -116,7 +116,7 @@
  * GtG3DividendReceivable.vue — G3 应收股利底稿主入口
  *
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 1.1, 9.1~9.3
- * sheetName 分发到 G3 专属子组件（G3-1~G3-5 + 附注），G3A/未迁移走 OnlyOffice
+ * sheetName 分发到 G3 专属子组件（G3A + G3-1~G3-5 + 附注），未迁移走 OnlyOffice
  * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式
  * EventBus：监听 g3:save-items 持久化 + substantive:adjudicated(1131)
  */
@@ -125,6 +125,7 @@ import { useG3DivRecFormData } from './composables/useG3DivRecFormData'
 import { useG3DualMode } from './composables/useG3DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
@@ -163,10 +164,10 @@ const currentSheet = computed(() => {
 
 const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
 
-/** G3-1~G3-5 + 附注 为 HTML 专属组件（支持双模式） */
+/** G3A + G3-1~G3-5 + 附注 为 HTML 专属组件（支持双模式） */
 const isHtmlSheet = computed(() => {
   const s = currentSheet.value
-  return /^G3-[1-5]$/.test(s) || s.startsWith('附注') || !!adjudicationConfig.value
+  return s === 'G3A' || /^G3-[1-5]$/.test(s) || s.startsWith('附注') || !!adjudicationConfig.value
 })
 
 const dualMode = useG3DualMode({

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG13DualMode — G13 HTML ↔ OnlyOffice 双模式
  * Spec: .kiro/specs/g13-fair-value-changes/ Task 4.2
  */
@@ -16,8 +16,8 @@ export function useG13DualMode(options: {
   const isOoAvailable = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

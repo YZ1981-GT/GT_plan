@@ -62,6 +62,32 @@ def _build_program_sheet(tmp_path, sheet_name="应收票据审计程序表D1A"):
     return fp, sheet_name
 
 
+def test_extract_rows_with_sub_steps(tmp_path):
+    """xlsx 单元格含（1）（2）子步骤时应拆分为 sub_steps。"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "债权投资实质性程序表G4A"
+    ws["A15"] = "序号"
+    ws["B15"] = "审计程序"
+    ws["C15"] = "程序分类"
+    ws["I15"] = "底稿索引"
+    ws["A17"] = 1
+    ws["B17"] = (
+        "获取或编制债权投资明细表，完成以下工作："
+        "（1）检查初始确认；"
+        "（2）与总账核对相符。"
+    )
+    fp = tmp_path / "g4a.xlsx"
+    wb.save(str(fp))
+    wb.close()
+    programs = extract_program_rows(fp, "债权投资实质性程序表G4A")
+    assert len(programs) == 1
+    assert programs[0]["sub_steps"]
+    assert len(programs[0]["sub_steps"]) == 2
+    assert "债权投资" in programs[0]["program_desc"]
+    assert "（1）" not in programs[0]["program_desc"]
+
+
 def test_extract_basic_rows(tmp_path):
     fp, sn = _build_program_sheet(tmp_path)
     programs = extract_program_rows(fp, sn)

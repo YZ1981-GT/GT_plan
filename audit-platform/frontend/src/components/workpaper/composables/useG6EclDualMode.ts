@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG6EclDualMode — G6 其他债权投资(ECL组) HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 4.2 / Req 6.6
@@ -25,8 +25,8 @@ export function useG6EclDualMode(options: UseG6EclDualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

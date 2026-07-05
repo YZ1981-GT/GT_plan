@@ -102,9 +102,9 @@ inclusion: always
 - **🔵 G13公允价值变动收益**：三件套齐全待开发(6sheet/4需求/6PBT/8任务6波次，最简洁)
 - **🔵 G14信用减值损失**：三件套齐全待开发(6sheet/4需求/7PBT/8任务6波次，坏账滚动)
 - **✅ G6其他债权投资-ecl**：全部完成(39/39任务全绿，主入口sheetName v-if分发+5子组件(impairment4+voucher1)+8composable+后端3py+useG6EclFormulaEngine 8纯函数+三阶段Stage判定+ECL公式链⑥=⑤×②A+①×(②A-②)+凭证OCR+抽凭引擎+借贷平衡+转回校验+导入导出3表9端点+AI 4section+6PBT+33单元+16组件逻辑+20集成测试)
-- **🔵 G6/G7三组拆分(三件套齐全待开发)**：
-  - G6其他债权投资：main(8sheet/7需求/8PBT/11任务8波次,77行8层审定+33列3Tab+ECL公式链)/sppi(6sheet/7需求/10PBT/14任务6波次,SPPI80行6section+业务模式chip+利息实际利率法)/~~ecl~~✅已完成
-  - G7长期股权投资：main(7sheet/6需求/9PBT/12任务7波次,97行5组审定+54列5Tab+355行附注)/equity-method(8sheet/7需求/9PBT/11任务7波次,权益法测算★+内部交易顺逆流+减值MAX)/subsidiary(7sheet/7需求/8PBT/13任务10波次,CAS33控制六要素+同控/非同控+处置一揽子)
+- **🔵 G6/G7三组拆分**：
+  - G6其他债权投资：~~main~~✅/~~sppi~~✅/~~ecl~~✅ 全部完成
+  - G7长期股权投资：✅**main全部完成(42/42)**+✅**equity-method全部完成(42/42)**+✅**subsidiary全部完成(50/50)**，主入口sheetName v-if分发+7子组件(G7A程序表+G7-1审定表97行5组+G7-2明细表54列5区段Tab+G7-3调整分录+底稿目录+附注上市253行+附注国企355行)+4composable+后端4py+useG7FormulaEngine 8纯函数+9PBT(fast-check)+4单元测试文件(67tests)+后端12PBT(hypothesis)+11集成测试=90测试全绿+6大集成+导入导出2表6端点+AI 2section；权益法组主入口+8子组件(info3+calculation3+impairment2)+4composable+后端3py+useG7EquityMethodFormulaEngine 9纯函数+14PBT(fast-check)+36前端单元测试+21后端测试=71测试全绿+导入导出7表21端点+AI 4section；子公司组主入口sheetName v-if分发+7子组件(initial3+subsequent1+disposal2+voucher1)+4composable+后端4py+useG7SubFormulaEngine 8纯函数+8PBT(fast-check 10tests)+前端152单元测试+后端13PBT+14单元+16集成=205测试全绿+6大集成+导入导出6表18端点+AI 5section+G7-18 3区段Tab+虚拟滚动降级分页
 - **🔵 G13公允价值变动收益**：requirements已创建(8sheet/4需求/6PBT，最简单损益+交叉勾稽)待design+tasks
 - **🔵 G14信用减值损失**：requirements已创建(8sheet/4需求/7PBT，借方费用+ECL汇总勾稽)待design+tasks
 - **✅ voucher-sampling-engine**：全部完成(5种算法+4端点+5Vue组件+D2集成+8后端PBT+13前端PBT+21集成+81单元=123测试全绿)
@@ -126,7 +126,7 @@ inclusion: always
 - **🔵 H7生产性生物资产**：三件套齐全待开发(26sheet/14需求/12PBT/~55任务,双计量+行业守卫农林牧渔+产量记录+互转)
 - **🔵 H8使用权资产**：三件套齐全待开发(20sheet/11需求/10PBT/~50任务,CAS21核心+H9强联动+H8-6/H8-8双分支+简化处理)
 - **🔵 H9租赁负债**：三件套齐全待开发(~10sheet/8需求/8PBT/~35任务,CAS21配对+负债贷方+摊销表实际利率法+现值折现)
-- **🔵 H10资产处置损益**：三件套齐全待开发(8sheet/7需求/6PBT/~28任务,损益类取发生额!+联动H1~H8减少+H6清理)
+- **✅ H10资产处置损益**：`h10-asset-disposal-income` 全量完成(8sheet/6115损益类发生额/7审定行+3区段明细+检查表+附注；vitest 24 + pytest 11 + E2E 10)
 - **🔵 I1无形资产**：三件套齐全待开发(18sheet/14需求/12PBT/~55任务,摊销2分支+DCF减值+三科目+权属94行+I2转入)
 - **🔵 I2开发支出**：三件套齐全待开发(21sheet/14需求/10PBT/~55任务,CAS6五条件核心+I6↔I2双向+I1转入+4类检查+截止双向)
 - **🔵 I3商誉**：三件套齐全待开发(15sheet/10需求/8PBT/~40任务,不摊销!仅年度减值+DCF/CGU+先冲商誉再分摊+100×16+153行)
@@ -150,7 +150,12 @@ inclusion: always
   - `s-estimate-calculation-workpapers`(计算型专属4componentType:s15-eps-roe/s21-data-asset/s20-revenue-deduction/s3-policy-change,纯函数公式引擎EPS加权股数+ROE+资本化归集,审定回写,11需求/8波)
   - `s-special-transaction-workpapers`(交易/专家/检查型:6专属s4/s5/s6/s12/s13/s14+检查表型走a-program-console,S4商业实质IF/S5债权债务人损益/S12专家3分支/S17旧xls转换,11需求/8波)
   - bundle类均对齐a17-bundle;专属类均对齐D4;S类程序表主体用a-program-console embedded
+- **✅ C1企业层面控制重构完成**：从sheetName v-if平铺改为"主控台+多级Dialog/Drawer向导模式"（九段折叠进度→步骤弹窗55%→过程记录全屏Dialog→嵌套Detail 70%→样本表85%→示例Drawer 45%），1908行SFC，0 TS诊断。子sheet(C1-1~C1-4-6)在wp_code_overrides标记skip+从_WHOLE_WP_MULTISHEET_DEDICATED移除→外层tab只显示主程序表1个页签
+- **🔴 向导式组件隐藏子sheet tab方法**：①wp_code_overrides子编码标skip ②保留_WHOLE_WP_MULTISHEET_DEDICATED(否则主sheet走class_code派生丢专属组件) ③wp_render_config的skip过滤用`_SHEET_CODE_RE`尾部正则匹配不到头部编码(如"C1-1 xx")→需补充`re.match(r'([A-Z]\d+(?:-\d+)*)', sheet_name)`头部提取
 - **🔵 C类控制测试5 spec三件套齐全待开发**(源模板36 xlsx无VBA,导航靠底稿目录+命名区域下拉,分析工具backend/scripts/analyze_c_category.py+dump_c_content.py。C2~C15已归档c-control-test-component)：
+  - **✅ C2~C15统一方向已完成**：c-control-test从视图切换改为弹窗层叠模式(L0汇总表始终可见+L1控制详情Dialog 80%+L2偏差评价Dialog 65%嵌套)，14循环共用，子组件(SummaryTable/SubPage/DecisionTree)不动
+  - **✅ C2~C15新增控制点交互已完成**："+新增"→弹出65% Dialog填写15字段(3列grid+AI辅助描述)+频率→样本量建议提示→保存入库→汇总表自动增行；FAB"+"同入口；汇总表保留inline快编辑
+  - **🔵 C2~C15新增弹窗增强**：待实现①编制提示(琥珀色块)放弹窗顶部供用户参考+作为AI system context ②附件上传区(右上卡片)上传制度/访谈/合同→OCR识别→作为AI生成"控制描述"的参考材料
   - `c1-entity-level-control`(C1企业层面控制,COSO五要素分组程序中控台+C1-4财报内控6子表样本勾稽,8需求/6波)
   - `c22-itgc-bundle`(C22 IT一般控制34sheet:SA信息安全/PE运行维护/PM程序变更/NS新系统4大类+主矩阵总览+缺陷联动汇总C21-1,含C21 IT专业成员,9需求/7波)
   - `c23-c24-journal-entry-testing`(C23分录控制测试人员核对+C24分录细节测试useC24AnalyticsEngine:借贷平衡/科目对比/跳号/异常筛选/本福特首位数分布,分录导入,8需求/7波) ✅**全部完成(25/25任务)**
@@ -175,7 +180,7 @@ inclusion: always
 - **router_registry 必查**；**service 只 flush 不 commit**
 - **新增 componentType 必须同步更新 VALID_COMPONENT_TYPES**
 - **Bundle wpIdMap必须用item.wp_id不能用item.id**
-- **D~N专属组件必须有RENDERER_DISPATCH注册**（否则被onlyoffice-sheet吞掉）
+- **D~N专属组件必须有RENDERER_DISPATCH注册**（否则被onlyoffice-sheet吞掉）——C类同理！c1-entity-level-control曾因缺render策略py+DISPATCH注册导致前端只显示OO
 - **D~N专属组件不能有内部el-tabs**：接sheetName prop用v-if分发
 - **🔴 专属组件复盘3查（F5血泪）**：①双模式别漏——主入口HTML sheet顶部必须放el-segmented(HTML/OO)+useXDualMode，否则Req双模式回归且composable变死代码 ②EventBus跨表值(如审定成本)必须持久化到checklist_responses(独立item_id)+render策略回读seed，只靠同会话事件刷新后丢失 ③TB自动取数字段(只读)必须真接线：render策略查tb_balance(get_active_filter)→html_data返回→FormData提取→组件watch seed setTbValues，光有setter没人调=假只读手填
 - **account_package_registry sheets顺序=目录行顺序**

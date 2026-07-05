@@ -438,7 +438,7 @@ sheets:
       - A2:I2
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   替代程序H0-5:
-    component_type: a-program-console
+    component_type: confirmation-alternative-h05
     class_code: A-替代程序
     fixed_cells:
       A1: 致同会计师事务所

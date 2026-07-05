@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG6SppiDualMode — G6 其他债权投资(SPPI组) HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g6-other-bond-investment-sppi/ Task 1.9 / Req 7.7
@@ -25,8 +25,8 @@ export function useG6SppiDualMode(options: UseG6SppiDualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

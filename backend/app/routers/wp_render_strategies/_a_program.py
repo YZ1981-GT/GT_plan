@@ -16,48 +16,7 @@ from ._context import RenderContext
 logger = logging.getLogger(__name__)
 
 
-def _parse_sub_steps(content: str) -> tuple[str, list[dict]]:
-    """解析程序 content 为父描述 + 子步骤列表。
-
-    模板 content 格式：
-        "获取或编制应收账款明细表，执行以下程序：\n（1）复核加计…\n（2）检查…"
-    解析为：
-        parent_desc = "获取或编制应收账款明细表，执行以下程序："
-        sub_steps = [{"no": 1, "text": "复核加计…"}, {"no": 2, "text": "检查…"}]
-
-    支持中文括号（N）和英文括号(N)两种编号格式。
-    无子步骤时 sub_steps 为空列表，parent_desc 为原始 content。
-    """
-    import re
-
-    if not content:
-        return "", []
-
-    # 按换行拆分（模板中 \n 已为实际换行）
-    lines = [ln.strip() for ln in content.split("\n") if ln.strip()]
-    if not lines:
-        return content.strip(), []
-
-    # 匹配子步骤行：以（N）或 (N) 开头
-    step_pattern = re.compile(r"^[（\(](\d+)[）\)]\s*(.*)")
-
-    parent_lines: list[str] = []
-    sub_steps: list[dict] = []
-    in_steps = False
-
-    for line in lines:
-        m = step_pattern.match(line)
-        if m:
-            in_steps = True
-            sub_steps.append({"no": int(m.group(1)), "text": m.group(2)})
-        elif in_steps and sub_steps:
-            # 续行（子步骤跨行）
-            sub_steps[-1]["text"] += line
-        else:
-            parent_lines.append(line)
-
-    parent_desc = "\n".join(parent_lines) if parent_lines else (lines[0] if lines else content)
-    return parent_desc, sub_steps
+from app.services.wp_program_sub_steps import enrich_program_row, parse_sub_steps
 
 
 async def _generate_a_program_data(
@@ -106,7 +65,7 @@ async def _generate_a_program_data(
                     applicable = it.get("applicable")
                     status = "not_applicable" if applicable == "na" else "pending"
                     # 解析子程序步骤：content 中 \n（N）... 格式为子步骤
-                    parent_desc, sub_steps = _parse_sub_steps(desc)
+                    parent_desc, sub_steps = parse_sub_steps(desc)
                     programs.append({
                         "id": f"row-{it.get('seq')}",
                         "program_no": it.get("seq"),
@@ -133,6 +92,7 @@ async def _generate_a_program_data(
     if not programs and file_path:
         try:
             programs = extract_program_rows(file_path, sheet_name)
+            programs = [enrich_program_row(p) for p in programs]
         except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
             logger.warning("A-程序表提取失败 %s/%s: %s", file_path, sheet_name, e)
             programs = []

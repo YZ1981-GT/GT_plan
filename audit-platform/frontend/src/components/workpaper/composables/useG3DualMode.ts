@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG3DualMode — G3 应收股利 HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 8.2 / Req 14.1~14.4
@@ -25,8 +25,8 @@ export function useG3DualMode(options: UseG3DualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

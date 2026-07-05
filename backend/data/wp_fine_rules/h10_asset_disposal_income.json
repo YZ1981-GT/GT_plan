@@ -4,7 +4,7 @@
   "version": "2025-R5",
   "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/H10.yaml",
   "account_codes": [
-    "6702"
+    "6115"
   ],
   "source_files": [
     {

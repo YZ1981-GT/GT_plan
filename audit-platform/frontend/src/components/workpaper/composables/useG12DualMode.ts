@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG12DualMode — G12 HTML ↔ OnlyOffice
  */
 import { ref, onMounted, type Ref } from 'vue'
@@ -10,8 +10,8 @@ export function useG12DualMode(options: { wpId: Ref<string>; reloadAll?: () => P
   const currentMode = ref<G12RenderMode>('html')
   const isOoAvailable = ref(false)
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

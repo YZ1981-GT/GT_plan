@@ -202,4 +202,9 @@ describe('G4 集成: defineAsyncComponent 懒加载', () => {
     }
     expect(g4aConfig.componentType).toBe('a-program-console')
   })
+
+  it('G4A 程序表壳层对齐 D4A（无抽凭引擎 toolbar）', async () => {
+    const { G_CYCLE_PROCEDURE_SHEETS } = await import('../composables/cycleProcedureSheets')
+    expect(G_CYCLE_PROCEDURE_SHEETS.G4A.sheetLabel).toBe('债权投资实质性程序表G4A')
+  })
 })

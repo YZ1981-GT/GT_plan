@@ -7,22 +7,41 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <div v-if="isProcedureSheet" class="l2-procedure-toolbar">
+        <el-segmented
+          v-model="procedureDualMode.currentMode.value"
+          :options="procedureDualMode.modeOptions.value"
+          size="small"
+          @change="procedureDualMode.onModeChange"
+        />
+        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || 'L2A'"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
       <!-- L2 主sheet 底稿目录 -->
       <L2TabIndex
-        v-if="currentSheet === 'L2'"
+        v-else-if="currentSheet === 'L2'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />
       <!-- 程序表 L2A -->
-      <GtAProgramConsole
+      <CycleTabProcedure
         v-else-if="currentSheet === 'L2A'"
+        sheet-code="L2A"
+        :html-data="props.htmlData"
         :wp-id="props.wpId"
-        sheet-name="L2A"
-        :schema="{ columns: [], rows: [] }"
-        :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
-        :readonly="isReadonly"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
       />
       <!-- L2-1 审定表 -->
       <L2TabAdjudication
@@ -106,6 +125,8 @@
 import { ref, computed, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
+import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import useVersionTrail from './composables/useVersionTrail'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -122,7 +143,6 @@ const L2TabDisclosureSoe = defineAsyncComponent(() => import('./l2/core/L2TabDis
 const L2TabInterestCheck = defineAsyncComponent(() => import('./l2/inspection/L2TabInterestCheck.vue'))
 
 // Shared
-const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 
@@ -180,6 +200,12 @@ const currentSheet = computed(() => {
   if (name.includes('上市')) return '附注上市'
   if (name.includes('国企')) return '附注国企'
   return name
+})
+
+const isProcedureSheet = computed(() => currentSheet.value === 'L2A')
+const procedureDualMode = useCycleHtmlOoDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  storagePrefix: 'l2-proc:',
 })
 
 // ─── Provide openReviewDialog ────────────────────────────────────────────────
@@ -243,5 +269,13 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.l2-procedure-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 </style>

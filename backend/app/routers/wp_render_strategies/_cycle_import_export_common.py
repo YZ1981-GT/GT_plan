@@ -71,6 +71,19 @@ def is_numeric_field_key(key: str) -> bool:
         # G11 投资收益
         "currentIncome", "currentOpening", "currentClosing", "priorOpening", "priorClosing",
         "creditAmount",
+        # G7 长期股权投资明细表
+        "holdingRatio", "votingRatio",
+        "openingInvestCost", "openingEquityAdj", "openingImpairment", "openingBookValue",
+        "openingAuditedCost", "openingAuditedEquity", "openingAuditedImpairment", "openingAuditedNetValue",
+        "increaseNewInvest", "increaseEquityMethod", "decreaseDisposal", "decreaseEquityAdj",
+        "impairmentProvision", "impairmentReversal", "investeeNetProfit",
+        "holdingRatioChange", "otherComprehensiveIncome", "otherEquityChange", "profitDistribution",
+        "closingInvestCost", "closingEquityAdj", "closingSubtotal",
+        "closingImpairment", "closingBookValue", "auditAdjustment", "auditedAmount",
+        "recoverableAmount", "disposalGainLoss",
+        "investeeNetAssets", "shareOfNetAssets", "goodwill",
+        "internalTransElim", "unrecognizedLoss", "equityMethodIncome",
+        "currentOCI", "dividendIncome",
     }
 
 

@@ -50,7 +50,7 @@ describe('G3 集成: sheetName 正则分发（7 sheets + fallback）', () => {
   }
 
   const SHEET_CODE_MAP: Record<string, string> = {
-    'G3A': 'procedure',           // → OnlyOffice (a-program-console)
+    'G3A': 'procedure',           // → CycleTabProcedure (a-program-console)
     'G3-1': 'adjudication',       // → CycleTabAdjudication
     'G3-2': 'detail',             // → G3TabDetail (4区段)
     'G3-3': 'adjustment',         // → G3TabAdjustment

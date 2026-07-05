@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG4EclDualMode — G4 债权投资(ECL组) HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g4-bond-investment-ecl/ Task 4.4 / Req 10.6
@@ -25,8 +25,8 @@ export function useG4EclDualMode(options: UseG4EclDualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

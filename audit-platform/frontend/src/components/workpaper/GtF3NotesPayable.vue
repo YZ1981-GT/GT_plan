@@ -58,22 +58,14 @@
 
       <template v-else>
 
-        <!-- F3A 程序表 -->
-
-        <GtAProgramConsole
-
+        <!-- F3A 程序表（对齐 D4A） -->
+        <CycleTabProcedure
           v-if="currentSheet === 'F3A'"
-
+          sheet-code="F3A"
+          :html-data="props.htmlData"
           :wp-id="props.wpId"
-
-          sheet-name="F3A"
-
-          :schema="{ columns: [], rows: [] }"
-
-          :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
-
-          :readonly="isReadonly"
-
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
         />
 
 
@@ -303,6 +295,7 @@ import { useF3CrossSheet } from './composables/useF3CrossSheet'
 import { useF3DualMode } from './composables/useF3DualMode'
 
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 
 

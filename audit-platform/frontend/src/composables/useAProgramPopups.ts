@@ -26,6 +26,7 @@
 import { ref, computed, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
+import { normalizeAProgramRows } from '@/components/workpaper/composables/parseProgramSubSteps'
 
 // ─── Types（与 GtAProgramConsole.vue 结构一致，composable 独立持有避免互相 import）───
 interface ProgramAssertions {
@@ -56,6 +57,7 @@ interface ProgramRow {
   history?: ProgramHistoryItem[]
   attachment_count?: number
   phase?: string
+  sub_steps?: Array<{ no: number; text: string }>
 }
 
 interface TrimDecision {
@@ -230,7 +232,7 @@ export function useAProgramPopups(options: {
   function initData() {
     const htmlData = options.htmlData()
     if (htmlData?.programs && htmlData.programs.length > 0) {
-      programs.value = JSON.parse(JSON.stringify(htmlData.programs))
+      programs.value = normalizeAProgramRows(JSON.parse(JSON.stringify(htmlData.programs))) as ProgramRow[]
     } else {
       programs.value = []
       // htmlData 为空时自动从 procedure-tables API 拉取
@@ -252,16 +254,18 @@ export function useAProgramPopups(options: {
       )
       const data = res?.data || res
       if (data?.items && Array.isArray(data.items)) {
-        programs.value = data.items.map((item: any, idx: number) => ({
-          id: item._key || `proc-${idx}`,
-          program_no: item.seq,
-          program_desc: item.content,
-          program_category: '',
-          linked_workpapers: item.ref_index || '',
-          execution_summary: item.summary || '',
-          status: item.step_status || ((item.applicable === 'na' || item.applicable === 'no') ? 'not_applicable' : 'pending'),
-          phase: item.phase || undefined,
-        }))
+        programs.value = normalizeAProgramRows(
+          data.items.map((item: any, idx: number) => ({
+            id: item._key || `proc-${idx}`,
+            program_no: item.seq,
+            program_desc: item.content,
+            program_category: '',
+            linked_workpapers: item.ref_index || '',
+            execution_summary: item.summary || '',
+            status: item.step_status || ((item.applicable === 'na' || item.applicable === 'no') ? 'not_applicable' : 'pending'),
+            phase: item.phase || undefined,
+          })),
+        ) as ProgramRow[]
       }
       // 存储 applicable_when（B30 等仅限合并审计的底稿）
       if (data?.applicable_when) {

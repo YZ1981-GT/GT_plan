@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useL2DualMode — L2 应付利息双模式切换 composable
  *
  * Spec: .kiro/specs/l2-interest-payable/
@@ -137,7 +137,7 @@ export function useL2DualMode(options: UseL2DualModeOptions) {
   /** el-segmented 模式选项列表 */
   const modeOptions = computed<L2ModeOption[]>(() => [
     { label: '结构化', value: 'structured' },
-    { label: 'OnlyOffice', value: 'onlyoffice', disabled: !isOOHealthy.value },
+    { label: '在线编辑', value: 'onlyoffice', disabled: !isOOHealthy.value },
   ])
 
   /** OO 不可用时的禁用 tooltip */

@@ -1,4 +1,4 @@
-/** 比照 useF2ValuationDualMode */
+﻿/** 比照 useF2ValuationDualMode */
 import { ref, onMounted, type Ref } from 'vue'
 
 export type F2SpeRenderMode = 'html' | 'onlyoffice'
@@ -12,8 +12,8 @@ export function useF2SpecialDualMode(options: {
   const currentMode = ref<F2SpeRenderMode>('html')
   const isOoAvailable = ref(false)
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   async function checkOOHealth(): Promise<boolean> {

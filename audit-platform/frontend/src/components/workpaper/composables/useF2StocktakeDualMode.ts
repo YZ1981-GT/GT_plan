@@ -1,4 +1,4 @@
-/** 监盘 bundle 双模式 — localStorage 前缀独立于 spe/val */
+﻿/** 监盘 bundle 双模式 — localStorage 前缀独立于 spe/val */
 import { ref, onMounted, type Ref } from 'vue'
 
 export type F2StRenderMode = 'html' | 'onlyoffice'
@@ -12,8 +12,8 @@ export function useF2StocktakeDualMode(options: {
   const currentMode = ref<F2StRenderMode>('html')
   const isOoAvailable = ref(false)
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   async function checkOOHealth(): Promise<boolean> {

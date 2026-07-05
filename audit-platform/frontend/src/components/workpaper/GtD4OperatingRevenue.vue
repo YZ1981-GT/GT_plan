@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="d4-operating-revenue">
     <!-- 加载状态 -->
     <div v-if="isLoading" class="loading-container">
@@ -295,7 +295,7 @@ const renderMode = computed({
 })
 
 const renderModeOptions = computed(() => [
-  { label: 'HTML精美化', value: 'html' as const },
+  { label: '结构化视图', value: 'html' as const },
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,

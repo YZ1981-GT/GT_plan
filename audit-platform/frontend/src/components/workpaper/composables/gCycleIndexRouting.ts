@@ -1,20 +1,21 @@
 /**
- * G12/G13/G14「底稿目录」Tab 路由：b-index sheet → 循环 HTML 目录组件（D4TabIndex 同级体验）
+ * G12/G13/G14/H10「底稿目录」Tab 路由：b-index sheet → 循环 HTML 目录组件（D4TabIndex 同级体验）
  */
-export const GCYCLE_INDEX_WP_CODES = ['G12', 'G13', 'G14'] as const
+export const GCYCLE_INDEX_WP_CODES = ['G12', 'G13', 'G14', 'H10'] as const
 export type GCycleIndexWpCode = (typeof GCYCLE_INDEX_WP_CODES)[number]
 
 export const GCYCLE_INDEX_COMPONENT_MAP: Record<GCycleIndexWpCode, string> = {
   G12: 'g12-net-hedge-gains',
   G13: 'g13-fair-value-changes',
   G14: 'g14-credit-impairment-loss',
+  H10: 'h10-asset-disposal-income',
 }
 
 export function isGCycleIndexWpCode(wpCode: string): wpCode is GCycleIndexWpCode {
   return (GCYCLE_INDEX_WP_CODES as readonly string[]).includes(wpCode)
 }
 
-/** b-index + G12/G13/G14 → 委托到循环目录组件 */
+/** b-index + G12/G13/G14/H10 → 委托到循环目录组件 */
 export function isCycleDelegatedIndexSheet(sheetComponentType: string, wpCode: string): boolean {
   return sheetComponentType === 'b-index' && isGCycleIndexWpCode(wpCode)
 }

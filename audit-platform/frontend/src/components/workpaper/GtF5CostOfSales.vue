@@ -24,14 +24,14 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- F5A 程序表 → OnlyOffice -->
-      <GtOnlyOfficeSheet
+      <!-- F5A 程序表（对齐 D4A） -->
+      <CycleTabProcedure
         v-else-if="currentSheet === 'F5A'"
+        sheet-code="F5A"
+        :html-data="props.htmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
-        :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
-        style="height: calc(100vh - 180px)"
+        :is-readonly="isReadonly"
       />
 
       <!-- F5-1 审定表（损益类专属组件） -->
@@ -136,6 +136,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponen
 import { useF5CosSalFormData } from './composables/useF5CosSalFormData'
 import { useF5CosOfDualMode } from './composables/useF5CosOfDualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -176,8 +177,11 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
-/** F5-1~F5-8 为 HTML 专属组件渲染的 sheet（支持双模式切换）；F5A/未匹配走 OnlyOffice */
-const isHtmlSheet = computed(() => /^F5-\d+$/.test(currentSheet.value))
+/** F5A + F5-1~F5-8 为 HTML 专属组件（支持双模式切换） */
+const isHtmlSheet = computed(() => {
+  const s = currentSheet.value
+  return s === 'F5A' || /^F5-\d+$/.test(s)
+})
 
 const dualMode = useF5CosOfDualMode({
   wpId: wpIdRef,

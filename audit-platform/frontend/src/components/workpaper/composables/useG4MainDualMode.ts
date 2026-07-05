@@ -5,6 +5,7 @@
  * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
  */
 import { ref, onMounted, type Ref } from 'vue'
+import { dualModeHtmlOoOptions } from './dualModeLabels'
 
 export type G4MainRenderMode = 'html' | 'onlyoffice'
 
@@ -24,10 +25,7 @@ export function useG4MainDualMode(options: UseG4MainDualModeOptions) {
   const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
-  ]
+  const modeOptions = dualModeHtmlOoOptions()
 
   function loadPersistedMode(): void {
     try {

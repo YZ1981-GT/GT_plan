@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG14DualMode — G14 HTML ↔ OnlyOffice 双模式
  * Spec: .kiro/specs/g14-credit-impairment-loss/ Task 4.2
  */
@@ -16,8 +16,8 @@ export function useG14DualMode(options: {
   const isOoAvailable = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

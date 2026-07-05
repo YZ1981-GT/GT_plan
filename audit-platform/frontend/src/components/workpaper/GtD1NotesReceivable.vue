@@ -1,4 +1,4 @@
-<template>
+﻿<template>
 
   <div class="d1-notes-receivable" :class="{ 'is-readonly': review.isReadonly.value }">
 
@@ -653,7 +653,7 @@ const renderMode = computed({
 
 const renderModeOptions = computed(() => [
 
-  { label: 'HTML精美化', value: 'html' as const },
+  { label: '结构化视图', value: 'html' as const },
 
   {
 

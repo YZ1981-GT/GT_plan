@@ -75,6 +75,8 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'confirmation-alternative-f06',
       'confirmation-diff-securities',
       'confirmation-alternative-g06',
+      'confirmation-alternative-h05',
+      'h10-asset-disposal-income',
       'g14-credit-impairment-loss',
       'g13-fair-value-changes',
       'g12-net-hedge-gains',

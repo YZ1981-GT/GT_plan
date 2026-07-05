@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useF5CosOfDualMode — F5 营业成本 HTML ↔ OnlyOffice 双模式切换（比照 useF3DualMode）
  *
  * Spec: .kiro/specs/f5-cost-of-sales/ Task 8.2 / Req 13.4
@@ -25,8 +25,8 @@ export function useF5CosOfDualMode(options: UseF5DualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

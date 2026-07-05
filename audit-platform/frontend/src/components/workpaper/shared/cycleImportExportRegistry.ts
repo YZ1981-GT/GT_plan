@@ -66,6 +66,10 @@ export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
     apiPrefix: 'g0',
     sheets: ['G0-3S', 'G0-6'],
   },
+  h0: {
+    apiPrefix: 'h0',
+    sheets: ['H0-5'],
+  },
 }
 
 export const COMPOUND_IMPORT_EXPORT: Record<string, CompoundImportExportGroup[]> = {

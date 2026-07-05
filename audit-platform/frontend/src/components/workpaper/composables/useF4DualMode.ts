@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useF4DualMode — F4 HTML ↔ OnlyOffice 双模式（比照 useF3DualMode）
  *
  * localStorage 持久化 key: 'f4-ap-mode:{wpId}'
@@ -25,8 +25,8 @@ export function useF4DualMode(options: UseF4DualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

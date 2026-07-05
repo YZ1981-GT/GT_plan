@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG6MainDualMode — G6 其他债权投资(main组) HTML ↔ OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g6-other-bond-investment-main/ Task 1.11 / Req 7.7
@@ -25,8 +25,8 @@ export function useG6MainDualMode(options: UseG6MainDualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

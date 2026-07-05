@@ -7,22 +7,41 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <div v-if="isProcedureSheet" class="l1-procedure-toolbar">
+        <el-segmented
+          v-model="procedureDualMode.currentMode.value"
+          :options="procedureDualMode.modeOptions.value"
+          size="small"
+          @change="procedureDualMode.onModeChange"
+        />
+        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <GtOnlyOfficeSheet
+        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || 'L1A'"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
       <!-- L1 主sheet 底稿目录 -->
       <L1TabIndex
-        v-if="currentSheet === 'L1'"
+        v-else-if="currentSheet === 'L1'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />
       <!-- 程序表 L1A -->
-      <GtAProgramConsole
+      <CycleTabProcedure
         v-else-if="currentSheet === 'L1A'"
+        sheet-code="L1A"
+        :html-data="props.htmlData"
         :wp-id="props.wpId"
-        sheet-name="L1A"
-        :schema="{ columns: [], rows: [] }"
-        :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
-        :readonly="isReadonly"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
       />
       <!-- L1-1 审定表 -->
       <L1TabAdjudication
@@ -144,6 +163,8 @@ import { useAuthStore } from '@/stores/auth'
 import { useL1FormData } from '@/composables/useL1FormData'
 import { useL1Adjudication } from '@/composables/useL1Adjudication'
 import { useL1CrossSheet } from '@/composables/useL1CrossSheet'
+import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import useVersionTrail from './composables/useVersionTrail'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -167,7 +188,6 @@ const L1TabPledgeCheck = defineAsyncComponent(() => import('./l1/inspection/L1Ta
 const L1TabStLoanCheck = defineAsyncComponent(() => import('./l1/inspection/L1TabStLoanCheck.vue'))
 
 // Shared
-const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 
@@ -253,6 +273,12 @@ const currentSheet = computed(() => {
   return name
 })
 
+const isProcedureSheet = computed(() => currentSheet.value === 'L1A')
+const procedureDualMode = useCycleHtmlOoDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  storagePrefix: 'l1-proc:',
+})
+
 // ─── Provide openReviewDialog ────────────────────────────────────────────────
 
 /** 复核对话状态 */
@@ -318,5 +344,13 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.l1-procedure-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 </style>

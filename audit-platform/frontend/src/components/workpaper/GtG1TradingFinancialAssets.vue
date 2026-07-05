@@ -3,16 +3,33 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div class="g1-toolbar">
+        <el-segmented
+          v-if="isHtmlSheet"
+          v-model="dualMode.currentMode.value"
+          :options="dualMode.modeOptions"
+          size="small"
+          @change="dualMode.onModeChange"
+        />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
-        v-if="currentSheet === 'G1A'"
+        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+      />
+
+      <CycleTabProcedure
+        v-else-if="currentSheet === 'G1A'"
+        sheet-code="G1A"
+        :html-data="props.htmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
       />
 
       <G1TabAdjudication
@@ -164,8 +181,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useG1TraFinFormData } from './composables/useG1TraFinFormData'
+import { useG1DualMode } from './composables/useG1DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useG1ReviewDialogProvide } from './composables/useG1ReviewDialogProvide'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import G1TabAdjudication from './g1-trading-financial-assets/core/G1TabAdjudication.vue'
 import G1TabFairValueTest from './g1-trading-financial-assets/valuation/G1TabFairValueTest.vue'
 import G1TabDetail from './g1-trading-financial-assets/core/G1TabDetail.vue'
@@ -224,9 +243,19 @@ const currentSheet = computed(() => {
 })
 
 const MIGRATED_SHEETS = new Set([
-  'G1-1', 'G1-2', 'G1-3', 'G1-4', 'G1-5', 'G1-6', 'G1-7',
+  'G1A', 'G1-1', 'G1-2', 'G1-3', 'G1-4', 'G1-5', 'G1-6', 'G1-7',
   'G1-8', 'G1-9', 'G1-10', 'G1-11', 'G1-12', 'G1-13', 'G1-14',
 ])
+
+const isHtmlSheet = computed(() => {
+  const code = currentSheet.value
+  return code === 'G1A' || MIGRATED_SHEETS.has(code) || code.startsWith('附注')
+})
+
+const dualMode = useG1DualMode({
+  wpId: wpIdRef,
+  reloadAll: () => formData.loadAll(),
+})
 
 const useGridFallback = computed(() => {
   const code = currentSheet.value

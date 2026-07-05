@@ -6,11 +6,13 @@ import {
 } from '../gCycleIndexRouting'
 
 describe('gCycleIndexRouting', () => {
-  it('G12/G13/G14 b-index 委托到循环 HTML 目录组件', () => {
+  it('G12/G13/G14/H10 b-index 委托到循环 HTML 目录组件', () => {
     expect(isCycleDelegatedIndexSheet('b-index', 'G12')).toBe(true)
     expect(resolveCycleIndexComponentType('b-index', 'G12')).toBe('g12-net-hedge-gains')
     expect(resolveCycleIndexComponentType('b-index', 'G13')).toBe('g13-fair-value-changes')
     expect(resolveCycleIndexComponentType('b-index', 'G14')).toBe('g14-credit-impairment-loss')
+    expect(isCycleDelegatedIndexSheet('b-index', 'H10')).toBe(true)
+    expect(resolveCycleIndexComponentType('b-index', 'H10')).toBe('h10-asset-disposal-income')
   })
 
   it('其他底稿 b-index 保持 GtBIndex', () => {

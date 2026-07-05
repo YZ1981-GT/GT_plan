@@ -80,7 +80,9 @@ export type HtmlComponentType =
   | 'confirmation-alternative-f06'
   | 'confirmation-diff-securities'
   | 'confirmation-alternative-g06'
+  | 'confirmation-alternative-h05'
   | 'g14-credit-impairment-loss'
+  | 'h10-asset-disposal-income'
   | 'g13-fair-value-changes'
   | 'g12-net-hedge-gains'
   | 'g11-investment-income'
@@ -197,7 +199,7 @@ export interface HtmlRendererEntry {
 const GtA1Dashboard = defineAsyncComponent(() => import('./GtA1Dashboard.vue'))
 const GtA2AdjustmentConsole = defineAsyncComponent(() => import('./GtA2AdjustmentConsole.vue'))
 const GtA3ConsolidationConsole = defineAsyncComponent(() => import('./GtA3ConsolidationConsole.vue'))
-const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
+const GtCycleAProgramRouter = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 const GtBIndex = defineAsyncComponent(() => import('./GtBIndex.vue'))
 const GtCNoteTable = defineAsyncComponent(() => import('./GtCNoteTable.vue'))
 const GtDForm = defineAsyncComponent(() => import('./GtDForm/GtDForm.vue'))
@@ -243,6 +245,7 @@ const GtConfirmationAlternativeF05 = defineAsyncComponent(() => import('./confir
 const GtConfirmationAlternativeF06 = defineAsyncComponent(() => import('./confirmation/alternativeF06/GtConfirmationAlternativeF06.vue'))
 const GtConfirmationDiffSecurities = defineAsyncComponent(() => import('./g0-confirmation/diffSecurities/GtConfirmationDiffSecurities.vue'))
 const GtConfirmationAlternativeG06 = defineAsyncComponent(() => import('./g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue'))
+const GtConfirmationAlternativeH05 = defineAsyncComponent(() => import('./confirmation/alternativeH05/GtConfirmationAlternativeH05.vue'))
 const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
@@ -290,6 +293,7 @@ const GtG11InvestmentIncome = defineAsyncComponent(() => import('./GtG11Investme
 const GtG12NetHedgeGains = defineAsyncComponent(() => import('./GtG12NetHedgeGains.vue'))
 const GtG13FairValueChanges = defineAsyncComponent(() => import('./GtG13FairValueChanges.vue'))
 const GtG14CreditImpairmentLoss = defineAsyncComponent(() => import('./GtG14CreditImpairmentLoss.vue'))
+const GtH10AssetDisposalIncome = defineAsyncComponent(() => import('./GtH10AssetDisposalIncome.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -329,7 +333,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
   },
   {
     componentType: 'a-program-console',
-    component: GtAProgramConsole,
+    component: GtCycleAProgramRouter,
     icon: '📋',
     label: 'A 程序表中控台',
     emits: ['save'],
@@ -710,6 +714,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtConfirmationAlternativeG06,
     icon: '🔄',
     label: '替代程序(投资循环)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'confirmation-alternative-h05',
+    component: GtConfirmationAlternativeH05,
+    icon: '🔄',
+    label: '替代程序(固定资产循环)',
     emits: ['save'],
     contextProps: 'standard',
   },
@@ -1238,6 +1250,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: GtG14CreditImpairmentLoss,
     icon: '⚠️',
     label: 'G14 信用减值损失',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'h10-asset-disposal-income',
+    component: GtH10AssetDisposalIncome,
+    icon: '🏭',
+    label: 'H10 资产处置损益',
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },

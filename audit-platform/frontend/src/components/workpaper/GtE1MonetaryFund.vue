@@ -7,15 +7,43 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- E1A / E26A 程序表 → OnlyOffice fallback (全高) -->
+      <div v-if="isProcedureSheet" class="e1-mode-toolbar">
+        <el-segmented
+          v-model="procedureDualMode.currentMode.value"
+          :options="procedureDualMode.modeOptions"
+          size="small"
+          @change="procedureDualMode.onModeChange"
+        />
+        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
       <GtOnlyOfficeSheet
-        v-if="currentSheet === 'E1A' || currentSheet === 'E26A'"
+        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
+
+      <CycleTabProcedure
+        v-else-if="currentSheet === 'E1A'"
+        sheet-code="E1A"
+        :html-data="props.htmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+      />
+
+      <CycleTabProcedure
+        v-else-if="currentSheet === 'E26A'"
+        sheet-code="E26A"
+        :html-data="props.htmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+      />
+
       <!-- E1-1 审定表 -->
       <E1TabAdjudication v-else-if="currentSheet === 'E1-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-2 现金明细 -->
@@ -85,6 +113,8 @@
  */
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
+import { useG1DualMode } from './composables/useG1DualMode'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -129,6 +159,7 @@ defineEmits<{
 
 const isLoading = ref(false)
 const isReadonly = computed(() => !!props.readonly)
+const wpIdRef = computed(() => props.wpId)
 const bsDate = ref('')
 const allResponses: Ref<Map<string, any>> = ref(new Map())
 
@@ -145,9 +176,9 @@ function debouncedSave(_items: any[]) { /* noop - children handle persistence */
  */
 const currentSheet = computed(() => {
   const name = props.sheetName || ''
-  // 提取 E1A 或 E26A
-  if (/E1A/.test(name)) return 'E1A'
+  // E26A 须在 E1A 之前（避免误匹配）
   if (/E26A/.test(name)) return 'E26A'
+  if (/E1A/.test(name)) return 'E1A'
   // 提取 E1-\d+ 格式编码
   const match = name.match(/E1-(\d+)/)
   if (match) return `E1-${match[1]}`
@@ -156,6 +187,13 @@ const currentSheet = computed(() => {
   if (name.includes('国企')) return '附注国企'
   return name
 })
+
+const isProcedureSheet = computed(() => {
+  const s = currentSheet.value
+  return s === 'E1A' || s === 'E26A'
+})
+
+const procedureDualMode = useG1DualMode({ wpId: wpIdRef })
 
 /**
  * E1-3 双 variant: sheetName 含"仅人民币"→rmb，含"人民币及外币"→multi
@@ -191,5 +229,12 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.e1-mode-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
 }
 </style>

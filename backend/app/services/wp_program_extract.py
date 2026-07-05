@@ -24,6 +24,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from app.services.wp_program_sub_steps import enrich_program_row
+
 logger = logging.getLogger(__name__)
 
 # 认定子表头关键词 → ProgramRow.assertions 键
@@ -160,7 +162,7 @@ def extract_program_rows_from_grid(grid: list[list[Any]]) -> list[dict]:
             raw = _cell_text(_grid_cell(grid, r, idx_col))
             linked = raw.replace("\n", "/").replace("//", "/").strip("/ ")
 
-        programs.append({
+        programs.append(enrich_program_row({
             "id": f"row-{program_no}",
             "program_no": program_no,
             "program_desc": desc,
@@ -168,7 +170,7 @@ def extract_program_rows_from_grid(grid: list[list[Any]]) -> list[dict]:
             "assertions": assertions,
             "linked_workpapers": linked,
             "status": "pending",
-        })
+        }))
 
     return programs
 

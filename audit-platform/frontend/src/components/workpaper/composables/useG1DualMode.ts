@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG1DualMode — G1 交易性金融资产 HTML ↔ OnlyOffice 双模式切换（比照 useF5CosOfDualMode）
  *
  * Spec: .kiro/specs/g1-trading-financial-assets/ Task 8.2 / Req 15.4
@@ -25,8 +25,8 @@ export function useG1DualMode(options: UseG1DualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {

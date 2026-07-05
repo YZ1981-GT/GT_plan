@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useG5DualMode — G5 长期应收款 HTML↔OnlyOffice 双模式切换
  *
  * Spec: .kiro/specs/g5-long-term-receivable/
@@ -15,8 +15,8 @@ export function useG5DualMode() {
   const viewMode = ref<'HTML' | 'OO'>(stored === 'OO' ? 'OO' : 'HTML')
 
   const viewModeOptions = [
-    { label: 'HTML', value: 'HTML' },
-    { label: 'OnlyOffice', value: 'OO' },
+    { label: '结构化视图', value: 'HTML' },
+    { label: '在线编辑', value: 'OO' },
   ]
 
   watch(viewMode, (val) => {

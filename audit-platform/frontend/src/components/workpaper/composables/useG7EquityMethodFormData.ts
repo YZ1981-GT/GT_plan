@@ -1,0 +1,568 @@
+/**
+ * useG7EquityMethodFormData — G7 长期股权投资(权益法组) 数据加载/保存/selfLoad
+ *
+ * Spec: .kiro/specs/g7-long-term-equity-method/
+ *
+ * 职责：
+ * - selfLoad: bundle内嵌场景 htmlData 为 null 时自行获取 render-config
+ * - 数据加载（loadResponses + loadRenderConfig 并行）
+ * - 指数退避重试保存（3次，500ms/1000ms/2000ms）
+ * - localStorage 暂存（网络全部失败时 fallback）
+ * - 恢复暂存数据（加载后自动 flush）
+ * - 批量保存（saveBatch）
+ * - 组件卸载时 flush 未保存数据（onScopeDispose）
+ *
+ * 注意：本组无 writebackTB（权益法组不直接回写 trial_balance）
+ *
+ * Requirements: 1.4, 7.2
+ */
+import { ref, onScopeDispose, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import type { ChecklistResponse } from './useF1FormData'
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const DRAFT_PREFIX = 'g7-equity-method-draft'
+const MAX_RETRIES = 3
+const BASE_DELAY_MS = 500
+
+function draftKey(wpId: string, itemId: string): string {
+  return `${DRAFT_PREFIX}:${wpId}:${itemId}`
+}
+
+// ─── Content Types ───────────────────────────────────────────────────────────
+
+export interface BasicInfoRow {
+  id: string
+  seq: number
+  investeeName: string
+  creditCode: string
+  establishDate: string
+  registeredCapital: number
+  paidInCapital: number
+  registeredAddress: string
+  industry: string
+  mainBusiness: string
+  legalRepresentative: string
+  controlType: '子公司' | '合营' | '联营'
+  investmentRatio: number
+  votingRatio: number
+  otherShareholderName: string
+  otherShareholderRatio: number
+  boardSeats: number
+  appointedDirectors: number
+  hasVeto: boolean
+  participatesInDecision: boolean
+  significantInfluenceBasis: string
+  managementComposition: string
+  latestAuditReportDate: string
+  auditOpinionType: string
+  relatedPartyRelation: string
+  remark: string
+}
+
+export interface FinancialInfoRow {
+  id: string
+  seq: number
+  investeeName: string
+  reportItem: string
+  priorAmount: number
+  currentAmount: number
+  changeAmount: number
+  changeRate: number | null
+  analysisNote: string
+  dataSource: string
+  auditStatus: '已审' | '未审' | '待确认'
+  remark: string
+}
+
+export interface AccountingPolicyRow {
+  id: string
+  seq: number
+  policyItem: string
+  investeePolicy: string
+  investorPolicy: string
+  isConsistent: '一致' | '不一致' | '不适用'
+  adjustmentAmount: number
+  adjustmentNote: string
+}
+
+export interface InvestmentCostTestRow {
+  id: string
+  seq: number
+  investeeName: string
+  investDate: string
+  mergeType: '合并' | '非合并'
+  consideration: number
+  directCosts: number
+  initialCost: number
+  netAssetFairValue: number
+  shareOfNetAssets: number
+  difference: number
+  differenceNature: '商誉' | '营业外收入'
+  accountingTreatment: string
+  fvAdjustmentDetail: string
+  adjustedNetAssets: number
+  adjustedShareOfNetAssets: number
+  auditConclusion: '无差异' | '存在差异-可接受' | '存在差异-需调整'
+  indexRef: string
+}
+
+export interface EquityMethodCalcRow {
+  id: string
+  seq: number
+  investeeName: string
+  reportedNetProfit: number
+  internalTransactionAdj: number
+  fvDepreciationAdj: number
+  accountingPolicyAdj: number
+  otherAdj: number
+  adjustedNetProfit: number
+  investmentRatio: number
+  equityShare: number
+  confirmedIncome: number
+  incomeDifference: number
+  ociChange: number
+  ociShare: number
+  otherEquityChange: number
+  otherEquityShare: number
+  dividendDistributed: number
+  openingBalance: number
+  closingBalance: number
+  auditConclusion: '无差异' | '差异可接受' | '差异需调整'
+}
+
+export interface InternalTransactionRow {
+  id: string
+  seq: number
+  investeeName: string
+  transactionType: '顺流' | '逆流'
+  transactionContent: string
+  transactionAmount: number
+  unrealizedProfit: number
+  investmentRatio: number
+  eliminationAmount: number
+  priorElimination: number
+  currentChange: number
+  eliminationEntry: string
+  isRelatedParty: boolean
+  auditConclusion: '合理' | '基本合理' | '不合理'
+  indexRef: string
+  remark: string
+}
+
+export interface UnrecognizedLossRow {
+  id: string
+  seq: number
+  investeeName: string
+  investmentBookValue: number
+  longTermReceivable: number
+  otherLongTermEquity: number
+  estimatedLiability: number
+  totalLongTermEquity: number
+  cumulativeLoss: number
+  excessLoss: number
+  allocationOrder: string
+  reduceInvestment: number
+  reduceLongTermReceivable: number
+  reduceOtherEquity: number
+  recognizeEstimatedLiability: number
+  unrecognizedLoss: number
+  currentChange: number
+  auditConclusion: '合理' | '基本合理' | '不合理'
+}
+
+export interface ImpairmentTestRow {
+  id: string
+  seq: number
+  investeeName: string
+  bookValue: number
+  recoverableAmount: number
+  hasImpairmentSign: boolean
+  impairmentAmount: number
+  fvLessDisposalCost: number
+  valueInUse: number
+  auditConclusion: '无需计提' | '需计提' | '已充分计提'
+  indexRef: string
+}
+
+export interface G7EquityMethodContent {
+  basicInfo: { rows: BasicInfoRow[] }
+  financialInfo: { rows: FinancialInfoRow[]; groups: { investeeName: string; rows: FinancialInfoRow[] }[] }
+  accountingPolicy: { rows: AccountingPolicyRow[]; conclusion: string }
+  investmentCostTest: { rows: InvestmentCostTestRow[]; conclusion: string }
+  equityMethodCalc: { rows: EquityMethodCalcRow[]; materialityLevel: number; conclusion: string; groups: { investeeName: string; rows: EquityMethodCalcRow[] }[] }
+  internalTransaction: { rows: InternalTransactionRow[]; conclusion: string }
+  unrecognizedLoss: { rows: UnrecognizedLossRow[]; conclusion: string }
+  impairmentTest: { rows: ImpairmentTestRow[]; conclusion: string }
+}
+
+// ─── Options ─────────────────────────────────────────────────────────────────
+
+export interface UseG7EquityMethodFormDataOptions {
+  wpId: Ref<string>
+  projectId: Ref<string>
+  onAfterSave?: () => void
+}
+
+// ─── Composable ──────────────────────────────────────────────────────────────
+
+export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions) {
+  const { wpId, projectId } = opts
+
+  const isLoading = ref(false)
+  const loadError = ref<string | null>(null)
+  const sheetCache = ref<Record<string, any>>({})
+  const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+  const renderMeta = ref<Record<string, any>>({})
+  const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  const _pendingItems = new Set<string>()
+
+  /** item_id前缀：筛选G7权益法组相关数据 */
+  const ITEM_PREFIXES = ['G7-4-', 'G7-5-', 'G7-6-', 'G7-13-', 'G7-14-', 'G7-15-', 'G7-16-', 'G7-17-']
+
+  // ─── Draft Restore ──────────────────────────────────────────────────────────
+
+  /** 恢复 localStorage 中暂存的草稿数据并尝试重新保存 */
+  function restoreDrafts(): void {
+    if (!wpId.value) return
+    const prefix = `${DRAFT_PREFIX}:${wpId.value}:`
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (!key?.startsWith(prefix)) continue
+      try {
+        const itemId = key.slice(prefix.length)
+        const stored = JSON.parse(localStorage.getItem(key) || '') as ChecklistResponse
+        if (itemId && stored?.item_id) {
+          allResponses.value.set(itemId, stored)
+          void saveImmediate(itemId, stored, 1)
+          localStorage.removeItem(key)
+        }
+      } catch { /* ignore corrupt draft */ }
+    }
+  }
+
+  // ─── Load ────────────────────────────────────────────────────────────────────
+
+  /** 加载 checklist-responses 数据 */
+  async function loadResponses(): Promise<void> {
+    if (!wpId.value) return
+    try {
+      const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
+      const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      const map = new Map<string, ChecklistResponse>()
+      for (const r of responses) {
+        if (r.item_id && ITEM_PREFIXES.some((p: string) => r.item_id.startsWith(p))) {
+          map.set(r.item_id, {
+            item_id: r.item_id,
+            conclusion: r.conclusion ?? null,
+            remark: r.remark ?? null,
+          })
+        }
+      }
+      allResponses.value = map
+      restoreDrafts()
+    } catch {
+      ElMessage.warning('G7(权益法)数据加载失败，可手动填写')
+    }
+  }
+
+  /**
+   * selfLoad: 当组件在bundle内嵌场景 htmlData 为 null 时，
+   * 自行调用 render-config?force_component_type=g7-long-term-equity-method 获取渲染数据
+   */
+  async function selfLoad(): Promise<void> {
+    if (!wpId.value) return
+    try {
+      const res = await api.get(`/api/workpapers/${wpId.value}/render-config`, {
+        params: { force_component_type: 'g7-long-term-equity-method' },
+        _silent: true,
+      } as any)
+      const data = res?.data ?? res
+      renderMeta.value = data?.html_data ?? data ?? {}
+      const sheets = data?.sheets ?? data?.data?.sheets ?? []
+      for (const s of sheets) {
+        const key = s.sheet_name || s.name || 'default'
+        sheetCache.value[key] = s.html_data ?? s
+      }
+    } catch {
+      // selfLoad 失败不阻塞：组件仍可从 checklist_responses 加载数据
+    }
+  }
+
+  /** 统一加载入口（loadResponses + selfLoad 并行） */
+  async function loadAll(): Promise<void> {
+    isLoading.value = true
+    loadError.value = null
+    try {
+      await Promise.all([loadResponses(), selfLoad()])
+    } catch (err: any) {
+      loadError.value = err?.message || '加载失败'
+    } finally {
+      isLoading.value = false
+    }
+  }
+
+  /** 获取缓存的sheet数据 */
+  function getSheet(name: string) {
+    return sheetCache.value[name] ?? { rows: [] }
+  }
+
+  /**
+   * 从 sheetCache 中解析出完整的 G7EquityMethodContent 结构
+   * 用于从 render-config 返回的 html_data 中提取各 section 数据
+   */
+  function parseContent(): Partial<G7EquityMethodContent> {
+    const result: Partial<G7EquityMethodContent> = {}
+
+    for (const [key, value] of Object.entries(sheetCache.value)) {
+      if (!value) continue
+      const content = value?.content ?? value
+
+      if (key.includes('G7-4') || key.includes('基本信息')) {
+        result.basicInfo = content as G7EquityMethodContent['basicInfo']
+      } else if (key.includes('G7-5') || key.includes('财务信息')) {
+        result.financialInfo = content as G7EquityMethodContent['financialInfo']
+      } else if (key.includes('G7-6') || key.includes('会计政策')) {
+        result.accountingPolicy = content as G7EquityMethodContent['accountingPolicy']
+      } else if (key.includes('G7-13') || key.includes('投资成本')) {
+        result.investmentCostTest = content as G7EquityMethodContent['investmentCostTest']
+      } else if (key.includes('G7-14') || key.includes('权益法测算')) {
+        result.equityMethodCalc = content as G7EquityMethodContent['equityMethodCalc']
+      } else if (key.includes('G7-15') || key.includes('内部交易')) {
+        result.internalTransaction = content as G7EquityMethodContent['internalTransaction']
+      } else if (key.includes('G7-16') || key.includes('未确认')) {
+        result.unrecognizedLoss = content as G7EquityMethodContent['unrecognizedLoss']
+      } else if (key.includes('G7-17') || key.includes('减值')) {
+        result.impairmentTest = content as G7EquityMethodContent['impairmentTest']
+      }
+    }
+
+    return result
+  }
+
+  // ─── Save (指数退避重试3次 + localStorage暂存) ────────────────────────────────
+
+  /**
+   * 立即保存指定 item（带指数退避重试）
+   * 重试策略：500ms → 1000ms → 2000ms
+   * 全部失败后 localStorage 暂存
+   */
+  async function saveImmediate(
+    itemId: string,
+    data: Partial<ChecklistResponse>,
+    retries = MAX_RETRIES,
+  ): Promise<void> {
+    // 清除该 item 的 debounce timer
+    const timer = _debounceTimers.get(itemId)
+    if (timer) {
+      clearTimeout(timer)
+      _debounceTimers.delete(itemId)
+    }
+    _pendingItems.delete(itemId)
+
+    const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+    const updated: ChecklistResponse = {
+      ...existing,
+      ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
+      ...(data.remark !== undefined ? { remark: data.remark } : {}),
+      item_id: itemId,
+    }
+    allResponses.value.set(itemId, updated)
+
+    // 指数退避重试
+    for (let i = 0; i < retries; i++) {
+      try {
+        await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
+          project_id: projectId.value,
+          items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
+        })
+        // 成功 → 清除本地暂存
+        try {
+          localStorage.removeItem(draftKey(wpId.value, itemId))
+        } catch { /* ignore */ }
+        opts.onAfterSave?.()
+        return
+      } catch {
+        if (i < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, BASE_DELAY_MS * 2 ** i))
+        }
+      }
+    }
+
+    // 全部重试失败 → localStorage 暂存
+    try {
+      localStorage.setItem(draftKey(wpId.value, itemId), JSON.stringify(updated))
+      ElMessage.warning(`G7(权益法) 数据暂存本地（${itemId}），网络恢复后将自动同步`)
+    } catch { /* ignore quota exceeded */ }
+  }
+
+  /** 批量保存多个 items（一次 PUT 提交，带重试） */
+  async function saveBatch(
+    items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>,
+    retries = MAX_RETRIES,
+  ): Promise<void> {
+    if (!items.length || !wpId.value) return
+
+    const toSave: ChecklistResponse[] = []
+    for (const { itemId, data } of items) {
+      const timer = _debounceTimers.get(itemId)
+      if (timer) {
+        clearTimeout(timer)
+        _debounceTimers.delete(itemId)
+      }
+      _pendingItems.delete(itemId)
+
+      const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+      const updated: ChecklistResponse = {
+        ...existing,
+        ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
+        ...(data.remark !== undefined ? { remark: data.remark } : {}),
+        item_id: itemId,
+      }
+      allResponses.value.set(itemId, updated)
+      toSave.push(updated)
+    }
+
+    for (let i = 0; i < retries; i++) {
+      try {
+        await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
+          project_id: projectId.value,
+          items: toSave.map((item) => ({
+            item_id: item.item_id,
+            conclusion: item.conclusion,
+            remark: item.remark,
+          })),
+        })
+        // 成功 → 清除所有相关本地暂存
+        for (const item of toSave) {
+          try { localStorage.removeItem(draftKey(wpId.value, item.item_id)) } catch { /* ignore */ }
+        }
+        opts.onAfterSave?.()
+        return
+      } catch {
+        if (i < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, BASE_DELAY_MS * 2 ** i))
+        }
+      }
+    }
+
+    // 全部重试失败 → localStorage 逐项暂存
+    for (const item of toSave) {
+      try {
+        localStorage.setItem(draftKey(wpId.value, item.item_id), JSON.stringify(item))
+      } catch { /* ignore */ }
+    }
+    ElMessage.warning('G7(权益法) 数据暂存本地，网络恢复后将自动同步')
+  }
+
+  /** debounce 2000ms 文本字段保存（per item_id 独立计时器） */
+  function debouncedSave(itemId: string, data: Partial<ChecklistResponse>): void {
+    const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+    const updated: ChecklistResponse = {
+      ...existing,
+      ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
+      ...(data.remark !== undefined ? { remark: data.remark } : {}),
+      item_id: itemId,
+    }
+    allResponses.value.set(itemId, updated)
+    _pendingItems.add(itemId)
+
+    const prevTimer = _debounceTimers.get(itemId)
+    if (prevTimer) clearTimeout(prevTimer)
+
+    const newTimer = setTimeout(() => {
+      _debounceTimers.delete(itemId)
+      _pendingItems.delete(itemId)
+      void saveImmediate(itemId, updated)
+    }, 2000)
+    _debounceTimers.set(itemId, newTimer)
+  }
+
+  /**
+   * 保存完整 content JSON（POST 到 workpaper content 端点）
+   * 用于保存权益法组所有 sheet 的完整结构化数据
+   */
+  async function saveContent(content: Partial<G7EquityMethodContent>, retries = MAX_RETRIES): Promise<void> {
+    if (!wpId.value) return
+    for (let i = 0; i < retries; i++) {
+      try {
+        await api.post(`/api/workpapers/${wpId.value}/content`, {
+          project_id: projectId.value,
+          content,
+        })
+        opts.onAfterSave?.()
+        return
+      } catch {
+        if (i < retries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, BASE_DELAY_MS * 2 ** i))
+        }
+      }
+    }
+    // 全部失败 → localStorage 暂存整体 content
+    try {
+      localStorage.setItem(`${DRAFT_PREFIX}:${wpId.value}:__content__`, JSON.stringify(content))
+      ElMessage.warning('G7(权益法) 内容暂存本地，网络恢复后将自动同步')
+    } catch { /* ignore */ }
+  }
+
+  // ─── Flush（组件卸载） ───────────────────────────────────────────────────────
+
+  function _flushPending(): void {
+    for (const timer of _debounceTimers.values()) {
+      clearTimeout(timer)
+    }
+    _debounceTimers.clear()
+
+    if (_pendingItems.size > 0) {
+      const items: ChecklistResponse[] = []
+      for (const itemId of _pendingItems) {
+        const resp = allResponses.value.get(itemId)
+        if (resp) items.push(resp)
+      }
+      _pendingItems.clear()
+      if (items.length > 0) {
+        void api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
+          project_id: projectId.value,
+          items: items.map((item) => ({
+            item_id: item.item_id,
+            conclusion: item.conclusion,
+            remark: item.remark,
+          })),
+        }).catch(() => { /* best-effort flush */ })
+      }
+    }
+  }
+
+  // ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+  onScopeDispose(() => {
+    _flushPending()
+  })
+
+  // ─── Return ──────────────────────────────────────────────────────────────────
+
+  return {
+    // State
+    data: allResponses,
+    loading: isLoading,
+    error: loadError,
+    sheetCache,
+    renderMeta,
+    // Load
+    load: loadAll,
+    selfLoad,
+    getSheet,
+    parseContent,
+    loadResponses,
+    // Save
+    save: saveImmediate,
+    saveImmediate,
+    saveBatch,
+    saveContent,
+    debouncedSave,
+  }
+}
+
+export default useG7EquityMethodFormData

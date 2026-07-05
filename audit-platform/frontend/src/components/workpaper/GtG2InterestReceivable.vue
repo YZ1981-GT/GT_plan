@@ -24,14 +24,14 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- G2A 程序表 → OnlyOffice（复用 a-program-console） -->
-      <GtOnlyOfficeSheet
+      <!-- G2A 程序表（对齐 D4A） -->
+      <CycleTabProcedure
         v-else-if="currentSheet === 'G2A'"
+        sheet-code="G2A"
+        :html-data="props.htmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
-        :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
-        style="height: calc(100vh - 180px)"
+        :is-readonly="isReadonly"
       />
 
       <!-- G2-1 审定表 -->
@@ -144,6 +144,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponen
 import { useG2IntRecFormData } from './composables/useG2IntRecFormData'
 import { useG2DualMode } from './composables/useG2DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -183,10 +184,10 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
-/** G2-1~G2-8 + 附注 为 HTML 专属组件（支持双模式） */
+/** G2A + G2-1~G2-8 + 附注 为 HTML 专属组件（支持双模式） */
 const isHtmlSheet = computed(() => {
   const s = currentSheet.value
-  return /^G2-[1-8]$/.test(s) || s.startsWith('附注')
+  return s === 'G2A' || /^G2-[1-8]$/.test(s) || s.startsWith('附注')
 })
 
 const dualMode = useG2DualMode({

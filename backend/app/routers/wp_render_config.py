@@ -64,6 +64,9 @@ _SHEET_CODE_RE = re.compile(r"([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$")
 # 只影响 override 命中本集合的 wp_code，对其余底稿零回归。
 _WHOLE_WP_MULTISHEET_DEDICATED: set[str] = {
     "c1-entity-level-control",
+    # C2~C15 业务循环控制测试：多 sheet 工作簿（底稿目录 + 汇总表 + Cx-1-X + 选项清单），
+    # 整册统一路由到 c-control-test，由前端 GtCControlTest 弹窗层叠分发（L0汇总+L1详情+L2偏差）。
+    "c-control-test",
     # C22 IT 一般控制测试：单一 34-sheet 工作簿（1 主矩阵 + 33 子页），
     # 整册统一路由到 c22-itgc-bundle，由前端 GtC22ItgcBundle 内部按 sheetName /
     # 分组 el-tabs 分发（矩阵总览 + SA/PE/PM/NS 子页 + C21/C21-1）。
@@ -94,6 +97,7 @@ _CONFIRMATION_COMPONENTS: set[str] = {
     "confirmation-alternative-f06",
     "confirmation-diff-securities",
     "confirmation-alternative-g06",
+    "confirmation-alternative-h05",
     "confirmation-reliability",
     "confirmation-fraud-risk",
 }
@@ -111,6 +115,7 @@ _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-alternative-f06": "alternative-f06-v1",
     "confirmation-diff-securities": "diff-securities-v1",
     "confirmation-alternative-g06": "alternative-g06-v1",
+    "confirmation-alternative-h05": "alternative-h05-v1",
     "confirmation-reliability": "reliability-v1",
     "confirmation-fraud-risk": "fraud-risk-v1",
 }
@@ -792,6 +797,22 @@ async def _get_render_config_impl(
         # sheet_name 级 skip override（隐藏辅助 sheet，如 A1-11 的文号规则页）
         if cls.sheet_name and _WP_CODE_OVERRIDE.get(cls.sheet_name) == "skip":
             continue
+        # 编码级 skip override：从 sheet_name 提取编码后再查（如 "C1-1 企业层面..." → "C1-1" → skip）
+        if cls.sheet_name:
+            _skip_m = _SHEET_CODE_RE.search(cls.sheet_name)
+            if _skip_m and _WP_CODE_OVERRIDE.get(_skip_m.group(1)) == "skip":
+                continue
+            # 补充：编码在开头的场景（如 "C1-4-4企业层面..." → "C1-4-4"）
+            if not _skip_m:
+                _skip_m2 = re.match(r"([A-Z]\d+(?:-\d+)*)", cls.sheet_name)
+                if _skip_m2 and _WP_CODE_OVERRIDE.get(_skip_m2.group(1)) == "skip":
+                    continue
+            # 向导式专属组件隐藏辅助sheet（选项清单/底稿目录，无标准编码）
+            _ovr_check = _WP_CODE_OVERRIDE.get(wp_code)
+            if _ovr_check and _ovr_check in _WHOLE_WP_MULTISHEET_DEDICATED:
+                _sn_lower = cls.sheet_name
+                if "选项清单" in _sn_lower or "不归档" in _sn_lower or "底稿目录" in _sn_lower:
+                    continue
         ovr = _WP_CODE_OVERRIDE.get(wp_code)
         # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
         # 如 D0-5→confirmation-alternative-d05）。sheet 级 override 优先于 class_code 派生。

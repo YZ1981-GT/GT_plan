@@ -1,4 +1,4 @@
-/**
+﻿/**
  * useF3DualMode — F3 HTML ↔ OnlyOffice 双模式（比照 useD4DualMode）
  *
  * Spec: .kiro/specs/f3-notes-payable/ Task 8.2
@@ -24,8 +24,8 @@ export function useF3DualMode(options: UseF3DualModeOptions) {
   const checking = ref(false)
 
   const modeOptions = [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
+    { label: '结构化视图', value: 'html' },
+    { label: '在线编辑', value: 'onlyoffice' },
   ]
 
   function loadPersistedMode(): void {
