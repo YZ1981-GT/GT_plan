@@ -240,6 +240,53 @@ export interface NoteSectionChangedPayload {
   noteSection: string
 }
 
+// ─── C2~C15 控制测试结论联动（c-control-test-refresh Task 5.1） ──────────────
+
+/**
+ * C2~C15 控制测试循环结论变更（GtCControlTest → B50 风险评估订阅）。
+ * 铁律：仅在结论实际变更（新旧值不同）时发布（Requirement 7.2/7.3）。
+ */
+export interface ControlTestConcludedPayload {
+  /** 底稿编码 C2~C15 */
+  wpCode: string
+  /** 循环名称（如"销售与收款循环"） */
+  cycleName: string
+  /** 新结论值 */
+  conclusion: string
+  /** 缺陷摘要（有缺陷时为描述，否则为空） */
+  defectSummary: string
+}
+
+// ─── C1 企业层面控制结论 / 缺陷联动（c1-entity-level-control Task 7.3） ──────────
+
+/**
+ * C1 企业层面控制整体结论变更（GtC1EntityControl → B50 风险评估订阅）。
+ * 铁律：仅在结论实际变更（新旧值不同）时发布（Requirement 11.1/11.4）。
+ */
+export interface C1EntityControlConclusionPayload {
+  projectId: string
+  wpId: string
+  wpCode?: string
+  /** 新的整体结论（有效/部分有效/无效，或清空为 ''） */
+  conclusion: string
+  /** 变更前的整体结论（供订阅方判断迁移方向） */
+  previousConclusion: string
+}
+
+/**
+ * C1 识别出企业层面控制缺陷 → 一键跳转 A14 缺陷评价并带入缺陷摘要（Requirement 11.2）。
+ * GtIndexChip 跳转 A14 时同时发布，供 A14 缺陷评价底稿预填缺陷摘要。
+ */
+export interface C1DefectToA14Payload {
+  projectId: string
+  wpId: string
+  wpCode?: string
+  /** 缺陷摘要文本 */
+  defectSummary: string
+  /** 来源缺陷 item_id（C1-defect-{d}-summary） */
+  itemId: string
+}
+
 // ─── 事件映射表 ───────────────────────────────────────────────────────────────
 
 export type Events = {
@@ -279,6 +326,14 @@ export type Events = {
 
   // 联动总线 stale 事件（Sprint 4 Task 4.7）
   'linkage:stale-changed': { project_id: string; affected_modules: string[]; total_affected: number }
+
+  // D~N 实质性程序审定数变更（Adjudication → TB回写 + 附注刷新）
+  'substantive:adjudicated': {
+    accountCode: string
+    auditedAmount: number
+    wpCode: string
+    timestamp: number
+  }
 
   // useStaleSummaryFull 订阅的细粒度事件（payload 不强约束，由 SSE bridge / 业务方按需 emit）
   'adjustment:created': void
@@ -322,6 +377,22 @@ export type Events = {
   // 四栏附注联动（four-panel-note-linkage）
   'catalog:note-select': CatalogNoteSelectPayload
   'note:section-changed': NoteSectionChangedPayload
+
+  // C2~C15 控制测试结论联动（c-control-test-refresh Task 5.1）
+  'control:test-concluded': ControlTestConcludedPayload
+
+  // C1 企业层面控制结论 / 缺陷联动（c1-entity-level-control Task 7.3）
+  'c1:entity-control-conclusion': C1EntityControlConclusionPayload
+  'c1:defect-identified': C1DefectToA14Payload
+
+  // L1 短期借款利息测算联动 L2/L8（l1-short-term-loans Task 3.2）
+  'l1:interest-calculated': {
+    wpCode: string
+    totalInterest: number
+    financialExpenseInterest: number
+    byContract: Array<{ contractNo: string; interest: number }>
+    timestamp: number
+  }
 
   // consol-phase1-arch-lock 需求 4.3: 后端返回 423 合并锁定 → 刷新前端锁定态
   'consol-lock:detected': { projectId?: string }

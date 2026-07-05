@@ -96,20 +96,20 @@ export type SaveFn = (items: ChecklistItem[]) => Promise<void>
 // ─── Constants (exported for testing) ────────────────────────────────────────
 
 export const CYCLE_CONFIG: Record<number, { name: string; b23ProcessNum: number; targetCycle: string; targetCycleName: string }> = {
-  2:  { name: '采购与付款循环', b23ProcessNum: 1, targetCycle: 'DA', targetCycleName: '采购与付款' },
-  3:  { name: '销售与收款循环', b23ProcessNum: 2, targetCycle: 'EA', targetCycleName: '销售与收款' },
-  4:  { name: '资金管理循环', b23ProcessNum: 3, targetCycle: 'FA', targetCycleName: '资金管理' },
-  5:  { name: '生产与存货循环', b23ProcessNum: 4, targetCycle: 'GA', targetCycleName: '生产与存货' },
-  6:  { name: '薪酬与人力循环', b23ProcessNum: 5, targetCycle: 'HA', targetCycleName: '薪酬与人力' },
-  7:  { name: '固定资产循环', b23ProcessNum: 6, targetCycle: 'IA', targetCycleName: '固定资产' },
-  8:  { name: '投资循环', b23ProcessNum: 7, targetCycle: 'JA', targetCycleName: '投资' },
-  9:  { name: '其他流程', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '其他' },
-  10: { name: '收入确认循环', b23ProcessNum: 2, targetCycle: 'EA', targetCycleName: '收入确认' },
-  11: { name: '关联方交易循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '关联方交易' },
-  12: { name: '估计与判断循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '估计与判断' },
-  13: { name: '期末财务报告循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '期末财务报告' },
-  14: { name: '信息技术一般控制', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: 'ITGC' },
-  15: { name: '其他特殊控制', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '其他特殊' },
+  2:  { name: '销售与收款循环', b23ProcessNum: 2, targetCycle: 'DA', targetCycleName: '销售与收款' },
+  3:  { name: '货币资金循环', b23ProcessNum: 3, targetCycle: 'EA', targetCycleName: '货币资金' },
+  4:  { name: '采购与付款循环', b23ProcessNum: 1, targetCycle: 'FA', targetCycleName: '采购与付款' },
+  5:  { name: '存货与仓储循环', b23ProcessNum: 4, targetCycle: 'GA', targetCycleName: '存货与仓储' },
+  6:  { name: '投资循环', b23ProcessNum: 7, targetCycle: 'JA', targetCycleName: '投资' },
+  7:  { name: '筹资循环', b23ProcessNum: 8, targetCycle: 'LA', targetCycleName: '筹资' },
+  8:  { name: '人力资源与工薪循环', b23ProcessNum: 5, targetCycle: 'HA', targetCycleName: '人力资源与工薪' },
+  9:  { name: '固定资产循环', b23ProcessNum: 6, targetCycle: 'IA', targetCycleName: '固定资产' },
+  10: { name: '无形资产循环', b23ProcessNum: 6, targetCycle: 'IA', targetCycleName: '无形资产' },
+  11: { name: '税项循环', b23ProcessNum: 8, targetCycle: 'NA', targetCycleName: '税项' },
+  12: { name: '关联方交易循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '关联方交易' },
+  13: { name: '或有事项循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '或有事项' },
+  14: { name: '持续经营循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '持续经营' },
+  15: { name: '期后事项循环', b23ProcessNum: 8, targetCycle: 'KA', targetCycleName: '期后事项' },
 }
 
 export const CONTROL_TEST_COLORS: Record<string, { color: string; bg: string }> = {

@@ -1,76 +1,136 @@
 # C26.yaml — 信息处理控制测试
-# componentType: d-form-table
-# Requirements: G4-4 信息处理控制测试
+# componentType: c26-info-processing-control
+# 专属组件：GtC26InfoControl（信息处理控制矩阵 + 四要素 + 动态行）
 
 wp_code: C26
 template_version: v2025-R5
+component_type: c26-info-processing-control
 description: |
   测试信息处理（自动化）控制，评估系统自动控制的有效性。
-  依赖 C22 IT一般控制测试结论。
+  关注信息处理四要素：完整性/准确性/授权/访问限制。
+  矩阵按循环分组，支持动态增删控制条目行。
 
 sheets:
-  信息处理控制测试:
-    component_type: d-form-table
-    form_type: table
+  C26 信息处理控制测试:
+    component_type: c26-info-processing-control
     title: 信息处理控制测试
-    description: 测试应用系统中的自动化控制及手动+IT控制。
+    description: 按循环列示 IT 应用控制（ITAC），记录穿行测试与控制测试。
 
+    # 动态行矩阵结构
     dynamic_table:
       add_row_button: true
-      max_rows: 50
+      named_row: true  # 新增行需先命名（控制索引号）
+      max_rows: 100
+
       columns:
-        system_name:
-          field: system_name
-          type: text
-          label: 应用系统名称
-          width: 130
-        control_id:
-          field: control_id
-          type: text
-          label: 控制编号
-          width: 100
-        control_description:
-          field: control_description
-          type: textarea
-          label: 控制描述
-          width: 250
-        control_type:
-          field: control_type
+        category:
+          field: category
           type: enum
-          label: 控制类型
-          width: 100
-          dict_source: control_type_dict
-        itgc_dependency:
-          field: itgc_dependency
+          label: 控制类别
+          width: 160
+          dict_source: category_dict
+        control_index_no:
+          field: controlIndexNo
           type: text
-          label: 依赖ITGC
-          width: 100
-          render_hint: ref_chip
-          hint: "关联 C22 对应步骤（如 SA-3）"
-        test_method:
-          field: test_method
+          label: 信息处理控制索引号
+          width: 130
+          placeholder: "IT-R&R-xx"
+          tooltip: true
+        purpose:
+          field: purpose
           type: textarea
-          label: 测试方法
-          width: 200
+          label: 测试目的
+          width: flex
+        planned_test:
+          field: plannedTest
+          type: textarea
+          label: 计划测试过程
+          width: flex
+          ai_assist: true
+        walkthrough:
+          field: walkthrough
+          type: textarea
+          label: 穿行测试
+          width: flex
+          ai_assist: true
+        control_test:
+          field: controlTest
+          type: textarea
+          label: 控制测试
+          width: flex
+          ai_assist: true
         test_result:
-          field: test_result
-          type: textarea
+          field: testResult
+          type: enum
           label: 测试结果
-          width: 200
+          width: 100
+          dict_source: test_result_dict
+        client_feedback:
+          field: clientFeedback
+          type: textarea
+          label: 客户反馈
+          width: flex
         conclusion:
           field: conclusion
           type: enum
           label: 结论
-          width: 90
+          width: 100
           dict_source: conclusion_dict
           render_hint: risk_badge
+        evidence:
+          field: evidence
+          type: ref_chip
+          label: 证据及索引号
+          width: 120
+          attachment: true
 
+    # 信息处理四要素（每条控制多选）
+    elements:
+      type: checkbox_group
+      label: 信息处理四要素
+      options: ["完整性", "准确性", "授权", "访问限制"]
+
+    # 循环筛选标签
+    cycle_filter:
+      type: tag_select
+      options:
+        - 销售循环
+        - 采购循环
+        - 收入确认
+        - 存货循环
+        - 固定资产
+        - 货币资金
+        - 其他
+
+    # 字典定义
     dictionaries:
-      control_type_dict:
-        - value: automated
-          label: 自动
-        - value: manual_it
-          label: 手动+IT
+      category_dict:
+        - value: sales
+          label: 与销售循环相关的控制
+        - value: procurement
+          label: 与采购循环相关的控制
+        - value: inventory
+          label: 与存货循环相关的控制
+        - value: fixed_assets
+          label: 与固定资产循环相关的控制
+        - value: monetary
+          label: 与货币资金循环相关的控制
+        - value: revenue
+          label: 与收入确认相关的控制
+        - value: order
+          label: 与订单签订有关的控制
+        - value: other
+          label: 其他
+      test_result_dict:
+        - value: no_exception
+          label: 未发现例外
+          color: green
+        - value: exception
+          label: 发现例外
+          color: red
+        - value: na
+          label: 不适用
+          color: gray
       conclusion_dict:
         - value: effective
           label: 有效
@@ -78,3 +138,23 @@ sheets:
         - value: ineffective
           label: 无效
           color: red
+        - value: partial
+          label: 部分有效
+          color: yellow
+        - value: na
+          label: 不适用
+          color: gray
+
+    # 方法论上下文（琥珀色区块）
+    methodology_context:
+      title: 信息处理控制填写说明
+      content: |
+        信息处理控制是企业内部控制的一种特殊形态（由系统参与完成）。
+        关注四要素：
+        (1) 完整性 — 顺序标号/编辑检查确保无遗漏
+        (2) 准确性 — 编辑检查/限制检查/合理性检查/存在性检查/格式检查
+        (3) 授权 — 交易流程中必须存在恰当的授权
+        (4) 访问限制 — 对特殊会计记录的访问须经数据所有者正式授权
+
+        ITAC 类型：自动控制 / 系统报表 / 自动计算 / 访问控制 / 系统接口
+        依赖 C22 IT一般控制测试结论。

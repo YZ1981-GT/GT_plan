@@ -151,6 +151,14 @@ export type HtmlComponentType =
   | 'd6-contract-assets'
   | 'd7-contract-liabilities'
   | 'e1-monetary-fund'
+  | 'c1-entity-level-control'
+  | 'c22-itgc-bundle'
+  | 'c23-journal-entry-control'
+  | 'c24-journal-entry-detail'
+  | 'c25-internal-audit-reliance'
+  | 'c26-info-processing-control'
+  | 'l1-short-term-loans'
+  | 'l2-interest-payable'
   | 'review-bundle'
 
 /**
@@ -1270,6 +1278,70 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     component: defineAsyncComponent(() => import('./GtE1MonetaryFund.vue')),
     icon: '💵',
     label: 'E1 货币资金',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c1-entity-level-control',
+    component: defineAsyncComponent(() => import('./GtC1EntityControl.vue')),
+    icon: '🏛️',
+    label: 'C1 企业层面控制测试',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c22-itgc-bundle',
+    component: defineAsyncComponent(() => import('./GtC22ItgcBundle.vue')),
+    icon: '💻',
+    label: 'C22 IT一般控制测试聚合',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c23-journal-entry-control',
+    component: defineAsyncComponent(() => import('./GtC23JournalControl.vue')),
+    icon: '📋',
+    label: 'C23 会计分录控制测试',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c24-journal-entry-detail',
+    component: defineAsyncComponent(() => import('./GtC24JournalDetail.vue')),
+    icon: '🔍',
+    label: 'C24 会计分录细节测试',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c25-internal-audit-reliance',
+    component: defineAsyncComponent(() => import('./GtC25InternalAudit.vue')),
+    icon: '🔎',
+    label: 'C25 利用内部审计工作',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'c26-info-processing-control',
+    component: defineAsyncComponent(() => import('./GtC26InfoControl.vue')),
+    icon: '🛡️',
+    label: 'C26 信息处理控制测试',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l1-short-term-loans',
+    component: defineAsyncComponent(() => import('./GtL1ShortTermLoans.vue')),
+    icon: '🏦',
+    label: 'L1 短期借款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l2-interest-payable',
+    component: defineAsyncComponent(() => import('./GtL2InterestPayable.vue')),
+    icon: '💸',
+    label: 'L2 应付利息',
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },

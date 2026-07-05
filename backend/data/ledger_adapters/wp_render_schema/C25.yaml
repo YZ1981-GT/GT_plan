@@ -1,70 +1,98 @@
-# C25.yaml — 利用内审工作
-# componentType: d-form-table
-# Requirements: G5-4 利用内审工作
+# C25.yaml — 利用内部审计工作
+# componentType: c25-internal-audit-reliance
+# 专属组件：GtC25InternalAudit（10 步评估程序 + 利用结论）
 
 wp_code: C25
 template_version: v2025-R5
+component_type: c25-internal-audit-reliance
 description: |
   评价内部审计工作的可利用程度，决定是否减少外部审计程序。
-  评价维度：客观性、胜任能力、系统性方法、职业谨慎。
+  10 步评估程序：性质范围→领域识别→阅读报告→工作质量→重新执行→
+  补充测试→利用结论→合作计划→一致性→初始判断复核。
 
 sheets:
-  利用内审工作评价:
-    component_type: d-form-table
-    form_type: table
-    title: 利用内审工作评价
-    description: 按4个维度评价内审工作可利用程度并确定利用范围。
+  C25利用内部审计工作:
+    component_type: c25-internal-audit-reliance
+    title: 利用内部审计工作
+    description: 按 10 步评估内审工作的性质范围、胜任能力、可利用程度、重新执行程度。
 
-    dynamic_table:
-      add_row_button: true
-      max_rows: 10
-      columns:
-        dimension:
-          field: dimension
-          type: enum
-          label: 评价维度
-          width: 120
-          dict_source: dimension_dict
-        content:
-          field: content
-          type: textarea
-          label: 评价内容
-          width: 250
-        conclusion:
-          field: conclusion
-          type: enum
-          label: 结论
-          width: 120
-          dict_source: conclusion_dict
-          render_hint: risk_badge
-        scope:
-          field: scope
-          type: textarea
-          label: 利用范围说明
-          width: 200
-        planned_procedures:
-          field: planned_procedures
-          type: textarea
-          label: 拟实施的审计程序
-          width: 250
+    # 10 步评估程序结构
+    steps:
+      - seq: 1
+        procedure: 考虑内审工作的性质和范围
+        sub_steps: []
+      - seq: 2
+        procedure: 识别可能与审计策略相关的领域
+        sub_steps: ["识别内审覆盖的关键领域", "评估与审计策略的相关性", "确定需进一步利用的范围", "记录初步判断"]
+      - seq: 3
+        procedure: 阅读内审报告获知程序性质范围及发现
+        sub_steps: []
+      - seq: 4
+        procedure: 获取内审工作底稿确定质量
+        sub_steps: ["工作底稿的完整性", "程序执行的充分性", "证据的适当性", "结论的合理性"]
+      - seq: 5
+        procedure: 确定重新执行内审工作的程度
+        sub_steps: ["判断重新执行的必要性", "确定重新执行的范围", "记录重新执行结果"]
+      - seq: 6
+        procedure: 考虑是否需要补充执行测试
+        sub_steps: []
+      - seq: 7
+        procedure: 评价合理借助内审工作的结果
+        sub_steps: ["评价内审结论的可靠性", "确定审计证据的充分性", "考虑对审计意见的影响", "确定利用程度"]
+      - seq: 8
+        procedure: 与企业适当人员的合作计划
+        sub_steps: []
+      - seq: 9
+        procedure: 测试结果与内审发现是否一致
+        sub_steps: []
+      - seq: 10
+        procedure: 初始判断是否仍然合理
+        sub_steps: []
 
-    dictionaries:
-      dimension_dict:
-        - value: objectivity
-          label: 客观性
-        - value: competence
-          label: 胜任能力
-        - value: systematic
-          label: 系统性方法
-        - value: due_care
-          label: 职业谨慎
-      conclusion_dict:
-        - value: usable
-          label: 可利用
-          color: green
-        - value: partial
-          label: 部分可利用
-          color: yellow
-        - value: not_usable
-          label: 不可利用
-          color: red
+    # 列结构
+    columns:
+      seq:
+        field: seq
+        type: number
+        label: 序号
+        width: 40
+      procedure:
+        field: procedure
+        type: readonly
+        label: 审计程序
+        width: flex
+      applicable:
+        field: applicable
+        type: enum
+        label: 是否适用
+        width: 80
+        options: ["是", "否"]
+      executor:
+        field: executor
+        type: text
+        label: 执行人
+        width: 100
+      result:
+        field: result
+        type: textarea
+        label: 执行情况说明
+        width: flex
+        ai_assist: true
+      index_ref:
+        field: index_ref
+        type: ref_chip
+        label: 索引号
+        width: 100
+
+    # 利用结论枚举
+    conclusion_options:
+      - value: can_use
+        label: 可以利用内部审计工作
+      - value: cannot_use
+        label: 不能利用内部审计工作
+      - value: partial_use
+        label: 可以部分利用内部审计工作
+
+  GT_Custom:
+    hidden: true
+    description: 系统配置 sheet，前端不展示

@@ -2,8 +2,8 @@
 
 **最后更新**：2026-06-29
 **当前分支**：`work/2026-05-30-wp-specs`
-**Spec 总数**：**229**（active 10 + archived 219）
-**当前 active = 10**（3 全局治理 + 6 D1拆分 + 1 通用复核对话）
+**Spec 总数**：**240**（active 21 + archived 219）
+**当前 active = 21**（3 全局治理 + 6 D1拆分 + 1 通用复核对话 + 6 S类特定项目程序 + 5 C类控制测试专项）
 **最高迁移**：V094
 **测试总数**：~17500+（含 PBT 40+ properties）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
@@ -26,7 +26,7 @@
 
 ---
 
-## 一、Active Specs（10个）
+## 一、Active Specs（21个）
 
 ### 全局治理（3，未启动）
 
@@ -52,6 +52,31 @@
 | Spec | 说明 |
 |------|------|
 | `audit-review-dialog` | 通用审计复核对话(GtReviewDialog+后端V095) 13需求14P39任务 |
+
+### C 类控制测试专项（5，三件套齐全待执行）
+
+> 源模板 `3.风险应对-一般性程序与控制测试（C1-C26）` 共 36 xlsx（无 VBA，导航靠底稿目录+命名区域下拉）。分析工具 `backend/scripts/analyze_c_category.py` + `dump_c_content.py`。C2~C15 循环控制测试已归档（`c-control-test-component`），本轮覆盖未做的 C1/C21/C22/C23/C24/C25/C26 + 翻新 C2~C15。
+
+| Spec | 覆盖底稿 | 类型 | 需求/波次 |
+|------|---------|------|-----------|
+| `c1-entity-level-control` | C1 企业层面控制（COSO五要素+财报内控子表） | D4专属 | 8需求/6波 |
+| `c22-itgc-bundle` | C22 IT一般控制(34sheet SA/PE/PM/NS)+C21+C21-1 | bundle | 9需求/7波 |
+| `c23-c24-journal-entry-testing` | C23分录控制+C24分录细节(跳号/异常/本福特) | D4专属(计算) | 8需求/7波 |
+| `c25-c26-internal-audit-info-control` | C25利用内审+C26信息处理控制 | D4专属 | 7需求/6波 |
+| `c-control-test-refresh` | C2~C15翻新(汇总表+控制测试+Cx-2偏差决策树)，取代c-control-test-component | D4专属 | 8需求/7波 |
+
+### S 类特定项目程序（6，三件套齐全待执行）
+
+> 源模板 `6.特定项目程序（S）` 共 87 个 xlsx。分析工具 `backend/scripts/analyze_s_category.py` + `dump_s34_content.py` + `dump_s_special_content.py`。
+
+| Spec | 覆盖底稿 | 类型 | 需求/波次 |
+|------|---------|------|-----------|
+| `s34-ipo-review-bundle` | S34-0~41（41个，IPO大组件一行分组页签） | bundle | 12需求/7波 |
+| `s32-fraud-response-bundle` | S32-1~13（551文舞弊核查） | bundle | 8需求/7波 |
+| `s33-announcement14-bundle` | S33-1~9（14号公告核查） | bundle | 8需求/7波 |
+| `s35-refinancing-bundle` | S35-1~5（再融资审核） | bundle | 8需求/7波 |
+| `s-estimate-calculation-workpapers` | S3/S15/S20/S21（计算型专属，4 componentType） | D4专属 | 11需求/8波 |
+| `s-special-transaction-workpapers` | S1/S2/S4/S5/S6/S8/S9/S10/S11/S12/S13/S14/S16/S17（交易/专家/检查型，6专属+检查表型） | D4专属 | 11需求/8波 |
 
 ---
 

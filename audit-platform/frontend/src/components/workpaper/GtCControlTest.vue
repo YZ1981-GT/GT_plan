@@ -1,362 +1,167 @@
 <template>
-  <div class="c-control-test" :class="{ 'is-readonly': state.isReadonly.value }">
-    <!-- 已复核横幅 -->
-    <div v-if="state.isReviewed.value" class="reviewed-banner">
-      <el-icon><CircleCheckFilled /></el-icon>
-      <span>已复核 — {{ state.reviewInfo.value?.reviewer }} {{ state.reviewInfo.value?.date }}</span>
+  <div class="c-control-test" :class="{ 'is-readonly': readonly }">
+    <!-- 加载状态 -->
+    <div v-if="loading" class="loading-container">
+      <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 主 Tab -->
-    <el-tabs v-model="activeTab" class="main-tabs">
-      <el-tab-pane label="控制测试" name="main">
-        <!-- 顶部设置栏 -->
-        <div class="top-bar">
-          <div class="cycle-info">
-            <span class="cycle-name">{{ state.cycleName.value }}</span>
-            <span class="wp-code-badge">{{ wpCode }}</span>
+    <template v-else>
+      <!-- ═══ 目录导航视图 ═══ -->
+      <div v-if="currentView === 'directory'" class="cct-directory">
+        <!-- 顶部项目信息 + 循环上下文 -->
+        <div class="cct-header">
+          <div class="cct-header-title">
+            <span class="cct-cycle-badge">{{ wpCode }}</span>
+            <span class="cct-cycle-name">{{ cycleName }}控制测试</span>
           </div>
-          <div class="tolerable-rate-setting">
-            <span>可容忍偏差率：</span>
-            <el-input-number
-              v-model="tolerableRatePercent"
-              :min="0" :max="50" :step="1"
-              :disabled="state.isReadonly.value"
-              size="small"
-              @change="onTolerableRateChange"
-            />
-            <span>%</span>
+          <div class="cct-project-info">
+            <span class="cct-info-item">客户：{{ clientName || '—' }}</span>
+            <span class="cct-info-item">会计期间：{{ year }}年度</span>
           </div>
-          <div class="card-controls no-print">
-            <el-button size="small" @click="state.expandAll()">全部展开</el-button>
-            <el-button size="small" @click="state.collapseAll()">全部收起</el-button>
+          <!-- B23/B50 快捷跳转 Chips -->
+          <div class="cct-linkage-chips">
+            <span class="cct-linkage-label">关联底稿：</span>
+            <GtIndexChip value="B23" :context="b23Context" />
+            <GtIndexChip value="B50" :context="b50Context" />
           </div>
         </div>
 
-        <!-- B23 引用面板 -->
-        <div class="b23-reference-panel">
-          <div class="panel-header">
-            <span class="panel-title">B23 控制点引用</span>
-            <el-tag
-              v-if="state.b23ControlPoints.value.length === 0"
-              type="warning" size="small"
-            >B23 尚未录入该循环控制点</el-tag>
-            <el-button
-              v-if="!state.isReadonly.value"
-              class="no-print" size="small" type="primary" plain
-              @click="state.addControlPoint()"
-            >+ 新增控制点</el-button>
+        <!-- 蓝色渐变引导区 -->
+        <div class="cct-guidance-area">
+          <div class="cct-guidance-header">
+            <el-icon><InfoFilled /></el-icon>
+            <span>操作流程引导</span>
           </div>
-          <div v-if="state.b23ControlPoints.value.length > 0" class="b23-list">
-            <div v-for="bp in state.b23ControlPoints.value" :key="bp.controlId" class="b23-item">
-              <span class="b23-id">{{ bp.controlId }}</span>
-              <span class="b23-objective">{{ bp.objective }}</span>
+          <div class="cct-guidance-steps">
+            <div class="step-item">
+              <span class="step-num">①</span>
+              <span class="step-text">目录导航</span>
+            </div>
+            <div class="step-item">
+              <span class="step-num">②</span>
+              <span class="step-text">控制清单</span>
+            </div>
+            <div class="step-item">
+              <span class="step-num">③</span>
+              <span class="step-text">逐控制抽样</span>
+            </div>
+            <div class="step-item">
+              <span class="step-num">④</span>
+              <span class="step-text">偏差评价</span>
             </div>
           </div>
         </div>
 
-        <!-- 控制点卡片列表 -->
-        <div class="control-points-list">
-          <div
-            v-for="cp in state.controlPoints.value"
-            :key="cp.index"
-            class="control-point-card"
-            :style="{ borderLeftColor: getCardColor(cp.conclusion) }"
-          >
-            <!-- 卡片标题栏 -->
-            <div class="card-header" @click="state.toggleCard(cp.index)">
-              <div class="header-left">
-                <span class="ctrl-index">{{ cp.index }}</span>
-                <span class="ctrl-objective">{{ cp.objective || '(未命名控制点)' }}</span>
-              </div>
-              <div class="header-right">
-                <el-tag v-if="cp.conclusion" :color="getCardBg(cp.conclusion)" size="small" effect="plain">
-                  {{ cp.conclusion }}
-                </el-tag>
-                <span v-if="cp.deviationStats.deviationRate !== null" class="deviation-badge"
-                  :class="{ exceed: cp.deviationStats.exceedsTolerable }"
-                >
-                  偏差率 {{ (cp.deviationStats.deviationRate * 100).toFixed(1) }}%
-                </span>
-                <el-icon class="expand-icon no-print">
-                  <ArrowDown v-if="!expandedCards.has(cp.index)" />
-                  <ArrowUp v-else />
-                </el-icon>
-              </div>
+        <!-- 目录列表 -->
+        <div class="cct-nav-list">
+          <div class="cct-nav-section-title">底稿目录</div>
+
+          <!-- 汇总表 -->
+          <div class="cct-nav-item" @click="navigateTo('summary')">
+            <span class="cct-nav-icon">📋</span>
+            <span class="cct-nav-label">{{ wpCode }} 控制测试汇总表</span>
+            <el-icon class="cct-nav-arrow"><ArrowRight /></el-icon>
+          </div>
+
+          <!-- 各控制测试子页 -->
+          <template v-for="ctrl in controlPointList" :key="ctrl.id">
+            <div class="cct-nav-item" @click="navigateTo(`ctrl-${ctrl.index}`)">
+              <span class="cct-nav-icon">🧪</span>
+              <span class="cct-nav-label">{{ wpCode }}-1-{{ ctrl.index }} {{ ctrl.name || '控制测试' }}</span>
+              <el-icon class="cct-nav-arrow"><ArrowRight /></el-icon>
             </div>
+          </template>
 
-            <!-- 卡片展开内容 -->
-            <div v-show="expandedCards.has(cp.index)" class="card-body">
-              <!-- 控制目标编辑 -->
-              <div class="field-row">
-                <label>控制目标</label>
-                <el-input
-                  :model-value="cp.objective"
-                  :disabled="state.isReadonly.value"
-                  placeholder="输入控制目标描述"
-                  @input="(val: string) => onObjectiveChange(cp.index, val)"
-                />
-              </div>
-
-              <!-- 测试方法多选 -->
-              <div class="field-row">
-                <label>测试方法</label>
-                <el-checkbox-group
-                  :model-value="cp.testMethods"
-                  :disabled="state.isReadonly.value"
-                  @change="(val: TestMethod[]) => state.setTestMethods(cp.index, val)"
-                >
-                  <el-checkbox label="询问" value="询问" />
-                  <el-checkbox label="观察" value="观察" />
-                  <el-checkbox label="检查" value="检查" />
-                  <el-checkbox label="重新执行" value="重新执行" />
-                </el-checkbox-group>
-                <div v-if="cp.testMethods.includes('重新执行')" class="method-tip">
-                  重新执行需逐笔记录执行过程
-                </div>
-              </div>
-
-              <!-- 样本管理区域 -->
-              <div class="samples-section">
-                <div class="samples-header">
-                  <span class="samples-count">样本量: {{ cp.samples.length }} 笔</span>
-                  <div v-if="!state.isReadonly.value" class="samples-actions no-print">
-                    <el-button size="small" @click="onAddSample(cp.index)">+ 添加样本</el-button>
-                    <el-button size="small" @click="showBatchDialog(cp.index)">批量添加</el-button>
-                  </div>
-                </div>
-
-                <div v-if="cp.samples.length === 0" class="empty-samples">
-                  请添加测试样本
-                </div>
-
-                <div v-else class="samples-list">
-                  <div
-                    v-for="sample in cp.samples" :key="sample.index"
-                    class="sample-row"
-                    :class="{ 'deviation-highlight': sample.result === '偏差' }"
-                  >
-                    <span class="sample-index">{{ sample.index }}</span>
-                    <el-input
-                      :model-value="sample.voucherNo"
-                      :disabled="state.isReadonly.value"
-                      size="small" placeholder="凭证号"
-                      class="sample-field"
-                      @input="(val: string) => onSampleFieldChange(cp.index, sample.index, 'voucher', val)"
-                    />
-                    <el-input
-                      :model-value="sample.date"
-                      :disabled="state.isReadonly.value"
-                      size="small" placeholder="日期"
-                      class="sample-field"
-                      @input="(val: string) => onSampleFieldChange(cp.index, sample.index, 'date', val)"
-                    />
-                    <el-input
-                      :model-value="sample.amount"
-                      :disabled="state.isReadonly.value"
-                      size="small" placeholder="金额"
-                      class="sample-field"
-                      @input="(val: string) => onSampleFieldChange(cp.index, sample.index, 'amount', val)"
-                    />
-                    <el-radio-group
-                      :model-value="sample.result"
-                      :disabled="state.isReadonly.value"
-                      size="small"
-                      @change="(val: SampleResult) => state.setSampleResult(cp.index, sample.index, val)"
-                    >
-                      <el-radio-button value="有效">有效</el-radio-button>
-                      <el-radio-button value="偏差">偏差</el-radio-button>
-                      <el-radio-button value="不适用">不适用</el-radio-button>
-                    </el-radio-group>
-                    <el-button
-                      v-if="!state.isReadonly.value"
-                      class="no-print" size="small" type="danger" plain
-                      @click="state.removeSample(cp.index, sample.index)"
-                    >删除</el-button>
-                    <!-- 偏差描述 -->
-                    <div v-if="sample.result === '偏差'" class="deviation-desc-row">
-                      <el-input
-                        :model-value="sample.deviationDesc"
-                        :disabled="state.isReadonly.value"
-                        type="textarea" :rows="2"
-                        placeholder="描述偏差情况"
-                        @input="(val: string) => onDeviationDescChange(cp.index, sample.index, val)"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 偏差统计 -->
-              <div class="deviation-stats">
-                <template v-if="cp.deviationStats.effectiveSamples === 0 && cp.samples.length > 0">
-                  <span class="no-effective">无有效样本，无法计算偏差率</span>
-                </template>
-                <template v-else-if="cp.deviationStats.deviationRate !== null">
-                  <span>偏差数: {{ cp.deviationStats.deviationCount }}</span>
-                  <span> / 有效样本: {{ cp.deviationStats.effectiveSamples }}</span>
-                  <span> = </span>
-                  <span
-                    class="rate-value"
-                    :class="{ exceed: cp.deviationStats.exceedsTolerable }"
-                  >{{ (cp.deviationStats.deviationRate * 100).toFixed(1) }}%</span>
-                  <span v-if="cp.deviationStats.exceedsTolerable" class="exceed-warning">
-                    超出可容忍偏差率
-                  </span>
-                </template>
-              </div>
-
-              <!-- 控制点结论 -->
-              <div class="point-conclusion-section">
-                <label>控制点结论</label>
-                <div v-if="cp.suggestedConclusion" class="suggestion-tip">
-                  系统建议: {{ cp.suggestedConclusion }}
-                </div>
-                <el-radio-group
-                  :model-value="cp.conclusion"
-                  :disabled="state.isReadonly.value"
-                  @change="(val: ControlPointConclusion) => onPointConclusionChange(cp.index, val)"
-                >
-                  <el-radio value="控制有效运行">控制有效运行</el-radio>
-                  <el-radio value="控制存在偏差但可接受">控制存在偏差但可接受</el-radio>
-                  <el-radio value="控制无效">控制无效</el-radio>
-                </el-radio-group>
-                <div v-if="cp.conclusionOverridden" class="override-badge">
-                  已手动调整 — {{ cp.overrideReason }}
-                </div>
-              </div>
-
-              <!-- 删除控制点 -->
-              <div v-if="!state.isReadonly.value" class="card-footer no-print">
-                <el-button size="small" type="danger" plain @click="state.removeControlPoint(cp.index)">
-                  删除此控制点
-                </el-button>
-              </div>
-            </div>
+          <!-- 偏差评价 -->
+          <div class="cct-nav-item" @click="navigateTo('deviation')">
+            <span class="cct-nav-icon">⚖️</span>
+            <span class="cct-nav-label">{{ wpCode }}-2 评价控制偏差</span>
+            <el-icon class="cct-nav-arrow"><ArrowRight /></el-icon>
           </div>
         </div>
+      </div>
 
-        <!-- 循环级整体结论 -->
-        <div class="cycle-conclusion-section">
-          <h3>循环级整体结论</h3>
-          <div v-if="state.suggestCycleConclusion.value" class="suggestion-tip">
-            系统建议: {{ state.suggestCycleConclusion.value }}
-          </div>
-          <el-radio-group
-            :model-value="state.cycleConclusion.value"
-            :disabled="state.isReadonly.value"
-            @change="onCycleConclusionChange"
-          >
-            <el-radio value="全部有效">全部有效</el-radio>
-            <el-radio value="部分偏差">部分偏差</el-radio>
-            <el-radio value="控制失效">控制失效</el-radio>
-          </el-radio-group>
-          <div v-if="state.isCycleConclusionOverridden.value" class="override-badge">
-            已手动调整
-          </div>
+      <!-- ═══ 汇总表视图 ═══ -->
+      <CControlTestSummaryTable
+        v-else-if="currentView === 'summary'"
+        :wp-code="wpCode"
+        :rows="state.summaryRows"
+        :readonly="isReadonly"
+        :update-summary-text="updateSummaryText"
+        :update-summary-enum="updateSummaryEnum"
+        :update-summary-sample-size="updateSummarySampleSize"
+        :add-control-point="addControlPoint"
+        :remove-control-point="removeControlPoint"
+        @navigate="navigateTo"
+      />
+
+      <!-- ═══ 控制测试子页视图 (Cx-1-X) ═══ -->
+      <CControlTestSubPage
+        v-else-if="currentView.startsWith('ctrl-')"
+        :wp-id="wpId"
+        :project-id="projectId"
+        :wp-code="wpCode"
+        :page-index="currentCtrlIndex - 1"
+        :page="currentControlPage"
+        :control-name="currentControlName"
+        :readonly="isReadonly"
+        :update-ctrl-page-text="updateCtrlPageText"
+        :update-ctrl-page-enum="updateCtrlPageEnum"
+        :update-ctrl-page-sample-size="updateCtrlPageSampleSize"
+        :add-sample="addSample"
+        :remove-sample="removeSample"
+        :update-sample-description="updateSampleDescription"
+        :update-sample-result="updateSampleResult"
+        :update-summary-deviation="handleDeviationBackfill"
+        @navigate="navigateTo"
+      />
+
+      <!-- ═══ 偏差评价视图 (Cx-2) ═══ -->
+      <CControlTestDecisionTree
+        v-else-if="currentView.startsWith('deviation')"
+        :wp-code="wpCode"
+        :dev-index="currentDevIndex"
+        :dev-state="currentDeviationState"
+        :control-name="currentDevControlName"
+        :control-names="allControlNames"
+        :control-count="state.summaryRows.length"
+        :readonly="isReadonly"
+        :update-deviation-step="updateDeviationStep"
+        :writeback-defect="writebackDefect"
+        :build-defect-summary="buildDefectSummary"
+        @navigate="navigateTo"
+        @change-dev-index="handleChangeDevIndex"
+      />
+
+      <!-- ═══ 编制提示（底部折叠） ═══ -->
+      <details class="cct-compilation-tips">
+        <summary>编制提示</summary>
+        <div class="cct-tips-content">
+          <p>1. 控制测试旨在验证内部控制在审计期间运行的有效性。</p>
+          <p>2. 汇总表需按循环列示所有被测控制点，确保覆盖认定层次重大风险所涉及的关键控制。</p>
+          <p>3. 样本规模参照致同 2025 修订版样本规模区间表确定（频率×次数→最小样本量），可根据职业判断调整。</p>
+          <p>4. 抽样结果中标记为「偏差」的项目，需在 Cx-2 偏差评价决策树中进一步分析其性质并推导结论。</p>
+          <p>5. 如决策树推导至「控制缺陷」，应联动 A14 内控缺陷评价底稿进行缺陷等级评价。</p>
+          <p>6. 循环整体结论变更时通过 EventBus 通知 B50 更新控制风险评估。</p>
         </div>
-
-        <!-- 联动面板 -->
-        <div class="linkage-panel">
-          <h4>关联底稿</h4>
-          <div class="linkage-chips">
-            <el-tag type="info" class="ref-chip">B23 {{ state.linkageInfo.value.b23WpCode }} (P{{ state.linkageInfo.value.b23ProcessNum }})</el-tag>
-            <el-tag type="info" class="ref-chip">B50 风险评估</el-tag>
-            <el-tag
-              :type="state.linkageInfo.value.needsExtendedProcedures ? 'danger' : 'info'"
-              class="ref-chip"
-            >
-              {{ state.linkageInfo.value.targetCycleCode }} {{ state.linkageInfo.value.targetCycleName }}
-            </el-tag>
-          </div>
-          <div v-if="state.linkageInfo.value.needsExtendedProcedures" class="extended-warning">
-            ⚠️ 控制失效 — 需扩大实质性程序范围
-          </div>
-        </div>
-
-        <!-- 复核签字区域 -->
-        <div class="review-section">
-          <h4>现场经理复核</h4>
-          <div v-if="state.pendingItems.value.length > 0" class="pending-list">
-            <p>待完成事项：</p>
-            <ul>
-              <li v-for="(item, idx) in state.pendingItems.value" :key="idx">{{ item }}</li>
-            </ul>
-          </div>
-          <el-button
-            v-if="!state.isReadonly.value"
-            type="primary"
-            :disabled="!state.canReview.value"
-            class="no-print"
-            @click="onReview"
-          >签字复核</el-button>
-          <el-button
-            v-if="state.isReviewed.value && !externalReadonly"
-            type="warning" plain
-            class="no-print"
-            @click="showAmendDialog = true"
-          >启动修改</el-button>
-        </div>
-      </el-tab-pane>
-
-      <!-- 证据明细 Tab -->
-      <el-tab-pane label="证据明细" name="evidence">
-        <div class="evidence-tab">
-          <p class="evidence-placeholder">暂无证据明细底稿（{{ wpCode }}-2）</p>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 批量添加对话框 -->
-    <el-dialog v-model="batchDialogVisible" title="批量添加样本" width="400px">
-      <el-form>
-        <el-form-item label="起始凭证号">
-          <el-input v-model="batchStart" placeholder="如: 001" />
-        </el-form-item>
-        <el-form-item label="截止凭证号">
-          <el-input v-model="batchEnd" placeholder="如: 010" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="batchDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="onBatchAdd">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 覆盖理由对话框 -->
-    <el-dialog v-model="overrideDialogVisible" title="调整理由" width="400px">
-      <el-input v-model="overrideReason" type="textarea" :rows="3" placeholder="请填写手动调整理由" />
-      <template #footer>
-        <el-button @click="overrideDialogVisible = false">取消</el-button>
-        <el-button type="primary" :disabled="!overrideReason.trim()" @click="confirmOverride">确定</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 修改原因对话框 -->
-    <el-dialog v-model="showAmendDialog" title="启动修改" width="400px">
-      <el-input v-model="amendReason" type="textarea" :rows="3" placeholder="请填写修改原因" />
-      <template #footer>
-        <el-button @click="showAmendDialog = false">取消</el-button>
-        <el-button type="primary" :disabled="!amendReason.trim()" @click="onAmend">确定</el-button>
-      </template>
-    </el-dialog>
+      </details>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, onBeforeUnmount } from 'vue'
-import { ArrowDown, ArrowUp, CircleCheckFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { useCControlTestData } from './composables/useCControlTestData'
-import {
-  useCControlTest,
-  CONTROL_TEST_COLORS,
-  type TestMethod,
-  type SampleResult,
-  type ControlPointConclusion,
-  type CycleConclusion,
-} from './composables/useCControlTest'
+import { ArrowRight, InfoFilled } from '@element-plus/icons-vue'
+import { useProjectStore } from '@/stores/project'
+import { useCControlTestData } from '@/composables/useCControlTestData'
+import { createEmptyState, type DecisionTreeState } from '@/composables/useDeviationDecisionTree'
+import { CYCLE_CONFIG } from './composables/useCControlTest'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import CControlTestSummaryTable from './cControlTest/CControlTestSummaryTable.vue'
+import CControlTestSubPage from './cControlTest/CControlTestSubPage.vue'
+import CControlTestDecisionTree from './cControlTest/CControlTestDecisionTree.vue'
 
-// ─── Props / Emits ───────────────────────────────────────────────────────────
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
@@ -364,6 +169,7 @@ const props = defineProps<{
   wpCode: string
   year: number
   readonly?: boolean
+  sheetName?: string
 }>()
 
 const emit = defineEmits<{
@@ -374,157 +180,153 @@ const emit = defineEmits<{
 // ─── Derived ─────────────────────────────────────────────────────────────────
 
 const cycleNum = computed(() => parseInt(props.wpCode.replace(/^C/i, ''), 10) || 2)
-const externalReadonly = computed(() => props.readonly ?? false)
 const wpIdRef = toRef(props, 'wpId')
+const projectIdRef = toRef(props, 'projectId')
 const wpCodeRef = toRef(props, 'wpCode')
+const isReadonly = computed(() => props.readonly ?? false)
 
-// ─── Composables ─────────────────────────────────────────────────────────────
-
-const { allResponses, loading, saving, loadAll, saveImmediate, saveDebouncedText, flushPendingSave, getField, setFieldImmediate } =
-  useCControlTestData(wpIdRef, cycleNum)
-
-const state = useCControlTest(allResponses, cycleNum, wpCodeRef, saveImmediate, externalReadonly)
-
-// ─── Local UI State ──────────────────────────────────────────────────────────
-
-const activeTab = ref('main')
-const expandedCards = state.expandedCards
-const batchDialogVisible = ref(false)
-const batchCtrlIndex = ref(1)
-const batchStart = ref('')
-const batchEnd = ref('')
-const overrideDialogVisible = ref(false)
-const overrideReason = ref('')
-const overrideTarget = ref<{ type: 'point' | 'cycle'; index: number; conclusion: string }>({ type: 'point', index: 0, conclusion: '' })
-const showAmendDialog = ref(false)
-const amendReason = ref('')
-
-const tolerableRatePercent = computed({
-  get: () => Math.round(state.tolerableDeviationRate.value * 100),
-  set: () => { /* handled by onTolerableRateChange */ },
+const cycleName = computed(() => {
+  const config = CYCLE_CONFIG[cycleNum.value]
+  return config?.name || `循环${cycleNum.value}`
 })
+
+/** B23 流程编号（用于 GtIndexChip context） */
+const b23Context = computed(() => {
+  const config = CYCLE_CONFIG[cycleNum.value]
+  if (!config) return ''
+  return `${config.name} — 流程${config.b23ProcessNum}`
+})
+
+/** B50 上下文（用于 GtIndexChip context） */
+const b50Context = computed(() => {
+  const config = CYCLE_CONFIG[cycleNum.value]
+  if (!config) return ''
+  return `${config.name} — 控制风险评估`
+})
+
+// ─── Project Info ────────────────────────────────────────────────────────────
+
+const projectStore = useProjectStore()
+const clientName = computed(() => projectStore.clientName || '')
+
+// ─── Data Composable ─────────────────────────────────────────────────────────
+
+const { state, loading, selfLoad, flushPendingSaves,
+  updateSummaryText, updateSummaryEnum, updateSummarySampleSize,
+  addControlPoint, removeControlPoint,
+  updateCtrlPageText, updateCtrlPageEnum, updateCtrlPageSampleSize,
+  addSample, removeSample, updateSampleDescription, updateSampleResult,
+  updateDeviationStep, writebackDefect, buildDefectSummary } =
+  useCControlTestData(wpIdRef, projectIdRef, wpCodeRef, isReadonly)
+
+// ─── View Dispatching ────────────────────────────────────────────────────────
+
+/** 当前视图：directory / summary / ctrl-{m} / deviation / deviation-{m} */
+const currentView = ref<string>('directory')
+
+/** 从 currentView 提取当前控制点索引 */
+const currentCtrlIndex = computed(() => {
+  const m = currentView.value.match(/^ctrl-(\d+)$/)
+  return m ? parseInt(m[1], 10) : 0
+})
+
+/** 导航到指定视图 */
+function navigateTo(view: string) {
+  currentView.value = view
+}
+
+// ─── Control Point List (from saved data) ────────────────────────────────────
+
+interface NavControlPoint {
+  id: string
+  index: number
+  name: string
+}
+
+/** 从 state.summaryRows 中获取控制点列表用于目录导航 */
+const controlPointList = computed<NavControlPoint[]>(() => {
+  return state.value.summaryRows.map((row, i) => ({
+    id: `ctrl-${i + 1}`,
+    index: i + 1,
+    name: row.controlName || '',
+  }))
+})
+
+// ─── Control Page & Deviation helpers for sub-components ─────────────────────
+
+/** 当前控制测试子页数据 */
+const currentControlPage = computed(() => {
+  const idx = currentCtrlIndex.value - 1
+  if (idx >= 0 && idx < state.value.controlPages.length) {
+    return state.value.controlPages[idx]
+  }
+  return { attribute: '', frequency: '', relatedRisk: '', testMethod: '',
+    testProcedure: '', populationDef: '', populationSource: '',
+    sampleSize: null, samplingMethod: '', samplingProcess: '',
+    deviationDef: '', samples: [] }
+})
+
+/** 当前控制点名称 */
+const currentControlName = computed(() => {
+  const idx = currentCtrlIndex.value - 1
+  if (idx >= 0 && idx < state.value.summaryRows.length) {
+    return state.value.summaryRows[idx].controlName || ''
+  }
+  return ''
+})
+
+/** 偏差回填汇总表 */
+function handleDeviationBackfill(pageIndex: number, hasDeviation: '是' | '否') {
+  if (isReadonly.value) return
+  if (pageIndex >= 0 && pageIndex < state.value.summaryRows.length) {
+    updateSummaryEnum(pageIndex, 'hasDeviation', hasDeviation)
+  }
+}
+
+/** 当前偏差评价的控制点索引（deviation 或 deviation-{m}） */
+const currentDevIndex = computed(() => {
+  const m = currentView.value.match(/^deviation-(\d+)$/)
+  if (m) return parseInt(m[1], 10) - 1
+  return 0
+})
+
+/** 当前偏差评价状态 */
+const currentDeviationState = computed<DecisionTreeState>(() => {
+  const idx = currentDevIndex.value
+  if (idx >= 0 && idx < state.value.deviationStates.length) {
+    return state.value.deviationStates[idx]
+  }
+  return createEmptyState()
+})
+
+/** 当前偏差评价控制点名称 */
+const currentDevControlName = computed(() => {
+  const idx = currentDevIndex.value
+  if (idx >= 0 && idx < state.value.summaryRows.length) {
+    return state.value.summaryRows[idx].controlName || ''
+  }
+  return ''
+})
+
+/** 全部控制点名称列表 */
+const allControlNames = computed(() => {
+  return state.value.summaryRows.map(r => r.controlName || '')
+})
+
+/** 切换偏差评价的控制点 */
+function handleChangeDevIndex(index: number) {
+  currentView.value = `deviation-${index + 1}`
+}
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  await loadAll()
-  await state.loadB23Reference()
-  // Expand first card if any exist
-  if (state.controlPoints.value.length > 0) {
-    state.expandedCards.value = new Set([1])
-  }
+  await selfLoad()
 })
 
 onBeforeUnmount(() => {
-  flushPendingSave()
+  flushPendingSaves()
 })
-
-// ─── Handlers ────────────────────────────────────────────────────────────────
-
-function getCardColor(conclusion: ControlPointConclusion | null): string {
-  if (!conclusion) return '#d9d9d9'
-  return CONTROL_TEST_COLORS[conclusion]?.color || '#d9d9d9'
-}
-
-function getCardBg(conclusion: ControlPointConclusion | null): string {
-  if (!conclusion) return '#fafafa'
-  return CONTROL_TEST_COLORS[conclusion]?.bg || '#fafafa'
-}
-
-function onTolerableRateChange(val: number | undefined): void {
-  if (val === undefined) return
-  state.setTolerableRate(val / 100)
-}
-
-function onObjectiveChange(ctrlIndex: number, val: string): void {
-  const itemId = `C${cycleNum.value}-ctrl-${ctrlIndex}-objective`
-  const item = { item_id: itemId, conclusion: null, remark: val, wp_ref: null }
-  allResponses.value.set(itemId, item)
-  saveDebouncedText(item)
-}
-
-function onSampleFieldChange(ctrlIndex: number, sampleIndex: number, field: string, val: string): void {
-  const itemId = `C${cycleNum.value}-ctrl-${ctrlIndex}-sample-${sampleIndex}-${field}`
-  const item = { item_id: itemId, conclusion: null, remark: val, wp_ref: null }
-  allResponses.value.set(itemId, item)
-  saveDebouncedText(item)
-}
-
-function onDeviationDescChange(ctrlIndex: number, sampleIndex: number, val: string): void {
-  const itemId = `C${cycleNum.value}-ctrl-${ctrlIndex}-sample-${sampleIndex}-deviation`
-  const item = { item_id: itemId, conclusion: null, remark: val, wp_ref: null }
-  allResponses.value.set(itemId, item)
-  saveDebouncedText(item)
-}
-
-function onAddSample(ctrlIndex: number): void {
-  state.addSample(ctrlIndex, {})
-}
-
-function showBatchDialog(ctrlIndex: number): void {
-  batchCtrlIndex.value = ctrlIndex
-  batchStart.value = ''
-  batchEnd.value = ''
-  batchDialogVisible.value = true
-}
-
-function onBatchAdd(): void {
-  state.addBatchSamples(batchCtrlIndex.value, { startVoucherNo: batchStart.value, endVoucherNo: batchEnd.value })
-  batchDialogVisible.value = false
-}
-
-function onPointConclusionChange(ctrlIndex: number, val: ControlPointConclusion): void {
-  const suggested = state.suggestPointConclusion(ctrlIndex).value
-  if (suggested !== null && val !== suggested) {
-    // Need override reason
-    overrideTarget.value = { type: 'point', index: ctrlIndex, conclusion: val }
-    overrideReason.value = ''
-    overrideDialogVisible.value = true
-  } else {
-    state.setPointConclusion(ctrlIndex, val)
-  }
-}
-
-function onCycleConclusionChange(val: CycleConclusion): void {
-  const suggested = state.suggestCycleConclusion.value
-  if (suggested !== null && val !== suggested) {
-    overrideTarget.value = { type: 'cycle', index: 0, conclusion: val }
-    overrideReason.value = ''
-    overrideDialogVisible.value = true
-  } else {
-    state.setCycleConclusion(val)
-    emit('save')
-  }
-}
-
-function confirmOverride(): void {
-  if (!overrideReason.value.trim()) {
-    ElMessage.warning('需填写调整理由')
-    return
-  }
-  if (overrideTarget.value.type === 'point') {
-    state.setPointConclusion(overrideTarget.value.index, overrideTarget.value.conclusion as ControlPointConclusion, overrideReason.value)
-  } else {
-    state.setCycleConclusion(overrideTarget.value.conclusion as CycleConclusion, overrideReason.value)
-    emit('save')
-  }
-  overrideDialogVisible.value = false
-}
-
-async function onReview(): Promise<void> {
-  await state.doReview()
-  emit('completed')
-}
-
-async function onAmend(): Promise<void> {
-  if (!amendReason.value.trim()) {
-    ElMessage.warning('请填写修改原因')
-    return
-  }
-  await state.startAmendment(amendReason.value)
-  showAmendDialog.value = false
-  amendReason.value = ''
-}
 </script>
 
 <style scoped>
@@ -532,341 +334,243 @@ async function onAmend(): Promise<void> {
   padding: 16px;
   max-width: 1200px;
   margin: 0 auto;
+  font-size: 13px;
 }
+
 .c-control-test.is-readonly {
   pointer-events: auto;
 }
-.reviewed-banner {
-  background: #f6ffed;
-  border: 1px solid #b7eb8f;
-  border-radius: 4px;
-  padding: 8px 16px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #52c41a;
-  font-weight: 500;
-}
-.top-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-.cycle-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cycle-name {
-  font-size: 16px;
-  font-weight: 600;
-}
-.wp-code-badge {
-  background: #e6f7ff;
-  color: #1890ff;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-.tolerable-rate-setting {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-}
-.card-controls {
-  margin-left: auto;
-}
-.b23-reference-panel {
-  background: #fafafa;
-  border: 1px solid #f0f0f0;
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-}
-.panel-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.panel-title {
-  font-weight: 500;
-  font-size: 14px;
-}
-.b23-list {
-  margin-top: 8px;
-}
-.b23-item {
-  display: flex;
-  gap: 8px;
-  padding: 4px 0;
-  font-size: 13px;
-}
-.b23-id {
-  color: #1890ff;
-  font-weight: 500;
-}
-.control-points-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-.control-point-card {
-  border: 1px solid #f0f0f0;
-  border-left: 4px solid #d9d9d9;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: border-left-color 0.3s;
-}
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  cursor: pointer;
-  background: #fafafa;
-}
-.card-header:hover {
-  background: #f5f5f5;
-}
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.ctrl-index {
-  background: #1890ff;
-  color: #fff;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-}
-.ctrl-objective {
-  font-size: 14px;
-  color: #333;
-}
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.deviation-badge {
-  font-size: 12px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #f6ffed;
-  color: #52c41a;
-}
-.deviation-badge.exceed {
-  background: #fff2f0;
-  color: #ff4d4f;
-}
-.card-body {
-  padding: 16px;
-  border-top: 1px solid #f0f0f0;
-}
-.field-row {
-  margin-bottom: 16px;
-}
-.field-row label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 4px;
-  color: #666;
-}
-.method-tip {
-  color: #faad14;
-  font-size: 12px;
-  margin-top: 4px;
-}
-.samples-section {
-  margin-bottom: 16px;
-}
-.samples-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.samples-count {
-  font-size: 13px;
-  font-weight: 500;
-  color: #666;
-}
-.empty-samples {
-  color: #bfbfbf;
-  font-size: 13px;
-  text-align: center;
+
+.loading-container {
   padding: 24px;
-  border: 1px dashed #d9d9d9;
-  border-radius: 4px;
-}
-.samples-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.sample-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: 4px;
-  background: #fafafa;
-  flex-wrap: wrap;
-}
-.sample-row.deviation-highlight {
-  background: #fff2f0;
-}
-.sample-index {
-  font-size: 12px;
-  color: #999;
-  width: 20px;
-}
-.sample-field {
-  width: 100px;
-}
-.deviation-desc-row {
-  width: 100%;
-  margin-top: 8px;
-  padding-left: 28px;
-}
-.deviation-stats {
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: #666;
-}
-.rate-value {
-  font-weight: 600;
-  color: #52c41a;
-}
-.rate-value.exceed {
-  color: #ff4d4f;
-}
-.exceed-warning {
-  color: #ff4d4f;
-  font-weight: 500;
-  margin-left: 8px;
-}
-.no-effective {
-  color: #bfbfbf;
-}
-.point-conclusion-section {
-  margin-bottom: 16px;
-}
-.point-conclusion-section label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  margin-bottom: 4px;
-  color: #666;
-}
-.suggestion-tip {
-  font-size: 12px;
-  color: #1890ff;
-  margin-bottom: 8px;
-}
-.override-badge {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #faad14;
-  background: #fffbe6;
-  padding: 4px 8px;
-  border-radius: 4px;
-  display: inline-block;
-}
-.card-footer {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 12px;
-}
-.cycle-conclusion-section {
-  background: #f9f9f9;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-.cycle-conclusion-section h3 {
-  margin: 0 0 12px;
-  font-size: 15px;
-}
-.linkage-panel {
-  margin-bottom: 16px;
-}
-.linkage-panel h4 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-.linkage-chips {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ref-chip {
-  cursor: pointer;
-}
-.extended-warning {
-  margin-top: 8px;
-  color: #ff4d4f;
-  font-size: 13px;
-  font-weight: 500;
-}
-.review-section {
-  border-top: 1px solid #f0f0f0;
-  padding-top: 16px;
-}
-.review-section h4 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-.pending-list {
-  margin-bottom: 12px;
-  font-size: 13px;
-  color: #666;
-}
-.pending-list ul {
-  margin: 4px 0;
-  padding-left: 20px;
-}
-.evidence-tab {
-  padding: 24px;
-  text-align: center;
-}
-.evidence-placeholder {
-  color: #bfbfbf;
-  font-size: 14px;
 }
 
-/* Print styles */
+/* ─── Header ─── */
+.cct-header {
+  margin-bottom: 16px;
+}
+
+.cct-header-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.cct-cycle-badge {
+  background: #e6f7ff;
+  color: #1890ff;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cct-cycle-name {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.cct-project-info {
+  display: flex;
+  gap: 24px;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.cct-info-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ─── Linkage Chips (B23/B50) ─── */
+.cct-linkage-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cct-linkage-label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+/* ─── Guidance Area ─── */
+.cct-guidance-area {
+  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
+  border: 1px solid #b3d9f2;
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+
+.cct-guidance-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #1a73e8;
+  margin-bottom: 10px;
+  font-size: 13px;
+}
+
+.cct-guidance-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.step-text {
+  font-size: 13px;
+}
+
+/* ─── Navigation List ─── */
+.cct-nav-list {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cct-nav-section-title {
+  padding: 12px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cct-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  cursor: pointer;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+}
+
+.cct-nav-item:last-child {
+  border-bottom: none;
+}
+
+.cct-nav-item:hover {
+  background: #f0f7ff;
+}
+
+.cct-nav-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.cct-nav-label {
+  flex: 1;
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.cct-nav-arrow {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* ─── View Header (sub-pages) ─── */
+.cct-view-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cct-view-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+/* ─── Readonly 铁律：全局禁止编辑 ─── */
+.c-control-test.is-readonly :deep(.el-input__inner),
+.c-control-test.is-readonly :deep(.el-textarea__inner),
+.c-control-test.is-readonly :deep(.el-select .el-input__inner),
+.c-control-test.is-readonly :deep(.el-input-number) {
+  cursor: not-allowed;
+}
+
+/* readonly 隐藏增删操作按钮（保留导航按钮） */
+.c-control-test.is-readonly :deep(.cct-view-actions) {
+  display: none;
+}
+
+/* ─── 编制提示 <details> 折叠 ─── */
+.cct-compilation-tips {
+  margin-top: 24px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cct-compilation-tips summary {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  background: #f9fafb;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cct-compilation-tips summary:hover {
+  background: #f3f4f6;
+}
+
+.cct-compilation-tips[open] summary {
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.cct-tips-content {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.8;
+}
+
+.cct-tips-content p {
+  margin: 0 0 4px;
+}
+
+/* ─── Print ─── */
 @media print {
-  .no-print {
-    display: none !important;
+  .cct-guidance-area {
+    display: none;
   }
-  .card-body {
-    display: block !important;
-  }
-  .control-point-card {
-    break-inside: avoid;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .c-control-test {
-    padding: 0;
-  }
-  .deviation-badge,
-  .reviewed-banner,
-  .sample-row.deviation-highlight {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
+  .cct-compilation-tips {
+    display: none;
   }
 }
 </style>

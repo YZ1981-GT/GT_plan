@@ -85,6 +85,8 @@ const props = withDefaults(defineProps<{
   preventNavigate?: boolean
   /** 为 true 时 chip 灰显不可点击（程序步骤不适用时） */
   disabled?: boolean
+  /** 附带上下文摘要（如缺陷描述），显示在 tooltip 中 */
+  context?: string
 }>(), {
   validate: true,
   preventNavigate: false,
@@ -194,7 +196,12 @@ const tooltipContent = computed(() => {
   if (resolveStatus.value === 'exists') {
     const { ns, layer, target } = parsed.value
     const layerLabel = ['', '单元格', 'Sheet', '底稿', '模块'][layer] || ''
-    return `${layerLabel}跳转 → ${ns}:${target}`
+    const base = `${layerLabel}跳转 → ${ns}:${target}`
+    // 附带上下文摘要
+    if (props.context) {
+      return `${base}\n${props.context}`
+    }
+    return base
   }
 
   if (resolveStatus.value === 'pending' && resolving.value) {

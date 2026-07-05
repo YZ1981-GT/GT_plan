@@ -46,27 +46,16 @@ from ._d3_prepaid_accounts import render as render_d3_prepaid_accounts
 from ._d5_receivables_financing import render as render_d5_receivables_financing
 from ._d6_contract_assets import render as render_d6_contract_assets
 from ._d7_contract_liabilities import render as render_d7_contract_liabilities
-from ._f1_prepayment import render as render_f1_prepayment
-from ._f2_inventory_main import render as render_f2_inventory_main
-from ._f2_inventory_valuation_impairment import render as render_f2_inventory_valuation_impairment
-from ._f2_inventory_special import render as render_f2_inventory_special
-from ._f2_stocktake import render as render_f2_stocktake
-from ._g1_trading_financial_assets import render as render_g1_trading_financial_assets
-from ._f3_notes_payable import render as render_f3_notes_payable
-from ._f4_accounts_payable import render as render_f4_accounts_payable
-from ._f5_cost_of_sales import render as render_f5_cost_of_sales
-from ._g2_interest_receivable import render as render_g2_interest_receivable
-from ._g3_dividend_receivable import render as render_g3_dividend_receivable
-from ._g4_bond_investment_main import render as render_g4_bond_investment_main
-from ._g5_long_term_receivable import render as render_g5_long_term_receivable
-from ._g8_other_equity_instruments import render as render_g8_other_equity_instruments
-from ._g9_other_noncurrent_financial import render as render_g9_other_noncurrent_financial
-from ._g10_trading_financial_liabilities import render as render_g10_trading_financial_liabilities
-from ._g11_investment_income import render as render_g11_investment_income
-from ._g12_net_hedge_gains import render as render_g12_net_hedge_gains
-from ._g13_fair_value_changes import render as render_g13_fair_value_changes
-from ._g14_credit_impairment_loss import render as render_g14_credit_impairment_loss
 from ._e1_monetary_fund import render as render_e1_monetary_fund
+from ._c1_entity_control import render as render_c1_entity_control
+from ._c22_itgc import render as render_c22_itgc
+from ._c23_journal_control import render as render_c23_journal_control
+from ._c24_journal_detail import render as render_c24_journal_detail
+from ._c25_internal_audit import render as render_c25_internal_audit
+from ._c26_info_processing import render as render_c26_info_processing
+from ._c_control_test import render as render_c_control_test
+from ._l1_short_term_loans import render as render_l1_short_term_loans
+from ._l2_interest_payable import render as render_l2_interest_payable
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -113,24 +102,13 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "d6-contract-assets": render_d6_contract_assets,
     "d7-contract-liabilities": render_d7_contract_liabilities,
     "e1-monetary-fund": render_e1_monetary_fund,
-    "f1-prepayment": render_f1_prepayment,
-    "f2-inventory-main": render_f2_inventory_main,
-    "f2-inventory-valuation-impairment": render_f2_inventory_valuation_impairment,
-    "f2-inventory-special": render_f2_inventory_special,
-    "f2-stocktake-bundle": render_f2_stocktake,
-    "g1-trading-financial-assets": render_g1_trading_financial_assets,
-    "f3-notes-payable": render_f3_notes_payable,
-    "f4-accounts-payable": render_f4_accounts_payable,
-    "f5-cost-of-sales": render_f5_cost_of_sales,
-    "g2-interest-receivable": render_g2_interest_receivable,
-    "g3-dividend-receivable": render_g3_dividend_receivable,
-    "g4-bond-investment-main": render_g4_bond_investment_main,
-    "g5-long-term-receivable": render_g5_long_term_receivable,
-    "g8-other-equity-instruments": render_g8_other_equity_instruments,
-    "g9-other-noncurrent-financial": render_g9_other_noncurrent_financial,
-    "g10-trading-financial-liabilities": render_g10_trading_financial_liabilities,
-    "g11-investment-income": render_g11_investment_income,
-    "g12-net-hedge-gains": render_g12_net_hedge_gains,
-    "g13-fair-value-changes": render_g13_fair_value_changes,
-    "g14-credit-impairment-loss": render_g14_credit_impairment_loss,
+    "c1-entity-level-control": render_c1_entity_control,
+    "c22-itgc-bundle": render_c22_itgc,
+    "c23-journal-entry-control": render_c23_journal_control,
+    "c24-journal-entry-detail": render_c24_journal_detail,
+    "c25-internal-audit-reliance": render_c25_internal_audit,
+    "c26-info-processing-control": render_c26_info_processing,
+    "c-control-test": render_c_control_test,
+    "l1-short-term-loans": render_l1_short_term_loans,
+    "l2-interest-payable": render_l2_interest_payable,
 }

@@ -54,6 +54,31 @@ _schema_service = WpRenderSchemaService()
 # 用于多 sheet 底稿按 sheet 级编码查 _WP_CODE_OVERRIDE（协作者 confirmation-* 精细组件）。
 _SHEET_CODE_RE = re.compile(r"([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$")
 
+# ─── 整册专属组件（多 sheet 但整册路由到同一 componentType，靠 sheetName v-if 分发） ──
+# 这类底稿本身没有 account_package_registry 条目（非科目工作包），但设计上要求
+# 整个 wp 的所有 sheet 都渲染为同一个专属自加载组件（如 C1 → GtC1EntityControl，
+# 内部按 sheetName 分发 program/example/fr-summary/process-record）。
+# 多 sheet dispatch 默认逐 sheet 按 class_code 派生（会把 C1 拆成 a-program-console +
+# onlyoffice-sheet），故此处显式声明：当 wp_code override ∈ 本集合时，多 sheet 分支
+# 统一采用 wp_code override（等价于 pkg_sheets 的 else 分支）。
+# 只影响 override 命中本集合的 wp_code，对其余底稿零回归。
+_WHOLE_WP_MULTISHEET_DEDICATED: set[str] = {
+    "c1-entity-level-control",
+    # C22 IT 一般控制测试：单一 34-sheet 工作簿（1 主矩阵 + 33 子页），
+    # 整册统一路由到 c22-itgc-bundle，由前端 GtC22ItgcBundle 内部按 sheetName /
+    # 分组 el-tabs 分发（矩阵总览 + SA/PE/PM/NS 子页 + C21/C21-1）。
+    "c22-itgc-bundle",
+    # C23 会计分录控制测试：单一 5-sheet 工作簿，
+    # 整册统一路由到 c23-journal-entry-control，由前端 GtC23JournalControl 按 sheetName v-if 分发。
+    "c23-journal-entry-control",
+    # C24 会计分录细节测试：单一 11-sheet 工作簿，
+    # 整册统一路由到 c24-journal-entry-detail，由前端 GtC24JournalDetail 按 sheetName v-if 分发。
+    "c24-journal-entry-detail",
+    # L2 应付利息：单一 8-sheet 工作簿，
+    # 整册统一路由到 l2-interest-payable，由前端 GtL2InterestPayable 按 sheetName v-if 分发。
+    "l2-interest-payable",
+}
+
 # 协作者 D0 函证精细组件（纯前端 componentType，无后端 renderer）。
 # 这些不在 _ONLYOFFICE_HTML_WHITELIST 但必须保留(不被重写成 onlyoffice-sheet)，
 # 由前端 htmlRendererRegistry 渲染；后端从模板提取 grid 供其消费。
@@ -783,6 +808,10 @@ async def _get_render_config_impl(
                 if _sheet_ovr:
                     # sheet 级 override 命中（精细 confirmation-* 组件 或 D4A→a-program-console）→ 直接采用
                     component_type = _sheet_ovr
+                elif ovr in _WHOLE_WP_MULTISHEET_DEDICATED:
+                    # 整册专属组件（如 C1→c1-entity-level-control）：所有 sheet 统一路由到
+                    # wp_code override，由前端专属组件按 sheetName v-if 内部分发（对齐 D4 标准）。
+                    component_type = ovr
                 elif pkg_sheets and ovr:
                     # pkg_sheets（专属组件 registry）模式：非 b-index 的 sheet 统一用 wp_code override
                     # （附注/明细/调整等都路由到同一专属组件由其内部按 sheetName 分发）

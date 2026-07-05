@@ -148,6 +148,14 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'd6-contract-assets',
       'd7-contract-liabilities',
       'e1-monetary-fund',
+      'c1-entity-level-control',
+      'c22-itgc-bundle',
+      'c23-journal-entry-control',
+      'c24-journal-entry-detail',
+      'c25-internal-audit-reliance',
+      'c26-info-processing-control',
+      'l1-short-term-loans',
+      'l2-interest-payable',
       'review-bundle',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)

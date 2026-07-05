@@ -291,13 +291,32 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
             )):
                 # 专属组件自由格式：签字/日期/长文本均存 conclusion，跳过白名单校验
                 pass
+            elif item.item_id.startswith("C1-"):
+                # C1 企业层面控制测试：适用性 Y/N + 段/整体结论 + 测试方法 + 控制频率 + 段裁剪
+                allowed = (
+                    "Y", "N", "NA",
+                    "有效", "部分有效", "无效",
+                    "控制有效运行", "控制存在偏差但可接受", "控制无效",
+                    "询问", "观察", "检查", "重新执行", "抽样", "询问和观察",
+                    "每笔", "每日", "每周", "每月", "每季", "每年",
+                    "每月一次", "每季一次", "每年一次", "根据需要", "不定期",
+                    "已执行", "尚未执行",
+                )
+                if item.conclusion and item.conclusion not in allowed:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"C1 企业层面控制 conclusion 值无效，收到: '{item.conclusion}'",
+                    )
             elif any(item.item_id.startswith(f"C{n}-") for n in range(2, 16)):
-                # C2~C15 控制测试：控制点结论 + 样本结果 + 循环结论 + 测试方法 + 签字标记
+                # C2~C15 控制测试：控制点结论 + 样本结果 + 循环结论 + 测试方法 + 偏差性质 + 决策树 + 签字标记
                 allowed = (
                     "控制有效运行", "控制存在偏差但可接受", "控制无效",
+                    "控制有效", "构成控制缺陷",
                     "有效", "偏差", "不适用",
                     "全部有效", "部分偏差", "控制失效",
                     "询问", "观察", "检查", "重新执行",
+                    "系统性偏差", "人为偏差", "随机性偏差",
+                    "扩大样本量", "直接认定为偏差",
                     "Y", "N",
                 )
                 if item.conclusion not in allowed:
