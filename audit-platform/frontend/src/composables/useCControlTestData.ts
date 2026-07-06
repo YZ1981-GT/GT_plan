@@ -151,10 +151,11 @@ function createEmptyControlPage(): ControlPage {
 }
 
 /**
- * 从 wpCode (e.g., "C2", "C10") 提取循环编号
+ * 从 wpCode (e.g., "C2", "C10", "C14-2") 提取循环编号
+ * C14-2 → 14（偏差评价 Cx-2 底稿的主循环编号）
  */
 export function extractCycleNumber(wpCode: string): number {
-  const match = wpCode.match(/^C(\d+)$/i)
+  const match = wpCode.match(/^C(\d+)/i)
   return match ? parseInt(match[1], 10) : 0
 }
 

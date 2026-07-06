@@ -449,7 +449,12 @@ const emit = defineEmits<{
 
 // ─── Derived ─────────────────────────────────────────────────────────────────
 
-const cycleNum = computed(() => parseInt(props.wpCode.replace(/^C/i, ''), 10) || 2)
+const cycleNum = computed(() => {
+  // "C14-2" → 14, "C14" → 14
+  const code = props.wpCode || ''
+  const m = code.match(/^C(\d+)/i)
+  return m ? parseInt(m[1], 10) : 2
+})
 /** 检测当前 sheetName 是否为偏差评价表 (Cx-2) */
 const isDeviationSheet = computed(() => {
   const sn = props.sheetName || ''
@@ -487,13 +492,28 @@ const clientName = computed(() => projectStore.clientName || '')
 
 // ─── Data Composable ─────────────────────────────────────────────────────────
 
+/**
+ * 偏差评价独立底稿(Cx-2)需要加载主底稿(Cx)的checklist_responses数据。
+ * 当 wpCode 为 "C14-2" 等格式时，用主底稿的 wpCode "C14" 来解析数据。
+ * 但 wpId 仍然用当前底稿的 ID（数据实际存储位置）。
+ *
+ * 注意：account_package 合并场景下，从 C14 tab 切换到 C14-2 tab 时，
+ * wpId 和 wpCode 都是 C14 的（由 GtWpRenderer 传入），不会触发此逻辑。
+ * 此逻辑仅在用户直接打开 C14-2 独立底稿时触发。
+ */
+const effectiveWpCodeRef = computed(() => {
+  // "C14-2" → "C14"（去除 -2 后缀，确保 extractCycleNumber 和数据前缀正确）
+  const code = props.wpCode || ''
+  return code.replace(/-\d+$/, '')
+})
+
 const { state, loading, selfLoad, flushPendingSaves,
   updateSummaryText, updateSummaryEnum, updateSummarySampleSize,
   addControlPoint, removeControlPoint,
   updateCtrlPageText, updateCtrlPageEnum, updateCtrlPageSampleSize,
   addSample, removeSample, updateSampleDescription, updateSampleResult,
   updateDeviationStep, writebackDefect, buildDefectSummary } =
-  useCControlTestData(wpIdRef, projectIdRef, wpCodeRef, isReadonly)
+  useCControlTestData(wpIdRef, projectIdRef, effectiveWpCodeRef, isReadonly)
 
 // ─── Dialog State ────────────────────────────────────────────────────────────
 
