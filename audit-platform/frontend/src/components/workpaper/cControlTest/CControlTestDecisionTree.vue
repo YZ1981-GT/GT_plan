@@ -51,14 +51,29 @@
           <el-icon class="cct-step-info"><InfoFilled /></el-icon>
         </el-tooltip>
       </div>
-      <el-input
-        v-model="exceptionDescription"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 5 }"
-        :disabled="readonly"
-        placeholder="描述控制测试中发现的例外情况，包括具体表现、涉及金额、时间区间、影响范围等"
-        @blur="handleExceptionDescBlur"
-      />
+      <div class="cct-exception-desc-input">
+        <el-input
+          v-model="exceptionDescription"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 5 }"
+          :disabled="readonly"
+          placeholder="描述控制测试中发现的例外情况，包括具体表现、涉及金额、时间区间、影响范围等"
+          @blur="handleExceptionDescBlur"
+        />
+        <el-tooltip content="AI辅助生成例外情况描述（基于控制点名称和循环上下文）" placement="top" :show-after="300">
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            class="cct-exception-ai-btn"
+            :loading="aiGeneratingException"
+            :disabled="readonly"
+            @click="handleAiGenerateException"
+          >
+            <el-icon><MagicStick /></el-icon>
+          </el-button>
+        </el-tooltip>
+      </div>
     </div>
 
     <!-- 六步决策树 -->
@@ -429,8 +444,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ArrowLeft, WarningFilled, InfoFilled, Right, Document } from '@element-plus/icons-vue'
+import { ArrowLeft, WarningFilled, InfoFilled, Right, Document, MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import http from '@/utils/http'
 import {
   evaluateDecisionTree,
   getStepOptions,
@@ -443,6 +460,7 @@ import {
 
 const props = defineProps<{
   wpCode: string
+  wpId?: string
   devIndex: number
   devState: DecisionTreeState
   controlName: string
@@ -483,6 +501,52 @@ function handleExceptionDescBlur() {
 // ─── 示例参考 Drawer ─────────────────────────────────────────────────────────
 
 const showExampleDrawer = ref(false)
+
+// ─── AI 辅助生成例外情况描述 ─────────────────────────────────────────────────
+
+const aiGeneratingException = ref(false)
+
+async function handleAiGenerateException(): Promise<void> {
+  if (props.readonly || aiGeneratingException.value) return
+  aiGeneratingException.value = true
+  try {
+    const context: Record<string, string> = {}
+    if (props.controlName) context['控制点名称'] = props.controlName
+    if (props.wpCode) context['循环编码'] = props.wpCode
+    if (exceptionDescription.value) context['现有描述'] = exceptionDescription.value
+
+    const systemHint = '请根据以下控制点信息，生成一段专业的控制例外情况描述（80~150字），需包含：例外具体表现、涉及的交易金额或笔数、发生时间区间、影响范围。使用审计专业用语。'
+
+    const wpId = props.wpId
+    if (!wpId) {
+      ElMessage.warning('AI服务暂不可用（缺少底稿ID）')
+      return
+    }
+
+    const res = await http.post(
+      `/api/workpapers/${wpId}/ai/generate-text`,
+      {
+        prompt: systemHint,
+        context,
+        existingContent: exceptionDescription.value || '',
+        section: 'control-exception-description',
+      },
+      { _silent: true } as any,
+    )
+    const generated = res?.data?.data?.content || res?.data?.content || res?.data?.text || ''
+    if (generated) {
+      exceptionDescription.value = generated
+      handleExceptionDescBlur() // 持久化
+      ElMessage.success('AI已生成例外情况描述')
+    } else {
+      ElMessage.info('AI未返回内容，请手动填写')
+    }
+  } catch {
+    ElMessage.warning('AI服务暂不可用，请手动填写')
+  } finally {
+    aiGeneratingException.value = false
+  }
+}
 // ─── 决策树推导结果 ──────────────────────────────────────────────────────────
 
 const treeResult = computed(() => evaluateDecisionTree(props.devState))
@@ -886,6 +950,21 @@ const conclusionTagType = computed(() => {
   font-size: 13px;
   font-weight: 600;
   color: #374151;
+}
+
+.cct-exception-desc-input {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.cct-exception-desc-input .el-input {
+  flex: 1;
+}
+
+.cct-exception-ai-btn {
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
 /* ─── 步骤注释说明 ─── */

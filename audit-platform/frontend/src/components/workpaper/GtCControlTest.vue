@@ -52,6 +52,7 @@
           <!-- 决策树组件（直接渲染，非弹窗） -->
           <CControlTestDecisionTree
             :wp-code="wpCode"
+            :wp-id="wpId"
             :dev-index="activeDeviationIndex"
             :dev-state="activeDeviationState"
             :control-name="activeDeviationControlName"
@@ -394,6 +395,7 @@
       <CControlTestDecisionTree
         v-if="deviationDialogVisible"
         :wp-code="wpCode"
+        :wp-id="wpId"
         :dev-index="activeDeviationIndex"
         :dev-state="activeDeviationState"
         :control-name="activeDeviationControlName"
