@@ -1144,7 +1144,7 @@ onBeforeUnmount(() => {
 /* ─── OO Container ─── */
 .cct-oo-container {
   min-height: 600px;
-  border: 1px solid #e5e7eb;
+  height: calc(100vh - 280px);
   border-radius: 8px;
   overflow: hidden;
 }
