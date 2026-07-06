@@ -200,6 +200,71 @@ async def save_custom_guidance(
 
 
 # ---------------------------------------------------------------------------
+# POST /api/workpapers/{wp_id}/ai/generate-text — 通用 AI 文本生成（单次，非流式）
+# ---------------------------------------------------------------------------
+
+
+class AiGenerateTextRequest(BaseModel):
+    prompt: str = ""
+    context: dict[str, str] = {}
+    existingContent: str = ""
+    section: str = ""
+
+
+class AiGenerateTextResponse(BaseModel):
+    content: str
+
+
+@router.post("/{wp_id}/ai/generate-text")
+async def workpaper_ai_generate_text(
+    wp_id: str,
+    request: AiGenerateTextRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """通用底稿级 AI 文本生成 — 单次调用返回生成内容
+
+    用于底稿编制中的各类 AI 辅助文本生成（控制描述、审计说明、例外描述等）。
+    接收 prompt（系统指令）+ context（字段上下文）+ existingContent（已有内容），
+    拼接为单轮请求发送给 LLM，返回生成文本。
+    """
+    from app.services.llm_client import chat_completion
+    from app.core.config import settings
+
+    if not settings.WP_AI_SERVICE_ENABLED:
+        raise HTTPException(status_code=503, detail="AI 服务未启用")
+
+    # 构建 LLM 输入
+    system_msg = request.prompt or "请根据提供的上下文信息生成专业的审计文本。"
+    user_parts = []
+    if request.context:
+        user_parts.append("【上下文信息】")
+        for k, v in request.context.items():
+            user_parts.append(f"- {k}：{v}")
+    if request.existingContent:
+        user_parts.append(f"\n【现有内容（可参考或改进）】\n{request.existingContent}")
+    if request.section:
+        user_parts.append(f"\n【目标字段】{request.section}")
+
+    user_msg = "\n".join(user_parts) if user_parts else "请生成内容。"
+
+    try:
+        generated = await chat_completion(
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            model=settings.DEFAULT_CHAT_MODEL,
+            max_tokens=512,
+        )
+        content = generated if isinstance(generated, str) else ""
+        return {"code": 200, "message": "success", "data": {"content": content}}
+    except Exception as e:
+        logger.warning("AI generate-text failed: %s", e)
+        raise HTTPException(status_code=503, detail="AI 服务暂不可用")
+
+
+# ---------------------------------------------------------------------------
 # POST /api/workpapers/{wp_id}/ai-chat — 底稿级 AI 对话（SSE streaming）
 # ---------------------------------------------------------------------------
 

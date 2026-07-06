@@ -50,30 +50,26 @@
         <el-tooltip content="描述控制测试中发现的例外情况具体表现、涉及金额、影响范围等" placement="top" :show-after="300">
           <el-icon class="cct-step-info"><InfoFilled /></el-icon>
         </el-tooltip>
-      </div>
-      <div class="cct-exception-desc-input">
-        <el-input
-          v-model="exceptionDescription"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 5 }"
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          class="cct-exception-ai-btn"
+          :loading="aiGeneratingException"
           :disabled="readonly"
-          placeholder="描述控制测试中发现的例外情况，包括具体表现、涉及金额、时间区间、影响范围等"
-          @blur="handleExceptionDescBlur"
-        />
-        <el-tooltip content="AI辅助生成例外情况描述（基于控制点名称和循环上下文）" placement="top" :show-after="300">
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            class="cct-exception-ai-btn"
-            :loading="aiGeneratingException"
-            :disabled="readonly"
-            @click="handleAiGenerateException"
-          >
-            <el-icon><MagicStick /></el-icon>
-          </el-button>
-        </el-tooltip>
+          @click="handleAiGenerateException"
+        >
+          <el-icon><MagicStick /></el-icon> AI
+        </el-button>
       </div>
+      <el-input
+        v-model="exceptionDescription"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 5 }"
+        :disabled="readonly"
+        placeholder="描述控制测试中发现的例外情况，包括具体表现、涉及金额、时间区间、影响范围等"
+        @blur="handleExceptionDescBlur"
+      />
     </div>
 
     <!-- 六步决策树 -->
@@ -952,19 +948,8 @@ const conclusionTagType = computed(() => {
   color: #374151;
 }
 
-.cct-exception-desc-input {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
-.cct-exception-desc-input .el-input {
-  flex: 1;
-}
-
 .cct-exception-ai-btn {
-  flex-shrink: 0;
-  margin-top: 4px;
+  margin-left: auto;
 }
 
 /* ─── 步骤注释说明 ─── */
