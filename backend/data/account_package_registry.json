@@ -919,6 +919,286 @@
         { "sheet_name": "检查表H10-4", "sheet_type": "conclusion", "source_wp_code": "H10" }
       ],
       "external_cards": ["adjustment_impact"], "downstream": ["report", "sign_off"], "known_conflicts": []
+    },
+    {
+      "account_code": "C2",
+      "account_name": "销售与收款循环控制测试",
+      "standard_code": "C2",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C2",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C2", "C2-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C2控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C2" },
+        { "sheet_name": "C2-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C2-2" }
+      ],
+      "external_cards": [],
+      "notes": "C2控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C3",
+      "account_name": "货币资金循环控制测试",
+      "standard_code": "C3",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C3",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C3", "C3-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C3控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C3" },
+        { "sheet_name": "C3-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C3-2" }
+      ],
+      "external_cards": [],
+      "notes": "C3控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C4",
+      "account_name": "采购与付款循环控制测试",
+      "standard_code": "C4",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C4",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C4", "C4-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C4控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C4" },
+        { "sheet_name": "C4-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C4-2" }
+      ],
+      "external_cards": [],
+      "notes": "C4控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C5",
+      "account_name": "投资循环控制测试",
+      "standard_code": "C5",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C5",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C5", "C5-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C5控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C5" },
+        { "sheet_name": "C5-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C5-2" }
+      ],
+      "external_cards": [],
+      "notes": "C5控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C6",
+      "account_name": "固定资产循环控制测试",
+      "standard_code": "C6",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C6",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C6", "C6-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C6控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C6" },
+        { "sheet_name": "C6-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C6-2" }
+      ],
+      "external_cards": [],
+      "notes": "C6控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C7",
+      "account_name": "在建工程循环控制测试",
+      "standard_code": "C7",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C7",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C7", "C7-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C7控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C7" },
+        { "sheet_name": "C7-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C7-2" }
+      ],
+      "external_cards": [],
+      "notes": "C7控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C8",
+      "account_name": "无形资产及其他长期资产循环控制测试",
+      "standard_code": "C8",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C8",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C8", "C8-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C8控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C8" },
+        { "sheet_name": "C8-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C8-2" }
+      ],
+      "external_cards": [],
+      "notes": "C8控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C9",
+      "account_name": "研发循环控制测试",
+      "standard_code": "C9",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C9",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C9", "C9-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C9控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C9" },
+        { "sheet_name": "C9-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C9-2" }
+      ],
+      "external_cards": [],
+      "notes": "C9控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C10",
+      "account_name": "职工薪酬循环控制测试",
+      "standard_code": "C10",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C10",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C10", "C10-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C10控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C10" },
+        { "sheet_name": "C10-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C10-2" }
+      ],
+      "external_cards": [],
+      "notes": "C10控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C11",
+      "account_name": "管理循环控制测试",
+      "standard_code": "C11",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C11",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C11", "C11-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C11控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C11" },
+        { "sheet_name": "C11-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C11-2" }
+      ],
+      "external_cards": [],
+      "notes": "C11控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C12",
+      "account_name": "税金循环控制测试",
+      "standard_code": "C12",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C12",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C12", "C12-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C12控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C12" },
+        { "sheet_name": "C12-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C12-2" }
+      ],
+      "external_cards": [],
+      "notes": "C12控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C13",
+      "account_name": "债务循环控制测试",
+      "standard_code": "C13",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C13",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C13", "C13-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C13控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C13" },
+        { "sheet_name": "C13-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C13-2" }
+      ],
+      "external_cards": [],
+      "notes": "C13控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C14",
+      "account_name": "租赁循环控制测试",
+      "standard_code": "C14",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C14",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C14", "C14-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C14控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C14" },
+        { "sheet_name": "C14-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C14-2" }
+      ],
+      "external_cards": [],
+      "notes": "C14控制测试+偏差评价合并包"
+    },
+    {
+      "account_code": "C15",
+      "account_name": "关联方循环控制测试",
+      "standard_code": "C15",
+      "direction": null,
+      "category": "控制测试",
+      "mapping_status": "mapped",
+      "industry": ["通用"],
+      "primary_wp_code": "C15",
+      "control_panel_sheet": null,
+      "source_wp_codes": ["C15", "C15-2"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "C15控制测试汇总表", "sheet_type": "control_panel", "source_wp_code": "C15" },
+        { "sheet_name": "C15-2评价控制偏差", "sheet_type": "procedure", "source_wp_code": "C15-2" }
+      ],
+      "external_cards": [],
+      "notes": "C15控制测试+偏差评价合并包"
     }
   ]
 }

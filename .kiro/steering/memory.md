@@ -156,6 +156,8 @@ inclusion: always
   - **✅ C2~C15统一方向已完成**：c-control-test从视图切换改为弹窗层叠模式(L0汇总表始终可见+L1控制详情Dialog 80%+L2偏差评价Dialog 65%嵌套)，14循环共用，子组件(SummaryTable/SubPage/DecisionTree)不动
   - **✅ C2~C15新增控制点交互已完成**："+新增"→弹出65% Dialog填写15字段(3列grid+AI辅助描述)+频率→样本量建议提示→保存入库→汇总表自动增行；FAB"+"同入口；汇总表保留inline快编辑
   - **🔵 C2~C15新增弹窗增强**：待实现①编制提示(琥珀色块)放弹窗顶部供用户参考+作为AI system context ②附件上传区(右上卡片)上传制度/访谈/合同→OCR识别→作为AI生成"控制描述"的参考材料
+  - **✅ C2~C15 account_package合并已添加**：14个包配置已加入account_package_registry.json(source_wp_codes=[Cx,Cx-2]，sheets=汇总表+偏差评价)，打开Cx底稿时应显示3tab(汇总+偏差+完整Excel)。需重启后端验证render-config是否正确合并
+  - **🔵 Cx-2偏差评价组件增强**：①红框处加双模式切换(结构化视图↔在线编辑，参照D4 el-segmented) ②决策树加注释说明(注1~注6完整文字) ③加"示例参考"Drawer(源模板第二个sheet示例内容) ④顶部加"控制例外情况描述"textarea ⑤底部加"评价结论"汇总区 ⑥交互用文本描述+弹窗而非纯表格
   - `c1-entity-level-control`(C1企业层面控制,COSO五要素分组程序中控台+C1-4财报内控6子表样本勾稽,8需求/6波)
   - `c22-itgc-bundle`(C22 IT一般控制34sheet:SA信息安全/PE运行维护/PM程序变更/NS新系统4大类+主矩阵总览+缺陷联动汇总C21-1,含C21 IT专业成员,9需求/7波)
   - `c23-c24-journal-entry-testing`(C23分录控制测试人员核对+C24分录细节测试useC24AnalyticsEngine:借贷平衡/科目对比/跳号/异常筛选/本福特首位数分布,分录导入,8需求/7波) ✅**全部完成(25/25任务)**

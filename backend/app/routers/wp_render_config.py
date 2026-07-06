@@ -807,11 +807,12 @@ async def _get_render_config_impl(
                 _skip_m2 = re.match(r"([A-Z]\d+(?:-\d+)*)", cls.sheet_name)
                 if _skip_m2 and _WP_CODE_OVERRIDE.get(_skip_m2.group(1)) == "skip":
                     continue
-            # 向导式专属组件隐藏辅助sheet（选项清单/底稿目录，无标准编码）
+            # 向导式专属组件隐藏辅助sheet（选项清单/底稿目录/示例/不打印，无标准编码）
             _ovr_check = _WP_CODE_OVERRIDE.get(wp_code)
             if _ovr_check and _ovr_check in _WHOLE_WP_MULTISHEET_DEDICATED:
                 _sn_lower = cls.sheet_name
-                if "选项清单" in _sn_lower or "不归档" in _sn_lower or "底稿目录" in _sn_lower:
+                if ("选项清单" in _sn_lower or "不归档" in _sn_lower or "底稿目录" in _sn_lower
+                        or "不打印" in _sn_lower or _sn_lower.startswith("示例")):
                     continue
         ovr = _WP_CODE_OVERRIDE.get(wp_code)
         # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
