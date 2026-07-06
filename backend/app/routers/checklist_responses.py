@@ -317,9 +317,10 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
                     "询问", "观察", "检查", "重新执行",
                     "系统性偏差", "人为偏差", "随机性偏差",
                     "扩大样本量", "直接认定为偏差",
+                    "是", "否",
                     "Y", "N",
                 )
-                if item.conclusion not in allowed:
+                if item.conclusion and item.conclusion not in allowed:
                     raise HTTPException(
                         status_code=422,
                         detail=f"C控制测试 conclusion 值无效，收到: '{item.conclusion}'",
