@@ -443,7 +443,12 @@ async def get_sheet_onlyoffice_config(
 
     # 聚合包内的独立 source_wp_code sheet（如 D4-5）：尝试用 sheet 级编码找独立模板
     _sheet_wp_code = wp_code
+    # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
+    # 尾部匹配：如 "营业收入会计政策检查D4-5"
     _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+    # 头部匹配：如 "C14-2评价控制偏差" / "C14-2 xxx"
+    if not _m:
+        _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
     if _m and _m.group(1) != wp_code:
         _candidate = _m.group(1)
         _candidate_tpl = find_template_file_any(_candidate)
@@ -589,7 +594,10 @@ async def get_sheet_wopi_contents(
     # 聚合包内独立 source sheet（如 D4-5）应服务其独立文件，而非父 wp_code（D4）
     # 对应的任意 D4 模板（否则 OO 下载到 D4-12 合同检查表却标题显示 D4-5）。
     _sheet_wp_code = wp_code
+    # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
     _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+    if not _m:
+        _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
     if _m and _m.group(1) != wp_code:
         _candidate = _m.group(1)
         if find_template_file_any(_candidate):
