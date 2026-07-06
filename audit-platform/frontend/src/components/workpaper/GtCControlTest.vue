@@ -7,8 +7,83 @@
 
     <template v-else>
       <!-- ═══════════════════════════════════════════════════════════════════
-           L0 Main Console — 始终可见
+           判断当前 sheetName 是否为偏差评价 (Cx-2)
+           如果是 → 直接渲染决策树（不显示汇总表）
+           如果否 → 渲染 L0 汇总表主控台
            ═══════════════════════════════════════════════════════════════════ -->
+
+      <!-- ═══ Cx-2 偏差评价独立视图（sheetName 包含 "-2"） ═══ -->
+      <div v-if="isDeviationSheet" class="cct-deviation-standalone">
+        <!-- 顶部信息 -->
+        <div class="cct-header">
+          <div class="cct-header-title">
+            <span class="cct-cycle-badge">{{ wpCode }}</span>
+            <span class="cct-cycle-name">{{ cycleName }} — 评价控制偏差</span>
+          </div>
+          <div class="cct-project-info">
+            <span class="cct-info-item">客户：{{ clientName || '—' }}</span>
+            <span class="cct-info-item">会计期间：{{ year }}年度</span>
+          </div>
+        </div>
+
+        <!-- 双模式切换 (结构化视图 ↔ 在线编辑) -->
+        <div class="cct-mode-bar">
+          <el-segmented v-model="deviationViewMode" :options="deviationModeOptions" size="small" />
+        </div>
+
+        <!-- 结构化视图 -->
+        <template v-if="deviationViewMode === 'structured'">
+          <!-- 蓝色渐变引导区 -->
+          <div class="cct-guidance-area">
+            <div class="cct-guidance-header">
+              <el-icon><InfoFilled /></el-icon>
+              <span>偏差评价决策树 — 6步推导控制有效性</span>
+            </div>
+            <div class="cct-guidance-steps">
+              <div class="step-item"><span class="step-num">①</span><span class="step-text">判断是否偏差</span></div>
+              <div class="step-item"><span class="step-num">②</span><span class="step-text">确定偏差性质</span></div>
+              <div class="step-item"><span class="step-num">③</span><span class="step-text">确定应对措施</span></div>
+              <div class="step-item"><span class="step-num">④</span><span class="step-text">扩大样本验证</span></div>
+              <div class="step-item"><span class="step-num">⑤</span><span class="step-text">缺陷评价(A14)</span></div>
+              <div class="step-item"><span class="step-num">⑥</span><span class="step-text">设计缺陷判断</span></div>
+            </div>
+          </div>
+
+          <!-- 决策树组件（直接渲染，非弹窗） -->
+          <CControlTestDecisionTree
+            :wp-code="wpCode"
+            :dev-index="activeDeviationIndex"
+            :dev-state="activeDeviationState"
+            :control-name="activeDeviationControlName"
+            :control-names="allControlNames"
+            :control-count="state.summaryRows.length"
+            :readonly="isReadonly"
+            :update-deviation-step="updateDeviationStep"
+            :writeback-defect="writebackDefect"
+            :build-defect-summary="buildDefectSummary"
+            :exception-desc="activeExceptionDesc"
+            :update-exception-desc="updateExceptionDesc"
+            @navigate="handleDeviationNavigateStandalone"
+            @change-dev-index="handleChangeDevIndex"
+          />
+        </template>
+
+        <!-- 在线编辑 (OnlyOffice) -->
+        <template v-else>
+          <div class="cct-oo-container">
+            <GtOnlyOfficeSheet
+              v-if="wpId"
+              :wp-id="wpId"
+              :project-id="projectId"
+              :sheet-name="sheetName || ''"
+              :readonly="isReadonly"
+            />
+          </div>
+        </template>
+      </div>
+
+      <!-- ═══ L0 Main Console — 汇总表模式（非偏差评价sheet） ═══ -->
+      <template v-else>
 
       <!-- 顶部项目信息 + 循环上下文 -->
       <div class="cct-header">
@@ -110,7 +185,8 @@
           <el-icon><Plus /></el-icon>
         </el-button>
       </div>
-    </template>
+      </template><!-- end inner v-else (L0 汇总表模式) -->
+    </template><!-- end outer v-else (loading完成) -->
 
     <!-- ═══════════════════════════════════════════════════════════════════
          L0.5 新增/编辑控制点 Dialog (70% width)
@@ -327,6 +403,8 @@
         :update-deviation-step="updateDeviationStep"
         :writeback-defect="writebackDefect"
         :build-defect-summary="buildDefectSummary"
+        :exception-desc="activeExceptionDesc"
+        :update-exception-desc="updateExceptionDesc"
         @navigate="handleDeviationNavigate"
         @change-dev-index="handleChangeDevIndex"
       />
@@ -348,6 +426,7 @@ import { useCControlTestData } from '@/composables/useCControlTestData'
 import { createEmptyState, type DecisionTreeState } from '@/composables/useDeviationDecisionTree'
 import { CYCLE_CONFIG } from './composables/useCControlTest'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
 import CControlTestSummaryTable from './cControlTest/CControlTestSummaryTable.vue'
 import CControlTestSubPage from './cControlTest/CControlTestSubPage.vue'
 import CControlTestDecisionTree from './cControlTest/CControlTestDecisionTree.vue'
@@ -371,6 +450,12 @@ const emit = defineEmits<{
 // ─── Derived ─────────────────────────────────────────────────────────────────
 
 const cycleNum = computed(() => parseInt(props.wpCode.replace(/^C/i, ''), 10) || 2)
+/** 检测当前 sheetName 是否为偏差评价表 (Cx-2) */
+const isDeviationSheet = computed(() => {
+  const sn = props.sheetName || ''
+  // 匹配 "C2-2评价控制偏差" / "C14-2评价控制偏差" / 含 "-2" 的偏差sheet
+  return /C\d+-2/i.test(sn) || /评价控制偏差/.test(sn)
+})
 const wpIdRef = toRef(props, 'wpId')
 const projectIdRef = toRef(props, 'projectId')
 const wpCodeRef = toRef(props, 'wpCode')
@@ -422,6 +507,13 @@ const activeDeviationIndex = ref(0)
 
 /** 循环整体结论 */
 const cycleConclusion = ref<string>('')
+
+/** Cx-2 偏差评价双模式切换 */
+const deviationViewMode = ref<'structured' | 'online-edit'>('structured')
+const deviationModeOptions = [
+  { label: '结构化视图', value: 'structured' },
+  { label: '在线编辑', value: 'online-edit' },
+]
 
 // ─── L0 → L1: Control Page helpers ──────────────────────────────────────────
 
@@ -499,6 +591,24 @@ const hasSomeDeviation = computed(() => {
   return state.value.summaryRows.some(r => r.hasDeviation === '是')
 })
 
+// ─── 控制例外描述 (持久化) ───────────────────────────────────────────────────
+
+/** 当前选中控制点的例外描述 */
+const activeExceptionDesc = computed(() => {
+  const idx = activeDeviationIndex.value
+  if (idx >= 0 && idx < state.value.deviationStates.length) {
+    return (state.value.deviationStates[idx] as any)?.exceptionDesc || ''
+  }
+  return ''
+})
+
+/** 更新控制点的例外描述（持久化到 checklist_responses） */
+function updateExceptionDesc(devIndex: number, desc: string) {
+  if (isReadonly.value) return
+  // 利用 updateDeviationStep 来保存例外描述（复用 deviation 持久化通道）
+  updateDeviationStep(devIndex, 'exceptionDesc', desc)
+}
+
 // ─── Navigation Handlers ─────────────────────────────────────────────────────
 
 /**
@@ -548,6 +658,11 @@ function handleDeviationNavigate(view: string) {
 /** 切换偏差评价的控制点索引 */
 function handleChangeDevIndex(index: number) {
   activeDeviationIndex.value = index
+}
+
+/** 独立偏差评价视图的导航处理（不关闭弹窗，因为没有弹窗） */
+function handleDeviationNavigateStandalone(_view: string) {
+  // 独立视图模式下 navigate 事件忽略（已经在页面上，无需切换）
 }
 
 // ─── Dialog Openers ──────────────────────────────────────────────────────────
@@ -1017,6 +1132,21 @@ onBeforeUnmount(() => {
   bottom: 32px;
   right: 32px;
   z-index: 100;
+}
+
+/* ─── Mode Bar (Cx-2 双模式) ─── */
+.cct-mode-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* ─── OO Container ─── */
+.cct-oo-container {
+  min-height: 600px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .cct-fab-btn {

@@ -217,10 +217,11 @@ export function useCControlTestData(
     const sampleMap = new Map<number, Map<number, Partial<SampleResult>>>()
     let maxCtrl = 0
 
-    // Collect deviation states: C{n}-dev-{m}-step{k} or C{n}-dev-{m}-conclusion
+    // Collect deviation states: C{n}-dev-{m}-step{k} or C{n}-dev-{m}-conclusion or C{n}-dev-{m}-exceptionDesc
     const devStepPattern = new RegExp(`^C${n}-dev-(\\d+)-step(\\d+)$`)
     const devConclusionPattern = new RegExp(`^C${n}-dev-(\\d+)-conclusion$`)
-    const devMap = new Map<number, Partial<DecisionTreeState>>()
+    const devExceptionDescPattern = new RegExp(`^C${n}-dev-(\\d+)-exceptionDesc$`)
+    const devMap = new Map<number, Partial<DecisionTreeState & { exceptionDesc?: string }>>()
     let maxDev = 0
 
     for (const r of filtered) {
@@ -305,6 +306,17 @@ export function useCControlTestData(
         const m = parseInt(devConcMatch[1], 10)
         if (m > maxDev) maxDev = m
         // conclusion stored but state is derived from steps
+        continue
+      }
+
+      // ─── Parse deviation exceptionDesc ───
+      const devExcMatch = id.match(devExceptionDescPattern)
+      if (devExcMatch) {
+        const m = parseInt(devExcMatch[1], 10)
+        if (m > maxDev) maxDev = m
+        if (!devMap.has(m)) devMap.set(m, {})
+        const dev = devMap.get(m)!
+        ;(dev as any).exceptionDesc = r.remark || ''
         continue
       }
 
@@ -451,6 +463,10 @@ export function useCControlTestData(
       items.push({ item_id: `C${n}-dev-${m}-step3`, conclusion: dev.step3 || null, remark: null })
       items.push({ item_id: `C${n}-dev-${m}-step4`, conclusion: dev.step4 || null, remark: null })
       items.push({ item_id: `C${n}-dev-${m}-step6`, conclusion: dev.step6 || null, remark: null })
+
+      // exceptionDesc (文本字段，存 remark)
+      const excDesc = (dev as any).exceptionDesc || ''
+      items.push({ item_id: `C${n}-dev-${m}-exceptionDesc`, conclusion: null, remark: excDesc || null })
 
       // Deviation conclusion (derived, but stored for quick read)
       items.push({
@@ -683,13 +699,18 @@ export function useCControlTestData(
   /** 更新偏差决策树步骤（即时保存） */
   function updateDeviationStep(
     devIndex: number,
-    step: 'step1' | 'step2' | 'step3' | 'step4' | 'step6',
+    step: 'step1' | 'step2' | 'step3' | 'step4' | 'step6' | 'exceptionDesc',
     value: string | null,
   ): void {
     if (isReadonly.value) return
     if (devIndex < 0 || devIndex >= state.value.deviationStates.length) return
     ;(state.value.deviationStates[devIndex] as any)[step] = value
-    saveImmediate()
+    // exceptionDesc 使用 debounce（文本字段），其余即时保存
+    if (step === 'exceptionDesc') {
+      debounceSave()
+    } else {
+      saveImmediate()
+    }
   }
 
   // ─── Cycle conclusion ──────────────────────────────────────────────────────
