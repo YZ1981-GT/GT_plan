@@ -101,6 +101,30 @@ async def get_opening_balance(
     return {"opening_balance": float(opening), "account_code": account_code}
 
 
+@router.get("/entries-all")
+async def get_all_ledger_entries(
+    project_id: UUID,
+    year: int = Query(...),
+    date_from: str | None = None,
+    date_to: str | None = None,
+    page: int = 1,
+    page_size: int = Query(2000, ge=1, le=5000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """全量序时账分录（不限科目）— 供 C24 会计分录细节测试四表联动
+
+    返回当年全部分录（分页，最大 5000/页）。字段：
+    voucher_date, voucher_no, account_code, account_name, debit_amount, credit_amount,
+    summary, preparer/poster/reviewer（如表中有）。
+    """
+    svc = _svc(db, None)
+    return await svc.get_all_ledger_entries(
+        project_id, year, date_from=date_from, date_to=date_to,
+        page=page, page_size=page_size,
+    )
+
+
 @router.get("/entries/{account_code}")
 async def get_ledger_entries(
     project_id: UUID,

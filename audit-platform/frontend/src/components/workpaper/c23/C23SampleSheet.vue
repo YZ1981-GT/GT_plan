@@ -10,179 +10,213 @@
     <section class="c23-section">
       <div class="section-header">
         <span class="section-title">控制测试样本（25笔）</span>
-        <span class="formula-cell" title="偏差统计 = 偏差数 / 已填样本数">
-          偏差统计：{{ deviationCount }} / {{ deviationTotal }}
-        </span>
+        <div class="section-actions">
+          <span class="formula-cell" title="偏差统计 = 偏差数 / 已填样本数">
+            偏差统计：{{ deviationCount }} / {{ deviationTotal }}
+          </span>
+          <el-dropdown v-if="!isReadonly" trigger="click" @command="onImportExportCmd">
+            <el-button size="small" type="primary" plain>
+              导入导出 ▾
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="export-template">📥 导出模板（空表）</el-dropdown-item>
+                <el-dropdown-item command="export-data">📤 导出数据（含已填）</el-dropdown-item>
+                <el-dropdown-item command="import-data">📂 导入数据</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
       </div>
 
+      <!-- 精简主表格：关键列 + 点击行弹 Dialog -->
       <el-table
         :data="samples"
         border
         size="small"
         class="c23-table"
-        max-height="600"
+        max-height="520"
         :row-class-name="rowClassName"
+        highlight-current-row
+        @row-click="onRowClick"
       >
-        <el-table-column label="序号" width="55" align="center" fixed>
+        <el-table-column label="序" width="45" align="center" fixed>
           <template #default="{ row }">{{ row.seq }}</template>
         </el-table-column>
-        <!-- 📎 附件上传列 -->
-        <el-table-column label="📎" width="60" align="center">
-          <template #default="{ row, $index }">
-            <div class="attach-cell">
-              <!-- 已有附件：显示文件名链接 -->
-              <el-tooltip
-                v-if="sampleAttachments[$index]"
-                :content="sampleAttachments[$index].fileName"
-                placement="top"
-              >
-                <a
-                  :href="`/api/attachments/${sampleAttachments[$index].id}/download`"
-                  target="_blank"
-                  class="attach-link"
-                  @click.stop
-                >📎</a>
-              </el-tooltip>
-              <!-- 上传按钮 (非只读) -->
-              <el-upload
-                v-if="!isReadonly"
-                :auto-upload="true"
-                :show-file-list="false"
-                accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff"
-                :http-request="(req: any) => onUploadSampleAttachment($index, req.file)"
-              >
-                <el-button
-                  size="small"
-                  :icon="UploadFilled"
-                  circle
-                  :loading="uploadingRow === $index"
-                  :title="sampleAttachments[$index] ? '重新上传' : '上传凭证'"
-                />
-              </el-upload>
-            </div>
+        <el-table-column label="📎" width="45" align="center">
+          <template #default="{ $index }">
+            <span v-if="sampleAttachments[$index]" class="attach-flag">📎</span>
+            <span v-else class="attach-empty">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="凭证日期" min-width="120">
-          <template #default="{ row, $index }">
+        <el-table-column label="凭证日期" min-width="110">
+          <template #default="{ row }">
+            <span class="cell-text">{{ row.date || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="凭证编号" min-width="120">
+          <template #default="{ row }">
+            <span class="cell-text">{{ row.voucherNo || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="编制人" min-width="80">
+          <template #default="{ row }">
+            <span class="cell-text">{{ row.preparer || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审核人" min-width="80">
+          <template #default="{ row }">
+            <span class="cell-text">{{ row.reviewer || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否偏差" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.deviation === '否'" type="success" size="small" effect="plain">否</el-tag>
+            <el-tag v-else-if="row.deviation?.startsWith('是')" type="danger" size="small" effect="plain">{{ row.deviation }}</el-tag>
+            <span v-else class="cell-empty">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="70" align="center">
+          <template #default="{ row }">
+            <span v-if="row.date && row.preparer && row.deviation">✅</span>
+            <span v-else-if="row.date || row.preparer">🟡</span>
+            <span v-else>⬜</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="c23-table-tip">
+        💡 点击任意行打开详情编辑（填写全部字段）；或使用「导入导出」批量操作
+      </div>
+    </section>
+
+    <!-- ═══ 样本详情 Dialog ═══ -->
+    <el-dialog
+      v-model="sampleDialogVisible"
+      :title="`样本 ${activeSampleIndex + 1} — 编辑详情`"
+      width="600px"
+      :close-on-click-modal="false"
+      append-to-body
+    >
+      <template v-if="activeSampleIndex >= 0 && activeSampleIndex < samples.length">
+        <el-form label-position="left" label-width="90px" class="c23-sample-form">
+          <el-form-item label="凭证日期">
             <el-input
-              :model-value="row.date"
+              :model-value="samples[activeSampleIndex].date"
               :disabled="isReadonly"
-              size="small"
               placeholder="YYYY-MM-DD"
-              @input="$emit('update-sample', $index, 'date', $event)"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'date', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证编号" min-width="110">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="凭证编号">
             <el-input
-              :model-value="row.voucherNo"
+              :model-value="samples[activeSampleIndex].voucherNo"
               :disabled="isReadonly"
-              size="small"
               placeholder="凭证编号"
-              @input="$emit('update-sample', $index, 'voucherNo', $event)"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'voucherNo', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="编制人" min-width="90">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="编制人">
             <el-input
-              :model-value="row.preparer"
+              :model-value="samples[activeSampleIndex].preparer"
               :disabled="isReadonly"
-              size="small"
               placeholder="编制人"
-              @input="$emit('update-sample', $index, 'preparer', $event)"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'preparer', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="过账人" min-width="90">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="过账人">
             <el-input
-              :model-value="row.poster"
+              :model-value="samples[activeSampleIndex].poster"
               :disabled="isReadonly"
-              size="small"
               placeholder="过账人"
-              @input="$emit('update-sample', $index, 'poster', $event)"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'poster', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="审核人" min-width="90">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="审核人">
             <el-input
-              :model-value="row.reviewer"
+              :model-value="samples[activeSampleIndex].reviewer"
               :disabled="isReadonly"
-              size="small"
               placeholder="审核人"
-              @input="$emit('update-sample', $index, 'reviewer', $event)"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'reviewer', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="支持性文件" min-width="110">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="支持性文件">
             <el-input
-              :model-value="row.supportDoc"
+              :model-value="samples[activeSampleIndex].supportDoc"
               :disabled="isReadonly"
-              size="small"
-              placeholder="支持性文件"
-              @input="$emit('update-sample', $index, 'supportDoc', $event)"
+              placeholder="支持性文件类型及识别特征"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'supportDoc', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="批准过程" min-width="110">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="批准过程">
             <el-input
-              :model-value="row.approval"
+              :model-value="samples[activeSampleIndex].approval"
               :disabled="isReadonly"
-              size="small"
-              placeholder="批准过程"
-              @input="$emit('update-sample', $index, 'approval', $event)"
+              placeholder="批准过程描述"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'approval', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="是否偏差" width="130" align="center">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item label="是否偏差">
             <el-select
-              :model-value="row.deviation"
+              :model-value="samples[activeSampleIndex].deviation"
               :disabled="isReadonly"
-              size="small"
-              placeholder="—"
-              @change="$emit('update-sample', $index, 'deviation', $event)"
+              placeholder="请选择"
+              @change="(v: any) => $emit('update-sample', activeSampleIndex, 'deviation', v)"
             >
               <el-option label="否" value="否" />
               <el-option label="是-已解释" value="是-已解释" />
               <el-option label="是-需跟进" value="是-需跟进" />
             </el-select>
-          </template>
-        </el-table-column>
-        <el-table-column label="偏差说明" min-width="160">
-          <template #default="{ row, $index }">
+          </el-form-item>
+          <el-form-item v-if="samples[activeSampleIndex].deviation?.startsWith('是')" label="偏差说明">
             <el-input
-              :model-value="row.deviationNote"
+              :model-value="samples[activeSampleIndex].deviationNote"
               :disabled="isReadonly"
-              size="small"
-              placeholder="偏差说明"
-              @input="$emit('update-sample', $index, 'deviationNote', $event)"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              placeholder="描述偏差具体情况"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'deviationNote', v)"
             />
-          </template>
-        </el-table-column>
-        <el-table-column label="索引号" width="120">
-          <template #default="{ row, $index }">
-            <GtIndexChip
-              v-if="row.indexRef"
-              :value="row.indexRef"
-            />
+          </el-form-item>
+          <el-form-item label="索引号">
             <el-input
-              v-else
-              :model-value="row.indexRef"
+              :model-value="samples[activeSampleIndex].indexRef"
               :disabled="isReadonly"
-              size="small"
-              placeholder="索引号"
-              @input="$emit('update-sample', $index, 'indexRef', $event)"
+              placeholder="关联底稿索引号"
+              @input="(v: any) => $emit('update-sample', activeSampleIndex, 'indexRef', v)"
             />
-          </template>
-        </el-table-column>
-      </el-table>
-    </section>
+          </el-form-item>
+          <!-- 📎 附件 -->
+          <el-form-item label="附件">
+            <div class="c23-dialog-attach">
+              <el-upload
+                v-if="!isReadonly"
+                :auto-upload="true"
+                :show-file-list="false"
+                accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff"
+                :http-request="(req: any) => onUploadSampleAttachment(activeSampleIndex, req.file)"
+              >
+                <el-button size="small" :loading="uploadingRow === activeSampleIndex">
+                  📎 上传凭证 + OCR 识别
+                </el-button>
+              </el-upload>
+              <span v-if="sampleAttachments[activeSampleIndex]" class="attach-name">
+                {{ sampleAttachments[activeSampleIndex]?.fileName }}
+              </span>
+            </div>
+          </el-form-item>
+        </el-form>
+      </template>
+
+      <template #footer>
+        <el-button @click="sampleDialogVisible = false">关闭</el-button>
+        <el-button v-if="activeSampleIndex > 0" @click="activeSampleIndex--">← 上一笔</el-button>
+        <el-button v-if="activeSampleIndex < samples.length - 1" type="primary" @click="activeSampleIndex++">下一笔 →</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 隐藏的导入 input -->
+    <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="onImportFileChange" />
 
     <!-- 测试结论 -->
     <section class="c23-section">
@@ -230,14 +264,11 @@
  * Task: 8.2
  * Requirements: 10.1, 10.4, 10.5
  */
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { uploadAttachment } from '@/services/commonApi'
-
-const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
 /** 样本行附件信息 */
 export interface SampleAttachment {
@@ -279,6 +310,78 @@ const emit = defineEmits<{
 // ─── Attachment state ───
 const sampleAttachments = ref<Array<SampleAttachment | null>>([])
 const uploadingRow = ref<number | null>(null)
+
+// ─── Dialog state ───
+const sampleDialogVisible = ref(false)
+const activeSampleIndex = ref(0)
+const importFileInput = ref<HTMLInputElement | null>(null)
+
+function onRowClick(row: any) {
+  activeSampleIndex.value = row.seq - 1
+  sampleDialogVisible.value = true
+}
+
+// ─── 导入导出 ───
+function onImportExportCmd(cmd: string) {
+  if (cmd === 'export-template') exportTemplate()
+  else if (cmd === 'export-data') exportData()
+  else if (cmd === 'import-data') importFileInput.value?.click()
+}
+
+async function exportTemplate() {
+  const XLSX = await import('xlsx')
+  const headers = ['序号', '凭证日期', '凭证编号', '编制人', '过账人', '审核人', '支持性文件', '批准过程', '是否偏差', '偏差说明', '索引号']
+  const rows = Array.from({ length: 25 }, (_, i) => [i + 1, '', '', '', '', '', '', '', '', '', ''])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'C23-2 样本')
+  XLSX.writeFile(wb, 'C23-2_控制测试样本_模板.xlsx')
+  ElMessage.success('模板已导出')
+}
+
+async function exportData() {
+  const XLSX = await import('xlsx')
+  const headers = ['序号', '凭证日期', '凭证编号', '编制人', '过账人', '审核人', '支持性文件', '批准过程', '是否偏差', '偏差说明', '索引号']
+  const rows = props.samples.map(s => [s.seq, s.date, s.voucherNo, s.preparer, s.poster, s.reviewer, s.supportDoc, s.approval, s.deviation, s.deviationNote, s.indexRef])
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'C23-2 样本')
+  XLSX.writeFile(wb, 'C23-2_控制测试样本_数据.xlsx')
+  ElMessage.success('数据已导出')
+}
+
+async function onImportFileChange(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  const XLSX = await import('xlsx')
+  const buf = await file.arrayBuffer()
+  const wb = XLSX.read(buf, { type: 'array' })
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const data = XLSX.utils.sheet_to_json<any>(ws, { header: 1 })
+  // 跳过表头行
+  const rows = data.slice(1)
+  let imported = 0
+  for (let i = 0; i < Math.min(rows.length, 25); i++) {
+    const row = rows[i]
+    if (!row || !row.length) continue
+    const idx = (row[0] ? Number(row[0]) - 1 : i)
+    if (idx < 0 || idx >= 25) continue
+    if (row[1]) emit('update-sample', idx, 'date', String(row[1]))
+    if (row[2]) emit('update-sample', idx, 'voucherNo', String(row[2]))
+    if (row[3]) emit('update-sample', idx, 'preparer', String(row[3]))
+    if (row[4]) emit('update-sample', idx, 'poster', String(row[4]))
+    if (row[5]) emit('update-sample', idx, 'reviewer', String(row[5]))
+    if (row[6]) emit('update-sample', idx, 'supportDoc', String(row[6]))
+    if (row[7]) emit('update-sample', idx, 'approval', String(row[7]))
+    if (row[8]) emit('update-sample', idx, 'deviation', String(row[8]))
+    if (row[9]) emit('update-sample', idx, 'deviationNote', String(row[9]))
+    if (row[10]) emit('update-sample', idx, 'indexRef', String(row[10]))
+    imported++
+  }
+  // 重置 input
+  if (importFileInput.value) importFileInput.value.value = ''
+  ElMessage.success(`已导入 ${imported} 笔样本数据`)
+}
 
 // 初始化附件数组
 onMounted(async () => {
@@ -592,31 +695,49 @@ function rowClassName({ row }: { row: any }) {
   background-color: #fdf6ec !important;
 }
 
-/* 📎 附件单元格 */
-.attach-cell {
+/* 表格精简模式 */
+.cell-text { font-size: 13px; color: #303133; }
+.cell-empty { color: #c0c4cc; }
+.attach-flag { font-size: 14px; }
+.attach-empty { color: #c0c4cc; }
+
+.c23-table-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #909399;
+}
+
+.section-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
+  gap: 12px;
 }
 
-.attach-link {
-  text-decoration: none;
-  font-size: 14px;
+/* Dialog 表单 */
+.c23-sample-form {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+.c23-dialog-attach {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.attach-name {
+  font-size: 12px;
+  color: #606266;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 表格行可点击 */
+.c23-table :deep(.el-table__body tr) {
   cursor: pointer;
 }
-
-.attach-link:hover {
-  opacity: 0.7;
-}
-
-.attach-cell :deep(.el-upload) {
-  display: inline-flex;
-}
-
-.attach-cell :deep(.el-button.is-circle) {
-  width: 24px;
-  height: 24px;
-  padding: 0;
+.c23-table :deep(.el-table__body tr:hover td) {
+  background: #f3eefb !important;
 }
 </style>

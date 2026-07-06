@@ -80,6 +80,11 @@ from ._g0_confirmation import render_g0_diff_securities, render_g0_alternative
 from ._h0_confirmation import render_h0_alternative
 from ._c1_entity_level_control import render as render_c1_entity_level_control
 from ._c_control_test import render as render_c_control_test
+from ._c22_itgc import render as render_c22_itgc
+from ._c23_journal_control import render as render_c23_journal_control
+from ._c24_journal_detail import render as render_c24_journal_detail
+from ._c25_internal_audit import render as render_c25_internal_audit
+from ._c26_info_processing import render as render_c26_info_processing
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -160,4 +165,9 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "confirmation-alternative-h05": render_h0_alternative,
     "c1-entity-level-control": render_c1_entity_level_control,
     "c-control-test": render_c_control_test,
+    "c22-itgc-bundle": render_c22_itgc,
+    "c23-journal-entry-control": render_c23_journal_control,
+    "c24-journal-entry-detail": render_c24_journal_detail,
+    "c25-internal-audit-reliance": render_c25_internal_audit,
+    "c26-info-processing-control": render_c26_info_processing,
 }

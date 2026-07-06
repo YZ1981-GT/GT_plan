@@ -48,7 +48,17 @@
         style="margin-top: 12px;"
         show-icon
       >
-        尚未导入分录数据，请先在程序表或汇总表中导入会计分录。
+        <template #title>尚未导入分录数据</template>
+        <p style="margin: 4px 0 8px; color: #606266;">请通过以下方式导入会计分录：</p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <el-button type="primary" size="small" @click="$emit('load-from-ledger')">
+            📊 从序时账（tb_ledger）自动拉取
+          </el-button>
+          <el-button size="small" @click="$emit('import-excel')">
+            📂 从 Excel 导入
+          </el-button>
+        </div>
+        <p style="margin-top: 8px; font-size: 12px; color: #909399;">推荐使用「从序时账拉取」——自动读取已入库的四表数据，无需手动整理 Excel。</p>
       </el-alert>
     </section>
 
@@ -83,6 +93,8 @@ defineProps<{
 defineEmits<{
   (e: 'update:conclusion', val: string): void
   (e: 'ai-suggest', fieldId: string): void
+  (e: 'load-from-ledger'): void
+  (e: 'import-excel'): void
 }>()
 </script>
 

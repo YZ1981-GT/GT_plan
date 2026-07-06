@@ -256,6 +256,46 @@ class LedgerPenetrationService:
         result = await self.db.execute(stmt)
         return result.scalar() or Decimal(0)
 
+    async def get_all_ledger_entries(
+        self, project_id: UUID, year: int,
+        date_from: str | None = None, date_to: str | None = None,
+        page: int = 1, page_size: int = 2000,
+    ) -> dict:
+        """全量序时账分录（不限科目）— 供 C24 会计分录细节测试
+
+        返回 {items, total, page, page_size}。不筛科目，返回全年全部分录。
+        """
+        tbl = TbLedger.__table__
+        active_filter = await get_active_filter(self.db, tbl, project_id, year)
+        base = (
+            sa.select(
+                tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
+                tbl.c.account_code, tbl.c.account_name,
+                tbl.c.debit_amount, tbl.c.credit_amount,
+                tbl.c.summary,
+            )
+            .where(active_filter)
+        )
+        if date_from:
+            base = base.where(tbl.c.voucher_date >= date_from)
+        if date_to:
+            base = base.where(tbl.c.voucher_date <= date_to)
+
+        # 总数
+        count_stmt = sa.select(sa.func.count()).select_from(base.subquery())
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+
+        # 分页
+        offset = (page - 1) * page_size
+        data_stmt = (
+            base.order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+            .offset(offset).limit(page_size)
+        )
+        result = await self.db.execute(data_stmt)
+        items = [dict(r._mapping) for r in result.fetchall()]
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
+
     async def get_ledger_entries(
         self, project_id: UUID, year: int, account_code: str,
         date_from: str | None = None, date_to: str | None = None,

@@ -49,15 +49,6 @@ vi.mock('@/composables/useWpAiSuggest', () => ({
 }))
 
 // Stub child components to avoid deep rendering — focus on data flow
-vi.mock('../GtAProgramConsole.vue', () => ({
-  __esModule: true,
-  default: {
-    name: 'GtAProgramConsole',
-    props: ['wpId', 'sheetName', 'schema', 'htmlData', 'readonly'],
-    template: '<div class="program-console-stub" />',
-  },
-}))
-
 vi.mock('../c24/C24SummarySheet.vue', () => ({
   __esModule: true,
   default: {
@@ -302,12 +293,15 @@ describe('端到端：导入分录 → 异常筛选（Req 4.1）', () => {
     expect(count).toBeGreaterThanOrEqual(4)
   })
 
-  it('无分录数据时异常列表为空', async () => {
+  it('无分录数据时显示空数据引导区', async () => {
     const wrapper = mountC24({ sheetName: 'C24-5', responses: [] })
     await flushPromises()
 
+    // 无分录时应显示空数据引导区，而非异常分录组件
+    const emptyGuide = wrapper.find('.c24-empty-data-guide')
+    expect(emptyGuide.exists()).toBe(true)
     const stub = wrapper.find('.c24-anomaly-stub')
-    expect(Number(stub.attributes('data-anomaly-count'))).toBe(0)
+    expect(stub.exists()).toBe(false)
   })
 })
 
@@ -425,7 +419,7 @@ describe('端到端：C24-0 汇总反映各测试项结论（Req 6.2）', () => 
 
 describe('端到端：sheetName 分发各 sheet 渲染正确组件', () => {
   it.each([
-    ['C24A', '.program-console-stub'],
+    ['C24A', '.c24-console'],
     ['C24-0', '.c24-summary-stub'],
     ['C24-1', '.c24-balance-stub'],
     ['C24-2', '.c24-tb-stub'],

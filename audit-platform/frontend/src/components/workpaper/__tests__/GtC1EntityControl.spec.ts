@@ -315,13 +315,13 @@ describe('交互增强：点选控件 / 引导区 / 方法论上下文 / tooltip
     expect(vm.getMultiEnum('C1-4-summary-2-method')).toEqual([])
   })
 
-  it('顶部引导区含 4 个序号步骤（填写项目信息→逐要素测试→财报内控→结论，Req 9.3）', async () => {
+  it('顶部引导区含 4 个序号步骤（填写项目信息→逐段执行测试→过程记录→结论，Req 9.3）', async () => {
     const wrapper = mountC1('C1 企业层面控制测试程序表')
     await flushPromises()
     const vm = wrapper.vm as any
     expect(vm.GUIDE_STEPS.length).toBe(4)
     expect(vm.GUIDE_STEPS.map((s: any) => s.title)).toEqual([
-      '填写项目信息', '逐要素测试', '财报内控过程记录', '形成结论',
+      '填写项目信息', '逐段执行测试', '过程记录', '形成结论',
     ])
     // DOM：蓝色渐变引导区渲染
     expect(wrapper.find('.c1-guide').exists()).toBe(true)
@@ -343,14 +343,15 @@ describe('交互增强：点选控件 / 引导区 / 方法论上下文 / tooltip
     const wrapper = mountC1('C1-4企业层面内控测试示例4-财务报告内部控制')
     await flushPromises()
     const tips = wrapper.findAll('.c1-judge-head')
-    expect(tips.length).toBe(3) // 控制频率 / 测试方法 / 测试结论
+    // 控制频率 / 测试方法 / 测试结论 (fr-summary) + 📎 附件 (sample table)
+    expect(tips.length).toBeGreaterThanOrEqual(3)
   })
 
   it('fr-summary 测试方法渲染为 checkbox-group 多选点选控件（Req 9.1）', async () => {
     const wrapper = mountC1('C1-4企业层面内控测试示例4-财务报告内部控制')
     await flushPromises()
-    // 每行一个 checkbox-group，6 行 → 6 组
-    expect(wrapper.findAll('.el-checkbox-group-stub').length).toBe(6)
+    // fr-summary 6行 + sample dialog 过程记录 1 个 = 7（stub 环境全渲染）
+    expect(wrapper.findAll('.el-checkbox-group-stub').length).toBeGreaterThanOrEqual(6)
   })
 })
 

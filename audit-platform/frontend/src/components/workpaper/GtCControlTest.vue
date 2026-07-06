@@ -582,7 +582,10 @@ const controlDialogTitle = computed(() => {
 const activeDeviationState = computed<DecisionTreeState>(() => {
   const idx = activeDeviationIndex.value
   if (idx >= 0 && idx < state.value.deviationStates.length) {
-    return state.value.deviationStates[idx]
+    const s = state.value.deviationStates[idx]
+    // 必须展开为新对象以强制 computed 追踪深层属性变化
+    // 否则原地修改 step1/step2 等属性不会触发 computed 重算 → 子组件不重渲染
+    return { ...s }
   }
   return createEmptyState()
 })

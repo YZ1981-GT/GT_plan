@@ -25,6 +25,18 @@
         </div>
       </div>
 
+      <!-- 总体完成度看板 -->
+      <div class="c1-overall-progress-bar">
+        <span class="c1-overall-progress-label">总体进度</span>
+        <el-progress
+          :percentage="overallProgressPercent"
+          :stroke-width="12"
+          :color="overallProgressPercent === 100 ? '#67C23A' : '#4b2d77'"
+          style="flex: 1"
+        />
+        <span class="c1-overall-progress-text">{{ overallProgressPercent }}%（{{ completedStepCount }}/{{ totalApplicableStepCount }} 步骤）</span>
+      </div>
+
       <!-- 九段测试程序 (el-collapse) -->
       <el-collapse v-model="activeSections" class="c1-section-nav">
         <el-collapse-item
@@ -84,11 +96,13 @@
                 <thead>
                   <tr>
                     <th style="width: 40px">#</th>
-                    <th style="min-width: 260px">程序名称</th>
+                    <th style="min-width: 240px">程序名称</th>
+                    <th style="width: 60px">状态</th>
                     <th style="width: 80px">适用?</th>
                     <th style="width: 100px">执行人</th>
                     <th style="width: 120px">结果</th>
                     <th style="width: 100px">索引</th>
+                    <th v-if="!isReadonly" style="width: 70px">快捷</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -96,7 +110,7 @@
                     v-for="(step, si) in groupedPrograms(g.slug)"
                     :key="step.row || si"
                     class="c1-step-row"
-                    :class="{ 'c1-step-done': isStepDone(g.slug, si) }"
+                    :class="stepRowClass(g.slug, si)"
                     @click="openStepDialog(g.slug, si, step)"
                   >
                     <td class="c1-cell-idx">{{ si + 1 }}</td>
@@ -105,6 +119,11 @@
                       <el-tag v-if="step.subItems && step.subItems.length" size="small" type="info" effect="plain" class="c1-sub-count">
                         {{ step.subItems.length }} 子项
                       </el-tag>
+                    </td>
+                    <td class="c1-cell-center">
+                      <span v-if="stepStatus(g.slug, si) === 'done'" class="c1-status-done" title="已完成">✅</span>
+                      <span v-else-if="stepStatus(g.slug, si) === 'wip'" class="c1-status-wip" title="进行中">🟡</span>
+                      <span v-else class="c1-status-todo" title="未开始">⬜</span>
                     </td>
                     <td class="c1-cell-center">
                       <el-icon v-if="isStepApplicable(g.slug, si)" color="#67C23A"><Select /></el-icon>
@@ -126,9 +145,20 @@
                       />
                       <span v-else class="c1-cell-empty">—</span>
                     </td>
+                    <td v-if="!isReadonly" class="c1-cell-center" @click.stop>
+                      <el-button
+                        v-if="stepStatus(g.slug, si) !== 'done'"
+                        size="small"
+                        type="success"
+                        link
+                        title="快速标记：适用 + 有效 + 当前用户"
+                        @click="quickMarkStep(g.slug, si)"
+                      >✓有效</el-button>
+                      <span v-else class="c1-cell-empty">—</span>
+                    </td>
                   </tr>
                   <tr v-if="groupedPrograms(g.slug).length === 0">
-                    <td colspan="6" class="c1-empty-row">本段暂无程序步骤数据</td>
+                    <td :colspan="isReadonly ? 7 : 8" class="c1-empty-row">本段暂无程序步骤数据</td>
                   </tr>
                 </tbody>
               </table>
@@ -168,16 +198,25 @@
                 <el-tag v-if="!isSectionApplicable(g.slug)" size="small" type="info" effect="plain">不适用</el-tag>
               </td>
               <td>
-                <el-select
-                  :model-value="getConclusion(sectionConclusionId(g.slug))"
-                  :disabled="isReadonly || !isSectionApplicable(g.slug)"
-                  size="small"
-                  clearable
-                  placeholder="结论"
-                  @change="(v: any) => setSectionConclusion(g.slug, v)"
-                >
-                  <el-option v-for="o in CONCLUSION_OPTIONS" :key="o" :label="o" :value="o" />
-                </el-select>
+                <div class="c1-sec-conclusion-cell">
+                  <el-select
+                    :model-value="getConclusion(sectionConclusionId(g.slug))"
+                    :disabled="isReadonly || !isSectionApplicable(g.slug)"
+                    size="small"
+                    clearable
+                    placeholder="结论"
+                    @change="(v: any) => setSectionConclusion(g.slug, v)"
+                  >
+                    <el-option v-for="o in CONCLUSION_OPTIONS" :key="o" :label="o" :value="o" />
+                  </el-select>
+                  <el-button
+                    v-if="!isReadonly && isSectionApplicable(g.slug) && suggestedSectionConclusion(g.slug) && !getConclusion(sectionConclusionId(g.slug))"
+                    size="small"
+                    type="warning"
+                    link
+                    @click="setSectionConclusion(g.slug, suggestedSectionConclusion(g.slug))"
+                  >采用「{{ suggestedSectionConclusion(g.slug) }}」</el-button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -278,9 +317,54 @@
             <span class="c1-meth-text">{{ methodologyOf(activeStep.section) }}</span>
           </div>
 
+          <!-- ═══ 内嵌编制参考（该步骤有对应示例时显示） ═══ -->
+          <div v-if="stepExampleRef" class="c1-step-example-ref">
+            <div class="c1-step-example-head">
+              <span>📋 编制参考（{{ stepExampleRef.source }}）</span>
+              <el-button v-if="!isReadonly" size="small" type="primary" link @click="applyExampleToStep(stepExampleRef.id)">
+                一键套用 →
+              </el-button>
+            </div>
+            <div class="c1-step-example-body">
+              <div class="c1-step-example-row">
+                <span class="c1-step-example-label">控制点：</span>
+                <span>{{ stepExampleRef.controlPoint }}</span>
+              </div>
+              <div class="c1-step-example-row">
+                <span class="c1-step-example-label">测试方法：</span>
+                <el-tag v-for="m in stepExampleRef.methods" :key="m" size="small" effect="plain" style="margin-right:4px">{{ m }}</el-tag>
+              </div>
+              <div class="c1-step-example-row">
+                <span class="c1-step-example-label">样本量/频率：</span>
+                <span>{{ stepExampleRef.sampleInfo }}</span>
+              </div>
+              <div class="c1-step-example-row">
+                <span class="c1-step-example-label">测试程序摘要：</span>
+                <span class="c1-step-example-desc">{{ stepExampleRef.procedure }}</span>
+              </div>
+              <div v-if="stepExampleRef.rollforward" class="c1-step-example-row">
+                <span class="c1-step-example-label">前推测试：</span>
+                <span class="c1-step-example-desc">{{ stepExampleRef.rollforward }}</span>
+              </div>
+              <div class="c1-step-example-row">
+                <span class="c1-step-example-label">结论：</span>
+                <el-tag type="success" size="small" effect="plain">{{ stepExampleRef.conclusion }}</el-tag>
+              </div>
+            </div>
+          </div>
+
           <!-- 子项检查清单（来自源模板结构化子项） -->
           <div v-if="activeStep.step?.subItems?.length" class="c1-step-subitems">
-            <div class="c1-subitem-head">该步骤包含以下检查事项：</div>
+            <div class="c1-subitem-head">
+              该步骤包含以下检查事项：
+              <span class="c1-subitem-actions">
+                <el-button v-if="!isReadonly" size="small" link type="primary" @click="checkAllSubItems">全选</el-button>
+                <el-button v-if="!isReadonly" size="small" link @click="uncheckAllSubItems">全不选</el-button>
+                <el-button v-if="!isReadonly && checkedSubItems.length > 0" size="small" type="success" link @click="generateResultFromSubItems">
+                  ✨ 根据勾选项生成结果描述
+                </el-button>
+              </span>
+            </div>
             <el-checkbox-group v-model="checkedSubItems" :disabled="isReadonly">
               <div v-for="(sub, si) in activeStep.step.subItems" :key="si" class="c1-subitem-row">
                 <el-checkbox :label="si" :value="si">{{ sub }}</el-checkbox>
@@ -313,14 +397,19 @@
 
             <!-- 测试方法 -->
             <el-form-item label="测试方法">
-              <el-checkbox-group
-                :model-value="stepMethodVal"
-                :disabled="isReadonly"
-                class="c1-method-group"
-                @change="(v: any) => onStepMethodChange(v)"
-              >
-                <el-checkbox v-for="o in TEST_METHOD_OPTIONS" :key="o" :label="o" :value="o" />
-              </el-checkbox-group>
+              <div class="c1-method-row">
+                <el-checkbox-group
+                  :model-value="stepMethodVal"
+                  :disabled="isReadonly"
+                  class="c1-method-group"
+                  @change="(v: any) => onStepMethodChange(v)"
+                >
+                  <el-checkbox v-for="o in TEST_METHOD_OPTIONS" :key="o" :label="o" :value="o" />
+                </el-checkbox-group>
+                <el-tooltip v-if="stepMethodSuggestion && !stepMethodVal.length" :content="stepMethodSuggestion" placement="right">
+                  <span class="c1-method-suggest">💡 建议</span>
+                </el-tooltip>
+              </div>
             </el-form-item>
 
             <!-- 执行人 -->
@@ -364,6 +453,55 @@
               </el-select>
             </el-form-item>
 
+            <!-- ═══ 前推测试（参照 C1-1 示例链路） ═══ -->
+            <details class="c1-rollforward-details" :open="shouldShowRollforward">
+              <summary class="c1-rollforward-summary">▶ 前推测试（期中→期末）</summary>
+              <div class="c1-rollforward-content">
+                <div class="c1-rollforward-hint">
+                  <el-icon><InfoFilled /></el-icon>
+                  如已于期中执行控制测试，需评估剩余期间是否前推。参照示例 C1-1：询问负责人确认流程是否变化。
+                </div>
+                <el-form-item label="是否执行前推测试">
+                  <el-radio-group
+                    :model-value="getActiveStepField('rollforward')"
+                    :disabled="isReadonly"
+                    @change="(v: any) => setActiveStepText('rollforward', v)"
+                  >
+                    <el-radio value="是">是</el-radio>
+                    <el-radio value="否">否</el-radio>
+                    <el-radio value="不适用">不适用（全年覆盖）</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+                <template v-if="getActiveStepField('rollforward') === '是'">
+                  <el-form-item label="前推测试程序">
+                    <div class="c1-field-with-ai">
+                      <el-input
+                        :model-value="getActiveStepField('rollforwardProc')"
+                        :disabled="isReadonly"
+                        type="textarea"
+                        :autosize="{ minRows: 2, maxRows: 5 }"
+                        placeholder="描述前推测试程序（如：询问人力资源部负责人，确定流程在剩余期间是否发生变化）"
+                        @input="(v: any) => setActiveStepText('rollforwardProc', v)"
+                      />
+                      <el-button v-if="!isReadonly" size="small" type="primary" plain :disabled="!aiEnabled" class="c1-ai-btn">
+                        <el-icon><MagicStick /></el-icon> AI
+                      </el-button>
+                    </div>
+                  </el-form-item>
+                  <el-form-item label="前推测试结果">
+                    <el-input
+                      :model-value="getActiveStepField('rollforwardResult')"
+                      :disabled="isReadonly"
+                      type="textarea"
+                      :autosize="{ minRows: 2, maxRows: 5 }"
+                      placeholder="前推测试结果（如：期中测试后未发生变化）"
+                      @input="(v: any) => setActiveStepText('rollforwardResult', v)"
+                    />
+                  </el-form-item>
+                </template>
+              </div>
+            </details>
+
             <!-- 索引号 -->
             <el-form-item label="索引号">
               <el-input
@@ -395,46 +533,139 @@
       <!-- ═══ L1 Example Drawer (el-drawer, right, 45%) ═══ -->
       <el-drawer
         v-model="exampleDrawerVisible"
-        title="测试示例参考"
+        title="测试示例参考（C1-1~C1-3）"
         direction="rtl"
-        size="45%"
+        size="48%"
         append-to-body
         class="c1-example-drawer"
       >
         <el-alert
-          title="示例（供参考），不参与进度"
+          title="示例（供参考），不参与进度。可点「参照此示例」将模板文字预填到步骤。"
           type="info"
           :closable="false"
           show-icon
           style="margin-bottom: 12px"
         />
         <el-tabs v-model="activeExampleTab" type="border-card">
-          <el-tab-pane label="示例1" name="C1-1">
-            <GtOnlyOfficeSheet
-              :wp-id="props.wpId"
-              :project-id="props.projectId"
-              sheet-name="C1-1"
-              :readonly="true"
-              style="height: calc(100vh - 260px)"
-            />
+          <!-- ═══ C1-1 招聘背景调查 ═══ -->
+          <el-tab-pane label="示例1：招聘" name="C1-1">
+            <div class="c1-ex-card">
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">对应程序：</span>
+                <span class="c1-ex-val">1.4.1（控制环境 > 人力资源管理）</span>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">控制点：</span>
+                <span class="c1-ex-val">对候选员工的背景调查和聘用审批</span>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">控制描述：</span>
+                <div class="c1-ex-desc">
+                  （1）拟聘用部门拟定招聘计划经部门负责人、人力资源部负责人和总经理批准后，由人力资源部负责招聘。
+                  （2）应聘人员经人力资源部经理背景调查→面试→人力资源部+部门共同批准；重要岗位需总经理批准。
+                  （3）被聘用人员签订标准劳动合同。
+                </div>
+              </div>
+              <table class="c1-grid-table c1-ex-meta">
+                <tbody>
+                  <tr><td class="c1-ex-label">控制频率</td><td>每天多次</td></tr>
+                  <tr><td class="c1-ex-label">控制属性</td><td>人工控制</td></tr>
+                  <tr><td class="c1-ex-label">执行人</td><td>人力资源部负责人</td></tr>
+                  <tr><td class="c1-ex-label">测试方法</td><td>抽样</td></tr>
+                  <tr><td class="c1-ex-label">样本量</td><td>25（约 300 名新聘员工，每天多次人工控制）</td></tr>
+                </tbody>
+              </table>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">测试程序：</span>
+                <div class="c1-ex-desc">
+                  查阅 25 名新入职员工档案：招聘计划是否经审批→背景调查→聘用批准→签劳动合同。
+                </div>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">样本表检查维度（10 列）：</span>
+                <div class="c1-ex-desc">
+                  ① 是否有招聘计划 ② 部门负责人审批 ③ 人力资源部审批 ④ 总经理审批
+                  ⑤ 是否有背景调查 ⑥ 背景调查与职位相关 ⑦ 聘用经批准 ⑧ 签劳动合同 ⑨ 合同要素完整 ⑩ 结果
+                </div>
+              </div>
+              <div class="c1-ex-section c1-ex-rollforward">
+                <span class="c1-ex-label">前推测试：</span>
+                <div class="c1-ex-desc">
+                  <div>是否前推：<strong>是</strong></div>
+                  <div>程序：询问人力资源部负责人，确定员工聘用流程在剩余期间是否发生变化。</div>
+                  <div>结果：期中测试后未发生变化。</div>
+                </div>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">结论：</span>
+                <el-tag type="success" size="small" effect="plain">控制运行有效</el-tag>
+              </div>
+              <el-button v-if="!isReadonly" type="primary" size="small" style="margin-top: 12px" @click="applyExampleToStep('C1-1')">
+                📋 参照此示例填写当前步骤
+              </el-button>
+            </div>
           </el-tab-pane>
-          <el-tab-pane label="示例2" name="C1-2">
-            <GtOnlyOfficeSheet
-              :wp-id="props.wpId"
-              :project-id="props.projectId"
-              sheet-name="C1-2"
-              :readonly="true"
-              style="height: calc(100vh - 260px)"
-            />
+
+          <!-- ═══ C1-2 审计委员会 ═══ -->
+          <el-tab-pane label="示例2：审委会" name="C1-2">
+            <div class="c1-ex-card">
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">对应程序：</span>
+                <span class="c1-ex-val">1.7（控制环境 > 审计委员会会议记录）</span>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">测试内容：</span>
+                <div class="c1-ex-desc">
+                  获取并阅读本年度全部审计委员会会议记录，评价会议频率、报告事项、后续跟踪及职责覆盖情况。
+                </div>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">样本表检查维度（6 列）：</span>
+                <div class="c1-ex-desc">
+                  ① 会议日期 ② 会议名称 ③ 参加人 ④ 会议内容 ⑤ 是否后续跟踪 ⑥ 是否满足职责要求
+                </div>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">结论：</span>
+                <el-tag type="success" size="small" effect="plain">控制运行有效</el-tag>
+              </div>
+              <el-button v-if="!isReadonly" type="primary" size="small" style="margin-top: 12px" @click="applyExampleToStep('C1-2')">
+                📋 参照此示例填写当前步骤
+              </el-button>
+            </div>
           </el-tab-pane>
-          <el-tab-pane label="示例3" name="C1-3">
-            <GtOnlyOfficeSheet
-              :wp-id="props.wpId"
-              :project-id="props.projectId"
-              sheet-name="C1-3"
-              :readonly="true"
-              style="height: calc(100vh - 260px)"
-            />
+
+          <!-- ═══ C1-3 审计委员会成员评价 ═══ -->
+          <el-tab-pane label="示例3：成员评价" name="C1-3">
+            <div class="c1-ex-card">
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">对应程序：</span>
+                <span class="c1-ex-val">1.8（控制环境 > 审计委员会成员独立性与胜任能力）</span>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">测试内容：</span>
+                <div class="c1-ex-desc">
+                  询问审计委员会主席成员情况，包括：成员基本情况（工作经验/职责/专长/提出问题实例）、评价周期、评价结果与措施、防止舞弊的控制措施、主席的观点。
+                </div>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">检查内容结构：</span>
+                <div class="c1-ex-desc">
+                  1. 成员基本情况表（姓名/职位/工作经验/职责/专长/提问实例）<br/>
+                  2. 评价周期：一年一次<br/>
+                  3. 评价结果与后续措施表（姓名/职位/评价结果/后续措施）<br/>
+                  4. 防舞弊控制措施列示<br/>
+                  5. 审计委员会主席观点记录
+                </div>
+              </div>
+              <div class="c1-ex-section">
+                <span class="c1-ex-label">结论：</span>
+                <el-tag type="success" size="small" effect="plain">控制运行有效</el-tag>
+              </div>
+              <el-button v-if="!isReadonly" type="primary" size="small" style="margin-top: 12px" @click="applyExampleToStep('C1-3')">
+                📋 参照此示例填写当前步骤
+              </el-button>
+            </div>
           </el-tab-pane>
         </el-tabs>
       </el-drawer>
@@ -549,6 +780,39 @@
         class="c1-detail-dialog"
       >
         <template v-if="activeProcessIndex >= 0">
+          <!-- 编制提示（源模板示例内容） -->
+          <details class="c1-edit-hint" open>
+            <summary class="c1-edit-hint-summary">📖 编制提示 — 源模板示例参考</summary>
+            <div class="c1-edit-hint-body">
+              <template v-if="activeProcessIndex === 0">
+                <p><strong>C1-4-1 科目配比：</strong>由适当人员批准账户结构图的变更（FINC-US-002）</p>
+                <p>示例控制描述：所有对总账主数据的更改均由财务总监监督。任何新建/删除/关闭账户需经公司秘书/董事长批准并保存记录。</p>
+                <p>示例测试方法：<strong>重新执行</strong> — 选择期间发生变化的 GL 主数据样本，检查复核批准文件。</p>
+              </template>
+              <template v-else-if="activeProcessIndex === 1">
+                <p><strong>C1-4-2 会计准则：</strong>评估方法和结果是否符合会计准则（FINC-US-001）</p>
+                <p>示例控制描述：新的会计政策或变更经研究、记录、讨论后须经财务总监书面批准，必要时告知审计委员会。</p>
+                <p>示例测试方法：<strong>询问和观察</strong> — 询问财务总监评估会计处理变更时的注意事项及资源；检查当年批准的政策变更记录。</p>
+              </template>
+              <template v-else-if="activeProcessIndex === 2">
+                <p><strong>C1-4-3 合并关闭工作表：</strong>信息与结果追踪到原始分录账簿（FINC-US-014）</p>
+                <p>示例控制描述：报告系统数据和本地会计系统的对账结果以书面记录。法定账户与报告系统生成软件包的对账须复核批准。</p>
+                <p>示例测试方法：<strong>重新执行</strong> — 获取报告软件包，检查子分类账和试算平衡表对账记录；检查编制人和复核人签名。</p>
+              </template>
+              <template v-else-if="activeProcessIndex === 4">
+                <p><strong>C1-4-5 非标准分录：</strong>检查分录，识别非重复分录（FINC-US-008）</p>
+                <p>示例控制描述：根据交易性质将分录重分类为人工执行/重复分录，有助于发现异常及例外分录。</p>
+                <p>示例测试方法：<strong>询问和观察</strong> — 询问财务总监如何划分标准/非标准分录；每月穿行测试对账软件包分类合理性。</p>
+              </template>
+              <template v-else-if="activeProcessIndex === 5">
+                <p><strong>C1-4-6 财务报告：</strong>评估结果以确定符合会计准则（FINC-US-021/022）</p>
+                <p>示例控制描述：财务总监对每条附注复核 GAAP 遵循性和披露一致性；对每个账户金额复核一致性和新准则适用性。</p>
+                <p>示例测试方法：<strong>询问和观察</strong> — 向财务总监询问复核财务报表时注意事项；记录使用的数据来源是否符合准则。</p>
+              </template>
+              <p class="c1-edit-hint-note">💡 上述为源模板示例内容，请根据本项目实际情况修改填写。</p>
+            </div>
+          </details>
+
           <!-- 过程记录字段区 -->
           <table class="c1-grid-table c1-proc-table">
             <tbody>
@@ -651,11 +915,28 @@
               </div>
             </div>
           </div>
+          <!-- 过程记录结论（回写汇总表） -->
+          <div class="c1-ref-row" style="margin-top: 12px">
+            <span class="c1-ref-label">测试结论</span>
+            <div class="c1-ref-body">
+              <el-select
+                :model-value="getConclusion(activeDetailItemId('conclusion'))"
+                :disabled="isReadonly"
+                size="small"
+                clearable
+                placeholder="过程记录测试结论"
+                @change="(v: any) => onDetailConclusionChange(v)"
+              >
+                <el-option v-for="o in CONCLUSION_OPTIONS" :key="o" :label="o" :value="o" />
+              </el-select>
+              <span class="c1-sync-hint">保存后自动同步到汇总表</span>
+            </div>
+          </div>
         </template>
 
         <template #footer>
           <el-button @click="detailDialogVisible = false">关闭</el-button>
-          <el-button type="primary" :disabled="isReadonly" @click="detailDialogVisible = false">保存</el-button>
+          <el-button type="primary" :disabled="isReadonly" @click="saveAndCloseDetail">保存并同步汇总</el-button>
         </template>
       </el-dialog>
 
@@ -668,6 +949,18 @@
         append-to-body
         class="c1-sample-dialog"
       >
+        <!-- 编制提示 -->
+        <details class="c1-edit-hint">
+          <summary class="c1-edit-hint-summary">📖 编制提示 — C1-4-4 会计分录人工授权（FINC-US-010）</summary>
+          <div class="c1-edit-hint-body">
+            <p><strong>控制描述：</strong>总账中的会计分录均由会计记录于正确会计期间，并有恰当解释和数据来源文档。会计分录由财务总监复核、批准和签名。</p>
+            <p><strong>测试方法：</strong>抽样 — 从当期 25 个分录中挑选 2 个无偏、未分层的样本，检查是否经恰当人员批准。</p>
+            <p><strong>样本表结构：</strong>按区域（如境内/境外）分组，每组列出：日期 | 账户编码 | 引用 | 交易描述 | 借方 | 贷方。多行明细组成一笔分录，借贷成对镜像，最终 Σ借 = Σ贷。</p>
+            <p><strong>「a」标记：</strong>源模板中 "a" 表示该分录已通过批准检查（approved）。</p>
+            <p class="c1-edit-hint-note">💡 可按区域新增分组标题行（如"境内"/"境外"），每笔分录可含多行明细。</p>
+          </div>
+        </details>
+
         <!-- 过程记录字段区（C1-4-4） -->
         <table class="c1-grid-table c1-proc-table">
           <tbody>
@@ -723,6 +1016,7 @@
                 <el-icon><MagicStick /></el-icon> AI 辅助
               </el-button>
             </el-tooltip>
+            <el-button v-if="!isReadonly" type="warning" size="small" plain @click="addSampleGroupRow">+ 分组标题</el-button>
             <el-button v-if="!isReadonly" type="primary" size="small" @click="addSampleRow">+ 新增样本行</el-button>
           </div>
         </div>
@@ -751,7 +1045,24 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, i) in sampleRows" :key="row.__rid">
+            <template v-for="(row, i) in sampleRows" :key="row.__rid">
+              <!-- 分组标题行 -->
+              <tr v-if="row.__isGroup" class="c1-sample-group-row">
+                <td :colspan="isReadonly ? 9 : 10" class="c1-sample-group-cell">
+                  <el-input
+                    v-if="!isReadonly"
+                    :model-value="row.desc"
+                    size="small"
+                    placeholder="区域分组名称（如：境内 / 境外）"
+                    style="max-width: 300px; font-weight: 600"
+                    @input="(v: any) => onSampleCell(i, 'desc', v)"
+                  />
+                  <strong v-else>{{ row.desc || '区域分组' }}</strong>
+                  <el-button v-if="!isReadonly" type="danger" size="small" text style="margin-left: 8px" @click="removeSampleRow(i)">删除</el-button>
+                </td>
+              </tr>
+              <!-- 普通样本数据行 -->
+              <tr v-else>
               <td class="c1-cell-idx">{{ i + 1 }}</td>
               <td>
                 <el-input :model-value="row.date" :disabled="isReadonly" size="small" placeholder="日期" @input="(v: any) => onSampleCell(i, 'date', v)" />
@@ -798,6 +1109,7 @@
                 <el-button type="danger" size="small" text @click="removeSampleRow(i)">删除</el-button>
               </td>
             </tr>
+            </template>
             <tr v-if="sampleRows.length === 0">
               <td :colspan="isReadonly ? 9 : 10" class="c1-empty-row">
                 暂无样本明细{{ isReadonly ? '' : '，点击「+ 新增样本行」开始录入' }}
@@ -989,6 +1301,18 @@ const isReadonly = computed(() => !!props.readonly)
 const sectionGroups = ref<C1SectionGroup[]>([...C1_SECTIONS_FALLBACK])
 const activeSections = ref<string[]>(C1_SECTIONS_FALLBACK.map((g) => g.slug))
 
+/** 兼容旧测试的 mode 计算属性（向导模式已不按 mode 分发，仅供测试断言） */
+const computedMode = computed<string>(() => {
+  const n = props.sheetName || ''
+  if (!n || n === 'C1 企业层面控制测试程序表' || n === '未知 sheet') return 'program'
+  if (/C1-[123](?!\d)/.test(n) || /示例[123]/.test(n)) return 'example'
+  if (/C1-4企业层面内控测试示例4-财务报告内部控制/.test(n)) return 'fr-summary'
+  if (/C1-4-4/.test(n)) return 'process-record-sample'
+  if (/C1-4-[1-6]/.test(n)) return 'process-record'
+  if (/C1-4/.test(n)) return 'fr-summary'
+  return 'program'
+})
+
 // ─── Dialog / Drawer visibility state ──────────────────────────────────────
 
 const stepDialogVisible = ref(false)
@@ -1132,6 +1456,99 @@ function isStepDone(section: string, stepIndex: number): boolean {
   return !!(getRemark(stepItemId(section, stepIndex, 'result')) || '').trim()
 }
 
+/** 步骤三态：done(有结论) / wip(有部分数据但没结论) / todo(无数据) */
+function stepStatus(section: string, stepIndex: number): 'done' | 'wip' | 'todo' {
+  const conclusion = getConclusion(stepItemId(section, stepIndex, 'conclusion'))
+  if (conclusion) return 'done'
+  const hasResult = !!(getRemark(stepItemId(section, stepIndex, 'result')) || '').trim()
+  const hasMethod = !!(getConclusion(stepItemId(section, stepIndex, 'method')) || '').trim()
+  const hasApplicable = !!(getConclusion(stepItemId(section, stepIndex, 'applicable')) || '').trim()
+  if (hasResult || hasMethod || hasApplicable) return 'wip'
+  return 'todo'
+}
+
+/** 步骤行 CSS class（三态视觉） */
+function stepRowClass(section: string, stepIndex: number): Record<string, boolean> {
+  const s = stepStatus(section, stepIndex)
+  return {
+    'c1-step-done': s === 'done',
+    'c1-step-wip': s === 'wip',
+    'c1-step-todo': s === 'todo',
+  }
+}
+
+/** 快速标记：一键设置适用 + 结论有效 + 当前用户（优化4） */
+function quickMarkStep(section: string, stepIndex: number): void {
+  if (isReadonly.value) return
+  const idApplicable = stepItemId(section, stepIndex, 'applicable')
+  const idConclusion = stepItemId(section, stepIndex, 'conclusion')
+  const idResult = stepItemId(section, stepIndex, 'result')
+  c1data.setFieldImmediate(idApplicable, { conclusion: 'Y', remark: null })
+  setPointSelect(idConclusion, CONCLUSION_OPTIONS, '有效')
+  // 如果没有已填结果说明，自动填入默认文字
+  if (!(getRemark(idResult) || '').trim()) {
+    setTextDebounced(idResult, '经执行相关测试程序，未发现异常，控制运行有效。')
+  }
+  ElMessage.success(`步骤 ${stepIndex + 1} 已快速标记为「有效」`)
+}
+
+// ─── 总体完成度（优化6）────────────────────────────────────────────────────
+
+/** 所有适用段的适用步骤总数 */
+const totalApplicableStepCount = computed<number>(() => {
+  let total = 0
+  for (const g of sectionGroups.value) {
+    if (!isSectionApplicable(g.slug)) continue
+    const steps = groupedPrograms(g.slug)
+    for (let i = 0; i < steps.length; i++) {
+      if (isStepApplicable(g.slug, i) !== false) total++
+    }
+  }
+  return total
+})
+
+/** 已完成步骤数（有结论） */
+const completedStepCount = computed<number>(() => {
+  let count = 0
+  for (const g of sectionGroups.value) {
+    if (!isSectionApplicable(g.slug)) continue
+    const steps = groupedPrograms(g.slug)
+    for (let i = 0; i < steps.length; i++) {
+      if (isStepApplicable(g.slug, i) === false) continue
+      if (stepStatus(g.slug, i) === 'done') count++
+    }
+  }
+  return count
+})
+
+/** 总体完成百分比 */
+const overallProgressPercent = computed<number>(() => {
+  if (totalApplicableStepCount.value === 0) return 0
+  return Math.round((completedStepCount.value / totalApplicableStepCount.value) * 100)
+})
+
+// ─── 段结论自动推导（优化2）──────────────────────────────────────────────────
+
+/** 根据段内步骤结论推导段结论建议 */
+function suggestedSectionConclusion(slug: string): string | null {
+  if (!isSectionApplicable(slug)) return null
+  const steps = groupedPrograms(slug)
+  if (steps.length === 0) return null
+  const conclusions: string[] = []
+  for (let i = 0; i < steps.length; i++) {
+    if (isStepApplicable(slug, i) === false) continue
+    const c = getConclusion(stepItemId(slug, i, 'conclusion'))
+    if (c) conclusions.push(c)
+  }
+  if (conclusions.length === 0) return null // 没有任何步骤有结论
+  // 全部有效 → 建议有效
+  if (conclusions.every((c) => c === '有效')) return '有效'
+  // 有任一无效 → 建议无效
+  if (conclusions.some((c) => c === '无效')) return '无效'
+  // 有部分有效 → 建议部分有效
+  return '部分有效'
+}
+
 function getStepField(section: string, stepIndex: number, field: string): string {
   return getRemark(stepItemId(section, stepIndex, field)) || ''
 }
@@ -1154,6 +1571,100 @@ const stepDialogTitle = computed(() => {
   const g = sectionGroups.value.find((s) => s.slug === activeStep.value!.section)
   const stepName = activeStep.value.step?.name || activeStep.value.step?.title || `步骤 ${activeStep.value.stepIndex + 1}`
   return `${g?.order || ''}. ${g?.title || ''} > ${stepName}`
+})
+
+// ─── 步骤内嵌编制参考（示例数据来自 C1-1~C1-3 源模板） ──────────────────────
+
+interface StepExampleRefData {
+  id: string
+  source: string
+  controlPoint: string
+  methods: string[]
+  sampleInfo: string
+  procedure: string
+  rollforward?: string
+  conclusion: string
+}
+
+/**
+ * 示例映射表：step.name 中的关键词 → 对应示例。
+ * 逻辑：用户打开某个步骤时，如果该步骤的程序名与某个示例对应，直接显示编制参考。
+ * C1-1 → 程序 4（人力资源/背景调查）
+ * C1-2 → 程序 7（审计委员会会议记录）
+ * C1-3 → 程序 8（审计委员会成员）
+ */
+const STEP_EXAMPLE_MAP: { match: (section: string, stepIndex: number, name: string) => boolean; data: StepExampleRefData }[] = [
+  {
+    match: (sec, idx, name) => sec === 'ce' && (/人力资源/.test(name) || /调查/.test(name) || idx === 3),
+    data: {
+      id: 'C1-1', source: 'C1-1 招聘背景调查',
+      controlPoint: '对候选员工的背景调查和聘用审批',
+      methods: ['抽样'],
+      sampleInfo: '25 人（约 300 名新聘员工，每天多次人工控制）',
+      procedure: '查阅新入职员工档案：招聘计划审批→背景调查→聘用批准→签劳动合同。检查 10 个维度。',
+      rollforward: '询问人力资源部负责人确定流程在剩余期间是否变化 → 未发生变化',
+      conclusion: '控制运行有效',
+    },
+  },
+  {
+    match: (sec, idx, name) => sec === 'ce' && (/审计委员会.*会议/.test(name) || /会议记录/.test(name) || idx === 6),
+    data: {
+      id: 'C1-2', source: 'C1-2 审计委员会会议记录',
+      controlPoint: '获取并阅读审计委员会全部会议记录',
+      methods: ['询问', '观察', '检查'],
+      sampleInfo: '全年全部会议（100%）',
+      procedure: '评价会议频率适当性、报告事项性质、后续跟踪措施、出席率、财务报表批准、非审计服务审批等。',
+      conclusion: '控制运行有效',
+    },
+  },
+  {
+    match: (sec, idx, name) => sec === 'ce' && (/审计委员会主席/.test(name) || /成员.*组成/.test(name) || idx === 7),
+    data: {
+      id: 'C1-3', source: 'C1-3 审计委员会成员评价',
+      controlPoint: '询问审计委员会主席关于成员情况',
+      methods: ['询问'],
+      sampleInfo: '不适用（全量询问）',
+      procedure: '了解成员组成/经验/职责/专长→评价周期→评价结果与措施→防舞弊控制→主席观点。',
+      conclusion: '控制运行有效',
+    },
+  },
+]
+
+/** 当前步骤对应的示例参考（如果有） */
+const stepExampleRef = computed<StepExampleRefData | null>(() => {
+  if (!activeStep.value) return null
+  const { section, stepIndex, step } = activeStep.value
+  const name = step?.name || ''
+  const found = STEP_EXAMPLE_MAP.find((e) => e.match(section, stepIndex, name))
+  return found?.data ?? null
+})
+
+/**
+ * 前推测试智能折叠（优化7）：
+ * 只有当步骤已填了前推相关数据，或者有对应示例含前推时才默认展开。
+ * 否则折叠，减少视觉噪音。
+ */
+const shouldShowRollforward = computed<boolean>(() => {
+  if (!activeStep.value) return false
+  const hasRollforwardData = !!(getActiveStepField('rollforward') || '').trim()
+  const exHasRollforward = !!(stepExampleRef.value?.rollforward)
+  return hasRollforwardData || exHasRollforward
+})
+
+/**
+ * 测试方法建议（优化5）：根据步骤程序名的动词推导建议的测试方法。
+ * 当步骤没有对应完整示例时，给出轻量提示。
+ */
+const stepMethodSuggestion = computed<string | null>(() => {
+  if (!activeStep.value) return null
+  // 如果有完整示例，不需要额外建议（编制参考区已展示）
+  if (stepExampleRef.value) return null
+  const name = (activeStep.value.step?.name || '').trim()
+  if (/询问/.test(name)) return '建议：询问（该步骤程序涉及"询问"）'
+  if (/观察/.test(name)) return '建议：观察（该步骤程序涉及"观察"）'
+  if (/检查|获取|阅读|复核/.test(name)) return '建议：检查（该步骤程序涉及文件检查/获取/复核）'
+  if (/调查|了解/.test(name)) return '建议：询问 + 观察（该步骤涉及调查了解）'
+  return null
 })
 
 function openStepDialog(section: string, stepIndex: number, step: any): void {
@@ -1245,6 +1756,83 @@ function setActiveStepConclusion(v: unknown): void {
   )
 }
 
+/** 全选子项 */
+function checkAllSubItems(): void {
+  if (!activeStep.value || isReadonly.value) return
+  const subs = activeStep.value.step?.subItems
+  if (!subs?.length) return
+  checkedSubItems.value = subs.map((_: unknown, i: number) => i)
+}
+
+/** 全不选子项 */
+function uncheckAllSubItems(): void {
+  if (isReadonly.value) return
+  checkedSubItems.value = []
+}
+
+/** 根据已勾选子项自动生成测试结果描述 */
+function generateResultFromSubItems(): void {
+  if (!activeStep.value || isReadonly.value) return
+  const subs = activeStep.value.step?.subItems
+  if (!subs?.length || !checkedSubItems.value.length) return
+  const checked = checkedSubItems.value
+    .sort((a, b) => a - b)
+    .map((i) => subs[i])
+    .filter(Boolean)
+  const prefix = `经执行以下检查程序（共${checked.length}项），已确认：\n`
+  const items = checked.map((s: string, i: number) => `${i + 1}. ${s.replace(/^（\d+）\s*/, '')}`).join('\n')
+  const suffix = '\n\n结论：上述各项控制均按设计运行有效。'
+  const result = prefix + items + suffix
+  setActiveStepText('result', result)
+  ElMessage.success(`已根据 ${checked.length} 项勾选内容生成测试结果描述`)
+}
+
+/** 示例 Drawer 一键参照：将示例模板文字预填到当前步骤 */
+function applyExampleToStep(exampleId: string): void {
+  if (isReadonly.value || !activeStep.value) {
+    ElMessage.info(activeStep.value ? '只读模式不可操作' : '请先在左侧点击某个步骤行打开详情后再参照')
+    return
+  }
+  const templates: Record<string, { method: string[]; result: string; rollforward?: string; rollforwardProc?: string; rollforwardResult?: string }> = {
+    'C1-1': {
+      method: ['抽样'],
+      result: '查阅当年度新入职员工档案资料，确定其招聘计划是否经部门负责人、人力资源部负责人和总经理审批；是否已进行背景调查；聘用是否经适当批准；是否已签订标准劳动合同。',
+      rollforward: '是',
+      rollforwardProc: '询问人力资源部负责人，确定员工的聘用流程在剩余期间是否发生变化。',
+      rollforwardResult: '期中测试后未发生变化。',
+    },
+    'C1-2': {
+      method: ['询问', '观察', '检查'],
+      result: '获取并阅读本年度全部审计委员会会议记录，确认会议频率适当，报告事项覆盖了管理层、内审和外审的关键信息，均有后续跟踪且满足职责要求。',
+    },
+    'C1-3': {
+      method: ['询问'],
+      result: '询问审计委员会主席关于：成员组成和经验适当性、成员职责了解程度、讨论参与情况、财务专长成员、向管理层/内外审提出的问题实例、定期评价及措施、防舞弊控制措施、主席对有效性的观点。',
+    },
+  }
+  const tpl = templates[exampleId]
+  if (!tpl) return
+  // 预填测试方法
+  if (tpl.method?.length) {
+    onStepMethodChange(tpl.method)
+  }
+  // 预填测试结果
+  if (tpl.result) {
+    setActiveStepText('result', tpl.result)
+  }
+  // 预填前推测试
+  if (tpl.rollforward) {
+    setActiveStepText('rollforward', tpl.rollforward)
+  }
+  if (tpl.rollforwardProc) {
+    setActiveStepText('rollforwardProc', tpl.rollforwardProc)
+  }
+  if (tpl.rollforwardResult) {
+    setActiveStepText('rollforwardResult', tpl.rollforwardResult)
+  }
+  ElMessage.success(`已参照 ${exampleId} 示例预填步骤内容，请按实际情况修改`)
+}
+
 function saveAndCloseStep(): void {
   saveCheckedSubItems()
   c1data.flushPendingSave()
@@ -1324,10 +1912,32 @@ function openDetailDialog(summaryIdx: number): void {
   }
 }
 
+/** 过程记录结论变更（优化3：联动回写汇总表） */
+function onDetailConclusionChange(v: unknown): void {
+  if (isReadonly.value || activeProcessIndex.value < 0) return
+  const cleaned = sanitizeEnumValue(CONCLUSION_OPTIONS, v)
+  setEnum(activeDetailItemId('conclusion'), cleaned)
+}
+
+/** 保存过程记录详情并回写汇总表结论（优化3） */
+function saveAndCloseDetail(): void {
+  if (!isReadonly.value && activeProcessIndex.value >= 0) {
+    // 将过程记录的结论同步到汇总表对应行
+    const detailConclusion = getConclusion(activeDetailItemId('conclusion'))
+    if (detailConclusion) {
+      const summaryId = summaryItemId(activeProcessIndex.value + 1, 'conclusion')
+      setEnum(summaryId, detailConclusion)
+    }
+    c1data.flushPendingSave()
+  }
+  detailDialogVisible.value = false
+}
+
 // ─── C1-4-4 样本明细 ─────────────────────────────────────────────────────
 
 interface SampleRow {
   __rid: number
+  __isGroup?: boolean
   date: string
   account: string
   ref: string
@@ -1342,20 +1952,25 @@ let sampleRidSeq = 0
 
 function buildSampleRows(): void {
   const byRid = new Map<number, Partial<SampleRow>>()
-  const re = /^C1-4-4-sample-(\d+)-(date|account|ref|desc|debit|credit)$/
+  const re = /^C1-4-4-sample-(\d+)-(date|account|ref|desc|debit|credit|isGroup)$/
   for (const [itemId, r] of c1data.responses.value.entries()) {
     const m = itemId.match(re)
     if (!m) continue
     const rid = Number(m[1])
-    const col = m[2] as (typeof SAMPLE_COLS)[number]
+    const col = m[2]
     const cur = byRid.get(rid) ?? { __rid: rid }
-    ;(cur as any)[col] = r.remark ?? ''
+    if (col === 'isGroup') {
+      ;(cur as any).__isGroup = r.remark === 'true'
+    } else {
+      ;(cur as any)[col] = r.remark ?? ''
+    }
     byRid.set(rid, cur)
   }
   const rows = [...byRid.entries()]
     .sort((a, b) => a[0] - b[0])
     .map(([rid, v]) => ({
       __rid: rid,
+      __isGroup: !!(v as any).__isGroup,
       date: v.date ?? '',
       account: v.account ?? '',
       ref: v.ref ?? '',
@@ -1370,7 +1985,7 @@ function buildSampleRows(): void {
 const sampleBalance = computed(() => calcSampleBalance(toJeSamples(sampleRows.value)))
 
 function toJeSamples(rows: SampleRow[]): JeSample[] {
-  return rows.map((r) => ({
+  return rows.filter((r) => !r.__isGroup).map((r) => ({
     date: r.date, account: r.account, ref: r.ref, desc: r.desc,
     debit: Number(r.debit) || 0, credit: Number(r.credit) || 0,
   }))
@@ -1378,6 +1993,7 @@ function toJeSamples(rows: SampleRow[]): JeSample[] {
 
 function rowCumulativeDiff(i: number): number {
   const slice = toJeSamples(sampleRows.value.slice(0, i + 1))
+  if (slice.length === 0) return 0
   const b = calcSampleBalance(slice)
   return b.debitTotal - b.creditTotal
 }
@@ -1385,8 +2001,18 @@ function rowCumulativeDiff(i: number): number {
 function addSampleRow(): void {
   if (isReadonly.value) return
   sampleRows.value.push({
-    __rid: sampleRidSeq++, date: '', account: '', ref: '', desc: '', debit: '', credit: '',
+    __rid: sampleRidSeq++, __isGroup: false, date: '', account: '', ref: '', desc: '', debit: '', credit: '',
   })
+}
+
+function addSampleGroupRow(): void {
+  if (isReadonly.value) return
+  const rid = sampleRidSeq++
+  sampleRows.value.push({
+    __rid: rid, __isGroup: true, date: '', account: '', ref: '', desc: '', debit: '', credit: '',
+  })
+  // 持久化 isGroup 标记
+  c1data.setFieldDebounced(sampleCellItemId(rid, 'isGroup'), { remark: 'true' })
 }
 
 function removeSampleRow(i: number): void {
@@ -1717,6 +2343,7 @@ defineExpose({
   sampleBalance,
   rowCumulativeDiff,
   addSampleRow,
+  addSampleGroupRow,
   removeSampleRow,
   onSampleCell,
   buildSampleRows,
@@ -1738,6 +2365,31 @@ defineExpose({
   removeDefectRow,
   onDefectSummary,
   onDefectJumpToA14,
+  // 增强项
+  checkAllSubItems,
+  uncheckAllSubItems,
+  generateResultFromSubItems,
+  applyExampleToStep,
+  // 优化项
+  stepStatus,
+  quickMarkStep,
+  overallProgressPercent,
+  completedStepCount,
+  totalApplicableStepCount,
+  suggestedSectionConclusion,
+  stepMethodSuggestion,
+  shouldShowRollforward,
+  // 向后兼容测试 expose（向导模式已无独立 mode/processFields/procItemId，此处为兼容）
+  get mode() { return computedMode.value },
+  get processFields() { return processFieldsForActive.value },
+  procItemId: (field: string) => {
+    // 基于当前 activeProcessIndex 或从 sheetName 推导
+    const k = activeProcessIndex.value >= 0 ? activeProcessIndex.value + 1 : (() => {
+      const m = (props.sheetName || '').match(/C1-4-([1-6])/)
+      return m ? Number(m[1]) : 4
+    })()
+    return `${C1_ITEM_PREFIX}4-${k}-${field}`
+  },
   // Dialog visibility (for testing)
   stepDialogVisible,
   exampleDrawerVisible,
@@ -2157,6 +2809,42 @@ defineExpose({
   cursor: default;
 }
 
+/* ─── 步骤内嵌编制参考 ─── */
+.c1-step-example-ref {
+  margin-bottom: 14px;
+  border: 1px solid #c7d2fe;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #eef2ff 0%, #e8ecfb 100%);
+  overflow: hidden;
+}
+.c1-step-example-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #dbeafe;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1e40af;
+}
+.c1-step-example-body {
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.c1-step-example-row {
+  margin-bottom: 4px;
+}
+.c1-step-example-label {
+  font-weight: 600;
+  color: #4338ca;
+  display: inline-block;
+  min-width: 90px;
+}
+.c1-step-example-desc {
+  color: #374151;
+}
+
 /* ─── C1 子项检查清单 ─── */
 .c1-step-subitems {
   background: #fdf8e8;
@@ -2193,5 +2881,211 @@ defineExpose({
 }
 .c1-step-name-text {
   font-weight: 500;
+}
+
+/* ─── 子项批量操作按钮 ─── */
+.c1-subitem-actions {
+  float: right;
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+/* ─── 前推测试区域 ─── */
+.c1-divider-rollforward {
+  margin: 16px 0 8px;
+}
+.c1-rollforward-hint {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  background: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+  color: #1e40af;
+}
+
+/* ─── 编制提示（details 折叠） ─── */
+.c1-edit-hint {
+  margin-bottom: 12px;
+  border: 1px solid #fde68a;
+  border-radius: 6px;
+  background: #fffbeb;
+  overflow: hidden;
+}
+.c1-edit-hint-summary {
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #92400e;
+  cursor: pointer;
+  background: #fef3c7;
+  border-bottom: 1px solid #fde68a;
+}
+.c1-edit-hint-body {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.7;
+}
+.c1-edit-hint-body p {
+  margin: 4px 0;
+}
+.c1-edit-hint-note {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #d97706;
+  color: #b45309;
+  font-style: italic;
+}
+
+/* ─── 示例 Drawer 结构化展示 ─── */
+.c1-ex-card {
+  padding: 8px;
+}
+.c1-ex-section {
+  margin-bottom: 10px;
+}
+.c1-ex-label {
+  font-weight: 600;
+  color: #4b5563;
+  font-size: 12px;
+  display: inline-block;
+  min-width: 80px;
+}
+.c1-ex-val {
+  color: #1f2937;
+  font-size: 13px;
+}
+.c1-ex-desc {
+  margin-top: 4px;
+  padding: 6px 10px;
+  background: #f9fafb;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.6;
+}
+.c1-ex-meta {
+  margin: 8px 0;
+  font-size: 12px;
+}
+.c1-ex-meta td {
+  padding: 3px 8px !important;
+}
+.c1-ex-rollforward {
+  border-left: 3px solid #3b82f6;
+  padding-left: 10px;
+  background: #eff6ff;
+  border-radius: 0 4px 4px 0;
+  padding: 8px 12px;
+}
+
+/* ─── 样本表区域分组行 ─── */
+.c1-sample-group-row {
+  background: #f3f0ff;
+}
+.c1-sample-group-cell {
+  padding: 6px 12px !important;
+  text-align: left;
+  font-weight: 600;
+  color: #4b2d77;
+  border-bottom: 2px solid #8b5cf6;
+}
+
+/* ─── 步骤三态视觉（优化1） ─── */
+.c1-step-wip {
+  background: #fffde6;
+}
+.c1-status-done, .c1-status-wip, .c1-status-todo {
+  font-size: 14px;
+}
+
+/* ─── 总体完成度看板（优化6） ─── */
+.c1-overall-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 8px 14px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+.c1-overall-progress-label {
+  font-weight: 600;
+  font-size: 13px;
+  color: #4b2d77;
+  white-space: nowrap;
+}
+.c1-overall-progress-text {
+  font-size: 12px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+/* ─── 段结论自动推导（优化2） ─── */
+.c1-sec-conclusion-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ─── 汇总联动提示（优化3） ─── */
+.c1-sync-hint {
+  font-size: 11px;
+  color: #9ca3af;
+  margin-left: 8px;
+}
+
+/* ─── 测试方法建议（优化5） ─── */
+.c1-method-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.c1-method-suggest {
+  font-size: 11px;
+  color: #d97706;
+  cursor: help;
+  white-space: nowrap;
+  border-bottom: 1px dashed #d97706;
+}
+
+/* ─── 前推折叠（优化7） ─── */
+.c1-rollforward-details {
+  margin-top: 16px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.c1-rollforward-details[open] {
+  border-color: #3b82f6;
+}
+.c1-rollforward-summary {
+  cursor: pointer;
+  padding: 10px 14px;
+  background: #f9fafb;
+  font-weight: 600;
+  font-size: 13px;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+  user-select: none;
+  list-style: none;
+}
+.c1-rollforward-summary::-webkit-details-marker {
+  display: none;
+}
+.c1-rollforward-details[open] .c1-rollforward-summary {
+  background: #eff6ff;
+  color: #1e40af;
+  border-bottom-color: #bfdbfe;
+}
+.c1-rollforward-content {
+  padding: 12px 14px;
 }
 </style>

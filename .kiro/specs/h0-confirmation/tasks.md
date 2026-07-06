@@ -48,12 +48,12 @@ H0 固定资产循环函证对齐 D0 架构：复用 D0 共享组件（6 个 com
 
 ### Phase 0: 双源输入（参照 D0 / F0 Phase 0）
 
-- [ ] 0.1 openpyxl 实读 `H0 固定资产循环函证.xlsx` 全 9 sheet
+- [x] 0.1 openpyxl 实读 `H0 固定资产循环函证.xlsx` 全 9 sheet
   - 确认 H0-5 每区块实际列头 / 行数 / 公式
   - 产出：`h0_structure_summary.json`
   - _Requirements: 2.5_
 
-- [ ] 0.2 D0 架构交叉验证
+- [x] 0.2 D0 架构交叉验证
   - 对照 `h0_d0_alignment.md` 与 D0 overrides / F0-5 实现
   - 产出：`h0_conflict_resolution.md`（列配置与 xlsx 冲突决议）
   - _Requirements: 1, 2_
@@ -63,33 +63,33 @@ H0 固定资产循环函证对齐 D0 架构：复用 D0 共享组件（6 个 com
 - [x] 1.1 修正 overrides + account_package（对标 D0）
   - [x] `wp_code_overrides.json` 9 条 H0 映射（H0A/H0-1~H0-7）
   - [x] `account_package_registry.json` → `H0_fixed_asset_confirmation`（sheet_type 同 G0）
-  - [ ] 注册 `confirmation-alternative-h05`（VALID_COMPONENT_TYPES + registry + DISPATCH）
-  - [ ] 人工审核 `H0.yaml` component_type
+  - [x] 注册 `confirmation-alternative-h05`（VALID_COMPONENT_TYPES + registry + DISPATCH）
+  - [x] 人工审核 `H0.yaml` component_type
   - _Requirements: 1.1~1.4, 4_
 
-- [ ]* 1.2 编写注册契约测试
+- [-]* 1.2 编写注册契约测试
   - `test_h0_registration_contract.py`：9 条 overrides + h05 dispatch
   - 更新 `htmlRendererRegistry.spec.ts`
   - _Requirements: 4_
 
 ### Phase 2: 公式引擎 useH0FormulaEngine.ts
 
-- [ ] 2.1 创建 `alternativeH05/composables/useH0FormulaEngine.ts`
+- [~] 2.1 创建 `alternativeH05/composables/useH0FormulaEngine.ts`
   - calcBlockTotal / calcCheckRatio / calcRowVariance / isAbnormal
   - _Requirements: 5_
 
-- [ ]* 2.2 Property P1 PBT：区块合计
+- [~]* 2.2 Property P1 PBT：区块合计
   - **Feature: confirmation-alternative-h05, Property P1**
 
-- [ ]* 2.3 Property P2 PBT：检查比例（除零→0）
+- [~]* 2.3 Property P2 PBT：检查比例（除零→0）
 
-- [ ]* 2.4 Property P3 PBT：行差异与零差异恒等
+- [~]* 2.4 Property P3 PBT：行差异与零差异恒等
 
-- [ ]* 2.5 Property P4 PBT：异常判定
+- [~]* 2.5 Property P4 PBT：异常判定
 
 ### Phase 3: Composable 数据管理（参照 useAlternativeF05Data）
 
-- [ ] 3.1 创建 `useAlternativeH05Data.ts`
+- [~] 3.1 创建 `useAlternativeH05Data.ts`
   - Master-Detail（公司→4 区块检查表）
   - `blockColumnConfigsH05.ts` 四区块列定义
   - loadAll / persistAll（`_format: alternative-h05-v1`）
@@ -98,7 +98,7 @@ H0 固定资产循环函证对齐 D0 架构：复用 D0 共享组件（6 个 com
 
 ### Phase 4: Vue 组件（参照 GtConfirmationAlternativeF05）
 
-- [ ] 4.1 创建 `alternativeH05/GtConfirmationAlternativeH05.vue`
+- [~] 4.1 创建 `alternativeH05/GtConfirmationAlternativeH05.vue`
   - 复用 AlternativeD05Dashboard / Master / CheckBlock
   - 余额汇总 + 抽样参数 + 4 区块宽表 + OCR + 导入导出下拉
   - ref_index → H1 / L1 / L3
@@ -107,35 +107,35 @@ H0 固定资产循环函证对齐 D0 架构：复用 D0 共享组件（6 个 com
 
 ### Phase 5: 后端
 
-- [ ] 5.1 创建 `_h0_confirmation.py` + `_h0_confirmation_import_export.py` + `_h0_confirmation_ai.py`
+- [~] 5.1 创建 `_h0_confirmation.py` + `_h0_confirmation_import_export.py` + `_h0_confirmation_ai.py`
   - 注册 router（参照 `_f0_import_export` / `_g0_confirmation`）
   - _Requirements: 3, 4_
 
-- [ ] 5.2 创建 `useH0ImportExport.ts`
+- [~] 5.2 创建 `useH0ImportExport.ts`
   - _Requirements: 3_
 
 ### Phase 6: 跨模块联动
 
-- [ ] 6.1 confirmation-hub 验证 H0 全 Tab 路由
+- [~] 6.1 confirmation-hub 验证 H0 全 Tab 路由
   - ConfirmationTabs 按 wp_code 分发 H0-5 → h05
   - _Requirements: 7_
 
-- [ ] 6.2 EventBus 联动
+- [~] 6.2 EventBus 联动
   - H0-1→H0-5 importFromSummary
   - confirmation:updated 刷新
   - _Requirements: 2.8, 5_
 
 ### Phase 7: 版本链
 
-- [ ] 7.1 GtConfirmationAlternativeH05 集成 useVersionTrail
+- [~] 7.1 GtConfirmationAlternativeH05 集成 useVersionTrail
   - _Requirements: 6_
 
 ### Phase 8: 测试与 E2E
 
-- [ ]* 8.1 集成测试 `h0Confirmation.integration.spec.ts`
+- [~]* 8.1 集成测试 `h0Confirmation.integration.spec.ts`
   - overrides 映射 / 四区块 CRUD / 导入导出 round-trip
 
-- [ ]* 8.2 E2E 扩展 `h-cycle-h0-confirmation-hub.spec.ts`
+- [~]* 8.2 E2E 扩展 `h-cycle-h0-confirmation-hub.spec.ts`
   - 对齐 `g-cycle-g0-confirmation` 模式：H0-1 summary testid、H0-5 四区块可见
   - 使用 `ensure-test-project` findWorkpaper + loginAs
   - _Requirements: 全部_

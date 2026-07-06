@@ -137,7 +137,7 @@ sheets:
       - B11:C11
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   函证结果汇总表H0-1:
-    component_type: d-form-confirmation
+    component_type: confirmation-summary
     class_code: D-函证
     fixed_cells:
       A1: 致同会计师事务所
@@ -233,7 +233,7 @@ sheets:
       - X6:X7
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   核实被函证单位信息H0-2:
-    component_type: d-form-confirmation
+    component_type: confirmation-entity-verify
     class_code: D-函证
     fixed_cells:
       A1: 致同会计师事务所
@@ -327,7 +327,7 @@ sheets:
       - AB1:AL1
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   跟函函证过程控制H0-3:
-    component_type: d-form-confirmation
+    component_type: confirmation-followup
     class_code: D-函证
     fixed_cells:
       A1: 致同会计师事务所
@@ -362,7 +362,7 @@ sheets:
       - A5:F5
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   差异核对表H0-4:
-    component_type: d-form-table
+    component_type: confirmation-diff-reconcile
     class_code: D-检查表
     fixed_cells:
       A1: 致同会计师事务所
@@ -489,7 +489,7 @@ sheets:
       - A1:S1
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   邮件传真回函可靠性验证H0-6:
-    component_type: d-form-confirmation
+    component_type: confirmation-reliability
     class_code: D-函证
     fixed_cells:
       A1: 致同会计师事务所
@@ -566,7 +566,7 @@ sheets:
       - B5:B6
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
   函证程序舞弊风险评价表H0-7:
-    component_type: d-form-confirmation
+    component_type: confirmation-fraud-risk
     class_code: D-函证
     fixed_cells:
       A1: 致同会计师事务所

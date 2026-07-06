@@ -325,6 +325,22 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
                         status_code=422,
                         detail=f"C控制测试 conclusion 值无效，收到: '{item.conclusion}'",
                     )
+            elif item.item_id.startswith(("C23A-", "C23-", "C24A-", "C24-", "C25-", "C26-", "C22.")):
+                # C23~C26 专属组件：步骤结论 + 适用性 + 测试方法 + 人员清单结论 + 样本偏差
+                allowed = (
+                    "有效", "部分有效", "无效",
+                    "Y", "N",
+                    "未发现偏差", "发现偏差-影响不重大", "发现偏差-影响重大",
+                    "人员清单不存在异常",
+                    "控制运行有效", "控制无效",
+                    "是", "否", "是-需跟进",
+                    "创建", "授权", "记录",
+                )
+                if item.conclusion and item.conclusion not in allowed:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"C23~C26 conclusion 值无效，收到: '{item.conclusion}'",
+                    )
             elif item.item_id.startswith("D1-"):
                 # D1 应收票据：程序表状态 + 业务模式 + 终止确认 + 披露结论 + 检查结论 + ECL方法 + 标记
                 allowed = (

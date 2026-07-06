@@ -26,6 +26,7 @@ inclusion: always
 - **🔴 交互点选优先(尤其C类控制测试等判断型底稿)**：判断/枚举字段一律下拉/单选/多选tag/按钮点选，减少手打；长文本才用autosize textarea+AI辅助。跳转联动一键完成(汇总↔子页↔B23/B50/A14一键带入)。必要处(样本证据/凭证/审计证据/过程记录)加📎附件上传+OCR识别自动填充。结论/缺陷/偏差回写(→B50 EventBus/→A14缺陷底稿/→C21-1汇总/→汇总表"是否偏差")。多加操作提示(顶部蓝色渐变引导区+方法论上下文琥珀块+字段tooltip+编制提示details)
 - **叙述式底稿UI规范**：仅核对+结论的底稿不加独立审计意见区；textarea用autosize
 - **抽凭表行级OCR**：📎附件列上传后复用`/d4/contract-ocr`端点OCR识别→确认弹窗填入
+- **🔴 示例内嵌编制参考（非Drawer被动查看）**：源模板示例内容必须内嵌到对应步骤/过程记录的编制界面中，用户填写时直接看到参照+一键套用，不是藏在Drawer里让用户主动找。核心：参照示例要求来完善底稿开发，让用户点点点就能完成编制
 - 功能收敛；git 单 commit；**push 前必先 fetch**；**协作走 PR 不直推 main**
 - **spec 归档按功能分类**（05-business-features / 04-infra 等），不按日期批次建目录
 - 目标并发 6000 人；底稿编码致同 2025 修订版
@@ -157,7 +158,7 @@ inclusion: always
   - **✅ C2~C15新增控制点交互已完成**："+新增"→弹出65% Dialog填写15字段(3列grid+AI辅助描述)+频率→样本量建议提示→保存入库→汇总表自动增行；FAB"+"同入口；汇总表保留inline快编辑
   - **🔵 C2~C15新增弹窗增强**：待实现①编制提示(琥珀色块)放弹窗顶部供用户参考+作为AI system context ②附件上传区(右上卡片)上传制度/访谈/合同→OCR识别→作为AI生成"控制描述"的参考材料
   - **✅ C2~C15 account_package合并已添加**：14个包配置已加入account_package_registry.json(source_wp_codes=[Cx,Cx-2]，sheets=汇总表+偏差评价)，打开Cx底稿时应显示3tab(汇总+偏差+完整Excel)。需重启后端验证render-config是否正确合并
-  - **🔵 Cx-2偏差评价组件增强**：①红框处加双模式切换(结构化视图↔在线编辑，参照D4 el-segmented) ②决策树加注释说明(注1~注6完整文字) ③加"示例参考"Drawer(源模板第二个sheet示例内容) ④顶部加"控制例外情况描述"textarea ⑤底部加"评价结论"汇总区 ⑥交互用文本描述+弹窗而非纯表格
+  - **✅ Cx-2偏差评价组件增强已完成**：①el-segmented双模式(结构化↔OnlyOffice) ②注释说明(注1~6嵌入每步卡片) ③示例参考Drawer(4个完整决策路径示例) ④顶部"控制例外情况描述"textarea(持久化C{n}-dev-{m}-exceptionDesc) ⑤评价结论汇总区(el-card+路径/名称/结论) ⑥useCControlTestData扩展exceptionDesc字段
   - `c1-entity-level-control`(C1企业层面控制,COSO五要素分组程序中控台+C1-4财报内控6子表样本勾稽,8需求/6波)
   - `c22-itgc-bundle`(C22 IT一般控制34sheet:SA信息安全/PE运行维护/PM程序变更/NS新系统4大类+主矩阵总览+缺陷联动汇总C21-1,含C21 IT专业成员,9需求/7波)
   - `c23-c24-journal-entry-testing`(C23分录控制测试人员核对+C24分录细节测试useC24AnalyticsEngine:借贷平衡/科目对比/跳号/异常筛选/本福特首位数分布,分录导入,8需求/7波) ✅**全部完成(25/25任务)**
@@ -182,13 +183,18 @@ inclusion: always
 - **router_registry 必查**；**service 只 flush 不 commit**
 - **新增 componentType 必须同步更新 VALID_COMPONENT_TYPES**
 - **Bundle wpIdMap必须用item.wp_id不能用item.id**
-- **D~N专属组件必须有RENDERER_DISPATCH注册**（否则被onlyoffice-sheet吞掉）——C类同理！c1-entity-level-control曾因缺render策略py+DISPATCH注册导致前端只显示OO
+- **D~N专属组件必须有RENDERER_DISPATCH注册**（否则被onlyoffice-sheet吞掉）——C类同理！c1-entity-level-control曾因缺render策略py+DISPATCH注册导致前端只显示OO。**C22再次踩坑：_c22_itgc.py写好但忘了在__init__.py import+注册到DISPATCH dict**
+- **🔴 新增 item_id 前缀必须在 checklist_responses.py 白名单注册**：C23A-/C24-/C25-/C26- 前缀的 conclusion 被 else 默认白名单(`Y/X-I/X-W/N-A`)拒绝→422。新专属组件的 item_id 前缀必须在保存端点的校验链中添加对应 `elif` 分支
+- **🔴 独立子底稿(如C23-1/C23-2)必须在wp_code_overrides中也映射到父组件**：平台可能把多sheet工作簿拆成独立底稿(各有wp_id)，不映射则走OO兜底。**C24-0~C24-5同理已加入**
+- **🔴 多底稿共享数据问题**：C24子底稿(C24-3跳号等)各有独立wpId但分录数据存在主C24下→selfLoad数据为空→解法：selfLoad结束后如果journalEntries空+非程序表页→自动调loadFromLedger()从序时账拉取
 - **D~N专属组件不能有内部el-tabs**：接sheetName prop用v-if分发
+- **🔴 禁止用PowerShell Set-Content/Get-Content操作Vue文件**：会破坏UTF-8编码(中文变乱码)→编译报错。必须只用str_replace工具修改文件内容。C24曾因`-replace`+`Set-Content`导致全文件乱码需git checkout恢复
 - **🔴 专属组件复盘3查（F5血泪）**：①双模式别漏——主入口HTML sheet顶部必须放el-segmented(HTML/OO)+useXDualMode，否则Req双模式回归且composable变死代码 ②EventBus跨表值(如审定成本)必须持久化到checklist_responses(独立item_id)+render策略回读seed，只靠同会话事件刷新后丢失 ③TB自动取数字段(只读)必须真接线：render策略查tb_balance(get_active_filter)→html_data返回→FormData提取→组件watch seed setTbValues，光有setter没人调=假只读手填
 - **account_package_registry sheets顺序=目录行顺序**
 - **导入导出composable必须用http(axios)不能用原生fetch**（无Authorization header→401）
 - **StreamingResponse中文文件名必须RFC5987编码**
 - **GtOnlyOfficeSheet健康检查响应解析**：`health.data?.data?.healthy`双层兼容
+- **OO sheet_name→wp_code解析必须头尾双匹配**：尾部`re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$")`匹配"xxx**D4-5**"；头部`re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*")`匹配"**C14-2**评价控制偏差"——两处端点(config+wopi)必须同步
 - **聚合包内独立sheet三端点wp_code必须一致**（config/WOPI/callback统一用sheet级解析）
 - **project_assignments列名是staff_id不是user_id**
 - **结构化章节数据不能存到textarea content**（用独立item_id分别存checklist_responses）
@@ -197,6 +203,9 @@ inclusion: always
 
 ### 前端
 - **底稿编码→实际内容必须查源模板**：不能凭编码猜内容
+- **🔴 computed传prop的深层响应陷阱**：`computed(() => state.value.arr[idx])` 只追踪数组元素引用不追踪属性变化→子组件收到prop不更新→"点击没反应"。**修复：`return { ...s }` 展开读取所有属性建立依赖**（C15-2偏差评价决策树踩坑）
+- **专属组件跨sheet跳转标准模式**：子组件emit('navigate-sheet', sheetName)→GtWpRenderer.onChildNavigateSheet按sheet_name模糊匹配切换activeSheetName。已注册全局通道，所有专属组件可复用
+- **C24四表联动端点**：`GET /ledger/entries-all?year=&page=&page_size=` 全量序时账查询(不限科目,max 5000/页)，供C24细节测试一键拉取分录自动分析
 - **render-config返回结构是`{sheets:[{html_data:{...}}]}`**
 - **新专属组件必须有selfLoad逻辑**（bundle内嵌场景htmlData为null）
 - **A1 Dashboard子Tab组件必须自加载**
@@ -204,6 +213,9 @@ inclusion: always
 - **API调用可能触发全局404弹窗**：预期404请求加`{_silent:true}`
 - **naive UTC时间戳前端少8小时**：补`Z`标记再交fmtDateTime
 - **GtAProgramConsole需selfLoad**（bundle内嵌场景）
+- **通用AI文本生成端点**：`POST /api/workpapers/{wp_id}/ai/generate-text`在`wp_guidance_chat.py`中，接收prompt/context/existingContent/section，调用`chat_completion`返回内容；所有底稿的AI辅助按钮统一调用此端点
+- **Cx-2独立底稿wpCode含"-2"后缀**：`extractCycleNumber`正则不能用`$`锚定尾部；传入composable前必须`.replace(/-\d+$/, '')`去后缀，否则cycleNum=0数据全丢
+- **C2~C15 conclusion白名单必须含null守卫+决策树值"是/否"**：`checklist_responses.py`中C2~C15校验缺`and item.conclusion`守卫→null触发422；决策树step1/step4值"是/否"也需加入allowed元组
 
 ### OnlyOffice
 1. JWT：开发环境 `JWT_ENABLED=false`

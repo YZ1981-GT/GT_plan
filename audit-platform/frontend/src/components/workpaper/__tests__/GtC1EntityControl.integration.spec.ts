@@ -169,32 +169,31 @@ describe('端到端：九段分组 rendering（Req 2.1）', () => {
     expect(names).toEqual(['ce', 'ra', 'mo', 'bu', 'ic', 'fr', 'el', 'ye', 'rp'])
   })
 
-  it('loadPrograms 下发带 section slug 的步骤 → 按九段分流透传 GtAProgramConsole', async () => {
-    const programs = [
-      { section: 'ce', row: 7, name: 'ce-1' },
-      { section: 'ce', row: 11, name: 'ce-2' },
-      { section: 'ce', row: 16, name: 'ce-3' },
-      { section: 'fr', row: 95, name: 'fr-1' },
-      { section: 'fr', row: 98, name: 'fr-2' },
-    ]
-    const wrapper = mountC1({ sheetName: 'C1 企业层面控制测试程序表', programs })
+  it('loadPrograms 加载内置步骤 → 按九段分流渲染步骤表格', async () => {
+    const wrapper = mountC1({ sheetName: 'C1 企业层面控制测试程序表' })
     await flushPromises()
 
-    // 有分组数据时不渲染兜底单一控制台；每段一个分组控制台
-    const consoles = wrapper.findAll('.a-program-console-stub')
-    expect(consoles.length).toBe(9)
-    const counts = consoles.map((c) => Number(c.attributes('data-programs')))
-    // ce=3, fr=2, 其余 0；总数守恒 = 输入步骤数（无遗漏无重复，Property 2）
-    expect(counts.reduce((a, b) => a + b, 0)).toBe(5)
-    expect(counts).toContain(3)
-    expect(counts).toContain(2)
+    // 向导模式：每段一个步骤表格（c1-step-table），9 段 = 9 个表格
+    const tables = wrapper.findAll('.c1-step-table')
+    expect(tables.length).toBe(9)
+    // 步骤行总数 > 0（内置 131 条解析后的步骤分布到各段）
+    const rows = wrapper.findAll('.c1-step-row')
+    expect(rows.length).toBeGreaterThan(0)
+    // 九段步骤总数守恒（无遗漏无重复，Property 2）
+    const vm = wrapper.vm as any
+    let total = 0
+    for (const g of vm.sectionGroups) {
+      total += vm.groupedPrograms(g.slug).length
+    }
+    expect(total).toBe(rows.length)
   })
 
-  it('无分组数据时回退单一程序中控台（GtAProgramConsole 内建 grid 兜底，Req 2.4）', async () => {
+  it('无分组数据时步骤表格显示空行提示（Req 2.4）', async () => {
     const wrapper = mountC1({ sheetName: 'C1 企业层面控制测试程序表', programs: [] })
     await flushPromises()
-    // 九段面板内 hint（无分组数据）+ 底部单一 console
-    expect(wrapper.find('.c1-program-console').exists()).toBe(true)
+    // 九段表格都渲染但内容为空行提示
+    expect(wrapper.find('.c1-step-table').exists()).toBe(true)
+    expect(wrapper.find('.c1-empty-row').exists()).toBe(true)
   })
 
   it('selfLoad 失败时回退九段常量兜底仍渲染 9 段', async () => {
@@ -297,7 +296,7 @@ describe('端到端：C1-4-4 样本借贷勾稽实时重算（Req 4.4）', () =>
     const wrapper = mountC1({ sheetName: 'C1-4-4企业层面内控测试示例4', responses })
     await flushPromises()
 
-    expect(wrapper.find('.c1-process-sample').exists()).toBe(true)
+    expect(wrapper.find('.c1-sample-table').exists()).toBe(true)
     const foot = wrapper.find('.c1-sample-foot')
     expect(foot.exists()).toBe(true)
     expect(foot.text()).toContain('借贷平衡')
@@ -348,25 +347,29 @@ describe('端到端：C1-4-4 样本借贷勾稽实时重算（Req 4.4）', () =>
 
 describe('端到端：sheetName 分发渲染正确顶层区块', () => {
   it.each([
-    ['C1 企业层面控制测试程序表', '.c1-program'],
-    ['C1-1 企业层面控制测试示例1', '.c1-example'],
-    ['C1-3企业层面控制测试示例3', '.c1-example'],
-    ['C1-4企业层面内控测试示例4-财务报告内部控制', '.c1-fr-summary'],
-    ['C1-4-1企业层面内控测试示例4', '.c1-process-record'],
-    ['C1-4-4企业层面内控测试示例4', '.c1-process-sample'],
-    ['', '.c1-program'],
-    ['未知 sheet 名', '.c1-program'],
-  ])('%s → 渲染 %s', async (sheetName, selector) => {
+    ['C1 企业层面控制测试程序表', 'program'],
+    ['C1-1 企业层面控制测试示例1', 'example'],
+    ['C1-3企业层面控制测试示例3', 'example'],
+    ['C1-4企业层面内控测试示例4-财务报告内部控制', 'fr-summary'],
+    ['C1-4-1企业层面内控测试示例4', 'process-record'],
+    ['C1-4-4企业层面内控测试示例4', 'process-record-sample'],
+    ['', 'program'],
+    ['未知 sheet 名', 'program'],
+  ])('%s → mode=%s（向导模式下主区块始终渲染）', async (sheetName, expectedMode) => {
     const wrapper = mountC1({ sheetName })
     await flushPromises()
-    expect(wrapper.find(selector).exists()).toBe(true)
+    // 向导模式：所有 sheetName 都渲染主页面（九段折叠面板始终在）
+    expect(wrapper.find('.c1-section-nav').exists()).toBe(true)
+    // mode 计算属性正确
+    expect((wrapper.vm as any).mode).toBe(expectedMode)
   })
 
-  it('示例 sheet 渲染「示例（供参考）」标注 + 只读 OnlyOffice（Req 5.2）', async () => {
+  it('示例 sheet 渲染结构化示例参考（替代 OnlyOffice，Req 5.2 增强）', async () => {
     const wrapper = mountC1({ sheetName: 'C1-2 企业层面控制测试示例2' })
     await flushPromises()
-    expect(wrapper.find('.c1-example').exists()).toBe(true)
+    // 向导模式下示例通过 Drawer 结构化展示（初始焦点打开 Drawer）
     expect(wrapper.text()).toContain('示例（供参考）')
-    expect(wrapper.find('.onlyoffice-stub').exists()).toBe(true)
+    // 主体始终渲染
+    expect(wrapper.find('.c1-section-nav').exists()).toBe(true)
   })
 })

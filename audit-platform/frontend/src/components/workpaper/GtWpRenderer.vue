@@ -155,6 +155,7 @@
         @formula-saved="reload"
         @open-formula="onOpenFormula"
         @restore="reload"
+        @navigate-sheet="onChildNavigateSheet"
       />
 
       <!-- Univer 类（F/G）有模板网格数据时只读展示；C-附注披露无 schema 时也走只读网格兜底；无注册表 renderer 但有 grid cells 时兜底 -->
@@ -763,6 +764,18 @@ const switchTreeHtmlData = computed(() => ({
 function onSwitchNavigate(sheetName: string) {
   onJumpToSection(sheetName)
   switchPopoverVisible.value = false
+}
+
+/** 子组件 emit navigate-sheet → 切换当前 active tab 到目标 sheet */
+function onChildNavigateSheet(sheetName: string) {
+  if (!sheetName) return
+  // 尝试精确匹配
+  const exists = renderConfig.value?.sheets?.find(s => s.sheet_name.includes(sheetName))
+  if (exists) {
+    activeSheetName.value = exists.sheet_name
+  } else {
+    ElMessage.info(`未找到 sheet「${sheetName}」`)
+  }
 }
 
 function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: string }) {
