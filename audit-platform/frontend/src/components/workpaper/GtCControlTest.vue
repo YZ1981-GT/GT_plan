@@ -680,9 +680,12 @@ function handleChangeDevIndex(index: number) {
   activeDeviationIndex.value = index
 }
 
-/** 独立偏差评价视图的导航处理（不关闭弹窗，因为没有弹窗） */
+/** 独立偏差评价视图的导航处理（浏览器后退） */
 function handleDeviationNavigateStandalone(_view: string) {
-  // 独立视图模式下 navigate 事件忽略（已经在页面上，无需切换）
+  // 独立视图模式下 navigate 回退到上一页（底稿列表或 C14 汇总表）
+  if (_view === 'summary' || _view === 'directory') {
+    window.history.back()
+  }
 }
 
 // ─── Dialog Openers ──────────────────────────────────────────────────────────
@@ -980,6 +983,13 @@ function handleFabAdd() {
 
 onMounted(async () => {
   await selfLoad()
+
+  // 独立偏差评价模式（Cx-2 底稿）：确保至少有一个 deviation state slot
+  // 否则决策树的 updateDeviationStep 会因 index >= length 而静默失败
+  if (isDeviationSheet.value && state.value.deviationStates.length === 0) {
+    // 自动创建一个默认控制点（偏差评价至少需要一个评价对象）
+    addControlPoint('控制点1')
+  }
 })
 
 onBeforeUnmount(() => {
