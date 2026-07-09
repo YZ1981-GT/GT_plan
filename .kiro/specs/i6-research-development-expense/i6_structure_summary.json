@@ -1,0 +1,1548 @@
+{
+  "source_file": "基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\I 无形资产循环\\I6 研发费用.xlsx",
+  "file_size_kb": 85.2,
+  "科目": "6602 研发费用",
+  "科目方向": "借方/损益类",
+  "取数规则": "损益类取发生额（非期末余额）！从 tb_ledger 汇总，净发生额=借方发生-贷方发生",
+  "sheet_count": 11,
+  "sheet_names": [
+    "底稿目录",
+    "研发费用实质性程序 I6A",
+    "附注披露（上市公司）",
+    "附注披露（国有企业）",
+    "审定表I6-1",
+    "明细表I6-2",
+    "调整分录汇总I6-3",
+    "其他针对性检查表I6-4",
+    "截止性测试（账到单据）I6-5",
+    "截止性测试（单据到账）I6-6",
+    "GT_Custom"
+  ],
+  "named_ranges": [],
+  "sheets": [
+    {
+      "index": 1,
+      "name": "底稿目录",
+      "rows": 20,
+      "cols": 6,
+      "dimensions": "20行 × 6列",
+      "primary_headers": [
+        "会计期间：202X年度",
+        "序号",
+        "内容",
+        "索引号",
+        "备注"
+      ],
+      "all_header_rows": {
+        "row_1": [
+          "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+          "目录"
+        ],
+        "row_3": [
+          "会计期间：202X年度",
+          "序号",
+          "内容",
+          "索引号",
+          "备注"
+        ],
+        "row_4": [
+          "编制人：",
+          "1",
+          "研发费用实质性程序",
+          "I6A"
+        ],
+        "row_5": [
+          "编制日期：",
+          "2",
+          "研发费用审定表",
+          "I6-1"
+        ],
+        "row_6": [
+          "复核人：",
+          "3",
+          "研发费用附注披露表（上市公司）",
+          "无需打印"
+        ],
+        "row_7": [
+          "复核日期：",
+          "4",
+          "研发费用附注披露表（国有企业）",
+          "无需打印"
+        ],
+        "row_8": [
+          "5",
+          "研发费用明细表",
+          "I6-2"
+        ]
+      },
+      "formula_count": 0,
+      "formula_samples": [],
+      "formula_by_column": {},
+      "formula_patterns": {},
+      "merged_areas": [
+        "B1:E1",
+        "A17:A19",
+        "A14:A16",
+        "E10:E17",
+        "A10:A13"
+      ],
+      "merged_area_count": 5,
+      "data_types": {
+        "A": "string",
+        "B": "number",
+        "C": "string",
+        "D": "string",
+        "E": "string"
+      }
+    },
+    {
+      "index": 2,
+      "name": "研发费用实质性程序 I6A",
+      "rows": 34,
+      "cols": 12,
+      "dimensions": "34行 × 12列",
+      "primary_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D4"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D4"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页    次："
+        ],
+        "row_8": [
+          "审计目标",
+          "财务报表的认定"
+        ]
+      },
+      "formula_count": 7,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!D4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_by_column": {
+        "A": 2,
+        "C": 2,
+        "E": 2,
+        "I": 1
+      },
+      "formula_patterns": {
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1
+      },
+      "merged_areas": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "G14:I14",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "J18:L18",
+        "A9:F9",
+        "G9:I9",
+        "A14:B14",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "J19:L19",
+        "A1:I1",
+        "A15:A16",
+        "G8:I8",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "merged_area_count": 23,
+      "data_types": {
+        "A": "string",
+        "B": "string",
+        "C": "string",
+        "D": "string",
+        "E": "string",
+        "F": "string",
+        "G": "string",
+        "H": "string",
+        "I": "string",
+        "J": "string"
+      }
+    },
+    {
+      "index": 3,
+      "name": "附注披露（上市公司）",
+      "rows": 19,
+      "cols": 7,
+      "dimensions": "19行 × 7列",
+      "primary_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7"
+        ],
+        "row_6": [
+          "项目",
+          "本期发生额",
+          "上期发生额"
+        ],
+        "row_7": [
+          "='明细表I6-2'!X9",
+          "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$Q:$Q)",
+          "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$W:$W)"
+        ],
+        "row_8": [
+          "='明细表I6-2'!X10",
+          "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$Q:$Q)",
+          "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$W:$W)"
+        ]
+      },
+      "formula_count": 35,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表I6-2'!X9"
+        },
+        {
+          "cell": "B7",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C7",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表I6-2'!X10"
+        },
+        {
+          "cell": "B8",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C8",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表I6-2'!X11"
+        },
+        {
+          "cell": "B9",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A9,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C9",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A9,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表I6-2'!X12"
+        },
+        {
+          "cell": "B10",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A10,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C10",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A10,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表I6-2'!X13"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A11,'明细表I6-2'!$Q:$Q)"
+        }
+      ],
+      "formula_by_column": {
+        "C": 12,
+        "A": 11,
+        "B": 10,
+        "E": 2
+      },
+      "formula_patterns": {
+        "='明细表IN-N'!XN": 9,
+        "=SUMIF('明细表IN-N'!$X:$X,$AN,'明细表IN-N'!$Q:$Q)": 9,
+        "=SUMIF('明细表IN-N'!$X:$X,$AN,'明细表IN-N'!$W:$W)": 9,
+        "=底稿目录!AN": 6,
+        "=SUM(BN:BN)": 1,
+        "=SUM(CN:CN)": 1
+      },
+      "merged_areas": [
+        "A2:F2",
+        "A1:F1"
+      ],
+      "merged_area_count": 2,
+      "data_types": {
+        "A": "formula",
+        "B": "formula",
+        "C": "formula"
+      }
+    },
+    {
+      "index": 4,
+      "name": "附注披露（国有企业）",
+      "rows": 16,
+      "cols": 6,
+      "dimensions": "16行 × 6列",
+      "primary_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7"
+        ],
+        "row_6": [
+          "项目",
+          "本期发生额",
+          "上期发生额"
+        ],
+        "row_7": [
+          "='明细表I6-2'!X9",
+          "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$Q:$Q)",
+          "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$W:$W)"
+        ],
+        "row_8": [
+          "='明细表I6-2'!X10",
+          "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$Q:$Q)",
+          "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$W:$W)"
+        ]
+      },
+      "formula_count": 35,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表I6-2'!X9"
+        },
+        {
+          "cell": "B7",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C7",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A7,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表I6-2'!X10"
+        },
+        {
+          "cell": "B8",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C8",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A8,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表I6-2'!X11"
+        },
+        {
+          "cell": "B9",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A9,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C9",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A9,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表I6-2'!X12"
+        },
+        {
+          "cell": "B10",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A10,'明细表I6-2'!$Q:$Q)"
+        },
+        {
+          "cell": "C10",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A10,'明细表I6-2'!$W:$W)"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表I6-2'!X13"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUMIF('明细表I6-2'!$X:$X,$A11,'明细表I6-2'!$Q:$Q)"
+        }
+      ],
+      "formula_by_column": {
+        "C": 12,
+        "A": 11,
+        "B": 10,
+        "D": 2
+      },
+      "formula_patterns": {
+        "='明细表IN-N'!XN": 9,
+        "=SUMIF('明细表IN-N'!$X:$X,$AN,'明细表IN-N'!$Q:$Q)": 9,
+        "=SUMIF('明细表IN-N'!$X:$X,$AN,'明细表IN-N'!$W:$W)": 9,
+        "=底稿目录!AN": 6,
+        "=SUM(BN:BN)": 1,
+        "=SUM(CN:CN)": 1
+      },
+      "merged_areas": [
+        "A2:E2",
+        "A1:E1"
+      ],
+      "merged_area_count": 2,
+      "data_types": {
+        "A": "formula",
+        "B": "formula",
+        "C": "formula"
+      }
+    },
+    {
+      "index": 5,
+      "name": "审定表I6-1",
+      "rows": 27,
+      "cols": 11,
+      "dimensions": "27行 × 11列",
+      "primary_headers": [
+        "='明细表I6-2'!A9",
+        "='明细表I6-2'!T9",
+        "='明细表I6-2'!U9",
+        "='明细表I6-2'!V9",
+        "=B7+C7+D7",
+        "='明细表I6-2'!N9",
+        "='明细表I6-2'!O9",
+        "='明细表I6-2'!P9",
+        "=F7+G7+H7",
+        "=I7-E7",
+        "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D5"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页次："
+        ],
+        "row_5": [
+          "类别",
+          "上期数",
+          "本期数",
+          "本期审定数与上期\n审定数的比较"
+        ],
+        "row_6": [
+          "未审数",
+          "账项调整",
+          "重分类调整",
+          "审定数",
+          "未审数",
+          "账项调整",
+          "重分类调整",
+          "审定数",
+          "变动额",
+          "变动率"
+        ],
+        "row_7": [
+          "='明细表I6-2'!A9",
+          "='明细表I6-2'!T9",
+          "='明细表I6-2'!U9",
+          "='明细表I6-2'!V9",
+          "=B7+C7+D7",
+          "='明细表I6-2'!N9",
+          "='明细表I6-2'!O9",
+          "='明细表I6-2'!P9",
+          "=F7+G7+H7",
+          "=I7-E7",
+          "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+        ],
+        "row_8": [
+          "='明细表I6-2'!A10",
+          "='明细表I6-2'!T10",
+          "='明细表I6-2'!U10",
+          "='明细表I6-2'!V10",
+          "=B8+C8+D8",
+          "='明细表I6-2'!N10",
+          "='明细表I6-2'!O10",
+          "='明细表I6-2'!P10",
+          "=F8+G8+H8",
+          "=I8-E8",
+          "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))"
+        ]
+      },
+      "formula_count": 137,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!D5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表I6-2'!A9"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表I6-2'!T9"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表I6-2'!U9"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表I6-2'!V9"
+        },
+        {
+          "cell": "E7",
+          "formula": "=B7+C7+D7"
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表I6-2'!N9"
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表I6-2'!O9"
+        },
+        {
+          "cell": "H7",
+          "formula": "='明细表I6-2'!P9"
+        },
+        {
+          "cell": "I7",
+          "formula": "=F7+G7+H7"
+        },
+        {
+          "cell": "J7",
+          "formula": "=I7-E7"
+        },
+        {
+          "cell": "K7",
+          "formula": "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+        },
+        {
+          "cell": "A8",
+          "formula": "='明细表I6-2'!A10"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表I6-2'!T10"
+        }
+      ],
+      "formula_by_column": {
+        "E": 14,
+        "G": 14,
+        "K": 13,
+        "A": 12,
+        "B": 12,
+        "C": 12,
+        "D": 12,
+        "F": 12,
+        "H": 12,
+        "I": 12,
+        "J": 12
+      },
+      "formula_patterns": {
+        "=IN-EN": 11,
+        "=IF(AND(EN=N,JN=N),N,IF(AND(EN=N,JN>N),N,JN/EN))": 11,
+        "='明细表IN-N'!AN": 10,
+        "='明细表IN-N'!TN": 10,
+        "='明细表IN-N'!UN": 10,
+        "='明细表IN-N'!VN": 10,
+        "=BN+CN+DN": 10,
+        "='明细表IN-N'!NN": 10,
+        "='明细表IN-N'!ON": 10,
+        "='明细表IN-N'!PN": 10,
+        "=FN+GN+HN": 10,
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1,
+        "=SUM(BN:BN)": 1,
+        "=SUM(CN:CN)": 1,
+        "=SUM(DN:DN)": 1,
+        "=SUM(EN:EN)": 1,
+        "=SUM(FN:FN)": 1,
+        "=SUM(GN:GN)": 1,
+        "=SUM(HN:HN)": 1
+      },
+      "merged_areas": [
+        "A5:A6",
+        "J5:K5",
+        "A2:K2",
+        "B5:E5",
+        "F5:I5",
+        "A1:K1"
+      ],
+      "merged_area_count": 6,
+      "data_types": {
+        "A": "formula",
+        "B": "formula",
+        "C": "formula",
+        "D": "formula",
+        "E": "formula",
+        "F": "formula",
+        "G": "formula",
+        "H": "formula",
+        "I": "formula",
+        "J": "formula",
+        "K": "formula"
+      },
+      "income_statement_indicators": {
+        "has_debit_credit_headers": false,
+        "has_net_occurrence": false,
+        "has_occurrence_formula": true,
+        "debit_credit_formula_samples": [
+          {
+            "cell": "J7",
+            "formula": "=I7-E7"
+          },
+          {
+            "cell": "J8",
+            "formula": "=I8-E8"
+          },
+          {
+            "cell": "J9",
+            "formula": "=I9-E9"
+          },
+          {
+            "cell": "J10",
+            "formula": "=I10-E10"
+          },
+          {
+            "cell": "J11",
+            "formula": "=I11-E11"
+          }
+        ],
+        "key_headers_found": []
+      }
+    },
+    {
+      "index": 6,
+      "name": "明细表I6-2",
+      "rows": 44,
+      "cols": 65,
+      "dimensions": "44行 × 65列",
+      "primary_headers": [
+        "类别",
+        "1月",
+        "2月",
+        "3月",
+        "4月",
+        "5月",
+        "6月",
+        "7月",
+        "8月",
+        "9月",
+        "10月",
+        "11月",
+        "12月",
+        "本期未审合计",
+        "账项调整",
+        "重分类调整",
+        "本期审定数",
+        "各项目占比",
+        "与相关科目勾稽",
+        "上期未审数",
+        "上期账项调整",
+        "上期重分类调整",
+        "上期审定数",
+        "个别报表下的重分类",
+        "合并报表下的重分类",
+        "备注"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D8"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页次："
+        ],
+        "row_6": [
+          "1.所有应当记录的研发费用均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+          "2.与研发费用有关的金额及其他数据已恰当记录，相关披露已得到恰当计量和描述。"
+        ],
+        "row_8": [
+          "类别",
+          "1月",
+          "2月",
+          "3月",
+          "4月",
+          "5月",
+          "6月",
+          "7月",
+          "8月",
+          "9月",
+          "10月",
+          "11月",
+          "12月",
+          "本期未审合计",
+          "账项调整",
+          "重分类调整",
+          "本期审定数",
+          "各项目占比",
+          "与相关科目勾稽",
+          "上期未审数",
+          "上期账项调整",
+          "上期重分类调整",
+          "上期审定数",
+          "个别报表下的重分类",
+          "合并报表下的重分类",
+          "备注"
+        ]
+      },
+      "formula_count": 84,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "O3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Z3",
+          "formula": "=底稿目录!D8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "O4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "N9",
+          "formula": "=SUM(B9:M9)"
+        },
+        {
+          "cell": "Q9",
+          "formula": "=N9+O9+P9"
+        },
+        {
+          "cell": "R9",
+          "formula": "=IF(Q9=0,0,Q9/$Q$19)"
+        },
+        {
+          "cell": "W9",
+          "formula": "=T9+U9+V9"
+        },
+        {
+          "cell": "N10",
+          "formula": "=SUM(B10:M10)"
+        },
+        {
+          "cell": "Q10",
+          "formula": "=N10+O10+P10"
+        },
+        {
+          "cell": "R10",
+          "formula": "=IF(Q10=0,0,Q10/$Q$19)"
+        },
+        {
+          "cell": "W10",
+          "formula": "=T10+U10+V10"
+        },
+        {
+          "cell": "N11",
+          "formula": "=SUM(B11:M11)"
+        },
+        {
+          "cell": "Q11",
+          "formula": "=N11+O11+P11"
+        },
+        {
+          "cell": "R11",
+          "formula": "=IF(Q11=0,0,Q11/$Q$19)"
+        },
+        {
+          "cell": "W11",
+          "formula": "=T11+U11+V11"
+        },
+        {
+          "cell": "N12",
+          "formula": "=SUM(B12:M12)"
+        }
+      ],
+      "formula_by_column": {
+        "N": 12,
+        "Q": 11,
+        "R": 11,
+        "W": 11,
+        "H": 4,
+        "O": 3,
+        "A": 2,
+        "B": 2,
+        "C": 2,
+        "D": 2,
+        "E": 2,
+        "F": 2,
+        "G": 2,
+        "I": 2,
+        "J": 2
+      },
+      "formula_patterns": {
+        "=SUM(BN:MN)": 10,
+        "=NN+ON+PN": 10,
+        "=IF(QN=N,N,QN/$Q$N)": 10,
+        "=TN+UN+VN": 10,
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1,
+        "=SUM(BN:BN)": 1,
+        "=SUM(CN:CN)": 1,
+        "=SUM(DN:DN)": 1,
+        "=SUM(EN:EN)": 1,
+        "=SUM(FN:FN)": 1,
+        "=SUM(GN:GN)": 1,
+        "=SUM(HN:HN)": 1,
+        "=SUM(IN:IN)": 1,
+        "=SUM(JN:JN)": 1,
+        "=SUM(KN:KN)": 1,
+        "=SUM(LN:LN)": 1,
+        "=SUM(MN:MN)": 1,
+        "=SUM(NN:NN)": 1,
+        "=SUM(ON:ON)": 1
+      },
+      "merged_areas": [
+        "A1:Z1",
+        "A2:Z2"
+      ],
+      "merged_area_count": 2,
+      "data_types": {
+        "A": "string",
+        "B": "formula",
+        "C": "formula",
+        "D": "formula",
+        "E": "formula",
+        "F": "formula",
+        "G": "formula",
+        "H": "formula",
+        "I": "formula",
+        "J": "string",
+        "K": "formula",
+        "L": "formula",
+        "M": "formula",
+        "N": "formula",
+        "O": "string",
+        "P": "string",
+        "Q": "formula",
+        "R": "formula",
+        "S": "string",
+        "T": "string",
+        "U": "string",
+        "V": "string",
+        "W": "formula",
+        "X": "string",
+        "Y": "string",
+        "Z": "string"
+      },
+      "monthly_structure": {
+        "detected": true,
+        "header_row": 8,
+        "month_count": 12,
+        "month_columns": {
+          "1月": "L",
+          "2月": "M",
+          "3月": "D",
+          "4月": "E",
+          "5月": "F",
+          "6月": "G",
+          "7月": "H",
+          "8月": "I",
+          "9月": "J",
+          "10月": "K"
+        },
+        "structure": "月度12列横向宽表"
+      }
+    },
+    {
+      "index": 7,
+      "name": "调整分录汇总I6-3",
+      "rows": 21,
+      "cols": 10,
+      "dimensions": "21行 × 10列",
+      "primary_headers": [
+        "调整事项说明",
+        "类别（报表调整/账项调整/其他）",
+        "报表项目",
+        "科目名称",
+        "附注项目",
+        "……",
+        "借方调整金额",
+        "贷方调整金额",
+        "索引",
+        "备注"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D9"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页次："
+        ],
+        "row_5": [
+          "调整事项说明",
+          "类别（报表调整/账项调整/其他）",
+          "报表项目",
+          "科目名称",
+          "附注项目",
+          "……",
+          "借方调整金额",
+          "贷方调整金额",
+          "索引",
+          "备注"
+        ]
+      },
+      "formula_count": 7,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_by_column": {
+        "A": 2,
+        "D": 2,
+        "F": 2,
+        "J": 1
+      },
+      "formula_patterns": {
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1
+      },
+      "merged_areas": [
+        "A1:J1",
+        "A2:J2",
+        "A21:J21"
+      ],
+      "merged_area_count": 3,
+      "data_types": {
+        "A": "string"
+      }
+    },
+    {
+      "index": 8,
+      "name": "其他针对性检查表I6-4",
+      "rows": 37,
+      "cols": 18,
+      "dimensions": "37行 × 18列",
+      "primary_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D18"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D18"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页    次："
+        ]
+      },
+      "formula_count": 10,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!D18"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G31",
+          "formula": "=SUM(G17:G30)"
+        },
+        {
+          "cell": "G32",
+          "formula": "='明细表I6-2'!Q19"
+        },
+        {
+          "cell": "G33",
+          "formula": "=G31/G32"
+        }
+      ],
+      "formula_by_column": {
+        "G": 5,
+        "A": 2,
+        "D": 2,
+        "P": 1
+      },
+      "formula_patterns": {
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1,
+        "=SUM(GN:GN)": 1,
+        "='明细表IN-N'!QN": 1,
+        "=GN/GN": 1
+      },
+      "merged_areas": [
+        "P15:P16",
+        "I15:M15",
+        "A1:P1",
+        "A15:G15",
+        "H15:H16",
+        "N15:N16",
+        "O15:O16",
+        "A2:P2"
+      ],
+      "merged_area_count": 8,
+      "data_types": {
+        "A": "string",
+        "B": "string",
+        "C": "string",
+        "D": "string",
+        "E": "string",
+        "F": "string",
+        "G": "string",
+        "H": "string",
+        "I": "string",
+        "J": "number",
+        "K": "number",
+        "L": "number",
+        "M": "number",
+        "N": "string",
+        "O": "string",
+        "P": "string"
+      }
+    },
+    {
+      "index": 9,
+      "name": "截止性测试（账到单据）I6-5",
+      "rows": 51,
+      "cols": 13,
+      "dimensions": "51行 × 13列",
+      "primary_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D19"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D19"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页  次："
+        ]
+      },
+      "formula_count": 7,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D19"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_by_column": {
+        "A": 2,
+        "D": 2,
+        "F": 2,
+        "J": 1
+      },
+      "formula_patterns": {
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1
+      },
+      "merged_areas": [
+        "A2:I2",
+        "A12:A13",
+        "B12:E12",
+        "I12:I13",
+        "J12:J13",
+        "A1:I1",
+        "F12:H12",
+        "A10:J10"
+      ],
+      "merged_area_count": 8,
+      "data_types": {
+        "A": "number",
+        "B": "string",
+        "C": "string",
+        "D": "string",
+        "E": "string",
+        "F": "string",
+        "G": "string",
+        "H": "string",
+        "I": "string",
+        "J": "string"
+      }
+    },
+    {
+      "index": 10,
+      "name": "截止性测试（单据到账）I6-6",
+      "rows": 49,
+      "cols": 13,
+      "dimensions": "49行 × 13列",
+      "primary_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D20"
+      ],
+      "all_header_rows": {
+        "row_3": [
+          "=底稿目录!A2",
+          "=底稿目录!A4",
+          "=底稿目录!A5",
+          "索引号：",
+          "=底稿目录!D20"
+        ],
+        "row_4": [
+          "=底稿目录!A3",
+          "=底稿目录!A6",
+          "=底稿目录!A7",
+          "页  次："
+        ]
+      },
+      "formula_count": 7,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D20"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_by_column": {
+        "A": 2,
+        "D": 2,
+        "F": 2,
+        "J": 1
+      },
+      "formula_patterns": {
+        "=底稿目录!AN": 6,
+        "=底稿目录!DN": 1
+      },
+      "merged_areas": [
+        "A2:I2",
+        "A12:A13",
+        "E12:H12",
+        "I12:I13",
+        "J12:J13",
+        "A1:I1",
+        "B12:D12",
+        "A10:J10"
+      ],
+      "merged_area_count": 8,
+      "data_types": {
+        "A": "number",
+        "B": "string",
+        "C": "string",
+        "D": "string",
+        "E": "string",
+        "F": "string",
+        "G": "string",
+        "H": "string",
+        "I": "string",
+        "J": "string"
+      }
+    },
+    {
+      "index": 11,
+      "name": "GT_Custom",
+      "rows": 8,
+      "cols": 2,
+      "dimensions": "8行 × 2列",
+      "primary_headers": [
+        "C1",
+        "Custom 1"
+      ],
+      "all_header_rows": {
+        "row_1": [
+          "C1",
+          "Custom 1"
+        ],
+        "row_2": [
+          "C2",
+          "Custom 2"
+        ],
+        "row_3": [
+          "C3",
+          "Custom 3"
+        ],
+        "row_4": [
+          "C4",
+          "Custom 4"
+        ],
+        "row_5": [
+          "C5",
+          "Custom 5"
+        ],
+        "row_6": [
+          "C6",
+          "Custom 6"
+        ],
+        "row_7": [
+          "C7",
+          "Custom 7"
+        ],
+        "row_8": [
+          "C8",
+          "Custom 8"
+        ]
+      },
+      "formula_count": 0,
+      "formula_samples": [],
+      "formula_by_column": {},
+      "formula_patterns": {},
+      "merged_areas": [],
+      "merged_area_count": 0,
+      "data_types": {
+        "A": "string",
+        "B": "string"
+      }
+    }
+  ],
+  "月度12列验证": {
+    "detected": true,
+    "header_row": 8,
+    "month_count": 12,
+    "month_columns": {
+      "1月": "L",
+      "2月": "M",
+      "3月": "D",
+      "4月": "E",
+      "5月": "F",
+      "6月": "G",
+      "7月": "H",
+      "8月": "I",
+      "9月": "J",
+      "10月": "K"
+    },
+    "structure": "月度12列横向宽表"
+  },
+  "损益类取数验证": {
+    "has_debit_credit_headers": false,
+    "has_net_occurrence": false,
+    "has_occurrence_formula": true,
+    "debit_credit_formula_samples": [
+      {
+        "cell": "J7",
+        "formula": "=I7-E7"
+      },
+      {
+        "cell": "J8",
+        "formula": "=I8-E8"
+      },
+      {
+        "cell": "J9",
+        "formula": "=I9-E9"
+      },
+      {
+        "cell": "J10",
+        "formula": "=I10-E10"
+      },
+      {
+        "cell": "J11",
+        "formula": "=I11-E11"
+      }
+    ],
+    "key_headers_found": []
+  },
+  "validation": {
+    "total_sheets": 11,
+    "expected_effective_sheets": 11,
+    "match": true,
+    "matched_glossary_entries": [
+      "Tab_Index",
+      "Procedure_Table_I6A",
+      "Adjudication_I6_1",
+      "Detail_I6_2",
+      "Adjustment_I6_3",
+      "Targeted_Check_I6_4",
+      "Cutoff_Forward_I6_5",
+      "Cutoff_Backward_I6_6",
+      "Disclosure_Listed",
+      "Disclosure_SOE"
+    ],
+    "unmatched_glossary_entries": [],
+    "sheet_mapping": {
+      "Tab_Index": "底稿目录",
+      "Procedure_Table_I6A": "研发费用实质性程序 I6A",
+      "Adjudication_I6_1": "审定表I6-1",
+      "Detail_I6_2": "明细表I6-2",
+      "Adjustment_I6_3": "调整分录汇总I6-3",
+      "Targeted_Check_I6_4": "其他针对性检查表I6-4",
+      "Cutoff_Forward_I6_5": "截止性测试（账到单据）I6-5",
+      "Cutoff_Backward_I6_6": "截止性测试（单据到账）I6-6",
+      "Disclosure_Listed": "附注披露（上市公司）",
+      "Disclosure_SOE": "附注披露（国有企业）"
+    },
+    "extra_sheets": [
+      "GT_Custom"
+    ]
+  },
+  "summary": {
+    "total_sheets": 11,
+    "effective_sheets": 10,
+    "total_formulas": 329,
+    "total_merged_areas": 67,
+    "total_rows": 326,
+    "total_cols_max": 65,
+    "avg_rows_per_sheet": 29.6,
+    "named_range_count": 0,
+    "income_statement_type": true,
+    "data_source": "tb_ledger（发生额汇总，非 tb_balance 期末余额）",
+    "monthly_12_column": true
+  }
+}

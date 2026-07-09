@@ -24,7 +24,7 @@ export interface IndividualDetailRow { rowId: string; rowType: RowType; name: st
 export interface PortfolioDetailRow { rowId: string; rowType: RowType; drawerTypeOrAging: string; isFixed: boolean; balance: number; provision: number; lossRate: number }
 export interface BadDebtMovementRow { rowId: string; rowType: RowType; label: string; isFixed: boolean; priorBalance: number; provision: number; reversal: number; writeOff: number; transfer: number; other: number; endBalance: number }
 export interface ReversalDetailRow { rowId: string; rowType: RowType; isFixed: boolean; companyName: string; reversalReason: string; originalMethod: string; reversalBasis: string; amount: number }
-export interface WriteOffDetailRow { rowId: string; rowType: RowType; isFixed: boolean; companyName: string; noteType: string; amount: number; reason: string; procedure: string }
+export interface WriteOffDetailRow { rowId: string; rowType: RowType; isFixed: boolean; companyName: string; noteType: string; amount: number; reason: string; procedure: string; relatedPartyFlag: string }
 export interface CategorySummaryRow { rowId: string; rowType: RowType; category: string; isFixed: boolean; endBalance: number; endProvision: number; endBookValue: number; priorBalance: number; priorProvision: number; priorBookValue: number }
 
 export type SaveFn = (items: ChecklistItem[]) => Promise<void>
@@ -41,13 +41,21 @@ export interface UseD1DisclosureOptions {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const DISCLOSURE_GUIDANCE: Record<string, string[]> = {
-  top: ['企业因销售商品、提供服务等取得的、不属于《中华人民共和国票据法》规范票据的"云信"、"融信"等数字化应收账款债权凭证，不应在应收票据项目列示。'],
-  endorsed: [
-    '证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，应在附注中披露该信息。',
-    '终止确认判断标准：信用等级较高的银行承兑→终止确认；信用等级不高的银行承兑→未终止确认。',
+  top: [
+    '【提示：企业因销售商品、提供服务等取得的、不属于《中华人民共和国票据法》规范票据的"云信"、"融信"等数字化应收账款债权凭证，不应当在"应收票据"项目中列示。企业管理"云信"、"融信"等的业务模式以收取合同现金流量为目标的，应当在"应收账款"项目中列示；既以收取合同现金流量为目标又以出售为目标的，应当在"应收款项融资"项目中列示。',
+    '如果法律上认定供应链票据属于《商业汇票承兑、贴现与再贴现管理办法》（中国人民银行中国银行保险监督管理委员会令〔2022〕第4号）的范围、具备《票据法》规定的要件，则持有方应当自法律认定生效日（2023年1月1日）起将其作为"应收票据"进行会计处理（根据其业务模式列示为应收票据或应收款项融资），且无需对前期比较期间数据进行追溯调整。】',
   ],
-  badDebtClassification: ['此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。'],
-  writeOff: ['对于其中重要的应收票据，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露。'],
+  tableHint: ['【上面各张表均可添加行项目】'],
+  transferIntro: [
+    '（如根据《企业会计准则第23号——金融资产转移》终止确认的应收票据，列示其终止确认的金额，及与终止确认相关的利得和损失）',
+  ],
+  endorsed: [
+    '【提示：证监会《2014 年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：',
+    '用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。',
+    '或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】',
+  ],
+  badDebtClassification: ['【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】'],
+  writeOff: ['【提示：对于其中重要的应收票据，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露。】'],
 }
 
 export const ENDORSED_JUDGMENT_TEMPLATES: Record<string, string> = {
@@ -175,6 +183,14 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     rowId: '__transfer_total__', rowType: 'summary', category: '合计', isFixed: true,
     transferAmount: calcSubtotal(transferRows.value.map(r => r.transferAmount)),
   }))
+  function addTransferRow(): void {
+    transferRows.value.push({ rowId: genId('tr'), rowType: 'dynamic', category: '', isFixed: false, transferAmount: 0 })
+    persistRows('transfer-rows', transferRows.value)
+  }
+  function removeTransferRow(rowId: string): void {
+    transferRows.value = transferRows.value.filter(r => r.rowId !== rowId || r.isFixed)
+    persistRows('transfer-rows', transferRows.value)
+  }
 
   // ─── Bad Debt Classification (Task 2.5) ──────────────────────────────────
   function buildClassRows(periodKey: string): Ref<BadDebtClassRow[]> {
@@ -293,10 +309,10 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
 
   const writeOffDetailRows = ref<WriteOffDetailRow[]>(loadRows<WriteOffDetailRow>('writeoff-rows'))
   const writeOffDetailTotal = computed<WriteOffDetailRow>(() => ({
-    rowId: '__wo_total__', rowType: 'summary', isFixed: true, companyName: '合计', noteType: '', amount: calcSubtotal(writeOffDetailRows.value.map(r => r.amount)), reason: '', procedure: '',
+    rowId: '__wo_total__', rowType: 'summary', isFixed: true, companyName: '合计', noteType: '', amount: calcSubtotal(writeOffDetailRows.value.map(r => r.amount)), reason: '', procedure: '', relatedPartyFlag: '',
   }))
   function addWriteOffRow(): void {
-    writeOffDetailRows.value.push({ rowId: genId('wo'), rowType: 'dynamic', isFixed: false, companyName: '', noteType: '', amount: 0, reason: '', procedure: '' })
+    writeOffDetailRows.value.push({ rowId: genId('wo'), rowType: 'dynamic', isFixed: false, companyName: '', noteType: '', amount: 0, reason: '', procedure: '', relatedPartyFlag: '' })
     persistRows('writeoff-rows', writeOffDetailRows.value)
   }
   function removeWriteOffRow(rowId: string): void {
@@ -305,8 +321,24 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
   }
 
   // ─── Category Summary - SOE Only (Task 2.8) ──────────────────────────────
+  const importedTopSummaryRows = ref<any[]>(loadRows<any>('top-summary-rows'))
   const categorySummaryRows = computed<CategorySummaryRow[]>(() => {
     const d = crossSheetData.value
+    const hasCross = Boolean(d.bankEndBalance || d.bankPriorBalance || d.bankEndProvision || d.bankPriorProvision || d.commercialEndBalance || d.commercialPriorBalance || d.commercialEndProvision || d.commercialPriorProvision)
+    if (!hasCross && variant === 'soe' && importedTopSummaryRows.value.length > 0) {
+      return importedTopSummaryRows.value.map((r, idx) => ({
+        rowId: r.rowId || `cat-import-${idx}`,
+        rowType: (r.rowType || 'fixed') as RowType,
+        category: r.category || '',
+        isFixed: true,
+        endBalance: parseNum(r.endBalance),
+        endProvision: parseNum(r.endProvision),
+        endBookValue: parseNum(r.endBookValue),
+        priorBalance: parseNum(r.priorBalance),
+        priorProvision: parseNum(r.priorProvision),
+        priorBookValue: parseNum(r.priorBookValue),
+      }))
+    }
     return [
       {
         rowId: 'cat-bank', rowType: 'fixed' as RowType, category: '银行承兑汇票', isFixed: true,
@@ -422,7 +454,7 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     // Endorsed
     endorsedRows, endorsedTotal, addEndorsedRow, removeEndorsedRow,
     // Transfer
-    transferRows, transferTotal,
+    transferRows, transferTotal, addTransferRow, removeTransferRow,
     // Bad debt classification
     classEndRows, classEndTotal, classPriorRows, classPriorTotal,
     individualEndRows, individualPriorRows, addIndividualRow, removeIndividualRow,

@@ -67,6 +67,9 @@ export interface UseD1SamplingVouchingOptions {
 
 /** Population field keys */
 const POP_DESC_KEY = 'D1-sampling-population-desc'
+const POP_TEST_SCOPE_KEY = 'D1-sampling-test-population'
+const POP_SPECIFIC_SCOPE_KEY = 'D1-sampling-specific-scope'
+const POP_METHOD_KEY = 'D1-sampling-method'
 const POP_COUNT_KEY = 'D1-sampling-population-count'
 const POP_AMOUNT_KEY = 'D1-sampling-population-amount'
 const POP_SIZE_KEY = 'D1-sampling-population-size'
@@ -94,6 +97,9 @@ const VOUCHING_STRING_FIELDS: Array<keyof VouchingRow> = [
   'existenceCheck',
   'accuracyCheck',
   'appropriatenessCheck',
+  'attachmentId',
+  'attachmentName',
+  'ocrStatus',
   'remark',
   'indexRef',
 ]
@@ -134,6 +140,9 @@ export function emptyVouchingRow(seq: number): VouchingRow {
     existenceCheck: '',
     accuracyCheck: '',
     appropriatenessCheck: '',
+    attachmentId: '',
+    attachmentName: '',
+    ocrStatus: 'none',
     remark: '',
     indexRef: '',
   }
@@ -152,7 +161,10 @@ export function emptySpecificSampleRow(): SpecificSampleRow {
 /** 默认抽样总体 */
 function defaultPopulation(): SamplePopulation {
   return {
+    testPopulation: '',
+    specificItemScope: '',
     populationDesc: '',
+    samplingMethod: '',
     totalCount: 0,
     totalAmount: 0,
     sampleSize: 0,
@@ -218,6 +230,9 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
   function loadPopulation(): SamplePopulation {
     const pop = defaultPopulation()
     pop.populationDesc = allResponses.value.get(POP_DESC_KEY)?.remark ?? ''
+    pop.testPopulation = allResponses.value.get(POP_TEST_SCOPE_KEY)?.remark ?? ''
+    pop.specificItemScope = allResponses.value.get(POP_SPECIFIC_SCOPE_KEY)?.remark ?? ''
+    pop.samplingMethod = allResponses.value.get(POP_METHOD_KEY)?.remark ?? ''
     pop.totalCount = parseNum(allResponses.value.get(POP_COUNT_KEY)?.remark)
     pop.totalAmount = parseNum(allResponses.value.get(POP_AMOUNT_KEY)?.remark)
     pop.sampleSize = parseNum(allResponses.value.get(POP_SIZE_KEY)?.remark)
@@ -273,10 +288,13 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
       allResponses.value.get(NOTE_KEY)?.remark,
       allResponses.value.get(CONCLUSION_KEY)?.remark,
       allResponses.value.get(POP_DESC_KEY)?.remark,
+      allResponses.value.get(POP_TEST_SCOPE_KEY)?.remark,
+      allResponses.value.get(POP_SPECIFIC_SCOPE_KEY)?.remark,
+      allResponses.value.get(POP_METHOD_KEY)?.remark,
       allResponses.value.get(TEST_CONCLUSION_KEY)?.remark,
       allResponses.value.get(TOLERABLE_RATE_KEY)?.remark,
     ],
-    ([newVouching, newSamples, newNote, newConclusion, _newPopDesc, newTestConc, newRate]) => {
+    ([newVouching, newSamples, newNote, newConclusion, _newPopDesc, _newTestScope, _newSpecificScope, _newMethod, newTestConc, newRate]) => {
       if (newVouching !== undefined && newVouching !== serializeVouchingRows()) {
         vouchingRows.value = loadVouchingRows()
       }
@@ -373,7 +391,13 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
 
     const pop = { ...population.value }
     const numFields: Array<keyof SamplePopulation> = ['totalCount', 'totalAmount', 'sampleSize', 'actualDrawn']
-    const strFields: Array<keyof SamplePopulation> = ['populationDesc', 'sampleCalcRef']
+    const strFields: Array<keyof SamplePopulation> = [
+      'testPopulation',
+      'specificItemScope',
+      'populationDesc',
+      'samplingMethod',
+      'sampleCalcRef',
+    ]
 
     if (numFields.includes(field)) {
       ;(pop as any)[field] = parseNum(value)
@@ -387,6 +411,9 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
     // Map field to storage key
     const keyMap: Record<keyof SamplePopulation, string> = {
       populationDesc: POP_DESC_KEY,
+      testPopulation: POP_TEST_SCOPE_KEY,
+      specificItemScope: POP_SPECIFIC_SCOPE_KEY,
+      samplingMethod: POP_METHOD_KEY,
       totalCount: POP_COUNT_KEY,
       totalAmount: POP_AMOUNT_KEY,
       sampleSize: POP_SIZE_KEY,

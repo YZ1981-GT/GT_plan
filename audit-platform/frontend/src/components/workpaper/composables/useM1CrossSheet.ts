@@ -89,13 +89,23 @@ export function useM1CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * 载荷: { wpCode, distributedDividend, distributableProfit, ratio, timestamp }
    * 取 distributedDividend（M6实际分配股利金额）
    */
-  function _onM6ProfitDistributed(payload: any): void {
-    _m6ProfitDistributed.value = parseNum(payload?.distributedDividend ?? payload?.amount)
+  function _onM6ProfitDistributed(payload: {
+    wpCode?: string
+    dividendAmount?: number
+    cashDividend?: number
+    stockDividend?: number
+    distributedDividend?: number
+    amount?: number
+    timestamp?: number
+  }): void {
+    _m6ProfitDistributed.value = parseNum(
+      payload?.dividendAmount ?? payload?.distributedDividend ?? payload?.amount,
+    )
   }
 
   // ─── 订阅 EventBus ─────────────────────────────────────────────────────────
 
-  eventBus.on('m6:profit-distributed' as any, _onM6ProfitDistributed)
+  eventBus.on('m6:profit-distributed', _onM6ProfitDistributed)
 
   // ─── 初始化：从 allResponses 读取已持久化的M6数据 ───────────────────────────
 
@@ -200,7 +210,7 @@ export function useM1CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // ─── Cleanup（组件卸载取消订阅） ──────────────────────────────────────────
 
   onScopeDispose(() => {
-    eventBus.off('m6:profit-distributed' as any, _onM6ProfitDistributed)
+    eventBus.off('m6:profit-distributed', _onM6ProfitDistributed)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────

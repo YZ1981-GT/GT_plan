@@ -282,7 +282,7 @@
     - 金额fmtAmount + el-segmented双模式
     - _Requirements: 2.1-2.9, 3.4, 3.6, 4.1-4.7, 17.1-17.3, 19.1, 20.1, 21.1-21.5, 22.1-22.4_
 
-- [ ] 17. 实现 D7TabDetail.vue 明细表
+- [x] 17. 实现 D7TabDetail.vue 明细表
   - [x] 17.1 创建 `d7/D7TabDetail.vue`（~400行）
     - el-table横向滚动27列，固定前2列（合同名称/项目名称、单位名称）
     - "类型(款项性质)"下拉（预收货款/开发项目预收款/预收工程款/其他）+ 蓝色info提示CAS14
@@ -299,7 +299,7 @@
     - el-segmented双模式
     - _Requirements: 5.1-5.12, 6.1-6.7, 7.1-7.5, 17.2, 19.3, 20.1, 22.1-22.5_
 
-- [ ] 18. 实现 D7TabAdjustment.vue 调整分录
+- [x] 18. 实现 D7TabAdjustment.vue 调整分录
   - [x] 18.1 创建 `d7/D7TabAdjustment.vue`（~250行）
     - el-table 10列 + "新增调整分录"按钮
     - 底部借贷合计行 + 平衡指示（绿色✓平衡/红色✗不平衡：差额xxx）
@@ -308,7 +308,7 @@
     - el-segmented双模式
     - _Requirements: 8.1-8.7, 20.1_
 
-- [ ] 19. 实现 D7TabAnalysis.vue 分析表
+- [x] 19. 实现 D7TabAnalysis.vue 分析表
   - [x] 19.1 创建 `d7/D7TabAnalysis.vue`（~350行）
     - 4区块卡片式布局：(一)借方发生额分析 + (三)贷方发生额分析 + (四)Top10债务人 + 审计说明/结论
     - 借方/贷方区块底部差异行（差异≠0红色高亮）
@@ -319,7 +319,7 @@
     - el-segmented双模式
     - _Requirements: 9.1-9.10, 19.2, 20.1_
 
-- [ ] 20. 实现 D7TabLongTerm.vue 账龄1年以上
+- [x] 20. 实现 D7TabLongTerm.vue 账龄1年以上
   - [x] 20.1 创建 `d7/D7TabLongTerm.vue`（~250行）
     - el-table 8列 + "从D7-2导入"按钮 + "添加行"按钮
     - 底部合计行（期末余额/至审计日结转金额列SUM）
@@ -330,7 +330,7 @@
     - el-segmented双模式
     - _Requirements: 10.1-10.8, 19.3, 20.1_
 
-- [ ] 21. 实现 D7TabRelatedParty.vue 关联方
+- [x] 21. 实现 D7TabRelatedParty.vue 关联方
   - [x] 21.1 创建 `d7/D7TabRelatedParty.vue`（~300行）
     - el-table 11列 + "从D7-2导入"按钮 + "添加关联方"按钮
     - "关联关系"下拉（实际控制人/控股股东/...）
@@ -341,7 +341,7 @@
     - el-segmented双模式
     - _Requirements: 11.1-11.9, 19.3, 20.1, 21.1-21.3_
 
-- [ ] 22. 实现 D7TabVoucherCheck.vue 凭证检查
+- [x] 22. 实现 D7TabVoucherCheck.vue 凭证检查
   - [x] 22.1 创建 `d7/D7TabVoucherCheck.vue`（~350行）
     - 3区域布局：抽样参数区 + (1)本期增减变动检查表 + (2)期后结转检查表
     - 抽样参数区6字段 + 进度条（已抽取/目标样本量）
@@ -354,7 +354,7 @@
     - el-segmented双模式
     - _Requirements: 12.1-12.9, 18.5, 19.4, 20.1, 21.1-21.3_
 
-- [ ] 23. 实现 D7TabDisclosure.vue 附注披露
+- [x] 23. 实现 D7TabDisclosure.vue 附注披露
   - [x] 23.1 创建 `d7/D7TabDisclosure.vue`（~350行）
     - el-segmented切换（"上市公司版" | "国企版"）
     - 上市公司版3子节卡片：(1)按性质分类（固定行+减：非流动+合计）(2)超1年重要合同负债（动态行+合计）(3)重大变动（动态行+合计）
@@ -371,7 +371,7 @@
 - [x] 24. Checkpoint - 全部Vue组件验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 25. 实现后端导入导出端点
+- [x] 25. 实现后端导入导出端点
   - [x] 25.1 创建 `backend/app/routers/wp_render_strategies/_d7_import_export.py`
     - POST /api/workpapers/{wp_id}/d7/export-template?sheet=D7-2|D7-5|D7-6（空白xlsx模板）
     - POST /api/workpapers/{wp_id}/d7/export-data?sheet=D7-2|D7-5|D7-6（含数据xlsx）
@@ -387,7 +387,7 @@
     - **Feature: d7-contract-liabilities, Property 11: 导入导出Round-Trip**
     - **Validates: Requirements 6.5, 6.6**
 
-- [ ] 26. 实现后端Resolver和AI生成端点
+- [x] 26. 实现后端Resolver和AI生成端点
   - [x] 26.1 创建 `backend/app/routers/wp_render_strategies/_d7_resolvers.py`
     - 注册`d7_tb_unadjusted` resolver到_REGISTRY（从trial_balance科目2205取期初/期末未审数）
     - 注册`d7_ledger_analysis` resolver到_REGISTRY（从tb_ledger科目2205取借方/贷方发生额+按对方科目分拆）
@@ -400,14 +400,14 @@
     - 注册到router_registry "AI与辅助"组
     - _Requirements: 4.2, 4.3, 7.2, 9.8, 9.9, 10.5, 10.6_
 
-- [ ] 27. 实现后端render策略函数和account_package_registry
+- [x] 27. 实现后端render策略函数和account_package_registry
   - [x] 27.1 在RENDERER_DISPATCH注册'd7-contract-liabilities'→`_render_d7_contract_liabilities`策略函数
     - 实现`_render_d7_contract_liabilities`返回审定表双区块结构+明细表行数据+各sheet配置
     - 更新account_package_registry.json添加D7_contract_liabilities工作包（含9个有效sheet：D7A/D7-1/D7-2/D7-3/D7-4/D7-5/D7-6/D7-7/附注）
     - 读取D7.yaml render schema生成初始结构化数据
     - _Requirements: 25.1, 25.2, 25.5_
 
-- [ ] 28. 集成主入口与双模式切换
+- [x] 28. 集成主入口与双模式切换
   - [x] 28.1 完善 GtD7ContractLiabilities.vue 主入口
     - el-tabs 8个tab-pane引用9个子组件（附注内含el-segmented切换上市/国企）
     - Tab顺序对齐源模板sheet顺序：D7A→D7-1→D7-2→D7-3→D7-4→D7-5→D7-6→D7-7→附注
@@ -425,7 +425,7 @@
 - [x] 29. Checkpoint - 后端与双模式验证
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 30. 回归测试与全量验证
+- [x] 30. 回归测试与全量验证
   - [x] 30.1 运行全量测试确保无回归
     - vitest run 所有D7相关spec文件
     - python -m pytest backend/tests/ -k d7

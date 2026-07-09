@@ -14,12 +14,12 @@ export function useD7ReviewThreads(wpId: Ref<string>) {
         params: { wp_id: wpId.value },
         _silent: true,
       } as any)
-      const threads: Array<{ section_id: string; has_unread: boolean }> =
+      const threads: Array<{ section_id: string; has_unread: boolean; has_targeted_unread?: boolean }> =
         res.data?.data?.threads ?? res.data?.threads ?? []
       const map: Record<string, 'blue' | 'red'> = {}
       for (const t of threads) {
         if (t.section_id) {
-          map[t.section_id] = t.has_unread ? 'red' : 'blue'
+          map[t.section_id] = (t.has_unread || t.has_targeted_unread) ? 'red' : 'blue'
         }
       }
       activeThreads.value = map

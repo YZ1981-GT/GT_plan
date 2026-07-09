@@ -4,7 +4,7 @@
  * 覆盖：
  * 1. M6→M5 联动测试: useM6CrossSheet publishes 'm6:net-profit' with correct payload
  * 2. M6→M1 联动测试: useM6CrossSheet publishes 'm6:profit-distributed' with correct payload
- * 3. M5→M6 反向核对: simulate 'm5:accrual-confirmed' → surplusVsM5 updates correctly
+ * 3. M5→M6 反向核对: simulate 'm5:surplus-accrual' → surplusVsM5 updates correctly
  * 4. M1→M6 反向核对: simulate 'm1:declared-confirmed' → dividendVsM1 updates correctly
  * 5. 审定表vs明细表交叉验证: adjudicationVsDetail diff calculation
  * 6. 联动一致: 当M6=M5值时 isConsistent=true, 差异>threshold时 isConsistent=false
@@ -183,13 +183,13 @@ describe('集成测试 — M6→M1 联动: publishDividendToM1 (Req 4.2)', () =>
 // Section 3: M5→M6 反向核对 (Req 4.3)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('集成测试 — M5→M6 反向核对: m5:accrual-confirmed → surplusVsM5 (Req 4.3)', () => {
+describe('集成测试 — M5→M6 反向核对: m5:surplus-accrual → surplusVsM5 (Req 4.3)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     onHandlers.clear()
   })
 
-  it('接收 m5:accrual-confirmed → _m5AccrualConfirmed 更新', () => {
+  it('接收 m5:surplus-accrual → _m5AccrualConfirmed 更新', () => {
     const responses = createResponses([])
 
     const scope = effectScope()
@@ -198,7 +198,7 @@ describe('集成测试 — M5→M6 反向核对: m5:accrual-confirmed → surplu
 
       expect(_m5AccrualConfirmed.value).toBe(0)
 
-      eventBus.emit('m5:accrual-confirmed' as any, {
+      eventBus.emit('m5:surplus-accrual', {
         totalAccrual: 1500000,
       })
 
@@ -207,14 +207,14 @@ describe('集成测试 — M5→M6 反向核对: m5:accrual-confirmed → surplu
     scope.stop()
   })
 
-  it('接收 m5:accrual-confirmed → 自动持久化到 allResponses', () => {
+  it('接收 m5:surplus-accrual → 自动持久化到 allResponses', () => {
     const responses = createResponses([])
 
     const scope = effectScope()
     scope.run(() => {
       useM6CrossSheet(responses)
 
-      eventBus.emit('m5:accrual-confirmed' as any, {
+      eventBus.emit('m5:surplus-accrual', {
         totalAccrual: 980000,
       })
 
@@ -232,7 +232,7 @@ describe('集成测试 — M5→M6 反向核对: m5:accrual-confirmed → surplu
     scope.run(() => {
       const { _m5AccrualConfirmed } = useM6CrossSheet(responses)
 
-      eventBus.emit('m5:accrual-confirmed' as any, { amount: 770000 })
+      eventBus.emit('m5:surplus-accrual', { amount: 770000 })
 
       expect(_m5AccrualConfirmed.value).toBe(770000)
     })
@@ -253,7 +253,7 @@ describe('集成测试 — M5→M6 反向核对: m5:accrual-confirmed → surplu
       expect(surplusVsM5.value.isConsistent).toBe(false)
 
       // M5确认计提金额
-      eventBus.emit('m5:accrual-confirmed' as any, { totalAccrual: 1000000 })
+      eventBus.emit('m5:surplus-accrual', { totalAccrual: 1000000 })
 
       // 现在一致
       expect(surplusVsM5.value.diff).toBe(0)
@@ -282,7 +282,7 @@ describe('集成测试 — M1→M6 反向核对: m1:declared-confirmed → divid
 
       expect(_m1DeclaredConfirmed.value).toBe(0)
 
-      eventBus.emit('m1:declared-confirmed' as any, {
+      eventBus.emit('m1:declared-confirmed', {
         declaredAmount: 2000000,
       })
 
@@ -298,7 +298,7 @@ describe('集成测试 — M1→M6 反向核对: m1:declared-confirmed → divid
     scope.run(() => {
       useM6CrossSheet(responses)
 
-      eventBus.emit('m1:declared-confirmed' as any, {
+      eventBus.emit('m1:declared-confirmed', {
         declaredAmount: 3500000,
       })
 
@@ -316,7 +316,7 @@ describe('集成测试 — M1→M6 反向核对: m1:declared-confirmed → divid
     scope.run(() => {
       const { _m1DeclaredConfirmed } = useM6CrossSheet(responses)
 
-      eventBus.emit('m1:declared-confirmed' as any, { amount: 1200000 })
+      eventBus.emit('m1:declared-confirmed', { amount: 1200000 })
 
       expect(_m1DeclaredConfirmed.value).toBe(1200000)
     })
@@ -337,7 +337,7 @@ describe('集成测试 — M1→M6 反向核对: m1:declared-confirmed → divid
       expect(dividendVsM1.value.isConsistent).toBe(false)
 
       // M1确认宣告金额
-      eventBus.emit('m1:declared-confirmed' as any, { declaredAmount: 2500000 })
+      eventBus.emit('m1:declared-confirmed', { declaredAmount: 2500000 })
 
       // 一致
       expect(dividendVsM1.value.diff).toBe(0)

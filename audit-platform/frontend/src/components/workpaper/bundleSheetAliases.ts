@@ -114,4 +114,17 @@ export const BUNDLE_SHEET_ALIASES: Record<string, BundleSheetAlias> = {
   'S34-8-2': { parent: 'S34', sheet: 'S34-8' },
   'S34-9-1': { parent: 'S34', sheet: 'S34-9' },
   'S34-11-1': { parent: 'S34', sheet: 'S34-11' },
+
+  // ─── S35 再融资审核特项底稿 bundle ─────────────────────────────────────
+  // S35-1~S35-5 在 wp_code_overrides 映射为 skip，
+  // 外部 GtIndexChip 点击 S35-x 时 fallback 路由到 S35 parent bundle。
+  // 子 sheet 编码（S35-x-1）也路由到对应父 Tab。
+  'S35-1': { parent: 'S35', sheet: 'S35-1' },
+  'S35-2': { parent: 'S35', sheet: 'S35-2' },
+  'S35-3': { parent: 'S35', sheet: 'S35-3' },
+  'S35-4': { parent: 'S35', sheet: 'S35-4' },
+  'S35-5': { parent: 'S35', sheet: 'S35-5' },
+  'S35-1-1': { parent: 'S35', sheet: 'S35-1' },
+  'S35-2-1': { parent: 'S35', sheet: 'S35-2' },
+  'S35-3-1': { parent: 'S35', sheet: 'S35-3' },
 }

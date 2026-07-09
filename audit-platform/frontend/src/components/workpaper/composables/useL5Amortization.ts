@@ -209,7 +209,7 @@ export function useL5Amortization(
 
   /** 发布 'l5:amortization-calculated' 供L8订阅 */
   function publishAmortization(): void {
-    eventBus.emit('l5:amortization-calculated' as any, {
+    eventBus.emit('l5:amortization-calculated', {
       wpCode: 'L5',
       periodAmortization: periodAmortizationTotal.value,
       timestamp: Date.now(),

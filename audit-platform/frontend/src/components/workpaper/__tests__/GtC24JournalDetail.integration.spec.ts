@@ -178,6 +178,7 @@ function mountC24(opts: {
   mockGet.mockImplementation((url: string, _options?: any) => {
     if (typeof url !== 'string') return Promise.resolve({})
     if (url.includes('/checklist-responses')) return Promise.resolve(responses)
+    if (url.includes('/entries-all')) return Promise.resolve({ items: [], total: 0, page: 1, page_size: 5000 })
     if (url.includes('/feature-flags')) return Promise.resolve({ flags: { WP_AI_SERVICE_ENABLED: false } })
     return Promise.resolve({})
   })

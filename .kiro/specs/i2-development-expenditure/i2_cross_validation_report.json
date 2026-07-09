@@ -1,0 +1,290 @@
+{
+  "task": "0.2 底稿模板库md交叉验证",
+  "spec": "i2-development-expenditure",
+  "sources": {
+    "xlsx_structure": "D:\\GT_plan\\.kiro\\specs\\i2-development-expenditure\\i2_structure_summary.json",
+    "md_reference": "D:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\BCD类底稿md\\I无形资产循环\\I无形资产循环底稿模板库.md"
+  },
+  "conflict_resolution_rule": "列名/公式以xlsx为准；联动方向/认定映射以md为准",
+  "summary": {
+    "total_checks": 6,
+    "passed": 6,
+    "warnings": 0,
+    "failed": 0,
+    "overall_status": "pass",
+    "key_conclusions": [
+      "xlsx I2开发支出.xlsx共21 sheet，md I2系列仅11个模板 → 差异因xlsx将I7(研发费用)检查表合并到I2",
+      "CAS6五条件：xlsx I2-6(66列)足以覆盖五条件检查矩阵，对应md I7-6(资本化时点判断)",
+      "I6↔I2联动：xlsx I2-5实质性分析通过外部引用'[1]明细表I6-2'确认联动，md确认费用化+资本化=研发总额",
+      "I2→I1转入：xlsx I2-2明细表N列(转无形)为联动数据源，md I1-7增加检查表确认接收方向",
+      "公式方向全部符合资产类(1717)：期末=期初+借方-贷方",
+      "冲突解决：列名/公式以xlsx为准(更完整)；联动方向/认定映射以md为准(业务语义)"
+    ]
+  },
+  "validations": [
+    {
+      "check": "CAS6五条件交叉验证",
+      "status": "pass",
+      "findings": [
+        "I2-6有66列，足以容纳CAS6五条件检查矩阵",
+        "md I7-6提及: 技术可行性=True, 市场可行性=True",
+        "CAS6五条件完整定义已确认（来自CAS6第9条）: 技术可行性/完成意图/使用或出售能力/未来经济利益/资源充足"
+      ],
+      "xlsx_evidence": {
+        "sheet_name": "研发项目资本化时点判断I2-6",
+        "dimensions": "45行 × 66列",
+        "formula_count": 11,
+        "cols": 66,
+        "has_sum_formulas": true
+      },
+      "md_evidence": {
+        "I7-6_exists": true,
+        "mentions_tech_feasibility": true,
+        "mentions_market_feasibility": true
+      },
+      "cas6_conditions_defined": [
+        {
+          "id": 1,
+          "name": "技术可行性",
+          "description": "完成该无形资产以使其能够使用或出售在技术上具有可行性"
+        },
+        {
+          "id": 2,
+          "name": "完成意图",
+          "description": "具有完成该无形资产并使用或出售的意图"
+        },
+        {
+          "id": 3,
+          "name": "使用或出售能力",
+          "description": "无形资产产生经济利益的方式，包括能够证明运用该无形资产生产的产品存在市场或无形资产自身存在市场"
+        },
+        {
+          "id": 4,
+          "name": "未来经济利益",
+          "description": "有足够的技术、财务资源和其他资源支持，以完成该无形资产的开发，并有能力使用或出售该无形资产"
+        },
+        {
+          "id": 5,
+          "name": "资源充足",
+          "description": "归属于该无形资产开发阶段的支出能够可靠地计量"
+        }
+      ]
+    },
+    {
+      "check": "I6↔I2双向联动交叉验证",
+      "status": "pass",
+      "findings": [
+        "xlsx I2-5实质性分析含2个I6引用公式 → 确认I6↔I2联动",
+        "xlsx含2个外部I6引用（'[1]明细表I6-2'格式），确认I2与I6为独立xlsx但有公式联动",
+        "md确认：I7(≈I6研发费用)费用化 + I2资本化 = 研发总额 → VR-I6-01校验规则成立"
+      ],
+      "xlsx_evidence": {
+        "i2_5_has_i6_reference": true,
+        "i6_reference_formulas": [
+          {
+            "cell": "A10",
+            "formula": "='[1]明细表I6-2'!A9"
+          },
+          {
+            "cell": "B10",
+            "formula": "='[1]明细表I6-2'!Q9"
+          }
+        ],
+        "external_i6_references": [
+          {
+            "sheet": "实质性分析I2-5",
+            "cell": "A10",
+            "formula": "='[1]明细表I6-2'!A9"
+          },
+          {
+            "sheet": "实质性分析I2-5",
+            "cell": "B10",
+            "formula": "='[1]明细表I6-2'!Q9"
+          }
+        ]
+      },
+      "md_evidence": {
+        "has_i7_series": true,
+        "linkage_direction": "md中I7(研发费用=I6)与I2(开发支出)为互补关系"
+      },
+      "linkage_rules": {
+        "validation_rule": "VR-I6-01",
+        "formula": "I6费用化金额 + I2资本化金额 = 研发总额",
+        "direction": "bidirectional",
+        "event_publish": "research:expense-updated / development:capitalized-updated",
+        "md_source": "I7系列(研发费用)与I2系列(开发支出)为同一研发活动的费用化vs资本化互补关系"
+      }
+    },
+    {
+      "check": "I2→I1转入联动交叉验证",
+      "status": "pass",
+      "findings": [
+        "xlsx I2-1审定表含7个引用明细表I2-2的公式",
+        "xlsx I2-2期末公式P=L+M-N-O确认：期末=期初+增加-转无形-转费用 → N列(转无形)即为I1转入联动数据源",
+        "md I1-7增加检查表存在，增加方式含'内部研发转入' → 确认I2→I1转入联动方向正确"
+      ],
+      "xlsx_evidence": {
+        "i2_1_dimensions": "32行 × 10列",
+        "i2_1_formula_count": 75,
+        "i2_1_row5_headers": [
+          "项目",
+          "期初数",
+          "期末数",
+          "本期审定数与上期\n审定数的比较",
+          "原因分析"
+        ],
+        "detail_cross_refs": 7,
+        "i2_2_cols": 61,
+        "end_balance_formula": [
+          {
+            "cell": "P13",
+            "formula": "=L13+M13-N13-O13"
+          }
+        ]
+      },
+      "md_evidence": {
+        "i1_7_exists": true
+      },
+      "transfer_rules": {
+        "direction": "I2→I1",
+        "trigger": "开发支出资本化完成转入无形资产",
+        "formula": "I2审定表'本期减少-转无形'列合计 = I1增加检查表对应转入金额",
+        "event": "development:capitalized-to-intangible",
+        "cross_ref": "I2→I1-5(增加)/I1-7(增加检查表)",
+        "md_source": "I1-7增加检查表中增加方式含'内部研发转入'"
+      }
+    },
+    {
+      "check": "Sheet名称映射验证",
+      "status": "pass",
+      "findings": [
+        "xlsx共21 sheets, md I2系列共11个模板",
+        "xlsx独有(md无对应): 10个 (含专属检查表I2-4~I2-12，这些在md中归于I7系列)",
+        "关键发现：xlsx I2比md I2多出11个sheet，因为xlsx将I7(研发费用)的检查表合并到了I2开发支出xlsx中统一管理"
+      ],
+      "mapping": {
+        "开发支出实质性程序I2A": {
+          "md_code": "I2A",
+          "md_exists": true
+        },
+        "审定表I2-1": {
+          "md_code": "I2-1",
+          "md_exists": true
+        },
+        "附注披露（上市公司）": {
+          "md_code": "I2-2",
+          "md_exists": true
+        },
+        "附注披露（国有企业）": {
+          "md_code": "I2-3",
+          "md_exists": true
+        },
+        "明细表I2-2": {
+          "md_code": "I2-4",
+          "md_exists": true
+        },
+        "调整分录汇总I2-3": {
+          "md_code": "I2-5",
+          "md_exists": true
+        },
+        "研发项目资本化时点判断I2-6": {
+          "md_code": "I2-6",
+          "md_exists": true
+        },
+        "截止性测试（账到单据）I2-13": {
+          "md_code": "I2-10",
+          "md_exists": true
+        },
+        "截止性测试（单据到账）I2-14": {
+          "md_code": "I2-9",
+          "md_exists": true
+        },
+        "减值准备测试表I2-15": {
+          "md_code": "I2-7",
+          "md_exists": true
+        },
+        "可收回金额测试I2-16": {
+          "md_code": "I2-8",
+          "md_exists": true
+        }
+      },
+      "xlsx_only_sheets": [
+        "底稿目录",
+        "会计政策检查I2-4",
+        "实质性分析I2-5",
+        "研发项目构成明细表I2-7",
+        "研发材料投入检查表I2-8",
+        "研发人员认定检查表I2-9",
+        "研发人员工时检查表I2-10",
+        "委外研发检查表I2-11",
+        "针对性检查表I2-12",
+        "GT_Custom"
+      ],
+      "md_only_codes": []
+    },
+    {
+      "check": "公式方向验证（资产类1717开发支出）",
+      "status": "pass",
+      "findings": [
+        "验证3个核心公式，全部符合资产类期末=期初+借方-贷方方向"
+      ],
+      "formula_evidence": [
+        {
+          "sheet": "明细表I2-2",
+          "cell": "G13",
+          "formula": "=B13+C13-E13-F13",
+          "interpretation": "未审期末 = 期初 + 增加 - 转无形 - 转费用",
+          "direction": "asset_end = begin + debit - credit",
+          "matches_1717": true
+        },
+        {
+          "sheet": "明细表I2-2",
+          "cell": "P13",
+          "formula": "=L13+M13-N13-O13",
+          "interpretation": "审定期末 = 审定期初 + 审定增加 - 审定转无形 - 审定转费用",
+          "direction": "asset_end = begin + debit - credit",
+          "matches_1717": true
+        },
+        {
+          "sheet": "研发项目构成明细表I2-7",
+          "cell": "AC12",
+          "formula": "=E12+M12-U12",
+          "interpretation": "期末材料=期初材料+本期增加-本期减少",
+          "direction": "asset_end = begin + debit - credit",
+          "matches_1717": true
+        }
+      ]
+    },
+    {
+      "check": "列头一致性验证",
+      "status": "pass",
+      "findings": [
+        "审定表I2-1: xlsx列头=['项目', '期初数', '期末数', '本期审定数与上期\\n审定数的比较', '原因分析']",
+        "审定表I2-1: md模板列头=['项目', '未审数', '调整数', '审定数', '索引号']",
+        "冲突解决：列名/公式以xlsx为准 — xlsx含更完整的列结构和公式"
+      ],
+      "conflicts": [
+        {
+          "sheet": "审定表I2-1",
+          "xlsx_headers": [
+            "项目",
+            "期初数",
+            "期末数",
+            "本期审定数与上期\n审定数的比较",
+            "原因分析"
+          ],
+          "md_headers": [
+            "项目",
+            "未审数",
+            "调整数",
+            "审定数",
+            "索引号"
+          ],
+          "resolution": "以xlsx为准：xlsx实际为32行×10列含期初/期末/本期审定数比较/原因分析等详细列",
+          "note": "md为简化模板，实际xlsx结构更丰富"
+        }
+      ],
+      "resolution_rule": "列名/公式以xlsx为准；联动方向/认定映射以md为准"
+    }
+  ]
+}

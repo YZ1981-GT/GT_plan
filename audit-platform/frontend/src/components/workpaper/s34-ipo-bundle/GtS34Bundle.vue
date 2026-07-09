@@ -21,6 +21,7 @@
  */
 import { ref, computed, watch, onMounted, provide } from 'vue'
 import { useRoute } from 'vue-router'
+import { CircleCheckFilled, Loading, RemoveFilled, CloseBold } from '@element-plus/icons-vue'
 import { useS34BundleState } from '../composables/useS34BundleState'
 import { useS34CrossRef } from './useS34CrossRef'
 import { S34_TAB_DEFS, S34_GROUP_NAMES, type TabDef } from './S34_TAB_CONFIG'
@@ -132,6 +133,19 @@ const activeRegRef = computed(() => {
   return regRefMap.value[tab.wpCode] || null
 })
 
+// ─── 仪表盘计算（Req 10.2, 10.3, 10.4）───
+/** 进度条总基数（已完成+进行中+未开始，不含不适用） */
+const progressTotal = computed(() =>
+  progressSummary.value.completed + progressSummary.value.inProgress + progressSummary.value.notStarted + progressSummary.value.notApplicable,
+)
+
+/** 三色进度条百分比（以可统计总数为基准） */
+function barPercent(key: 'completed' | 'inProgress' | 'notStarted'): string {
+  const total = progressSummary.value.completed + progressSummary.value.inProgress + progressSummary.value.notStarted
+  if (total <= 0) return '0%'
+  return `${(progressSummary.value[key] / total) * 100}%`
+}
+
 // ─── Lifecycle ───
 onMounted(async () => {
   await loadWpIndex()
@@ -160,41 +174,63 @@ onMounted(async () => {
     </div>
 
     <template v-else>
-      <!-- 完成进度仪表盘 (Req 10.2, 10.3) -->
+      <!-- 完成进度仪表盘 (Req 10.2, 10.3, 10.4) -->
+      <!-- 联动 overview：点击统计数字跳转到 overview 面板查看详情 -->
       <div class="gt-s34-bundle__dashboard" data-testid="s34-dashboard">
         <div class="dashboard-stats">
-          <span class="dashboard-stat dashboard-stat--success">
-            ✓ {{ progressSummary.completed }} 已完成
+          <span
+            class="dashboard-stat dashboard-stat--success dashboard-stat--clickable"
+            :title="'点击查看已完成底稿详情'"
+            @click="activeTab = 'overview'"
+          >
+            <el-icon :size="14"><CircleCheckFilled /></el-icon>
+            <strong>{{ progressSummary.completed }}</strong> 已完成
           </span>
-          <span class="dashboard-stat dashboard-stat--warning">
-            ◐ {{ progressSummary.inProgress }} 进行中
+          <span
+            class="dashboard-stat dashboard-stat--warning dashboard-stat--clickable"
+            :title="'点击查看进行中底稿详情'"
+            @click="activeTab = 'overview'"
+          >
+            <el-icon :size="14"><Loading /></el-icon>
+            <strong>{{ progressSummary.inProgress }}</strong> 进行中
           </span>
-          <span class="dashboard-stat dashboard-stat--info">
-            ○ {{ progressSummary.notStarted }} 未开始
+          <span
+            class="dashboard-stat dashboard-stat--info dashboard-stat--clickable"
+            :title="'点击查看未开始底稿详情'"
+            @click="activeTab = 'overview'"
+          >
+            <el-icon :size="14"><RemoveFilled /></el-icon>
+            <strong>{{ progressSummary.notStarted }}</strong> 未开始
           </span>
           <span
             v-if="progressSummary.notApplicable > 0"
-            class="dashboard-stat dashboard-stat--disabled"
+            class="dashboard-stat dashboard-stat--disabled dashboard-stat--clickable"
+            :title="'点击查看不适用底稿'"
+            @click="activeTab = 'overview'"
           >
-            — {{ progressSummary.notApplicable }} 不适用
+            <el-icon :size="14"><CloseBold /></el-icon>
+            <s>{{ progressSummary.notApplicable }}</s> 不适用
           </span>
           <span class="dashboard-stat dashboard-stat--total">
-            共 {{ visibleTabs.length - 1 }} 项专项底稿
+            共 {{ progressTotal }} 项
           </span>
         </div>
-        <!-- 三色进度条 -->
+        <!-- 三色进度条（Req 10.3: 绿=已完成，黄=进行中，灰=未开始） -->
         <div class="dashboard-bar" data-testid="s34-dashboard-bar">
           <div
             class="dashboard-bar__segment dashboard-bar__segment--success"
-            :style="{ width: `${(progressSummary.completed / Math.max(visibleTabs.length - 1, 1)) * 100}%` }"
+            :style="{ width: barPercent('completed') }"
+            :title="`已完成 ${progressSummary.completed} 项`"
           />
           <div
             class="dashboard-bar__segment dashboard-bar__segment--warning"
-            :style="{ width: `${(progressSummary.inProgress / Math.max(visibleTabs.length - 1, 1)) * 100}%` }"
+            :style="{ width: barPercent('inProgress') }"
+            :title="`进行中 ${progressSummary.inProgress} 项`"
           />
           <div
             class="dashboard-bar__segment dashboard-bar__segment--info"
-            :style="{ width: `${(progressSummary.notStarted / Math.max(visibleTabs.length - 1, 1)) * 100}%` }"
+            :style="{ width: barPercent('notStarted') }"
+            :title="`未开始 ${progressSummary.notStarted} 项`"
           />
         </div>
       </div>
@@ -329,6 +365,16 @@ onMounted(async () => {
   margin-left: auto;
   color: var(--gt-color-text-secondary, #606266);
   font-weight: 500;
+}
+
+.dashboard-stat--clickable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 6px;
+  transition: background-color 0.2s ease;
+}
+.dashboard-stat--clickable:hover {
+  background-color: var(--gt-color-bg-elevated, #f5f7fa);
 }
 
 /* 三色进度条 */

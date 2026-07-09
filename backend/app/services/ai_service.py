@@ -40,6 +40,10 @@ _paddle_ocr: "paddleocr.PaddleOCR | None" = None
 def _get_paddle_ocr() -> "paddleocr.PaddleOCR":
     """延迟初始化 PaddleOCR 实例"""
     global _paddle_ocr
+    if paddleocr is None:
+        raise AIServiceUnavailableError(
+            "PaddleOCR 未安装（当前 Python 环境无 paddleocr 包）"
+        )
     if _paddle_ocr is None:
         _paddle_ocr = paddleocr.PaddleOCR(
             use_angle_cls=True,
@@ -130,10 +134,10 @@ def _merge_system_messages(messages: list[dict[str, str]]) -> list[dict[str, str
 
 
 async def _get_chromadb_client() -> httpx.AsyncClient:
-    """获取 ChromaDB HTTP 客户端"""
+    """获取 ChromaDB HTTP 客户端（健康检查用短超时，避免拖慢 /api/ai/health）"""
     return httpx.AsyncClient(
         base_url=settings.CHROMADB_URL,
-        timeout=httpx.Timeout(30.0, connect=10.0),
+        timeout=httpx.Timeout(2.0, connect=1.0),
         mounts={},
         trust_env=False,
     )
@@ -478,7 +482,7 @@ class AIService:
     # -------------------------------------------------------------------------
 
     async def health_check(self) -> dict[str, Any]:
-        """检查所有AI引擎健康状态"""
+        """检查所有AI引擎健康状态（探针并行，避免串行拖到 3s+）"""
         vllm_status = "unavailable"
         ollama_status = "unavailable"
         paddleocr_status = "unavailable"
@@ -486,46 +490,59 @@ class AIService:
         active_chat_model = None
         active_embedding_model = None
 
-        # 检查 vLLM（主要 LLM 服务）
-        try:
-            async with await _get_llm_client() as client:
-                response = await asyncio.wait_for(
-                    client.get("/models"), timeout=5.0,
-                )
-                if response.status_code == 200:
-                    vllm_status = "healthy"
-                    models = response.json().get("data", [])
-                    if models:
-                        active_chat_model = models[0].get("id", settings.DEFAULT_CHAT_MODEL)
-        except Exception as e:
-            logger.warning(f"vLLM health check failed: {e}")
+        async def _probe_vllm() -> tuple[str, str | None]:
+            try:
+                async with await _get_llm_client() as client:
+                    response = await asyncio.wait_for(client.get("/models"), timeout=2.0)
+                    if response.status_code == 200:
+                        models = response.json().get("data", [])
+                        mid = models[0].get("id", settings.DEFAULT_CHAT_MODEL) if models else None
+                        return "healthy", mid
+            except Exception as e:
+                logger.debug(f"vLLM health check failed: {e}")
+            return "unavailable", None
 
-        # 检查 Ollama（备用）
-        try:
-            async with await _get_ollama_client() as client:
-                response = await asyncio.wait_for(
-                    client.get("/api/tags"), timeout=5.0,
-                )
-                if response.status_code == 200:
-                    ollama_status = "healthy"
-        except Exception as e:
-            logger.debug(f"Ollama health check failed (backup): {e}")
+        async def _probe_ollama() -> str:
+            try:
+                async with await _get_ollama_client() as client:
+                    response = await asyncio.wait_for(client.get("/api/tags"), timeout=1.0)
+                    if response.status_code == 200:
+                        return "healthy"
+            except Exception as e:
+                logger.debug(f"Ollama health check failed (backup): {e}")
+            return "unavailable"
 
-        # 检查 PaddleOCR
-        try:
-            _get_paddle_ocr()
-            paddleocr_status = "healthy"
-        except Exception as e:
-            logger.warning(f"PaddleOCR health check failed: {e}")
+        async def _probe_paddle() -> str:
+            if paddleocr is None:
+                return "unavailable"
+            try:
+                _get_paddle_ocr()
+                return "healthy"
+            except Exception as e:
+                logger.debug(f"PaddleOCR health check failed: {e}")
+                return "unavailable"
 
-        # 检查 ChromaDB
-        try:
-            async with await _get_chromadb_client() as client:
-                response = await client.get("/api/v1/heartbeat")
-                if response.status_code == 200:
-                    chromadb_status = "healthy"
-        except Exception as e:
-            logger.warning(f"ChromaDB health check failed: {e}")
+        async def _probe_chroma() -> str:
+            try:
+                async with await _get_chromadb_client() as client:
+                    response = await asyncio.wait_for(
+                        client.get("/api/v1/heartbeat"),
+                        timeout=0.8,
+                    )
+                    if response.status_code == 200:
+                        return "healthy"
+            except Exception as e:
+                logger.debug(f"ChromaDB health check failed: {e}")
+            return "unavailable"
+
+        (vllm_status, vllm_model), ollama_status, paddleocr_status, chromadb_status = await asyncio.gather(
+            _probe_vllm(),
+            _probe_ollama(),
+            _probe_paddle(),
+            _probe_chroma(),
+        )
+        if vllm_model:
+            active_chat_model = vllm_model
 
         # 从数据库获取激活模型
         if not active_chat_model:

@@ -1,0 +1,217 @@
+# backend/data/wp_render_schema/k12-non-operating-income.yaml
+# K12 营业外收入 — 专属组件渲染 schema
+# componentType: k12-non-operating-income
+# 科目 6301 营业外收入（**损益类/贷方科目！取发生额非余额**）
+# Template: K12 营业外收入.xlsx（9 有效 sheet）
+# 公式特征：净发生额=贷方-借方；审定=未审+AJE+RJE；按来源分行明细
+# K循环损益类最简底稿（贷方科目，与日常活动无关的利得）
+
+wp_code: K12
+wp_name: 营业外收入
+component_type: k12-non-operating-income
+selfLoad: true
+template_path: backend/wp_templates/K/K12 营业外收入.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['6301']
+income_statement: true  # 损益类标识！
+related_accounts:
+  - code: '6301'
+    name: 营业外收入
+    direction: credit
+    category: income_statement
+
+special_rules:
+  income_statement: true
+  account_direction: credit  # 贷方科目！（收入类）
+  net_formula: "贷方发生-借方发生"
+  source_table: "tb_ledger"  # 从tb_ledger取数
+  non_operating_classification: true
+  vs_other_gains: "6117(K10)"  # 与日常活动相关→其他收益
+
+formula_count: 90
+description: K循环损益类最简底稿（9sheet，损益类取发生额+营业外收入按来源分类）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置（损益类！回写发生额而非期末余额）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '6301'
+  direction: credit
+  source_sheet: K12-1
+  value_field: audited_amount  # 审定发生额
+  value_type: occurrence_amount  # 发生额非余额！
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 生成配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ai_sections:
+  - id: non-operating-eval
+    name: 营业外收入分类评价
+    description: 营业外收入来源分析+分类正确性评价
+    location: K12-1审定表底部
+  - id: overall-opinion
+    name: 总体审计意见
+    description: K12底稿总体审计结论
+    location: K12-1审定表结论区
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-K12-01
+    source_wp: K12-2
+    target_wp: K12-1
+    description: '明细表合计 → 审定表K12-1净发生额'
+    direction: outbound
+  - ref_id: CW-K12-02
+    source_wp: K12-3
+    target_wp: K12-1
+    description: 'AJE/RJE汇总 → 审定表K12-1'
+    direction: outbound
+  - ref_id: CW-K12-03
+    source_wp: K12-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+  - ref_id: CW-K12-04
+    source_wp: K12-4
+    target_wp: K12-2
+    description: '检查表分类核对 → 明细表'
+    direction: outbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（9 sheets，含K12A程序表+底稿目录）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: K12
+    group: core
+    dimensions: "15×8"
+    component: K12TabIndex
+    class_code: B-底稿目录
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 营业外收入实质性程序表K12A
+  # ─────────────────────────────────────────────────────────────────────────
+  营业外收入实质性程序表K12A:
+    code: K12A
+    group: core
+    dimensions: "20×11"
+    component: a-program-console
+    class_code: A-实质性程序
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K12-1（70公式！损益类！取发生额，贷方科目）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K12-1:
+    code: K12-1
+    group: core
+    dimensions: "25×11"
+    component: K12TabAdjudication
+    class_code: F-审定表
+    account_codes: ['6301']
+    formula_count: 70
+    income_statement: true
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      value_type: occurrence_amount
+      accounts: ['6301']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'6301', adjudicatedAmount}" }
+      subscribe:
+        - { event: "adjustment:created", filter: "accountCode=6301" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K12-2（26列3区段，27行）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K12-2:
+    code: K12-2
+    group: core
+    dimensions: "27×26"
+    component: K12TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 31
+    import_export: true
+    add_row_prompt: nonOperatingItem
+    segments:
+      - { name: "基础", columns: "序号/收入来源/收入类型/对方单位/金额/发生日期" }
+      - { name: "分析", columns: "占比/同比/说明" }
+      - { name: "检查", columns: "依据文件/凭证号/是否偶发/结论/备注" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K12-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K12-3:
+    code: K12-3
+    group: core
+    dimensions: "21×10"
+    component: K12TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 营业外收入检查表K12-4
+  # ─────────────────────────────────────────────────────────────────────────
+  营业外收入检查表K12-4:
+    code: K12-4
+    group: core
+    dimensions: "30×12"
+    component: K12TabNonOperatingCheck
+    class_code: F-检查表
+    check_items:
+      - 真实性
+      - 依据合规
+      - 分类正确性(与日常活动无关)
+      - 期间归属
+      - 税务处理
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 附注披露信息（上市公司）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "41×17"
+    component: K12TabDisclosureListed
+    class_code: H-附注
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6301" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'non_operating_income'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 附注披露信息（国有企业）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "29×5"
+    component: K12TabDisclosureSoe
+    class_code: H-附注
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6301" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'non_operating_income'}" }

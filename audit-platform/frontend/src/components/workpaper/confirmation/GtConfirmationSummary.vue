@@ -165,6 +165,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { useConfirmationData } from './composables/useConfirmationData'
 import { useViewMode } from './composables/useViewMode'
 import type { ConfirmationRow } from './confirmationTypes'
@@ -402,6 +403,15 @@ function handleDelete() {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
+  // 通知兄弟函证 sheet 刷新（confirmation:updated EventBus 联动）
+  if (props.projectId && props.wpCode) {
+    eventBus.emit('confirmation:updated', {
+      projectId: props.projectId,
+      wpCode: props.wpCode,
+      wpId: props.wpId,
+      timestamp: Date.now(),
+    })
+  }
 }
 
 function handleRowClick(row: ConfirmationRow) {

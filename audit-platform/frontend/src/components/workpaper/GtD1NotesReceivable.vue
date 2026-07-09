@@ -130,6 +130,8 @@
 
         :sheet-name="props.sheetName"
 
+        :related-parties="relatedParties"
+
       />
 
       <D1TabBadDebt
@@ -410,6 +412,13 @@
 
     </template>
 
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d1ReviewSection.id"
+      :section-label="d1ReviewSection.label"
+    />
+    <GtWpReviewDialogHost />
+
   </div>
 
 </template>
@@ -446,6 +455,9 @@ import { useD1EventBus } from './composables/useD1EventBus'
 import { resolveD1SheetCode } from './composables/useD1SheetRouting'
 
 import { resolveD1SheetLabel } from './composables/d1SheetLabels'
+import { resolveD1ReviewSection } from './composables/d1ReviewSectionMap'
+import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
+import GtWpReviewRail from './GtWpReviewRail.vue'
 
 import D1TabIndex from './d1/D1TabIndex.vue'
 
@@ -566,6 +578,24 @@ const review = useD1Review(
 
 
 const currentSheet = computed<string>(() => resolveD1SheetCode(props.sheetName || ''))
+
+const relatedParties = computed<string[]>(() => {
+  const raw = props.htmlData?.project_context?.related_parties
+    ?? props.htmlData?.projectContext?.related_parties
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((p: unknown) => {
+      if (typeof p === 'string') return p
+      if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>
+        return String(o.name ?? o.party_name ?? o.partyName ?? '')
+      }
+      return ''
+    })
+    .filter(Boolean)
+})
+
+const d1ReviewSection = computed(() => resolveD1ReviewSection(currentSheet.value))
 
 
 

@@ -222,7 +222,13 @@ class TestBroadcastRaw:
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.post(
                     f"/api/review-threads/{_THREAD_ID}/messages",
-                    json={"content": "请复核此数据", "message_type": "text"},
+                    json={
+                        "content": "请复核此数据",
+                        "message_type": "text",
+                        "target_user_id": str(uuid.uuid4()),
+                        "target_user_name": "李四",
+                        "target_role": "现场经理",
+                    },
                 )
 
         assert resp.status_code == 200
@@ -235,6 +241,8 @@ class TestBroadcastRaw:
         assert payload["thread_id"] == str(_THREAD_ID)
         assert payload["message"]["content"] == "请复核此数据"
         assert payload["message"]["sender_id"] == str(_USER_ID)
+        assert payload["message"]["target_user_name"] == "李四"
+        assert payload["message"]["target_role"] == "现场经理"
 
 
 # ─── 6.4 AI 生成端点 ────────────────────────────────────────────────────────
@@ -286,6 +294,12 @@ class TestAiGenerate:
 # ─── 6.5 权限守卫 ───────────────────────────────────────────────────────────
 
 
+class _FakeAdmin:
+    id = _USER_ID
+    username = "admin"
+    role = UserRole.admin
+
+
 class TestPermissionGuard:
     """无关项目用户请求返回 403。
 
@@ -301,6 +315,8 @@ class TestPermissionGuard:
         db = _mock_db()
         db.execute = AsyncMock(side_effect=[
             _result(wp_row),     # SELECT project_id FROM working_paper
+            _result(no_access),  # project_users check → None
+            _result(no_access),  # project_users check → None
             _result(no_access),  # project_assignments check → None
         ])
 
@@ -316,6 +332,32 @@ class TestPermissionGuard:
         assert "无权访问" in resp.json()["detail"]
 
     @pytest.mark.asyncio
+    async def test_admin_bypasses_project_assignment_check(self):
+        """admin 无 project_assignments 仍可获取/创建复核线程。"""
+        wp_row = (str(_PROJECT_ID),)
+        thread_row = (str(_THREAD_ID), f"{_WP_ID}:audit-note", "open")
+
+        db = _mock_db()
+        db.execute = AsyncMock(side_effect=[
+            _result(wp_row),           # working_paper → project_id
+            _result(None),             # SELECT thread → not found
+            MagicMock(),               # INSERT thread
+            _result(thread_row),       # SELECT thread after insert
+            _result_with_messages(thread_row, []),  # messages
+        ])
+
+        app = _make_app(db, user=_FakeAdmin())
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            resp = await c.get(
+                "/api/review-threads",
+                params={"wp_id": str(_WP_ID), "section_id": "audit-note"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["id"] == str(_THREAD_ID)
+
+    @pytest.mark.asyncio
     async def test_unauthorized_user_ai_generate_403(self):
         """User with no project assignment on AI generate → 403."""
         wp_row = (str(_PROJECT_ID),)
@@ -324,6 +366,7 @@ class TestPermissionGuard:
         db = _mock_db()
         db.execute = AsyncMock(side_effect=[
             _result(wp_row),
+            _result(no_access),
             _result(no_access),
         ])
 

@@ -13,7 +13,7 @@ import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 // ── Types ───────────────────────────────────────────────────────────────────
 
 export type SenderRole = '审计助理' | '现场经理' | '业务合伙人' | '质量控制复核合伙人' | 'EQCR技术复核人'
-export type MessageType = 'text' | 'system' | 'quote'
+export type MessageType = 'text' | 'system' | 'quote' | 'private'
 export type ThreadStatus = 'open' | 'closed'
 
 export interface ReviewMessage {
@@ -24,9 +24,18 @@ export interface ReviewMessage {
   sender_role: SenderRole
   content: string
   message_type: MessageType
+  target_user_id?: string | null
+  target_user_name?: string | null
+  target_role?: string | null
   created_at: string
   _status?: 'sending' | 'sent' | 'failed'
   _tempId?: string
+}
+
+export interface ReviewRecipient {
+  user_id: string
+  user_name: string
+  role?: string | null
 }
 
 export interface GtReviewDialogProps {
@@ -46,10 +55,21 @@ export interface GtReviewDialogProps {
   }
 }
 
+function isMessageTargetedToCurrentUser(message: ReviewMessage, currentUser: { id: string; name: string }): boolean {
+  if (message.target_user_id && message.target_user_id === currentUser.id) return true
+  if (!message.target_user_name) return false
+  const names = message.target_user_name
+    .split(/[、,，]/)
+    .map((n) => n.trim())
+    .filter(Boolean)
+  return names.includes(currentUser.name)
+}
+
 // ── Exported Pure Utility Functions ─────────────────────────────────────────
 
 const WRITE_ROLES: SenderRole[] = ['审计助理', '现场经理', '业务合伙人']
 const READ_ONLY_ROLES: SenderRole[] = ['质量控制复核合伙人', 'EQCR技术复核人']
+const SLA_HOURS = 24
 
 export function buildThreadKey(wpId: string, sectionId: string): string {
   return `${wpId}:${sectionId}`
@@ -113,11 +133,17 @@ export function useReviewDialog(props: GtReviewDialogProps) {
   const lastClickIndex = ref<number>(-1)
   const selectedCount = computed(() => selectedIds.value.size)
   const canExport = computed(() => selectedIds.value.size > 0)
+  const showOnlyTargetMe = ref(false)
+  const filteredMessages = computed(() => {
+    if (!showOnlyTargetMe.value) return messages.value
+    return messages.value.filter((m) => isMessageTargetedToCurrentUser(m, props.currentUser))
+  })
 
   // ─ Export edit state
   const isExportDialogOpen = ref(false)
   const exportText = ref('')
   const isAiPolishing = ref(false)
+  const isPrivateMessage = ref(false)
 
   // ─ AI generate state
   const isAiGenerating = ref(false)
@@ -128,9 +154,22 @@ export function useReviewDialog(props: GtReviewDialogProps) {
 
   // ─ Unread
   const unreadCount = ref(0)
+  const targetedUnreadCount = ref(0)
+  const slaWarnedThreadIds = ref<Set<string>>(new Set())
 
   // ─ Close confirm
   const isCloseConfirmOpen = ref(false)
+  const recipients = ref<ReviewRecipient[]>([])
+  const selectedTargetUserIds = ref<string[]>([])
+  const selectedTargetRole = ref<string>('')
+
+  const targetRoleOptions: { label: SenderRole; value: SenderRole }[] = [
+    { label: '审计助理', value: '审计助理' },
+    { label: '现场经理', value: '现场经理' },
+    { label: '业务合伙人', value: '业务合伙人' },
+    { label: '质量控制复核合伙人', value: '质量控制复核合伙人' },
+    { label: 'EQCR技术复核人', value: 'EQCR技术复核人' },
+  ]
 
   // ════════════════════════════════════════════════════════════════════════════
   // 3.1 Message CRUD
@@ -147,6 +186,10 @@ export function useReviewDialog(props: GtReviewDialogProps) {
       threadId.value = data.id
       threadStatus.value = data.status as ThreadStatus
       messages.value = data.messages ?? []
+      unreadCount.value = 0
+      targetedUnreadCount.value = 0
+      await loadRecipients()
+      checkSlaReminder()
     } catch {
       ElMessage.error('加载对话失败')
     } finally {
@@ -162,6 +205,15 @@ export function useReviewDialog(props: GtReviewDialogProps) {
   async function sendMessage(content: string): Promise<void> {
     if (!content.trim() || !threadId.value) return
     const tempId = crypto.randomUUID()
+    const targetUsers = recipients.value.filter((u) => selectedTargetUserIds.value.includes(u.user_id))
+    const targetUserNameText = targetUsers.map((u) => u.user_name).join('、')
+    const isMultiTarget = targetUsers.length > 1
+    const effectiveTargetUserId = !isMultiTarget ? (targetUsers[0]?.user_id || null) : null
+    const effectiveTargetUserName = targetUserNameText || null
+    if (isPrivateMessage.value && !effectiveTargetUserId) {
+      ElMessage.warning('私密消息仅支持指定单人')
+      return
+    }
     const optimistic: ReviewMessage = {
       id: tempId,
       thread_id: threadId.value,
@@ -169,7 +221,10 @@ export function useReviewDialog(props: GtReviewDialogProps) {
       sender_name: props.currentUser.name,
       sender_role: props.currentUser.role,
       content,
-      message_type: 'text',
+      message_type: isPrivateMessage.value ? 'private' : 'text',
+      target_user_id: effectiveTargetUserId,
+      target_user_name: effectiveTargetUserName,
+      target_role: selectedTargetRole.value || null,
       created_at: new Date().toISOString(),
       _status: 'sending',
       _tempId: tempId,
@@ -178,7 +233,10 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     try {
       const { data } = await http.post(`/api/review-threads/${threadId.value}/messages`, {
         content,
-        message_type: 'text',
+        message_type: isPrivateMessage.value ? 'private' : 'text',
+        target_user_id: effectiveTargetUserId,
+        target_user_name: effectiveTargetUserName,
+        target_role: selectedTargetRole.value || null,
       })
       const idx = messages.value.findIndex((m) => m._tempId === tempId)
       if (idx !== -1) {
@@ -198,6 +256,9 @@ export function useReviewDialog(props: GtReviewDialogProps) {
       const { data } = await http.post(`/api/review-threads/${threadId.value}/messages`, {
         content: msg.content,
         message_type: msg.message_type,
+        target_user_id: msg.target_user_id ?? null,
+        target_user_name: msg.target_user_name ?? null,
+        target_role: msg.target_role ?? null,
       })
       const idx = messages.value.findIndex((m) => m._tempId === tempId)
       if (idx !== -1) messages.value[idx] = { ...data, _status: 'sent' }
@@ -222,8 +283,38 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     if (msgData.sender_id === props.currentUser.id) return
     if (isOpen.value) {
       messages.value.push(msgData as ReviewMessage)
+      checkSlaReminder()
     } else {
       unreadCount.value++
+      if (isMessageTargetedToCurrentUser(msgData as ReviewMessage, props.currentUser)) {
+        targetedUnreadCount.value++
+      }
+    }
+  }
+
+  function checkSlaReminder(): void {
+    if (!threadId.value || slaWarnedThreadIds.value.has(threadId.value)) return
+    const now = Date.now()
+    const pending = messages.value.filter((m) => {
+      if (m.sender_id === props.currentUser.id) return false
+      if (!isMessageTargetedToCurrentUser(m, props.currentUser)) return false
+      const createdTs = new Date(m.created_at).getTime()
+      return now - createdTs > SLA_HOURS * 3600 * 1000
+    })
+    if (pending.length > 0) {
+      ElMessage.warning(`存在 ${pending.length} 条发给我的复核消息已超过 ${SLA_HOURS} 小时未回复`)
+      slaWarnedThreadIds.value.add(threadId.value)
+    }
+  }
+
+  async function loadRecipients(): Promise<void> {
+    try {
+      const { data } = await http.get('/api/review-dialog/recipients', {
+        params: { wp_id: props.wpId },
+      })
+      recipients.value = Array.isArray(data) ? data : []
+    } catch {
+      recipients.value = []
     }
   }
 
@@ -274,7 +365,7 @@ export function useReviewDialog(props: GtReviewDialogProps) {
   }
 
   function selectAll(): void {
-    selectedIds.value = new Set(messages.value.map((m) => m.id))
+    selectedIds.value = new Set(filteredMessages.value.map((m) => m.id))
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -285,6 +376,13 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     const selected = messages.value.filter((m) => selectedIds.value.has(m.id))
     exportText.value = formatExportText(selected)
     isExportDialogOpen.value = true
+  }
+
+  function quickExportSingle(messageId: string): void {
+    if (!messageId) return
+    enterSelectMode()
+    selectedIds.value = new Set([messageId])
+    exportSelected()
   }
 
   async function aiPolish(): Promise<void> {
@@ -310,16 +408,26 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     if (!exportText.value.trim()) return
     const wpCode = props.relatedData?.wpCode ?? props.wpId
     const itemId = generateItemId(wpCode as string, Date.now())
+    const selectedMessages = messages.value.filter((m) => selectedIds.value.has(m.id))
+    const targetUsers = selectedMessages
+      .flatMap((m) => (m.target_user_name ? m.target_user_name.split(/[、,，]/).map((n) => n.trim()) : []))
+      .filter(Boolean)
     const remark = buildRemarkMetadata(
       props.currentUser.id,
       threadId.value ?? '',
       [...selectedIds.value],
     )
+    const richRemark = {
+      ...remark,
+      target_users: Array.from(new Set(targetUsers)),
+      export_version: 'v2',
+      selected_message_ids: [...selectedIds.value],
+    }
     try {
       await http.post(`/api/workpapers/${props.wpId}/checklist-responses`, {
         item_id: itemId,
         value: exportText.value,
-        remark: JSON.stringify(remark),
+        remark: JSON.stringify(richRemark),
       })
       ElMessage.success('已保存到复核记录')
       isExportDialogOpen.value = false
@@ -387,6 +495,7 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     isLoading,
     dialogTitle,
     messages,
+    filteredMessages,
     threadId,
     threadStatus,
     // Multi-select
@@ -394,6 +503,7 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     selectedIds,
     selectedCount,
     canExport,
+    showOnlyTargetMe,
     // Export edit
     isExportDialogOpen,
     exportText,
@@ -405,8 +515,14 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     canRead,
     // Unread
     unreadCount,
+    targetedUnreadCount,
     // Close confirm
     isCloseConfirmOpen,
+    recipients,
+    selectedTargetUserIds,
+    selectedTargetRole,
+    isPrivateMessage,
+    targetRoleOptions,
     // Methods (3.1)
     openDialog,
     closeDialog,
@@ -420,6 +536,7 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     selectAll,
     // Methods (3.4)
     exportSelected,
+    quickExportSingle,
     aiPolish,
     saveToReviewRecord,
     // Methods (3.5)
@@ -429,5 +546,8 @@ export function useReviewDialog(props: GtReviewDialogProps) {
     confirmClose,
     confirmContinue,
     confirmExport,
+    loadRecipients,
+    isMessageTargetedToCurrentUser: (message: ReviewMessage) =>
+      isMessageTargetedToCurrentUser(message, props.currentUser),
   }
 }

@@ -190,6 +190,16 @@ export interface ConfirmationReceivedPayload {
   accountCode?: string
 }
 
+/** 函证底稿更新（H0/D0/F0 等函证 sheet 保存后通知兄弟 sheet 刷新） */
+export interface ConfirmationUpdatedPayload {
+  projectId: string
+  wpCode: string
+  /** 源底稿 ID */
+  wpId?: string
+  /** 触发时间戳 */
+  timestamp: number
+}
+
 /** 上年数据导入（PREV 公式重取） */
 export interface PriorYearImportedPayload {
   projectId: string
@@ -342,6 +352,14 @@ export type Events = {
     timestamp: number
   }
 
+  // H5 折耗分配 → D5 营业成本
+  'depletion:allocated': {
+    wp_code: string
+    totalDepletion: number
+    allocations: Array<{ costCenter: string; amount: number }>
+    timestamp: number
+  }
+
   // useStaleSummaryFull 订阅的细粒度事件（payload 不强约束，由 SSE bridge / 业务方按需 emit）
   'adjustment:created': {
     wpCode: string
@@ -374,6 +392,7 @@ export type Events = {
   'adjustment:saved': AdjustmentSavedPayload
   'project:updated': ProjectUpdatedPayload
   'confirmation:received': ConfirmationReceivedPayload
+  'confirmation:updated': ConfirmationUpdatedPayload
   'prior-year:imported': PriorYearImportedPayload
   'manual-refresh': { projectId?: string; wpId?: string }
 
@@ -421,6 +440,140 @@ export type Events = {
     totalAccrued: number
     /** 按来源分类：短期借款/长期借款/应付债券 */
     bySource: Array<{ source: string; amount: number }>
+    timestamp: number
+  }
+
+  // L4 应付债券实际利率法利息 → L2/L8
+  'l4:interest-calculated': {
+    wpCode: string
+    totalInterest: number
+    /** L8 订阅优先取本期利息费用 */
+    periodInterest?: number
+    timestamp: number
+  }
+
+  // L5 未确认融资费用本期摊销 → L8
+  'l5:amortization-calculated': {
+    wpCode: string
+    periodAmortization: number
+    timestamp: number
+  }
+
+  // M2 外币出资折算差异 → M4 资本公积
+  'm2:fx-diff-to-m4': {
+    wpCode: string
+    totalFxDiff: number
+    byInvestor: Array<{ investor: string; fxDiff: number }>
+    timestamp: number
+  }
+
+  // M3 库存股注销冲减 → M2/M4
+  'm3:cancellation-deduction': {
+    wpCode: string
+    totalCancellationAmount: number
+    deductCapitalTotal: number
+    deductReserveTotal: number
+    remainingDiff: number
+    byBatch: Array<{
+      batchName: string
+      cancelAmount: number
+      deductCapital: number
+      deductReserve: number
+    }>
+    timestamp: number
+  }
+
+  // M5 盈余公积计提 → M6 可供分配利润
+  'm5:surplus-accrual': {
+    wpCode: string
+    statutoryAccrual: number
+    discretionaryAccrual: number
+    totalAccrual: number
+    timestamp: number
+  }
+
+  // M6 本年净利润/计提基数 → M5
+  'm6:net-profit': {
+    wpCode?: string
+    netProfit?: number
+    /** 弥补以前年度亏损后的计提基数（订阅方优先） */
+    accrualBase?: number
+    /** 兼容旧载荷 */
+    amount?: number
+    priorLossOffset?: number
+    timestamp?: number
+  }
+
+  // M6 分配股利 → M1 应付股利
+  'm6:profit-distributed': {
+    wpCode: string
+    dividendAmount: number
+    cashDividend?: number
+    stockDividend?: number
+    /** 兼容订阅方旧字段名 */
+    distributedDividend?: number
+    amount?: number
+    timestamp: number
+  }
+
+  // M7 专项储备资本化支出 → H1 固定资产
+  'm7:capital-exp-to-h1': {
+    wpCode: string
+    capitalExpAmount: number
+    items?: string[]
+    timestamp: number
+  }
+
+  // J3 权益结算股份支付 → M4 资本公积（订阅侧已用）
+  'j3:equity-settled': {
+    wpCode?: string
+    equitySettledAmount?: number
+    waitingPeriodAmount?: number
+    amount?: number
+    timestamp?: number
+  }
+
+  // M1 实际宣告股利确认 → M6 核对（订阅侧已用）
+  'm1:declared-confirmed': {
+    wpCode?: string
+    declaredAmount?: number
+    amount?: number
+    timestamp?: number
+  }
+
+  // N2 应交税费计提 → N4 税金及附加
+  'tax-accrual:updated': {
+    wpCode: string
+    accruals: Array<{ tax: string; amount: number }>
+    totalAccrual: number
+    timestamp: number
+  }
+
+  // N5 所得税费用更新（当期/递延/有效税率）
+  'income-tax:updated': {
+    wpCode: string
+    currentTax: number
+    deferredTax: number
+    totalIncomeTax: number
+    effectiveTaxRate: number
+    timestamp: number
+  }
+
+  // N1-4 测算表递延税负债合计 → N3
+  'deferred-tax:liability-from-n1': {
+    liabilityTotal: number
+    wpCode: string
+    source?: string
+    timestamp: number
+  }
+
+  // N1-5 可确认递延税资产合计回填
+  'loss-check:recognizable-updated': {
+    wpCode: string
+    recognizableTotal?: number
+    /** 兼容测试/旧载荷 */
+    totalRecognizable?: number
+    source?: string
     timestamp: number
   }
 

@@ -29,6 +29,7 @@ from app.deps import require_project_access, check_consol_lock
 from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest
 from app.services.working_paper_service import WorkingPaperService
+from app.services.project_audit_year import fetch_project_audit_year
 from app.services.wp_download_service import WpDownloadService, WpUploadService
 from app.models.workpaper_models import WpIndex, WpCrossRef, WorkingPaper, WpFileStatus
 
@@ -258,16 +259,7 @@ async def get_workpaper_file_info(
     wp_code = wp_index or ""
 
     svc = FieldOverrideService(db)
-    year_val = 0
-    try:
-        year_q = await db.execute(sa.text(
-            "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
-        ), {"pid": str(project_id)})
-        yr = year_q.scalar()
-        year_val = yr or 0
-    except Exception as e:
-        import logging as _logging
-        _logging.getLogger(__name__).warning("查询项目年度失败 pid=%s: %s", project_id, e)
+    year_val = await fetch_project_audit_year(db, project_id) or 0
 
     sign_status = None
     if year_val:

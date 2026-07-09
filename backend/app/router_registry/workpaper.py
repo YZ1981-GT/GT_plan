@@ -154,6 +154,8 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_render_strategies._g0_confirmation_ai import router as g0_ai_generate
     from app.routers.wp_render_strategies._h0_confirmation_import_export import router as h0_import_export
     from app.routers.wp_render_strategies._h0_confirmation_ai import router as h0_ai_generate
+    from app.routers.wp_render_strategies._k0_confirmation_import_export import router as k0_import_export
+    from app.routers.wp_render_strategies._k0_confirmation_ai import router as k0_ai_generate
     from app.routers.wp_render_strategies._g1_trading_financial_assets_import_export import router as g1_import_export
     from app.routers.wp_render_strategies._g1_trading_financial_assets_ai import router as g1_ai_generate
     from app.routers.wp_render_strategies._g2_interest_receivable_import_export import router as g2_import_export
@@ -203,6 +205,34 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_render_strategies._h10_asset_disposal_income_import_export import router as h10_import_export
     from app.routers.wp_render_strategies._h10_asset_disposal_income_validate import router as h10_validate
     from app.routers.wp_render_strategies._h10_asset_disposal_income_ai import router as h10_ai_generate
+    from app.routers.wp_render_strategies._i1_amortization_engine import router as i1_amortization
+    from app.routers.wp_render_strategies._h1_import_export import router as h1_import_export
+    from app.routers.wp_render_strategies._h1_ai_generate import router as h1_ai_generate
+    from app.routers.wp_render_strategies._h1_depreciation_engine import router as h1_depreciation
+    from app.routers.wp_render_strategies._i1_ai_generate import router as i1_ai_generate
+    from app.routers.wp_render_strategies._i2_import_export import router as i2_import_export
+    from app.routers.wp_render_strategies._i2_ai_generate import router as i2_ai_generate
+    from app.routers.wp_render_strategies._i2_capitalization_engine import router as i2_capitalization
+    from app.routers.wp_render_strategies._i3_import_export import router as i3_import_export
+    from app.routers.wp_render_strategies._i3_ai_generate import router as i3_ai_generate
+    from app.routers.wp_render_strategies._i3_dcf_engine import router as i3_dcf_engine
+    from app.routers.wp_render_strategies._i4_import_export import router as i4_import_export
+    from app.routers.wp_render_strategies._i4_ai_generate import router as i4_ai_generate
+    from app.routers.wp_render_strategies._i5_import_export import router as i5_import_export
+    from app.routers.wp_render_strategies._i5_ai_generate import router as i5_ai_generate
+    from app.routers.wp_render_strategies._i6_import_export import router as i6_import_export
+    from app.routers.wp_render_strategies._i6_ai_generate import router as i6_ai_generate
+    from app.routers.wp_render_strategies._h2_import_export import router as h2_import_export
+    from app.routers.wp_render_strategies._h2_ai_generate import router as h2_ai_generate
+    from app.routers.wp_render_strategies._h2_interest_cap_engine import router as h2_interest_cap
+    from app.routers.wp_render_strategies._h3_import_export import router as h3_import_export
+    from app.routers.wp_render_strategies._h3_ai_generate import router as h3_ai_generate
+    from app.routers.wp_render_strategies._h3_transfer_engine import router as h3_transfer_engine
+    from app.routers.wp_render_strategies._h4_import_export import router as h4_import_export
+    from app.routers.h5_oil_gas_assets import router as h5_oil_gas_assets
+    from app.routers.wp_render_strategies._h6_import_export import router as h6_import_export
+    from app.routers.wp_render_strategies._h8_import_export import router as h8_import_export
+    from app.routers.wp_render_strategies._i1_import_export import router as i1_import_export
     from app.routers.wp_render_strategies._g5_long_term_receivable_import_export import router as g5_import_export
     from app.routers.wp_render_strategies._g5_long_term_receivable_ai import router as g5_ai_generate
     from app.routers.l1_short_term_loans import router as l1_import_export
@@ -227,10 +257,44 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.n1_deferred_tax_assets import router as n1_deferred_tax_assets
     from app.routers.n2_taxes_payable import router as n2_taxes_payable
     from app.routers.n3_deferred_tax_liabilities import router as n3_deferred_tax_liabilities
+    from app.routers.n4_taxes_and_surcharges import router as n4_taxes_and_surcharges
     from app.routers.n5_income_tax_expense import router as n5_income_tax_expense
     from app.routers.s_estimate_calculation import router as s_estimate_calculation
     from app.routers.s_transaction_calculation import router as s_transaction_calculation
     from app.routers.s34_checklist_router import router as s34_checklist
+    from app.routers.wp_render_strategies._k1_import_export import router as k1_import_export
+    from app.routers.wp_render_strategies._k1_ai_generate import router as k1_ai_generate
+    from app.routers.wp_render_strategies._k2_import_export import router as k2_import_export
+    from app.routers.wp_render_strategies._k2_ai_generate import router as k2_ai_generate
+    from app.routers.wp_render_strategies._k3_import_export import router as k3_import_export
+    from app.routers.wp_render_strategies._k3_ai_generate import router as k3_ai_generate
+    from app.routers.wp_render_strategies._k4_import_export import router as k4_import_export
+    from app.routers.wp_render_strategies._k4_ai_generate import router as k4_ai_generate
+    from app.routers.wp_render_strategies._k5_import_export import router as k5_import_export
+    from app.routers.wp_render_strategies._k5_ai_generate import router as k5_ai_generate
+    from app.routers.wp_render_strategies._k6_import_export import router as k6_import_export
+    from app.routers.wp_render_strategies._k6_ai_generate import router as k6_ai_generate
+    from app.routers.wp_render_strategies._k7_import_export import router as k7_import_export
+    from app.routers.wp_render_strategies._k7_ai_generate import router as k7_ai_generate
+    from app.routers.wp_render_strategies._k8_import_export import router as k8_import_export
+    from app.routers.wp_render_strategies._k8_ai_generate import router as k8_ai_generate
+    from app.routers.wp_render_strategies._k9_import_export import router as k9_import_export
+    from app.routers.wp_render_strategies._k9_ai_generate import router as k9_ai_generate
+    from app.routers.wp_render_strategies._k10_import_export import router as k10_import_export
+    from app.routers.wp_render_strategies._k10_ai_generate import router as k10_ai_generate
+    from app.routers.wp_render_strategies._k11_import_export import router as k11_import_export
+    from app.routers.wp_render_strategies._k11_ai_generate import router as k11_ai_generate
+    from app.routers.wp_render_strategies._k12_import_export import router as k12_import_export
+    from app.routers.wp_render_strategies._k12_ai_generate import router as k12_ai_generate
+    from app.routers.wp_render_strategies._k13_ai_generate import router as k13_ai_generate
+    from app.routers.wp_render_strategies._k13_import_export import router as k13_import_export
+    from app.routers.h9_lease_liabilities import router as h9_import_export
+    from app.routers.wp_render_strategies._j1_import_export import router as j1_import_export
+    from app.routers.wp_render_strategies._j1_ai_generate import router as j1_ai_generate
+    from app.routers.wp_render_strategies._j2_import_export import router as j2_import_export
+    from app.routers.wp_render_strategies._j2_ai_generate import router as j2_ai_generate
+    from app.routers.wp_render_strategies._j3_import_export import router as j3_import_export
+    from app.routers.wp_render_strategies._j3_ai_generate import router as j3_ai_generate
     from app.routers.issue_hints import router as issue_hints
     from app.routers.workpaper_summaries import router as workpaper_summaries
     from app.routers.wp_render_registry import router as wp_render_registry
@@ -244,11 +308,11 @@ def register_workpaper_routers(app: FastAPI) -> None:
         "生命周期": [working_paper, wp_editor, wp_batch_domain, wp_relation_domain, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review_domain, wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync, wp_onlyoffice],
-        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export, f1_import_export, f2_import_export, f2_val_import_export, f2_spe_import_export, f2_st_import_export, f3_import_export, f4_import_export, f5_import_export, g0_import_export, h0_import_export, g1_import_export, g2_import_export, g3_import_export, g4_main_import_export, g4_sppi_import_export, g4_ecl_import_export, g5_import_export, g6_main_import_export, g6_sppi_import_export, g6_ecl_import_export, g7_main_import_export, g7_method_import_export, g7_sub_import_export, g8_import_export, g8_validate, g9_import_export, g9_validate, g10_import_export, g10_validate, g11_import_export, g11_validate, g12_import_export, g13_import_export, g14_import_export, h10_import_export, h10_validate, l1_import_export, c24_import_export, l2_interest_payable, l3_long_term_loans, l4_bonds_payable, l5_long_term_payables, l6_special_payables, l7_other_noncurrent_liabilities, l8_financial_expenses, m1_dividends_payable, m2_paid_in_capital, m3_treasury_stock, m4_capital_reserve, m5_surplus_reserve, m6_retained_earnings, m7_special_reserve, m8_general_risk_reserve, m9_other_comprehensive_income, m10_other_equity_instruments, n1_deferred_tax_assets, n2_taxes_payable, n3_deferred_tax_liabilities, n5_income_tax_expense, s_estimate_calculation, s_transaction_calculation, s34_checklist],
+        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export, f1_import_export, f2_import_export, f2_val_import_export, f2_spe_import_export, f2_st_import_export, f3_import_export, f4_import_export, f5_import_export, g0_import_export, h0_import_export, g1_import_export, g2_import_export, g3_import_export, g4_main_import_export, g4_sppi_import_export, g4_ecl_import_export, g5_import_export, g6_main_import_export, g6_sppi_import_export, g6_ecl_import_export, g7_main_import_export, g7_method_import_export, g7_sub_import_export, g8_import_export, g8_validate, g9_import_export, g9_validate, g10_import_export, g10_validate, g11_import_export, g11_validate, g12_import_export, g13_import_export, g14_import_export, h10_import_export, h10_validate, l1_import_export, c24_import_export, l2_interest_payable, l3_long_term_loans, l4_bonds_payable, l5_long_term_payables, l6_special_payables, l7_other_noncurrent_liabilities, l8_financial_expenses, m1_dividends_payable, m2_paid_in_capital, m3_treasury_stock, m4_capital_reserve, m5_surplus_reserve, m6_retained_earnings, m7_special_reserve, m8_general_risk_reserve, m9_other_comprehensive_income, m10_other_equity_instruments, n1_deferred_tax_assets, n2_taxes_payable, n3_deferred_tax_liabilities, n4_taxes_and_surcharges, n5_income_tax_expense, s_estimate_calculation, s_transaction_calculation, s34_checklist, k0_import_export, h1_import_export, h2_import_export, h3_import_export, h4_import_export, h5_oil_gas_assets, h6_import_export, h8_import_export, h9_import_export, i1_import_export, i2_import_export, i3_import_export, i4_import_export, i5_import_export, i6_import_export, k1_import_export, k2_import_export, k3_import_export, k4_import_export, k5_import_export, k6_import_export, k7_import_export, k8_import_export, k9_import_export, k10_import_export, k11_import_export, k12_import_export, k13_import_export, j1_import_export, j2_import_export, j3_import_export],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],
-        "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, b14_ai_generate, a171_ai_generate, a177_ai_generate, a176_docx_sync, d1_ai_generate, d2_ai_generate, d3_ai_generate, d4_ai_generate, d4_contract_ocr, d5_ai_generate, d6_ai_generate, d7_ai_generate, f2_ai_generate, f2_contract_ocr, f2_val_ai_generate, f2_val_contract_ocr, f2_spe_ai_generate, f2_spe_contract_ocr, f2_st_ai_generate, f2_st_contract_ocr, f3_ai_generate, f3_contract_ocr, f4_ai_generate, f5_ai_generate, f5_contract_ocr, g0_ai_generate, h0_ai_generate, g1_ai_generate, g2_ai_generate, g3_ai_generate, g4_main_ai_generate, g4_sppi_ai_generate, g4_ecl_ai_generate, g5_ai_generate, g6_main_ai_generate, g6_sppi_ai_generate, g6_ecl_ai_generate, g7_main_ai_generate, g7_method_ai_generate, g7_sub_ai_generate, g8_ai_generate, g8_contract_ocr, g9_ai_generate, g9_contract_ocr, g10_ai_generate, g10_contract_ocr, g11_ai_generate, g11_contract_ocr, g12_ai_generate, g13_ai_generate, g14_ai_generate, h10_ai_generate],
+        "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, b14_ai_generate, a171_ai_generate, a177_ai_generate, a176_docx_sync, d1_ai_generate, d2_ai_generate, d3_ai_generate, d4_ai_generate, d4_contract_ocr, d5_ai_generate, d6_ai_generate, d7_ai_generate, f2_ai_generate, f2_contract_ocr, f2_val_ai_generate, f2_val_contract_ocr, f2_spe_ai_generate, f2_spe_contract_ocr, f2_st_ai_generate, f2_st_contract_ocr, f3_ai_generate, f3_contract_ocr, f4_ai_generate, f5_ai_generate, f5_contract_ocr, g0_ai_generate, h0_ai_generate, k0_ai_generate, g1_ai_generate, g2_ai_generate, g3_ai_generate, g4_main_ai_generate, g4_sppi_ai_generate, g4_ecl_ai_generate, g5_ai_generate, g6_main_ai_generate, g6_sppi_ai_generate, g6_ecl_ai_generate, g7_main_ai_generate, g7_method_ai_generate, g7_sub_ai_generate, g8_ai_generate, g8_contract_ocr, g9_ai_generate, g9_contract_ocr, g10_ai_generate, g10_contract_ocr, g11_ai_generate, g11_contract_ocr, g12_ai_generate, g13_ai_generate, g14_ai_generate, h10_ai_generate, h1_ai_generate, h1_depreciation, h2_ai_generate, h2_interest_cap, h3_ai_generate, h3_transfer_engine, i1_ai_generate, i1_amortization, i2_ai_generate, i2_capitalization, i3_ai_generate, i3_dcf_engine, i4_ai_generate, i5_ai_generate, i6_ai_generate, k1_ai_generate, k2_ai_generate, k3_ai_generate, k4_ai_generate, k5_ai_generate, k6_ai_generate, k7_ai_generate, k8_ai_generate, k9_ai_generate, k10_ai_generate, k11_ai_generate, k12_ai_generate, k13_ai_generate, j1_ai_generate, j2_ai_generate, j3_ai_generate],
         "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry],
         "科目工作包": [account_packages],
     }

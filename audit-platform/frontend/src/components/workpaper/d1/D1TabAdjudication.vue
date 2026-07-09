@@ -63,7 +63,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: async (items) => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch { ElMessage.warning('保存失败，请重试') }
   },
   loadSubWorkpaperData: async () => ({}),
@@ -173,7 +173,6 @@ async function handleAiConclusion() {
   <div class="d1-tab-adjudication">
     <div class="tab-header">
       <h4>审定表 D1-1</h4>
-      <GtReviewTrigger section-id="D1-adjudication-header" />
       <div class="toolbar-right">
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
         <el-button size="small" @click="onExportData">导出数据</el-button>

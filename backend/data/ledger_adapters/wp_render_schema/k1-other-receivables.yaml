@@ -1,0 +1,337 @@
+# backend/data/ledger_adapters/wp_render_schema/k1-other-receivables.yaml
+# K1 其他应收款 — 专属组件渲染 schema
+# componentType: k1-other-receivables
+# 科目 1221 其他应收款（借方/资产类）+ 1231 坏账准备（贷方/资产备抵类）
+# Template: K1 其他应收款.xlsx（16 有效 sheet）
+# 公式特征：期末=期初+借方-贷方（资产类）；期末=期初+贷方-借方（备抵类）；
+#           审定=未审+AJE+RJE；ECL=EAD×PD×LGD；阶段判定∈{1,2,3}
+# 创建: 2026-07-30
+
+wp_code: K1
+wp_name: 其他应收款
+component_type: k1-other-receivables
+selfLoad: true
+template_path: backend/wp_templates/K/K1 其他应收款.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1221', '1231']
+related_accounts:
+  - code: '1221'
+    name: 其他应收款
+    direction: debit
+    category: asset
+  - code: '1231'
+    name: 坏账准备
+    direction: credit
+    category: contra_asset
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - policy-check
+  - large-amount-eval
+  - overdue-eval
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（16 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K1TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 其他应收款实质性程序表K1A
+  # ─────────────────────────────────────────────────────────────────────────
+  其他应收款实质性程序表K1A:
+    code: K1A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K1-1 (89行×13列, 47公式, 双区块+净值)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K1-1:
+    code: K1-1
+    group: core
+    dimensions: "89×13"
+    component: K1TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1221', '1231']
+    formula_count: 47
+    virtual_scroll: true
+    sections:
+      - name: 一、其他应收款
+        account_code: '1221'
+        direction: debit
+        balance_formula: "期末=期初+借方-贷方"
+      - name: 二、坏账准备
+        account_code: '1231'
+        direction: credit
+        balance_formula: "期末=期初+贷方-借方"
+      - name: 账面净值
+        type: net
+        formula: "其他应收款 - 坏账准备"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + debit - credit", condition: "direction=debit" }
+      - { name: calcContraEndBalance, target: closing_balance, expr: "opening + credit - debit", condition: "direction=credit" }
+      - { name: calcNetValue, target: net_value, expr: "receivable - badDebt" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1221', '1231']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1221', adjudicatedAmount}" }
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1231', adjudicatedAmount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K1-2 (50行×36列, 10公式, 3区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K1-2:
+    code: K1-2
+    group: core
+    dimensions: "50×36"
+    component: K1TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 300
+    formula_count: 10
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+      - name: 账龄分析
+        tab_index: 1
+      - name: 减值与结论
+        tab_index: 2
+    import_export: true
+    add_row_prompt: counterparty
+    highlights:
+      - { condition: "agingGt3Years", style: orange, tooltip: "3年以上账龄" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 坏账准备明细表K1-3 (39行×13列, 21公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  坏账准备明细表K1-3:
+    code: K1-3
+    group: impairment
+    dimensions: "39×13"
+    component: K1TabBadDebtDetail
+    class_code: F-明细表
+    formula_count: 21
+    formulas:
+      - { name: calcBadDebtEnd, target: closing_bad_debt, expr: "opening + provision - reversal - writeoff" }
+      - { name: calcProvisionRate, target: provision_rate, expr: "closing_bad_debt / receivable_closing" }
+    cross_refs:
+      - ref_id: CW-K1-3-001
+        target_wp: K1-8
+        description: '坏账明细 vs K1-8测算应计提'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 调整分录汇总K1-4
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K1-4:
+    code: K1-4
+    group: core
+    component: K1TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 大额其他应收款情况分析表K1-5 (26行×13列, 9公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  大额其他应收款情况分析表K1-5:
+    code: K1-5
+    group: inspection
+    dimensions: "26×13"
+    component: K1TabLargeAmount
+    class_code: F-检查表
+    dynamic_rows: true
+    formula_count: 9
+    formulas:
+      - { name: calcProportion, target: proportion, expr: "item / total" }
+    import_export: true
+    highlights:
+      - { condition: "proportion > threshold", style: orange }
+    cross_refs:
+      - ref_id: CW-K1-5-001
+        target_wp: K1-2
+        description: '大额筛选 ← K1-2明细'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 信用减值损失会计政策检查K1-6 (段落型)
+  # ─────────────────────────────────────────────────────────────────────────
+  信用减值损失会计政策检查K1-6:
+    code: K1-6
+    group: inspection
+    component: K1TabPolicyCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS22, CAS24]
+    check_items:
+      - { id: ecl_model, label: ECL模型选择是否适当, type: conclusion }
+      - { id: aging_group, label: 账龄组合划分是否合理, type: conclusion }
+      - { id: loss_rate_basis, label: 预期损失率确定依据是否充分, type: conclusion }
+      - { id: forward_looking, label: 前瞻性调整是否合理, type: conclusion }
+    guidance:
+      methodology_context: amber_left_border
+    ai_section: policy-check
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 三阶段划分检查表K1-7 (63行×11列)
+  # ─────────────────────────────────────────────────────────────────────────
+  三阶段划分检查表K1-7:
+    code: K1-7
+    group: impairment
+    dimensions: "63×11"
+    component: K1TabStageCheck
+    class_code: F-检查表
+    virtual_scroll: true
+    import_export: true
+    highlights:
+      - { condition: "stage == 3", style: red, tooltip: "Stage3已减值" }
+      - { condition: "stage == 2", style: orange, tooltip: "Stage2信用风险显著增加" }
+    cross_refs:
+      - ref_id: CW-K1-7-001
+        target_wp: K1-2
+        description: '阶段列联动 → K1-2明细'
+        direction: outbound
+      - ref_id: CW-K1-7-002
+        target_wp: K1-8
+        description: '阶段 → K1-8测算'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 坏账准备测算K1-8 (62行×19列, 11公式, 2区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  坏账准备测算K1-8:
+    code: K1-8
+    group: impairment
+    dimensions: "62×19"
+    component: K1TabBadDebtCalc
+    class_code: G-测算
+    virtual_scroll: true
+    formula_count: 11
+    tab_sections:
+      - name: 账龄迁徙
+        tab_index: 0
+      - name: ECL测算
+        tab_index: 1
+    formulas:
+      - { name: calcECL, target: ecl, expr: "ead * pd * lgd" }
+      - { name: calcAgingLoss, target: aging_loss, expr: "balance * lossRate" }
+      - { name: calcProvisionVariance, target: variance, expr: "calculated - booked" }
+    highlights:
+      - { condition: "variance > materiality", style: red, tooltip: "差异超重要性水平" }
+    cross_refs:
+      - ref_id: CW-K1-8-001
+        target_wp: K1-3
+        description: '测算应计提 → K1-3坏账明细'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 坏账准备转回收回核销检查表K1-9
+  # ─────────────────────────────────────────────────────────────────────────
+  坏账准备转回收回核销检查表K1-9:
+    code: K1-9
+    group: inspection
+    component: K1TabWriteoffCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - ocr: { endpoint: "/d4/contract-ocr" }
+    cross_refs:
+      - ref_id: CW-K1-9-001
+        target_wp: K1-3
+        description: '核销/转回 核对 ← K1-3坏账明细'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 长期未收回款项检查表K1-10
+  # ─────────────────────────────────────────────────────────────────────────
+  长期未收回款项检查表K1-10:
+    code: K1-10
+    group: inspection
+    component: K1TabOverdueCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    ai_section: overdue-eval
+    cross_refs:
+      - ref_id: CW-K1-10-001
+        target_wp: K1-7
+        description: '长期未收回风险 → K1-7阶段升级'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 13: 关联方及交易检查表K1-11
+  # ─────────────────────────────────────────────────────────────────────────
+  关联方及交易检查表K1-11:
+    code: K1-11
+    group: inspection
+    component: K1TabRelatedParty
+    class_code: F-检查表
+    dynamic_rows: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 14: 其他应收款检查表K1-12
+  # ─────────────────────────────────────────────────────────────────────────
+  其他应收款检查表K1-12:
+    code: K1-12
+    group: inspection
+    component: K1TabReceivableCheck
+    class_code: F-检查表
+    highlights:
+      - { condition: "conclusion == '不合规'", style: red }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 15: 附注披露信息（上市公司）(166行×12列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "166×12"
+    component: K1TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 16: 附注披露信息（国有企业）(130行×10列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "130×10"
+    component: K1TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }

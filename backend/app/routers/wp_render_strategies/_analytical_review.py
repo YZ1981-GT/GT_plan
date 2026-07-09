@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 
-import sqlalchemy as sa
+from app.services.project_audit_year import fetch_project_audit_year
 
 from ._context import RenderContext
 
@@ -29,15 +29,10 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         # scope: standalone for A1-13, consolidated for A1-14
         ar_scope = "consolidated" if wp_code == "A1-14" else "standalone"
-        # Get year from project
-        year_result = await db.execute(
-            sa.text(
-                "SELECT EXTRACT(YEAR FROM audit_period_end)::int "
-                "FROM projects WHERE id = :pid"
-            ),
-            {"pid": str(project_id)},
-        )
-        ar_year = year_result.scalar_one_or_none() or 2025
+        ar_year = await fetch_project_audit_year(db, project_id)
+        if not ar_year:
+            from datetime import datetime
+            ar_year = datetime.now().year - 1
         ar_data = await get_analytical_review_data(
             db, project_id, ar_year, wp_code, ar_scope
         )

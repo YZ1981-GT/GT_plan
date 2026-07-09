@@ -41,7 +41,8 @@ VALID_D1_CONCLUSIONS = [
     "组合评估", "个别认定",
     "AJE", "RJE",
     "listed", "soe", "general",
-    "Y", "N",
+    "Y", "N", "是", "否",
+    "合理", "基本合理但需关注", "不合理",
 ]
 
 # Invalid conclusion values (not in D1 whitelist)

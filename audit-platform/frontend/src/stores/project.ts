@@ -30,6 +30,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { getProject, getProjectAuditYear } from '@/services/auditPlatformApi'
+import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
@@ -110,9 +111,10 @@ export const useProjectStore = defineStore('project', () => {
         clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
         projectStatus.value = (proj as any)?.status || ''
         auditScope.value = (proj as any)?.audit_scope || (proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone'
-        if ((proj as any)?.audit_year) {
-          const ay = Number((proj as any).audit_year)
-          if (Number.isFinite(ay) && ay > 2000) auditYear.value = ay
+        const resolved = resolveAuditYearFromProject(proj as any)
+        if (resolved) {
+          auditYear.value = resolved
+          if (!Number.isFinite(qy) || qy <= 2000) year.value = resolved
         }
       } catch { /* ignore */ }
     }
@@ -132,12 +134,10 @@ export const useProjectStore = defineStore('project', () => {
       clientName.value = (proj as any)?.client_name || (proj as any)?.name || ''
       projectStatus.value = (proj as any)?.status || ''
       auditScope.value = (proj as any)?.audit_scope || (proj as any)?.project_type === 'consolidated' ? 'consolidated' : 'standalone'
-      if ((proj as any)?.audit_year) {
-        const ay = Number((proj as any).audit_year)
-        if (Number.isFinite(ay) && ay > 2000) {
-          auditYear.value = ay
-          year.value = ay
-        }
+      const resolved = resolveAuditYearFromProject(proj as any)
+      if (resolved) {
+        auditYear.value = resolved
+        year.value = resolved
       }
     } catch { /* ignore */ }
     // Load project role

@@ -204,8 +204,8 @@ export function useN5CrossSheet(
 
   // ─── 订阅 EventBus ─────────────────────────────────────────────────────────
 
-  eventBus.on('deferred-tax:asset-updated' as any, _onDeferredTaxAssetUpdated)
-  eventBus.on('deferred-tax:liability-updated' as any, _onDeferredTaxLiabilityUpdated)
+  eventBus.on('deferred-tax:asset-updated', _onDeferredTaxAssetUpdated)
+  eventBus.on('deferred-tax:liability-updated', _onDeferredTaxLiabilityUpdated)
 
   // ─── 初始化：从 allResponses 恢复已持久化的跨底稿数据 ─────────────────────
 
@@ -509,7 +509,7 @@ export function useN5CrossSheet(
     const { current, deferred, total } = adjudicationVsCalc.value
     const rate = effectiveTaxRate.value.rate
 
-    eventBus.emit('income-tax:updated' as any, {
+    eventBus.emit('income-tax:updated', {
       wpCode: 'N5',
       currentTax: current,
       deferredTax: deferred,
@@ -553,8 +553,8 @@ export function useN5CrossSheet(
   // ─── Cleanup（组件卸载取消订阅） ──────────────────────────────────────────
 
   onScopeDispose(() => {
-    eventBus.off('deferred-tax:asset-updated' as any, _onDeferredTaxAssetUpdated)
-    eventBus.off('deferred-tax:liability-updated' as any, _onDeferredTaxLiabilityUpdated)
+    eventBus.off('deferred-tax:asset-updated', _onDeferredTaxAssetUpdated)
+    eventBus.off('deferred-tax:liability-updated', _onDeferredTaxLiabilityUpdated)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────

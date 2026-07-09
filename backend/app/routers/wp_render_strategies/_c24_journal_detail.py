@@ -56,8 +56,15 @@ async def render(ctx: RenderContext) -> dict | None:
                 "conclusion": row.conclusion or "",
                 "remark": row.remark or "",
             }
-            # 统计已导入分录数量（存储在 C24-journal-entries item_id）
-            if row.item_id == "C24-journal-entries" and row.remark:
+            # 统计已导入分录数量
+            if row.item_id == "C24-journal-source" and row.remark:
+                try:
+                    meta = json.loads(row.remark)
+                    if isinstance(meta, dict) and meta.get("count") is not None:
+                        journal_entry_count = int(meta["count"])
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+            elif row.item_id == "C24-journal-entries" and row.remark:
                 try:
                     entries = json.loads(row.remark)
                     if isinstance(entries, list):

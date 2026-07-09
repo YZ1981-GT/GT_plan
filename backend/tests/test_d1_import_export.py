@@ -26,11 +26,18 @@ from app.routers.wp_render_strategies._d1_import_export import (
     _export_d1_2_row,
     _export_d1_3_row,
     _export_d1_4_row,
+    _export_d1_5_row,
     _parse_d1_2_row,
     _parse_d1_3_row,
     _parse_d1_4_row,
+    _parse_d1_5_row,
+    _parse_d1_5_legacy_row,
+    _normalize_d1_5_headers,
+    _D1_5_LEGACY_HEADERS,
+    _validate_columns_against,
     _validate_columns,
     _create_template_wb,
+    _find_header_row,
     _SHEET_HEADERS,
 )
 
@@ -243,15 +250,85 @@ def test_template_workbook_has_correct_headers() -> None:
     for sheet_code in ["D1-2", "D1-3", "D1-4"]:
         wb = _create_template_wb(sheet_code)
         ws = wb.active
-
-        actual_headers = [
-            cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))
-            if cell.value is not None
-        ]
-
         expected = _SHEET_HEADERS[sheet_code]
-        assert actual_headers == expected, f"{sheet_code}: headers mismatch"
-        assert ws.freeze_panes == "A2", f"{sheet_code}: freeze panes not set"
+        header_row, actual_headers = _find_header_row(ws, expected)
+        # 去掉尾部空列后比较
+        actual_trimmed = [h for h in actual_headers if h][: len(expected)]
+        # 允许 actual 含 fill 后的列；至少应覆盖全部期望列
+        missing = [h for h in expected if h not in actual_headers]
+        assert not missing, f"{sheet_code}: missing headers {missing} (row={header_row})"
+        assert header_row >= 1
+        if sheet_code == "D1-4":
+            assert header_row == 2, "D1-4 双行合并表头叶子行应为第2行"
+            assert "编制说明" in wb.sheetnames
+            assert ws.freeze_panes == "A3"
+        else:
+            assert header_row == 1
+            assert "编制说明" in wb.sheetnames
+            assert ws.freeze_panes == "A2"
+            assert actual_trimmed == expected
+
+
+def test_find_header_row_with_title_and_merged_d1_4() -> None:
+    """标题行 + 双行合并表头时仍能定位叶子表头。"""
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["应收票据坏账准备明细表 D1-4"])
+    ws.append([])
+    ws.append(["项目", "期初余额", None, None, "本期增加", None, "本期减少", None, None, "期末余额", None])
+    ws.append(_SHEET_HEADERS["D1-4"])
+    hr, headers = _find_header_row(ws, _SHEET_HEADERS["D1-4"])
+    assert hr == 4, f"expected leaf header at row 4, got {hr}"
+    missing = [h for h in _SHEET_HEADERS["D1-4"] if h not in headers]
+    assert not missing, missing
+
+
+def test_d1_5_template_and_roundtrip() -> None:
+    """D1-5 模板含标题区+编制说明；导出行可解析回结构。"""
+    wb = _create_template_wb("D1-5")
+    assert "编制说明" in wb.sheetnames
+    ws = wb.active
+    header_row, headers = _find_header_row(ws, _SHEET_HEADERS["D1-5"])
+    assert header_row == 5, f"expected header row 5, got {header_row}"
+    missing = _validate_columns_against(_normalize_d1_5_headers(headers), "D1-5")
+    assert not missing, missing
+
+    sample = {
+        "description": "重分类调整",
+        "category": "账项调整",
+        "reportItem": "应收票据",
+        "accountName": "1121-应收票据",
+        "noteItem": "应收票据",
+        "debitAmount": 1000,
+        "creditAmount": 0,
+        "indexRef": "D1-3",
+    }
+    exported = _export_d1_5_row(sample)
+    parsed = _parse_d1_5_row(tuple(exported), _SHEET_HEADERS["D1-5"])
+    assert parsed["description"] == "重分类调整"
+    assert parsed["debitAmount"] == 1000
+    assert parsed["accountName"] == "1121-应收票据"
+
+
+def test_d1_5_legacy_import_split() -> None:
+    """旧版借方/贷方/金额格式拆分为双列行。"""
+    headers = _D1_5_LEGACY_HEADERS
+    row = (1, "AJE", "1121-应收票据", "6001-收入", 500, "测试")
+    rows = _parse_d1_5_legacy_row(row, headers, 1)
+    assert len(rows) == 2
+    assert rows[0]["debitAmount"] == 500
+    assert rows[1]["creditAmount"] == 500
+
+
+def test_guidance_sheet_content_d1_3_d1_4() -> None:
+    for code in ("D1-3", "D1-4", "D1-5"):
+        wb = _create_template_wb(code)
+        assert "编制说明" in wb.sheetnames
+        guide = wb["编制说明"]
+        texts = [str(c.value or "") for row in guide.iter_rows(min_col=1, max_col=1) for c in row]
+        assert any("注意事项" in t or "填写要求" in t for t in texts)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

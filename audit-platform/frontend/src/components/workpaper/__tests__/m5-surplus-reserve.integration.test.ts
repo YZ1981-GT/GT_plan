@@ -178,7 +178,7 @@ describe('集成测试 — EventBus m6:net-profit → useM5CrossSheet (Req 4.2)'
       expect(_m6NetProfit.value).toBe(0)
 
       // 模拟M6发布净利润事件
-      eventBus.emit('m6:net-profit' as any, {
+      eventBus.emit('m6:net-profit', {
         netProfit: 5000000,
         accrualBase: 4800000,
       })
@@ -201,7 +201,7 @@ describe('集成测试 — EventBus m6:net-profit → useM5CrossSheet (Req 4.2)'
     scope.run(() => {
       const { _m6NetProfit } = useM5CrossSheet(responses)
 
-      eventBus.emit('m6:net-profit' as any, { netProfit: 3000000 })
+      eventBus.emit('m6:net-profit', { netProfit: 3000000 })
 
       expect(_m6NetProfit.value).toBe(3000000)
     })
@@ -215,7 +215,7 @@ describe('集成测试 — EventBus m6:net-profit → useM5CrossSheet (Req 4.2)'
     scope.run(() => {
       const { _m6NetProfit } = useM5CrossSheet(responses)
 
-      eventBus.emit('m6:net-profit' as any, { amount: 2500000 })
+      eventBus.emit('m6:net-profit', { amount: 2500000 })
 
       expect(_m6NetProfit.value).toBe(2500000)
     })
@@ -322,7 +322,7 @@ describe('集成测试 — accrualVsM6 M5-4计提基数 vs M6净利润 (Req 4.2)
       expect(accrualVsM6.value.isConsistent).toBe(false)
 
       // M6发布净利润，与M5-4基数一致
-      eventBus.emit('m6:net-profit' as any, { accrualBase: 5000000 })
+      eventBus.emit('m6:net-profit', { accrualBase: 5000000 })
 
       // 更新后 → diff=0
       expect(accrualVsM6.value.diff).toBe(0)
@@ -425,7 +425,7 @@ describe('集成测试 — E2E: M6 publishes → M5 calculates → diff flagged 
       const crossSheet = useM5CrossSheet(responses)
 
       // Step 1: M6发布净利润
-      eventBus.emit('m6:net-profit' as any, {
+      eventBus.emit('m6:net-profit', {
         wpCode: 'M6',
         netProfit: 5000000,
         accrualBase: 5000000,
@@ -498,7 +498,7 @@ describe('集成测试 — E2E: M6 publishes → M5 calculates → diff flagged 
       const crossSheet = useM5CrossSheet(responses)
 
       // (1) M6发布净利润=10000000
-      eventBus.emit('m6:net-profit' as any, { accrualBase: 10000000 })
+      eventBus.emit('m6:net-profit', { accrualBase: 10000000 })
       expect(crossSheet.accrualVsM6.value.isConsistent).toBe(true)
 
       // (2) M5计算计提金额
@@ -560,14 +560,14 @@ describe('集成测试 — EventBus cleanup on scope dispose (Req 4.7)', () => {
     })
 
     // scope active 时事件触发有效
-    eventBus.emit('m6:net-profit' as any, { accrualBase: 7000000 })
+    eventBus.emit('m6:net-profit', { accrualBase: 7000000 })
     expect(crossSheet!._m6NetProfit.value).toBe(7000000)
 
     // 停止 scope
     scope.stop()
 
     // 此时再 emit 不应触发更新（handler 已移除）
-    eventBus.emit('m6:net-profit' as any, { accrualBase: 9999999 })
+    eventBus.emit('m6:net-profit', { accrualBase: 9999999 })
     expect(crossSheet!._m6NetProfit.value).toBe(7000000) // 值不变
   })
 })

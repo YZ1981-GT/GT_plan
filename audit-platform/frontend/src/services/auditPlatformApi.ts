@@ -3,6 +3,7 @@
   * 封装所有后端 API 调用
   */
  import http from '@/utils/http'
+ import { resolveAuditYearFromProject } from '@/utils/resolveAuditYear'
  import {
    projects as P_proj, trialBalance as P_tb, adjustments as P_adj,
    materiality as P_mat, misstatements as P_mis, reports as P_rpt,
@@ -15,6 +16,8 @@
    name?: string | null
    client_name?: string | null
    audit_year?: number | string | null
+   audit_period_end?: string | null
+   audit_period_start?: string | null
  }
 
  export async function listProjects(): Promise<ProjectListItem[]> {
@@ -29,8 +32,7 @@
 
 export async function getProjectAuditYear(projectId: string): Promise<number | null> {
   const project = await getProject(projectId)
-  const auditYear = Number(project?.audit_year)
-  return Number.isFinite(auditYear) && auditYear > 2000 ? auditYear : null
+  return resolveAuditYearFromProject(project)
 }
 
 // ─── Trial Balance ───

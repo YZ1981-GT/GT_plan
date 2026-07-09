@@ -111,6 +111,13 @@
       />
       </template>
     </template>
+
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d4ReviewSection.id"
+      :section-label="d4ReviewSection.label"
+    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -130,6 +137,9 @@ import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from '
 import { useD4FormData } from './composables/useD4FormData'
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
+import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
 import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
@@ -249,6 +259,8 @@ const currentSheet = computed(() => {
   if (name.includes('国企') || name.includes('国有')) return '附注国企'
   return name
 })
+
+const d4ReviewSection = computed(() => resolveCycleReviewSection('D4', currentSheet.value))
 
 const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],

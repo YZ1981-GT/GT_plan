@@ -256,9 +256,9 @@ _CRITICAL_A_CODES = [
     "I1-2",     # audit-sheet (无形资产明细表)
     "I3-4",     # audit-sheet (DCF测算WACC/NPV)
     # J 类关键底稿 — 职工薪酬循环
-    "J1A",      # a-program-console (应付职工薪酬程序表)
-    "J2A",      # a-program-console (设定受益计划程序表)
-    "J3A",      # a-program-console (股份支付程序表)
+    "J1A",      # j1-employee-compensation (应付职工薪酬程序表，整册内分发)
+    "J2A",      # j2-defined-benefit-plan (设定受益计划程序表，整册内分发)
+    "J3A",      # j3-share-based-payment (股份支付程序表，整册内分发)
     "J1-1",     # d-form-table (应付职工薪酬审定表)
     "J2-1",     # d-form-table (设定受益计划审定表)
     "J3-1",     # d-form-table (股份支付审定表)
@@ -310,8 +310,8 @@ _CRITICAL_A_CODES = [
     "L4-1",     # d-form-table (应付债券审定表明细)
     "L8-1",     # d-form-table (财务费用审定表明细)
     # M 类关键底稿 — 权益循环
-    "M1A",      # a-program-console (实收资本程序表)
-    "M6A",      # a-program-console (利润分配程序表)
+    "M1A",      # m1-dividends-payable (应付股利程序表，整册内分发)
+    "M6A",      # m6-retained-earnings (未分配利润程序表，整册内分发)
     "M2",       # d-form-table (资本公积审定表)
     "M2-1",     # d-form-table (资本公积审定表明细)
     "M6",       # d-form-table (利润分配审定表)

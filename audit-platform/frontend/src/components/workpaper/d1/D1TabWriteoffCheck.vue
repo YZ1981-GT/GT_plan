@@ -22,6 +22,7 @@ import {
   useD1WriteoffCheck,
   RECOVERY_METHODS,
   NOTE_NATURES,
+  YN_OPTIONS,
   type ReversalRow,
   type WriteoffRow,
 } from '../composables/useD1WriteoffCheck'
@@ -31,6 +32,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD1AiGenerate } from '../composables/useD1AiGenerate'
+import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -53,6 +55,8 @@ const injectedDisplayPrefs = inject<{ fmtAmount: (v: number) => string }>('displ
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
+const wpIdImportRef = toRef(props, 'wpId') as unknown as Ref<string>
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdImportRef, 'D1-16')
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -79,6 +83,8 @@ const {
   missingWriteoffFields,
   auditNote,
   auditConclusion,
+  auditProcedures,
+  saveAuditProcedures,
   saveAuditNote,
   saveAuditConclusion,
   isLoading,
@@ -90,11 +96,11 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: async (items: ChecklistItem[]) => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch { ElMessage.warning('保存失败，请重试') }
   },
   saveDebouncedText: (item: ChecklistItem) => {
-    http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items: [item] })
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items: [item] })
       .catch(() => { /* silent */ })
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
@@ -153,8 +159,13 @@ async function onSyncWriteoffToD14() {
 
 const wpIdRef = toRef(props, 'wpId')
 const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
+const aiLoadingProcedures = ref(false)
 const aiLoadingNote = ref(false)
 const aiLoadingConclusion = ref(false)
+const writebackPreviewVisible = ref(false)
+const writebackPreviewTitle = ref('')
+const writebackPreviewItems = ref<Array<{ key: string; label: string; value: string; checked: boolean }>>([])
+const pendingWritebackScope = ref<'procedures' | ''>('')
 
 function buildWriteoffContext(): string {
   const lines: string[] = []
@@ -174,6 +185,101 @@ function buildWriteoffContext(): string {
   }
 
   return lines.join('\n')
+}
+
+const DEFAULT_AUDIT_OBJECTIVE = '应收票据坏账准备转回和核销金额已恰当反映于财务报表，相关会计处理符合准则要求，转回与核销依据充分、审批流程完整且与台账一致。'
+
+function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function extractLabelSections(text: string, labels: string[]): Record<string, string> {
+  const result: Record<string, string> = {}
+  const normalized = (text || '').replace(/\r\n/g, '\n')
+  if (!normalized.trim()) return result
+
+  const starts = labels
+    .map((label) => {
+      const re = new RegExp(`(?:^|\\n)\\s*(?:\\d+[\\.、]\\s*|[（(]\\d+[)）]\\s*)?${escapeRegex(label)}\\s*[：:]\\s*`, 'g')
+      const match = re.exec(normalized)
+      if (!match || match.index == null) return null
+      return { label, start: match.index + match[0].length }
+    })
+    .filter((v): v is { label: string; start: number } => !!v)
+    .sort((a, b) => a.start - b.start)
+
+  for (let i = 0; i < starts.length; i += 1) {
+    const cur = starts[i]
+    const end = i + 1 < starts.length ? starts[i + 1].start : normalized.length
+    result[cur.label] = normalized.slice(cur.start, end).trim()
+  }
+  return result
+}
+
+function openWritebackPreview(
+  title: string,
+  scope: 'procedures',
+  sections: Record<string, string>,
+  preferredOrder: string[],
+) {
+  const items = preferredOrder
+    .map((key) => {
+      const value = (sections[key] || '').trim()
+      if (!value) return null
+      return { key, label: key, value, checked: true }
+    })
+    .filter((item): item is { key: string; label: string; value: string; checked: boolean } => !!item)
+  if (items.length === 0) {
+    ElMessage.info('AI未返回可回写字段')
+    return
+  }
+  writebackPreviewTitle.value = title
+  pendingWritebackScope.value = scope
+  writebackPreviewItems.value = items
+  writebackPreviewVisible.value = true
+}
+
+function applySelectedWriteback() {
+  const selected = writebackPreviewItems.value.filter((item) => item.checked)
+  if (selected.length === 0) {
+    ElMessage.info('请至少勾选一个字段')
+    return
+  }
+  if (pendingWritebackScope.value === 'procedures') {
+    for (const item of selected) {
+      if (item.key === '审计过程') saveAuditProcedures(item.value)
+    }
+  }
+  writebackPreviewVisible.value = false
+  pendingWritebackScope.value = ''
+  ElMessage.success(`已回写 ${selected.length} 个字段`)
+}
+
+function selectAllWritebackItems() {
+  writebackPreviewItems.value.forEach((item) => { item.checked = true })
+}
+
+function clearAllWritebackItems() {
+  writebackPreviewItems.value.forEach((item) => { item.checked = false })
+}
+
+async function generateAuditProceduresWithAI() {
+  aiLoadingProcedures.value = true
+  try {
+    const text = await generateAndConfirm(
+      'writeoff-audit-procedures',
+      buildWriteoffContext() + `\n【现有审计过程】${auditProcedures.value || '（未填写）'}`,
+      {
+        guidance: '请输出“审计过程：”段落，体现穿行检查、凭证核验、审批程序复核、关联方识别、与D1-4勾稽及异常处理。',
+      },
+      'AI · 审计过程',
+    )
+    if (!text) return
+    const sections = extractLabelSections(text, ['审计过程'])
+    openWritebackPreview('AI回写预览 · 审计过程', 'procedures', sections, ['审计过程'])
+  } finally {
+    aiLoadingProcedures.value = false
+  }
 }
 
 async function generateAuditNoteWithAI() {
@@ -228,14 +334,43 @@ const GUIDANCE_TEXTS = [
 
     <template v-if="!isLoading">
       <div class="tab-header">
-        <h4>转回核销检查 D1-16</h4>
-        <GtReviewTrigger section-id="D1-writeoff-header" />
+        <h4>应收票据大额坏账准备转回、核销检查表 D1-16</h4>
+        <div class="toolbar-right">
+          <GtReviewTrigger section-id="D1-writeoff-header" />
+          <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+          <el-button size="small" @click="onExportData">导出数据</el-button>
+          <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+            <el-button size="small">导入数据</el-button>
+          </el-upload>
+        </div>
       </div>
+
+      <details class="methodology-collapse" open>
+        <summary class="methodology-summary">📖 审计目标与审计过程（点击展开/收起）</summary>
+        <div class="methodology-body">
+          <p class="method-title"><strong>一、审计目标：</strong></p>
+          <p class="objective-static">{{ DEFAULT_AUDIT_OBJECTIVE }}</p>
+          <div class="method-title-row">
+            <p class="method-title"><strong>二、审计过程：</strong></p>
+            <el-tooltip :content="aiAvailable ? 'AI辅助生成审计过程' : 'AI服务暂不可用'" placement="top">
+              <el-button size="small" :loading="aiLoadingProcedures" :disabled="isReadonly || !aiAvailable" @click="generateAuditProceduresWithAI">🤖 AI</el-button>
+            </el-tooltip>
+          </div>
+          <el-input
+            type="textarea"
+            :rows="3"
+            :model-value="auditProcedures"
+            placeholder="请填写审计过程..."
+            :disabled="isReadonly"
+            @change="(v: string) => saveAuditProcedures(v || '')"
+          />
+        </div>
+      </details>
       <!-- ═══════════════════════════════════════════════════════════════════ -->
       <!-- Section 1: 转回检查 -->
       <!-- ═══════════════════════════════════════════════════════════════════ -->
       <section class="reversal-section">
-        <h3 class="section-heading">(一)本期重要的坏账准备转回检查</h3>
+        <h3 class="section-heading">（一）本期重要的坏账准备转回检查</h3>
         <div class="section-stat">
           共{{ reversalRows.length }}笔转回，合计金额{{ fmtAmount(reversalTotalE) }}元
         </div>
@@ -301,7 +436,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
 
           <!-- D: 原依据 -->
-          <el-table-column label="原依据" min-width="120">
+          <el-table-column label="原确定坏账准备的依据" min-width="160">
             <template #default="{ row }: { row: ReversalRow }">
               <el-input
                 type="textarea"
@@ -315,7 +450,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
 
           <!-- E: 转回金额 -->
-          <el-table-column label="转回金额" width="110" align="right">
+          <el-table-column label="收回或转回金额" width="130" align="right">
             <template #default="{ row }: { row: ReversalRow }">
               <el-tooltip
                 v-if="reversalExceedsProvision(row)"
@@ -347,7 +482,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
 
           <!-- F: 原计提 -->
-          <el-table-column label="原计提" width="110" align="right">
+          <el-table-column label="收回或转回前累计已计提坏账准备金额" width="210" align="right">
             <template #default="{ row }: { row: ReversalRow }">
               <el-input-number
                 :model-value="row.priorProvisionAmount"
@@ -484,12 +619,12 @@ const GUIDANCE_TEXTS = [
       <!-- Section 2: 核销检查 -->
       <!-- ═══════════════════════════════════════════════════════════════════ -->
       <section class="writeoff-section">
-        <h3 class="section-heading">(二)本期重要的核销应收票据检查</h3>
+        <h3 class="section-heading">（二）本期重要的核销应收票据检查</h3>
         <div class="section-stat">
           共{{ writeoffRows.length }}笔核销，合计金额{{ fmtAmount(writeoffTotalC) }}元
         </div>
 
-        <!-- 5列核销表格 -->
+        <!-- 8列核销表格 -->
         <el-table
           :data="writeoffRows"
           border
@@ -513,7 +648,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
 
           <!-- B: 性质 -->
-          <el-table-column label="性质" width="120">
+          <el-table-column label="应收票据的性质" width="140">
             <template #default="{ row }: { row: WriteoffRow }">
               <el-select
                 :model-value="row.noteNature"
@@ -580,6 +715,63 @@ const GUIDANCE_TEXTS = [
                   v-if="row.writeoffAmount > 0 && !row.writeoffProcedure.trim()"
                   class="required-star"
                 >*</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- F: 是否关联交易产生 -->
+          <el-table-column label="是否由关联交易产生" width="150">
+            <template #default="{ row }: { row: WriteoffRow }">
+              <el-select
+                :model-value="row.isRelatedPartyGenerated"
+                placeholder="选择"
+                size="small"
+                clearable
+                :disabled="isReadonly"
+                style="width: 100%"
+                @change="(v: string) => updateWriteoffRow(row.id, 'isRelatedPartyGenerated', v || '')"
+              >
+                <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
+              </el-select>
+            </template>
+          </el-table-column>
+
+          <!-- G: 合理性分析 -->
+          <el-table-column label="合理性分析" min-width="150">
+            <template #default="{ row }: { row: WriteoffRow }">
+              <div class="cell-with-star">
+                <el-input
+                  type="textarea"
+                  :rows="2"
+                  :model-value="row.reasonabilityAnalysis"
+                  placeholder="合理性分析..."
+                  :disabled="isReadonly"
+                  @change="(v: string) => updateWriteoffRow(row.id, 'reasonabilityAnalysis', v || '')"
+                />
+                <span
+                  v-if="row.writeoffAmount > 0 && !row.reasonabilityAnalysis.trim()"
+                  class="required-star"
+                >*</span>
+              </div>
+            </template>
+          </el-table-column>
+
+          <!-- H: 索引号 -->
+          <el-table-column label="索引号" width="110">
+            <template #default="{ row }: { row: WriteoffRow }">
+              <div class="index-cell">
+                <el-input
+                  :model-value="row.indexRef"
+                  size="small"
+                  placeholder="索引号"
+                  :disabled="isReadonly"
+                  @change="(v: string) => updateWriteoffRow(row.id, 'indexRef', v || '')"
+                />
+                <GtIndexChip
+                  v-if="row.indexRef"
+                  :value="row.indexRef"
+                  :context-project-id="projectId"
+                />
               </div>
             </template>
           </el-table-column>
@@ -730,6 +922,30 @@ const GUIDANCE_TEXTS = [
           <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
         </details>
       </section>
+
+      <el-dialog v-model="writebackPreviewVisible" :title="writebackPreviewTitle" width="640px" destroy-on-close>
+        <div class="writeback-preview">
+          <div class="writeback-toolbar">
+            <el-button size="small" @click="selectAllWritebackItems">全选</el-button>
+            <el-button size="small" @click="clearAllWritebackItems">全不选</el-button>
+          </div>
+          <div
+            v-for="item in writebackPreviewItems"
+            :key="item.key"
+            class="writeback-item"
+          >
+            <el-checkbox v-model="item.checked" class="writeback-item-check" />
+            <div class="writeback-item-content">
+              <div class="writeback-item-label">{{ item.label }}</div>
+              <div class="writeback-item-value">{{ item.value }}</div>
+            </div>
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="writebackPreviewVisible = false">取消</el-button>
+          <el-button type="primary" @click="applySelectedWriteback">确认回写</el-button>
+        </template>
+      </el-dialog>
     </template>
   </div>
 </template>
@@ -742,13 +958,66 @@ const GUIDANCE_TEXTS = [
 .tab-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 12px;
 }
 
 .tab-header h4 {
   margin: 0;
   font-size: 15px;
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.methodology-collapse {
+  margin-bottom: 16px;
+  border-radius: 6px;
+  border: 1px solid #faecd8;
+  border-left: 3px solid #e6a23c;
+  background: #fffbf0;
+}
+
+.methodology-summary {
+  cursor: pointer;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b88230;
+}
+
+.methodology-body {
+  padding: 8px 14px 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.method-title {
+  margin: 0 0 8px;
+}
+
+.objective-static {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.method-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.method-title-row .method-title {
+  margin: 0;
 }
 
 .mode-switcher {
@@ -789,6 +1058,12 @@ const GUIDANCE_TEXTS = [
 /* 表格样式 */
 .writeoff-table {
   margin-bottom: 4px;
+}
+
+::deep(.writeoff-table .el-table__cell),
+::deep(.writeoff-table .el-input__inner),
+::deep(.writeoff-table .el-textarea__inner) {
+  font-size: 13px;
 }
 
 :deep(.writeoff-table .el-textarea__inner) {
@@ -949,5 +1224,49 @@ const GUIDANCE_TEXTS = [
 .guidance-fold p {
   margin: 6px 0;
   line-height: 1.6;
+}
+
+.writeback-preview {
+  max-height: 52vh;
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.writeback-toolbar {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.writeback-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.writeback-item-check {
+  padding-top: 2px;
+}
+
+.writeback-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.writeback-item-label {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+
+.writeback-item-value {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: #303133;
+  word-break: break-word;
 }
 </style>

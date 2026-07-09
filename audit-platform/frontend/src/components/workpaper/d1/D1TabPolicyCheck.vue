@@ -53,7 +53,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wp
 async function saveImmediate(items: any[]): Promise<void> {
   if (props.isReadonly) return
   try {
-    await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
   } catch {
     ElMessage.warning('保存失败，请重试')
   }
@@ -65,7 +65,7 @@ async function debouncedSave(items: any[]): Promise<void> {
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(async () => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch {
       ElMessage.warning('保存失败，请重试')
     }
@@ -109,13 +109,6 @@ const {
   isReadonly: toRef(props, 'isReadonly') as unknown as Ref<boolean>,
 })
 
-// ─── Header Info ─────────────────────────────────────────────────────────────
-
-const entityName = computed(() => props.allResponses?.get('D1-header-entity-name')?.remark ?? '')
-const periodEnd = computed(() => props.allResponses?.get('D1-header-period-end')?.remark ?? '')
-const indexNo = computed(() => props.allResponses?.get('D1-header-index-no')?.remark ?? 'D1-14')
-const pageNo = computed(() => props.allResponses?.get('D1-header-page-no')?.remark ?? '')
-
 // ─── Audit Objective (static) ────────────────────────────────────────────────
 
 const auditObjectiveText = '检查公司应收票据坏账准备的会计政策是否符合《企业会计准则第22号——金融工具确认和计量》的规定，评价预期信用损失模型的适当性，核实会计政策在各期间是否一贯适用，并对政策合理性形成审计结论。'
@@ -124,6 +117,109 @@ const auditObjectiveText = '检查公司应收票据坏账准备的会计政策�
 
 const wpIdRef = toRef(props, 'wpId')
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD1AiGenerate(wpIdRef)
+const aiLoadingOverview = ref(false)
+const aiLoadingEclModel = ref(false)
+const writebackPreviewVisible = ref(false)
+const writebackPreviewTitle = ref('')
+const writebackPreviewItems = ref<Array<{ key: string; label: string; value: string; checked: boolean }>>([])
+const pendingWritebackScope = ref<'overview' | 'ecl' | ''>('')
+
+function escapeRegex(input: string): string {
+  return input.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * 容错解析 AI 文本中的“标签：内容”多段结构。
+ * 支持：
+ * - 中文/英文冒号（：/:）
+ * - 标签前编号（1. / 1、 / （1））
+ * - 多行段落内容，直到下一个标签开始
+ */
+function extractLabelSections(text: string, labels: string[]): Record<string, string> {
+  const result: Record<string, string> = {}
+  const normalized = (text || '').replace(/\r\n/g, '\n')
+  if (!normalized.trim()) return result
+
+  const positions: Array<{ label: string; idx: number; start: number }> = []
+  for (const label of labels) {
+    const marker = new RegExp(String.raw`(?:^|\s)(?:[（(]?\d+[)）.、]?\s*)?${escapeRegex(label)}\s*[：:]`, 'm')
+    const matched = marker.exec(normalized)
+    if (!matched || matched.index < 0) continue
+    const start = matched.index + matched[0].length
+    positions.push({ label, idx: matched.index, start })
+  }
+  if (positions.length === 0) return result
+  positions.sort((a, b) => a.idx - b.idx)
+
+  for (let i = 0; i < positions.length; i++) {
+    const current = positions[i]
+    const next = positions[i + 1]
+    const end = next ? next.idx : normalized.length
+    const content = normalized.slice(current.start, end).trim()
+    if (content) {
+      result[current.label] = content
+    }
+  }
+  return result
+}
+
+function openWritebackPreview(
+  title: string,
+  scope: 'overview' | 'ecl',
+  sectionMap: Record<string, string>,
+  labels: string[],
+) {
+  const items = labels
+    .map((label) => ({
+      key: label,
+      label,
+      value: sectionMap[label] || '',
+      checked: Boolean(sectionMap[label]),
+    }))
+    .filter((item) => item.value)
+  if (items.length === 0) {
+    ElMessage.warning('AI 未生成可回写字段')
+    return
+  }
+  writebackPreviewTitle.value = title
+  pendingWritebackScope.value = scope
+  writebackPreviewItems.value = items
+  writebackPreviewVisible.value = true
+}
+
+function applySelectedWriteback() {
+  const selected = writebackPreviewItems.value.filter((item) => item.checked)
+  if (selected.length === 0) {
+    ElMessage.info('请至少勾选一个字段')
+    return
+  }
+  if (pendingWritebackScope.value === 'overview') {
+    for (const item of selected) {
+      if (item.key === '公司政策描述') policyOverviewLeft.value = item.value
+      if (item.key === '审计师核查意见') policyOverviewRight.value = item.value
+    }
+    savePolicyOverview()
+  } else if (pendingWritebackScope.value === 'ecl') {
+    for (const item of selected) {
+      if (item.key === '组合评估方法') eclModelPortfolio.value = item.value
+      if (item.key === '单项评估标准') eclModelIndividual.value = item.value
+      if (item.key === '迁徙率法参数') eclModelMigration.value = item.value
+      if (item.key === '审计师核查意见') eclModelRight.value = item.value
+    }
+    saveEclModel()
+  }
+  writebackPreviewVisible.value = false
+  pendingWritebackScope.value = ''
+  ElMessage.success(`已回写 ${selected.length} 个字段`)
+}
+
+function selectAllWritebackItems() {
+  writebackPreviewItems.value.forEach((item) => { item.checked = true })
+}
+
+function clearAllWritebackItems() {
+  writebackPreviewItems.value.forEach((item) => { item.checked = false })
+}
 
 function buildPolicyContext(): string {
   return [
@@ -148,6 +244,63 @@ async function generateConclusionWithAI() {
   if (text) {
     conclusionText.value = text
     saveConclusionText()
+  }
+}
+
+async function generateOverviewWithAI() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingOverview.value = true
+  try {
+    const text = await generateAndConfirm(
+      'ecl-audit-note',
+      [
+        `公司政策描述：${policyOverviewLeft.value || ''}`,
+        `审计师核查意见：${policyOverviewRight.value || ''}`,
+      ].join('\n'),
+      {
+        sheet: 'D1-14',
+        section: 'policy-overview',
+        task: '请生成“公司政策描述”和“审计师核查意见”两部分，使用“公司政策描述：”“审计师核查意见：”作为前缀。',
+      },
+      'AI · 会计政策概述',
+    )
+    if (!text) return
+    const sections = extractLabelSections(text, ['公司政策描述', '审计师核查意见'])
+    openWritebackPreview('AI回写预览 · 会计政策概述', 'overview', sections, ['公司政策描述', '审计师核查意见'])
+  } finally {
+    aiLoadingOverview.value = false
+  }
+}
+
+async function generateEclModelWithAI() {
+  if (props.isReadonly || !aiAvailable.value) return
+  aiLoadingEclModel.value = true
+  try {
+    const text = await generateAndConfirm(
+      'ecl-audit-note',
+      [
+        `组合评估方法：${eclModelPortfolio.value || ''}`,
+        `单项评估标准：${eclModelIndividual.value || ''}`,
+        `迁徙率法参数：${eclModelMigration.value || ''}`,
+        `审计师核查意见：${eclModelRight.value || ''}`,
+      ].join('\n'),
+      {
+        sheet: 'D1-14',
+        section: 'ecl-model',
+        task: '请生成“组合评估方法、单项评估标准、迁徙率法参数、审计师核查意见”四部分，分别用同名前缀输出。',
+      },
+      'AI · ECL模型描述',
+    )
+    if (!text) return
+    const sections = extractLabelSections(text, ['组合评估方法', '单项评估标准', '迁徙率法参数', '审计师核查意见'])
+    openWritebackPreview(
+      'AI回写预览 · ECL模型描述',
+      'ecl',
+      sections,
+      ['组合评估方法', '单项评估标准', '迁徙率法参数', '审计师核查意见'],
+    )
+  } finally {
+    aiLoadingEclModel.value = false
   }
 }
 
@@ -193,8 +346,8 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
       <template v-else>
         <div class="tab-header">
           <h4>会计政策检查 D1-14</h4>
-          <GtReviewTrigger section-id="D1-policy-header" />
           <div class="toolbar-right">
+            <GtReviewTrigger section-id="D1-policy-header" />
             <el-button size="small" @click="onExportTemplate">导出模板</el-button>
             <el-button size="small" @click="onExportData">导出数据</el-button>
             <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
@@ -202,19 +355,7 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
             </el-upload>
           </div>
         </div>
-        <!-- Section 1: 底稿抬头 -->
         <div class="section">
-          <div class="header-block">
-            <div class="header-firm">致同会计师事务所（特殊普通合伙）</div>
-            <div class="header-title">应收票据坏账准备会计政策检查</div>
-            <div class="header-meta">
-              <span v-if="entityName">被审计单位：{{ entityName }}</span>
-              <span v-if="periodEnd">截止日期：{{ periodEnd }}</span>
-              <span>索引号：{{ indexNo }}</span>
-              <span v-if="pageNo">页次：{{ pageNo }}</span>
-            </div>
-          </div>
-
           <el-alert
             type="info"
             :closable="false"
@@ -229,7 +370,19 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
 
         <!-- Section 2: 政策概述 左右分栏 -->
         <div class="section">
-          <h3 class="section-title">一、公司坏账准备会计政策概述</h3>
+          <div class="section-title-row">
+            <h3 class="section-title">一、公司坏账准备会计政策概述</h3>
+            <el-tooltip :content="aiAvailable ? 'AI辅助生成本模块内容' : 'AI服务暂不可用'" placement="top">
+              <el-button
+                size="small"
+                :loading="aiLoadingOverview"
+                :disabled="isReadonly || !aiAvailable"
+                @click="generateOverviewWithAI"
+              >
+                🤖 AI
+              </el-button>
+            </el-tooltip>
+          </div>
           <el-row :gutter="16">
             <el-col :lg="14" :md="12">
               <div class="left-panel">
@@ -262,7 +415,19 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
 
         <!-- Section 3: ECL模型描述 左右分栏 -->
         <div class="section">
-          <h3 class="section-title">二、预期信用损失模型描述</h3>
+          <div class="section-title-row">
+            <h3 class="section-title">二、预期信用损失模型描述</h3>
+            <el-tooltip :content="aiAvailable ? 'AI辅助生成本模块内容' : 'AI服务暂不可用'" placement="top">
+              <el-button
+                size="small"
+                :loading="aiLoadingEclModel"
+                :disabled="isReadonly || !aiAvailable"
+                @click="generateEclModelWithAI"
+              >
+                🤖 AI
+              </el-button>
+            </el-tooltip>
+          </div>
           <el-row :gutter="16">
             <el-col :lg="14" :md="12">
               <div class="left-panel">
@@ -413,6 +578,29 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
         </div>
       </template>
     </div>
+    <el-dialog v-model="writebackPreviewVisible" :title="writebackPreviewTitle" width="640px" destroy-on-close>
+      <div class="writeback-preview">
+        <div class="writeback-toolbar">
+          <el-button size="small" @click="selectAllWritebackItems">全选</el-button>
+          <el-button size="small" @click="clearAllWritebackItems">全不选</el-button>
+        </div>
+        <div
+          v-for="item in writebackPreviewItems"
+          :key="item.key"
+          class="writeback-item"
+        >
+          <el-checkbox v-model="item.checked" class="writeback-item-check" />
+          <div class="writeback-item-content">
+            <div class="writeback-item-label">{{ item.label }}</div>
+            <div class="writeback-item-value">{{ item.value }}</div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="writebackPreviewVisible = false">取消</el-button>
+        <el-button type="primary" @click="applySelectedWriteback">确认回写</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -444,36 +632,19 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
   margin-bottom: 24px;
 }
 
-.header-block {
-  text-align: center;
-  margin-bottom: 16px;
-}
-
-.header-firm {
-  font-size: 14px;
-  color: #606266;
-}
-
-.header-title {
-  font-size: 18px;
-  font-weight: bold;
-  margin: 8px 0;
-}
-
-.header-meta {
-  font-size: 13px;
-  color: #909399;
-  display: flex;
-  gap: 16px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
 .section-title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: 0;
   color: #303133;
+}
+
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .left-panel {
@@ -561,5 +732,56 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
   color: #606266;
   white-space: pre-wrap;
   line-height: 1.6;
+}
+
+.writeback-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.writeback-toolbar {
+  display: flex;
+  gap: 8px;
+}
+
+.writeback-item {
+  margin: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.writeback-item-check {
+  margin-top: 2px;
+}
+
+.writeback-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.writeback-item-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.writeback-item-value {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #606266;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #f5f7fa;
+  border-radius: 4px;
+  padding: 6px 8px;
 }
 </style>

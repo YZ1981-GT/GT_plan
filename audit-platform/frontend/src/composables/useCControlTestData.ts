@@ -697,6 +697,24 @@ export function useCControlTestData(
 
   // ─── Field update helpers: Deviation state ─────────────────────────────────
 
+  /**
+   * Cx-2 偏差评价：确保 deviationStates 有可写槽位。
+   * 合并包从汇总 tab 切到 Cx-2 tab 时 onMounted 已跑过且当时非偏差视图，需补建槽位。
+   */
+  function ensureDeviationSlots(): void {
+    if (isReadonly.value) return
+    const rowCount = state.value.summaryRows.length
+    if (rowCount > state.value.deviationStates.length) {
+      while (state.value.deviationStates.length < rowCount) {
+        state.value.deviationStates.push(createEmptyState())
+      }
+      saveImmediate()
+    }
+    if (state.value.deviationStates.length === 0) {
+      addControlPoint('控制点1')
+    }
+  }
+
   /** 更新偏差决策树步骤（即时保存） */
   function updateDeviationStep(
     devIndex: number,
@@ -705,7 +723,10 @@ export function useCControlTestData(
   ): void {
     if (isReadonly.value) return
     if (devIndex < 0 || devIndex >= state.value.deviationStates.length) return
-    ;(state.value.deviationStates[devIndex] as any)[step] = value
+    const current = state.value.deviationStates[devIndex]
+    state.value.deviationStates[devIndex] = { ...current, [step]: value } as DecisionTreeState & {
+      exceptionDesc?: string
+    }
     // exceptionDesc 使用 debounce（文本字段），其余即时保存
     if (step === 'exceptionDesc') {
       debounceSave()
@@ -829,6 +850,7 @@ export function useCControlTestData(
     updateSampleResult,
     // Deviation helpers
     updateDeviationStep,
+    ensureDeviationSlots,
     // Cycle conclusion
     updateCycleConclusion,
     // B23 import (Req 11.4)

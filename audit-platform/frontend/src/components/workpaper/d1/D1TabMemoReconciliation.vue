@@ -2,31 +2,18 @@
 /**
  * D1TabMemoReconciliation.vue — 备查簿核对D1-7 HTML渲染
  *
- * Spec: .kiro/specs/d1-endorsement-discount/
- * Task: 9.1
- *
- * 渲染（HTML 模式）：
- * - 审计目标（只读 el-alert type=info）+ 审计过程说明
- * - 截止日期 el-date-picker（YYYY-MM-DD）
- * - 工具栏：导出模板/导出数据/导入数据（SHEET_CODE='D1-7'）+ 添加银行/商业承兑票据
- * - 31 列宽表 el-table（4 表头分组：基本信息/流转/金额/审定），
- *   票据类型/票据号 fixed=left，动态行可删除，小计/合计 summary 行只读加粗
- * - 核对区（备查簿合计 / 明细账D1-2 / 差异）：差异非零红色，明细账浅蓝取自 D1-2，
- *   crossSheetStatus=error 时占位 '-' + ⚠️
- * - 贴现背书统计区（已贴现总额 / 已背书总额）
- * - 审计说明 / 审计结论（textarea + 🤖AI + 💬复核）
- * - 编制提示折叠区（<details> 蓝色左边线+浅蓝背景）
- * - el-segmented 双模式切换头部
- *
- * Requirements: 4.1-4.8, 5.1-5.6, 6.1-6.5, 12.1, 16.1-16.6
+ * 卡片视图 / 宽表视图 + 联动计算 + AI辅助 + D1-2/D1-8勾稽
  */
-import { ref, inject, toRef, computed, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, inject, toRef, computed, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD1MemoReconciliation, type MemoRow } from '../composables/useD1MemoReconciliation'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import GtIndexChip from '../GtIndexChip.vue'
+import D1MemoNoteCard from './D1MemoNoteCard.vue'
 import { useD1TabImportExport } from '../composables/useD1TabImportExport'
+import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import { useWorkpaperWideTable } from '../composables/useWorkpaperWideTable'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
@@ -65,13 +52,19 @@ const {
   reconciliationRows,
   hasDifference,
   endorsedStats,
+  unexpiredSummaryRows,
+  allDataRows,
+  rowWarnings,
+  warningCount,
   crossSheetStatus,
+  auditProcedures,
   auditNote,
   auditConclusion,
   addRow,
   removeRow,
   updateCell,
   setCutoffDate,
+  saveAuditProcedures,
   saveAuditNote,
   saveAuditConclusion,
 } = useD1MemoReconciliation({
@@ -80,7 +73,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: async (items) => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch { ElMessage.warning('保存失败，请重试') }
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
@@ -94,6 +87,196 @@ const YN_OPTIONS = ['是', '否']
 const RATING_OPTIONS = ['AAA', 'AA+', 'AA', 'AA-', 'A+', 'A', '其他']
 const RELATED_OPTIONS = ['关联方', '非关联方']
 
+const AUDIT_OBJECTIVES = [
+  '逐笔登记应收票据收到、背书、贴现、到期等全生命周期事项，确保可追溯；',
+  '备查簿汇总数与明细账 D1-2 核对，差异查明原因；',
+  '统计贴现/背书及未到期事项，支撑 D1-6 业务模式与 D1-8 检查。',
+]
+
+// ─── 双视图 + AI ─────────────────────────────────────────────────────────────
+const viewMode = ref<'card' | 'table'>('table')
+const viewModeOptions = [
+  { label: '卡片视图', value: 'card' as const },
+  { label: '宽表视图', value: 'table' as const },
+]
+const activeTab = ref('')
+const wpIdRef = toRef(props, 'wpId')
+const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-7')
+const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
+const aiLoadingProcedures = ref(false)
+const aiLoadingNote = ref(false)
+const aiLoadingConclusion = ref(false)
+const memoOcrExtracted = ref<Map<string, Record<string, any>>>(new Map())
+
+const warningsByRowId = computed(() => {
+  const map = new Map<string, string[]>()
+  for (const w of rowWarnings.value) map.set(w.rowId, w.messages)
+  return map
+})
+
+function buildMemoAiContext(extra = ''): Record<string, unknown> {
+  const gt = grandTotal.value
+  return {
+    sheet: 'D1-7',
+    cutoffDate: cutoffDate.value,
+    rowCount: allDataRows.value.length,
+    warningCount: warningCount.value,
+    hasDifference: hasDifference.value,
+    reconciliation: reconciliationRows.value.map((r) => r.label).join(' / '),
+    endingBalance: gt.endingBalance,
+    discountedTotal: endorsedStats.value.discountedTotal,
+    endorsedTotal: endorsedStats.value.endorsedTotal,
+    guidance: extra,
+  }
+}
+
+async function generateProceduresWithAI() {
+  if (props.isReadonly) return
+  aiLoadingProcedures.value = true
+  try {
+    const text = await generateAndConfirm(
+      'memo-audit-note',
+      auditProcedures.value,
+      buildMemoAiContext('生成D1-7审计过程步骤清单，覆盖备查簿登记、D1-2核对、贴现背书统计、未到期汇总。'),
+      'AI · 审计过程',
+    )
+    if (text) saveAuditProcedures(text)
+  } finally {
+    aiLoadingProcedures.value = false
+  }
+}
+
+async function generateNoteWithAI() {
+  if (props.isReadonly) return
+  aiLoadingNote.value = true
+  try {
+    const text = await generateAndConfirm(
+      'memo-audit-note',
+      auditNote.value,
+      buildMemoAiContext(`审计过程：${auditProcedures.value || '未填写'}`),
+      'AI · 审计说明',
+    )
+    if (text) saveAuditNote(text)
+  } finally {
+    aiLoadingNote.value = false
+  }
+}
+
+async function generateConclusionWithAI() {
+  if (props.isReadonly) return
+  aiLoadingConclusion.value = true
+  try {
+    const text = await generateAndConfirm(
+      'memo-audit-conclusion',
+      auditConclusion.value,
+      buildMemoAiContext(`审计说明：${auditNote.value || '未填写'}；差异：${hasDifference.value ? '存在' : '无'}`),
+      'AI · 审计结论',
+    )
+    if (text) saveAuditConclusion(text)
+  } finally {
+    aiLoadingConclusion.value = false
+  }
+}
+
+function cardTabLabel(row: MemoRow): string {
+  const no = row.noteNumber?.trim()
+  if (no) return no.length > 14 ? `${no.slice(0, 14)}…` : no
+  return row.category === 'bank' ? '银行承兑（新）' : '商业承兑（新）'
+}
+
+function onCardUpdate(rowId: string, field: keyof MemoRow, value: string | number) {
+  updateCell(rowId, field as string, value)
+}
+
+function mapD4OcrToMemoFields(extracted: Record<string, any>, current: MemoRow): Partial<MemoRow> {
+  const patch: Partial<MemoRow> = {}
+  const noteNo = String(extracted.contractNo || '').trim()
+  const issuer = String(extracted.counterparty || '').trim()
+  const issueDate = String(extracted.signDate || '').trim()
+  const maturityDate = String(extracted.settlementTime || '').trim()
+  const amount = Number(extracted.contractAmount || 0)
+  const remark = String(extracted.specialTerms || extracted.serviceContent || '').trim()
+
+  if (noteNo) patch.noteNumber = noteNo
+  if (issuer) patch.issuer = issuer
+  if (issueDate) patch.issueDate = issueDate
+  if (maturityDate) patch.maturityDate = maturityDate
+  if (amount > 0) patch.amount = amount
+  if (remark) patch.remarkText = current.remarkText ? `${current.remarkText}\nOCR:${remark}` : `OCR:${remark}`
+  return patch
+}
+
+async function onCardUploadOcr(row: MemoRow, file: File) {
+  if (props.isReadonly) return
+  updateCell(row.rowId, 'ocrStatus', 'processing')
+  updateCell(row.rowId, 'attachmentName', file.name)
+  const fd = new FormData()
+  fd.append('file', file)
+  try {
+    const res = await http.post(
+      `/api/workpapers/${props.wpId}/d4/contract-ocr`,
+      fd,
+      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
+    )
+    const data = res.data?.data ?? res.data ?? {}
+    const extracted = (data.extracted_fields || {}) as Record<string, any>
+    memoOcrExtracted.value.set(row.rowId, extracted)
+    updateCell(row.rowId, 'attachmentId', String(data.attachment_id || ''))
+    updateCell(row.rowId, 'attachmentName', file.name)
+    updateCell(row.rowId, 'ocrStatus', 'done')
+    ElMessage.success('OCR识别完成，请选择回填空字段或覆盖回填')
+  } catch {
+    updateCell(row.rowId, 'ocrStatus', 'failed')
+    ElMessage.warning('OCR识别失败，请稍后重试')
+  }
+}
+
+async function onCardApplyOcr(row: MemoRow, mode: 'empty-only' | 'override-all') {
+  if (props.isReadonly) return
+  const extracted = memoOcrExtracted.value.get(row.rowId)
+  if (!extracted) {
+    ElMessage.info('暂无OCR结果，请先上传附件')
+    return
+  }
+  if (mode === 'override-all') {
+    try {
+      await ElMessageBox.confirm('将使用OCR结果覆盖当前可映射字段，是否继续？', '覆盖回填确认', {
+        type: 'warning',
+        confirmButtonText: '继续覆盖',
+        cancelButtonText: '取消',
+      })
+    } catch {
+      return
+    }
+  }
+  const patch = mapD4OcrToMemoFields(extracted, row)
+  let count = 0
+  ;(Object.keys(patch) as Array<keyof MemoRow>).forEach((k) => {
+    const nextVal = patch[k] as any
+    const currentVal = (row as any)[k]
+    if (mode === 'empty-only' && currentVal) return
+    if (nextVal === undefined || nextVal === null || nextVal === '') return
+    updateCell(row.rowId, k, nextVal)
+    count++
+  })
+  ElMessage.success(count > 0 ? `已回填 ${count} 个字段` : '无可回填字段')
+}
+
+function onCardRemoveAttachment(row: MemoRow) {
+  if (props.isReadonly) return
+  updateCell(row.rowId, 'attachmentId', '')
+  updateCell(row.rowId, 'attachmentName', '')
+  updateCell(row.rowId, 'ocrStatus', 'none')
+  memoOcrExtracted.value.delete(row.rowId)
+}
+
+watch(allDataRows, (rows) => {
+  if (!activeTab.value && rows.length > 0) activeTab.value = rows[0].rowId
+  if (activeTab.value && !rows.some((r) => r.rowId === activeTab.value) && rows.length > 0) {
+    activeTab.value = rows[0].rowId
+  }
+}, { immediate: true })
+
 // ─── Column Descriptors ───────────────────────────────────────────────────────
 
 type ColType = 'text' | 'number' | 'date' | 'select'
@@ -103,6 +286,7 @@ interface ColDesc {
   width: number
   type: ColType
   options?: string[]
+  readonly?: boolean
 }
 
 // 基本信息（剩余 6 列；票据类型/票据号 fixed left 单列，见 template）
@@ -134,8 +318,8 @@ const amountCols: ColDesc[] = [
   { field: 'currentEndorsed', label: '本期背书', width: 120, type: 'number' },
   { field: 'currentMatured', label: '本期到期承兑', width: 130, type: 'number' },
   { field: 'currentDiscounted', label: '本期贴现', width: 120, type: 'number' },
-  { field: 'endingBalance', label: '年末余额', width: 120, type: 'number' },
-  { field: 'unexpiredEndorsedDiscounted', label: '期末未到期背书贴现', width: 160, type: 'number' },
+  { field: 'endingBalance', label: '年末余额（自动）', width: 130, type: 'number', readonly: true },
+  { field: 'unexpiredEndorsedDiscounted', label: '期末未到期背书贴现（自动）', width: 170, type: 'number', readonly: true },
 ]
 
 // 审定（8 列）
@@ -240,9 +424,7 @@ function reconValue(rowIndex: number, field: keyof MemoRow): number {
 const ledgerError = computed(() => crossSheetStatus.value === 'error')
 
 // ─── Import/Export ───────────────────────────────────────────────────────────
-
-const wpIdRef = toRef(props, 'wpId')
-const { onExportTemplate, onExportData, onImportFile } = useD1TabImportExport(wpIdRef, 'D1-7')
+// (moved to view mode section above)
 
 // ─── Review ────────────────────────────────────────────────────────────────────
 
@@ -259,10 +441,12 @@ function onCellContextMenu(row: MemoRow, _column: any, _cell: any, event: MouseE
 // ─── 编制提示 ────────────────────────────────────────────────────────────────────
 
 const GUIDANCE_TEXTS = [
+  '卡片视图按单张票据纵向分组填写；宽表视图适合批量录入与 Excel 导入导出对齐。',
+  '联动规则：状态→贴现/背书金额、承兑人→信用评级、截止日期→逾期/未到期汇总、年末余额自动滚动计算。',
   '备查簿应逐笔登记：对每一张银行承兑汇票、商业承兑汇票的收到、背书转让、贴现、到期承兑、退票等全生命周期事项逐笔登记，确保票据流转全过程可追溯。',
   '与明细账（D1-2）核对：备查簿逐笔登记的年初余额、本期收到、本期背书、本期到期、本期贴现、期末余额等汇总数，应与原值明细表 D1-2 相应科目一致；如存在差异应查明原因并在审计说明中记录。',
   '截止日期用于判断票据的期后事项（背书/贴现/到期）是否已终止确认；请填写审计基准日（通常为资产负债表日），据此计算"期末未到期背书贴现"及贴现背书统计。',
-  '贴现/背书统计：系统按票据状态自动汇总"已贴现总额"与"已背书总额"，用于评估票据终止确认及应收款项融资/应收票据的列报分类。',
+  '贴现/背书统计：系统按票据状态自动汇总"已贴现总额"与"已背书总额"；D1-8 可从本表按状态导入贴现/背书明细。',
 ]
 </script>
 
@@ -272,18 +456,37 @@ const GUIDANCE_TEXTS = [
         <h4>备查簿核对 D1-7</h4>
         <GtReviewTrigger section-id="D1-memo-header" />
       </div>
-      <!-- 审计目标 -->
-      <el-alert
-        type="info"
-        :closable="false"
-        show-icon
-        title="审计目标"
-        description="通过备查簿逐笔登记应收票据的收到、背书、贴现、到期等全生命周期事项，追踪票据流转过程，并与原值明细表D1-2核对，验证票据业务的完整性与准确性。"
-        class="audit-objective"
-      />
-      <div class="audit-process">
-        审计过程：逐笔登记备查簿票据信息 → 与明细账D1-2核对差异 → 统计贴现/背书总额 → 判断终止确认及列报分类。
-      </div>
+      <!-- 审计目标与过程 -->
+      <details class="methodology-collapse" open>
+        <summary class="methodology-summary">📖 审计目标与审计过程（点击展开/收起）</summary>
+        <div class="methodology-body">
+          <p class="method-title"><strong>一、审计目标：</strong></p>
+          <ol class="method-objectives">
+            <li v-for="(item, i) in AUDIT_OBJECTIVES" :key="'obj-' + i">{{ item }}</li>
+          </ol>
+          <div class="method-title-row">
+            <p class="method-title"><strong>二、审计过程：</strong></p>
+            <el-tooltip :content="aiAvailable ? 'AI辅助生成审计过程' : 'AI服务暂不可用'" placement="top">
+              <el-button
+                size="small"
+                :loading="aiLoadingProcedures"
+                :disabled="isReadonly || !aiAvailable"
+                @click="generateProceduresWithAI"
+              >
+                🤖 AI
+              </el-button>
+            </el-tooltip>
+          </div>
+          <el-input
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 8 }"
+            :model-value="auditProcedures"
+            placeholder="逐笔登记 → 与D1-2核对 → 统计贴现背书 → 判断终止确认……"
+            :disabled="isReadonly"
+            @input="(v: string) => saveAuditProcedures(v)"
+          />
+        </div>
+      </details>
 
       <!-- 截止日期 -->
       <div class="cutoff-row">
@@ -302,6 +505,7 @@ const GUIDANCE_TEXTS = [
 
       <!-- Toolbar -->
       <div class="table-toolbar">
+        <el-segmented v-model="viewMode" :options="viewModeOptions" size="small" />
         <el-button-group size="small">
           <el-button @click="onExportTemplate">导出模板</el-button>
           <el-button @click="onExportData">导出数据</el-button>
@@ -316,15 +520,81 @@ const GUIDANCE_TEXTS = [
         </el-button-group>
         <el-button-group>
           <el-button size="small" :disabled="isReadonly" @click="addRow('bank')">
-            + 添加银行承兑票据
+            + 银行承兑
           </el-button>
           <el-button size="small" :disabled="isReadonly" @click="addRow('commercial')">
-            + 添加商业承兑票据
+            + 商业承兑
           </el-button>
         </el-button-group>
+        <div class="toolbar-chips">
+          <GtIndexChip value="wp:D1-2" :context-project-id="projectId" />
+          <GtIndexChip value="wp:D1-8" :context-project-id="projectId" />
+          <GtIndexChip value="wp:D1-6" :context-project-id="projectId" />
+        </div>
       </div>
 
-      <!-- 31列宽表 -->
+      <el-alert
+        v-if="warningCount > 0"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="warn-banner"
+        :title="`发现 ${warningCount} 条票据需关注（缺票据号、逾期持有、贴现背书标记不一致等）`"
+      />
+
+      <!-- 卡片视图 -->
+      <template v-if="viewMode === 'card'">
+        <div class="overview-panel">
+          <div class="overview-info">
+            <h3 class="overview-title">
+              备查簿核对
+              <el-tag size="small" effect="plain" class="overview-code">D1-7</el-tag>
+            </h3>
+            <p class="overview-desc">
+              共 <strong>{{ allDataRows.length }}</strong> 张票据，
+              已贴现 <strong>{{ endorsedStats.discountedTotal.toLocaleString() }}</strong>，
+              已背书 <strong>{{ endorsedStats.endorsedTotal.toLocaleString() }}</strong>
+              <el-tag v-if="hasDifference" type="danger" size="small" style="margin-left:8px">与D1-2有差异</el-tag>
+            </p>
+          </div>
+        </div>
+        <div v-if="allDataRows.length === 0" class="empty-state">
+          暂无票据记录，请点击「+ 银行承兑」或「+ 商业承兑」添加，或导入 Excel 数据。
+        </div>
+        <el-tabs
+          v-else
+          v-model="activeTab"
+          type="card"
+          @tab-change="() => {}"
+        >
+          <el-tab-pane
+            v-for="row in allDataRows"
+            :key="row.rowId"
+            :name="row.rowId"
+            :label="cardTabLabel(row)"
+          >
+            <D1MemoNoteCard
+              :row="row"
+              :warnings="warningsByRowId.get(row.rowId) || []"
+              :is-readonly="isReadonly"
+              :project-id="projectId"
+              :note-type-options="NOTE_TYPE_OPTIONS"
+              :status-options="STATUS_OPTIONS"
+              :yn-options="YN_OPTIONS"
+              :rating-options="RATING_OPTIONS"
+              :related-options="RELATED_OPTIONS"
+              @update="(field, value) => onCardUpdate(row.rowId, field, value)"
+              @remove="removeRow(row.rowId)"
+              @upload-ocr="(file) => onCardUploadOcr(row, file)"
+              @apply-ocr="(mode) => onCardApplyOcr(row, mode)"
+              @remove-attachment="onCardRemoveAttachment(row)"
+            />
+          </el-tab-pane>
+        </el-tabs>
+      </template>
+
+      <!-- 宽表视图 -->
+      <template v-else>
       <el-alert v-if="useLargeTable && !useVirtualScroll" type="info" :closable="false" show-icon class="large-table-hint">
         行数较多，已启用固定高度滚动浏览（{{ dataRowCount }} 行）
       </el-alert>
@@ -423,8 +693,13 @@ const GUIDANCE_TEXTS = [
               </template>
               <!-- 可编辑 -->
               <template v-else-if="isEditable(row)">
+                <span
+                  v-if="col.type === 'number' && col.readonly"
+                  class="auto-calc-val"
+                  v-html="fmtAmount(row[col.field] as number)"
+                />
                 <el-input-number
-                  v-if="col.type === 'number'"
+                  v-else-if="col.type === 'number'"
                   :model-value="row[col.field] as number"
                   size="small"
                   :controls="false"
@@ -482,8 +757,13 @@ const GUIDANCE_TEXTS = [
                 <span v-else />
               </template>
               <template v-else-if="isEditable(row)">
+                <span
+                  v-if="col.type === 'number' && col.readonly"
+                  class="auto-calc-val"
+                  v-html="fmtAmount(row[col.field] as number)"
+                />
                 <el-input-number
-                  v-if="col.type === 'number'"
+                  v-else-if="col.type === 'number'"
                   :model-value="row[col.field] as number"
                   size="small"
                   :controls="false"
@@ -540,8 +820,13 @@ const GUIDANCE_TEXTS = [
                 <span v-else />
               </template>
               <template v-else-if="isEditable(row)">
+                <span
+                  v-if="col.type === 'number' && col.readonly"
+                  class="auto-calc-val"
+                  v-html="fmtAmount(row[col.field] as number)"
+                />
                 <el-input-number
-                  v-if="col.type === 'number'"
+                  v-else-if="col.type === 'number'"
                   :model-value="row[col.field] as number"
                   size="small"
                   :controls="false"
@@ -588,8 +873,13 @@ const GUIDANCE_TEXTS = [
                 <span v-else />
               </template>
               <template v-else-if="isEditable(row)">
+                <span
+                  v-if="col.type === 'number' && col.readonly"
+                  class="auto-calc-val"
+                  v-html="fmtAmount(row[col.field] as number)"
+                />
                 <el-input-number
-                  v-if="col.type === 'number'"
+                  v-else-if="col.type === 'number'"
                   :model-value="row[col.field] as number"
                   size="small"
                   :controls="false"
@@ -622,6 +912,7 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
       </el-table>
       </div>
+      </template>
 
       <!-- 核对区 -->
       <div class="section-title">核对区（备查簿 ↔ 明细账D1-2）</div>
@@ -680,8 +971,30 @@ const GUIDANCE_TEXTS = [
         </el-descriptions-item>
       </el-descriptions>
 
+      <!-- 未到期贴现/质押/背书汇总 -->
+      <div class="section-title">未到期贴现/质押/背书汇总</div>
+      <table class="unexpired-table">
+        <thead>
+          <tr>
+            <th>票据类型</th>
+            <th>已贴现未到期</th>
+            <th>已质押</th>
+            <th>已背书未到期</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in unexpiredSummaryRows" :key="row.category">
+            <td class="unexpired-label">{{ row.category }}</td>
+            <td class="recon-num" v-html="fmtAmount(row.discountedUnexpired)" />
+            <td class="recon-num" v-html="fmtAmount(row.pledged)" />
+            <td class="recon-num" v-html="fmtAmount(row.endorsedUnexpired)" />
+          </tr>
+        </tbody>
+      </table>
+      <p v-if="!cutoffDate" class="cutoff-hint">请先填写截止日期，以计算未到期贴现/背书金额。</p>
+
       <!-- 审计说明 -->
-      <div class="section-title">审计说明</div>
+      <div class="section-title">三、审计说明</div>
       <div class="note-section">
         <el-input
           type="textarea"
@@ -692,8 +1005,15 @@ const GUIDANCE_TEXTS = [
           @change="(v: string) => saveAuditNote(v || '')"
         />
         <div class="note-actions">
-          <el-tooltip content="AI生成（开发中）" placement="top">
-            <el-button size="small" disabled>🤖 AI</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI辅助生成审计说明' : 'AI服务暂不可用'" placement="top">
+            <el-button
+              size="small"
+              :loading="aiLoadingNote"
+              :disabled="isReadonly || !aiAvailable"
+              @click="generateNoteWithAI"
+            >
+              🤖 AI
+            </el-button>
           </el-tooltip>
           <el-button v-if="openReviewDialog" size="small" @click="onReview('D1-memo-note')">
             💬 复核
@@ -702,7 +1022,7 @@ const GUIDANCE_TEXTS = [
       </div>
 
       <!-- 审计结论 -->
-      <div class="section-title">审计结论</div>
+      <div class="section-title">四、审计结论</div>
       <div class="note-section">
         <el-input
           type="textarea"
@@ -713,8 +1033,15 @@ const GUIDANCE_TEXTS = [
           @change="(v: string) => saveAuditConclusion(v || '')"
         />
         <div class="note-actions">
-          <el-tooltip content="AI生成（开发中）" placement="top">
-            <el-button size="small" disabled>🤖 AI</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI辅助生成审计结论' : 'AI服务暂不可用'" placement="top">
+            <el-button
+              size="small"
+              :loading="aiLoadingConclusion"
+              :disabled="isReadonly || !aiAvailable"
+              @click="generateConclusionWithAI"
+            >
+              🤖 AI
+            </el-button>
           </el-tooltip>
           <el-button v-if="openReviewDialog" size="small" @click="onReview('D1-memo-conclusion')">
             💬 复核
@@ -792,6 +1119,131 @@ const GUIDANCE_TEXTS = [
   flex-wrap: wrap;
 }
 
+.toolbar-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.warn-banner {
+  margin-bottom: 12px;
+}
+
+.overview-panel {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #f0f7ff 0%, #eaf4ff 100%);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  border: 1px solid #d9ecff;
+}
+
+.overview-info { flex: 1; min-width: 0; }
+
+.overview-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.overview-code {
+  font-size: 11px;
+  color: #409eff;
+  border-color: #b3d8ff;
+  background: #fff;
+}
+
+.overview-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #606266;
+}
+
+.empty-state {
+  padding: 24px;
+  text-align: center;
+  color: #909399;
+  font-size: 13px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+
+.methodology-collapse {
+  margin-bottom: 16px;
+  border-radius: 6px;
+  border: 1px solid #faecd8;
+  border-left: 3px solid #e6a23c;
+  background: #fffbf0;
+}
+
+.methodology-summary {
+  cursor: pointer;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b88230;
+}
+
+.methodology-body {
+  padding: 8px 14px 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.method-title { margin: 8px 0 4px; font-size: 13px; }
+
+.method-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.method-title-row .method-title { margin: 0; }
+
+.method-objectives {
+  margin: 0 0 8px 1.2em;
+  padding: 0;
+}
+
+.unexpired-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.unexpired-table th,
+.unexpired-table td {
+  border: 1px solid #ebeef5;
+  padding: 8px 10px;
+}
+
+.unexpired-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+  text-align: center;
+}
+
+.unexpired-label {
+  font-weight: 600;
+  text-align: left !important;
+}
+
+.cutoff-hint {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #909399;
+}
+
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .virtual-hint { margin-bottom: 0; flex: 1; }
 .virtual-table { margin-bottom: 8px; }
@@ -815,9 +1267,15 @@ const GUIDANCE_TEXTS = [
 
 .summary-label {
   font-weight: 600;
+  font-size: 13px;
 }
 
 .summary-val {
+  font-weight: 600;
+}
+
+.auto-calc-val {
+  color: #409eff;
   font-weight: 600;
 }
 
@@ -839,6 +1297,10 @@ const GUIDANCE_TEXTS = [
 
 .note-number-cell .el-input {
   flex: 1;
+}
+
+.memo-table :deep(.el-table__body td:nth-child(1) .cell) {
+  font-size: 13px;
 }
 
 .delete-btn {

@@ -1,0 +1,345 @@
+# backend/data/wp_render_schema/i5-other-noncurrent-assets.yaml
+# I5 其他非流动资产 — 专属组件渲染 schema
+# componentType: i5-other-noncurrent-assets
+# 科目 1911 其他非流动资产（借方/资产类）— 最简标准资产类底稿
+# Template: I5 其他非流动资产.xlsx（9 有效 sheet）
+# 公式特征：期末=期初+增加-减少；审定=未审+AJE+RJE；三角勾稽
+# 创建: 2026-07-30
+
+wp_code: I5
+wp_name: 其他非流动资产
+component_type: i5-other-noncurrent-assets
+selfLoad: true
+template_path: backend/wp_templates/I/I5 其他非流动资产.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1911']
+related_accounts:
+  - code: '1911'
+    name: 其他非流动资产
+    direction: debit
+    category: asset
+
+special_rules:
+  triangle_reconciliation: "期末=期初+增加-减少"
+  simplest_standard: true
+  no_amortization: true
+  no_impairment: true
+
+formula_count: 80
+description: 最简标准资产类底稿（9sheet，无特殊逻辑）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '1911'
+  direction: debit
+  source_sheet: I5-1
+  value_field: audited_amount
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-I5-01
+    source_wp: I5-2
+    target_wp: I5-1
+    description: '明细表合计 → 审定表I5-1'
+    direction: outbound
+  - ref_id: CW-I5-02
+    source_wp: I5-3
+    target_wp: I5-1
+    description: 'AJE/RJE汇总 → 审定表I5-1'
+    direction: outbound
+  - ref_id: CW-I5-03
+    source_wp: I5-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（9 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: I5
+    group: core
+    dimensions: "28×13"
+    component: I5TabIndex
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 其他非流动资产实质性程序表I5A
+  # ─────────────────────────────────────────────────────────────────────────
+  其他非流动资产实质性程序表I5A:
+    code: I5A
+    group: core
+    dimensions: "25×11"
+    component: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+      - { field: applicability, label: 适用性, type: text, width: 80 }
+    rows: 25
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表I5-1（61公式，89行）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表I5-1:
+    code: I5-1
+    group: core
+    dimensions: "89×11"
+    component: I5TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1911']
+    formula_count: 61
+    virtual_scroll: true
+    columns:
+      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: opening_balance, label: 期初, type: number, width: 100 }
+      - { field: current_increase, label: 本期增加, type: number, width: 100 }
+      - { field: current_decrease, label: 本期减少, type: number, width: 100 }
+      - { field: closing_balance, label: 期末, type: number, width: 100, formula: "opening + increase - decrease" }
+      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_amount, label: AJE, type: number, width: 80 }
+      - { field: rje_amount, label: RJE, type: number, width: 80 }
+      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
+      - { field: change_rate, label: 变动率, type: percent, width: 80, formula: "(audited - prior) / prior" }
+      - { field: remark, label: 备注, type: text, width: 120, editable: true }
+    formulas:
+      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + increase - decrease" }
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcChangeRate, target: change_rate, expr: "(audited - prior) / prior" }
+      - { name: calcTriangleReconciliation, target: triangle_check, expr: "closing - (opening + increase - decrease) === 0" }
+    highlights:
+      - { condition: "triangle_mismatch", style: red, tooltip: "三角勾稽不平" }
+      - { condition: "tb_variance != 0", style: red }
+      - { condition: "abs(change_rate) > 0.5", style: yellow, tooltip: "变动率超50%" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1911']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1911', adjudicatedAmount}" }
+    footer:
+      - { type: tb_comparison, accounts: ['1911'] }
+      - { type: audit_note, label: 审计说明 }
+      - { type: audit_conclusion }
+      - { type: review_dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表I5-2（63行×26列，3区段Tab）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表I5-2:
+    code: I5-2
+    group: core
+    dimensions: "63×26"
+    component: I5TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 16
+    virtual_scroll: true
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: item_name, label: 资产名称, type: text, width: 150 }
+          - { field: item_type, label: 资产类型, type: select, width: 120, options: [预付款项, 待抵扣进项税, 合同资产, 待处理资产, 其他] }
+          - { field: start_date, label: 发生日期, type: date, width: 100 }
+          - { field: maturity_date, label: 到期日期, type: date, width: 100 }
+          - { field: counterparty, label: 对方单位, type: text, width: 150 }
+      - name: 金额信息
+        tab_index: 1
+        columns:
+          - { field: opening_balance, label: 期初余额, type: number, width: 100 }
+          - { field: current_increase, label: 本期增加, type: number, width: 100 }
+          - { field: current_decrease, label: 本期减少, type: number, width: 100 }
+          - { field: closing_balance, label: 期末余额, type: number, width: 100, formula: "opening + increase - decrease" }
+          - { field: unadjusted_amount, label: 未审数, type: number, width: 100 }
+          - { field: audited_amount, label: 审定数, type: number, width: 100 }
+          - { field: variance, label: 差异, type: number, width: 80 }
+      - name: 检查信息
+        tab_index: 2
+        columns:
+          - { field: voucher_no, label: 凭证号, type: text, width: 100 }
+          - { field: contract_no, label: 合同编号, type: text, width: 100 }
+          - { field: is_related_party, label: 关联方, type: select, width: 80, options: [是, 否] }
+          - { field: recoverability, label: 可回收性, type: select, width: 80, options: [正常, 存疑, 无法回收] }
+          - { field: conclusion, label: 结论, type: select, width: 80, options: [无异常, 需调整, 待确认] }
+          - { field: remark, label: 备注, type: text, width: 120, editable: true }
+    formulas:
+      - { name: calcClosingBalance, target: closing_balance, expr: "opening + increase - decrease" }
+      - { name: calcVariance, target: variance, expr: "audited - unadjusted" }
+    summary_rows:
+      - { type: grand_total }
+    import_export: true
+    add_row_prompt: item_name
+    cross_refs:
+      - ref_id: CW-I5-2-001
+        target_wp: I5-1
+        description: '明细合计 → 审定表I5-1'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总I5-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总I5-3:
+    code: I5-3
+    group: core
+    dimensions: "21×10"
+    component: I5TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: adjustment_item, label: 调整事项, type: text, width: 150 }
+      - { field: entry_type, label: 类别, type: select, width: 80, options: [AJE, RJE] }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: debit_amount, label: 借方, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    highlights:
+      - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
+    import_export: true
+    add_row_prompt: adjustment_item
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+    cross_refs:
+      - ref_id: CW-I5-3-001
+        target_wp: I5-1
+        description: 'AJE/RJE汇总 → 审定表I5-1'
+        severity: required
+        direction: outbound
+      - ref_id: CW-I5-3-002
+        target_wp: A13
+        description: '调整分录 → A13错报汇总'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 针对性检查表I5-4
+  # ─────────────────────────────────────────────────────────────────────────
+  针对性检查表I5-4:
+    code: I5-4
+    group: core
+    dimensions: "30×10"
+    component: I5TabTargetedCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS30]
+    check_items:
+      - { id: classification_correct, label: 分类正确性（应否归入其他科目）, type: conclusion, options: [正确, 需调整, 不适用] }
+      - { id: term_appropriate, label: 期限适当性（是否仍为非流动）, type: conclusion, options: [适当, 应转流动, 不适用] }
+      - { id: recoverability_assessment, label: 可回收性评估, type: conclusion, options: [可回收, 部分可回收, 无法回收, 不适用] }
+      - { id: existence_check, label: 真实性核查（合同/协议/付款凭证）, type: conclusion_with_evidence }
+      - { id: valuation_check, label: 计量准确性核查, type: conclusion_with_evidence }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 附注披露信息（上市公司）（20行×7列，41公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "20×7"
+    component: I5TabDisclosureListed
+    class_code: H-附注
+    formula_count: 41
+    variant: listed
+    columns:
+      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: current_increase, label: 本期增加, type: number }
+      - { field: current_decrease, label: 本期减少, type: number }
+      - { field: closing_balance, label: 期末余额, type: number, formula: "opening + increase - decrease" }
+      - { field: reason, label: 变动原因, type: text }
+      - { field: remark, label: 备注, type: text }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=1911" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'other_noncurrent_assets'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 附注披露信息（国有企业）（20行×5列，23公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "20×5"
+    component: I5TabDisclosureSoe
+    class_code: H-附注
+    formula_count: 23
+    variant: soe
+    columns:
+      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: current_increase, label: 本期增加, type: number }
+      - { field: current_decrease, label: 本期减少, type: number }
+      - { field: closing_balance, label: 期末余额, type: number, formula: "opening + increase - decrease" }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=1911" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'other_noncurrent_assets'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 底稿目录索引
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录索引:
+    code: 底稿目录索引
+    group: core
+    dimensions: "9×4"
+    component: I5TabIndex
+    class_code: B-底稿目录
+    layout:
+      type: simple_index
+      columns:
+        - { field: seq, label: 序号, type: number, width: 50 }
+        - { field: sheet_name, label: Sheet名称, type: text, width: 200 }
+        - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+        - { field: status, label: 状态, type: text, width: 80 }

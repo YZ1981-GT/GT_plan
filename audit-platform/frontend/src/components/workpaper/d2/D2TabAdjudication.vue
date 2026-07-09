@@ -1,8 +1,7 @@
 <script setup lang="ts">
 /**
- * D2TabAdjudication — 审定表 D2-1（完整三层结构）
- * 一、应收账款原值 | 二、坏账准备 | 三、净值 | 账龄组合附表
- * 参照 xlsx 审定表D2-1 + D4TabAdjudication 精美化
+ * D2TabAdjudication — 审定表 D2-1（模板结构版）
+ * 按 Excel 模板恢复区块样式，并支持账龄段枚举口径（3年段 / 5年段 / 自定义）
  */
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import { useD2Adjudication, type AdjudicationRow } from '../composables/useD2Adjudication'
@@ -86,6 +85,23 @@ interface SectionRow {
   isFromCrossSheet?: boolean
   isEditable?: boolean
 }
+interface ExcelMainRow {
+  key: string
+  label: string
+  level: 0 | 1 | 2
+  rowType: 'section' | 'data' | 'subtotal' | 'placeholder'
+  priorUnadjusted: number
+  priorAje: number
+  priorRje: number
+  priorAudited: number
+  currentUnadjusted: number
+  currentAje: number
+  currentRje: number
+  currentAudited: number
+  change: number
+  changeRate: number | ''
+  reasonAnalysis: string
+}
 
 function mapGrossRows(): SectionRow[] {
   return adjudicationRows.value.map(r => ({
@@ -99,6 +115,48 @@ function mapGrossRows(): SectionRow[] {
     isEditable: r.isEditable,
   }))
 }
+function getGrossByKey(rowKey: string): AdjudicationRow | null {
+  return adjudicationRows.value.find((r) => r.rowKey === rowKey) || null
+}
+function getProvisionByKey(rowKey: string): SectionRow | null {
+  return provisionRows.value.find((r) => r.rowKey === rowKey) || null
+}
+function getNetByKey(rowKey: string): SectionRow | null {
+  return netRows.value.find((r) => r.rowKey === rowKey) || null
+}
+function toMainRow(
+  key: string,
+  label: string,
+  level: 0 | 1 | 2,
+  rowType: 'section' | 'data' | 'subtotal' | 'placeholder',
+  src?: Partial<ExcelMainRow>,
+): ExcelMainRow {
+  return {
+    key,
+    label,
+    level,
+    rowType,
+    priorUnadjusted: src?.priorUnadjusted || 0,
+    priorAje: src?.priorAje || 0,
+    priorRje: src?.priorRje || 0,
+    priorAudited: src?.priorAudited || 0,
+    currentUnadjusted: src?.currentUnadjusted || 0,
+    currentAje: src?.currentAje || 0,
+    currentRje: src?.currentRje || 0,
+    currentAudited: src?.currentAudited || 0,
+    change: src?.change || 0,
+    changeRate: src?.changeRate ?? '',
+    reasonAnalysis: src?.reasonAnalysis || '',
+  }
+}
+
+interface AgingBandDef {
+  key: string
+  label: string
+  keys: string[]
+}
+
+type AgingMode = '3y' | '5y' | 'custom'
 
 const provisionRows = computed<SectionRow[]>(() => {
   const bd = crossSheet.badDebtByCategory.value
@@ -164,8 +222,70 @@ const netRows = computed<SectionRow[]>(() => {
   })
   return rows
 })
+const excelMainRows = computed<ExcelMainRow[]>(() => {
+  const gIndividual = getGrossByKey('individual')
+  const gAging = getGrossByKey('aging')
+  const gCustomer = getGrossByKey('customer-type')
+  const gTotal = getGrossByKey('total')
 
-const AGING_LABELS = [
+  const pIndividual = getProvisionByKey('individual')
+  const pAging = getProvisionByKey('aging')
+  const pCustomer = getProvisionByKey('customer-type')
+  const pTotal = getProvisionByKey('total')
+
+  const nIndividual = getNetByKey('individual')
+  const nAging = getNetByKey('aging')
+  const nCustomer = getNetByKey('customer-type')
+  const nTotal = getNetByKey('total')
+
+  return [
+    toMainRow('sec-gross', '一、应收账款原值', 0, 'section'),
+    toMainRow('gross-individual', '单项计提坏账准备', 1, 'data', gIndividual || undefined),
+    toMainRow('gross-aging-combo', '按组合计提坏账准备', 1, 'data', gAging || undefined),
+    toMainRow('gross-aging-band', '账龄组合', 2, 'data', gAging || undefined),
+    toMainRow('gross-customer-band', '客户类型组合', 2, 'data', gCustomer || undefined),
+    toMainRow('gross-other-band', '……组合', 2, 'placeholder'),
+    toMainRow('gross-subtotal', '小计', 1, 'subtotal', gTotal || undefined),
+
+    toMainRow('sec-provision', '二、应收账款坏账准备', 0, 'section'),
+    toMainRow('provision-individual', '单项计提坏账准备', 1, 'data', pIndividual ? {
+      priorAudited: pIndividual.priorAudited, currentAudited: pIndividual.currentAudited, change: pIndividual.change, changeRate: pIndividual.changeRate,
+    } : undefined),
+    toMainRow('provision-aging-combo', '按组合计提坏账准备', 1, 'data', pAging ? {
+      priorAudited: pAging.priorAudited, currentAudited: pAging.currentAudited, change: pAging.change, changeRate: pAging.changeRate,
+    } : undefined),
+    toMainRow('provision-aging-band', '账龄组合', 2, 'data', pAging ? {
+      priorAudited: pAging.priorAudited, currentAudited: pAging.currentAudited, change: pAging.change, changeRate: pAging.changeRate,
+    } : undefined),
+    toMainRow('provision-customer-band', '客户类型组合', 2, 'data', pCustomer ? {
+      priorAudited: pCustomer.priorAudited, currentAudited: pCustomer.currentAudited, change: pCustomer.change, changeRate: pCustomer.changeRate,
+    } : undefined),
+    toMainRow('provision-other-band', '……组合', 2, 'placeholder'),
+    toMainRow('provision-subtotal', '小计', 1, 'subtotal', pTotal ? {
+      priorAudited: pTotal.priorAudited, currentAudited: pTotal.currentAudited, change: pTotal.change, changeRate: pTotal.changeRate,
+    } : undefined),
+
+    toMainRow('sec-net', '三、应收账款净值', 0, 'section'),
+    toMainRow('net-individual', '单项计提坏账准备', 1, 'data', nIndividual ? {
+      priorAudited: nIndividual.priorAudited, currentAudited: nIndividual.currentAudited, change: nIndividual.change, changeRate: nIndividual.changeRate,
+    } : undefined),
+    toMainRow('net-aging-combo', '按组合计提坏账准备', 1, 'data', nAging ? {
+      priorAudited: nAging.priorAudited, currentAudited: nAging.currentAudited, change: nAging.change, changeRate: nAging.changeRate,
+    } : undefined),
+    toMainRow('net-aging-band', '账龄组合', 2, 'data', nAging ? {
+      priorAudited: nAging.priorAudited, currentAudited: nAging.currentAudited, change: nAging.change, changeRate: nAging.changeRate,
+    } : undefined),
+    toMainRow('net-customer-band', '客户类型组合', 2, 'data', nCustomer ? {
+      priorAudited: nCustomer.priorAudited, currentAudited: nCustomer.currentAudited, change: nCustomer.change, changeRate: nCustomer.changeRate,
+    } : undefined),
+    toMainRow('net-other-band', '……组合', 2, 'placeholder'),
+    toMainRow('net-subtotal', '合计', 1, 'subtotal', nTotal ? {
+      priorAudited: nTotal.priorAudited, currentAudited: nTotal.currentAudited, change: nTotal.change, changeRate: nTotal.changeRate,
+    } : undefined),
+  ]
+})
+
+const BASE_AGING_OPTIONS = [
   { key: 'within1Year', label: '一年以内' },
   { key: 'y1to2', label: '一到二年' },
   { key: 'y2to3', label: '二到三年' },
@@ -174,15 +294,161 @@ const AGING_LABELS = [
   { key: 'over5', label: '五年以上' },
 ] as const
 
+const AGING_PRESET_3Y: AgingBandDef[] = [
+  { key: 'within1Year', label: '一年以内', keys: ['within1Year'] },
+  { key: 'y1to2', label: '一到二年', keys: ['y1to2'] },
+  { key: 'y2to3', label: '二到三年', keys: ['y2to3'] },
+  { key: 'over3', label: '三年以上', keys: ['y3to4', 'y4to5', 'over5'] },
+]
+
+const AGING_PRESET_5Y: AgingBandDef[] = BASE_AGING_OPTIONS.map((v) => ({ key: v.key, label: v.label, keys: [v.key] }))
+
+const agingMode = ref<AgingMode>('5y')
+const customAgingBands = ref<AgingBandDef[]>([])
+
+function sumBandValue(source: Record<string, number>, keys: string[]): number {
+  return keys.reduce((s, key) => s + (Number(source[key]) || 0), 0)
+}
+
+function normalizeCustomBands(raw: any): AgingBandDef[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((it, idx) => {
+      const label = String(it?.label || '').trim()
+      const keys = Array.isArray(it?.keys)
+        ? it.keys
+          .map((k: unknown) => String(k))
+          .filter((k: string) => BASE_AGING_OPTIONS.some((op) => op.key === k))
+        : []
+      return {
+        key: String(it?.key || `custom-${idx + 1}`),
+        label: label || `自定义账龄${idx + 1}`,
+        keys: keys.length ? keys : ['within1Year'],
+      }
+    })
+    .filter((it) => it.label)
+}
+
+function getAgingBandsByMode(): AgingBandDef[] {
+  if (agingMode.value === '3y') return AGING_PRESET_3Y
+  if (agingMode.value === '5y') return AGING_PRESET_5Y
+  return customAgingBands.value.length ? customAgingBands.value : AGING_PRESET_5Y
+}
+
+function saveAgingMode(mode: AgingMode): void {
+  agingMode.value = mode
+  const item = { item_id: 'D2-adj-aging-mode', conclusion: null, remark: mode }
+  props.allResponses.set(item.item_id, item)
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+}
+
+function saveCustomAgingBands(): void {
+  const payload = JSON.stringify(customAgingBands.value)
+  const item = { item_id: 'D2-adj-aging-custom-bands', conclusion: null, remark: payload }
+  props.allResponses.set(item.item_id, item)
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+}
+
+function onCustomLabelChange(index: number, value: string): void {
+  const target = customAgingBands.value[index]
+  if (!target) return
+  target.label = value || `自定义账龄${index + 1}`
+  saveCustomAgingBands()
+}
+
+function onCustomKeysChange(index: number, keys: string[]): void {
+  const target = customAgingBands.value[index]
+  if (!target) return
+  target.keys = keys.length ? [...keys] : ['within1Year']
+  saveCustomAgingBands()
+}
+
+function addCustomBand(): void {
+  const nextIndex = customAgingBands.value.length + 1
+  customAgingBands.value.push({
+    key: `custom-${Date.now()}`,
+    label: `自定义账龄${nextIndex}`,
+    keys: ['within1Year'],
+  })
+  saveCustomAgingBands()
+}
+
+function removeCustomBand(index: number): void {
+  if (customAgingBands.value.length <= 1) return
+  customAgingBands.value.splice(index, 1)
+  saveCustomAgingBands()
+}
+
+watch(
+  () => props.allResponses.get('D2-adj-aging-mode')?.remark,
+  (remark) => {
+    if (remark === '3y' || remark === '5y' || remark === 'custom') {
+      agingMode.value = remark
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.allResponses.get('D2-adj-aging-custom-bands')?.remark,
+  (remark) => {
+    if (!remark) {
+      customAgingBands.value = []
+      return
+    }
+    try {
+      customAgingBands.value = normalizeCustomBands(JSON.parse(remark))
+    } catch {
+      customAgingBands.value = []
+    }
+  },
+  { immediate: true },
+)
+
 const agingTableRows = computed(() => {
-  const a = crossSheet.agingFromDetail.value.audited
-  return AGING_LABELS.map(({ key, label }) => ({
-    label,
-    amount: a[key],
-  }))
+  const bands = getAgingBandsByMode()
+  const source = crossSheet.agingFromDetail.value.audited as Record<string, number>
+  const bdRows = (() => {
+    try {
+      const raw = props.allResponses.get('D2-bd-aging-rows')?.remark
+      if (!raw) return []
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  })()
+
+  function resolveBdAmount(def: AgingBandDef): number {
+    const total = bdRows.reduce((sum: number, row: any) => {
+      const label = String(row?.label || '')
+      const hit = def.keys.some((k) => {
+        const keyLabel = BASE_AGING_OPTIONS.find((b) => b.key === k)?.label || ''
+        if (k === 'over5') return label.includes('5年以上') || label.includes('五年以上')
+        return keyLabel && label.includes(keyLabel)
+      })
+      return hit ? sum + (Number(row?.currentAudited) || 0) : sum
+    }, 0)
+    return total
+  }
+
+  return bands.map((def) => {
+    const gross = sumBandValue(source, def.keys)
+    const provision = resolveBdAmount(def)
+    return {
+      label: def.label,
+      gross,
+      provision,
+      net: gross - provision,
+    }
+  })
 })
 
-const agingTotal = computed(() => agingTableRows.value.reduce((s, r) => s + r.amount, 0))
+const agingTotal = computed(() => ({
+  gross: agingTableRows.value.reduce((s, r) => s + r.gross, 0),
+  provision: agingTableRows.value.reduce((s, r) => s + r.provision, 0),
+  net: agingTableRows.value.reduce((s, r) => s + r.net, 0),
+}))
 
 function fmtRate(rate: number | ''): string {
   if (rate === '') return '-'
@@ -201,6 +467,15 @@ function getCellClass(row: SectionRow | AdjudicationRow, field: string): string 
     classes.push('rate-warning')
   }
   return classes.join(' ')
+}
+function projectCellClass(row: ExcelMainRow): string {
+  const cls = []
+  if (row.rowType === 'section') cls.push('project-section')
+  if (row.rowType === 'subtotal') cls.push('project-subtotal')
+  if (row.level === 1) cls.push('project-level-1')
+  if (row.level === 2) cls.push('project-level-2')
+  if (row.label.includes('组合') || row.label.includes('……')) cls.push('project-red')
+  return cls.join(' ')
 }
 
 async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
@@ -223,15 +498,14 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 
 <template>
   <div class="d2-tab-adjudication">
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button-group size="small">
-          <el-button @click="onExportTemplate">导出模板</el-button>
-          <el-button @click="onExportData">导出数据</el-button>
-          <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-            <el-button :disabled="isReadonly">导入数据</el-button>
-          </el-upload>
-        </el-button-group>
+    <div class="tab-header">
+      <h4>应收账款审定表 D2-1</h4>
+      <div class="toolbar-right">
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+          <el-button size="small" :disabled="isReadonly">导入数据</el-button>
+        </el-upload>
       </div>
     </div>
 
@@ -250,135 +524,154 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 
     <el-skeleton :loading="loading" :rows="8" animated>
       <template #default>
-        <!-- 一、应收账款原值 -->
+        <div class="excel-header-card">
+          <div class="excel-title-main">致同会计师事务所</div>
+          <div class="excel-title-sub">应收账款审定表</div>
+          <div class="excel-meta-grid">
+            <div class="meta-cell"><span class="meta-label">被审计单位名称：</span><span class="meta-value">-</span></div>
+            <div class="meta-cell"><span class="meta-label">编制人：</span><span class="meta-value">-</span></div>
+            <div class="meta-cell"><span class="meta-label">编制日期：</span><span class="meta-value">-</span></div>
+            <div class="meta-cell"><span class="meta-label">索引号：</span><span class="meta-value">D2-1</span></div>
+            <div class="meta-cell"><span class="meta-label">截止日：</span><span class="meta-value">202X年12月31日</span></div>
+            <div class="meta-cell"><span class="meta-label">复核人：</span><span class="meta-value">-</span></div>
+            <div class="meta-cell"><span class="meta-label">复核日期：</span><span class="meta-value">-</span></div>
+            <div class="meta-cell"><span class="meta-label">页次：</span><span class="meta-value">1</span></div>
+          </div>
+        </div>
+
+        <!-- 主表（按模板行结构） -->
         <div class="section-block section-gross">
-          <div class="section-title">一、应收账款原值</div>
-          <el-table :data="adjudicationRows" border stripe size="small">
-            <el-table-column prop="label" label="项目" width="160" fixed />
+          <el-table :data="excelMainRows" border stripe size="small" class="d2-main-grid">
+            <el-table-column prop="label" label="项目" width="180" fixed>
+              <template #default="{ row }">
+                <span :class="projectCellClass(row)">{{ row.label }}</span>
+              </template>
+            </el-table-column>
             <el-table-column label="期初" align="center">
               <el-table-column label="未审" width="95" align="right">
-                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</template>
+                <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.priorUnadjusted) }}</template>
               </el-table-column>
               <el-table-column label="AJE" width="85" align="right">
-                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorAje) }}</template>
+                <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.priorAje) }}</template>
               </el-table-column>
               <el-table-column label="RJE" width="85" align="right">
-                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorRje) }}</template>
+                <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.priorRje) }}</template>
               </el-table-column>
               <el-table-column label="审定" width="95" align="right">
-                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorAudited) }}</template>
+                <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.priorAudited) }}</template>
               </el-table-column>
             </el-table-column>
             <el-table-column label="期末" align="center">
               <el-table-column label="未审" width="95" align="right">
                 <template #default="{ row }">
-                  <el-tooltip v-if="row.isFromSumif" content="取自D2-2 SUMIF">
-                    <span class="sumif-cell">{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</span>
-                  </el-tooltip>
-                  <span v-else>{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</span>
+                  <span>{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.currentUnadjusted) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="AJE" width="85" align="right">
-                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentAje) }}</template>
+                <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.currentAje) }}</template>
               </el-table-column>
               <el-table-column label="RJE" width="85" align="right">
-                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentRje) }}</template>
+                <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.currentRje) }}</template>
               </el-table-column>
               <el-table-column label="审定" width="95" align="right">
                 <template #default="{ row }">
-                  <span :class="getCellClass(row, 'currentAudited')">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
+                  <span>{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.currentAudited) }}</span>
                 </template>
               </el-table-column>
             </el-table-column>
             <el-table-column label="变动额" width="100" align="right">
-              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.change) }}</template>
+              <template #default="{ row }">{{ row.rowType === 'section' ? '' : displayPrefs.fmtAmount(row.change) }}</template>
             </el-table-column>
             <el-table-column label="变动率" width="90" align="right">
               <template #default="{ row }">
-                <span :class="getCellClass(row, 'changeRate')">{{ fmtRate(row.changeRate) }}</span>
-                <GtIndexChip
-                  v-if="isChangeRateWarning(row.changeRate) && jumpToSection"
-                  label="D2-5"
-                  @click="jumpToSection('应收账款分析表D2-5')"
-                />
+                <span>{{ row.rowType === 'section' ? '' : fmtRate(row.changeRate) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="原因分析" min-width="140">
               <template #default="{ row }">
-                <el-input
-                  v-if="row.isEditable && !isReadonly"
-                  :model-value="row.reasonAnalysis"
-                  size="small"
-                  @change="(v: string) => updateCell(row.rowKey, 'reason', v)"
-                />
-                <span v-else>{{ row.reasonAnalysis || '-' }}</span>
+                <span>{{ row.rowType === 'section' ? '' : (row.reasonAnalysis || '-') }}</span>
               </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <!-- 二、坏账准备 -->
-        <div class="section-block section-provision">
-          <div class="section-title">二、应收账款坏账准备</div>
-          <el-table :data="provisionRows" border stripe size="small">
-            <el-table-column prop="label" label="项目" width="200" />
-            <el-table-column label="期初审定" width="120" align="right">
-              <template #default="{ row }">
-                <span :class="getCellClass(row, 'currentAudited')">{{ displayPrefs.fmtAmount(row.priorAudited) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末审定" width="120" align="right">
-              <template #default="{ row }">
-                <el-tooltip content="取自D2-3坏账准备明细表">
-                  <span class="sumif-cell">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-            <el-table-column label="变动额" width="110" align="right">
-              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.change) }}</template>
-            </el-table-column>
-            <el-table-column label="变动率" width="90" align="right">
-              <template #default="{ row }">
-                <span :class="getCellClass(row, 'changeRate')">{{ fmtRate(row.changeRate) }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </div>
-
-        <!-- 三、净值 -->
-        <div class="section-block section-net">
-          <div class="section-title">三、应收账款净值</div>
-          <el-table :data="netRows" border stripe size="small">
-            <el-table-column prop="label" label="项目" width="200" />
-            <el-table-column label="期初审定" width="120" align="right">
-              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorAudited) }}</template>
-            </el-table-column>
-            <el-table-column label="期末审定" width="120" align="right">
-              <template #default="{ row }">
-                <span class="audited-cell">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="变动额" width="110" align="right">
-              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.change) }}</template>
-            </el-table-column>
-            <el-table-column label="变动率" width="90" align="right">
-              <template #default="{ row }">{{ fmtRate(row.changeRate) }}</template>
             </el-table-column>
           </el-table>
         </div>
 
         <!-- 账龄组合原值附表 -->
         <div class="section-block section-aging">
-          <div class="section-title">（一）账龄组合原值（取自 D2-2 审定账龄汇总）</div>
-          <el-table :data="agingTableRows" border size="small" style="max-width: 480px">
-            <el-table-column prop="label" label="账龄段" width="140" />
-            <el-table-column label="期末审定余额" align="right">
+          <div class="section-title-row">
+            <div class="section-title">（一）账龄组合列示（联动枚举口径）</div>
+            <div class="aging-mode-tools">
+              <span class="aging-mode-label">账龄段口径：</span>
+              <el-select
+                :model-value="agingMode"
+                size="small"
+                style="width: 140px"
+                :disabled="isReadonly"
+                @change="(v: AgingMode) => saveAgingMode(v)"
+              >
+                <el-option label="3年段" value="3y" />
+                <el-option label="5年段" value="5y" />
+                <el-option label="自定义" value="custom" />
+              </el-select>
+            </div>
+          </div>
+
+          <div v-if="agingMode === 'custom'" class="custom-aging-editor">
+            <div
+              v-for="(band, idx) in customAgingBands"
+              :key="band.key"
+              class="custom-aging-row"
+            >
+              <el-input
+                :model-value="band.label"
+                size="small"
+                :disabled="isReadonly"
+                placeholder="账龄段名称"
+                style="width: 170px"
+                @change="(v: string) => onCustomLabelChange(idx, v)"
+              />
+              <el-select
+                :model-value="band.keys"
+                size="small"
+                multiple
+                collapse-tags
+                collapse-tags-tooltip
+                style="width: 360px"
+                :disabled="isReadonly"
+                @change="(v: string[]) => onCustomKeysChange(idx, v)"
+              >
+                <el-option
+                  v-for="opt in BASE_AGING_OPTIONS"
+                  :key="opt.key"
+                  :label="opt.label"
+                  :value="opt.key"
+                />
+              </el-select>
+              <el-button size="small" text type="danger" :disabled="isReadonly" @click="removeCustomBand(idx)">
+                删除
+              </el-button>
+            </div>
+            <el-button size="small" :disabled="isReadonly" @click="addCustomBand">+ 新增账龄段</el-button>
+          </div>
+
+          <el-table :data="agingTableRows" border size="small" style="max-width: 760px">
+            <el-table-column prop="label" label="账龄段" width="180" />
+            <el-table-column label="账龄组合原值" align="right">
               <template #default="{ row }">
-                <span class="sumif-cell">{{ displayPrefs.fmtAmount(row.amount) }}</span>
+                <span class="sumif-cell">{{ displayPrefs.fmtAmount(row.gross) }}</span>
               </template>
             </el-table-column>
+            <el-table-column label="账龄组合坏账准备" align="right">
+              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.provision) }}</template>
+            </el-table-column>
+            <el-table-column label="账龄组合净值" align="right">
+              <template #default="{ row }"><span class="audited-cell">{{ displayPrefs.fmtAmount(row.net) }}</span></template>
+            </el-table-column>
           </el-table>
-          <div class="aging-total">小计：{{ displayPrefs.fmtAmount(agingTotal) }}</div>
+          <div class="aging-total">
+            小计：原值 {{ displayPrefs.fmtAmount(agingTotal.gross) }}；
+            坏账准备 {{ displayPrefs.fmtAmount(agingTotal.provision) }}；
+            净值 {{ displayPrefs.fmtAmount(agingTotal.net) }}
+          </div>
         </div>
 
         <!-- 试算平衡 -->
@@ -434,23 +727,165 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 </template>
 
 <style scoped>
-.d2-tab-adjudication { padding: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; margin-bottom: 12px; }
-.toolbar-left { display: flex; gap: 8px; }
+.d2-tab-adjudication { padding: 12px; background: #fff; }
+.tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+.tab-header h4 {
+  margin: 0;
+  font-size: 13px;
+  color: #303133;
+}
+.toolbar-right { display: flex; gap: 8px; align-items: center; }
 .tb-alert { margin-bottom: 12px; }
 .cross-alert { margin-bottom: 12px; }
 .warn-chip { margin-left: 8px; vertical-align: middle; }
-.section-block { margin-bottom: 20px; border-radius: 6px; padding: 12px; }
-.section-gross { background: #f0f9eb; border-left: 4px solid #67c23a; }
-.section-provision { background: #fdf6ec; border-left: 4px solid #e6a23c; }
-.section-net { background: #ecf5ff; border-left: 4px solid #409eff; }
-.section-aging { background: #f5f7fa; border-left: 4px solid #909399; }
-.section-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; color: #303133; }
-.sumif-cell { background: #e6f7ff; padding: 2px 6px; border-radius: 2px; }
+.section-block {
+  margin-bottom: 16px;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #ebeef5;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.excel-header-card {
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.excel-title-main,
+.excel-title-sub {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+.excel-title-main {
+  padding: 6px 8px 2px;
+  font-size: 14px;
+  border-bottom: 1px solid #ebeef5;
+}
+.excel-title-sub {
+  padding: 2px 8px 6px;
+  font-size: 15px;
+  border-bottom: 1px solid #ebeef5;
+}
+.excel-meta-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 120px;
+}
+.meta-cell {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-right: 1px solid #ebeef5;
+  border-bottom: 1px solid #ebeef5;
+  font-size: 13px;
+}
+.meta-cell:nth-child(4n) {
+  border-right: none;
+}
+.meta-label {
+  color: #606266;
+}
+.meta-value {
+  color: #303133;
+  font-weight: 500;
+}
+.section-gross,
+.section-provision,
+.section-net,
+.section-aging {
+  border-left: 3px solid #dcdfe6;
+}
+.section-title { font-weight: 600; font-size: 13px; margin-bottom: 10px; color: #303133; }
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.aging-mode-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aging-mode-label { color: #606266; font-size: 13px; }
+.custom-aging-editor {
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+  background: #fafcff;
+  padding: 8px;
+  margin-bottom: 10px;
+}
+.custom-aging-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sumif-cell { background: #eef6ff; padding: 2px 6px; border-radius: 4px; color: #225b9c; }
 .rate-warning { color: #f56c6c; font-weight: 600; }
 .audited-cell { font-weight: 600; }
-.aging-total { margin-top: 8px; font-size: 13px; font-weight: 600; text-align: right; padding-right: 12px; }
-.tb-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px; margin-bottom: 16px; }
+.aging-total { margin-top: 8px; font-size: 13px; font-weight: 600; text-align: right; padding-right: 12px; color: #606266; }
+.tb-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
 .audit-footer { margin-top: 16px; }
 .audit-block-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
+
+:deep(.el-table th.el-table__cell) {
+  background: #f7f8fa;
+  color: #303133;
+  font-size: 13px;
+}
+:deep(.d2-main-grid thead tr:first-child th.el-table__cell) {
+  background: #eceff5;
+  border-bottom-color: #cfd6e4;
+  font-weight: 700;
+}
+:deep(.d2-main-grid thead tr:nth-child(2) th.el-table__cell) {
+  background: #f5f7fb;
+  font-weight: 600;
+}
+:deep(.d2-main-grid .el-table__row) {
+  --el-table-tr-bg-color: #fff;
+}
+:deep(.d2-main-grid .el-table__row td:first-child .cell) {
+  font-weight: 500;
+}
+.project-section {
+  font-weight: 700;
+  color: #1f2d3d;
+}
+.project-subtotal {
+  font-weight: 700;
+}
+.project-level-1 {
+  padding-left: 6px;
+}
+.project-level-2 {
+  padding-left: 20px;
+}
+.project-red {
+  color: #c0392b;
+}
+:deep(.el-table td.el-table__cell) {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  font-size: 13px;
+}
+:deep(.el-input__wrapper),
+:deep(.el-input__inner),
+:deep(.el-textarea__inner),
+:deep(.el-button),
+:deep(.el-alert__content),
+:deep(.el-alert__title) {
+  font-size: 13px;
+}
 </style>

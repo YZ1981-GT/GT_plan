@@ -51,12 +51,7 @@
       </el-tabs>
 
       <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="projectId" />
-      <GtReviewDialog
-        v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
-        :key="reviewDialog.activationParams.value.sectionId"
-        v-bind="reviewDialog.activationParams.value"
-        @closed="reviewDialog.closeReviewDialog"
-      />
+      <GtWpReviewDialogHost />
     </template>
   </div>
 </template>
@@ -81,7 +76,7 @@ import GtAProgramConsole from './GtAProgramConsole.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -115,7 +110,7 @@ const versionToolbar = useWorkpaperVersionToolbar({
 const { versionTrailRef } = versionToolbar
 
 const wpIdRef = toRef(props, 'wpId')
-const reviewDialog = useF2ReviewDialogProvide({ wpId: wpIdRef, projectId })
+useF2ReviewDialogProvide({ wpId: wpIdRef, projectId })
 
 provide('reloadWorkpaperData', () => formData.loadAll())
 

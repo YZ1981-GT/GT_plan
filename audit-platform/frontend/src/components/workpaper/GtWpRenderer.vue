@@ -211,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Switch } from '@element-plus/icons-vue'
@@ -239,6 +239,8 @@ import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtWpToolbar from '@/components/workpaper/GtWpToolbar.vue'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
+import { useProjectStore } from '@/stores/project'
+import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 
 // ─── Types ───
 export interface SavePayload {
@@ -471,11 +473,12 @@ const cNoteGridFallback = computed<boolean>(() => {
 
 /**
  * OnlyOffice sheet 判定：html_data.onlyoffice === true 时路由到 GtOnlyOfficeSheet。
- * 后端 dispatch 循环对非 HTML 白名单 sheet 设 componentType="onlyoffice-sheet" +
- * html_data={onlyoffice: true, sheet_name}，前端据此分发到 iframe 嵌入组件。
+ * 若 componentType 已注册 HTML 专属组件（如 d1-notes-receivable），优先结构化视图，
+ * 避免历史 onlyoffice 标记或后端误判导致跳过双模式入口。
  */
 const isOnlyOfficeSheet = computed<boolean>(() => {
   if (isWholeExcelTab.value) return true
+  if (getRendererEntry(effectiveRendererComponentType.value)) return false
   const hd = activeSheetHtmlData.value as any
   return hd?.onlyoffice === true
 })
@@ -541,11 +544,22 @@ const extraComponentProps = computed<Record<string, unknown>>(() => {
   }
 })
 
-/** 公式校验/注册表用年度（从 render-config 解析或 route query 取，缺省当前年） */
+/** 公式校验/注册表用年度：render-config > 路由 > 项目 store > 通用兜底 */
 const preparationYear = computed(() => {
-  const routeYear = parseInt(route.query.year as string)
-  if (routeYear && routeYear > 2000) return routeYear
-  return new Date().getFullYear()
+  try {
+    const store = useProjectStore()
+    return resolveEffectiveAuditYear({
+      configYear: renderConfig.value?.audit_year,
+      routeYear: route.query.year,
+      storeAuditYear: store.auditYear,
+      storeYear: store.year,
+    })
+  } catch {
+    return resolveEffectiveAuditYear({
+      configYear: renderConfig.value?.audit_year,
+      routeYear: route.query.year,
+    })
+  }
 })
 
 /** componentType → 图标（sheet tab 显示），委托给 registry */
@@ -608,6 +622,20 @@ function onLocateCell(payload: WorkpaperLocateCellPayload) {
 onMounted(() => {
   eventBus.on('workpaper:locate-cell', onLocateCell)
 })
+
+watch(
+  () => renderConfig.value?.project_id,
+  (pid) => {
+    if (!pid) return
+    try {
+      const store = useProjectStore()
+      if (pid !== store.projectId) {
+        void store.loadProjectContext(pid)
+      }
+    } catch { /* no pinia in isolated tests */ }
+  },
+  { immediate: true },
+)
 
 onUnmounted(() => {
   eventBus.off('workpaper:locate-cell', onLocateCell)

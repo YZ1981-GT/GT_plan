@@ -271,6 +271,12 @@ class SchemaDriftDetector:
             result[table.name] = cols
         return result
 
+    # Pydantic schema / 非 ORM 模块：不参与 Base.metadata 注册，跳过可避免
+    # 热重载期间无意义 import 及误报（如 app.models.ai_schemas）。
+    _SKIP_MODEL_MODULES: frozenset[str] = frozenset({
+        "app.models.ai_schemas",
+    })
+
     @staticmethod
     def _import_all_models() -> None:
         """遍历 app.models 包，import 所有子模块，确保 Base.metadata 完整。
@@ -286,6 +292,11 @@ class SchemaDriftDetector:
         for mod_info in pkgutil.walk_packages(
             models_pkg.__path__, prefix="app.models."
         ):
+            if mod_info.name in SchemaDriftDetector._SKIP_MODEL_MODULES:
+                continue
+            # *_schemas 为 Pydantic DTO，非 SQLAlchemy ORM
+            if mod_info.name.rsplit(".", 1)[-1].endswith("_schemas"):
+                continue
             try:
                 importlib.import_module(mod_info.name)
             except Exception as e:  # noqa: BLE001 — 坏模块不应阻塞 drift 扫描

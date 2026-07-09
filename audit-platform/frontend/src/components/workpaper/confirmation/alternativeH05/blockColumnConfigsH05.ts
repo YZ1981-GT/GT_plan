@@ -100,6 +100,20 @@ export function getBlockConfigH05(blockType: BlockType): BlockConfig {
   return BLOCK_COLUMN_CONFIGS_H05[blockType]
 }
 
-export function getSumFieldsH05(blockType: BlockType): string[] {
-  return getBlockConfigH05(blockType).columns.filter((c) => c.sumField).map((c) => c.field)
+export function getSumFieldsH05(blockType: string): string[] {
+  const config = BLOCK_COLUMN_CONFIGS_H05[blockType]
+  if (!config) return []
+  return config.columns.filter((c) => c.sumField).map((c) => c.field)
 }
+
+export function getGroupsH05(blockType: string): string[] {
+  const config = BLOCK_COLUMN_CONFIGS_H05[blockType]
+  if (!config) return []
+  const groups = new Set<string>()
+  for (const col of config.columns) {
+    if (col.group) groups.add(col.group)
+  }
+  return [...groups]
+}
+
+export type { BlockType }

@@ -126,8 +126,8 @@ describe('Task 13.2: 性能优化验证', () => {
       expect(src).toContain('GtWpVersionTrail')
     })
 
-    it('GtReviewDialog 通过 defineAsyncComponent 懒加载', () => {
-      expect(src).toContain("defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))")
+    it('GtWpReviewDialogHost 通过 defineAsyncComponent 懒加载', () => {
+      expect(src).toContain("defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))")
     })
   })
 

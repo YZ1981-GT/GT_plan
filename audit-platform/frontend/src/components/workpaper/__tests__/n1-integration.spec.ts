@@ -522,12 +522,12 @@ describe('集成测试 — 跨底稿联动 N1-N3 correspondence (Req 7.1, 7.3, 7
 describe('集成测试 — EventBus: deferred-tax:asset-updated (Req 7.2)', () => {
   it('publish deferred-tax:asset-updated 正确格式', () => {
     const received: any[] = []
-    eventBus.on('deferred-tax:asset-updated' as any, (payload: any) => {
+    eventBus.on('deferred-tax:asset-updated', (payload: any) => {
       received.push(payload)
     })
 
     // 模拟 N1 递延税资产更新事件
-    eventBus.emit('deferred-tax:asset-updated' as any, {
+    eventBus.emit('deferred-tax:asset-updated', {
       wpCode: 'N1',
       endBalance: 13_000_000,
       beginBalance: 10_000_000,
@@ -548,13 +548,13 @@ describe('集成测试 — EventBus: deferred-tax:asset-updated (Req 7.2)', () =
   it('N5-8 订阅 deferred-tax:asset-updated 能收到事件', () => {
     let n5Received = false
     // 模拟 N5-8 递延所得税费用核对表订阅
-    eventBus.on('deferred-tax:asset-updated' as any, (payload: any) => {
+    eventBus.on('deferred-tax:asset-updated', (payload: any) => {
       if (payload.wpCode === 'N1') {
         n5Received = true
       }
     })
 
-    eventBus.emit('deferred-tax:asset-updated' as any, {
+    eventBus.emit('deferred-tax:asset-updated', {
       wpCode: 'N1',
       endBalance: 8_000_000,
       beginBalance: 5_000_000,
@@ -610,11 +610,11 @@ describe('集成测试 — EventBus: substantive:adjudicated (Req 7.4)', () => {
 describe('集成测试 — EventBus: loss-check:recognizable-updated (Req 5.5)', () => {
   it('N1-5亏损确认变化 → 发布事件供N1-4消费', () => {
     const received: any[] = []
-    eventBus.on('loss-check:recognizable-updated' as any, (payload: any) => {
+    eventBus.on('loss-check:recognizable-updated', (payload: any) => {
       received.push(payload)
     })
 
-    eventBus.emit('loss-check:recognizable-updated' as any, {
+    eventBus.emit('loss-check:recognizable-updated', {
       wpCode: 'N1',
       totalRecognizable: 2_500_000,
       timestamp: Date.now(),

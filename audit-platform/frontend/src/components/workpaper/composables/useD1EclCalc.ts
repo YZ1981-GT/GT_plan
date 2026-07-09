@@ -207,6 +207,7 @@ export interface UseD1EclCalcOptions {
 const ECL_ITEM_IDS = {
   portfolioRows: 'D1-ecl-portfolio-rows',
   individualRows: 'D1-ecl-individual-rows',
+  auditProcedures: 'D1-ecl-audit-procedures',
   auditNote: 'D1-ecl-audit-note',
   auditConclusion: 'D1-ecl-audit-conclusion',
   totalShouldProvision: 'D1-ecl-total-should-provision',
@@ -362,8 +363,16 @@ export function useD1EclCalc(options: UseD1EclCalcOptions) {
 
   // ─── 审计说明 / 审计结论 ──────────────────────────────────────────────────
 
+  const auditProcedures = ref('')
   const auditNote = ref('')
   const auditConclusion = ref('')
+
+  function saveAuditProcedures(): void {
+    if (isReadonly.value) return
+    debouncedSave([
+      { item_id: ECL_ITEM_IDS.auditProcedures, remark: auditProcedures.value, conclusion: null },
+    ])
+  }
 
   function saveAuditNote(): void {
     if (isReadonly.value) return
@@ -449,7 +458,8 @@ export function useD1EclCalc(options: UseD1EclCalcOptions) {
         individualRows.value = createEmptyRows(3)
       }
 
-      // Audit note & conclusion
+      // Audit procedures / note / conclusion
+      auditProcedures.value = get(ECL_ITEM_IDS.auditProcedures)?.remark ?? ''
       auditNote.value = get(ECL_ITEM_IDS.auditNote)?.remark ?? ''
       auditConclusion.value = get(ECL_ITEM_IDS.auditConclusion)?.remark ?? ''
     } finally {
@@ -623,8 +633,10 @@ export function useD1EclCalc(options: UseD1EclCalcOptions) {
     exceedsMateriality,
 
     // 审计说明/结论
+    auditProcedures,
     auditNote,
     auditConclusion,
+    saveAuditProcedures,
     saveAuditNote,
     saveAuditConclusion,
 

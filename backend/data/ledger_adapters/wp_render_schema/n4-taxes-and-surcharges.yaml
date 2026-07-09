@@ -1,0 +1,264 @@
+# backend/data/ledger_adapters/wp_render_schema/n4-taxes-and-surcharges.yaml
+# N4 税金及附加底稿 — n4-taxes-and-surcharges 专属组件渲染 schema
+# Spec: .kiro/specs/n4-taxes-and-surcharges/
+# Requirements: 1.1-1.11, 2.1-2.8, 6.1-6.5, 7.1-7.4
+# Design: GtN4TaxesAndSurcharges.vue + 6子组件 + 8 composable + 后端3py
+
+wp_code: N4
+wp_name: 税金及附加
+component_type: n4-taxes-and-surcharges
+template_path: backend/wp_templates/N/N4 税金及附加.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+
+# 科目配置
+related_accounts:
+  - code: '6403'
+    name: 税金及附加
+    direction: debit
+    account_type: income_expense
+    amount_type: period  # 损益类！取本期发生额（借方-贷方），非期末余额
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 配置（9 sheets，O2A skip）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  - code: N4
+    name: 底稿目录
+    component: N4TabIndex
+    description: 底稿目录导航+进度条+联动状态
+
+  - code: N4-1
+    name: 审定表
+    component: N4TabAdjudication
+    description: 税金及附加审定表（24×14，83公式，损益类发生额，各税种分行）
+    formulas: 83
+    writeback: true
+
+  - code: N4-2
+    name: 明细表
+    component: N4TabDetail
+    description: 各税种发生额明细（34×11，18公式，计税依据×税率）
+    formulas: 18
+    dynamic_rows: true
+
+  - code: N4-3
+    name: 调整分录
+    component: N4TabAdjustment
+    description: AJE/RJE调整分录汇总（借贷平衡校验）
+    dynamic_rows: true
+
+  - code: N4A
+    name: 审计程序表
+    component: GtCycleAProgramRouter
+    description: 税金及附加审计程序表（复用a-program-console）
+
+  - code: 附注(上市)
+    name: 附注披露信息（上市公司）
+    component: N4TabDisclosureListed
+    description: 上市公司税金及附加附注（18×12）
+
+  - code: 附注(国企)
+    name: 附注披露信息（国有企业）
+    component: N4TabDisclosureSoe
+    description: 国企税金及附加附注（17×11）
+
+  - code: O2A
+    name: 原底稿
+    skip: true
+    description: 辅助参考sheet，走OnlyOffice fallback
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 损益类取数配置（从tb_ledger取发生额！）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+data_source:
+  type: tb_ledger
+  amount_type: period  # 本期发生额（非期末余额！）
+  direction: debit     # 借方科目：净额=借方-贷方
+  account_filter: "6403%"
+  description: |
+    损益类科目6403：取本期发生额（借方发生-贷方发生）
+    与H10资产处置损益、I6研发费用、K13营业外支出同款取数逻辑
+    费用类借方科目：借方=费用增加（计提税费），贷方=费用冲回
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 公式引擎
+# ═══════════════════════════════════════════════════════════════════════════════
+
+formula_engine:
+  composable: useN4FormulaEngine
+  functions:
+    - name: calcAuditedAmount
+      formula: "u + a + r"
+      description: 审定数=未审数+AJE+RJE
+    - name: calcPeriodAmount
+      formula: "debitOccur - creditOccur"
+      description: 损益类本期发生额=借方发生-贷方发生（借方科目！）
+    - name: calcSubtotal
+      formula: "Σarr"
+      description: 合计=各行累加
+    - name: calcYoyChange
+      formula: "(current - prior) / |prior|"
+      description: 同比变动率（上期为0时返回null）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 多税种测算引擎（与N2同源）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+multi_tax_engine:
+  composable: useN4MultiTaxEngine
+  tax_types:
+    - 消费税
+    - 城建税
+    - 教育费附加
+    - 地方教育附加
+    - 房产税
+    - 土地使用税
+    - 车船税
+    - 印花税
+    - 资源税
+    - 其他
+  functions:
+    - name: calcSurtax
+      formula: "(vat + consumptionTax) × rate"
+      params: [vat, consumptionTax, rate]
+    - name: calcPropertyTaxByValue
+      formula: "originalValue × (1 - deductRate) × 0.012"
+      params: [originalValue, deductRate]
+    - name: calcStampTax
+      formula: "taxableAmount × rate"
+      params: [taxableAmount, rate]
+    - name: calcLandUseTax
+      formula: "area × unitTax"
+      params: [area, unitTax]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB回写
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  account_code: '6403'
+  amount_type: period  # 损益类回写发生额（非期末余额！）
+  direction: debit     # 借方科目：审定发生额=借方-贷方
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# EventBus 集成
+# ═══════════════════════════════════════════════════════════════════════════════
+
+event_bus:
+  publish:
+    - event: substantive:adjudicated
+      trigger: writebackTB
+      payload: { accountCode: '6403', wpCode: 'N4', type: 'occurrence_amount', amountType: 'period' }
+      description: N4-1审定完成→通知附注刷新
+
+    - event: adjustment:created
+      trigger: N4-3分录保存
+      payload: { wpCode: 'N4', accountCode: '6403', ajeAmount, rjeAmount }
+      description: N4-3调整分录→A13汇总
+
+    - event: expense:taxes-surcharges-updated
+      trigger: writebackTB
+      payload: { accountCode: '6403', wpCode: 'N4', amount }
+      description: N4审定合计→A类利润表"税金及附加"行勾稽
+
+  subscribe:
+    - event: tax-accrual:updated
+      handler: onTaxAccrualUpdated
+      description: N2各税种计提额变动→刷新N4交叉验证
+
+    - event: disclosure:refresh
+      handler: onDisclosureRefresh
+      description: 通用附注刷新信号→重新加载数据
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用（GtIndexChip配置）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-N4-001
+    source_wp: N4-1
+    target_wp: N2-1
+    source_field: 各税种费用确认额
+    target_field: 各税种本期计提额
+    description: N4-1税金及附加审定发生额 ↔ N2-1应交税费各税种计提额
+    severity: required
+    direction: bidirectional
+    validation: expense === accrual（费用确认=计提额）
+
+  - ref_id: CW-N4-002
+    source_wp: N4-1
+    target_wp: A
+    source_field: 审定发生额合计
+    target_field: 利润表"税金及附加"行
+    description: N4-1审定合计 → A类利润表税金及附加行取数
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-N4-003
+    source_wp: N4-3
+    target_wp: A13
+    source_field: AJE/RJE净额
+    target_field: 调整分录汇总
+    description: N4-3调整分录 → A13审计调整分录汇总
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-N4-004
+    source_wp: N4-1
+    target_wp: N4-2
+    source_field: 审定合计
+    target_field: 明细合计
+    description: N4-1审定表合计 ↔ N4-2明细表合计（交叉验证）
+    severity: required
+    direction: bidirectional
+    validation: adjudication_total === detail_total
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 六大集成标准
+# ═══════════════════════════════════════════════════════════════════════════════
+
+integration_standards:
+  version_trail:
+    enabled: true
+    composable: useWorkpaperVersionToolbar
+    auto_snapshot: true
+    description: 主入口集成版本链 + 子组件保存触发autoSnapshot
+
+  event_bus_disclosure:
+    enabled: true
+    subscribe: substantive:adjudicated
+    publish: disclosure:note-text-updated
+    description: 附注组件subscribe审定完成+publish文本更新
+
+  review_dialog:
+    enabled: true
+    pattern: provide/inject
+    provider: GtN4TaxesAndSurcharges.vue
+    consumers: [N4TabAdjudication, N4TabAdjustment, N4TabDetail, N4TabDisclosureListed, N4TabDisclosureSoe]
+    description: 主入口provide openReviewDialog→各子组件inject调用
+
+  import_export:
+    enabled: true
+    composable: useN4ImportExport
+    endpoints:
+      - POST /api/n4-taxes-and-surcharges/{wp_id}/export-template
+      - POST /api/n4-taxes-and-surcharges/{wp_id}/export-data
+      - POST /api/n4-taxes-and-surcharges/{wp_id}/import-data
+    applicable_sheets: [N4-2]  # 仅明细表（动态行）需导入导出
+
+  dual_mode:
+    enabled: true
+    composable: useN4DualMode
+    modes: [html, onlyoffice]
+    default: html
+    description: el-segmented切换HTML结构化视图/OnlyOffice编辑
+
+  # N4不涉及抽凭/截止测试/行级OCR（损益类费用底稿，非收入/应收）
+  voucher_sampling:
+    enabled: false
+    reason: N4为损益费用类底稿，无需抽凭（非收入/应收类控制测试）

@@ -183,12 +183,7 @@
     />
 
     <!-- 复核对话 -->
-    <GtReviewDialog
-      v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
-      :key="reviewDialog.activationParams.value.sectionId"
-      v-bind="reviewDialog.activationParams.value"
-      @closed="reviewDialog.closeReviewDialog"
-    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -203,7 +198,7 @@ import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../../GtGridSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('../../GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   htmlData: any
@@ -225,7 +220,7 @@ const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: pr
 const { versionTrailRef } = versionToolbar
 
 // ─── 复核对话 provide（供 section 标题栏 GtReviewTrigger inject）─────────────
-const reviewDialog = useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
+useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const data = useDiffSecuritiesData({
   htmlData: () => props.htmlData,

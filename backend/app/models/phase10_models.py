@@ -64,6 +64,12 @@ class ReviewMessage(Base):
     # V095 扩展列 — schema漂移修复
     thread_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
     sender_role: Mapped[str] = mapped_column(String(50), server_default=text("'assistant'"), nullable=False)
+    # V099 私信目标字段 — schema漂移修复（DB 有列 / ORM 补齐）
+    target_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    )
+    target_user_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    target_role: Mapped[str | None] = mapped_column(String(50), nullable=True)
 
 
 class ReviewThread(Base):

@@ -1,0 +1,421 @@
+# backend/data/wp_render_schema/i6-research-development-expense.yaml
+# I6 研发费用 — 专属组件渲染 schema
+# componentType: i6-research-development-expense
+# 科目 6602 研发费用（**损益类/借方科目！取发生额非余额**）
+# Template: I6 研发费用.xlsx（11 有效 sheet）
+# 公式特征：净发生额=借方-贷方；审定=未审+AJE+RJE；VR-I6-01: 费用化+资本化=研发总额
+# I循环唯一损益类底稿（与H10同款处理）
+# 创建: 2026-08-01
+
+wp_code: I6
+wp_name: 研发费用
+component_type: i6-research-development-expense
+selfLoad: true
+template_path: backend/wp_templates/I/I6 研发费用.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['6602']
+income_statement: true  # 损益类标识！
+related_accounts:
+  - code: '6602'
+    name: 研发费用
+    direction: debit
+    category: income_statement
+
+special_rules:
+  income_statement: true
+  account_direction: debit
+  net_formula: "借方发生-贷方发生"
+  source_table: "tb_ledger/tb_balance发生额列"
+  cross_wp_linkage: "I6↔I2双向(VR-I6-01: 费用化+资本化=研发总额)"
+  monthly_matrix: true
+  cutoff_test_bidirectional: true
+
+formula_count: 120
+description: I循环唯一损益类底稿（11sheet，损益类取发生额+I2双向联动+月度12列+截止双向）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置（损益类！回写发生额而非期末余额）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '6602'
+  direction: debit
+  source_sheet: I6-1
+  value_field: audited_amount  # 审定发生额
+  value_type: occurrence_amount  # 发生额非余额！
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用（I6↔I2双向！）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-I6-01
+    source_wp: I6-2
+    target_wp: I6-1
+    description: '明细表月度合计 → 审定表I6-1净发生额'
+    direction: outbound
+  - ref_id: CW-I6-02
+    source_wp: I6-3
+    target_wp: I6-1
+    description: 'AJE/RJE汇总 → 审定表I6-1'
+    direction: outbound
+  - ref_id: CW-I6-03
+    source_wp: I6-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+  - ref_id: CW-I6-04
+    source_wp: I6-1
+    target_wp: I2
+    description: 'I6费用化金额 ↔ I2资本化金额（VR-I6-01双向校验）'
+    direction: bidirectional
+  - ref_id: CW-I6-05
+    source_wp: I6-1
+    target_wp: I2
+    description: 'I6→I2: research:expense-updated EventBus'
+    direction: outbound
+  - ref_id: CW-I6-06
+    source_wp: I2
+    target_wp: I6-1
+    description: 'I2→I6: development:capitalized-updated EventBus'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（11 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: I6
+    group: core
+    dimensions: "28×13"
+    component: I6TabIndex
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 研发费用实质性程序表I6A
+  # ─────────────────────────────────────────────────────────────────────────
+  研发费用实质性程序表I6A:
+    code: I6A
+    group: core
+    dimensions: "25×11"
+    component: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+      - { field: applicability, label: 适用性, type: text, width: 80 }
+    rows: 25
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表I6-1（73公式！损益类！取发生额）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表I6-1:
+    code: I6-1
+    group: core
+    dimensions: "27×11"
+    component: I6TabAdjudication
+    class_code: F-审定表
+    account_codes: ['6602']
+    formula_count: 73
+    income_statement: true
+    columns:
+      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: debit_occurrence, label: 借方发生(费用增加), type: number, width: 120 }
+      - { field: credit_occurrence, label: 贷方发生(费用冲回), type: number, width: 120 }
+      - { field: net_occurrence, label: 净发生额, type: number, width: 100, formula: "debit - credit" }
+      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: tb_ledger_occurrence }
+      - { field: aje_amount, label: AJE, type: number, width: 80 }
+      - { field: rje_amount, label: RJE, type: number, width: 80 }
+      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
+      - { field: prior_amount, label: 同期, type: number, width: 100 }
+      - { field: change_rate, label: 变动率, type: percent, width: 80, formula: "(audited - prior) / prior" }
+      - { field: remark, label: 备注, type: text, width: 120, editable: true }
+    formulas:
+      - { name: calcIncomeStatementNet, target: net_occurrence, expr: "debit_occurrence - credit_occurrence" }
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcChangeRate, target: change_rate, expr: "(audited - prior) / prior" }
+    highlights:
+      - { condition: "tb_variance != 0", style: red }
+      - { condition: "abs(change_rate) > 0.3", style: yellow, tooltip: "月度变动率超30%" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      value_type: occurrence_amount  # 回写发生额！
+      accounts: ['6602']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'6602', adjudicatedAmount}" }
+        - { event: "research:expense-updated", payload: "{expenseAmount, capitalizedI2}" }
+      subscribe:
+        - { event: "development:capitalized-updated", action: "refreshI2Linkage" }
+    footer:
+      - { type: tb_comparison, accounts: ['6602'], source: occurrence }
+      - { type: i2_linkage_panel, label: "I6↔I2联动校验(VR-I6-01)" }
+      - { type: audit_note, label: 审计说明 }
+      - { type: audit_conclusion }
+      - { type: review_dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表I6-2（44行×65列，月度12列横向宽表）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表I6-2:
+    code: I6-2
+    group: core
+    dimensions: "44×65"
+    component: I6TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 23
+    monthly_matrix: true
+    columns:
+      # 固定列
+      - { field: item_name, label: 项目名称, type: text, width: 150, sticky: true }
+      - { field: expense_category, label: 费用类别, type: select, width: 120, sticky: true,
+          options: [人工费, 材料费, 折旧费, 试验费, 差旅费, 外协费, 其他] }
+      # 月度12列（横向滚动）
+      - { field: m1, label: 1月, type: number, width: 90 }
+      - { field: m2, label: 2月, type: number, width: 90 }
+      - { field: m3, label: 3月, type: number, width: 90 }
+      - { field: m4, label: 4月, type: number, width: 90 }
+      - { field: m5, label: 5月, type: number, width: 90 }
+      - { field: m6, label: 6月, type: number, width: 90 }
+      - { field: m7, label: 7月, type: number, width: 90 }
+      - { field: m8, label: 8月, type: number, width: 90 }
+      - { field: m9, label: 9月, type: number, width: 90 }
+      - { field: m10, label: 10月, type: number, width: 90 }
+      - { field: m11, label: 11月, type: number, width: 90 }
+      - { field: m12, label: 12月, type: number, width: 90 }
+      # 合计
+      - { field: year_total, label: 合计, type: number, width: 100, formula: "SUM(m1:m12)" }
+      - { field: prior_amount, label: 同期金额, type: number, width: 100 }
+      - { field: change_rate, label: 变动率(%), type: percent, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 120 }
+    formulas:
+      - { name: calcMonthlyTotal, target: year_total, expr: "SUM(m1,m2,...,m12)" }
+      - { name: calcChangeRate, target: change_rate, expr: "(year_total - prior) / prior * 100" }
+    summary_rows:
+      - { type: grand_total, formula: "各列SUM" }
+    import_export: true
+    add_row_prompt: item_name
+    trend_chart:
+      enabled: true
+      collapsible: true
+      highlight_threshold: 0.3
+    cross_refs:
+      - ref_id: CW-I6-2-001
+        target_wp: I6-1
+        description: '月度合计 → 审定表I6-1净发生额'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总I6-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总I6-3:
+    code: I6-3
+    group: core
+    dimensions: "21×10"
+    component: I6TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: adjustment_item, label: 调整事项, type: text, width: 150 }
+      - { field: entry_type, label: 类别, type: select, width: 80, options: [AJE, RJE] }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: debit_amount, label: 借方, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    highlights:
+      - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
+    import_export: true
+    add_row_prompt: adjustment_item
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+    cross_refs:
+      - ref_id: CW-I6-3-001
+        target_wp: I6-1
+        description: 'AJE/RJE汇总 → 审定表I6-1'
+        severity: required
+        direction: outbound
+      - ref_id: CW-I6-3-002
+        target_wp: A13
+        description: '调整分录 → A13错报汇总'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 针对性检查表I6-4
+  # ─────────────────────────────────────────────────────────────────────────
+  针对性检查表I6-4:
+    code: I6-4
+    group: core
+    dimensions: "30×10"
+    component: I6TabTargetedCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS6]
+    check_items:
+      - { id: expense_completeness, label: 费用归集完整性（研发活动支出是否全部归集到6602）, type: conclusion, options: [完整, 需补充, 不适用] }
+      - { id: personnel_allocation, label: 人员费用分摊合理性（研发人员工时分配）, type: conclusion, options: [合理, 需调整, 不适用] }
+      - { id: i2_consistency, label: 与I2(开发支出)划分一致性, type: conclusion, options: [一致, 存在差异, 不适用] }
+      - { id: expense_authenticity, label: 费用真实性（大额支出合同/发票/验收单）, type: conclusion_with_evidence }
+      - { id: rd_deduction_compliance, label: 研发加计扣除合规性, type: conclusion, options: [合规, 存在风险, 不适用] }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 截止性测试（账到单据）I6-5
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试（账到单据）I6-5:
+    code: I6-5
+    group: cutoff
+    dimensions: "20×10"
+    component: I6TabCutoffForward
+    class_code: F-截止测试
+    cutoff_direction: forward
+    sampling_range_days: 5
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: voucher_date, label: 记账日期, type: date, width: 100 }
+      - { field: amount, label: 金额, type: number, width: 100 }
+      - { field: expense_type, label: 费用类型, type: text, width: 100 }
+      - { field: recording_period, label: 记账期间, type: text, width: 80 }
+      - { field: document_date, label: 单据日期, type: date, width: 100 }
+      - { field: belongs_period, label: 归属期间, type: text, width: 80 }
+      - { field: is_crossover, label: 是否跨期, type: select, width: 80, options: [是, 否] }
+      - { field: conclusion, label: 结论, type: text, width: 100 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    integrations:
+      - cutoff_auto_sampling: { direction: forward, account_prefix: '6602', days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 截止性测试（单据到账）I6-6
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试（单据到账）I6-6:
+    code: I6-6
+    group: cutoff
+    dimensions: "20×10"
+    component: I6TabCutoffBackward
+    class_code: F-截止测试
+    cutoff_direction: backward
+    sampling_range_days: 5
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: document_date, label: 单据日期, type: date, width: 100 }
+      - { field: amount, label: 金额, type: number, width: 100 }
+      - { field: expense_type, label: 费用类型, type: text, width: 100 }
+      - { field: document_period, label: 单据期间, type: text, width: 80 }
+      - { field: voucher_date, label: 记账日期, type: date, width: 100 }
+      - { field: recording_period, label: 记账期间, type: text, width: 80 }
+      - { field: is_crossover, label: 是否跨期, type: select, width: 80, options: [是, 否] }
+      - { field: conclusion, label: 结论, type: text, width: 100 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    integrations:
+      - cutoff_auto_sampling: { direction: backward, account_prefix: '6602', days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 附注披露信息（上市公司）（19行×7列，24公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "19×7"
+    component: I6TabDisclosureListed
+    class_code: H-附注
+    formula_count: 24
+    variant: listed
+    columns:
+      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: current_amount, label: 本期发生额, type: number }
+      - { field: prior_amount, label: 上期发生额, type: number }
+      - { field: change_rate, label: 变动率(%), type: percent }
+      - { field: capitalized_amount, label: 资本化金额(联动I2), type: number, cross_ref: I2 }
+      - { field: total_rd, label: 研发总额, type: number, formula: "current + capitalized" }
+      - { field: remark, label: 备注, type: text }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6602" }
+        - { event: "development:capitalized-updated" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'research_development_expense'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 附注披露信息（国有企业）（16行×6列，24公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "16×6"
+    component: I6TabDisclosureSoe
+    class_code: H-附注
+    formula_count: 24
+    variant: soe
+    columns:
+      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: current_amount, label: 本期发生额, type: number }
+      - { field: prior_amount, label: 上期发生额, type: number }
+      - { field: capitalized_amount, label: 资本化金额(联动I2), type: number, cross_ref: I2 }
+      - { field: total_rd, label: 研发总额, type: number, formula: "current + capitalized" }
+      - { field: remark, label: 备注, type: text }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6602" }
+        - { event: "development:capitalized-updated" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'research_development_expense'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 底稿目录索引
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录索引:
+    code: 底稿目录索引
+    group: core
+    dimensions: "11×4"
+    component: I6TabIndex
+    class_code: B-底稿目录
+    layout:
+      type: simple_index
+      columns:
+        - { field: seq, label: 序号, type: number, width: 50 }
+        - { field: sheet_name, label: Sheet名称, type: text, width: 200 }
+        - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+        - { field: status, label: 状态, type: text, width: 80 }

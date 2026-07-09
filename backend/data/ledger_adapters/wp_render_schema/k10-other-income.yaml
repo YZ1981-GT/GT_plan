@@ -1,0 +1,275 @@
+# backend/data/ledger_adapters/wp_render_schema/k10-other-income.yaml
+# K10 其他收益 — 专属组件渲染 schema
+# componentType: k10-other-income
+# 科目 6117 其他收益（**损益类/贷方科目！取发生额非余额**）
+# Template: K10 其他收益.xlsx（10 有效 sheet）
+# 公式特征：净发生额=贷方-借方；审定=未审+AJE+RJE；按补助项目分行明细
+# K循环损益类底稿（贷方科目，与日常活动相关的政府补助）
+# 特殊：政府补助核对引擎（与K7递延收益分摊一致性校验）
+
+wp_code: K10
+wp_name: 其他收益
+component_type: k10-other-income
+selfLoad: true
+template_path: backend/wp_templates/K/K10 其他收益.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['6117']
+income_statement: true  # 损益类标识！
+related_accounts:
+  - code: '6117'
+    name: 其他收益
+    direction: credit
+    category: income_statement
+
+special_rules:
+  income_statement: true
+  account_direction: credit  # 贷方科目！（收益类）
+  net_formula: "贷方发生-借方发生"
+  source_table: "tb_ledger"  # 从tb_ledger取数
+  grant_reconcile: true  # 政府补助核对（与K7递延收益联动）
+  vs_non_operating: "6301(K12)"  # 与日常活动无关→营业外收入
+
+formula_count: 90
+description: K循环损益类底稿（10sheet，损益类取发生额+政府补助核对+应收补助检查）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置（损益类！回写发生额而非期末余额）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '6117'
+  direction: credit
+  source_sheet: K10-1
+  value_field: audited_amount  # 审定发生额
+  value_type: occurrence_amount  # 发生额非余额！
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 生成配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ai_sections:
+  - id: grant-reconcile-conclusion
+    name: 政府补助核对结论
+    description: K10-4政府补助核对结论（与K7递延收益分摊一致性）
+    location: K10-4政府补助核对表底部
+  - id: receivable-grant-eval
+    name: 应收补助评价
+    description: K10-5应收政府补助评价（收款权利/可收回/确认时点）
+    location: K10-5应收补助检查表底部
+  - id: overall-opinion
+    name: 总体审计意见
+    description: K10底稿总体审计结论
+    location: K10-1审定表结论区
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-K10-01
+    source_wp: K10-2
+    target_wp: K10-1
+    description: '明细表合计 → 审定表K10-1净发生额'
+    direction: outbound
+  - ref_id: CW-K10-02
+    source_wp: K10-3
+    target_wp: K10-1
+    description: 'AJE/RJE汇总 → 审定表K10-1'
+    direction: outbound
+  - ref_id: CW-K10-03
+    source_wp: K10-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+  - ref_id: CW-K10-04
+    source_wp: K10-4
+    target_wp: K7
+    description: '递延分摊 ←→ K7递延收益本期分摊（一致性核对）'
+    direction: bidirectional
+  - ref_id: CW-K10-05
+    source_wp: K10-4
+    target_wp: K10-1
+    description: '合计计入 → 审定表K10-1'
+    direction: outbound
+  - ref_id: CW-K10-06
+    source_wp: K10-6
+    target_wp: K10-2
+    description: '综合检查分类核对 → 明细表'
+    direction: outbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（10 sheets，含K10A程序表+底稿目录）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: K10
+    group: core
+    dimensions: "15×8"
+    component: K10TabIndex
+    class_code: B-底稿目录
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 其他收益实质性程序表K10A
+  # ─────────────────────────────────────────────────────────────────────────
+  其他收益实质性程序表K10A:
+    code: K10A
+    group: core
+    dimensions: "20×11"
+    component: a-program-console
+    class_code: A-实质性程序
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K10-1（69公式！损益类！取发生额，贷方科目）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K10-1:
+    code: K10-1
+    group: core
+    dimensions: "27×11"
+    component: K10TabAdjudication
+    class_code: F-审定表
+    account_codes: ['6117']
+    formula_count: 69
+    income_statement: true
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      value_type: occurrence_amount
+      accounts: ['6117']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'6117', adjudicatedAmount}" }
+      subscribe:
+        - { event: "adjustment:created", filter: "accountCode=6117" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K10-2（12列，43行，动态行）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K10-2:
+    code: K10-2
+    group: core
+    dimensions: "43×12"
+    component: K10TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 11
+    import_export: true
+    add_row_prompt: grantProject
+    columns:
+      - { name: "序号", key: "seq" }
+      - { name: "补助项目", key: "grantProject" }
+      - { name: "批文号", key: "approvalRef" }
+      - { name: "补助类型", key: "grantType" }
+      - { name: "来源", key: "recognitionSource" }
+      - { name: "本期计入金额", key: "currentAmount" }
+      - { name: "计入依据", key: "recognitionBasis" }
+      - { name: "凭证号", key: "voucherRef" }
+      - { name: "同比变动", key: "yoyChange" }
+      - { name: "结论", key: "conclusion" }
+      - { name: "索引", key: "indexRef" }
+      - { name: "备注", key: "remark" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K10-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K10-3:
+    code: K10-3
+    group: core
+    dimensions: "21×10"
+    component: K10TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 政府补助核对表K10-4（补助核对引擎，与K7联动）
+  # ─────────────────────────────────────────────────────────────────────────
+  政府补助核对表K10-4:
+    code: K10-4
+    group: inspection
+    dimensions: "30×10"
+    component: K10TabGrantReconcile
+    class_code: F-检查表
+    dynamic_rows: true
+    import_export: true
+    grant_reconcile_engine: true
+    cross_ref:
+      - { target: K7, description: "递延收益分摊一致性核对" }
+    check_items:
+      - 合计计入=直接+递延分摊
+      - 递延分摊与K7一致性
+      - 分类正确性(与日常活动相关)
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 应收政府补助检查表K10-5
+  # ─────────────────────────────────────────────────────────────────────────
+  应收政府补助检查表K10-5:
+    code: K10-5
+    group: inspection
+    dimensions: "20×8"
+    component: K10TabReceivableGrant
+    class_code: F-检查表
+    check_items:
+      - 批文依据
+      - 收款权利确凿性
+      - 预期可收回性
+      - 确认时点合规(CAS16第五条)
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 其他收益检查表K10-6
+  # ─────────────────────────────────────────────────────────────────────────
+  其他收益检查表K10-6:
+    code: K10-6
+    group: inspection
+    dimensions: "25×10"
+    component: K10TabOtherIncomeCheck
+    class_code: F-检查表
+    check_items:
+      - 真实性
+      - 依据合规
+      - 分类正确性(与日常活动相关→其他收益 vs 无关→营业外收入)
+      - 期间归属
+      - 税务处理(减免税/即征即退核实)
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 附注披露信息（上市公司）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "38×17"
+    component: K10TabDisclosureListed
+    class_code: H-附注
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6117" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'other_income'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 附注披露信息（国有企业）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "17×6"
+    component: K10TabDisclosureSoe
+    class_code: H-附注
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6117" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'other_income'}" }

@@ -1,5 +1,7 @@
 /**
- * useWorkpaperReviewProvide — 循环底稿通用复核对话 provider（D4/D5/D6/D7 共用）
+ * useWorkpaperReviewProvide — 循环底稿通用复核对话 provider（D1–D7 等）
+ *
+ * 须在同组件 template 内挂载 GtWpReviewDialogHost（及可选 GtWpReviewRail）。
  */
 import { provide, type Ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'

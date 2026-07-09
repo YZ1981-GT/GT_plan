@@ -72,10 +72,16 @@ export function useEditorMode(ctx: EditorModeContext): EditorModeReturn {
   const wpClassification = useWpClassification(wpCodeRef, ctx.projectId)
 
   const htmlComponentType = computed<string>(() => {
-    if (!wpClassification.classification.value) return ''
-    if (!wpClassification.classification.value.classifications?.length) return ''
-    const ct = wpClassification.componentType.value
-    return HTML_COMPONENT_TYPES.has(ct as string) ? (ct as string) : ''
+    // Prefer classification result; fall back to detail.component_type when already fetched
+    const fromClass = (() => {
+      if (!wpClassification.classification.value) return ''
+      if (!wpClassification.classification.value.classifications?.length) return ''
+      const ct = wpClassification.componentType.value
+      return HTML_COMPONENT_TYPES.has(ct as string) ? (ct as string) : ''
+    })()
+    if (fromClass) return fromClass
+    const fromDetail = componentType.value
+    return HTML_COMPONENT_TYPES.has(fromDetail) ? fromDetail : ''
   })
 
   const useHtmlRenderer = computed<boolean>(() => !!htmlComponentType.value)

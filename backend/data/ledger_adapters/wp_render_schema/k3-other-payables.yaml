@@ -1,0 +1,309 @@
+# backend/data/ledger_adapters/wp_render_schema/k3-other-payables.yaml
+# K3 其他应付款 — 专属组件渲染 schema
+# componentType: k3-other-payables
+# 科目 2241 其他应付款（贷方/负债类）
+# Template: K3 其他应付款.xlsx（11 有效 sheet）
+# 公式特征：期末=期初+贷方-借方（负债类！与资产类相反）；审定=未审+AJE+RJE
+#           完整性认定为主（负债易少计）+ 反向截止测试
+# 创建: 2026-07-30
+
+wp_code: K3
+wp_name: 其他应付款
+component_type: k3-other-payables
+selfLoad: true
+template_path: backend/wp_templates/K/K3 其他应付款.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['2241']
+related_accounts:
+  - code: '2241'
+    name: 其他应付款
+    direction: credit
+    category: liability
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - large-amount-eval
+  - long-outstanding-eval
+  - related-party-eval
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿交叉引用（cross_wp_references）
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_references:
+  - ref_id: CW-K3-001
+    source_wp: K3-1
+    target_wp: TB:2241
+    description: '审定表审定数→回写 trial_balance(2241)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K3-002
+    source_wp: K3-3
+    target_wp: A13
+    description: '调整分录→A13错报汇总（adjustment:created）'
+    direction: outbound
+    event: "adjustment:created"
+
+  - ref_id: CW-K3-003
+    source_wp: K3-1
+    target_wp: 附注
+    description: '审定表→附注披露自动刷新（substantive:adjudicated）'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K3-004
+    source_wp: K3-2
+    target_wp: K3-4
+    description: '明细表大额筛选→K3-4大额分析联动'
+    direction: outbound
+
+  - ref_id: CW-K3-005
+    source_wp: K3-2
+    target_wp: K3-5
+    description: '明细表3年以上→K3-5长期挂账联动'
+    direction: outbound
+
+  - ref_id: CW-K3-006
+    source_wp: K3-5
+    target_wp: K12
+    description: '长期挂账转销→K12营业外收入联动'
+    direction: outbound
+
+  - ref_id: CW-K3-007
+    source_wp: B50
+    target_wp: K3A
+    description: 'B50风险评估→K3实质性程序'
+    direction: inbound
+
+  - ref_id: CW-K3-008
+    source_wp: K3-7
+    target_wp: K3-2
+    description: '综合检查（含反向截止）→明细表完整性核对'
+    direction: outbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（12 sheets: 11有效 + 1程序表）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K3TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 其他应付款实质性程序表K3A
+  # ─────────────────────────────────────────────────────────────────────────
+  其他应付款实质性程序表K3A:
+    code: K3A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K3-1 (48行×11列, 50公式, 负债类！)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K3-1:
+    code: K3-1
+    group: core
+    dimensions: "48×11"
+    component: K3TabAdjudication
+    class_code: F-审定表
+    account_codes: ['2241']
+    formula_count: 50
+    sections:
+      - name: 其他应付款
+        account_code: '2241'
+        direction: credit
+        balance_formula: "期末=期初+贷方-借方"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcLiabilityEndBalance, target: closing_balance, expr: "opening + credit - debit" }
+      - { name: calcTriangleReconciliation, target: triangle_diff, expr: "end - (begin + inc - dec)" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['2241']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'2241', adjudicatedAmount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K3-2 (51行×27列, 19公式, 3区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K3-2:
+    code: K3-2
+    group: core
+    dimensions: "51×27"
+    component: K3TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 300
+    formula_count: 19
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns: [序号, 往来对象, 性质, 关联关系, 期初余额, 本期增加(贷方), 本期减少(借方), 期末余额]
+      - name: 账龄分析
+        tab_index: 1
+        columns: [1年内, 1-2年, 2-3年, 3年以上, 账龄合计]
+      - name: 检查结论
+        tab_index: 2
+        columns: [形成原因, 预计偿付时间, 是否长期挂账, 疑似未入账, 凭证号, 结论, 备注, 大额标记, 关联方标记, 期后偿付金额, 期后偿付日期, 核查状态, 审计师评价, 备注2]
+    import_export: true
+    add_row_prompt: counterparty
+    formulas:
+      - { name: calcLiabilityDetailEnd, target: closing_balance, expr: "opening + increase(credit) - decrease(debit)" }
+      - { name: calcAgingTotal, target: aging_total, expr: "agingLt1 + aging1to2 + aging2to3 + agingGt3" }
+    highlights:
+      - { condition: "closingBalance != opening + increase - decrease", style: red, tooltip: "期末≠期初+增(贷)-减(借)" }
+      - { condition: "agingGt3 > 0", style: orange, tooltip: "3年以上长期挂账风险" }
+      - { condition: "agingTotal != closingBalance", style: red, tooltip: "账龄合计≠期末余额" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K3-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K3-3:
+    code: K3-3
+    group: core
+    component: K3TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 大额其他应付款情况分析表K3-4 (27行×10列, 8公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  大额其他应付款情况分析表K3-4:
+    code: K3-4
+    group: inspection
+    dimensions: "27×10"
+    component: K3TabLargeAmount
+    class_code: F-明细表
+    formula_count: 8
+    formulas:
+      - { name: calcProportion, target: proportion, expr: "item_balance / total_balance" }
+    highlights:
+      - { condition: "proportion > threshold", style: orange, tooltip: "超过阈值" }
+    cross_refs:
+      - ref_id: CW-K3-4-001
+        target_wp: K3-2
+        description: '大额←明细表筛选'
+        direction: inbound
+    ai_section: large-amount-eval
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 长期挂账检查表K3-5
+  # ─────────────────────────────────────────────────────────────────────────
+  长期挂账检查表K3-5:
+    code: K3-5
+    group: inspection
+    component: K3TabLongOutstanding
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: existence, label: 长期挂账款项真实性, type: conclusion }
+      - { id: clearance, label: 清理必要性评估, type: conclusion }
+      - { id: transfer, label: 是否需转营业外收入, type: conclusion }
+      - { id: repayment_plan, label: 偿付计划可行性, type: conclusion }
+    cross_refs:
+      - ref_id: CW-K3-5-001
+        target_wp: K3-2
+        description: '长期挂账←明细表3年以上行'
+        direction: inbound
+      - ref_id: CW-K3-5-002
+        target_wp: K12
+        description: '转销→K12营业外收入'
+        direction: outbound
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+    ai_section: long-outstanding-eval
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 关联方及交易检查表K3-6
+  # ─────────────────────────────────────────────────────────────────────────
+  关联方及交易检查表K3-6:
+    code: K3-6
+    group: inspection
+    component: K3TabRelatedParty
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: fairness, label: 交易价格公允性, type: conclusion }
+      - { id: disclosure, label: 披露完整性(CAS36), type: conclusion }
+      - { id: capital_occupation, label: 资金占用检查, type: conclusion }
+      - { id: business_substance, label: 商业实质判断, type: conclusion }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - ocr: { endpoint: "/d4/contract-ocr" }
+    ai_section: related-party-eval
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 其他应付款检查表K3-7（含反向截止测试）
+  # ─────────────────────────────────────────────────────────────────────────
+  其他应付款检查表K3-7:
+    code: K3-7
+    group: inspection
+    component: K3TabPayableCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: completeness, label: 完整性（是否存在少计负债）, type: conclusion }
+      - { id: reverse_cutoff, label: 反向截止测试（期后偿付倒查未入账负债）, type: conclusion }
+      - { id: classification, label: 分类恰当性（流动vs非流动）, type: conclusion }
+      - { id: aging_accuracy, label: 账龄准确性, type: conclusion }
+      - { id: disclosure, label: 列报与披露, type: conclusion }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: { direction: reverse }
+    highlights:
+      - { condition: "conclusion == '不合规'", style: red }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 附注披露信息（上市公司）(45行×15列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "45×15"
+    component: K3TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 附注披露信息（国有企业）(45行×15列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "45×15"
+    component: K3TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }

@@ -69,6 +69,10 @@ export interface BalanceSummary {
   closing_balance?: number
   /** 本期销售金额 */
   sales_amount?: number
+  /** 本期新增金额（H0-5 固定资产使用） */
+  current_addition?: number
+  /** 本期采购金额（F0-5 预付账款使用） */
+  purchase_amount?: number
   /** 本期收款检查比例（自动：block3合计/sales_amount） */
   receipt_check_ratio?: number | null
   /** 本期出库检查比例（自动：block4合计/sales_amount） */

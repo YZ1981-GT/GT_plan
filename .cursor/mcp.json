@@ -16,6 +16,51 @@
     "playwright": {
       "command": "C:\\Program Files\\nodejs\\npx.cmd",
       "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "postgres": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "DATABASE_URI",
+        "crystaldba/postgres-mcp",
+        "--access-mode=restricted"
+      ],
+      "env": {
+        "DATABASE_URI": "postgresql://postgres:postgres@host.docker.internal:5432/audit_platform"
+      }
+    },
+    "github": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "-e",
+        "GITHUB_TOOLSETS",
+        "ghcr.io/github/github-mcp-server:latest"
+      ],
+      "envFile": "${workspaceFolder}/.cursor/mcp.env"
+    },
+    "gt-plan": {
+      "command": "python",
+      "args": ["${workspaceFolder}/tools/gt-plan-mcp/server.py"],
+      "env": {
+        "GT_PLAN_ROOT": "${workspaceFolder}"
+      }
+    },
+    "docker": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "mcp-docker-server"]
+    },
+    "context7": {
+      "command": "C:\\Program Files\\nodejs\\npx.cmd",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "envFile": "${workspaceFolder}/.cursor/mcp.env"
     }
   }
 }

@@ -21,7 +21,7 @@
  *
  * Requirements: 1.1-1.6, 2.1-2.5, 3.1-3.5, 14.1-14.5, 18.1-18.3, 18.6-18.7
  */
-import { inject, toRef, type Ref } from 'vue'
+import { inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1InventoryCount } from '../composables/useD1InventoryCount'
 import {
@@ -35,6 +35,7 @@ import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormD
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -77,17 +78,20 @@ const {
   auditConclusion,
   saveAuditNote,
   saveAuditConclusion,
+  exportTemplate,
+  exportData,
+  importData,
 } = useD1InventoryCount({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: async (items: ChecklistItem[]) => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch { ElMessage.warning('保存失败，请重试') }
   },
   saveDebouncedText: (item: ChecklistItem) => {
-    http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items: [item] })
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items: [item] })
       .catch(() => { /* silent */ })
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
@@ -101,6 +105,66 @@ const CONCLUSION_OPTIONS = [
   '存在差异，需进一步追查',
   '存在重大差异',
 ]
+
+const wpIdRef = toRef(props, 'wpId')
+const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
+const aiLoadingNote = ref(false)
+const aiLoadingConclusion = ref(false)
+
+function buildInventoryAiContext(extra = ''): Record<string, unknown> {
+  return {
+    sheet: 'D1-10',
+    rowCount: rows.value.length,
+    sumAmount: sumAmount.value,
+    bookBalance: bookBalance.value,
+    differenceAmount: differenceAmount.value,
+    hasDifference: hasDifference.value,
+    reconConclusion: reconArea.value.conclusion || '',
+    guidance: extra,
+  }
+}
+
+async function handleImportUpload(file: File): Promise<boolean> {
+  const result = await importData(file)
+  if (result.success) {
+    ElMessage.success(`导入成功：${result.rowCount} 行`)
+  } else {
+    ElMessage.warning(result.errors?.[0] || '导入失败')
+  }
+  return false
+}
+
+async function generateAuditNoteWithAI() {
+  if (props.isReadonly) return
+  aiLoadingNote.value = true
+  try {
+    const text = await generateAndConfirm(
+      'sampling-audit-note',
+      auditNote.value,
+      buildInventoryAiContext('基于监盘表、核对区和差异分析生成审计说明。'),
+      'AI · 审计说明',
+    )
+    if (text) saveAuditNote(text)
+  } finally {
+    aiLoadingNote.value = false
+  }
+}
+
+async function generateAuditConclusionWithAI() {
+  if (props.isReadonly) return
+  aiLoadingConclusion.value = true
+  try {
+    const text = await generateAndConfirm(
+      'sampling-audit-conclusion',
+      auditConclusion.value,
+      buildInventoryAiContext(`核对结论：${reconArea.value.conclusion || '未填写'}`),
+      'AI · 审计结论',
+    )
+    if (text) saveAuditConclusion(text)
+  } finally {
+    aiLoadingConclusion.value = false
+  }
+}
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -157,6 +221,18 @@ const GUIDANCE_TEXTS = [
 
       <!-- Toolbar -->
       <div class="table-toolbar">
+        <el-button-group size="small">
+          <el-button @click="exportTemplate">导出模板</el-button>
+          <el-button @click="exportData">导出数据</el-button>
+          <el-upload
+            :show-file-list="false"
+            accept=".xlsx,.xls"
+            :before-upload="handleImportUpload"
+            style="display:inline-block"
+          >
+            <el-button size="small">导入数据</el-button>
+          </el-upload>
+        </el-button-group>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
           + 添加票据
         </el-button>
@@ -540,8 +616,15 @@ const GUIDANCE_TEXTS = [
           @change="(v: string) => saveAuditNote(v || '')"
         />
         <div class="note-actions">
-          <el-tooltip content="AI生成（开发中）" placement="top">
-            <el-button size="small" disabled>🤖 AI</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI辅助生成审计说明' : 'AI服务暂不可用'" placement="top">
+            <el-button
+              size="small"
+              :loading="aiLoadingNote"
+              :disabled="isReadonly || !aiAvailable"
+              @click="generateAuditNoteWithAI"
+            >
+              🤖 AI
+            </el-button>
           </el-tooltip>
           <el-button
             v-if="openReviewDialog"
@@ -565,8 +648,15 @@ const GUIDANCE_TEXTS = [
           @change="(v: string) => saveAuditConclusion(v || '')"
         />
         <div class="note-actions">
-          <el-tooltip content="AI生成（开发中）" placement="top">
-            <el-button size="small" disabled>🤖 AI</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI辅助生成审计结论' : 'AI服务暂不可用'" placement="top">
+            <el-button
+              size="small"
+              :loading="aiLoadingConclusion"
+              :disabled="isReadonly || !aiAvailable"
+              @click="generateAuditConclusionWithAI"
+            >
+              🤖 AI
+            </el-button>
           </el-tooltip>
           <el-button
             v-if="openReviewDialog"

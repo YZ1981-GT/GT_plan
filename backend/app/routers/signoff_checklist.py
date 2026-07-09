@@ -18,7 +18,9 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_current_user, get_db
+from app.core.database import get_db
+from app.deps import get_current_user
+from app.services.project_audit_year import fetch_project_audit_year
 from app.models.core import User
 from app.services.signoff_checklist_service import (
     SignoffChecklist,
@@ -47,15 +49,10 @@ async def get_signoff_checklist(
     # 若未指定年度，从项目获取
     actual_year = year
     if actual_year is None:
-        try:
-            result = await db.execute(
-                text("SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"),
-                {"pid": str(project_id)},
-            )
-            row = result.fetchone()
-            actual_year = row[0] if row and row[0] else 2025
-        except Exception:
-            actual_year = 2025
+        actual_year = await fetch_project_audit_year(db, project_id)
+        if actual_year is None:
+            from datetime import datetime
+            actual_year = datetime.now().year - 1
 
     svc = SignoffChecklistService(db)
     checklist = await svc.generate_checklist(

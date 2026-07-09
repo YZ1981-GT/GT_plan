@@ -7993,10 +7993,268 @@
         "M"
       ],
       "direction": "source_to_target"
+    },
+    {
+      "description": "I2 开发支出资本化转入→I1-5 无形资产增加检查",
+      "source_wp": "I2",
+      "source_sheet": "审定表I2-1",
+      "source_cell": "完工转固金额",
+      "source_cell_label": "资本化转入金额",
+      "source_file": "I2 开发支出.xlsx",
+      "source_address": "I2:审定表I2-1:完工转固金额",
+      "targets": [
+        {
+          "wp_code": "I1",
+          "sheet": "增加检查表I1-5",
+          "cell": "开发支出转入",
+          "cell_label": "开发支出资本化转入",
+          "formula": "=WP('I2','审定表I2-1','完工转固金额')",
+          "address": "I1:增加检查表I1-5:开发支出转入"
+        }
+      ],
+      "category": "internal",
+      "severity": "blocking",
+      "ref_id": "CW-405"
+    },
+    {
+      "ref_id": "CW-406",
+      "description": "I1-9 摊销分配→K8 销售费用明细 无形资产摊销行",
+      "source_wp": "I1",
+      "source_sheet": "摊销分配分析表I1-9",
+      "source_cell": "销售费用摊销",
+      "targets": [
+        {
+          "wp_code": "K8",
+          "sheet": "明细表K8-2",
+          "cell": "无形资产摊销",
+          "formula": "=WP('I1','摊销分配分析表I1-9','销售费用摊销')"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "warning",
+      "source_cell_label": "销售费用摊销合计",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:摊销分配分析表I1-9:销售费用摊销"
+    },
+    {
+      "ref_id": "CW-407",
+      "description": "I1-9 摊销分配→K9 管理费用明细 无形资产摊销行",
+      "source_wp": "I1",
+      "source_sheet": "摊销分配分析表I1-9",
+      "source_cell": "管理费用摊销",
+      "targets": [
+        {
+          "wp_code": "K9",
+          "sheet": "明细表K9-2",
+          "cell": "无形资产摊销",
+          "formula": "=WP('I1','摊销分配分析表I1-9','管理费用摊销')"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "warning",
+      "source_cell_label": "管理费用摊销合计",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:摊销分配分析表I1-9:管理费用摊销"
+    },
+    {
+      "ref_id": "CW-408",
+      "description": "I1-9 摊销分配→I6 研发费用 无形资产摊销行",
+      "source_wp": "I1",
+      "source_sheet": "摊销分配分析表I1-9",
+      "source_cell": "研发费用摊销",
+      "targets": [
+        {
+          "wp_code": "I6",
+          "sheet": "审定表I6-1",
+          "cell": "无形资产摊销",
+          "formula": "=WP('I1','摊销分配分析表I1-9','研发费用摊销')"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "warning",
+      "source_cell_label": "研发费用摊销合计",
+      "source_file": "I1 无形资产、累计摊销及减值准备.xlsx",
+      "source_address": "I1:摊销分配分析表I1-9:研发费用摊销"
+    },
+    {
+      "ref_id": "CW-409",
+      "description": "I2开发支出资本化金额↔I6研发费用双向联动（VR-I6-01: 费用化+资本化=研发总额）",
+      "source_wp": "I2",
+      "source_sheet": "审定表I2-1",
+      "source_cell": "资本化金额合计",
+      "targets": [
+        {
+          "wp_code": "I6",
+          "sheet": "审定表I6-1",
+          "cell": "资本化金额校验",
+          "formula": "=WP('I2','审定表I2-1','审定数合计')",
+          "cell_label": "I2资本化金额（VR-I6-01校验）",
+          "address": "I6:审定表I6-1:资本化金额校验"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "blocking",
+      "source_cell_label": "审定数合计（资本化金额）",
+      "source_file": "I2 开发支出.xlsx",
+      "source_address": "I2:审定表I2-1:资本化金额合计",
+      "direction": "bidirectional",
+      "note": "EventBus: I2 publish 'development:capitalized-updated' / I6 publish 'research:expense-updated'"
+    },
+    {
+      "ref_id": "CW-410",
+      "description": "I6研发费用费用化金额→I2开发支出联动校验（VR-I6-01反向）",
+      "source_wp": "I6",
+      "source_sheet": "审定表I6-1",
+      "source_cell": "审定数合计",
+      "targets": [
+        {
+          "wp_code": "I2",
+          "sheet": "审定表I2-1",
+          "cell": "费用化金额校验",
+          "formula": "=WP('I6','审定表I6-1','审定数合计')",
+          "cell_label": "I6费用化金额（VR-I6-01校验）",
+          "address": "I2:审定表I2-1:费用化金额校验"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "blocking",
+      "source_cell_label": "审定数合计（费用化金额）",
+      "source_file": "I6 研发费用.xlsx",
+      "source_address": "I6:审定表I6-1:审定数合计",
+      "direction": "bidirectional",
+      "note": "EventBus: I6 publish 'research:expense-updated' / I2 subscribe 更新 i6LinkageStatus"
+    },
+    {
+      "ref_id": "CW-411",
+      "description": "I2开发支出转入→I1-5无形资产增加检查",
+      "source_wp": "I2",
+      "source_sheet": "审定表I2-1",
+      "source_cell": "本期减少-转无形合计",
+      "targets": [
+        {
+          "wp_code": "I1",
+          "sheet": "增加检查表I1-5",
+          "cell": "开发支出转入",
+          "formula": "=WP('I2','审定表I2-1','本期减少-转无形合计')",
+          "cell_label": "开发支出资本化转入金额",
+          "address": "I1:增加检查表I1-5:开发支出转入"
+        }
+      ],
+      "category": "intangible_cycle",
+      "severity": "warning",
+      "source_cell_label": "本期减少-转无形资产列合计",
+      "source_file": "I2 开发支出.xlsx",
+      "source_address": "I2:审定表I2-1:本期减少-转无形合计",
+      "direction": "source_to_target",
+      "note": "EventBus: I2 publish 'development:capitalized-to-intangible' { amount, items }"
+    },
+    {
+      "ref_id": "CW-412",
+      "description": "J3 权益结算股份支付→M4 资本公积（share-payment:equity-settled）",
+      "source_wp": "J3",
+      "source_sheet": "审定表J3-1",
+      "source_cell": "权益结算金额",
+      "targets": [
+        {
+          "wp_code": "M4",
+          "sheet": "审定表M4-1",
+          "cell": "股份支付-资本公积",
+          "formula": "=WP('J3','审定表J3-1','权益结算金额')",
+          "cell_label": "股份支付增加资本公积",
+          "address": "M4:审定表M4-1:股份支付-资本公积"
+        }
+      ],
+      "category": "payroll_cycle",
+      "severity": "blocking",
+      "source_cell_label": "权益结算费用确认金额",
+      "source_file": "J3 股份支付.xlsx",
+      "source_address": "J3:审定表J3-1:权益结算金额",
+      "direction": "source_to_target",
+      "note": "EventBus: J3 publish 'share-payment:equity-settled' { amount, targetAccount: '3002' }"
+    },
+    {
+      "ref_id": "CW-413",
+      "description": "J3 现金结算股份支付→J1 应付职工薪酬（share-payment:cash-settled）",
+      "source_wp": "J3",
+      "source_sheet": "审定表J3-1",
+      "source_cell": "现金结算金额",
+      "targets": [
+        {
+          "wp_code": "J1",
+          "sheet": "审定表J1-1 ",
+          "cell": "现金结算股份支付负债",
+          "formula": "=WP('J3','审定表J3-1','现金结算金额')",
+          "cell_label": "现金结算股份支付确认负债",
+          "address": "J1:审定表J1-1:现金结算股份支付负债"
+        }
+      ],
+      "category": "payroll_cycle",
+      "severity": "warning",
+      "source_cell_label": "现金结算费用确认金额",
+      "source_file": "J3 股份支付.xlsx",
+      "source_address": "J3:审定表J3-1:现金结算金额",
+      "direction": "source_to_target",
+      "note": "EventBus: J3 publish 'share-payment:cash-settled' { amount, targetAccount: '2211' }"
+    },
+    {
+      "ref_id": "CW-414",
+      "description": "J2 精算假设变更→B51 会计估计底稿（actuarial:assumption-changed）",
+      "source_wp": "J2",
+      "source_sheet": "计提情况检查表J2-4",
+      "source_cell": "精算假设参数",
+      "targets": [
+        {
+          "wp_code": "B51",
+          "sheet": "会计估计评价表",
+          "cell": "精算假设变更",
+          "formula": null,
+          "cell_label": "设定受益计划精算假设",
+          "address": "B51:会计估计评价表:精算假设变更"
+        }
+      ],
+      "category": "payroll_cycle",
+      "severity": "warning",
+      "source_cell_label": "折现率/工资增长率/死亡率等精算假设",
+      "source_file": "J2 设定受益计划.xlsx",
+      "source_address": "J2:计提情况检查表J2-4:精算假设参数",
+      "direction": "source_to_target",
+      "note": "EventBus: J2 publish 'actuarial:assumption-changed' { changes, source: 'J2-4计提检查' }"
+    },
+    {
+      "ref_id": "CW-415",
+      "description": "J1 薪酬分配检查→K8/K9 交叉验证（compensation:adjusted EventBus）",
+      "source_wp": "J1",
+      "source_sheet": "分配情况检查表J1-7",
+      "source_cell": "分配数据汇总",
+      "targets": [
+        {
+          "wp_code": "K8",
+          "sheet": "审定表K8-1",
+          "cell": "薪酬交叉验证",
+          "formula": null,
+          "cell_label": "K8收到J1薪酬分配EventBus",
+          "address": "K8:审定表K8-1:薪酬交叉验证"
+        },
+        {
+          "wp_code": "K9",
+          "sheet": "审定表K9-1",
+          "cell": "薪酬交叉验证",
+          "formula": null,
+          "cell_label": "K9收到J1薪酬分配EventBus",
+          "address": "K9:审定表K9-1:薪酬交叉验证"
+        }
+      ],
+      "category": "payroll_cycle",
+      "severity": "blocking",
+      "source_cell_label": "管理费用薪酬+销售费用薪酬(EventBus联动)",
+      "source_file": "J1 应付职工薪酬.xlsx",
+      "source_address": "J1:分配情况检查表J1-7:分配数据汇总",
+      "direction": "source_to_target",
+      "note": "EventBus: J1 publish 'compensation:adjusted' { sellingExpenseSalary→K8, adminExpenseSalary→K9 }"
     }
   ],
   "stats": {
-    "total_references": 402,
+    "total_references": 415,
     "by_category": {
       "internal": 61,
       "revenue_cycle": 35,
@@ -8036,11 +8294,11 @@
       "materiality_linkage": 10,
       "control_test_linkage": 9
     },
-    "coverage_note": "覆盖 D-N 实质性程序(CW-01~CW-58) + B/C/A/S 计划/控制/完成/特定项目跨模块引用(CW-59~CW-88) + E1 货币资金优化扩展(CW-89~CW-107 + CW-108~CW-135) + D 销售循环反向回填(CW-136) + D 销售循环跨底稿引用(CW-137~CW-175) 共 175 条。 + F 采购存货循环跨底稿引用(CW-176~CW-210, 共 35 条) + H 固定资产循环跨底稿引用(CW-211~CW-242, 共 32 条) + I 无形资产循环跨底稿引用(共 29 条) + G 投资循环跨底稿引用（CW-267~CW-292, 共 26 条，含 G0→G7 反向回填 1 条） + J 职工薪酬循环跨底稿引用(CW-293~CW-312, 共 20 条) + K 管理循环跨底稿引用(CW-313~CW-332, 共 20 条) + L 筹资循环跨底稿引用(CW-333~CW-352, 共 20 条) + M 权益循环跨底稿引用(CW-353~CW-369, 共 17 条) + N 税金循环跨底稿引用(CW-370~CW-381, 共 12 条) + B/C→各循环联动(CW-382~CW-400, 共 19 条: B15 重要性水平→10 循环抽样范围 + C 控制测试结论→9 循环实质性程序范围) + G8/J2→M9 OCI核对联动(CW-403~CW-404, 共 2 条)",
+    "coverage_note": "覆盖 D-N 实质性程序(CW-01~CW-58) + B/C/A/S 计划/控制/完成/特定项目跨模块引用(CW-59~CW-88) + E1 货币资金优化扩展(CW-89~CW-107 + CW-108~CW-135) + D 销售循环反向回填(CW-136) + D 销售循环跨底稿引用(CW-137~CW-175) 共 175 条。 + F 采购存货循环跨底稿引用(CW-176~CW-210, 共 35 条) + H 固定资产循环跨底稿引用(CW-211~CW-242, 共 32 条) + I 无形资产循环跨底稿引用(共 29 条) + G 投资循环跨底稿引用（CW-267~CW-292, 共 26 条，含 G0→G7 反向回填 1 条） + J 职工薪酬循环跨底稿引用(CW-293~CW-312, 共 20 条) + K 管理循环跨底稿引用(CW-313~CW-332, 共 20 条) + L 筹资循环跨底稿引用(CW-333~CW-352, 共 20 条) + M 权益循环跨底稿引用(CW-353~CW-369, 共 17 条) + N 税金循环跨底稿引用(CW-370~CW-381, 共 12 条) + B/C→各循环联动(CW-382~CW-400, 共 19 条: B15 重要性水平→10 循环抽样范围 + C 控制测试结论→9 循环实质性程序范围) + G8/J2→M9 OCI核对联动(CW-403~CW-404, 共 2 条) + I1摊销分配→K8/K9/I6(本地合并新增) + I2开发支出联动(本地合并新增) + J循环EventBus联动(本地合并新增)",
     "naming_resolved": 81,
     "naming_unresolved": 26,
     "naming_rate": "75.7%",
-    "total": 402
+    "total": 415
   },
   "naming_rule": {
     "format": "{wp_code}:{sheet_name}:{cell_coordinate}",

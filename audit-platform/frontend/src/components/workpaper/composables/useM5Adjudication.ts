@@ -293,7 +293,7 @@ export function useM5Adjudication(
     } as any)
 
     // EventBus publish 'm5:surplus-accrual'（M5→M6: 盈余公积审定额→M6可供分配利润）
-    eventBus.emit('m5:surplus-accrual' as any, {
+    eventBus.emit('m5:surplus-accrual', {
       wpCode: 'M5',
       statutoryAccrual: statutorySubtotal.value.audited,
       discretionaryAccrual: discretionarySubtotal.value.audited,

@@ -177,6 +177,29 @@ const STAGE_META: { key: string; title: string }[] = [
   { key: 'disclosure', title: '披露与调整' },
 ]
 
+function isConfirmationNode(node: ArchNode): boolean {
+  return node.componentType.startsWith('confirmation-') || node.name.includes('函证')
+}
+
+function sortStageNodes(stageKey: string, nodes: ArchNode[]): ArchNode[] {
+  if (stageKey !== 'substantive') return nodes
+  // 仅对“实质性程序”分组排序：
+  // 1) 非函证保持原顺序
+  // 2) 函证集中放到最后
+  // 3) 函证按 indexRef/sheetName 去重，避免重复卡片
+  const nonConf = nodes.filter(n => !isConfirmationNode(n))
+  const conf = nodes.filter(n => isConfirmationNode(n))
+  const seen = new Set<string>()
+  const dedupedConf: ArchNode[] = []
+  for (const node of conf) {
+    const key = (node.indexRef || node.sheetName || node.name || '').trim().toUpperCase()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    dedupedConf.push(node)
+  }
+  return [...nonConf, ...dedupedConf]
+}
+
 const stages = computed<Stage[]>(() => {
   const buckets: Record<string, ArchNode[]> = {
     plan: [], finalize: [], substantive: [], disclosure: [],
@@ -186,7 +209,7 @@ const stages = computed<Stage[]>(() => {
   }
   // 仅返回非空阶段，保持固定顺序
   return STAGE_META
-    .map((m) => ({ key: m.key, title: m.title, nodes: buckets[m.key] }))
+    .map((m) => ({ key: m.key, title: m.title, nodes: sortStageNodes(m.key, buckets[m.key]) }))
     .filter((s) => s.nodes.length > 0)
 })
 

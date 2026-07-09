@@ -88,6 +88,27 @@ const STAGE_RANGES: Array<{ name: string; range: [number, number] }> = [
 
 const stages = ref<StageData[]>([])
 
+function parseLinkedRefs(value: string): string[] {
+  if (!value) return []
+  const parts = value.split(/[/,;、，；\n]/).map(s => s.trim()).filter(Boolean)
+  const out: string[] = []
+  for (const token of parts) {
+    const m = token.match(/^([A-Z]\d+)-(\d+)\s*(?:到|至|~|～|-)\s*(?:([A-Z]\d+)-)?(\d+)$/i)
+    if (m) {
+      const base1 = (m[1] || '').toUpperCase()
+      const start = Number(m[2])
+      const base2 = (m[3] || base1).toUpperCase()
+      const end = Number(m[4])
+      if (base1 === base2 && Number.isFinite(start) && Number.isFinite(end) && end >= start && end - start <= 50) {
+        for (let i = start; i <= end; i += 1) out.push(`${base1}-${i}`)
+        continue
+      }
+    }
+    out.push(token)
+  }
+  return out.filter((v, i) => out.indexOf(v) === i)
+}
+
 function buildStages() {
   const progs = props.programs || []
   if (!progs.length) { stages.value = []; return }
@@ -100,7 +121,7 @@ function buildStages() {
         short_desc: (p.program_desc || '').replace(/ — .*$/, '').slice(0, 14),
         full_desc: p.program_desc || '',
         status: p.status || 'pending',
-        refs: (p.linked_workpapers || '').split(/[,/、]/).map(r => r.trim()).filter(Boolean),
+        refs: parseLinkedRefs(p.linked_workpapers || ''),
       }))
     return { name: s.name, items }
   }).filter(s => s.items.length > 0)

@@ -9,12 +9,12 @@
  * 1. adjudicationVsDetail — M4-1审定表合计 vs M4-2明细表合计(资本溢价+其他资本公积) 交叉验证
  * 2. shareBasedVsJ3 — J3股份支付权益结算金额 vs M4其他资本公积账面增加 一致性校验
  * 3. fxDiffVsM2 — M2外币出资折算差异 vs M4资本溢价变动 一致性校验
- * 4. EventBus订阅 'j3:equity-settled' / 'm2:fx-diff'
+ * 4. EventBus订阅 'j3:equity-settled' / 'm2:fx-diff-to-m4'
  * 5. cross_wp_references 关联 J3、M2
  *
  * 联动方向：
  *   J3股份支付 → 'j3:equity-settled'  → shareBasedVsJ3（其他资本公积增加）
- *   M2实收资本 → 'm2:fx-diff'         → fxDiffVsM2（资本溢价变动）
+ *   M2实收资本 → 'm2:fx-diff-to-m4'   → fxDiffVsM2（资本溢价变动）
  *   M4-1审定表合计 ↔ M4-2明细表合计 双向勾稽
  *
  * 科目：4002 资本公积（**贷方/权益类！期末=期初+贷方-借方**）
@@ -95,7 +95,7 @@ export function useM4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
 
   /** J3股份支付权益结算金额（订阅 'j3:equity-settled'） */
   const _j3EquitySettled = ref(0)
-  /** M2外币出资折算差异（订阅 'm2:fx-diff'） */
+  /** M2外币出资折算差异（订阅 'm2:fx-diff-to-m4'） */
   const _m2FxDiff = ref(0)
 
   // ─── EventBus 订阅 handlers ─────────────────────────────────────────────
@@ -105,7 +105,13 @@ export function useM4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * 载荷: { wpCode, equitySettledAmount, waitingPeriodAmount, timestamp }
    * 取 equitySettledAmount（等待期确认的权益结算金额，计入其他资本公积）
    */
-  function _onJ3EquitySettled(payload: any): void {
+  function _onJ3EquitySettled(payload: {
+    wpCode?: string
+    equitySettledAmount?: number
+    waitingPeriodAmount?: number
+    amount?: number
+    timestamp?: number
+  }): void {
     _j3EquitySettled.value = parseNum(payload?.equitySettledAmount ?? payload?.amount)
   }
 
@@ -114,14 +120,20 @@ export function useM4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * 载荷: { wpCode, fxDiffAmount, timestamp }
    * 取 fxDiffAmount（外币出资折算差异，计入资本溢价）
    */
-  function _onM2FxDiff(payload: any): void {
-    _m2FxDiff.value = parseNum(payload?.fxDiffAmount ?? payload?.amount)
+  function _onM2FxDiff(payload: {
+    wpCode?: string
+    totalFxDiff?: number
+    fxDiffAmount?: number
+    amount?: number
+    timestamp?: number
+  }): void {
+    _m2FxDiff.value = parseNum(payload?.totalFxDiff ?? payload?.fxDiffAmount ?? payload?.amount)
   }
 
   // ─── 订阅 EventBus ─────────────────────────────────────────────────────────
 
-  eventBus.on('j3:equity-settled' as any, _onJ3EquitySettled)
-  eventBus.on('m2:fx-diff' as any, _onM2FxDiff)
+  eventBus.on('j3:equity-settled', _onJ3EquitySettled)
+  eventBus.on('m2:fx-diff-to-m4', _onM2FxDiff)
 
   // ─── 初始化：从 allResponses 读取已持久化的联动数据 ─────────────────────────
 
@@ -214,7 +226,7 @@ export function useM4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * 差额 = M2折算差异 - M4资本溢价变动
    *
    * 数据来源：
-   * - M2折算差异：EventBus 'm2:fx-diff' 或持久化 "M4-cross-m2-fx-diff"
+   * - M2折算差异：EventBus 'm2:fx-diff-to-m4' 或持久化 "M4-cross-m2-fx-diff"
    * - M4资本溢价变动：item_id "M4-M4-2-premium-fx-diff-change"（remark=外币折算差异计入资本溢价）
    */
   const fxDiffVsM2: ComputedRef<FxDiffVsM2Result> = computed(() => {
@@ -250,8 +262,8 @@ export function useM4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // ─── 5. Cleanup — 组件卸载时取消 EventBus 订阅 ─────────────────────────────
 
   onScopeDispose(() => {
-    eventBus.off('j3:equity-settled' as any, _onJ3EquitySettled)
-    eventBus.off('m2:fx-diff' as any, _onM2FxDiff)
+    eventBus.off('j3:equity-settled', _onJ3EquitySettled)
+    eventBus.off('m2:fx-diff-to-m4', _onM2FxDiff)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────

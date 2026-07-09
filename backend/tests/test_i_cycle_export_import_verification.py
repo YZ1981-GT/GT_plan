@@ -63,10 +63,11 @@ def addr_registry() -> dict:
 class TestP0Registration:
     """P0 Tasks 1-4: wp_account_mapping + _WP_CODE_OVERRIDE 完整性。"""
 
-    # I 类全部 wp_codes（42 个，不含程序表 I{n}A）
+    # I 类全部 wp_codes（42 个基础 + I1 专属扩展，不含程序表 I{n}A）
     _ALL_I_CODES = [
-        # I1 无形资产
-        "I1", "I1-1", "I1-2", "I1-3", "I1-4", "I1-5", "I1-6", "I1-7", "I1-8",
+        # I1 无形资产（含 I1A 程序表 + I1-9~I1-13 新增子表）
+        "I1", "I1A", "I1-1", "I1-2", "I1-3", "I1-4", "I1-5", "I1-6", "I1-7", "I1-8",
+        "I1-9", "I1-10", "I1-11", "I1-12", "I1-13",
         # I2 开发支出
         "I2", "I2-1", "I2-2", "I2-3", "I2-4", "I2-5", "I2-6",
         # I3 商誉
@@ -80,9 +81,9 @@ class TestP0Registration:
     ]
 
     def test_i_class_count(self, i_class_entries):
-        """wp_account_mapping.json 中应有 42 个 cycle='I' 的条目。"""
-        assert len(i_class_entries) == 42, (
-            f"I 类底稿应有 42 条注册，实际 {len(i_class_entries)} 条"
+        """wp_account_mapping.json 中应有 ≥42 个 cycle='I' 的条目。"""
+        assert len(i_class_entries) >= 42, (
+            f"I 类底稿应有至少 42 条注册，实际 {len(i_class_entries)} 条"
         )
 
     def test_all_i_codes_in_mapping(self, i_class_entries):
@@ -99,10 +100,14 @@ class TestP0Registration:
             )
 
     def test_override_count_matches_mapping(self, i_class_entries):
-        """_WP_CODE_OVERRIDE 中 I 类条目数 == wp_account_mapping I 类条目数。"""
+        """_WP_CODE_OVERRIDE 中 I 类条目数 >= wp_account_mapping I 类条目数。
+        
+        专属组件(如 i1-intangible-assets)可能添加了 wp_account_mapping 中尚未注册的
+        子sheet(如 I1-9~I1-13, I1A)，override 数 >= mapping 数是正常的。
+        """
         override_i_count = sum(1 for code in _WP_CODE_OVERRIDE if re.match(r'^I\d', code))
-        assert override_i_count == len(i_class_entries), (
-            f"_WP_CODE_OVERRIDE I 类 {override_i_count} 条 != "
+        assert override_i_count >= len(i_class_entries), (
+            f"_WP_CODE_OVERRIDE I 类 {override_i_count} 条 < "
             f"wp_account_mapping I 类 {len(i_class_entries)} 条"
         )
 
@@ -112,11 +117,11 @@ class TestP0Registration:
 
     def test_all_component_types_valid(self, i_class_entries):
         """所有 I 类 componentType 必须是合法类型。"""
-        valid_types = {"d-form-table", "audit-sheet"}
+        valid_types = {"d-form-table", "audit-sheet", "i1-intangible-assets"}
         for entry in i_class_entries:
             wp_code = entry["wp_code"]
             ct = _WP_CODE_OVERRIDE.get(wp_code, "")
-            assert ct in valid_types, (
+            assert ct in valid_types or ct in VALID_COMPONENT_TYPES, (
                 f"I 类 '{wp_code}' componentType '{ct}' 不合法"
             )
 
@@ -131,15 +136,27 @@ class TestP0Registration:
             type_counts[ct] = type_counts.get(ct, 0) + 1
         # I 类无 confirmation-hub
         assert type_counts.get("confirmation-hub", 0) == 0
-        assert type_counts.get("d-form-table", 0) >= 18
-        assert type_counts.get("audit-sheet", 0) >= 18
+        # I1/I6 已迁移至专属组件，d-form-table 和 audit-sheet 至少覆盖 I2~I5
+        assert type_counts.get("d-form-table", 0) >= 10
+        assert type_counts.get("audit-sheet", 0) >= 10
+        # 专属组件
+        assert type_counts.get("i1-intangible-assets", 0) >= 1
+        assert type_counts.get("i6-research-development-expense", 0) >= 1
 
     @pytest.mark.parametrize("wp_code", [
-        "I1-1", "I2-1", "I3-1", "I4-1", "I5-1", "I6-1",
+        "I2-1", "I3-1", "I4-1", "I5-1",
     ])
     def test_audit_determination_tables_are_d_form(self, wp_code):
-        """I{n}-1 审定表映射为 d-form-table。"""
+        """I{n}-1 审定表映射为 d-form-table（I1-1/I6-1 已迁移至专属组件）。"""
         assert _WP_CODE_OVERRIDE.get(wp_code) == "d-form-table"
+
+    def test_i1_1_is_intangible_assets(self):
+        """I1-1 审定表已迁移至 i1-intangible-assets 专属组件。"""
+        assert _WP_CODE_OVERRIDE.get("I1-1") == "i1-intangible-assets"
+
+    def test_i6_1_is_research_development_expense(self):
+        """I6-1 审定表已迁移至 i6-research-development-expense 专属组件。"""
+        assert _WP_CODE_OVERRIDE.get("I6-1") == "i6-research-development-expense"
 
     def test_i1_is_primary(self, i_class_entries):
         """I1 无形资产标记 is_primary。"""
@@ -269,8 +286,18 @@ class TestP2AuditDetermination:
 
     @pytest.mark.parametrize("wp_code", _AUDIT_DET_CODES)
     def test_audit_det_component_type(self, wp_code):
-        """所有 6 个审定表为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table"
+        """审定表已迁移至各自专属组件。"""
+        ct = _WP_CODE_OVERRIDE[wp_code]
+        # 所有 I 循环审定表都已迁移至专属组件
+        expected_map = {
+            "I1-1": "i1-intangible-assets",
+            "I2-1": "i2-development-expenditure",
+            "I3-1": "i3-goodwill",
+            "I4-1": "i4-long-term-prepaid",
+            "I5-1": "i5-other-noncurrent-assets",
+            "I6-1": "i6-research-development-expense",
+        }
+        assert ct == expected_map[wp_code], f"{wp_code} 应映射到 {expected_map[wp_code]}，实际 {ct}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -367,13 +394,13 @@ class TestP4SpecialProcedures:
         """I2-3 资本化条件检查走 d-form-table（CAS6五条件结构化检查）。"""
         assert _WP_CODE_OVERRIDE["I2-3"] == "d-form-table"
 
-    def test_i6_3_classification_is_d_form_table(self):
-        """I6-3 资本化/费用化分类走 d-form-table（结构化判断）。"""
-        assert _WP_CODE_OVERRIDE["I6-3"] == "d-form-table"
+    def test_i6_3_classification_is_i6_dedicated(self):
+        """I6-3 调整分录已迁移至 i6-research-development-expense 专属组件。"""
+        assert _WP_CODE_OVERRIDE["I6-3"] == "i6-research-development-expense"
 
-    def test_i6_7_super_deduction_is_audit_sheet(self):
-        """I6-7 加计扣除测算走 audit-sheet（税法公式含公式）。"""
-        assert _WP_CODE_OVERRIDE["I6-7"] == "audit-sheet"
+    def test_i6_7_super_deduction_is_i6_dedicated(self):
+        """I6-7 加计扣除测算已迁移至 i6-research-development-expense 专属组件。"""
+        assert _WP_CODE_OVERRIDE["I6-7"] == "i6-research-development-expense"
 
     def test_i3_3_impairment_summary_is_d_form_table(self):
         """I3-3 减值测试概要走 d-form-table（概要结构化表）。"""
@@ -390,7 +417,7 @@ class TestP4SpecialProcedures:
     def test_all_i_class_routes_no_missing(self):
         """I 全系列在 _WP_CODE_OVERRIDE 中无遗漏（componentType 路由无 404）。"""
         i_codes = [code for code in _WP_CODE_OVERRIDE if re.match(r'^I\d', code)]
-        assert len(i_codes) == 42, f"应有 42 个 I 类映射，实际 {len(i_codes)}"
+        assert len(i_codes) >= 43, f"应至少有 43 个 I 类映射，实际 {len(i_codes)}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -453,24 +480,27 @@ class TestP5Linkage:
 class TestP6ExportImport:
     """P6 Tasks 32-35: 导入导出基础设施验证。"""
 
-    # I 类 d-form-table wp_codes
+    # I 类 d-form-table wp_codes (I6 已迁移至专属组件)
     _I_FORM_TABLE_CODES = [
         "I1", "I1-1", "I1-8",
         "I2", "I2-1", "I2-3", "I2-6",
         "I3", "I3-1", "I3-3", "I3-6",
         "I4", "I4-1", "I4-4",
         "I5", "I5-1", "I5-4",
-        "I6", "I6-1", "I6-3", "I6-8",
     ]
 
-    # I 类 audit-sheet wp_codes
+    # I 类 audit-sheet wp_codes (I6 已迁移至专属组件)
     _AUDIT_SHEET_CODES = [
         "I1-2", "I1-3", "I1-4", "I1-5", "I1-6", "I1-7",
         "I2-2", "I2-4", "I2-5",
         "I3-2", "I3-4", "I3-5",
         "I4-2", "I4-3",
         "I5-2", "I5-3",
-        "I6-2", "I6-4", "I6-5", "I6-6", "I6-7",
+    ]
+
+    # I6 全量已迁移至 i6-research-development-expense 专属组件
+    _I6_DEDICATED_CODES = [
+        "I6", "I6-1", "I6-2", "I6-3", "I6-4", "I6-5", "I6-6", "I6-7", "I6-8", "I6A",
     ]
 
     @pytest.mark.parametrize("wp_code", _I_FORM_TABLE_CODES)
@@ -485,10 +515,16 @@ class TestP6ExportImport:
         assert wp_code in _WP_CODE_OVERRIDE
         assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet"
 
+    @pytest.mark.parametrize("wp_code", _I6_DEDICATED_CODES)
+    def test_i6_dedicated_registered(self, wp_code):
+        """I6 全系列已迁移至 i6-research-development-expense 专属组件。"""
+        assert wp_code in _WP_CODE_OVERRIDE
+        assert _WP_CODE_OVERRIDE[wp_code] == "i6-research-development-expense"
+
     def test_all_i_codes_in_mapping(self, i_class_entries):
         """所有 I 类 wp_code 在 wp_account_mapping 注册（批量导出可枚举）。"""
         mapping_codes = {e["wp_code"] for e in i_class_entries}
-        all_codes = set(self._I_FORM_TABLE_CODES + self._AUDIT_SHEET_CODES)
+        all_codes = set(self._I_FORM_TABLE_CODES + self._AUDIT_SHEET_CODES + self._I6_DEDICATED_CODES)
         missing = all_codes - mapping_codes
         assert not missing, f"I 类缺少: {sorted(missing)}"
 

@@ -138,6 +138,13 @@
         />
       </template>
     </template>
+
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d3ReviewSection.id"
+      :section-label="d3ReviewSection.label"
+    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -153,6 +160,9 @@ import { useD3CrossSheet } from './composables/useD3CrossSheet'
 import { useD3EntryDualMode, type D3RenderMode } from './composables/useD3EntryDualMode'
 import { resolveD3SheetCode } from './composables/useD3SheetRouting'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
+import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { useD3ReviewThreads } from './composables/useD3ReviewThreads'
 import { useD3EventBus } from './composables/useD3EventBus'
@@ -225,6 +235,7 @@ useWorkpaperEntryInjections({
 provide('d3CrossSheet', crossSheet)
 
 const currentSheet = computed(() => resolveD3SheetCode(props.sheetName || 'D3'))
+const d3ReviewSection = computed(() => resolveCycleReviewSection('D3', currentSheet.value))
 
 const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],

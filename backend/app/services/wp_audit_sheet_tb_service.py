@@ -17,6 +17,8 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.project_audit_year import fetch_project_audit_year
+
 logger = logging.getLogger(__name__)
 
 
@@ -55,8 +57,7 @@ async def fetch_audit_sheet_tb_values(
     - 某行 account_code 无对应 TB 行 → 该行不进 tb_values（前端按缺失即 null/「—」处理）；
     - 任意 SQL / 数据异常 → 记 warning 并返回已构建部分（或 ``{}``）。
 
-    年度来源：projects 表无 ``year`` 列，按系统标准做法从 ``audit_period_end`` 提取
-    年份（见 render-config 内 ``year_query`` / rotation_check 等）；为 NULL 则跳过取数。
+    年度来源：``project_audit_year`` 通用规则（audit_year > audit_period_end > audit_period_start）。
     """
     if db is None or project_id is None or not audit_rows:
         return {}
@@ -73,16 +74,7 @@ async def fetch_audit_sheet_tb_values(
         return {}
 
     try:
-        # ─── 年度：从 audit_period_end 提取年份（NULL → 跳过取数）──────────
-        year_result = await db.execute(
-            sa.text(
-                "SELECT EXTRACT(YEAR FROM audit_period_end)::int "
-                "FROM projects WHERE id = :pid"
-            ),
-            {"pid": str(project_id)},
-        )
-        year_row = year_result.first()
-        year = year_row[0] if year_row and year_row[0] else None
+        year = await fetch_project_audit_year(db, project_id)
         if not year:
             return {}
 

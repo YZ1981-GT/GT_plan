@@ -84,6 +84,9 @@ export interface VouchingRow {
   existenceCheck: string        // 存在性验证（已核实/未核实/不适用）
   accuracyCheck: string         // 准确性验证（金额一致/金额不一致/不适用）
   appropriatenessCheck: string  // 记录恰当性（恰当/不恰当/不适用）
+  attachmentId: string          // 附件ID（OCR上传后回传）
+  attachmentName: string        // 附件名称
+  ocrStatus: string             // OCR状态（none/processing/done/failed）
   remark: string                // 备注
   indexRef: string              // 索引号
 }
@@ -98,7 +101,10 @@ export interface ExceptionSummaryRow {
 
 /** D1-13 抽样总体定义 */
 export interface SamplePopulation {
-  populationDesc: string        // 抽样总体描述
+  testPopulation: string        // 测试总体
+  specificItemScope: string     // 特定样本范围（大额/关联方/异常等）
+  populationDesc: string        // 抽样总体（扣除特定样本后的范围）
+  samplingMethod: string        // 抽样方法
   totalCount: number            // 总体笔数
   totalAmount: number           // 总体金额
   sampleSize: number            // 确定的抽样样本量

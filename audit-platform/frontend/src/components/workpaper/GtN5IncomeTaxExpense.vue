@@ -315,14 +315,14 @@ onMounted(async () => {
 
   // ─── EventBus 订阅 ─────────────────────────────────────────────────
   eventBus.on('disclosure:refresh' as any, onDisclosureRefresh)
-  eventBus.on('deferred-tax:asset-updated' as any, onDeferredTaxUpdate)
-  eventBus.on('deferred-tax:liability-updated' as any, onDeferredTaxUpdate)
+  eventBus.on('deferred-tax:asset-updated', onDeferredTaxUpdate)
+  eventBus.on('deferred-tax:liability-updated', onDeferredTaxUpdate)
 })
 
 onBeforeUnmount(() => {
   eventBus.off('disclosure:refresh' as any, onDisclosureRefresh)
-  eventBus.off('deferred-tax:asset-updated' as any, onDeferredTaxUpdate)
-  eventBus.off('deferred-tax:liability-updated' as any, onDeferredTaxUpdate)
+  eventBus.off('deferred-tax:asset-updated', onDeferredTaxUpdate)
+  eventBus.off('deferred-tax:liability-updated', onDeferredTaxUpdate)
 })
 
 // ─── EventBus handlers ──────────────────────────────────────────────────────

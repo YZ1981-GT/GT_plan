@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
 from app.deps import get_db, get_current_user
+from app.services.project_audit_year import PROJECT_AUDIT_YEAR_SQL
 
 router = APIRouter(prefix="/api/projects", tags=["workpaper-prefill"])
 
@@ -17,10 +18,10 @@ async def get_prefill_context(
     """获取项目级预填充上下文（公司名/年度/合伙人/重要性等）"""
 
     # Get project info
-    # 注：projects 表无 year 列，年度从 audit_period_end 提取（系统标准做法）。
+    # 注：projects 表无 year 列，年度走 project_audit_year 通用规则。
     result = await db.execute(
         text("""
-            SELECT name, EXTRACT(YEAR FROM audit_period_end)::int AS year,
+            SELECT name, audit_year, audit_period_end, audit_period_start,
                    template_type, report_scope, wizard_state
             FROM projects WHERE id = :pid
         """),
@@ -30,6 +31,9 @@ async def get_prefill_context(
 
     if not project:
         return {"context": {}, "message": "项目未找到"}
+
+    year_row = (await db.execute(PROJECT_AUDIT_YEAR_SQL, {"pid": project_id})).first()
+    project_year = year_row[0] if year_row and year_row[0] else None
 
     # Get materiality from materiality table
     # 注：materiality 表列名为 overall_materiality（非 materiality_level）。
@@ -71,16 +75,16 @@ async def get_prefill_context(
 
     context = {
         "company_name": project[0] if project else "",
-        "audit_year": project[1] if project else None,
-        "template_type": project[2] if project else "soe",
-        "report_scope": project[3] if project else "standalone",
+        "audit_year": project_year,
+        "template_type": project[4] if project else "soe",
+        "report_scope": project[5] if project else "standalone",
         "partner_name": partner_row[0] if partner_row else "",
         "manager_name": manager_row[0] if manager_row else "",
         "materiality_level": float(mat_row[0]) if mat_row and mat_row[0] else None,
         "performance_materiality": float(mat_row[1]) if mat_row and mat_row[1] else None,
         "trivial_threshold": float(mat_row[2]) if mat_row and mat_row[2] else None,
         "report_date": None,  # To be filled by user
-        "balance_sheet_date": f"{project[1]}-12-31" if project and project[1] else None,
+        "balance_sheet_date": f"{project_year}-12-31" if project_year else None,
     }
 
     return {"context": context}

@@ -1,0 +1,7663 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\H 固定资产循环\\H8 使用权资产.xlsx",
+  "total_sheets": 20,
+  "sheet_names": [
+    "底稿目录",
+    "使用权资产实质性程序表H8A",
+    "审定表H8-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "明细表H8-2",
+    "调整分录汇总H8-3",
+    "租赁的识别H8-4",
+    "租赁期的确定H8-5",
+    "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+    "使用权资产 租赁负责初始及后续计量（按月）H8-6",
+    "租赁变更H8-7",
+    "折旧测算表（不含减值）H8-8",
+    "折旧测算表（含减值）H8-8",
+    "折旧分配分析表H8-9",
+    "减值测算表H8-10",
+    "可收回金额测试表H8-11",
+    "减少检查表H8-12",
+    "简化处理的租赁检查表H8-13",
+    "关联交易检查表H8-14"
+  ],
+  "expected_sheet_count": 20,
+  "sheets_match_expected": true,
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "max_row": 26,
+      "max_column": 8,
+      "column_count": 8,
+      "merged_ranges": [
+        "A21:A23",
+        "A17:A20",
+        "A24:A26"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "被审计单位："
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "截止日：202X年12月31日"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "序号"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "内容"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "备注"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [],
+      "data_types": {
+        "s": 64,
+        "n": 144
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "编制人：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "1",
+              "type": "n"
+            },
+            {
+              "col": "E",
+              "value": "使用权资产实质性程序表",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "H8A",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核人：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "2",
+              "type": "n"
+            },
+            {
+              "col": "E",
+              "value": "审定表",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "H8-1",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "编制日期：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "3",
+              "type": "n"
+            },
+            {
+              "col": "E",
+              "value": "附注披露信息（上市公司）",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "复核日期：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "4",
+              "type": "n"
+            },
+            {
+              "col": "E",
+              "value": "附注披露信息（国企）",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "无需打印",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产类别设置（以下内容请根据实际情况修改）：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "5",
+              "type": "n"
+            },
+            {
+              "col": "E",
+              "value": "明细表",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "H8-2",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 0
+    },
+    {
+      "sheet_name": "使用权资产实质性程序表H8A",
+      "max_row": 59,
+      "max_column": 12,
+      "column_count": 12,
+      "merged_ranges": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "J18:L18",
+        "A9:F9",
+        "A5:B5",
+        "G9:I9",
+        "A14:B14",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "J19:L19",
+        "A15:A16",
+        "G8:I8",
+        "A1:I1",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产实质性程序表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H8A"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 130,
+        "n": 572,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、本账户涉及的科目",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产、累计折旧、减值准备",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计目标与认定的对应关系",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "审计目标",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "财务报表的认定　",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "审定表H8-1",
+      "max_row": 65,
+      "max_column": 9,
+      "column_count": 9,
+      "merged_ranges": [
+        "A5:A6",
+        "B5:D5",
+        "A2:I2",
+        "E5:G5",
+        "A1:I1",
+        "H5:I5"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产、累计折旧及减值准备审定表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H8-1"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A8",
+          "formula": "=底稿目录!A9"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表H8-2'!D34"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表H8-2'!L34"
+        },
+        {
+          "cell": "D8",
+          "formula": "=B8+C8"
+        },
+        {
+          "cell": "E8",
+          "formula": "='明细表H8-2'!K34"
+        },
+        {
+          "cell": "F8",
+          "formula": "='明细表H8-2'!L34+'明细表H8-2'!M34+'明细表H8-2'!N34+'明细表H8-2'!O34-'明细表H8-2'!P34-'明细表H8-2'!Q34-'明细表H8-2'!R34"
+        },
+        {
+          "cell": "G8",
+          "formula": "=E8+F8"
+        },
+        {
+          "cell": "H8",
+          "formula": "=G8-D8"
+        },
+        {
+          "cell": "I8",
+          "formula": "=IF(AND(D8=0,H8=0),0,IF(AND(D8=0,H8>0),1,H8/D8))"
+        },
+        {
+          "cell": "A9",
+          "formula": "=底稿目录!A10"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表H8-2'!D35"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表H8-2'!L35"
+        },
+        {
+          "cell": "D9",
+          "formula": "=B9+C9"
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表H8-2'!K35"
+        },
+        {
+          "cell": "F9",
+          "formula": "='明细表H8-2'!L35+'明细表H8-2'!M35+'明细表H8-2'!N35+'明细表H8-2'!O35-'明细表H8-2'!P35-'明细表H8-2'!Q35-'明细表H8-2'!R35"
+        },
+        {
+          "cell": "G9",
+          "formula": "=E9+F9"
+        },
+        {
+          "cell": "H9",
+          "formula": "=G9-D9"
+        },
+        {
+          "cell": "I9",
+          "formula": "=IF(AND(D9=0,H9=0),0,IF(AND(D9=0,H9>0),1,H9/D9))"
+        },
+        {
+          "cell": "A10",
+          "formula": "=底稿目录!A11"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表H8-2'!D36"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表H8-2'!L36"
+        },
+        {
+          "cell": "D10",
+          "formula": "=B10+C10"
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表H8-2'!K36"
+        },
+        {
+          "cell": "F10",
+          "formula": "='明细表H8-2'!L36+'明细表H8-2'!M36+'明细表H8-2'!N36+'明细表H8-2'!O36-'明细表H8-2'!P36-'明细表H8-2'!Q36-'明细表H8-2'!R36"
+        },
+        {
+          "cell": "G10",
+          "formula": "=E10+F10"
+        },
+        {
+          "cell": "H10",
+          "formula": "=G10-D10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=IF(AND(D10=0,H10=0),0,IF(AND(D10=0,H10>0),1,H10/D10))"
+        },
+        {
+          "cell": "A11",
+          "formula": "=底稿目录!A12"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表H8-2'!D37"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表H8-2'!L37"
+        },
+        {
+          "cell": "D11",
+          "formula": "=B11+C11"
+        },
+        {
+          "cell": "E11",
+          "formula": "='明细表H8-2'!K37"
+        },
+        {
+          "cell": "F11",
+          "formula": "='明细表H8-2'!L37+'明细表H8-2'!M37+'明细表H8-2'!N37+'明细表H8-2'!O37-'明细表H8-2'!P37-'明细表H8-2'!Q37-'明细表H8-2'!R37"
+        },
+        {
+          "cell": "G11",
+          "formula": "=E11+F11"
+        },
+        {
+          "cell": "H11",
+          "formula": "=G11-D11"
+        },
+        {
+          "cell": "I11",
+          "formula": "=IF(AND(D11=0,H11=0),0,IF(AND(D11=0,H11>0),1,H11/D11))"
+        },
+        {
+          "cell": "A12",
+          "formula": "=底稿目录!A13"
+        },
+        {
+          "cell": "B12",
+          "formula": "='明细表H8-2'!D38"
+        },
+        {
+          "cell": "C12",
+          "formula": "='明细表H8-2'!L38"
+        },
+        {
+          "cell": "D12",
+          "formula": "=B12+C12"
+        },
+        {
+          "cell": "E12",
+          "formula": "='明细表H8-2'!K38"
+        },
+        {
+          "cell": "F12",
+          "formula": "='明细表H8-2'!L38+'明细表H8-2'!M38+'明细表H8-2'!N38+'明细表H8-2'!O38-'明细表H8-2'!P38-'明细表H8-2'!Q38-'明细表H8-2'!R38"
+        },
+        {
+          "cell": "G12",
+          "formula": "=E12+F12"
+        },
+        {
+          "cell": "H12",
+          "formula": "=G12-D12"
+        },
+        {
+          "cell": "I12",
+          "formula": "=IF(AND(D12=0,H12=0),0,IF(AND(D12=0,H12>0),1,H12/D12))"
+        },
+        {
+          "cell": "B13",
+          "formula": "=SUM(B8:B12)"
+        },
+        {
+          "cell": "C13",
+          "formula": "=SUM(C8:C12)"
+        },
+        {
+          "cell": "D13",
+          "formula": "=SUM(D8:D12)"
+        },
+        {
+          "cell": "E13",
+          "formula": "=SUM(E8:E12)"
+        },
+        {
+          "cell": "F13",
+          "formula": "=SUM(F8:F12)"
+        },
+        {
+          "cell": "G13",
+          "formula": "=SUM(G8:G12)"
+        },
+        {
+          "cell": "H13",
+          "formula": "=G13-D13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=IF(AND(D13=0,H13=0),0,IF(AND(D13=0,H13>0),1,H13/D13))"
+        },
+        {
+          "cell": "A15",
+          "formula": "=A8"
+        },
+        {
+          "cell": "B15",
+          "formula": "='明细表H8-2'!W34"
+        },
+        {
+          "cell": "C15",
+          "formula": "='明细表H8-2'!AD34"
+        },
+        {
+          "cell": "D15",
+          "formula": "=B15+C15"
+        },
+        {
+          "cell": "E15",
+          "formula": "='明细表H8-2'!AC34"
+        },
+        {
+          "cell": "F15",
+          "formula": "='明细表H8-2'!AD34+'明细表H8-2'!AE34+'明细表H8-2'!AF34-'明细表H8-2'!AG34-'明细表H8-2'!AH34-'明细表H8-2'!AI34"
+        },
+        {
+          "cell": "G15",
+          "formula": "=E15+F15"
+        },
+        {
+          "cell": "H15",
+          "formula": "=G15-D15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=IF(AND(D15=0,H15=0),0,IF(AND(D15=0,H15>0),1,H15/D15))"
+        },
+        {
+          "cell": "A16",
+          "formula": "=A9"
+        },
+        {
+          "cell": "B16",
+          "formula": "='明细表H8-2'!W35"
+        },
+        {
+          "cell": "C16",
+          "formula": "='明细表H8-2'!AD35"
+        },
+        {
+          "cell": "D16",
+          "formula": "=B16+C16"
+        },
+        {
+          "cell": "E16",
+          "formula": "='明细表H8-2'!AC35"
+        },
+        {
+          "cell": "F16",
+          "formula": "='明细表H8-2'!AD35+'明细表H8-2'!AE35+'明细表H8-2'!AF35-'明细表H8-2'!AG35-'明细表H8-2'!AH35-'明细表H8-2'!AI35"
+        },
+        {
+          "cell": "G16",
+          "formula": "=E16+F16"
+        },
+        {
+          "cell": "H16",
+          "formula": "=G16-D16"
+        },
+        {
+          "cell": "I16",
+          "formula": "=IF(AND(D16=0,H16=0),0,IF(AND(D16=0,H16>0),1,H16/D16))"
+        },
+        {
+          "cell": "A17",
+          "formula": "=A10"
+        },
+        {
+          "cell": "B17",
+          "formula": "='明细表H8-2'!W36"
+        },
+        {
+          "cell": "C17",
+          "formula": "='明细表H8-2'!AD36"
+        },
+        {
+          "cell": "D17",
+          "formula": "=B17+C17"
+        },
+        {
+          "cell": "E17",
+          "formula": "='明细表H8-2'!AC36"
+        },
+        {
+          "cell": "F17",
+          "formula": "='明细表H8-2'!AD36+'明细表H8-2'!AE36+'明细表H8-2'!AF36-'明细表H8-2'!AG36-'明细表H8-2'!AH36-'明细表H8-2'!AI36"
+        },
+        {
+          "cell": "G17",
+          "formula": "=E17+F17"
+        },
+        {
+          "cell": "H17",
+          "formula": "=G17-D17"
+        },
+        {
+          "cell": "I17",
+          "formula": "=IF(AND(D17=0,H17=0),0,IF(AND(D17=0,H17>0),1,H17/D17))"
+        },
+        {
+          "cell": "A18",
+          "formula": "=A11"
+        },
+        {
+          "cell": "B18",
+          "formula": "='明细表H8-2'!W37"
+        },
+        {
+          "cell": "C18",
+          "formula": "='明细表H8-2'!AD37"
+        },
+        {
+          "cell": "D18",
+          "formula": "=B18+C18"
+        },
+        {
+          "cell": "E18",
+          "formula": "='明细表H8-2'!AC37"
+        },
+        {
+          "cell": "F18",
+          "formula": "='明细表H8-2'!AD37+'明细表H8-2'!AE37+'明细表H8-2'!AF37-'明细表H8-2'!AG37-'明细表H8-2'!AH37-'明细表H8-2'!AI37"
+        },
+        {
+          "cell": "G18",
+          "formula": "=E18+F18"
+        },
+        {
+          "cell": "H18",
+          "formula": "=G18-D18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=IF(AND(D18=0,H18=0),0,IF(AND(D18=0,H18>0),1,H18/D18))"
+        },
+        {
+          "cell": "A19",
+          "formula": "=A12"
+        },
+        {
+          "cell": "B19",
+          "formula": "='明细表H8-2'!W38"
+        },
+        {
+          "cell": "C19",
+          "formula": "='明细表H8-2'!AD38"
+        },
+        {
+          "cell": "D19",
+          "formula": "=B19+C19"
+        },
+        {
+          "cell": "E19",
+          "formula": "='明细表H8-2'!AC38"
+        }
+      ],
+      "data_types": {
+        "s": 33,
+        "n": 332,
+        "f": 220
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项目",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "期初数",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "期末数",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "本期审定数与上期\n审定数的比较",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "B",
+              "value": "未审数",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "账项调整",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "审定数",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "未审数",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "账项调整",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "审定数",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "变动额",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "变动率",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、使用权资产原值",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A9",
+              "type": "f"
+            },
+            {
+              "col": "B",
+              "value": "='明细表H8-2'!D34",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "='明细表H8-2'!L34",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=B8+C8",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "='明细表H8-2'!K34",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "='明细表H8-2'!L34+'明细表H8-2'!M34+'明细表H8-2'!N34+'明细表H8-2'!O34-'明细表H8-2'!P34-'明细表H8-2'!Q34-'明细表H8-2'!R34",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=E8+F8",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=G8-D8",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "=IF(AND(D8=0,H8=0),0,IF(AND(D8=0,H8>0),1,H8/D8))",
+              "type": "f"
+            }
+          ]
+        }
+      ],
+      "formula_count": 220
+    },
+    {
+      "sheet_name": "附注披露信息（上市公司）",
+      "max_row": 48,
+      "max_column": 7,
+      "column_count": 7,
+      "merged_ranges": [
+        "A2:F2",
+        "A47:F47",
+        "A46:F46",
+        "A1:F1",
+        "A48:F48"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露表（上市公司）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号："
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 53,
+        "n": 277,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项  目",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "房屋及建筑物",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "机器设备",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "运输设备",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "……",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "合  计",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "返回目录",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、账面原值：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "    1.期初余额",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "    2.本期增加金额",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "附注披露信息（国企）",
+      "max_row": 32,
+      "max_column": 255,
+      "column_count": 255,
+      "merged_ranges": [
+        "A2:E2",
+        "A1:E1"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "附注披露信息（国有企业）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "B",
+              "col_idx": 2,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "索引号："
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 77,
+        "n": 8077,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项  目",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "期初余额",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "本期增加",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "本期减少",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "期末余额",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "返回目录",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、账面原值合计",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "XX",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "XX",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "XX",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "XX",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "其中：土地",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "      房屋、建筑物",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "明细表H8-2",
+      "max_row": 79,
+      "max_column": 58,
+      "column_count": 58,
+      "merged_ranges": [
+        "A2:V2",
+        "E10:G10",
+        "S9:V9",
+        "M10:O10",
+        "A37:C37",
+        "AN2:BF2",
+        "BE8:BF9",
+        "D8:V8",
+        "V10:V11",
+        "W9:W11",
+        "L9:L11",
+        "BA10:BA11",
+        "AJ10:AJ11",
+        "D9:D11",
+        "A33:C33",
+        "AT10:AT11",
+        "BA9:BD9",
+        "S10:S11",
+        "B8:B11",
+        "BB10:BB11",
+        "AQ10:AS10",
+        "BD10:BD11",
+        "AJ9:AM9",
+        "A32:C32",
+        "AC10:AC11",
+        "A35:C35",
+        "AK10:AK11",
+        "W1:AM1",
+        "AO9:AT9",
+        "A38:C38",
+        "AD9:AD11",
+        "AM10:AM11",
+        "Z10:AB10",
+        "AN9:AN11",
+        "A8:A11",
+        "A1:V1",
+        "C8:C11",
+        "X9:AC9",
+        "AV10:AW10",
+        "AE10:AF10",
+        "AO10:AP10",
+        "A34:C34",
+        "BC10:BC11",
+        "AL10:AL11",
+        "AE9:AI9",
+        "AV9:AZ9",
+        "BE10:BE11",
+        "AX10:AZ10",
+        "K10:K11",
+        "U10:U11",
+        "H10:J10",
+        "A36:C36",
+        "AN1:BF1",
+        "P10:R10",
+        "M9:R9",
+        "AG10:AI10",
+        "BF10:BF11",
+        "X10:Y10",
+        "AU9:AU11",
+        "E9:K9",
+        "W8:AM8",
+        "AN8:BD8",
+        "W2:AM2",
+        "T10:T11"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": "AN",
+              "col_idx": 40,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产、累计折旧及减值准备明细表"
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "使用权资产、累计折旧及减值准备明细表"
+            },
+            {
+              "col": "AN",
+              "col_idx": 40,
+              "value": "使用权资产、累计折旧及减值准备明细表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "P",
+              "col_idx": 16,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "U",
+              "col_idx": 21,
+              "value": "索引号："
+            },
+            {
+              "col": "V",
+              "col_idx": 22,
+              "value": "H8-2"
+            },
+            {
+              "col": "AC",
+              "col_idx": 29,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "AI",
+              "col_idx": 35,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "AL",
+              "col_idx": 38,
+              "value": "索引号："
+            },
+            {
+              "col": "AM",
+              "col_idx": 39,
+              "value": "H8-2"
+            },
+            {
+              "col": "AT",
+              "col_idx": 46,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "BA",
+              "col_idx": 53,
+              "value": "=AI3"
+            },
+            {
+              "col": "BE",
+              "col_idx": 57,
+              "value": "索引号："
+            },
+            {
+              "col": "BF",
+              "col_idx": 58,
+              "value": "H8-2"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "AC3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "AI3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "AT3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "BA3",
+          "formula": "=AI3"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "AC4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AI4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "AT4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "BA4",
+          "formula": "=AI4"
+        },
+        {
+          "cell": "K12",
+          "formula": "=SUM(D12:G12)-SUM(H12:J12)"
+        },
+        {
+          "cell": "S12",
+          "formula": "=D12+L12"
+        },
+        {
+          "cell": "T12",
+          "formula": "=(E12+F12+G12)+M12+N12+O12"
+        },
+        {
+          "cell": "U12",
+          "formula": "=(H12+I12+J12)+P12+Q12+R12"
+        },
+        {
+          "cell": "V12",
+          "formula": "=S12+T12-U12"
+        },
+        {
+          "cell": "AC12",
+          "formula": "=SUM(W12:Y12)-SUM(Z12:AB12)"
+        },
+        {
+          "cell": "AJ12",
+          "formula": "=W12+AD12"
+        },
+        {
+          "cell": "AK12",
+          "formula": "=X12+AE12+Y12+AF12"
+        },
+        {
+          "cell": "AL12",
+          "formula": "=Z12+AI12+AB12+AA12+AG12+AH12"
+        },
+        {
+          "cell": "AM12",
+          "formula": "=AJ12+AK12-AL12"
+        },
+        {
+          "cell": "AT12",
+          "formula": "=SUM(AN12:AP12)-SUM(AQ12:AS12)"
+        },
+        {
+          "cell": "BA12",
+          "formula": "=AN12+AU12"
+        },
+        {
+          "cell": "BB12",
+          "formula": "=AO12+AV12+AP12+AW12"
+        },
+        {
+          "cell": "BC12",
+          "formula": "=AQ12+AZ12+AS12+AR12+AX12+AY12"
+        },
+        {
+          "cell": "BD12",
+          "formula": "=BA12+BB12-BC12"
+        },
+        {
+          "cell": "BE12",
+          "formula": "=S12-AJ12-BA12"
+        },
+        {
+          "cell": "BF12",
+          "formula": "=V12-AM12-BD12"
+        },
+        {
+          "cell": "K13",
+          "formula": "=SUM(D13:G13)-SUM(H13:J13)"
+        },
+        {
+          "cell": "S13",
+          "formula": "=D13+L13"
+        },
+        {
+          "cell": "T13",
+          "formula": "=(E13+F13+G13)+M13+N13+O13"
+        },
+        {
+          "cell": "U13",
+          "formula": "=(H13+I13+J13)+P13+Q13+R13"
+        },
+        {
+          "cell": "V13",
+          "formula": "=S13+T13-U13"
+        },
+        {
+          "cell": "AC13",
+          "formula": "=SUM(W13:Y13)-SUM(Z13:AB13)"
+        },
+        {
+          "cell": "AJ13",
+          "formula": "=W13+AD13"
+        },
+        {
+          "cell": "AK13",
+          "formula": "=X13+AE13+Y13+AF13"
+        },
+        {
+          "cell": "AL13",
+          "formula": "=Z13+AI13+AB13+AA13+AG13+AH13"
+        },
+        {
+          "cell": "AM13",
+          "formula": "=AJ13+AK13-AL13"
+        },
+        {
+          "cell": "AT13",
+          "formula": "=SUM(AN13:AP13)-SUM(AQ13:AS13)"
+        },
+        {
+          "cell": "BA13",
+          "formula": "=AN13+AU13"
+        },
+        {
+          "cell": "BB13",
+          "formula": "=AO13+AV13+AP13+AW13"
+        },
+        {
+          "cell": "BC13",
+          "formula": "=AQ13+AZ13+AS13+AR13+AX13+AY13"
+        },
+        {
+          "cell": "BD13",
+          "formula": "=BA13+BB13-BC13"
+        },
+        {
+          "cell": "BE13",
+          "formula": "=S13-AJ13-BA13"
+        },
+        {
+          "cell": "BF13",
+          "formula": "=V13-AM13-BD13"
+        },
+        {
+          "cell": "K14",
+          "formula": "=SUM(D14:G14)-SUM(H14:J14)"
+        },
+        {
+          "cell": "S14",
+          "formula": "=D14+L14"
+        },
+        {
+          "cell": "T14",
+          "formula": "=(E14+F14+G14)+M14+N14+O14"
+        },
+        {
+          "cell": "U14",
+          "formula": "=(H14+I14+J14)+P14+Q14+R14"
+        },
+        {
+          "cell": "V14",
+          "formula": "=S14+T14-U14"
+        },
+        {
+          "cell": "AC14",
+          "formula": "=SUM(W14:Y14)-SUM(Z14:AB14)"
+        },
+        {
+          "cell": "AJ14",
+          "formula": "=W14+AD14"
+        },
+        {
+          "cell": "AK14",
+          "formula": "=X14+AE14+Y14+AF14"
+        },
+        {
+          "cell": "AL14",
+          "formula": "=Z14+AI14+AB14+AA14+AG14+AH14"
+        },
+        {
+          "cell": "AM14",
+          "formula": "=AJ14+AK14-AL14"
+        },
+        {
+          "cell": "AT14",
+          "formula": "=SUM(AN14:AP14)-SUM(AQ14:AS14)"
+        },
+        {
+          "cell": "BA14",
+          "formula": "=AN14+AU14"
+        },
+        {
+          "cell": "BB14",
+          "formula": "=AO14+AV14+AP14+AW14"
+        },
+        {
+          "cell": "BC14",
+          "formula": "=AQ14+AZ14+AS14+AR14+AX14+AY14"
+        },
+        {
+          "cell": "BD14",
+          "formula": "=BA14+BB14-BC14"
+        },
+        {
+          "cell": "BE14",
+          "formula": "=S14-AJ14-BA14"
+        },
+        {
+          "cell": "BF14",
+          "formula": "=V14-AM14-BD14"
+        },
+        {
+          "cell": "K15",
+          "formula": "=SUM(D15:G15)-SUM(H15:J15)"
+        },
+        {
+          "cell": "S15",
+          "formula": "=D15+L15"
+        },
+        {
+          "cell": "T15",
+          "formula": "=(E15+F15+G15)+M15+N15+O15"
+        },
+        {
+          "cell": "U15",
+          "formula": "=(H15+I15+J15)+P15+Q15+R15"
+        },
+        {
+          "cell": "V15",
+          "formula": "=S15+T15-U15"
+        },
+        {
+          "cell": "AC15",
+          "formula": "=SUM(W15:Y15)-SUM(Z15:AB15)"
+        },
+        {
+          "cell": "AJ15",
+          "formula": "=W15+AD15"
+        },
+        {
+          "cell": "AK15",
+          "formula": "=X15+AE15+Y15+AF15"
+        },
+        {
+          "cell": "AL15",
+          "formula": "=Z15+AI15+AB15+AA15+AG15+AH15"
+        },
+        {
+          "cell": "AM15",
+          "formula": "=AJ15+AK15-AL15"
+        },
+        {
+          "cell": "AT15",
+          "formula": "=SUM(AN15:AP15)-SUM(AQ15:AS15)"
+        },
+        {
+          "cell": "BA15",
+          "formula": "=AN15+AU15"
+        },
+        {
+          "cell": "BB15",
+          "formula": "=AO15+AV15+AP15+AW15"
+        },
+        {
+          "cell": "BC15",
+          "formula": "=AQ15+AZ15+AS15+AR15+AX15+AY15"
+        },
+        {
+          "cell": "BD15",
+          "formula": "=BA15+BB15-BC15"
+        },
+        {
+          "cell": "BE15",
+          "formula": "=S15-AJ15-BA15"
+        },
+        {
+          "cell": "BF15",
+          "formula": "=V15-AM15-BD15"
+        },
+        {
+          "cell": "K16",
+          "formula": "=SUM(D16:G16)-SUM(H16:J16)"
+        },
+        {
+          "cell": "S16",
+          "formula": "=D16+L16"
+        },
+        {
+          "cell": "T16",
+          "formula": "=(E16+F16+G16)+M16+N16+O16"
+        },
+        {
+          "cell": "U16",
+          "formula": "=(H16+I16+J16)+P16+Q16+R16"
+        },
+        {
+          "cell": "V16",
+          "formula": "=S16+T16-U16"
+        },
+        {
+          "cell": "AC16",
+          "formula": "=SUM(W16:Y16)-SUM(Z16:AB16)"
+        },
+        {
+          "cell": "AJ16",
+          "formula": "=W16+AD16"
+        },
+        {
+          "cell": "AK16",
+          "formula": "=X16+AE16+Y16+AF16"
+        },
+        {
+          "cell": "AL16",
+          "formula": "=Z16+AI16+AB16+AA16+AG16+AH16"
+        },
+        {
+          "cell": "AM16",
+          "formula": "=AJ16+AK16-AL16"
+        },
+        {
+          "cell": "AT16",
+          "formula": "=SUM(AN16:AP16)-SUM(AQ16:AS16)"
+        },
+        {
+          "cell": "BA16",
+          "formula": "=AN16+AU16"
+        },
+        {
+          "cell": "BB16",
+          "formula": "=AO16+AV16+AP16+AW16"
+        },
+        {
+          "cell": "BC16",
+          "formula": "=AQ16+AZ16+AS16+AR16+AX16+AY16"
+        },
+        {
+          "cell": "BD16",
+          "formula": "=BA16+BB16-BC16"
+        },
+        {
+          "cell": "BE16",
+          "formula": "=S16-AJ16-BA16"
+        },
+        {
+          "cell": "BF16",
+          "formula": "=V16-AM16-BD16"
+        },
+        {
+          "cell": "K17",
+          "formula": "=SUM(D17:G17)-SUM(H17:J17)"
+        }
+      ],
+      "data_types": {
+        "s": 116,
+        "n": 3777,
+        "f": 689
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "P",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2. 所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3.使用权资产以恰当的金额包括在财务报表中，与之相关",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产类别",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "使用权资产名称",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "使用权资产编号",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "使用权资产原值",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 689
+    },
+    {
+      "sheet_name": "调整分录汇总H8-3",
+      "max_row": 24,
+      "max_column": 10,
+      "column_count": 10,
+      "merged_ranges": [
+        "A1:J1",
+        "A2:J2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产调整分录汇总表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引号："
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "H8-3"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 16,
+        "n": 218,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "调整事项说明",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "类别（报表调整/账项调整/其他）",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "报表项目",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "科目名称",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "附注项目",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "……",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "借方调整金额",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "贷方调整金额",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "索引",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    },
+    {
+      "sheet_name": "租赁的识别H8-4",
+      "max_row": 90,
+      "max_column": 10,
+      "column_count": 10,
+      "merged_ranges": [
+        "C16:E16",
+        "A24:B24",
+        "C44:E44",
+        "C41:E41",
+        "A15:B15",
+        "A11:B11",
+        "A51:B51",
+        "A45:B45",
+        "C40:E40",
+        "A36:B36",
+        "C45:G45",
+        "C43:E43",
+        "C12:E12",
+        "C51:E51",
+        "C11:E11",
+        "A16:B16",
+        "A54:B54",
+        "A25:B25",
+        "C52:E52",
+        "A41:B41",
+        "C54:G54",
+        "C17:E17",
+        "A59:G59",
+        "A60:G60",
+        "A27:B27",
+        "A18:B18",
+        "C32:E32",
+        "A12:B12",
+        "A26:B26",
+        "A21:B21",
+        "C21:G21",
+        "A1:G1",
+        "C19:E19",
+        "C13:E13",
+        "C53:E53",
+        "A6:G6",
+        "A33:B33",
+        "I13:I14",
+        "A42:B42",
+        "C18:E18",
+        "C27:G27",
+        "A32:B32",
+        "A14:B14",
+        "C36:G36",
+        "A7:G7",
+        "A17:B17",
+        "C34:E34",
+        "C15:E15",
+        "A53:B53",
+        "C24:E24",
+        "A35:B35",
+        "C42:E42",
+        "A20:B20",
+        "C33:E33",
+        "C14:E14",
+        "A52:B52",
+        "A56:G56",
+        "A43:B43",
+        "A19:B19",
+        "A10:B10",
+        "A13:B13",
+        "A2:G2",
+        "A44:B44",
+        "C26:E26",
+        "A40:B40",
+        "A57:G57",
+        "C20:E20",
+        "C35:E35",
+        "C25:E25",
+        "A34:B34",
+        "C10:E10"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "租赁的识别"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "索引号："
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "H8-4"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F11",
+          "formula": "=IF(AND(F12=\"是\",F13=\"否\"),\"是\",\"否\")"
+        },
+        {
+          "cell": "C21",
+          "formula": "=IF(AND(F11=\"是\",F15=\"是\",F20=\"是\"),\"合同为租赁或者包含租赁\",\"不包含租赁\")"
+        },
+        {
+          "cell": "C27",
+          "formula": "=IF(AND(F25=\"是\",F26=\"是\"),\"构成合同中的一项单独租赁\",\"无须分拆\")"
+        },
+        {
+          "cell": "C36",
+          "formula": "=IF(OR(F33=\"是\",F34=\"是\",F35=\"是\"),\"应当合并为一份合同进行会计处理\",\"单项租赁\")"
+        },
+        {
+          "cell": "F41",
+          "formula": "=IF(AND(F42=\"是\",F43=\"是\"),\"是\",\"否\")"
+        },
+        {
+          "cell": "C45",
+          "formula": "=IF(AND(F41=\"是\",F44=\"是\"),\"属于短期租赁\",\"不属于短期租赁\")"
+        },
+        {
+          "cell": "C54",
+          "formula": "=IF(AND(F52=\"是\",F53=\"是\"),\"属于低价值资产租赁\",\"不属于低价值资产租赁\")"
+        }
+      ],
+      "data_types": {
+        "s": 104,
+        "n": 783,
+        "f": 13
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2. 所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3. 使用权资产以恰当的金额包括在财务报表中，与之相",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 租赁的识别",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 13
+    },
+    {
+      "sheet_name": "租赁期的确定H8-5",
+      "max_row": 52,
+      "max_column": 8,
+      "column_count": 8,
+      "merged_ranges": [
+        "C34:D34",
+        "A15:B15",
+        "C15:D15",
+        "C33:D33",
+        "A11:B11",
+        "C14:D14",
+        "A36:B36",
+        "C37:F37",
+        "C26:D26",
+        "C35:D35",
+        "A2:F2",
+        "C20:D20",
+        "A16:B16",
+        "A42:F42",
+        "C10:D10",
+        "C16:D16",
+        "A25:B25",
+        "C25:D25",
+        "A5:F5",
+        "A37:B37",
+        "A18:B18",
+        "A27:B27",
+        "G33:G36",
+        "A12:B12",
+        "A43:F43",
+        "A26:B26",
+        "A21:B21",
+        "C12:D12",
+        "H26:H28",
+        "C11:D11",
+        "A33:B33",
+        "C27:D27",
+        "C29:F29",
+        "A32:B32",
+        "C36:D36",
+        "A14:B14",
+        "A40:F40",
+        "A17:B17",
+        "C17:D17",
+        "A39:F39",
+        "A35:B35",
+        "A20:B20",
+        "C32:D32",
+        "A29:B29",
+        "A19:B19",
+        "A1:F1",
+        "A10:B10",
+        "C19:D19",
+        "A28:B28",
+        "C21:F21",
+        "A6:F6",
+        "A13:B13",
+        "C28:D28",
+        "C13:D13",
+        "C18:D18",
+        "A7:F7",
+        "A34:B34"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "租赁期的确定"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "col_idx": 3,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "索引号："
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "H8-5"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "C29",
+          "formula": "=IF(OR(E26=\"是\",E27=\"是\",E28=\"是\"),\"应当重新评估是否合理确定将行使续租选择权、购买选择权或不行使终止租赁选择权\",\"无需重新评估\")"
+        }
+      ],
+      "data_types": {
+        "s": 76,
+        "n": 333,
+        "f": 7
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2. 所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3. 使用权资产以恰当的金额包括在财务报表中，与之相",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 租赁期的确定【承租人有权使用租赁资产且不可撤销的期间】",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 7
+    },
+    {
+      "sheet_name": "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+      "max_row": 59,
+      "max_column": 13,
+      "column_count": 13,
+      "merged_ranges": [
+        "A49:I49",
+        "A47:I47",
+        "K33:K34",
+        "A48:I48",
+        "B33:F33",
+        "A33:A34",
+        "J33:J34",
+        "A1:K1",
+        "A2:K2",
+        "A6:I6",
+        "A5:K5",
+        "A50:I50",
+        "A11:G11",
+        "G33:I33"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产 租赁负责初始及后续计量（按年）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H8-6"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "D9",
+          "formula": "=2"
+        },
+        {
+          "cell": "E9",
+          "formula": "=(YEAR(C9)-YEAR(B9))+D9+(MONTH(C9)-MONTH(B9)+1)/12"
+        },
+        {
+          "cell": "F9",
+          "formula": "=DATE(YEAR(C9)+D9,MONTH(C9),DAY(C9))"
+        },
+        {
+          "cell": "B13",
+          "formula": "=I30"
+        },
+        {
+          "cell": "F13",
+          "formula": "=J35"
+        },
+        {
+          "cell": "C14",
+          "formula": "=F30"
+        },
+        {
+          "cell": "G14",
+          "formula": "=K35"
+        },
+        {
+          "cell": "C15",
+          "formula": "=H30+G30"
+        },
+        {
+          "cell": "F15",
+          "formula": "=G14-F13"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B13:B15)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C13:C15)"
+        },
+        {
+          "cell": "C20",
+          "formula": "=IF(E20=1,0,B20)"
+        },
+        {
+          "cell": "E20",
+          "formula": "=1/(1+$H$9)^D20"
+        },
+        {
+          "cell": "F20",
+          "formula": "=C20*E20"
+        },
+        {
+          "cell": "G20",
+          "formula": "=B20"
+        },
+        {
+          "cell": "C21",
+          "formula": "=IF(E21=1,0,B21)"
+        },
+        {
+          "cell": "D21",
+          "formula": "=D20+1"
+        },
+        {
+          "cell": "E21",
+          "formula": "=1/(1+$H$9)^D21"
+        },
+        {
+          "cell": "F21",
+          "formula": "=C21*E21"
+        },
+        {
+          "cell": "C22",
+          "formula": "=IF(E22=1,0,B22)"
+        },
+        {
+          "cell": "D22",
+          "formula": "=D21+1"
+        },
+        {
+          "cell": "E22",
+          "formula": "=1/(1+$H$9)^D22"
+        },
+        {
+          "cell": "F22",
+          "formula": "=C22*E22"
+        },
+        {
+          "cell": "C23",
+          "formula": "=IF(E23=1,0,B23)"
+        },
+        {
+          "cell": "D23",
+          "formula": "=D22+1"
+        },
+        {
+          "cell": "E23",
+          "formula": "=1/(1+$H$9)^D23"
+        },
+        {
+          "cell": "F23",
+          "formula": "=C23*E23"
+        },
+        {
+          "cell": "C24",
+          "formula": "=IF(E24=1,0,B24)"
+        },
+        {
+          "cell": "D24",
+          "formula": "=D23+1"
+        },
+        {
+          "cell": "E24",
+          "formula": "=1/(1+$H$9)^D24"
+        },
+        {
+          "cell": "F24",
+          "formula": "=C24*E24"
+        },
+        {
+          "cell": "C25",
+          "formula": "=IF(E25=1,0,B25)"
+        },
+        {
+          "cell": "D25",
+          "formula": "=D24+1"
+        },
+        {
+          "cell": "E25",
+          "formula": "=1/(1+$H$9)^D25"
+        },
+        {
+          "cell": "F25",
+          "formula": "=C25*E25"
+        },
+        {
+          "cell": "C26",
+          "formula": "=IF(E26=1,0,B26)"
+        },
+        {
+          "cell": "D26",
+          "formula": "=D25+1"
+        },
+        {
+          "cell": "E26",
+          "formula": "=1/(1+$H$9)^D26"
+        },
+        {
+          "cell": "F26",
+          "formula": "=C26*E26"
+        },
+        {
+          "cell": "C27",
+          "formula": "=IF(E27=1,0,B27)"
+        },
+        {
+          "cell": "D27",
+          "formula": "=D26+1"
+        },
+        {
+          "cell": "E27",
+          "formula": "=1/(1+$H$9)^D27"
+        },
+        {
+          "cell": "F27",
+          "formula": "=C27*E27"
+        },
+        {
+          "cell": "C28",
+          "formula": "=IF(E28=1,0,B28)"
+        },
+        {
+          "cell": "D28",
+          "formula": "=D27+1"
+        },
+        {
+          "cell": "E28",
+          "formula": "=1/(1+$H$9)^D28"
+        },
+        {
+          "cell": "F28",
+          "formula": "=C28*E28"
+        },
+        {
+          "cell": "C29",
+          "formula": "=IF(E29=1,0,B29)"
+        },
+        {
+          "cell": "D29",
+          "formula": "=D28+1"
+        },
+        {
+          "cell": "E29",
+          "formula": "=1/(1+$H$9)^D29"
+        },
+        {
+          "cell": "F29",
+          "formula": "=C29*E29"
+        },
+        {
+          "cell": "B30",
+          "formula": "=SUM(B20:B29)"
+        },
+        {
+          "cell": "C30",
+          "formula": "=SUM(C20:C29)"
+        },
+        {
+          "cell": "F30",
+          "formula": "=SUM(F20:F29)"
+        },
+        {
+          "cell": "G30",
+          "formula": "=SUM(G20:G29)"
+        },
+        {
+          "cell": "H30",
+          "formula": "=SUM(H20:H29)"
+        },
+        {
+          "cell": "I30",
+          "formula": "=F30+G30+H30"
+        },
+        {
+          "cell": "B35",
+          "formula": "=F30"
+        },
+        {
+          "cell": "C35",
+          "formula": "=C20"
+        },
+        {
+          "cell": "E35",
+          "formula": "=(B35-C35)*$H$9"
+        },
+        {
+          "cell": "F35",
+          "formula": "=B35-C35+E35"
+        },
+        {
+          "cell": "G35",
+          "formula": "=I30"
+        },
+        {
+          "cell": "H35",
+          "formula": "=$I$30/$I$9"
+        },
+        {
+          "cell": "I35",
+          "formula": "=G35-H35"
+        },
+        {
+          "cell": "J35",
+          "formula": "=F35*$J$9"
+        },
+        {
+          "cell": "K35",
+          "formula": "=I35*$J$9"
+        },
+        {
+          "cell": "B36",
+          "formula": "=B35-C35+E35"
+        },
+        {
+          "cell": "C36",
+          "formula": "=C21"
+        },
+        {
+          "cell": "E36",
+          "formula": "=(B36-C36)*$H$9"
+        },
+        {
+          "cell": "F36",
+          "formula": "=B36-C36+E36"
+        },
+        {
+          "cell": "G36",
+          "formula": "=I35"
+        },
+        {
+          "cell": "H36",
+          "formula": "=H35"
+        },
+        {
+          "cell": "I36",
+          "formula": "=G36-H36"
+        },
+        {
+          "cell": "J36",
+          "formula": "=F36*$J$9"
+        },
+        {
+          "cell": "K36",
+          "formula": "=I36*$J$9"
+        },
+        {
+          "cell": "B37",
+          "formula": "=B36-C36+E36"
+        },
+        {
+          "cell": "C37",
+          "formula": "=C22"
+        },
+        {
+          "cell": "E37",
+          "formula": "=(B37-C37)*$H$9"
+        },
+        {
+          "cell": "F37",
+          "formula": "=B37-C37+E37"
+        },
+        {
+          "cell": "G37",
+          "formula": "=I36"
+        },
+        {
+          "cell": "H37",
+          "formula": "=H36"
+        },
+        {
+          "cell": "I37",
+          "formula": "=G37-H37"
+        },
+        {
+          "cell": "J37",
+          "formula": "=F37*$J$9"
+        },
+        {
+          "cell": "K37",
+          "formula": "=I37*$J$9"
+        },
+        {
+          "cell": "B38",
+          "formula": "=B37-C37+E37"
+        },
+        {
+          "cell": "C38",
+          "formula": "=C23"
+        },
+        {
+          "cell": "E38",
+          "formula": "=(B38-C38)*$H$9"
+        },
+        {
+          "cell": "F38",
+          "formula": "=B38-C38+E38"
+        },
+        {
+          "cell": "G38",
+          "formula": "=I37"
+        },
+        {
+          "cell": "H38",
+          "formula": "=H37"
+        },
+        {
+          "cell": "I38",
+          "formula": "=G38-H38"
+        },
+        {
+          "cell": "J38",
+          "formula": "=F38*$J$9"
+        },
+        {
+          "cell": "K38",
+          "formula": "=I38*$J$9"
+        },
+        {
+          "cell": "B39",
+          "formula": "=B38-C38+E38"
+        }
+      ],
+      "data_types": {
+        "s": 74,
+        "n": 525,
+        "f": 156,
+        "d": 12
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2. 所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3. 记录的使用权资产由被审计单位拥有",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 租赁合同的基本信息",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产名称",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "租赁期开始日",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "合同约定初始期满日",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "续租期（年）",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "租赁期（考虑续租可能后）",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "租赁期截止日期",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "增量借款利率",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "折现率",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "使用权资产摊销期限（年）",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "适用税率",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "租赁期是指承租人有权使用租赁资产且不可撤销的期间;承租人有续租选择权，即有权选择续租该资产，且合理确定将行使该选择权的，租赁期还应当包含续租选择权涵盖的期间；承租人有终止租赁选择权即有权选择终止租赁该",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 156
+    },
+    {
+      "sheet_name": "使用权资产 租赁负责初始及后续计量（按月）H8-6",
+      "max_row": 361,
+      "max_column": 16,
+      "column_count": 16,
+      "merged_ranges": [
+        "A13:C13",
+        "A16:B16",
+        "A1:M1",
+        "A15:B15",
+        "A14:B14",
+        "A17:B17",
+        "A18:B18",
+        "D13:J13",
+        "A2:M2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产 租赁负责初始及后续计量（按月）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "索引号："
+            },
+            {
+              "col": "M",
+              "col_idx": 13,
+              "value": "H8-6"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E15",
+          "formula": "=K22"
+        },
+        {
+          "cell": "I15",
+          "formula": "=L22"
+        },
+        {
+          "cell": "F16",
+          "formula": "=E349"
+        },
+        {
+          "cell": "J16",
+          "formula": "=M22"
+        },
+        {
+          "cell": "F17",
+          "formula": "=H349"
+        },
+        {
+          "cell": "I17",
+          "formula": "=J16-I15"
+        },
+        {
+          "cell": "C18",
+          "formula": "=(YEAR($C$16)-YEAR($C$15))*12+MONTH($C$16)-MONTH($C$15)+1"
+        },
+        {
+          "cell": "E18",
+          "formula": "=SUM(E15:E17)"
+        },
+        {
+          "cell": "F18",
+          "formula": "=SUM(F15:F17)"
+        },
+        {
+          "cell": "I18",
+          "formula": "=SUM(I15:I17)"
+        },
+        {
+          "cell": "J18",
+          "formula": "=SUM(J15:J17)"
+        },
+        {
+          "cell": "B22",
+          "formula": "=C15"
+        },
+        {
+          "cell": "E22",
+          "formula": "=(D22+C22)/(POWER((1+$C$17),A22-1))"
+        },
+        {
+          "cell": "F22",
+          "formula": "=$C$17/12*E349"
+        },
+        {
+          "cell": "G22",
+          "formula": "=F22+E349"
+        },
+        {
+          "cell": "K22",
+          "formula": "=$E$349+$H$349-I22"
+        },
+        {
+          "cell": "L22",
+          "formula": "=G22*$C$19"
+        },
+        {
+          "cell": "M22",
+          "formula": "=K22*$C$19"
+        },
+        {
+          "cell": "A23",
+          "formula": "=A22+1"
+        },
+        {
+          "cell": "B23",
+          "formula": "=EDATE(B22,1)"
+        },
+        {
+          "cell": "E23",
+          "formula": "=(D23+C23)/(POWER((1+$C$17/12),A23-1))"
+        },
+        {
+          "cell": "F23",
+          "formula": "=$C$17/12*(G22-C23)"
+        },
+        {
+          "cell": "G23",
+          "formula": "=G22-C23+F23"
+        },
+        {
+          "cell": "I23",
+          "formula": "=IF(($A23-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J23",
+          "formula": "=IF(I23=0,0,J22+I23)"
+        },
+        {
+          "cell": "K23",
+          "formula": "=K22-I23"
+        },
+        {
+          "cell": "L23",
+          "formula": "=G23*$C$19"
+        },
+        {
+          "cell": "M23",
+          "formula": "=K23*$C$19"
+        },
+        {
+          "cell": "A24",
+          "formula": "=A23+1"
+        },
+        {
+          "cell": "B24",
+          "formula": "=EDATE(B23,1)"
+        },
+        {
+          "cell": "E24",
+          "formula": "=(D24+C24)/(POWER((1+$C$17/12),A24-1))"
+        },
+        {
+          "cell": "F24",
+          "formula": "=$C$17/12*(G23-C24)"
+        },
+        {
+          "cell": "G24",
+          "formula": "=G23-C24+F24"
+        },
+        {
+          "cell": "I24",
+          "formula": "=IF(($A24-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J24",
+          "formula": "=IF(I24=0,0,J23+I24)"
+        },
+        {
+          "cell": "K24",
+          "formula": "=K23-I24"
+        },
+        {
+          "cell": "L24",
+          "formula": "=G24*$C$19"
+        },
+        {
+          "cell": "M24",
+          "formula": "=K24*$C$19"
+        },
+        {
+          "cell": "A25",
+          "formula": "=A24+1"
+        },
+        {
+          "cell": "B25",
+          "formula": "=EDATE(B24,1)"
+        },
+        {
+          "cell": "E25",
+          "formula": "=(D25+C25)/(POWER((1+$C$17/12),A25-1))"
+        },
+        {
+          "cell": "F25",
+          "formula": "=$C$17/12*(G24-C25)"
+        },
+        {
+          "cell": "G25",
+          "formula": "=G24-C25+F25"
+        },
+        {
+          "cell": "I25",
+          "formula": "=IF(($A25-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J25",
+          "formula": "=IF(I25=0,0,J24+I25)"
+        },
+        {
+          "cell": "K25",
+          "formula": "=K24-I25"
+        },
+        {
+          "cell": "L25",
+          "formula": "=G25*$C$19"
+        },
+        {
+          "cell": "M25",
+          "formula": "=K25*$C$19"
+        },
+        {
+          "cell": "A26",
+          "formula": "=A25+1"
+        },
+        {
+          "cell": "B26",
+          "formula": "=EDATE(B25,1)"
+        },
+        {
+          "cell": "E26",
+          "formula": "=(D26+C26)/(POWER((1+$C$17/12),A26-1))"
+        },
+        {
+          "cell": "F26",
+          "formula": "=$C$17/12*(G25-C26)"
+        },
+        {
+          "cell": "G26",
+          "formula": "=G25-C26+F26"
+        },
+        {
+          "cell": "I26",
+          "formula": "=IF(($A26-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J26",
+          "formula": "=IF(I26=0,0,J25+I26)"
+        },
+        {
+          "cell": "K26",
+          "formula": "=K25-I26"
+        },
+        {
+          "cell": "L26",
+          "formula": "=G26*$C$19"
+        },
+        {
+          "cell": "M26",
+          "formula": "=K26*$C$19"
+        },
+        {
+          "cell": "A27",
+          "formula": "=A26+1"
+        },
+        {
+          "cell": "B27",
+          "formula": "=EDATE(B26,1)"
+        },
+        {
+          "cell": "E27",
+          "formula": "=(D27+C27)/(POWER((1+$C$17/12),A27-1))"
+        },
+        {
+          "cell": "F27",
+          "formula": "=$C$17/12*(G26-C27)"
+        },
+        {
+          "cell": "G27",
+          "formula": "=G26-C27+F27"
+        },
+        {
+          "cell": "I27",
+          "formula": "=IF(($A27-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J27",
+          "formula": "=IF(I27=0,0,J26+I27)"
+        },
+        {
+          "cell": "K27",
+          "formula": "=K26-I27"
+        },
+        {
+          "cell": "L27",
+          "formula": "=G27*$C$19"
+        },
+        {
+          "cell": "M27",
+          "formula": "=K27*$C$19"
+        },
+        {
+          "cell": "A28",
+          "formula": "=A27+1"
+        },
+        {
+          "cell": "B28",
+          "formula": "=EDATE(B27,1)"
+        },
+        {
+          "cell": "E28",
+          "formula": "=(D28+C28)/(POWER((1+$C$17/12),A28-1))"
+        },
+        {
+          "cell": "F28",
+          "formula": "=$C$17/12*(G27-C28)"
+        },
+        {
+          "cell": "G28",
+          "formula": "=G27-C28+F28"
+        },
+        {
+          "cell": "I28",
+          "formula": "=IF(($A28-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J28",
+          "formula": "=IF(I28=0,0,J27+I28)"
+        },
+        {
+          "cell": "K28",
+          "formula": "=K27-I28"
+        },
+        {
+          "cell": "L28",
+          "formula": "=G28*$C$19"
+        },
+        {
+          "cell": "M28",
+          "formula": "=K28*$C$19"
+        },
+        {
+          "cell": "A29",
+          "formula": "=A28+1"
+        },
+        {
+          "cell": "B29",
+          "formula": "=EDATE(B28,1)"
+        },
+        {
+          "cell": "E29",
+          "formula": "=(D29+C29)/(POWER((1+$C$17/12),A29-1))"
+        },
+        {
+          "cell": "F29",
+          "formula": "=$C$17/12*(G28-C29)"
+        },
+        {
+          "cell": "G29",
+          "formula": "=G28-C29+F29"
+        },
+        {
+          "cell": "I29",
+          "formula": "=IF(($A29-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        },
+        {
+          "cell": "J29",
+          "formula": "=IF(I29=0,0,J28+I29)"
+        },
+        {
+          "cell": "K29",
+          "formula": "=K28-I29"
+        },
+        {
+          "cell": "L29",
+          "formula": "=G29*$C$19"
+        },
+        {
+          "cell": "M29",
+          "formula": "=K29*$C$19"
+        },
+        {
+          "cell": "A30",
+          "formula": "=A29+1"
+        },
+        {
+          "cell": "B30",
+          "formula": "=EDATE(B29,1)"
+        },
+        {
+          "cell": "E30",
+          "formula": "=(D30+C30)/(POWER((1+$C$17/12),A30-1))"
+        },
+        {
+          "cell": "F30",
+          "formula": "=$C$17/12*(G29-C30)"
+        },
+        {
+          "cell": "G30",
+          "formula": "=G29-C30+F30"
+        },
+        {
+          "cell": "I30",
+          "formula": "=IF(($A30-1)>$C$18,0,($E$349+$H$349)/($C$18))"
+        }
+      ],
+      "data_types": {
+        "s": 60,
+        "n": 2424,
+        "f": 3290,
+        "d": 2
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "L",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "填表说明：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1、",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "租赁期开始日*(必填）",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "必填项，实际移交日，填写格式为YY-MM-DD 如：2021-01-01",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "2、",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "约满日期*(必填）",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "必填项，合同/协议约定的合同期满日，填写格式为YY-MM-DD 如：2024-09-30",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 9,
+          "cells": [
+            {
+              "col": "A",
+              "value": "3、",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "折现率*(必填）",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "按租赁合同的含报酬率或增量借款利率确定折现率。",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 3290
+    },
+    {
+      "sheet_name": "租赁变更H8-7",
+      "max_row": 100,
+      "max_column": 11,
+      "column_count": 11,
+      "merged_ranges": [
+        "B75:F75",
+        "A90:I90",
+        "A15:B15",
+        "C15:D15",
+        "A11:B11",
+        "A89:I89",
+        "A41:A42",
+        "F17:H17",
+        "A75:A76",
+        "A16:B16",
+        "A2:I2",
+        "C18:I18",
+        "C10:D10",
+        "C16:D16",
+        "A5:I5",
+        "F9:H9",
+        "A91:I91",
+        "C9:D9",
+        "A18:B18",
+        "A12:B12",
+        "G41:I41",
+        "C11:D11",
+        "G75:I75",
+        "A17:B17",
+        "C17:D17",
+        "F11:H11",
+        "F10:H10",
+        "F16:H16",
+        "A10:B10",
+        "A88:I88",
+        "C12:I12",
+        "A1:I1",
+        "A9:B9",
+        "F15:H15",
+        "B41:F41"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "租赁变更"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "H8-7"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "C12",
+          "formula": "=IF(AND(E10=\"是\",E11=\"是\"),\"应当将该租赁变更作为一项单独租赁进行会计处理\",\"应当分摊变更后合同的对价，重新确定租赁期，并按照变更后租赁付款额和修订后的折现率计算的现值重新计量租赁负债\")"
+        },
+        {
+          "cell": "D23",
+          "formula": "=2"
+        },
+        {
+          "cell": "E23",
+          "formula": "=(YEAR(C23)-YEAR(B23))+D23+(MONTH(C23)-MONTH(B23)+1)/12"
+        },
+        {
+          "cell": "F23",
+          "formula": "=DATE(YEAR(C23)+D23,MONTH(C23),DAY(C23))"
+        },
+        {
+          "cell": "C28",
+          "formula": "=IF(E28=1,0,B28)"
+        },
+        {
+          "cell": "E28",
+          "formula": "=1/(1+$H$23)^D28"
+        },
+        {
+          "cell": "F28",
+          "formula": "=C28*E28"
+        },
+        {
+          "cell": "G28",
+          "formula": "=B28"
+        },
+        {
+          "cell": "C29",
+          "formula": "=IF(E29=1,0,B29)"
+        },
+        {
+          "cell": "D29",
+          "formula": "=D28+1"
+        },
+        {
+          "cell": "E29",
+          "formula": "=1/(1+$H$23)^D29"
+        },
+        {
+          "cell": "F29",
+          "formula": "=C29*E29"
+        },
+        {
+          "cell": "C30",
+          "formula": "=IF(E30=1,0,B30)"
+        },
+        {
+          "cell": "D30",
+          "formula": "=D29+1"
+        },
+        {
+          "cell": "E30",
+          "formula": "=1/(1+$H$23)^D30"
+        },
+        {
+          "cell": "F30",
+          "formula": "=C30*E30"
+        },
+        {
+          "cell": "C31",
+          "formula": "=IF(E31=1,0,B31)"
+        },
+        {
+          "cell": "D31",
+          "formula": "=D30+1"
+        },
+        {
+          "cell": "E31",
+          "formula": "=1/(1+$H$23)^D31"
+        },
+        {
+          "cell": "F31",
+          "formula": "=C31*E31"
+        },
+        {
+          "cell": "C32",
+          "formula": "=IF(E32=1,0,B32)"
+        },
+        {
+          "cell": "D32",
+          "formula": "=D31+1"
+        },
+        {
+          "cell": "E32",
+          "formula": "=1/(1+$H$23)^D32"
+        },
+        {
+          "cell": "F32",
+          "formula": "=C32*E32"
+        },
+        {
+          "cell": "C33",
+          "formula": "=IF(E33=1,0,B33)"
+        },
+        {
+          "cell": "D33",
+          "formula": "=D32+1"
+        },
+        {
+          "cell": "E33",
+          "formula": "=1/(1+$H$23)^D33"
+        },
+        {
+          "cell": "F33",
+          "formula": "=C33*E33"
+        },
+        {
+          "cell": "C34",
+          "formula": "=IF(E34=1,0,B34)"
+        },
+        {
+          "cell": "D34",
+          "formula": "=D33+1"
+        },
+        {
+          "cell": "E34",
+          "formula": "=1/(1+$H$23)^D34"
+        },
+        {
+          "cell": "F34",
+          "formula": "=C34*E34"
+        },
+        {
+          "cell": "C35",
+          "formula": "=IF(E35=1,0,B35)"
+        },
+        {
+          "cell": "D35",
+          "formula": "=D34+1"
+        },
+        {
+          "cell": "E35",
+          "formula": "=1/(1+$H$23)^D35"
+        },
+        {
+          "cell": "F35",
+          "formula": "=C35*E35"
+        },
+        {
+          "cell": "C36",
+          "formula": "=IF(E36=1,0,B36)"
+        },
+        {
+          "cell": "D36",
+          "formula": "=D35+1"
+        },
+        {
+          "cell": "E36",
+          "formula": "=1/(1+$H$23)^D36"
+        },
+        {
+          "cell": "F36",
+          "formula": "=C36*E36"
+        },
+        {
+          "cell": "C37",
+          "formula": "=IF(E37=1,0,B37)"
+        },
+        {
+          "cell": "D37",
+          "formula": "=D36+1"
+        },
+        {
+          "cell": "E37",
+          "formula": "=1/(1+$H$23)^D37"
+        },
+        {
+          "cell": "F37",
+          "formula": "=C37*E37"
+        },
+        {
+          "cell": "B38",
+          "formula": "=SUM(B28:B37)"
+        },
+        {
+          "cell": "C38",
+          "formula": "=SUM(C28:C37)"
+        },
+        {
+          "cell": "F38",
+          "formula": "=SUM(F28:F37)"
+        },
+        {
+          "cell": "G38",
+          "formula": "=SUM(G28:G37)"
+        },
+        {
+          "cell": "H38",
+          "formula": "=SUM(H28:H37)"
+        },
+        {
+          "cell": "I38",
+          "formula": "=F38+G38+H38"
+        },
+        {
+          "cell": "B43",
+          "formula": "=F38"
+        },
+        {
+          "cell": "C43",
+          "formula": "=C28"
+        },
+        {
+          "cell": "E43",
+          "formula": "=(B43-C43)*$H$23"
+        },
+        {
+          "cell": "F43",
+          "formula": "=B43-C43+E43"
+        },
+        {
+          "cell": "G43",
+          "formula": "=I38"
+        },
+        {
+          "cell": "H43",
+          "formula": "=$I$38/$I$23"
+        },
+        {
+          "cell": "I43",
+          "formula": "=G43-H43"
+        },
+        {
+          "cell": "B44",
+          "formula": "=B43-C43+E43"
+        },
+        {
+          "cell": "C44",
+          "formula": "=C29"
+        },
+        {
+          "cell": "E44",
+          "formula": "=(B44-C44)*$H$23"
+        },
+        {
+          "cell": "F44",
+          "formula": "=B44-C44+E44"
+        },
+        {
+          "cell": "G44",
+          "formula": "=I43"
+        },
+        {
+          "cell": "H44",
+          "formula": "=H43"
+        },
+        {
+          "cell": "I44",
+          "formula": "=G44-H44"
+        },
+        {
+          "cell": "B45",
+          "formula": "=B44-C44+E44"
+        },
+        {
+          "cell": "C45",
+          "formula": "=C30"
+        },
+        {
+          "cell": "E45",
+          "formula": "=(B45-C45)*$H$23"
+        },
+        {
+          "cell": "F45",
+          "formula": "=B45-C45+E45"
+        },
+        {
+          "cell": "G45",
+          "formula": "=I44"
+        },
+        {
+          "cell": "H45",
+          "formula": "=H44"
+        },
+        {
+          "cell": "I45",
+          "formula": "=G45-H45"
+        },
+        {
+          "cell": "B46",
+          "formula": "=B45-C45+E45"
+        },
+        {
+          "cell": "C46",
+          "formula": "=C31"
+        },
+        {
+          "cell": "E46",
+          "formula": "=(B46-C46)*$H$23"
+        },
+        {
+          "cell": "F46",
+          "formula": "=B46-C46+E46"
+        },
+        {
+          "cell": "G46",
+          "formula": "=I45"
+        },
+        {
+          "cell": "H46",
+          "formula": "=H45"
+        },
+        {
+          "cell": "I46",
+          "formula": "=G46-H46"
+        },
+        {
+          "cell": "B47",
+          "formula": "=B46-C46+E46"
+        },
+        {
+          "cell": "C47",
+          "formula": "=C32"
+        },
+        {
+          "cell": "E47",
+          "formula": "=(B47-C47)*$H$23"
+        },
+        {
+          "cell": "F47",
+          "formula": "=B47-C47+E47"
+        },
+        {
+          "cell": "G47",
+          "formula": "=I46"
+        },
+        {
+          "cell": "H47",
+          "formula": "=H46"
+        },
+        {
+          "cell": "I47",
+          "formula": "=G47-H47"
+        },
+        {
+          "cell": "B48",
+          "formula": "=B47-C47+E47"
+        },
+        {
+          "cell": "C48",
+          "formula": "=C33"
+        },
+        {
+          "cell": "E48",
+          "formula": "=(B48-C48)*$H$23"
+        },
+        {
+          "cell": "F48",
+          "formula": "=B48-C48+E48"
+        },
+        {
+          "cell": "G48",
+          "formula": "=I47"
+        },
+        {
+          "cell": "H48",
+          "formula": "=H47"
+        },
+        {
+          "cell": "I48",
+          "formula": "=G48-H48"
+        },
+        {
+          "cell": "B49",
+          "formula": "=B48-C48+E48"
+        },
+        {
+          "cell": "C49",
+          "formula": "=C34"
+        }
+      ],
+      "data_types": {
+        "s": 130,
+        "n": 717,
+        "f": 230,
+        "d": 23
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2. 所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3. 记录的使用权资产由被审计单位拥有",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 租赁变更情况",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 1 租赁变更是否作为一项单独租赁",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "是否适用",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "是",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 230
+    },
+    {
+      "sheet_name": "折旧测算表（不含减值）H8-8",
+      "max_row": 51,
+      "max_column": 25,
+      "column_count": 25,
+      "merged_ranges": [
+        "A33:C33",
+        "A32:C32",
+        "A2:R2",
+        "A31:C31",
+        "A30:C30",
+        "A1:R1",
+        "A34:C34",
+        "A35:C35"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产折旧测算表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "索引号："
+            },
+            {
+              "col": "R",
+              "col_idx": 18,
+              "value": "H8-8"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表H8-2'!A12"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表H8-2'!B12"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表H8-2'!C12"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表H8-2'!S12"
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表H8-2'!AJ12"
+        },
+        {
+          "cell": "J9",
+          "formula": "=IF(G9=0,0,IF(RIGHT(G9,1)<>\"年\",G9*12,IF(LEN(G9)=3,VALUE(LEFT(G9,2))*12,IF(LEN(G9)=2,VALUE(LEFT(G9,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K9",
+          "formula": "=DATE((YEAR(F9)+G9),MONTH(F9),DAY(F9))"
+        },
+        {
+          "cell": "L9",
+          "formula": "=MIN((YEAR(K9)-YEAR(F9))*12+(MONTH(K9)-MONTH(F9)),(YEAR($D$7)-YEAR(F9))*12+MONTH($D$7)-MONTH(F9),G9*12)"
+        },
+        {
+          "cell": "M9",
+          "formula": "=IF(K9<$B$7,0,IF($D$7>K9,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F9),MONTH(F9),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F9),MONTH(F9),\"1\"),DATEDIF(YEAR(K9),MONTH(K9),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F9),MONTH(F9),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N9",
+          "formula": "=IF(J9=0,0,ROUND(((1-H9)/J9)*D9,4))"
+        },
+        {
+          "cell": "O9",
+          "formula": "=ROUND(N9*M9,2)"
+        },
+        {
+          "cell": "P9",
+          "formula": "=ROUND(I9-N9,2)"
+        },
+        {
+          "cell": "Q9",
+          "formula": "=ROUND(N9*L9,2)"
+        },
+        {
+          "cell": "R9",
+          "formula": "=ROUND(E9-Q9,2)"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表H8-2'!A13"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表H8-2'!B13"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表H8-2'!C13"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表H8-2'!S13"
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表H8-2'!AJ13"
+        },
+        {
+          "cell": "J10",
+          "formula": "=IF(G10=0,0,IF(RIGHT(G10,1)<>\"年\",G10*12,IF(LEN(G10)=3,VALUE(LEFT(G10,2))*12,IF(LEN(G10)=2,VALUE(LEFT(G10,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K10",
+          "formula": "=DATE((YEAR(F10)+G10),MONTH(F10),DAY(F10))"
+        },
+        {
+          "cell": "L10",
+          "formula": "=MIN((YEAR(K10)-YEAR(F10))*12+(MONTH(K10)-MONTH(F10)),(YEAR($D$7)-YEAR(F10))*12+MONTH($D$7)-MONTH(F10),G10*12)"
+        },
+        {
+          "cell": "M10",
+          "formula": "=IF(K10<$B$7,0,IF($D$7>K10,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F10),MONTH(F10),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F10),MONTH(F10),\"1\"),DATEDIF(YEAR(K10),MONTH(K10),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F10),MONTH(F10),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N10",
+          "formula": "=IF(J10=0,0,ROUND(((1-H10)/J10)*D10,4))"
+        },
+        {
+          "cell": "O10",
+          "formula": "=ROUND(N10*M10,2)"
+        },
+        {
+          "cell": "P10",
+          "formula": "=ROUND(I10-N10,2)"
+        },
+        {
+          "cell": "Q10",
+          "formula": "=ROUND(N10*L10,2)"
+        },
+        {
+          "cell": "R10",
+          "formula": "=ROUND(E10-Q10,2)"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表H8-2'!A14"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表H8-2'!B14"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表H8-2'!C14"
+        },
+        {
+          "cell": "D11",
+          "formula": "='明细表H8-2'!S14"
+        },
+        {
+          "cell": "E11",
+          "formula": "='明细表H8-2'!AJ14"
+        },
+        {
+          "cell": "J11",
+          "formula": "=IF(G11=0,0,IF(RIGHT(G11,1)<>\"年\",G11*12,IF(LEN(G11)=3,VALUE(LEFT(G11,2))*12,IF(LEN(G11)=2,VALUE(LEFT(G11,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K11",
+          "formula": "=DATE((YEAR(F11)+G11),MONTH(F11),DAY(F11))"
+        },
+        {
+          "cell": "L11",
+          "formula": "=MIN((YEAR(K11)-YEAR(F11))*12+(MONTH(K11)-MONTH(F11)),(YEAR($D$7)-YEAR(F11))*12+MONTH($D$7)-MONTH(F11),G11*12)"
+        },
+        {
+          "cell": "M11",
+          "formula": "=IF(K11<$B$7,0,IF($D$7>K11,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F11),MONTH(F11),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F11),MONTH(F11),\"1\"),DATEDIF(YEAR(K11),MONTH(K11),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F11),MONTH(F11),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N11",
+          "formula": "=IF(J11=0,0,ROUND(((1-H11)/J11)*D11,4))"
+        },
+        {
+          "cell": "O11",
+          "formula": "=ROUND(N11*M11,2)"
+        },
+        {
+          "cell": "P11",
+          "formula": "=ROUND(I11-N11,2)"
+        },
+        {
+          "cell": "Q11",
+          "formula": "=ROUND(N11*L11,2)"
+        },
+        {
+          "cell": "R11",
+          "formula": "=ROUND(E11-Q11,2)"
+        },
+        {
+          "cell": "A12",
+          "formula": "='明细表H8-2'!A15"
+        },
+        {
+          "cell": "B12",
+          "formula": "='明细表H8-2'!B15"
+        },
+        {
+          "cell": "C12",
+          "formula": "='明细表H8-2'!C15"
+        },
+        {
+          "cell": "D12",
+          "formula": "='明细表H8-2'!S15"
+        },
+        {
+          "cell": "E12",
+          "formula": "='明细表H8-2'!AJ15"
+        },
+        {
+          "cell": "J12",
+          "formula": "=IF(G12=0,0,IF(RIGHT(G12,1)<>\"年\",G12*12,IF(LEN(G12)=3,VALUE(LEFT(G12,2))*12,IF(LEN(G12)=2,VALUE(LEFT(G12,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K12",
+          "formula": "=DATE((YEAR(F12)+G12),MONTH(F12),DAY(F12))"
+        },
+        {
+          "cell": "L12",
+          "formula": "=MIN((YEAR(K12)-YEAR(F12))*12+(MONTH(K12)-MONTH(F12)),(YEAR($D$7)-YEAR(F12))*12+MONTH($D$7)-MONTH(F12),G12*12)"
+        },
+        {
+          "cell": "M12",
+          "formula": "=IF(K12<$B$7,0,IF($D$7>K12,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F12),MONTH(F12),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F12),MONTH(F12),\"1\"),DATEDIF(YEAR(K12),MONTH(K12),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F12),MONTH(F12),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N12",
+          "formula": "=IF(J12=0,0,ROUND(((1-H12)/J12)*D12,4))"
+        },
+        {
+          "cell": "O12",
+          "formula": "=ROUND(N12*M12,2)"
+        },
+        {
+          "cell": "P12",
+          "formula": "=ROUND(I12-N12,2)"
+        },
+        {
+          "cell": "Q12",
+          "formula": "=ROUND(N12*L12,2)"
+        },
+        {
+          "cell": "R12",
+          "formula": "=ROUND(E12-Q12,2)"
+        },
+        {
+          "cell": "A13",
+          "formula": "='明细表H8-2'!A16"
+        },
+        {
+          "cell": "B13",
+          "formula": "='明细表H8-2'!B16"
+        },
+        {
+          "cell": "C13",
+          "formula": "='明细表H8-2'!C16"
+        },
+        {
+          "cell": "D13",
+          "formula": "='明细表H8-2'!S16"
+        },
+        {
+          "cell": "E13",
+          "formula": "='明细表H8-2'!AJ16"
+        },
+        {
+          "cell": "J13",
+          "formula": "=IF(G13=0,0,IF(RIGHT(G13,1)<>\"年\",G13*12,IF(LEN(G13)=3,VALUE(LEFT(G13,2))*12,IF(LEN(G13)=2,VALUE(LEFT(G13,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K13",
+          "formula": "=DATE((YEAR(F13)+G13),MONTH(F13),DAY(F13))"
+        },
+        {
+          "cell": "L13",
+          "formula": "=MIN((YEAR(K13)-YEAR(F13))*12+(MONTH(K13)-MONTH(F13)),(YEAR($D$7)-YEAR(F13))*12+MONTH($D$7)-MONTH(F13),G13*12)"
+        },
+        {
+          "cell": "M13",
+          "formula": "=IF(K13<$B$7,0,IF($D$7>K13,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F13),MONTH(F13),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F13),MONTH(F13),\"1\"),DATEDIF(YEAR(K13),MONTH(K13),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F13),MONTH(F13),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N13",
+          "formula": "=IF(J13=0,0,ROUND(((1-H13)/J13)*D13,4))"
+        },
+        {
+          "cell": "O13",
+          "formula": "=ROUND(N13*M13,2)"
+        },
+        {
+          "cell": "P13",
+          "formula": "=ROUND(I13-N13,2)"
+        },
+        {
+          "cell": "Q13",
+          "formula": "=ROUND(N13*L13,2)"
+        },
+        {
+          "cell": "R13",
+          "formula": "=ROUND(E13-Q13,2)"
+        },
+        {
+          "cell": "A14",
+          "formula": "='明细表H8-2'!A17"
+        },
+        {
+          "cell": "B14",
+          "formula": "='明细表H8-2'!B17"
+        },
+        {
+          "cell": "C14",
+          "formula": "='明细表H8-2'!C17"
+        },
+        {
+          "cell": "D14",
+          "formula": "='明细表H8-2'!S17"
+        },
+        {
+          "cell": "E14",
+          "formula": "='明细表H8-2'!AJ17"
+        },
+        {
+          "cell": "J14",
+          "formula": "=IF(G14=0,0,IF(RIGHT(G14,1)<>\"年\",G14*12,IF(LEN(G14)=3,VALUE(LEFT(G14,2))*12,IF(LEN(G14)=2,VALUE(LEFT(G14,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K14",
+          "formula": "=DATE((YEAR(F14)+G14),MONTH(F14),DAY(F14))"
+        },
+        {
+          "cell": "L14",
+          "formula": "=MIN((YEAR(K14)-YEAR(F14))*12+(MONTH(K14)-MONTH(F14)),(YEAR($D$7)-YEAR(F14))*12+MONTH($D$7)-MONTH(F14),G14*12)"
+        },
+        {
+          "cell": "M14",
+          "formula": "=IF(K14<$B$7,0,IF($D$7>K14,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F14),MONTH(F14),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F14),MONTH(F14),\"1\"),DATEDIF(YEAR(K14),MONTH(K14),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F14),MONTH(F14),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N14",
+          "formula": "=IF(J14=0,0,ROUND(((1-H14)/J14)*D14,4))"
+        },
+        {
+          "cell": "O14",
+          "formula": "=ROUND(N14*M14,2)"
+        },
+        {
+          "cell": "P14",
+          "formula": "=ROUND(I14-N14,2)"
+        },
+        {
+          "cell": "Q14",
+          "formula": "=ROUND(N14*L14,2)"
+        },
+        {
+          "cell": "R14",
+          "formula": "=ROUND(E14-Q14,2)"
+        },
+        {
+          "cell": "A15",
+          "formula": "='明细表H8-2'!A18"
+        },
+        {
+          "cell": "B15",
+          "formula": "='明细表H8-2'!B18"
+        },
+        {
+          "cell": "C15",
+          "formula": "='明细表H8-2'!C18"
+        },
+        {
+          "cell": "D15",
+          "formula": "='明细表H8-2'!S18"
+        },
+        {
+          "cell": "E15",
+          "formula": "='明细表H8-2'!AJ18"
+        },
+        {
+          "cell": "J15",
+          "formula": "=IF(G15=0,0,IF(RIGHT(G15,1)<>\"年\",G15*12,IF(LEN(G15)=3,VALUE(LEFT(G15,2))*12,IF(LEN(G15)=2,VALUE(LEFT(G15,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "K15",
+          "formula": "=DATE((YEAR(F15)+G15),MONTH(F15),DAY(F15))"
+        },
+        {
+          "cell": "L15",
+          "formula": "=MIN((YEAR(K15)-YEAR(F15))*12+(MONTH(K15)-MONTH(F15)),(YEAR($D$7)-YEAR(F15))*12+MONTH($D$7)-MONTH(F15),G15*12)"
+        },
+        {
+          "cell": "M15",
+          "formula": "=IF(K15<$B$7,0,IF($D$7>K15,MIN(MONTH($D$7),DATEDIF(DATE(YEAR(F15),MONTH(F15),\"1\"),$D$7,\"M\")-DATEDIF(DATE(YEAR(F15),MONTH(F15),\"1\"),DATEDIF(YEAR(K15),MONTH(K15),\"1\"),\"M\")),MIN(DATEDIF(DATE(YEAR(F15),MONTH(F15),\"1\"),$D$7,\"m\"),MONTH($D$7))))"
+        },
+        {
+          "cell": "N15",
+          "formula": "=IF(J15=0,0,ROUND(((1-H15)/J15)*D15,4))"
+        }
+      ],
+      "data_types": {
+        "s": 35,
+        "n": 904,
+        "f": 334,
+        "d": 2
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "L",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "Q",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：使用权资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "折旧期初：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "2025-01-01 00:00:00",
+              "type": "d"
+            },
+            {
+              "col": "C",
+              "value": "折旧期末：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "2025-12-31 00:00:00",
+              "type": "d"
+            },
+            {
+              "col": "F",
+              "value": "各列顺序请根据需要进行调整，行数请根据需要增加。非公式列输入数据时请使用“选择性粘贴-数值”。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产类别",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "使用权资产名称",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "使用权资产编号",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "原值",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "累计折旧",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "开始使用日期",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "使用年限",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "残值率",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "账面月折旧额",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "使用月限",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "测算到期日",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "已提折旧月份",
+              "type": "s"
+            },
+            {
+              "col": "M",
+              "value": "本期折旧月份",
+              "type": "s"
+            },
+            {
+              "col": "N",
+              "value": "测算月折旧",
+              "type": "s"
+            },
+            {
+              "col": "O",
+              "value": "当期折旧费用",
+              "type": "s"
+            },
+            {
+              "col": "P",
+              "value": "月折旧额差异",
+              "type": "s"
+            },
+            {
+              "col": "Q",
+              "value": "累计折旧费用",
+              "type": "s"
+            },
+            {
+              "col": "R",
+              "value": "累计折旧额差异",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 334
+    },
+    {
+      "sheet_name": "折旧测算表（含减值）H8-8",
+      "max_row": 49,
+      "max_column": 27,
+      "column_count": 27,
+      "merged_ranges": [
+        "A33:C33",
+        "A32:C32",
+        "A2:X2",
+        "A31:C31",
+        "A30:C30",
+        "A1:X1",
+        "A34:C34",
+        "A35:C35",
+        "A29:C29"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产折旧测算表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "Q",
+              "col_idx": 17,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "W",
+              "col_idx": 23,
+              "value": "索引号："
+            },
+            {
+              "col": "X",
+              "col_idx": 24,
+              "value": "H8-8"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A9",
+          "formula": "='明细表H8-2'!A12"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表H8-2'!B12"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表H8-2'!C12"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表H8-2'!S12"
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表H8-2'!AJ12"
+        },
+        {
+          "cell": "F9",
+          "formula": "='明细表H8-2'!BA12"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(H9=0,0,IF(RIGHT(H9,1)<>\"年\",H9*12,IF(LEN(H9)=3,VALUE(LEFT(H9,2))*12,IF(LEN(H9)=2,VALUE(LEFT(H9,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "L9",
+          "formula": "=IF(DAY(G9)=1,IF(G9=0,0,DATE(YEAR(G9),MONTH(G9)+K9,DAY(G9))),IF(G9=0,0,DATE(YEAR(G9),MONTH(G9)+K9,DAY(G9)-1)))"
+        },
+        {
+          "cell": "M9",
+          "formula": "=MIN(IF(AND(DAY(G9)=31,DAY($D$7)=30),IF(G9=0,0,IF(L9>$D$7,VALUE(DATEDIF(G9,MIN($D$7,L9),\"m\"))+1,VALUE(DATEDIF(G9,MIN($D$7,L9),\"m\")+2))),IF(G9=0,0,IF(L9>$D$7,DATEDIF(G9,MIN($D$7,L9),\"m\"),VALUE(DATEDIF(G9,MIN($D$7,L9),\"m\")+1)))),K9)"
+        },
+        {
+          "cell": "N9",
+          "formula": "=IF(AND(DAY(G9)=31,DAY($F$7)=30),MIN(IF(G9=0,0,IF($F$7>G9,VALUE(DATEDIF(G9,$F$7,\"m\"))+1,0)),M9+1),MIN(IF(G9=0,0,IF($F$7>G9,DATEDIF(G9,$F$7,\"m\"),0)),M9))"
+        },
+        {
+          "cell": "O9",
+          "formula": "=IF(OR(G9=0,L9<$B$7),0,IF(AND(G9<$B$7,L9>$D$7),VALUE(DATEDIF($B$7,$D$7,\"m\")+1),IF(AND(G9<$B$7,L9<=$D$7),VALUE(DATEDIF($B$7,L9,\"m\")+1),IF(AND(G9>=$B$7,L9>$D$7),VALUE(DATEDIF(G9,$D$7,\"m\")),IF(AND(G9>=$B$7,L9<=$D$7),VALUE(DATEDIF(G9,L9,\"m\")+1),)))))"
+        },
+        {
+          "cell": "P9",
+          "formula": "=IF(AND(YEAR(G9)=YEAR($D$7),DAY(G9)=31,DAY($D$7)=30),IF(G9>$F$7,0,O9-Q9+1),IF(G9>$F$7,0,O9-Q9))"
+        },
+        {
+          "cell": "Q9",
+          "formula": "=IF(AND(DAY($F$7)=31,DAY($D$7)=30),IF(G9=0,0,IF($F$7<$B$7,O9,VALUE(DATEDIF(MAX(G9,$F$7),MIN(L9,$D$7),\"m\")))+1),IF(G9=0,0,IF($F$7<$B$7,O9,DATEDIF(MAX(G9,$F$7),MIN(L9,$D$7),\"m\"))))"
+        },
+        {
+          "cell": "R9",
+          "formula": "=IF(K9=0,0,ROUND(((1-I9)/K9)*D9,4))"
+        },
+        {
+          "cell": "S9",
+          "formula": "=ROUND(R9*N9,2)"
+        },
+        {
+          "cell": "T9",
+          "formula": "=IF((D9*(1-I9)-S9-F9)>0,(D9*(1-I9)-S9-F9)/(K9-N9),0)"
+        },
+        {
+          "cell": "U9",
+          "formula": "=ROUND(R9*P9,2)+ROUND(T9*Q9,2)"
+        },
+        {
+          "cell": "V9",
+          "formula": "=ROUND(J9-T9,2)"
+        },
+        {
+          "cell": "W9",
+          "formula": "=ROUND(R9*N9,2)+ROUND(T9*(M9-N9),2)"
+        },
+        {
+          "cell": "X9",
+          "formula": "=ROUND(E9-W9,2)"
+        },
+        {
+          "cell": "A10",
+          "formula": "='明细表H8-2'!A13"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表H8-2'!B13"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表H8-2'!C13"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表H8-2'!S13"
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表H8-2'!AJ13"
+        },
+        {
+          "cell": "F10",
+          "formula": "='明细表H8-2'!BA13"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(H10=0,0,IF(RIGHT(H10,1)<>\"年\",H10*12,IF(LEN(H10)=3,VALUE(LEFT(H10,2))*12,IF(LEN(H10)=2,VALUE(LEFT(H10,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "L10",
+          "formula": "=IF(DAY(G10)=1,IF(G10=0,0,DATE(YEAR(G10),MONTH(G10)+K10,DAY(G10))),IF(G10=0,0,DATE(YEAR(G10),MONTH(G10)+K10,DAY(G10)-1)))"
+        },
+        {
+          "cell": "M10",
+          "formula": "=MIN(IF(AND(DAY(G10)=31,DAY($D$7)=30),IF(G10=0,0,IF(L10>$D$7,VALUE(DATEDIF(G10,MIN($D$7,L10),\"m\"))+1,VALUE(DATEDIF(G10,MIN($D$7,L10),\"m\")+2))),IF(G10=0,0,IF(L10>$D$7,DATEDIF(G10,MIN($D$7,L10),\"m\"),VALUE(DATEDIF(G10,MIN($D$7,L10),\"m\")+1)))),K10)"
+        },
+        {
+          "cell": "N10",
+          "formula": "=IF(AND(DAY(G10)=31,DAY($F$7)=30),MIN(IF(G10=0,0,IF($F$7>G10,VALUE(DATEDIF(G10,$F$7,\"m\"))+1,0)),M10+1),MIN(IF(G10=0,0,IF($F$7>G10,DATEDIF(G10,$F$7,\"m\"),0)),M10))"
+        },
+        {
+          "cell": "O10",
+          "formula": "=IF(OR(G10=0,L10<$B$7),0,IF(AND(G10<$B$7,L10>$D$7),VALUE(DATEDIF($B$7,$D$7,\"m\")+1),IF(AND(G10<$B$7,L10<=$D$7),VALUE(DATEDIF($B$7,L10,\"m\")+1),IF(AND(G10>=$B$7,L10>$D$7),VALUE(DATEDIF(G10,$D$7,\"m\")),IF(AND(G10>=$B$7,L10<=$D$7),VALUE(DATEDIF(G10,L10,\"m\")+1),)))))"
+        },
+        {
+          "cell": "P10",
+          "formula": "=IF(AND(YEAR(G10)=YEAR($D$7),DAY(G10)=31,DAY($D$7)=30),IF(G10>$F$7,0,O10-Q10+1),IF(G10>$F$7,0,O10-Q10))"
+        },
+        {
+          "cell": "Q10",
+          "formula": "=IF(AND(DAY($F$7)=31,DAY($D$7)=30),IF(G10=0,0,IF($F$7<$B$7,O10,VALUE(DATEDIF(MAX(G10,$F$7),MIN(L10,$D$7),\"m\")))+1),IF(G10=0,0,IF($F$7<$B$7,O10,DATEDIF(MAX(G10,$F$7),MIN(L10,$D$7),\"m\"))))"
+        },
+        {
+          "cell": "R10",
+          "formula": "=IF(K10=0,0,ROUND(((1-I10)/K10)*D10,4))"
+        },
+        {
+          "cell": "S10",
+          "formula": "=ROUND(R10*N10,2)"
+        },
+        {
+          "cell": "T10",
+          "formula": "=IF((D10*(1-I10)-S10-F10)>0,(D10*(1-I10)-S10-F10)/(K10-N10),0)"
+        },
+        {
+          "cell": "U10",
+          "formula": "=ROUND(R10*P10,2)+ROUND(T10*Q10,2)"
+        },
+        {
+          "cell": "V10",
+          "formula": "=ROUND(J10-T10,2)"
+        },
+        {
+          "cell": "W10",
+          "formula": "=ROUND(R10*N10,2)+ROUND(T10*(M10-N10),2)"
+        },
+        {
+          "cell": "X10",
+          "formula": "=ROUND(E10-W10,2)"
+        },
+        {
+          "cell": "A11",
+          "formula": "='明细表H8-2'!A14"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表H8-2'!B14"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表H8-2'!C14"
+        },
+        {
+          "cell": "D11",
+          "formula": "='明细表H8-2'!S14"
+        },
+        {
+          "cell": "E11",
+          "formula": "='明细表H8-2'!AJ14"
+        },
+        {
+          "cell": "F11",
+          "formula": "='明细表H8-2'!BA14"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(H11=0,0,IF(RIGHT(H11,1)<>\"年\",H11*12,IF(LEN(H11)=3,VALUE(LEFT(H11,2))*12,IF(LEN(H11)=2,VALUE(LEFT(H11,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "L11",
+          "formula": "=IF(DAY(G11)=1,IF(G11=0,0,DATE(YEAR(G11),MONTH(G11)+K11,DAY(G11))),IF(G11=0,0,DATE(YEAR(G11),MONTH(G11)+K11,DAY(G11)-1)))"
+        },
+        {
+          "cell": "M11",
+          "formula": "=MIN(IF(AND(DAY(G11)=31,DAY($D$7)=30),IF(G11=0,0,IF(L11>$D$7,VALUE(DATEDIF(G11,MIN($D$7,L11),\"m\"))+1,VALUE(DATEDIF(G11,MIN($D$7,L11),\"m\")+2))),IF(G11=0,0,IF(L11>$D$7,DATEDIF(G11,MIN($D$7,L11),\"m\"),VALUE(DATEDIF(G11,MIN($D$7,L11),\"m\")+1)))),K11)"
+        },
+        {
+          "cell": "N11",
+          "formula": "=IF(AND(DAY(G11)=31,DAY($F$7)=30),MIN(IF(G11=0,0,IF($F$7>G11,VALUE(DATEDIF(G11,$F$7,\"m\"))+1,0)),M11+1),MIN(IF(G11=0,0,IF($F$7>G11,DATEDIF(G11,$F$7,\"m\"),0)),M11))"
+        },
+        {
+          "cell": "O11",
+          "formula": "=IF(OR(G11=0,L11<$B$7),0,IF(AND(G11<$B$7,L11>$D$7),VALUE(DATEDIF($B$7,$D$7,\"m\")+1),IF(AND(G11<$B$7,L11<=$D$7),VALUE(DATEDIF($B$7,L11,\"m\")+1),IF(AND(G11>=$B$7,L11>$D$7),VALUE(DATEDIF(G11,$D$7,\"m\")),IF(AND(G11>=$B$7,L11<=$D$7),VALUE(DATEDIF(G11,L11,\"m\")+1),)))))"
+        },
+        {
+          "cell": "P11",
+          "formula": "=IF(AND(YEAR(G11)=YEAR($D$7),DAY(G11)=31,DAY($D$7)=30),IF(G11>$F$7,0,O11-Q11+1),IF(G11>$F$7,0,O11-Q11))"
+        },
+        {
+          "cell": "Q11",
+          "formula": "=IF(AND(DAY($F$7)=31,DAY($D$7)=30),IF(G11=0,0,IF($F$7<$B$7,O11,VALUE(DATEDIF(MAX(G11,$F$7),MIN(L11,$D$7),\"m\")))+1),IF(G11=0,0,IF($F$7<$B$7,O11,DATEDIF(MAX(G11,$F$7),MIN(L11,$D$7),\"m\"))))"
+        },
+        {
+          "cell": "R11",
+          "formula": "=IF(K11=0,0,ROUND(((1-I11)/K11)*D11,4))"
+        },
+        {
+          "cell": "S11",
+          "formula": "=ROUND(R11*N11,2)"
+        },
+        {
+          "cell": "T11",
+          "formula": "=IF((D11*(1-I11)-S11-F11)>0,(D11*(1-I11)-S11-F11)/(K11-N11),0)"
+        },
+        {
+          "cell": "U11",
+          "formula": "=ROUND(R11*P11,2)+ROUND(T11*Q11,2)"
+        },
+        {
+          "cell": "V11",
+          "formula": "=ROUND(J11-T11,2)"
+        },
+        {
+          "cell": "W11",
+          "formula": "=ROUND(R11*N11,2)+ROUND(T11*(M11-N11),2)"
+        },
+        {
+          "cell": "X11",
+          "formula": "=ROUND(E11-W11,2)"
+        },
+        {
+          "cell": "A12",
+          "formula": "='明细表H8-2'!A15"
+        },
+        {
+          "cell": "B12",
+          "formula": "='明细表H8-2'!B15"
+        },
+        {
+          "cell": "C12",
+          "formula": "='明细表H8-2'!C15"
+        },
+        {
+          "cell": "D12",
+          "formula": "='明细表H8-2'!S15"
+        },
+        {
+          "cell": "E12",
+          "formula": "='明细表H8-2'!AJ15"
+        },
+        {
+          "cell": "F12",
+          "formula": "='明细表H8-2'!BA15"
+        },
+        {
+          "cell": "K12",
+          "formula": "=IF(H12=0,0,IF(RIGHT(H12,1)<>\"年\",H12*12,IF(LEN(H12)=3,VALUE(LEFT(H12,2))*12,IF(LEN(H12)=2,VALUE(LEFT(H12,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "L12",
+          "formula": "=IF(DAY(G12)=1,IF(G12=0,0,DATE(YEAR(G12),MONTH(G12)+K12,DAY(G12))),IF(G12=0,0,DATE(YEAR(G12),MONTH(G12)+K12,DAY(G12)-1)))"
+        },
+        {
+          "cell": "M12",
+          "formula": "=MIN(IF(AND(DAY(G12)=31,DAY($D$7)=30),IF(G12=0,0,IF(L12>$D$7,VALUE(DATEDIF(G12,MIN($D$7,L12),\"m\"))+1,VALUE(DATEDIF(G12,MIN($D$7,L12),\"m\")+2))),IF(G12=0,0,IF(L12>$D$7,DATEDIF(G12,MIN($D$7,L12),\"m\"),VALUE(DATEDIF(G12,MIN($D$7,L12),\"m\")+1)))),K12)"
+        },
+        {
+          "cell": "N12",
+          "formula": "=IF(AND(DAY(G12)=31,DAY($F$7)=30),MIN(IF(G12=0,0,IF($F$7>G12,VALUE(DATEDIF(G12,$F$7,\"m\"))+1,0)),M12+1),MIN(IF(G12=0,0,IF($F$7>G12,DATEDIF(G12,$F$7,\"m\"),0)),M12))"
+        },
+        {
+          "cell": "O12",
+          "formula": "=IF(OR(G12=0,L12<$B$7),0,IF(AND(G12<$B$7,L12>$D$7),VALUE(DATEDIF($B$7,$D$7,\"m\")+1),IF(AND(G12<$B$7,L12<=$D$7),VALUE(DATEDIF($B$7,L12,\"m\")+1),IF(AND(G12>=$B$7,L12>$D$7),VALUE(DATEDIF(G12,$D$7,\"m\")),IF(AND(G12>=$B$7,L12<=$D$7),VALUE(DATEDIF(G12,L12,\"m\")+1),)))))"
+        },
+        {
+          "cell": "P12",
+          "formula": "=IF(AND(YEAR(G12)=YEAR($D$7),DAY(G12)=31,DAY($D$7)=30),IF(G12>$F$7,0,O12-Q12+1),IF(G12>$F$7,0,O12-Q12))"
+        },
+        {
+          "cell": "Q12",
+          "formula": "=IF(AND(DAY($F$7)=31,DAY($D$7)=30),IF(G12=0,0,IF($F$7<$B$7,O12,VALUE(DATEDIF(MAX(G12,$F$7),MIN(L12,$D$7),\"m\")))+1),IF(G12=0,0,IF($F$7<$B$7,O12,DATEDIF(MAX(G12,$F$7),MIN(L12,$D$7),\"m\"))))"
+        },
+        {
+          "cell": "R12",
+          "formula": "=IF(K12=0,0,ROUND(((1-I12)/K12)*D12,4))"
+        },
+        {
+          "cell": "S12",
+          "formula": "=ROUND(R12*N12,2)"
+        },
+        {
+          "cell": "T12",
+          "formula": "=IF((D12*(1-I12)-S12-F12)>0,(D12*(1-I12)-S12-F12)/(K12-N12),0)"
+        },
+        {
+          "cell": "U12",
+          "formula": "=ROUND(R12*P12,2)+ROUND(T12*Q12,2)"
+        },
+        {
+          "cell": "V12",
+          "formula": "=ROUND(J12-T12,2)"
+        },
+        {
+          "cell": "W12",
+          "formula": "=ROUND(R12*N12,2)+ROUND(T12*(M12-N12),2)"
+        },
+        {
+          "cell": "X12",
+          "formula": "=ROUND(E12-W12,2)"
+        },
+        {
+          "cell": "A13",
+          "formula": "='明细表H8-2'!A16"
+        },
+        {
+          "cell": "B13",
+          "formula": "='明细表H8-2'!B16"
+        },
+        {
+          "cell": "C13",
+          "formula": "='明细表H8-2'!C16"
+        },
+        {
+          "cell": "D13",
+          "formula": "='明细表H8-2'!S16"
+        },
+        {
+          "cell": "E13",
+          "formula": "='明细表H8-2'!AJ16"
+        },
+        {
+          "cell": "F13",
+          "formula": "='明细表H8-2'!BA16"
+        },
+        {
+          "cell": "K13",
+          "formula": "=IF(H13=0,0,IF(RIGHT(H13,1)<>\"年\",H13*12,IF(LEN(H13)=3,VALUE(LEFT(H13,2))*12,IF(LEN(H13)=2,VALUE(LEFT(H13,1))*12,\"??\"))))"
+        },
+        {
+          "cell": "L13",
+          "formula": "=IF(DAY(G13)=1,IF(G13=0,0,DATE(YEAR(G13),MONTH(G13)+K13,DAY(G13))),IF(G13=0,0,DATE(YEAR(G13),MONTH(G13)+K13,DAY(G13)-1)))"
+        },
+        {
+          "cell": "M13",
+          "formula": "=MIN(IF(AND(DAY(G13)=31,DAY($D$7)=30),IF(G13=0,0,IF(L13>$D$7,VALUE(DATEDIF(G13,MIN($D$7,L13),\"m\"))+1,VALUE(DATEDIF(G13,MIN($D$7,L13),\"m\")+2))),IF(G13=0,0,IF(L13>$D$7,DATEDIF(G13,MIN($D$7,L13),\"m\"),VALUE(DATEDIF(G13,MIN($D$7,L13),\"m\")+1)))),K13)"
+        },
+        {
+          "cell": "N13",
+          "formula": "=IF(AND(DAY(G13)=31,DAY($F$7)=30),MIN(IF(G13=0,0,IF($F$7>G13,VALUE(DATEDIF(G13,$F$7,\"m\"))+1,0)),M13+1),MIN(IF(G13=0,0,IF($F$7>G13,DATEDIF(G13,$F$7,\"m\"),0)),M13))"
+        },
+        {
+          "cell": "O13",
+          "formula": "=IF(OR(G13=0,L13<$B$7),0,IF(AND(G13<$B$7,L13>$D$7),VALUE(DATEDIF($B$7,$D$7,\"m\")+1),IF(AND(G13<$B$7,L13<=$D$7),VALUE(DATEDIF($B$7,L13,\"m\")+1),IF(AND(G13>=$B$7,L13>$D$7),VALUE(DATEDIF(G13,$D$7,\"m\")),IF(AND(G13>=$B$7,L13<=$D$7),VALUE(DATEDIF(G13,L13,\"m\")+1),)))))"
+        },
+        {
+          "cell": "P13",
+          "formula": "=IF(AND(YEAR(G13)=YEAR($D$7),DAY(G13)=31,DAY($D$7)=30),IF(G13>$F$7,0,O13-Q13+1),IF(G13>$F$7,0,O13-Q13))"
+        },
+        {
+          "cell": "Q13",
+          "formula": "=IF(AND(DAY($F$7)=31,DAY($D$7)=30),IF(G13=0,0,IF($F$7<$B$7,O13,VALUE(DATEDIF(MAX(G13,$F$7),MIN(L13,$D$7),\"m\")))+1),IF(G13=0,0,IF($F$7<$B$7,O13,DATEDIF(MAX(G13,$F$7),MIN(L13,$D$7),\"m\"))))"
+        },
+        {
+          "cell": "R13",
+          "formula": "=IF(K13=0,0,ROUND(((1-I13)/K13)*D13,4))"
+        }
+      ],
+      "data_types": {
+        "s": 38,
+        "n": 801,
+        "f": 481,
+        "d": 3
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "Q",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：使用权资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "折旧期初：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "2025-01-01 00:00:00",
+              "type": "d"
+            },
+            {
+              "col": "C",
+              "value": "折旧期末：",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "2025-12-31 00:00:00",
+              "type": "d"
+            },
+            {
+              "col": "E",
+              "value": "计提减值准备日期：",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "2015-05-05 00:00:00",
+              "type": "d"
+            },
+            {
+              "col": "G",
+              "value": "各列顺序请根据需要进行调整，行数请根据需要增加。非公式列输入数据时请使用“选择性粘贴-数值”。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产类别",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "使用权资产名称",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "使用权资产编号",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "原值",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "累计折旧",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "减值准备",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "开始使用日期",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "使用年限",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "残值率",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "账面月折旧额",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "使用月限",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "测算到期日",
+              "type": "s"
+            },
+            {
+              "col": "M",
+              "value": "已提折旧月份",
+              "type": "s"
+            },
+            {
+              "col": "N",
+              "value": "截止计提减值准备日计提月份",
+              "type": "s"
+            },
+            {
+              "col": "O",
+              "value": "本期折旧月份",
+              "type": "s"
+            },
+            {
+              "col": "P",
+              "value": "本期折旧月份（减值前）",
+              "type": "s"
+            },
+            {
+              "col": "Q",
+              "value": "本期折旧月份（减值后）",
+              "type": "s"
+            },
+            {
+              "col": "R",
+              "value": "计提减值准备前月折旧",
+              "type": "s"
+            },
+            {
+              "col": "S",
+              "value": "计提减值准备前累计折旧",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 481
+    },
+    {
+      "sheet_name": "折旧分配分析表H8-9",
+      "max_row": 24,
+      "max_column": 10,
+      "column_count": 10,
+      "merged_ranges": [
+        "A1:J1",
+        "A13:B13",
+        "A2:J2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产折旧分配分析表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "col_idx": 4,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "G",
+              "col_idx": 7,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "I",
+              "col_idx": 9,
+              "value": "索引号："
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "H8-9"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "I8",
+          "formula": "=SUM(C8:H8)"
+        },
+        {
+          "cell": "I9",
+          "formula": "=SUM(C9:H9)"
+        },
+        {
+          "cell": "I10",
+          "formula": "=SUM(C10:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(C11:H11)"
+        },
+        {
+          "cell": "I12",
+          "formula": "=SUM(C12:H12)"
+        },
+        {
+          "cell": "C13",
+          "formula": "=SUM(C8:C12)"
+        },
+        {
+          "cell": "D13",
+          "formula": "=SUM(D8:D12)"
+        },
+        {
+          "cell": "E13",
+          "formula": "=SUM(E8:E12)"
+        },
+        {
+          "cell": "F13",
+          "formula": "=SUM(F8:F12)"
+        },
+        {
+          "cell": "G13",
+          "formula": "=SUM(G8:G12)"
+        },
+        {
+          "cell": "H13",
+          "formula": "=SUM(H8:H12)"
+        },
+        {
+          "cell": "I13",
+          "formula": "=SUM(I8:I12)"
+        }
+      ],
+      "data_types": {
+        "s": 35,
+        "n": 187,
+        "f": 18
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "I",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：使用权资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "序号",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "使用权资产类别",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "营业成本",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "制造费用",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "销售费用",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "管理费用",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "研发支出",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "…",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "合计",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1",
+              "type": "n"
+            },
+            {
+              "col": "B",
+              "value": "房屋及建筑物",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "=SUM(C8:H8)",
+              "type": "f"
+            }
+          ]
+        }
+      ],
+      "formula_count": 18
+    },
+    {
+      "sheet_name": "减值测算表H8-10",
+      "max_row": 35,
+      "max_column": 32,
+      "column_count": 32,
+      "merged_ranges": [
+        "A2:L2",
+        "A7:A9",
+        "K7:K9",
+        "L7:L9",
+        "A1:L1",
+        "D7:D8",
+        "C7:C8",
+        "B7:B9",
+        "H7:H8",
+        "I7:I8",
+        "J7:J8",
+        "E7:G7"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产减值测算表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "col_idx": 8,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "索引号："
+            },
+            {
+              "col": "L",
+              "col_idx": 12,
+              "value": "H8-10"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G10",
+          "formula": "=MAX(E10,F10)"
+        },
+        {
+          "cell": "H10",
+          "formula": "=IF(D10>G10,D10-G10,0)"
+        },
+        {
+          "cell": "J10",
+          "formula": "=H10-I10"
+        },
+        {
+          "cell": "G11",
+          "formula": "=MAX(E11,F11)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=IF(D11>G11,D11-G11,0)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=H11-I11"
+        },
+        {
+          "cell": "G12",
+          "formula": "=MAX(E12,F12)"
+        },
+        {
+          "cell": "H12",
+          "formula": "=IF(D12>G12,D12-G12,0)"
+        },
+        {
+          "cell": "J12",
+          "formula": "=H12-I12"
+        },
+        {
+          "cell": "G13",
+          "formula": "=MAX(E13,F13)"
+        },
+        {
+          "cell": "H13",
+          "formula": "=IF(D13>G13,D13-G13,0)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=H13-I13"
+        },
+        {
+          "cell": "G14",
+          "formula": "=MAX(E14,F14)"
+        },
+        {
+          "cell": "H14",
+          "formula": "=IF(D14>G14,D14-G14,0)"
+        },
+        {
+          "cell": "J14",
+          "formula": "=H14-I14"
+        },
+        {
+          "cell": "G15",
+          "formula": "=MAX(E15,F15)"
+        },
+        {
+          "cell": "H15",
+          "formula": "=IF(D15>G15,D15-G15,0)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=H15-I15"
+        },
+        {
+          "cell": "G16",
+          "formula": "=MAX(E16,F16)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=IF(D16>G16,D16-G16,0)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=H16-I16"
+        },
+        {
+          "cell": "G17",
+          "formula": "=MAX(E17,F17)"
+        },
+        {
+          "cell": "H17",
+          "formula": "=IF(D17>G17,D17-G17,0)"
+        },
+        {
+          "cell": "J17",
+          "formula": "=H17-I17"
+        },
+        {
+          "cell": "G18",
+          "formula": "=MAX(E18,F18)"
+        },
+        {
+          "cell": "H18",
+          "formula": "=IF(D18>G18,D18-G18,0)"
+        },
+        {
+          "cell": "J18",
+          "formula": "=H18-I18"
+        },
+        {
+          "cell": "G19",
+          "formula": "=MAX(E19,F19)"
+        },
+        {
+          "cell": "H19",
+          "formula": "=IF(D19>G19,D19-G19,0)"
+        },
+        {
+          "cell": "J19",
+          "formula": "=H19-I19"
+        },
+        {
+          "cell": "G20",
+          "formula": "=MAX(E20,F20)"
+        },
+        {
+          "cell": "H20",
+          "formula": "=IF(D20>G20,D20-G20,0)"
+        },
+        {
+          "cell": "J20",
+          "formula": "=H20-I20"
+        },
+        {
+          "cell": "G21",
+          "formula": "=MAX(E21,F21)"
+        },
+        {
+          "cell": "H21",
+          "formula": "=IF(D21>G21,D21-G21,0)"
+        },
+        {
+          "cell": "J21",
+          "formula": "=H21-I21"
+        },
+        {
+          "cell": "D22",
+          "formula": "=SUM(D10:D21)"
+        },
+        {
+          "cell": "E22",
+          "formula": "=SUM(E10:E21)"
+        },
+        {
+          "cell": "F22",
+          "formula": "=SUM(F10:F21)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(G10:G21)"
+        },
+        {
+          "cell": "H22",
+          "formula": "=SUM(H10:H21)"
+        },
+        {
+          "cell": "I22",
+          "formula": "=SUM(I10:I21)"
+        },
+        {
+          "cell": "J22",
+          "formula": "=SUM(J10:J21)"
+        }
+      ],
+      "data_types": {
+        "s": 37,
+        "n": 1034,
+        "f": 49
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：使用权资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产名称",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "是否存在减值迹象",
+              "type": "s"
+            },
+            {
+              "col": "C",
+              "value": "减值迹象描述",
+              "type": "s"
+            },
+            {
+              "col": "D",
+              "value": "账面价值",
+              "type": "s"
+            },
+            {
+              "col": "E",
+              "value": "可收回金额",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "期末应计提的减值金额（当⑤＜②）",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "期末账面已计提的减值准备",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "本期应补提的减值准备（注：使用权资产减值准备一旦计提，不得转回。）",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "工作底稿索引号",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "E",
+              "value": "公允价值减处置费用的净额",
+              "type": "s"
+            },
+            {
+              "col": "F",
+              "value": "预计未来现金流量现值",
+              "type": "s"
+            },
+            {
+              "col": "G",
+              "value": "可收回金额（③、④较高者）",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 49
+    },
+    {
+      "sheet_name": "可收回金额测试表H8-11",
+      "max_row": 90,
+      "max_column": 28,
+      "column_count": 28,
+      "merged_ranges": [
+        "N22:N23",
+        "C22:C23",
+        "I22:I23",
+        "K22:K23",
+        "A2:O2",
+        "N17:N18",
+        "F22:F23",
+        "N8:N9",
+        "H22:H23",
+        "I17:I18",
+        "O19:O21",
+        "O22:O23",
+        "A8:A9",
+        "L17:M18",
+        "A22:A23",
+        "A17:A18",
+        "K17:K18",
+        "O17:O18",
+        "O8:O9",
+        "J22:J23",
+        "L22:M22",
+        "G22:G23",
+        "J17:J18",
+        "E22:E23",
+        "A1:O1",
+        "D22:D23"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产减值准备测试表-可收回金额"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "索引号："
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "H8-11"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "M10",
+          "formula": "=SUM(H10:L10)"
+        },
+        {
+          "cell": "N10",
+          "formula": "=IF(B10>0,B10,IF(D10>0,D10,F10))-M10"
+        },
+        {
+          "cell": "M11",
+          "formula": "=SUM(H11:L11)"
+        },
+        {
+          "cell": "N11",
+          "formula": "=IF(B11>0,B11,IF(D11>0,D11,F11))-M11"
+        },
+        {
+          "cell": "M12",
+          "formula": "=SUM(H12:L12)"
+        },
+        {
+          "cell": "N12",
+          "formula": "=IF(B12>0,B12,IF(D12>0,D12,F12))-M12"
+        },
+        {
+          "cell": "B13",
+          "formula": "=SUM(B10:B12)"
+        },
+        {
+          "cell": "D13",
+          "formula": "=SUM(D10:D12)"
+        },
+        {
+          "cell": "F13",
+          "formula": "=SUM(F10:F12)"
+        },
+        {
+          "cell": "H13",
+          "formula": "=SUM(H10:H12)"
+        },
+        {
+          "cell": "I13",
+          "formula": "=SUM(I10:I12)"
+        },
+        {
+          "cell": "J13",
+          "formula": "=SUM(J10:J12)"
+        },
+        {
+          "cell": "K13",
+          "formula": "=SUM(K10:K12)"
+        },
+        {
+          "cell": "L13",
+          "formula": "=SUM(L10:L12)"
+        },
+        {
+          "cell": "M13",
+          "formula": "=SUM(M10:M12)"
+        },
+        {
+          "cell": "N13",
+          "formula": "=SUM(N10:N12)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=F19"
+        },
+        {
+          "cell": "B20",
+          "formula": "=1/(1+$K$24)^1"
+        },
+        {
+          "cell": "C20",
+          "formula": "=1/(1+$K$24)^2"
+        },
+        {
+          "cell": "D20",
+          "formula": "=1/(1+$K$24)^3"
+        },
+        {
+          "cell": "E20",
+          "formula": "=1/(1+$K$24)^4"
+        },
+        {
+          "cell": "F20",
+          "formula": "=1/(1+$K$24)^5"
+        },
+        {
+          "cell": "G20",
+          "formula": "=(1+H19)/((J24-H19)*(1+K24)^5)"
+        },
+        {
+          "cell": "B21",
+          "formula": "=B19*B20"
+        },
+        {
+          "cell": "C21",
+          "formula": "=C19*C20"
+        },
+        {
+          "cell": "D21",
+          "formula": "=D19*D20"
+        },
+        {
+          "cell": "E21",
+          "formula": "=E19*E20"
+        },
+        {
+          "cell": "F21",
+          "formula": "=F19*F20"
+        },
+        {
+          "cell": "G21",
+          "formula": "=G19*G20"
+        },
+        {
+          "cell": "N21",
+          "formula": "=SUM(B21:G21)"
+        },
+        {
+          "cell": "I24",
+          "formula": "=F24+G24*(H24-F24)"
+        },
+        {
+          "cell": "J24",
+          "formula": "=((C24*E24*(1-B24)+D24*I24))/(C24+D24)"
+        },
+        {
+          "cell": "K24",
+          "formula": "=J24/(1-(B24+L24))"
+        },
+        {
+          "cell": "N24",
+          "formula": "=MAX(N13,N21)"
+        },
+        {
+          "cell": "B28",
+          "formula": "=N24"
+        }
+      ],
+      "data_types": {
+        "s": 114,
+        "n": 2365,
+        "f": 41
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "J",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "N",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：使用权资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "（一）资产的公允价值减去处置费用后的净额",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产名称",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "公允价值",
+              "type": "s"
+            },
+            {
+              "col": "H",
+              "value": "处置费用（资产处置的直接归属费用）",
+              "type": "s"
+            },
+            {
+              "col": "N",
+              "value": "公允价值-处置费用",
+              "type": "s"
+            },
+            {
+              "col": "O",
+              "value": "备注",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 41
+    },
+    {
+      "sheet_name": "减少检查表H8-12",
+      "max_row": 39,
+      "max_column": 28,
+      "column_count": 28,
+      "merged_ranges": [
+        "A2:V2",
+        "A30:H30",
+        "B12:B13",
+        "A5:V5",
+        "F12:F13",
+        "N12:N13",
+        "A12:A13",
+        "T12:T13",
+        "C12:C13",
+        "U12:U13",
+        "D12:D13",
+        "I12:M12",
+        "A1:V1",
+        "H12:H13",
+        "V12:V13",
+        "A32:H32",
+        "O12:S12",
+        "E12:E13",
+        "G12:G13",
+        "A31:H31"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "使用权资产/租赁负债减少检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "U",
+              "col_idx": 21,
+              "value": "索引号："
+            },
+            {
+              "col": "V",
+              "col_idx": 22,
+              "value": "H8-13"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "M14",
+          "formula": "=J14-K14-L14"
+        },
+        {
+          "cell": "M15",
+          "formula": "=J15-K15-L15"
+        },
+        {
+          "cell": "M16",
+          "formula": "=J16-K16-L16"
+        },
+        {
+          "cell": "M17",
+          "formula": "=J17-K17-L17"
+        },
+        {
+          "cell": "M18",
+          "formula": "=J18-K18-L18"
+        },
+        {
+          "cell": "M19",
+          "formula": "=J19-K19-L19"
+        },
+        {
+          "cell": "M20",
+          "formula": "=J20-K20-L20"
+        },
+        {
+          "cell": "M21",
+          "formula": "=J21-K21-L21"
+        },
+        {
+          "cell": "M22",
+          "formula": "=J22-K22-L22"
+        },
+        {
+          "cell": "M23",
+          "formula": "=J23-K23-L23"
+        },
+        {
+          "cell": "M24",
+          "formula": "=J24-K24-L24"
+        },
+        {
+          "cell": "M25",
+          "formula": "=J25-K25-L25"
+        },
+        {
+          "cell": "M26",
+          "formula": "=J26-K26-L26"
+        },
+        {
+          "cell": "M27",
+          "formula": "=J27-K27-L27"
+        },
+        {
+          "cell": "M28",
+          "formula": "=J28-K28-L28"
+        },
+        {
+          "cell": "M29",
+          "formula": "=J29-K29-L29"
+        },
+        {
+          "cell": "I30",
+          "formula": "=SUM(I14:I29)"
+        },
+        {
+          "cell": "J30",
+          "formula": "=SUM(J14:J29)"
+        },
+        {
+          "cell": "K30",
+          "formula": "=SUM(K14:K29)"
+        },
+        {
+          "cell": "L30",
+          "formula": "=SUM(L14:L29)"
+        },
+        {
+          "cell": "M30",
+          "formula": "=SUM(M14:M29)"
+        },
+        {
+          "cell": "J31",
+          "formula": "='明细表H8-2'!U32"
+        },
+        {
+          "cell": "J32",
+          "formula": "=IF(J30=0,0,J30/$J$31)"
+        }
+      ],
+      "data_types": {
+        "s": 49,
+        "n": 1014,
+        "f": 29
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：1.资产负债表中记录的使用权是存在的，且已记录于恰当的账户；2.所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3.使用权资产以恰当的金额包括在财务报表中，与",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、样本选取标准与规模：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "测试总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "如使用权资产贷方发生额所有凭证共XX笔金额XX",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "特定样本：",
+              "type": "s"
+            },
+            {
+              "col": "J",
+              "value": "XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "抽样总体：",
+              "type": "s"
+            },
+            {
+              "col": "B",
+              "value": "测试总体扣除特定样本以外的样本，共XX笔、金额XX",
+              "type": "s"
+            },
+            {
+              "col": "I",
+              "value": "确定的抽样样本量：",
+              "type": "s"
+            },
+            {
+              "col": "K",
+              "value": "抽取XX笔",
+              "type": "s"
+            },
+            {
+              "col": "L",
+              "value": "（如果使用了样本计算器计算样本量，样本量计算过程见<XX>底稿）",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 29
+    },
+    {
+      "sheet_name": "简化处理的租赁检查表H8-13",
+      "max_row": 99,
+      "max_column": 18,
+      "column_count": 18,
+      "merged_ranges": [
+        "A1:O1",
+        "A20:D20",
+        "A2:O2"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "简化处理的租赁检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "col_idx": 5,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "K",
+              "col_idx": 11,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "索引号："
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "H8-12"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "K10",
+          "formula": "=I10*J10"
+        },
+        {
+          "cell": "M10",
+          "formula": "=K10-L10"
+        },
+        {
+          "cell": "K11",
+          "formula": "=I11*J11"
+        },
+        {
+          "cell": "M11",
+          "formula": "=K11-L11"
+        },
+        {
+          "cell": "K12",
+          "formula": "=I12*J12"
+        },
+        {
+          "cell": "M12",
+          "formula": "=K12-L12"
+        },
+        {
+          "cell": "K13",
+          "formula": "=I13*J13"
+        },
+        {
+          "cell": "M13",
+          "formula": "=K13-L13"
+        },
+        {
+          "cell": "K14",
+          "formula": "=I14*J14"
+        },
+        {
+          "cell": "M14",
+          "formula": "=K14-L14"
+        },
+        {
+          "cell": "K15",
+          "formula": "=I15*J15"
+        },
+        {
+          "cell": "M15",
+          "formula": "=K15-L15"
+        },
+        {
+          "cell": "K16",
+          "formula": "=I16*J16"
+        },
+        {
+          "cell": "M16",
+          "formula": "=K16-L16"
+        },
+        {
+          "cell": "K17",
+          "formula": "=I17*J17"
+        },
+        {
+          "cell": "M17",
+          "formula": "=K17-L17"
+        },
+        {
+          "cell": "K18",
+          "formula": "=I18*J18"
+        },
+        {
+          "cell": "M18",
+          "formula": "=K18-L18"
+        },
+        {
+          "cell": "K19",
+          "formula": "=I19*J19"
+        },
+        {
+          "cell": "M19",
+          "formula": "=K19-L19"
+        },
+        {
+          "cell": "H20",
+          "formula": "=SUM(H10:H19)"
+        },
+        {
+          "cell": "K20",
+          "formula": "=SUM(K10:K19)"
+        },
+        {
+          "cell": "L20",
+          "formula": "=SUM(L10:L19)"
+        },
+        {
+          "cell": "M20",
+          "formula": "=SUM(M10:M19)"
+        }
+      ],
+      "data_types": {
+        "s": 30,
+        "n": 1722,
+        "f": 30
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "N",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2. 所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "3. 使用权资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 30
+    },
+    {
+      "sheet_name": "关联交易检查表H8-14",
+      "max_row": 45,
+      "max_column": 15,
+      "column_count": 15,
+      "merged_ranges": [
+        "A1:O1",
+        "A7:O7",
+        "A2:O2",
+        "A6:O6"
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "关联交易检查表（使用权资产、租赁负债）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "col_idx": 1,
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "F",
+              "col_idx": 6,
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "J",
+              "col_idx": 10,
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "N",
+              "col_idx": 14,
+              "value": "索引号："
+            },
+            {
+              "col": "O",
+              "col_idx": 15,
+              "value": "H8-14"
+            }
+          ]
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "data_types": {
+        "s": 50,
+        "n": 619,
+        "f": 6
+      },
+      "sample_data": [
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3",
+              "type": "f"
+            },
+            {
+              "col": "F",
+              "value": "=底稿目录!A5",
+              "type": "f"
+            },
+            {
+              "col": "J",
+              "value": "=底稿目录!A7",
+              "type": "f"
+            },
+            {
+              "col": "N",
+              "value": "页  次：",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 6,
+          "cells": [
+            {
+              "col": "A",
+              "value": "使用权资产的审计目标：1.资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；2.所有应记录的使用权资产均已记录，所有应当包括在财务报表中的相关披露均已包括；3.记录的使用权资产由被审计单位拥",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 7,
+          "cells": [
+            {
+              "col": "A",
+              "value": "租赁负债的审计目标：1.资产负债表中记录的租赁负债是存在的，且已记录于恰当的账户；2.所有应记录的租赁负债均已记录，所有应当包括在财务报表中的相关披露均已包括；3.记录的租赁负债由被审计单位拥有或控制",
+              "type": "s"
+            }
+          ]
+        },
+        {
+          "row": 8,
+          "cells": [
+            {
+              "col": "A",
+              "value": "二、审计过程：",
+              "type": "s"
+            }
+          ]
+        }
+      ],
+      "formula_count": 6
+    }
+  ],
+  "sheet_name_mapping": {
+    "Tab_Index": "底稿目录",
+    "Procedure_Table_H8A": "使用权资产实质性程序表H8A",
+    "Adjudication_H8_1": "审定表H8-1",
+    "Disclosure_Listed": "附注披露信息（上市公司）",
+    "Disclosure_SOE": "附注披露信息（国企）",
+    "Detail_H8_2": "明细表H8-2",
+    "Adjustment_H8_3": "调整分录汇总H8-3",
+    "Lease_Identification_H8_4": "租赁的识别H8-4",
+    "Lease_Term_H8_5": "租赁期的确定H8-5",
+    "Measurement_Annual_H8_6": "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+    "Measurement_Monthly_H8_6": "使用权资产 租赁负责初始及后续计量（按月）H8-6",
+    "Lease_Modification_H8_7": "租赁变更H8-7",
+    "Depreciation_NoImpair_H8_8": "折旧测算表（不含减值）H8-8",
+    "Depreciation_WithImpair_H8_8": "折旧测算表（含减值）H8-8",
+    "Depreciation_Alloc_H8_9": "折旧分配分析表H8-9",
+    "Impairment_H8_10": "减值测算表H8-10",
+    "Recoverable_H8_11": "可收回金额测试表H8-11",
+    "Disposal_Check_H8_12": "减少检查表H8-12",
+    "Simplified_Check_H8_13": "简化处理的租赁检查表H8-13",
+    "Related_Party_H8_14": "关联交易检查表H8-14"
+  },
+  "branch_validation": {
+    "h8_6_branches": {
+      "found": true,
+      "count": 2,
+      "sheet_names": [
+        "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+        "使用权资产 租赁负责初始及后续计量（按月）H8-6"
+      ],
+      "expected_count": 2,
+      "description": "H8-6 按年计量/按月计量 双分支"
+    },
+    "h8_8_branches": {
+      "found": true,
+      "count": 2,
+      "sheet_names": [
+        "折旧测算表（不含减值）H8-8",
+        "折旧测算表（含减值）H8-8"
+      ],
+      "expected_count": 2,
+      "description": "H8-8 不含减值/含减值 双分支"
+    },
+    "H8-6_detail": {
+      "key": "H8-6",
+      "description": "使用权资产初始及后续计量",
+      "branches_found": [
+        {
+          "variant": "Annual",
+          "glossary_name": "Measurement_Annual_H8_6",
+          "actual_sheet_name": "使用权资产 租赁负责初始及后续计量（按年）H8-6",
+          "actual_rows": 59,
+          "actual_cols": 13,
+          "expected_rows": 59,
+          "expected_cols": 13,
+          "rows_match": true,
+          "cols_match": true
+        },
+        {
+          "variant": "Monthly",
+          "glossary_name": "Measurement_Monthly_H8_6",
+          "actual_sheet_name": "使用权资产 租赁负责初始及后续计量（按月）H8-6",
+          "actual_rows": 361,
+          "actual_cols": 16,
+          "expected_rows": 361,
+          "expected_cols": 16,
+          "rows_match": true,
+          "cols_match": true
+        }
+      ]
+    },
+    "H8-8_detail": {
+      "key": "H8-8",
+      "description": "折旧测算表",
+      "branches_found": [
+        {
+          "variant": "NoImpair",
+          "glossary_name": "Depreciation_NoImpair_H8_8",
+          "actual_sheet_name": "折旧测算表（不含减值）H8-8",
+          "actual_rows": 51,
+          "actual_cols": 25,
+          "expected_rows": 51,
+          "expected_cols": 25,
+          "rows_match": true,
+          "cols_match": true
+        },
+        {
+          "variant": "WithImpair",
+          "glossary_name": "Depreciation_WithImpair_H8_8",
+          "actual_sheet_name": "折旧测算表（含减值）H8-8",
+          "actual_rows": 49,
+          "actual_cols": 27,
+          "expected_rows": 49,
+          "expected_cols": 27,
+          "rows_match": true,
+          "cols_match": true
+        }
+      ]
+    }
+  },
+  "validation": {
+    "sheet_count_ok": true,
+    "actual_sheet_count": 20,
+    "expected_sheet_count": 20,
+    "h8_6_dual_branch_ok": true,
+    "h8_8_dual_branch_ok": true,
+    "all_branches_verified": true,
+    "all_sheets_have_data": true,
+    "total_formula_cells": 5617,
+    "total_merged_ranges": 376
+  }
+}

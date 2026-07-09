@@ -76,6 +76,8 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'confirmation-diff-securities',
       'confirmation-alternative-g06',
       'confirmation-alternative-h05',
+      'confirmation-alternative-k05',
+      'confirmation-alternative-k06',
       'h10-asset-disposal-income',
       'g14-credit-impairment-loss',
       'g13-fair-value-changes',
@@ -177,6 +179,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'n1-deferred-tax-assets',
       'n2-taxes-payable',
       'n3-deferred-tax-liabilities',
+      'n4-taxes-and-surcharges',
       'n5-income-tax-expense',
       's3-policy-change',
       's4-nonmonetary-exchange',
@@ -190,6 +193,38 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       's21-data-asset',
       's32-fraud-bundle',
       's33-ann14-bundle',
+      's34-ipo-bundle',
+      's35-refinance-bundle',
+      'h1-fixed-assets',
+      'h5-oil-gas-assets',
+      'h2-construction-in-progress',
+      'h3-investment-property',
+      'h4-engineering-materials',
+      'h6-asset-disposal-clearing',
+      'h8-right-of-use-assets',
+      'h9-lease-liabilities',
+      'i1-intangible-assets',
+      'i2-development-expenditure',
+      'i3-goodwill',
+      'i4-long-term-prepaid',
+      'i5-other-noncurrent-assets',
+      'i6-research-development-expense',
+      'j1-employee-compensation',
+      'j2-defined-benefit-plan',
+      'j3-share-based-payment',
+      'k1-other-receivables',
+      'k2-other-current-assets',
+      'k3-other-payables',
+      'k4-other-current-liabilities',
+      'k5-provisions',
+      'k6-held-for-sale',
+      'k7-deferred-income',
+      'k8-selling-expenses',
+      'k9-admin-expenses',
+      'k10-other-income',
+      'k11-asset-impairment-loss',
+      'k12-non-operating-income',
+      'k13-non-operating-expense',
       'review-bundle',
     ]
     expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
@@ -324,6 +359,22 @@ describe('htmlRendererRegistry — 工具函数', () => {
 })
 
 
+describe('htmlRendererRegistry — H0-5 固定资产循环替代程序注册契约', () => {
+  it('confirmation-alternative-h05 已注册且映射 GtConfirmationAlternativeH05', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('confirmation-alternative-h05')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('confirmation-alternative-h05')
+    expect(entry?.icon).toBe('🔄')
+    expect(entry?.label).toBe('替代程序(固定资产循环)')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 confirmation-alternative-h05', () => {
+    expect(isHtmlComponentType('confirmation-alternative-h05')).toBe(true)
+  })
+})
+
 describe('htmlRendererRegistry — D3 预收账款注册契约', () => {
   it('d3-prepaid-accounts 已注册且配置正确', () => {
     const entry = HTML_RENDERER_REGISTRY.get('d3-prepaid-accounts')
@@ -339,5 +390,223 @@ describe('htmlRendererRegistry — D3 预收账款注册契约', () => {
 
   it('isHtmlComponentType 识别 d3-prepaid-accounts', () => {
     expect(isHtmlComponentType('d3-prepaid-accounts')).toBe(true)
+  })
+})
+
+
+describe('htmlRendererRegistry — H2 在建工程注册契约', () => {
+  it('h2-construction-in-progress 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('h2-construction-in-progress')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('h2-construction-in-progress')
+    expect(entry?.icon).toBe('🚧')
+    expect(entry?.label).toBe('H2 在建工程')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 h2-construction-in-progress', () => {
+    expect(isHtmlComponentType('h2-construction-in-progress')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 h2-construction-in-progress 条目', () => {
+    const entry = getRendererEntry('h2-construction-in-progress')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('h2-construction-in-progress')
+  })
+})
+
+describe('htmlRendererRegistry — H3 投资性房地产注册契约', () => {
+  it('h3-investment-property 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('h3-investment-property')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('h3-investment-property')
+    expect(entry?.icon).toBe('🏠')
+    expect(entry?.label).toBe('H3 投资性房地产')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 h3-investment-property', () => {
+    expect(isHtmlComponentType('h3-investment-property')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 h3-investment-property 条目', () => {
+    const entry = getRendererEntry('h3-investment-property')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('h3-investment-property')
+  })
+
+  it('h3-investment-property 组件可被懒加载（defineAsyncComponent）', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('h3-investment-property')
+    expect(entry?.component).toBeDefined()
+    // component 应为函数或对象（defineAsyncComponent 结果）
+    expect(typeof entry?.component === 'function' || typeof entry?.component === 'object').toBe(true)
+  })
+})
+
+
+describe('htmlRendererRegistry — H4 工程物资注册契约', () => {
+  it('h4-engineering-materials 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('h4-engineering-materials')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('h4-engineering-materials')
+    expect(entry?.icon).toBe('🧱')
+    expect(entry?.label).toBe('H4 工程物资')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 h4-engineering-materials', () => {
+    expect(isHtmlComponentType('h4-engineering-materials')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 h4-engineering-materials 条目', () => {
+    const entry = getRendererEntry('h4-engineering-materials')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('h4-engineering-materials')
+  })
+
+  it('h4-engineering-materials 组件可被懒加载（defineAsyncComponent）', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('h4-engineering-materials')
+    expect(entry?.component).toBeDefined()
+    // component 应为函数或对象（defineAsyncComponent 结果）
+    expect(typeof entry?.component === 'function' || typeof entry?.component === 'object').toBe(true)
+  })
+})
+
+
+describe('htmlRendererRegistry — I6 研发费用注册契约', () => {
+  it('i6-research-development-expense 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('i6-research-development-expense')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('i6-research-development-expense')
+    expect(entry?.icon).toBe('🔬')
+    expect(entry?.label).toBe('I6 研发费用')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.emits).toContain('navigate-sheet')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 i6-research-development-expense', () => {
+    expect(isHtmlComponentType('i6-research-development-expense')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 i6-research-development-expense 条目', () => {
+    const entry = getRendererEntry('i6-research-development-expense')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('i6-research-development-expense')
+  })
+
+  it('i6-research-development-expense 组件可被懒加载（defineAsyncComponent）', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('i6-research-development-expense')
+    expect(entry?.component).toBeDefined()
+    // component 应为函数或对象（defineAsyncComponent 结果）
+    expect(typeof entry?.component === 'function' || typeof entry?.component === 'object').toBe(true)
+  })
+})
+
+
+describe('htmlRendererRegistry — K7 递延收益注册契约', () => {
+  it('k7-deferred-income 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('k7-deferred-income')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('k7-deferred-income')
+    expect(entry?.icon).toBe('📋')
+    expect(entry?.label).toBe('K7 递延收益')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.emits).toContain('navigate-sheet')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 k7-deferred-income', () => {
+    expect(isHtmlComponentType('k7-deferred-income')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 k7-deferred-income 条目', () => {
+    const entry = getRendererEntry('k7-deferred-income')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('k7-deferred-income')
+  })
+
+  it('k7-deferred-income 组件可被懒加载（defineAsyncComponent）', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('k7-deferred-income')
+    expect(entry?.component).toBeDefined()
+    // component 应为函数或对象（defineAsyncComponent 结果）
+    expect(typeof entry?.component === 'function' || typeof entry?.component === 'object').toBe(true)
+  })
+})
+
+
+describe('htmlRendererRegistry — K10 其他收益注册契约', () => {
+  it('k10-other-income 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('k10-other-income')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('k10-other-income')
+    expect(entry?.icon).toBe('🏛️')
+    expect(entry?.label).toBe('K10 其他收益')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.emits).toContain('navigate-sheet')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 k10-other-income', () => {
+    expect(isHtmlComponentType('k10-other-income')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 k10-other-income 条目', () => {
+    const entry = getRendererEntry('k10-other-income')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('k10-other-income')
+  })
+
+  it('k10-other-income 组件可被懒加载（defineAsyncComponent）', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('k10-other-income')
+    expect(entry?.component).toBeDefined()
+    // component 应为函数或对象（defineAsyncComponent 结果）
+    expect(typeof entry?.component === 'function' || typeof entry?.component === 'object').toBe(true)
+  })
+})
+
+
+describe('htmlRendererRegistry — N4 税金及附加注册契约', () => {
+  it('n4-taxes-and-surcharges 已注册且配置正确', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('n4-taxes-and-surcharges')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('n4-taxes-and-surcharges')
+    expect(entry?.icon).toBe('🧾')
+    expect(entry?.label).toBe('N4 税金及附加')
+    expect(entry?.emits).toContain('save')
+    expect(entry?.emits).toContain('completed')
+    expect(entry?.contextProps).toBe('standard')
+    expect(entry?.component).toBeDefined()
+  })
+
+  it('isHtmlComponentType 识别 n4-taxes-and-surcharges', () => {
+    expect(isHtmlComponentType('n4-taxes-and-surcharges')).toBe(true)
+  })
+
+  it('getRendererEntry 返回 n4-taxes-and-surcharges 条目', () => {
+    const entry = getRendererEntry('n4-taxes-and-surcharges')
+    expect(entry).toBeDefined()
+    expect(entry?.componentType).toBe('n4-taxes-and-surcharges')
+  })
+
+  it('n4-taxes-and-surcharges 组件可被懒加载（defineAsyncComponent）', () => {
+    const entry = HTML_RENDERER_REGISTRY.get('n4-taxes-and-surcharges')
+    expect(entry?.component).toBeDefined()
+    expect(typeof entry?.component === 'function' || typeof entry?.component === 'object').toBe(true)
   })
 })

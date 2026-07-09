@@ -23,6 +23,7 @@ from app.deps import get_current_user, require_operation
 from app.models.core import User
 from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.cross_ref_service import cross_ref_service
+from app.services.project_audit_year import fetch_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -363,15 +364,7 @@ async def _maybe_publish_determination_writeback(
             return
 
         # 推导年度
-        year = None
-        try:
-            yr = (await db.execute(sa.text(
-                "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
-            ), {"pid": str(project_id)})).first()
-            if yr and yr[0]:
-                year = yr[0]
-        except Exception:
-            year = None
+        year = await fetch_project_audit_year(db, project_id)
         if not year:
             return
 

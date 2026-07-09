@@ -116,7 +116,7 @@ const {
 const template = computed(() => props.htmlData?.template)
 const isA15_1 = computed(() => template.value?.wp_code === 'A15-1')
 const eqcrWorkbenchPath = computed(() =>
-  projectId.value ? `/projects/${projectId.value}/eqcr/projects/${projectId.value}` : '',
+  projectId.value ? `/eqcr/projects/${projectId.value}` : '',
 )
 const sections = computed(() => template.value?.sections ?? [])
 const toc = computed(() => template.value?.toc ?? [])

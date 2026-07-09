@@ -199,7 +199,7 @@ class MgmtRepresentationRule(GateRule):
         try:
             from app.models.core import Project
             from app.services.field_override_service import FieldOverrideService
-            from sqlalchemy import text
+            from app.services.project_audit_year import resolve_project_audit_year
 
             result = await db.execute(
                 select(Project).where(Project.id == project_id)
@@ -208,19 +208,7 @@ class MgmtRepresentationRule(GateRule):
             if project is None:
                 return None
 
-            # 获取审计年度
-            year_val = 0
-            if project.audit_period_end:
-                year_val = project.audit_period_end.year
-            else:
-                try:
-                    year_q = await db.execute(text(
-                        "SELECT EXTRACT(YEAR FROM audit_period_end)::int "
-                        "FROM projects WHERE id = :pid"
-                    ), {"pid": str(project_id)})
-                    year_val = year_q.scalar() or 0
-                except Exception:
-                    pass
+            year_val = resolve_project_audit_year(project) or 0
 
             # 尝试从 field_overrides 读取 A16 主版本 sign_status
             sign_status = None

@@ -81,8 +81,19 @@ export type HtmlComponentType =
   | 'confirmation-diff-securities'
   | 'confirmation-alternative-g06'
   | 'confirmation-alternative-h05'
+  | 'confirmation-alternative-k05'
+  | 'confirmation-alternative-k06'
   | 'g14-credit-impairment-loss'
   | 'h10-asset-disposal-income'
+  | 'h1-fixed-assets'
+  | 'h5-oil-gas-assets'
+  | 'h7-biological-assets'
+  | 'h2-construction-in-progress'
+  | 'h3-investment-property'
+  | 'h4-engineering-materials'
+  | 'h6-asset-disposal-clearing'
+  | 'h8-right-of-use-assets'
+  | 'h9-lease-liabilities'
   | 'g13-fair-value-changes'
   | 'g12-net-hedge-gains'
   | 'g11-investment-income'
@@ -180,6 +191,7 @@ export type HtmlComponentType =
   | 'n1-deferred-tax-assets'
   | 'n2-taxes-payable'
   | 'n3-deferred-tax-liabilities'
+  | 'n4-taxes-and-surcharges'
   | 'n5-income-tax-expense'
   | 's3-policy-change'
   | 's4-nonmonetary-exchange'
@@ -193,6 +205,30 @@ export type HtmlComponentType =
   | 's21-data-asset'
   | 's32-fraud-bundle'
   | 's33-ann14-bundle'
+  | 's34-ipo-bundle'
+  | 's35-refinance-bundle'
+  | 'i1-intangible-assets'
+  | 'i2-development-expenditure'
+  | 'i3-goodwill'
+  | 'i4-long-term-prepaid'
+  | 'i5-other-noncurrent-assets'
+  | 'i6-research-development-expense'
+  | 'j1-employee-compensation'
+  | 'j2-defined-benefit-plan'
+  | 'j3-share-based-payment'
+  | 'k1-other-receivables'
+  | 'k2-other-current-assets'
+  | 'k3-other-payables'
+  | 'k4-other-current-liabilities'
+  | 'k5-provisions'
+  | 'k6-held-for-sale'
+  | 'k7-deferred-income'
+  | 'k8-selling-expenses'
+  | 'k9-admin-expenses'
+  | 'k10-other-income'
+  | 'k11-asset-impairment-loss'
+  | 'k12-non-operating-income'
+  | 'k13-non-operating-expense'
   | 'review-bundle'
 
 /**
@@ -278,6 +314,8 @@ const GtConfirmationAlternativeF06 = defineAsyncComponent(() => import('./confir
 const GtConfirmationDiffSecurities = defineAsyncComponent(() => import('./g0-confirmation/diffSecurities/GtConfirmationDiffSecurities.vue'))
 const GtConfirmationAlternativeG06 = defineAsyncComponent(() => import('./g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue'))
 const GtConfirmationAlternativeH05 = defineAsyncComponent(() => import('./confirmation/alternativeH05/GtConfirmationAlternativeH05.vue'))
+const GtConfirmationAlternativeK05 = defineAsyncComponent(() => import('./confirmation/alternativeK05/GtConfirmationAlternativeK05.vue'))
+const GtConfirmationAlternativeK06 = defineAsyncComponent(() => import('./confirmation/alternativeK06/GtConfirmationAlternativeK06.vue'))
 const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
@@ -326,6 +364,15 @@ const GtG12NetHedgeGains = defineAsyncComponent(() => import('./GtG12NetHedgeGai
 const GtG13FairValueChanges = defineAsyncComponent(() => import('./GtG13FairValueChanges.vue'))
 const GtG14CreditImpairmentLoss = defineAsyncComponent(() => import('./GtG14CreditImpairmentLoss.vue'))
 const GtH10AssetDisposalIncome = defineAsyncComponent(() => import('./GtH10AssetDisposalIncome.vue'))
+const GtH1FixedAssets = defineAsyncComponent(() => import('./GtH1FixedAssets.vue'))
+const GtH5OilGasAssets = defineAsyncComponent(() => import('./GtH5OilGasAssets.vue'))
+const GtH7BiologicalAssets = defineAsyncComponent(() => import('./GtH7BiologicalAssets.vue'))
+const GtH2ConstructionInProgress = defineAsyncComponent(() => import('./GtH2ConstructionInProgress.vue'))
+const GtH3InvestmentProperty = defineAsyncComponent(() => import('./GtH3InvestmentProperty.vue'))
+const GtH4EngineeringMaterials = defineAsyncComponent(() => import('./GtH4EngineeringMaterials.vue'))
+const GtH6AssetDisposalClearing = defineAsyncComponent(() => import('./GtH6AssetDisposalClearing.vue'))
+const GtH8RightOfUseAssets = defineAsyncComponent(() => import('./GtH8RightOfUseAssets.vue'))
+const GtH9LeaseLiabilities = defineAsyncComponent(() => import('./GtH9LeaseLiabilities.vue'))
 
 // ─── 注册表（单一来源） ─────────────────────────────────────────────────────
 
@@ -339,7 +386,7 @@ const D_FORM_SUBTYPES = [
 ] as const
 
 const REGISTRY_LIST: HtmlRendererEntry[] = [
-  {
+{
     componentType: 'a1-dashboard',
     component: GtA1Dashboard,
     icon: '🎯',
@@ -347,7 +394,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a2-adjustment-console',
     component: GtA2AdjustmentConsole,
     icon: '📝',
@@ -355,7 +402,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a3-consolidation-console',
     component: GtA3ConsolidationConsole,
     icon: '🔗',
@@ -363,7 +410,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a-program-console',
     component: GtCycleAProgramRouter,
     icon: '📋',
@@ -371,14 +418,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b-index',
     component: GtBIndex,
     icon: '🗂️',
     label: 'B 底稿目录',
     emits: ['save'],
   },
-  {
+{
     componentType: 'c-note-table',
     component: GtCNoteTable,
     icon: '📝',
@@ -392,11 +439,11 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
       'open-formula',
     ],
   },
-  // D 子模式（5 种）共享 GtDForm，差异由 form-type prop 控制
+// D 子模式（5 种）共享 GtDForm，差异由 form-type prop 控制
   ...D_FORM_SUBTYPES.map<HtmlRendererEntry>((subtype) => ({
     componentType: subtype,
-    component: GtDForm,
-    icon: subtype === 'd-form-paragraph'
+component: GtDForm,
+icon: subtype === 'd-form-paragraph'
       ? '📄'
       : subtype === 'd-form-qa'
         ? '❓'
@@ -405,11 +452,12 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
           : subtype === 'd-form-review'
             ? '✍️'
             : '📑',
-    label: `D 检查表 (${subtype.replace('d-form-', '')})`,
-    emits: ['save'],
-    contextProps: 'form-type' as const,
-  })),
-  {
+label: `D 检查表 (${subtype.replace('d-form-',
+'')})`,
+emits: ['save'],
+contextProps: 'form-type' as const,
+})),
+{
     componentType: 'e-control-test',
     component: GtEControlTest,
     icon: '🧪',
@@ -422,14 +470,14 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     ],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'h-static-doc',
     component: GtHStaticDoc,
     icon: '📖',
     label: 'H 辅助说明',
     emits: [], // 只读
   },
-  {
+{
     componentType: 'custom',
     component: GtCustomWpEditor,
     icon: '📎',
@@ -437,7 +485,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'custom',
   },
-  {
+{
     componentType: 'audit-sheet',
     component: GtAuditSheet,
     icon: '📊',
@@ -445,7 +493,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'field-change', 'open-formula', 'restore'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'bad-debt-sheet',
     component: GtBadDebtSheet,
     icon: '💰',
@@ -453,7 +501,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [], // GtBadDebtSheet 自取数自落库，无 emit
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'cf-verification',
     component: GtCfVerification,
     icon: '💧',
@@ -461,7 +509,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'procedure-table',
     component: GtProcedureTable,
     icon: '📋',
@@ -469,7 +517,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'custom',
   },
-  {
+{
     componentType: 'report-analysis',
     component: GtReportAnalysis,
     icon: '📈',
@@ -477,7 +525,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'misstatement-summary',
     component: GtMisstatementSummary,
     icon: '⚠️',
@@ -485,7 +533,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'review-checklist',
     component: GtReviewChecklist,
     icon: '✍️',
@@ -493,7 +541,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'word-template',
     component: GtWordTemplate,
     icon: '📄',
@@ -501,7 +549,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'independence-signing',
     component: GtIndependenceSigning,
     icon: '✍️',
@@ -509,7 +557,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'wp-popup-signing',
     component: GtWpPopupSigning,
     icon: '✍️',
@@ -517,7 +565,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a1-11-signing-form',
     component: GtA111SigningForm,
     icon: '✍️',
@@ -525,7 +573,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'audit-legend',
     component: GtAuditLegend,
     icon: '📋',
@@ -533,7 +581,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'checklist-table',
     component: GtChecklistTable,
     icon: '✅',
@@ -541,7 +589,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'analytical-review',
     component: GtAnalyticalReview,
     icon: '📊',
@@ -549,7 +597,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-summary',
     component: GtA17Summary,
     icon: '📋',
@@ -557,7 +605,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'kam-workpaper',
     component: GtKamWorkpaper,
     icon: '🔑',
@@ -565,7 +613,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'regulatory-letter',
     component: GtRegulatoryLetter,
     icon: '📮',
@@ -573,7 +621,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'goodwill-impairment',
     component: GtGoodwillImpairment,
     icon: '💎',
@@ -581,7 +629,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'segment-report',
     component: GtSegmentReport,
     icon: '🏢',
@@ -589,7 +637,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'contingent-liability',
     component: GtContingentLiability,
     icon: '⚖️',
@@ -597,7 +645,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'discontinued-operations',
     component: GtDiscontinuedOperations,
     icon: '📉',
@@ -605,7 +653,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'misstatement-workpaper',
     component: GtMisstatementWorkpaper,
     icon: '⚠️',
@@ -613,7 +661,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a14-3-workbook',
     component: GtA14_3Workbook,
     icon: '🖥️',
@@ -621,7 +669,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a10-bundle',
     component: GtA10Bundle,
     icon: '📋',
@@ -629,7 +677,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a11-bundle',
     component: GtA11Bundle,
     icon: '📅',
@@ -637,7 +685,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a12-bundle',
     component: GtA12Bundle,
     icon: '📋',
@@ -645,7 +693,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a15-bundle',
     component: GtA15Bundle,
     icon: '🔄',
@@ -653,7 +701,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a16-bundle',
     component: GtA16Bundle,
     icon: '📜',
@@ -661,7 +709,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-bundle',
     component: GtA17Bundle,
     icon: '📋',
@@ -669,7 +717,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-summary',
     component: GtConfirmationSummary,
     icon: '✉️',
@@ -677,7 +725,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-entity-verify',
     component: GtConfirmationEntityVerify,
     icon: '🔍',
@@ -685,7 +733,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-followup',
     component: GtConfirmationFollowup,
     icon: '📋',
@@ -693,7 +741,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-diff-reconcile',
     component: GtConfirmationDiffReconcile,
     icon: '⚖️',
@@ -701,7 +749,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-alternative-d05',
     component: GtConfirmationAlternativeD05,
     icon: '🔄',
@@ -709,7 +757,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-alternative-d06',
     component: GtConfirmationAlternativeD06,
     icon: '🔄',
@@ -717,47 +765,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'confirmation-alternative-f05',
-    component: GtConfirmationAlternativeF05,
-    icon: '🔄',
-    label: '替代程序(预付及采购)',
-    emits: ['save'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'confirmation-alternative-f06',
-    component: GtConfirmationAlternativeF06,
-    icon: '🔄',
-    label: '替代程序(应付及采购)',
-    emits: ['save'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'confirmation-diff-securities',
-    component: GtConfirmationDiffSecurities,
-    icon: '📈',
-    label: '证券差异核对',
-    emits: ['save'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'confirmation-alternative-g06',
-    component: GtConfirmationAlternativeG06,
-    icon: '🔄',
-    label: '替代程序(投资循环)',
-    emits: ['save'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'confirmation-alternative-h05',
-    component: GtConfirmationAlternativeH05,
-    icon: '🔄',
-    label: '替代程序(固定资产循环)',
-    emits: ['save'],
-    contextProps: 'standard',
-  },
-  {
+{
     componentType: 'confirmation-diff-checklist',
     component: GtConfirmationDiffChecklist,
     icon: '📊',
@@ -765,7 +773,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-fraud-risk',
     component: GtConfirmationFraudRisk,
     icon: '🚨',
@@ -773,7 +781,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'confirmation-reliability',
     component: GtConfirmationReliability,
     icon: '🔐',
@@ -781,31 +789,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'c-control-test',
-    component: GtCControlTest,
-    icon: '🧪',
-    label: 'C 控制测试',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'd1-notes-receivable',
-    component: GtD1NotesReceivable,
-    icon: '📄',
-    label: 'D1 应收票据',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'd2-accounts-receivable',
-    component: GtD2AccountsReceivable,
-    icon: '💰',
-    label: 'D2 应收账款',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
+{
     componentType: 'b50-risk-assessment',
     component: GtB50RiskAssessment,
     icon: '🎯',
@@ -813,7 +797,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b22a-control-matrix',
     component: GtB22AControlMatrix,
     icon: '🛡️',
@@ -821,7 +805,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b22b-deficiency-evaluation',
     component: GtB22BDeficiencyEvaluation,
     icon: '⚠️',
@@ -829,7 +813,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b23-process-control',
     component: GtB23ProcessControl,
     icon: '🔄',
@@ -837,7 +821,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b30-group-audit',
     component: GtB30GroupAudit,
     icon: '🏢',
@@ -845,7 +829,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b2-bundle',
     component: GtB2Bundle,
     icon: '📋',
@@ -853,7 +837,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b13-bundle',
     component: GtB13Bundle,
     icon: '📋',
@@ -861,7 +845,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b19-bundle',
     component: GtB19Bundle,
     icon: '📋',
@@ -869,7 +853,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b51-bundle',
     component: GtB51Bundle,
     icon: '📋',
@@ -877,15 +861,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f2-stocktake-bundle',
-    component: GtF2StocktakeBundle,
-    icon: '📦',
-    label: 'F2 存货监盘',
-    emits: [],
-    contextProps: 'standard',
-  },
-  {
+{
     componentType: 'a1-12-dual-checklist',
     component: GtA112DualChecklist,
     icon: '✅',
@@ -893,7 +869,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a1-15-disclosure-checklist',
     component: GtA115DisclosureChecklist,
     icon: '📋',
@@ -901,7 +877,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a1-17-corresponding-data',
     component: defineAsyncComponent(() => import('./GtA117CorrespondingData.vue')),
     icon: '📊',
@@ -909,7 +885,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-6-closing-meeting',
     component: defineAsyncComponent(() => import('./GtA176ClosingMeeting.vue')),
     icon: '📋',
@@ -917,7 +893,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a18-1-regulatory-submission',
     component: defineAsyncComponent(() => import('./GtA181RegulatorySubmission.vue')),
     icon: '📨',
@@ -925,7 +901,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a18-2-regulatory-communication',
     component: defineAsyncComponent(() => import('./GtA182RegulatoryCommunication.vue')),
     icon: '📮',
@@ -933,7 +909,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a8-1-other-info-representation',
     component: defineAsyncComponent(() => import('./GtA81OtherInfoRepresentation.vue')),
     icon: '📋',
@@ -941,7 +917,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a11-1-subsequent-events-inquiry',
     component: defineAsyncComponent(() => import('./GtA111SubsequentEventsInquiry.vue')),
     icon: '📅',
@@ -949,7 +925,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-3-consultation-record',
     component: defineAsyncComponent(() => import('./GtA173ConsultationRecord.vue')),
     icon: '📋',
@@ -957,7 +933,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-3-1-consultation-execution',
     component: defineAsyncComponent(() => import('./GtA1731ConsultationExecution.vue')),
     icon: '📋',
@@ -965,7 +941,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-4-disagreement-record',
     component: defineAsyncComponent(() => import('./GtA174DisagreementRecord.vue')),
     icon: '📋',
@@ -973,7 +949,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-7-independence-declaration',
     component: defineAsyncComponent(() => import('./GtA177IndependenceDeclaration.vue')),
     icon: '✍️',
@@ -981,7 +957,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a9-1-deficiency-letter',
     component: defineAsyncComponent(() => import('./GtA91DeficiencyLetter.vue')),
     icon: '📋',
@@ -989,7 +965,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a9-2-deficiency-letter-governance',
     component: defineAsyncComponent(() => import('./GtA91DeficiencyLetter.vue')),
     icon: '📋',
@@ -997,7 +973,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a27-1-it-audit-memo',
     component: defineAsyncComponent(() => import('./GtA271ItAuditMemo.vue')),
     icon: '💻',
@@ -1005,7 +981,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a12-1-legal-confirmation',
     component: defineAsyncComponent(() => import('./GtA121LegalConfirmation.vue')),
     icon: '⚖️',
@@ -1013,7 +989,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a10-1-governance-communication',
     component: defineAsyncComponent(() => import('./GtA101GovernanceCommunication.vue')),
     icon: '📋',
@@ -1021,7 +997,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-1-audit-summary',
     component: defineAsyncComponent(() => import('./GtA171AuditSummary.vue')),
     icon: '📋',
@@ -1029,7 +1005,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a17-2-1-kam',
     component: defineAsyncComponent(() => import('./GtA1721Kam.vue')),
     icon: '🔑',
@@ -1037,7 +1013,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a5-1-cashflow-audit',
     component: defineAsyncComponent(() => import('./GtA51CashflowAudit.vue')),
     icon: '💰',
@@ -1045,7 +1021,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'a3-8-goodwill-impairment',
     component: defineAsyncComponent(() => import('./GtA38GoodwillImpairment.vue')),
     icon: '💠',
@@ -1053,7 +1029,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'jump-to-workpaper'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'b1-4-due-diligence-report',
     component: defineAsyncComponent(() => import('./GtB14DueDiligenceReport.vue')),
     icon: '📋',
@@ -1061,279 +1037,71 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'd4-operating-revenue',
-    component: defineAsyncComponent(() => import('./GtD4OperatingRevenue.vue')),
-    icon: '💹',
-    label: 'D4 营业收入',
-    emits: ['save', 'completed'],
+{
+    componentType: 'confirmation-alternative-f05',
+    component: GtConfirmationAlternativeF05,
+    icon: '🔄',
+    label: '替代程序(预付及采购)',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f1-prepayment',
-    component: GtF1Prepayment,
-    icon: '💳',
-    label: 'F1 预付账款',
-    emits: ['save', 'completed'],
+{
+    componentType: 'confirmation-alternative-f06',
+    component: GtConfirmationAlternativeF06,
+    icon: '🔄',
+    label: '替代程序(应付及采购)',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f2-inventory-main',
-    component: GtF2InventoryMain,
-    icon: '📦',
-    label: 'F2 存货核心',
-    emits: ['save', 'completed'],
+{
+    componentType: 'confirmation-alternative-g06',
+    component: GtConfirmationAlternativeG06,
+    icon: '🔄',
+    label: '替代程序(投资循环)',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f2-inventory-special',
-    component: GtF2InventorySpecial,
-    icon: '📦',
-    label: 'F2 存货特殊',
-    emits: ['save', 'completed'],
+{
+    componentType: 'confirmation-alternative-h05',
+    component: GtConfirmationAlternativeH05,
+    icon: '🔄',
+    label: '替代程序(固定资产循环)',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f2-inventory-valuation-impairment',
-    component: GtF2InventoryValuation,
-    icon: '📦',
-    label: 'F2 计价减值',
-    emits: ['save', 'completed'],
+{
+    componentType: 'confirmation-alternative-k05',
+    component: GtConfirmationAlternativeK05,
+    icon: '🔄',
+    label: '替代程序(其他应收款)',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f3-notes-payable',
-    component: GtF3NotesPayable,
-    icon: '📄',
-    label: 'F3 应付票据',
-    emits: ['save', 'completed'],
+{
+    componentType: 'confirmation-alternative-k06',
+    component: GtConfirmationAlternativeK06,
+    icon: '🔄',
+    label: '替代程序(其他应付款)',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'f4-accounts-payable',
-    component: GtF4AccountsPayable,
-    icon: '📋',
-    label: 'F4 应付账款',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'f5-cost-of-sales',
-    component: GtF5CostOfSales,
-    icon: '📊',
-    label: 'F5 营业成本',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g1-trading-financial-assets',
-    component: GtG1TradingFinancialAssets,
+{
+    componentType: 'confirmation-diff-securities',
+    component: GtConfirmationDiffSecurities,
     icon: '📈',
-    label: 'G1 交易性金融资产',
-    emits: ['save', 'completed'],
+    label: '证券差异核对',
+    emits: ['save'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'g2-interest-receivable',
-    component: GtG2InterestReceivable,
-    icon: '💰',
-    label: 'G2 应收利息',
-    emits: ['save', 'completed'],
+{
+    componentType: 'c-control-test',
+    component: GtCControlTest,
+    icon: '🧪',
+    label: 'C 控制测试',
+    emits: ['save', 'completed', 'navigate-sheet'],
     contextProps: 'standard',
   },
-  {
-    componentType: 'g3-dividend-receivable',
-    component: GtG3DividendReceivable,
-    icon: '💰',
-    label: 'G3 应收股利',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g4-bond-investment-main',
-    component: GtG4BondInvestmentMain,
-    icon: '🏦',
-    label: 'G4 债权投资',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g4-bond-investment-sppi',
-    component: GtG4BondInvestmentSppi,
-    icon: '🏦',
-    label: 'G4 SPPI',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g4-bond-investment-ecl',
-    component: GtG4BondInvestmentEcl,
-    icon: '🏦',
-    label: 'G4 ECL',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g5-long-term-receivable',
-    component: GtG5LongTermReceivable,
-    icon: '📑',
-    label: 'G5 长期应收款',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g6-other-bond-investment-main',
-    component: GtG6OtherBondMain,
-    icon: '📊',
-    label: 'G6 其他债权投资',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g6-other-bond-investment-sppi',
-    component: GtG6OtherBondSppi,
-    icon: '🔬',
-    label: 'G6 SPPI',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g6-other-bond-investment-ecl',
-    component: GtG6OtherBondEcl,
-    icon: '🏦',
-    label: 'G6 ECL',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g7-long-term-equity-main',
-    component: GtG7LongTermEquityMain,
-    icon: '🏢',
-    label: 'G7 长期股权投资',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g7-long-term-equity-method',
-    component: GtG7EquityMethod,
-    icon: '🏢',
-    label: 'G7 权益法',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g7-long-term-equity-subsidiary',
-    component: GtG7EquitySubsidiary,
-    icon: '🏢',
-    label: 'G7 子公司',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g8-other-equity-instruments',
-    component: GtG8OtherEquityInstruments,
-    icon: '📈',
-    label: 'G8 其他权益工具',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g9-other-noncurrent-financial',
-    component: GtG9OtherNoncurrentFinancial,
-    icon: '📈',
-    label: 'G9 其他非流动金融',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g10-trading-financial-liabilities',
-    component: GtG10TradingFinancialLiabilities,
-    icon: '📉',
-    label: 'G10 交易性金融负债',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g11-investment-income',
-    component: GtG11InvestmentIncome,
-    icon: '💹',
-    label: 'G11 投资收益',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g12-net-hedge-gains',
-    component: GtG12NetHedgeGains,
-    icon: '🛡️',
-    label: 'G12 套期收益',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g13-fair-value-changes',
-    component: GtG13FairValueChanges,
-    icon: '📊',
-    label: 'G13 公允价值变动',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'g14-credit-impairment-loss',
-    component: GtG14CreditImpairmentLoss,
-    icon: '⚠️',
-    label: 'G14 信用减值损失',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'h10-asset-disposal-income',
-    component: GtH10AssetDisposalIncome,
-    icon: '🏭',
-    label: 'H10 资产处置损益',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'd3-prepaid-accounts',
-    component: defineAsyncComponent(() => import('./GtD3PrepaidAccounts.vue')),
-    icon: '💰',
-    label: 'D3 预收账款',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'd5-receivables-financing',
-    component: defineAsyncComponent(() => import('./GtD5ReceivablesFinancing.vue')),
-    icon: '📈',
-    label: 'D5 应收款项融资',
-    emits: ['save', 'completed', 'jump-to-section'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'd6-contract-assets',
-    component: defineAsyncComponent(() => import('./GtD6ContractAssets.vue')),
-    icon: '📋',
-    label: 'D6 合同资产',
-    emits: ['save', 'completed', 'jump-to-section'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'd7-contract-liabilities',
-    component: defineAsyncComponent(() => import('./GtD7ContractLiabilities.vue')),
-    icon: '📋',
-    label: 'D7 合同负债',
-    emits: ['save', 'completed', 'jump-to-section'],
-    contextProps: 'standard',
-  },
-  {
-    componentType: 'e1-monetary-fund',
-    component: defineAsyncComponent(() => import('./GtE1MonetaryFund.vue')),
-    icon: '💵',
-    label: 'E1 货币资金',
-    emits: ['save', 'completed'],
-    contextProps: 'standard',
-  },
-  {
+{
     componentType: 'c1-entity-level-control',
     component: defineAsyncComponent(() => import('./GtC1EntityControl.vue')),
     icon: '🏛️',
@@ -1341,7 +1109,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'c22-itgc-bundle',
     component: defineAsyncComponent(() => import('./GtC22ItgcBundle.vue')),
     icon: '💻',
@@ -1349,7 +1117,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'c23-journal-entry-control',
     component: defineAsyncComponent(() => import('./GtC23JournalControl.vue')),
     icon: '📋',
@@ -1357,7 +1125,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'c24-journal-entry-detail',
     component: defineAsyncComponent(() => import('./GtC24JournalDetail.vue')),
     icon: '🔍',
@@ -1365,7 +1133,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'c25-internal-audit-reliance',
     component: defineAsyncComponent(() => import('./GtC25InternalAudit.vue')),
     icon: '🔎',
@@ -1373,7 +1141,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'c26-info-processing-control',
     component: defineAsyncComponent(() => import('./GtC26InfoControl.vue')),
     icon: '🛡️',
@@ -1381,7 +1149,551 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
+    componentType: 'd1-notes-receivable',
+    component: GtD1NotesReceivable,
+    icon: '📄',
+    label: 'D1 应收票据',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'd2-accounts-receivable',
+    component: GtD2AccountsReceivable,
+    icon: '💰',
+    label: 'D2 应收账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'd3-prepaid-accounts',
+    component: defineAsyncComponent(() => import('./GtD3PrepaidAccounts.vue')),
+    icon: '💰',
+    label: 'D3 预收账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'd4-operating-revenue',
+    component: defineAsyncComponent(() => import('./GtD4OperatingRevenue.vue')),
+    icon: '💹',
+    label: 'D4 营业收入',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'd5-receivables-financing',
+    component: defineAsyncComponent(() => import('./GtD5ReceivablesFinancing.vue')),
+    icon: '📈',
+    label: 'D5 应收款项融资',
+    emits: ['save', 'completed', 'jump-to-section'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'd6-contract-assets',
+    component: defineAsyncComponent(() => import('./GtD6ContractAssets.vue')),
+    icon: '📋',
+    label: 'D6 合同资产',
+    emits: ['save', 'completed', 'jump-to-section'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'd7-contract-liabilities',
+    component: defineAsyncComponent(() => import('./GtD7ContractLiabilities.vue')),
+    icon: '📋',
+    label: 'D7 合同负债',
+    emits: ['save', 'completed', 'jump-to-section'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'e1-monetary-fund',
+    component: defineAsyncComponent(() => import('./GtE1MonetaryFund.vue')),
+    icon: '💵',
+    label: 'E1 货币资金',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f1-prepayment',
+    component: GtF1Prepayment,
+    icon: '💳',
+    label: 'F1 预付账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f2-inventory-main',
+    component: GtF2InventoryMain,
+    icon: '📦',
+    label: 'F2 存货核心',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f2-inventory-special',
+    component: GtF2InventorySpecial,
+    icon: '📦',
+    label: 'F2 存货特殊',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f2-inventory-valuation-impairment',
+    component: GtF2InventoryValuation,
+    icon: '📦',
+    label: 'F2 计价减值',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f2-stocktake-bundle',
+    component: GtF2StocktakeBundle,
+    icon: '📦',
+    label: 'F2 存货监盘',
+    emits: [],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f3-notes-payable',
+    component: GtF3NotesPayable,
+    icon: '📄',
+    label: 'F3 应付票据',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f4-accounts-payable',
+    component: GtF4AccountsPayable,
+    icon: '📋',
+    label: 'F4 应付账款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'f5-cost-of-sales',
+    component: GtF5CostOfSales,
+    icon: '📊',
+    label: 'F5 营业成本',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g1-trading-financial-assets',
+    component: GtG1TradingFinancialAssets,
+    icon: '📈',
+    label: 'G1 交易性金融资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g2-interest-receivable',
+    component: GtG2InterestReceivable,
+    icon: '💰',
+    label: 'G2 应收利息',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g3-dividend-receivable',
+    component: GtG3DividendReceivable,
+    icon: '💰',
+    label: 'G3 应收股利',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g4-bond-investment-ecl',
+    component: GtG4BondInvestmentEcl,
+    icon: '🏦',
+    label: 'G4 ECL',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g4-bond-investment-main',
+    component: GtG4BondInvestmentMain,
+    icon: '🏦',
+    label: 'G4 债权投资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g4-bond-investment-sppi',
+    component: GtG4BondInvestmentSppi,
+    icon: '🏦',
+    label: 'G4 SPPI',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g5-long-term-receivable',
+    component: GtG5LongTermReceivable,
+    icon: '📑',
+    label: 'G5 长期应收款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g6-other-bond-investment-ecl',
+    component: GtG6OtherBondEcl,
+    icon: '🏦',
+    label: 'G6 ECL',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g6-other-bond-investment-main',
+    component: GtG6OtherBondMain,
+    icon: '📊',
+    label: 'G6 其他债权投资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g6-other-bond-investment-sppi',
+    component: GtG6OtherBondSppi,
+    icon: '🔬',
+    label: 'G6 SPPI',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g7-long-term-equity-main',
+    component: GtG7LongTermEquityMain,
+    icon: '🏢',
+    label: 'G7 长期股权投资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g7-long-term-equity-method',
+    component: GtG7EquityMethod,
+    icon: '🏢',
+    label: 'G7 权益法',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g7-long-term-equity-subsidiary',
+    component: GtG7EquitySubsidiary,
+    icon: '🏢',
+    label: 'G7 子公司',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g8-other-equity-instruments',
+    component: GtG8OtherEquityInstruments,
+    icon: '📈',
+    label: 'G8 其他权益工具',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g9-other-noncurrent-financial',
+    component: GtG9OtherNoncurrentFinancial,
+    icon: '📈',
+    label: 'G9 其他非流动金融',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g10-trading-financial-liabilities',
+    component: GtG10TradingFinancialLiabilities,
+    icon: '📉',
+    label: 'G10 交易性金融负债',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g11-investment-income',
+    component: GtG11InvestmentIncome,
+    icon: '💹',
+    label: 'G11 投资收益',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g12-net-hedge-gains',
+    component: GtG12NetHedgeGains,
+    icon: '🛡️',
+    label: 'G12 套期收益',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g13-fair-value-changes',
+    component: GtG13FairValueChanges,
+    icon: '📊',
+    label: 'G13 公允价值变动',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'g14-credit-impairment-loss',
+    component: GtG14CreditImpairmentLoss,
+    icon: '⚠️',
+    label: 'G14 信用减值损失',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h1-fixed-assets',
+    component: GtH1FixedAssets,
+    icon: '🏗️',
+    label: 'H1 固定资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h2-construction-in-progress',
+    component: GtH2ConstructionInProgress,
+    icon: '🚧',
+    label: 'H2 在建工程',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h3-investment-property',
+    component: GtH3InvestmentProperty,
+    icon: '🏠',
+    label: 'H3 投资性房地产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h4-engineering-materials',
+    component: GtH4EngineeringMaterials,
+    icon: '🧱',
+    label: 'H4 工程物资',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h5-oil-gas-assets',
+    component: GtH5OilGasAssets,
+    icon: '🛢️',
+    label: 'H5 油气资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h7-biological-assets',
+    component: GtH7BiologicalAssets,
+    icon: '🌱',
+    label: 'H7 生产性生物资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h6-asset-disposal-clearing',
+    component: GtH6AssetDisposalClearing,
+    icon: '🧹',
+    label: 'H6 固定资产清理',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h8-right-of-use-assets',
+    component: GtH8RightOfUseAssets,
+    icon: '📑',
+    label: 'H8 使用权资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h9-lease-liabilities',
+    component: GtH9LeaseLiabilities,
+    icon: '📋',
+    label: 'H9 租赁负债',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'h10-asset-disposal-income',
+    component: GtH10AssetDisposalIncome,
+    icon: '🏭',
+    label: 'H10 资产处置损益',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'i1-intangible-assets',
+    component: defineAsyncComponent(() => import('./GtI1IntangibleAssets.vue')),
+    icon: '💎',
+    label: 'I1 无形资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'i2-development-expenditure',
+    component: defineAsyncComponent(() => import('./GtI2DevelopmentExpenditure.vue')),
+    icon: '🔬',
+    label: 'I2 开发支出',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'i3-goodwill',
+    component: defineAsyncComponent(() => import('./GtI3Goodwill.vue')),
+    icon: '💎',
+    label: 'I3 商誉',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'i4-long-term-prepaid',
+    component: defineAsyncComponent(() => import('./GtI4LongTermPrepaid.vue')),
+    icon: '📋',
+    label: 'I4 长期待摊费用',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'i5-other-noncurrent-assets',
+    component: defineAsyncComponent(() => import('./GtI5OtherNoncurrentAssets.vue')),
+    icon: '📋',
+    label: 'I5 其他非流动资产',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'i6-research-development-expense',
+    component: defineAsyncComponent(() => import('./GtI6ResearchDevelopmentExpense.vue')),
+    icon: '🔬',
+    label: 'I6 研发费用',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'j1-employee-compensation',
+    component: defineAsyncComponent(() => import('./j1/GtJ1EmployeeCompensation.vue')),
+    icon: '👥',
+    label: 'J1 应付职工薪酬',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'j2-defined-benefit-plan',
+    component: defineAsyncComponent(() => import('./j2/GtJ2DefinedBenefitPlan.vue')),
+    icon: '🏥',
+    label: 'J2 设定受益计划',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'j3-share-based-payment',
+    component: defineAsyncComponent(() => import('./j3/GtJ3ShareBasedPayment.vue')),
+    icon: '📊',
+    label: 'J3 股份支付',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k1-other-receivables',
+    component: defineAsyncComponent(() => import('./GtK1OtherReceivables.vue')),
+    icon: '💰',
+    label: 'K1 其他应收款',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k2-other-current-assets',
+    component: defineAsyncComponent(() => import('./GtK2OtherCurrentAssets.vue')),
+    icon: '📋',
+    label: 'K2 其他流动资产',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k3-other-payables',
+    component: defineAsyncComponent(() => import('./GtK3OtherPayables.vue')),
+    icon: '💳',
+    label: 'K3 其他应付款',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k4-other-current-liabilities',
+    component: defineAsyncComponent(() => import('./GtK4OtherCurrentLiabilities.vue')),
+    icon: '📋',
+    label: 'K4 其他流动负债',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k5-provisions',
+    component: defineAsyncComponent(() => import('./GtK5Provisions.vue')),
+    icon: '⚖️',
+    label: 'K5 预计负债',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k6-held-for-sale',
+    component: defineAsyncComponent(() => import('./GtK6HeldForSale.vue')),
+    icon: '🏷️',
+    label: 'K6 持有待售',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k7-deferred-income',
+    component: defineAsyncComponent(() => import('./GtK7DeferredIncome.vue')),
+    icon: '📋',
+    label: 'K7 递延收益',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k8-selling-expenses',
+    component: defineAsyncComponent(() => import('./GtK8SellingExpenses.vue')),
+    icon: '💰',
+    label: 'K8 销售费用',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k9-admin-expenses',
+    component: defineAsyncComponent(() => import('./GtK9AdminExpenses.vue')),
+    icon: '🏢',
+    label: 'K9 管理费用',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k11-asset-impairment-loss',
+    component: defineAsyncComponent(() => import('./GtK11AssetImpairmentLoss.vue')),
+    icon: '📉',
+    label: 'K11 资产减值损失',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k10-other-income',
+    component: defineAsyncComponent(() => import('./GtK10OtherIncome.vue')),
+    icon: '🏛️',
+    label: 'K10 其他收益',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k12-non-operating-income',
+    component: defineAsyncComponent(() => import('./GtK12NonOperatingIncome.vue')),
+    icon: '🎁',
+    label: 'K12 营业外收入',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'k13-non-operating-expense',
+    component: defineAsyncComponent(() => import('./GtK13NonOperatingExpense.vue')),
+    icon: '💸',
+    label: 'K13 营业外支出',
+    emits: ['save', 'completed', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
     componentType: 'l1-short-term-loans',
     component: defineAsyncComponent(() => import('./GtL1ShortTermLoans.vue')),
     icon: '🏦',
@@ -1389,7 +1701,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l2-interest-payable',
     component: defineAsyncComponent(() => import('./GtL2InterestPayable.vue')),
     icon: '💸',
@@ -1397,7 +1709,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l3-long-term-loans',
     component: defineAsyncComponent(() => import('./GtL3LongTermLoans.vue')),
     icon: '🏛️',
@@ -1405,7 +1717,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l4-bonds-payable',
     component: defineAsyncComponent(() => import('./GtL4BondsPayable.vue')),
     icon: '📜',
@@ -1413,7 +1725,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l5-long-term-payables',
     component: defineAsyncComponent(() => import('./GtL5LongTermPayables.vue')),
     icon: '💳',
@@ -1421,7 +1733,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l6-special-payables',
     component: defineAsyncComponent(() => import('./GtL6SpecialPayables.vue')),
     icon: '🏛️',
@@ -1429,7 +1741,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l7-other-noncurrent-liabilities',
     component: defineAsyncComponent(() => import('./GtL7OtherNoncurrentLiabilities.vue')),
     icon: '📋',
@@ -1437,7 +1749,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'l8-financial-expenses',
     component: defineAsyncComponent(() => import('./GtL8FinancialExpenses.vue')),
     icon: '💰',
@@ -1445,7 +1757,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm1-dividends-payable',
     component: defineAsyncComponent(() => import('./GtM1DividendsPayable.vue')),
     icon: '💸',
@@ -1453,7 +1765,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm2-paid-in-capital',
     component: defineAsyncComponent(() => import('./GtM2PaidInCapital.vue')),
     icon: '🏦',
@@ -1461,7 +1773,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm3-treasury-stock',
     component: defineAsyncComponent(() => import('./GtM3TreasuryStock.vue')),
     icon: '📦',
@@ -1469,7 +1781,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm4-capital-reserve',
     component: defineAsyncComponent(() => import('./GtM4CapitalReserve.vue')),
     icon: '💰',
@@ -1477,7 +1789,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm5-surplus-reserve',
     component: defineAsyncComponent(() => import('./GtM5SurplusReserve.vue')),
     icon: '📊',
@@ -1485,7 +1797,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm6-retained-earnings',
     component: defineAsyncComponent(() => import('./GtM6RetainedEarnings.vue')),
     icon: '💰',
@@ -1493,7 +1805,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm7-special-reserve',
     component: defineAsyncComponent(() => import('./GtM7SpecialReserve.vue')),
     icon: '🛡️',
@@ -1501,7 +1813,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm8-general-risk-reserve',
     component: defineAsyncComponent(() => import('./GtM8GeneralRiskReserve.vue')),
     icon: '⚠️',
@@ -1509,7 +1821,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm9-other-comprehensive-income',
     component: defineAsyncComponent(() => import('./GtM9OtherComprehensiveIncome.vue')),
     icon: '🌈',
@@ -1517,7 +1829,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'm10-other-equity-instruments',
     component: defineAsyncComponent(() => import('./GtM10OtherEquityInstruments.vue')),
     icon: '📜',
@@ -1525,7 +1837,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'n1-deferred-tax-assets',
     component: defineAsyncComponent(() => import('./GtN1DeferredTaxAssets.vue')),
     icon: '🧾',
@@ -1533,7 +1845,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'n2-taxes-payable',
     component: defineAsyncComponent(() => import('./GtN2TaxesPayable.vue')),
     icon: '🧾',
@@ -1541,7 +1853,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 'n3-deferred-tax-liabilities',
     component: defineAsyncComponent(() => import('./GtN3DeferredTaxLiabilities.vue')),
     icon: '🧾',
@@ -1549,7 +1861,15 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
+    componentType: 'n4-taxes-and-surcharges',
+    component: defineAsyncComponent(() => import('./GtN4TaxesAndSurcharges.vue')),
+    icon: '🧾',
+    label: 'N4 税金及附加',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
     componentType: 'n5-income-tax-expense',
     component: defineAsyncComponent(() => import('./GtN5IncomeTaxExpense.vue')),
     icon: '🧾',
@@ -1557,7 +1877,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's3-policy-change',
     component: defineAsyncComponent(() => import('./s3-policy-change/GtS3PolicyChange.vue')),
     icon: '📋',
@@ -1565,7 +1885,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's4-nonmonetary-exchange',
     component: defineAsyncComponent(() => import('./s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue')),
     icon: '🔄',
@@ -1573,7 +1893,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's5-debt-restructuring',
     component: defineAsyncComponent(() => import('./s5-debt-restructuring/GtS5DebtRestructuring.vue')),
     icon: '📑',
@@ -1581,7 +1901,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's6-fund-occupation',
     component: defineAsyncComponent(() => import('./s6-fund-occupation/GtS6FundOccupation.vue')),
     icon: '💰',
@@ -1589,7 +1909,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's12-cpa-expert',
     component: defineAsyncComponent(() => import('./s12-cpa-expert/GtS12CpaExpert.vue')),
     icon: '👨‍💼',
@@ -1597,7 +1917,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's13-mgmt-expert',
     component: defineAsyncComponent(() => import('./s13-mgmt-expert/GtS13MgmtExpert.vue')),
     icon: '👨‍💻',
@@ -1605,7 +1925,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's14-accounting-estimate',
     component: defineAsyncComponent(() => import('./s14-accounting-estimate/GtS14AccountingEstimate.vue')),
     icon: '🧮',
@@ -1613,7 +1933,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's15-eps-roe',
     component: defineAsyncComponent(() => import('./s15-eps-roe/GtS15EpsRoe.vue')),
     icon: '📊',
@@ -1621,7 +1941,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's20-revenue-deduction',
     component: defineAsyncComponent(() => import('./s20-revenue-deduction/GtS20RevenueDeduction.vue')),
     icon: '💹',
@@ -1629,7 +1949,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's21-data-asset',
     component: defineAsyncComponent(() => import('./s21-data-asset/GtS21DataAsset.vue')),
     icon: '💾',
@@ -1637,7 +1957,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: ['save', 'completed'],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's32-fraud-bundle',
     component: defineAsyncComponent(() => import('./s32-fraud-bundle/GtS32Bundle.vue')),
     icon: '🚨',
@@ -1645,7 +1965,7 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
     componentType: 's33-ann14-bundle',
     component: defineAsyncComponent(() => import('./s33-ann14-bundle/GtS33Bundle.vue')),
     icon: '📋',
@@ -1653,14 +1973,31 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     emits: [],
     contextProps: 'standard',
   },
-  {
+{
+    componentType: 's34-ipo-bundle',
+    component: defineAsyncComponent(() => import('./s34-ipo-bundle/GtS34Bundle.vue')),
+    icon: '📋',
+    label: 'S34 首发审核特项核查聚合',
+    emits: [],
+    contextProps: 'standard',
+  },
+{
+    componentType: 's35-refinance-bundle',
+    component: defineAsyncComponent(() => import('./s35-refinance-bundle/GtS35Bundle.vue')),
+    icon: '📋',
+    label: 'S35 再融资审核特项核查聚合',
+    emits: [],
+    contextProps: 'standard',
+  },
+{
     componentType: 'review-bundle',
     component: GtReviewBundle,
     icon: '✍️',
     label: '角色复核聚合',
     emits: ['save'],
     contextProps: 'standard',
-  },
+  }
+
 ]
 
 /** 注册表 Map（O(1) 查找） */

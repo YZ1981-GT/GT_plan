@@ -134,6 +134,15 @@ class TestP0Registration:
         valid_types = {
             "d-form-table", "audit-sheet", "a-program-console",
             "confirmation-hub", "c-note-table",
+            # 已迁移为专属组件的 H 类
+            "h1-fixed-assets", "h2-construction-in-progress",
+            "h3-investment-property", "h4-engineering-materials",
+            "h10-asset-disposal-income",
+            # 函证组件
+            "confirmation-summary", "confirmation-entity-verify",
+            "confirmation-followup", "confirmation-diff-reconcile",
+            "confirmation-alternative-h05", "confirmation-diff-checklist",
+            "confirmation-fraud-risk", "confirmation-reliability",
         }
         for entry in h_class_entries:
             wp_code = entry["wp_code"]
@@ -160,8 +169,18 @@ class TestP0Registration:
         "H8-1", "H9-1", "H10-1",
     ])
     def test_audit_determination_tables_are_d_form(self, wp_code):
-        """H{n}-1 审定表映射为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE.get(wp_code) == "d-form-table"
+        """H{n}-1 审定表映射为 d-form-table 或已迁移到专属组件。"""
+        # 已迁移为专属组件的底稿不再走 d-form-table
+        _MIGRATED_TO_DEDICATED = {
+            "H1-1": "h1-fixed-assets",
+            "H2-1": "h2-construction-in-progress",
+            "H3-1": "h3-investment-property",
+            "H10-1": "h10-asset-disposal-income",
+        }
+        if wp_code in _MIGRATED_TO_DEDICATED:
+            assert _WP_CODE_OVERRIDE.get(wp_code) == _MIGRATED_TO_DEDICATED[wp_code]
+        else:
+            assert _WP_CODE_OVERRIDE.get(wp_code) == "d-form-table"
 
     def test_h5_applicable_when(self, h_class_entries):
         """H5 油气资产带 applicable_when 行业限制。"""
@@ -299,8 +318,17 @@ class TestP2AuditDetermination:
 
     @pytest.mark.parametrize("wp_code", _AUDIT_DET_CODES)
     def test_audit_det_component_type(self, wp_code):
-        """所有 10 个审定表为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table"
+        """所有 10 个审定表为 d-form-table 或已迁移到专属组件。"""
+        _MIGRATED_TO_DEDICATED = {
+            "H1-1": "h1-fixed-assets",
+            "H2-1": "h2-construction-in-progress",
+            "H3-1": "h3-investment-property",
+            "H10-1": "h10-asset-disposal-income",
+        }
+        if wp_code in _MIGRATED_TO_DEDICATED:
+            assert _WP_CODE_OVERRIDE[wp_code] == _MIGRATED_TO_DEDICATED[wp_code]
+        else:
+            assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -370,20 +398,20 @@ class TestP4SpecialProcedures:
     """P4 Tasks 29-34: 特殊程序 schema 确认。"""
 
     def test_h1_3_depreciation_is_audit_sheet(self):
-        """H1-3 折旧测算走 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE["H1-3"] == "audit-sheet"
+        """H1-3 折旧测算走 h1-fixed-assets 专属组件（已从 audit-sheet 迁移）。"""
+        assert _WP_CODE_OVERRIDE["H1-3"] == "h1-fixed-assets"
 
     def test_h1_5_impairment_is_audit_sheet(self):
-        """H1-5 减值测试走 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE["H1-5"] == "audit-sheet"
+        """H1-5 减值测试走 h1-fixed-assets 专属组件（已从 audit-sheet 迁移）。"""
+        assert _WP_CODE_OVERRIDE["H1-5"] == "h1-fixed-assets"
 
     def test_h2_3_interest_capitalization_is_audit_sheet(self):
-        """H2-3 利息资本化测算走 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE["H2-3"] == "audit-sheet"
+        """H2-3 利息资本化测算走 h2-construction-in-progress 专属组件（已从 audit-sheet 迁移）。"""
+        assert _WP_CODE_OVERRIDE["H2-3"] == "h2-construction-in-progress"
 
     def test_h3_3_fair_value_is_audit_sheet(self):
-        """H3-3 公允价值测试走 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE["H3-3"] == "audit-sheet"
+        """H3-3 公允价值测试走 h3-investment-property 专属组件（已从 audit-sheet 迁移）。"""
+        assert _WP_CODE_OVERRIDE["H3-3"] == "h3-investment-property"
 
     def test_h8_cas21_sheets_are_audit_sheet(self):
         """H8-3/H8-4/H8-5 使用权资产 CAS21 相关全部走 audit-sheet。"""
@@ -474,34 +502,43 @@ class TestP5Linkage:
 class TestP6ExportImport:
     """P6 Tasks 39-46: 导入导出基础设施验证。"""
 
-    # H 类 d-form-table wp_codes
+    # H 类 d-form-table wp_codes（排除已迁移到专属组件的：H1/H2/H3/H10，排除H0函证）
     _H_FORM_TABLE_CODES = [
-        "H0-1", "H0-2", "H0-3", "H0-4", "H0-5",
-        "H1", "H1-1", "H1-8",
-        "H2", "H2-1", "H2-6",
-        "H3", "H3-1", "H3-6",
         "H4", "H4-1", "H4-4",
         "H5", "H5-1", "H5-4",
         "H6", "H6-1", "H6-4",
         "H7", "H7-1", "H7-4",
         "H8", "H8-1", "H8-6",
         "H9", "H9-1", "H9-6",
-        "H10", "H10-1", "H10-4",
     ]
 
-    # H 类 audit-sheet wp_codes
+    # H 类 audit-sheet wp_codes（排除已迁移到专属组件的：H1/H2/H3/H10）
     _AUDIT_SHEET_CODES = [
-        "H1-2", "H1-3", "H1-4", "H1-5", "H1-6", "H1-7",
-        "H2-2", "H2-3", "H2-4", "H2-5",
-        "H3-2", "H3-3", "H3-4", "H3-5",
         "H4-2", "H4-3",
         "H5-2", "H5-3",
         "H6-2", "H6-3",
         "H7-2", "H7-3",
         "H8-2", "H8-3", "H8-4", "H8-5",
         "H9-2", "H9-3", "H9-4", "H9-5",
-        "H10-2", "H10-3",
     ]
+
+    # 已迁移到专属组件的 H 类 codes
+    _H_DEDICATED_CODES = {
+        "H1": "h1-fixed-assets", "H1-1": "h1-fixed-assets", "H1-8": "h1-fixed-assets",
+        "H1-2": "h1-fixed-assets", "H1-3": "h1-fixed-assets", "H1-4": "h1-fixed-assets",
+        "H1-5": "h1-fixed-assets", "H1-6": "h1-fixed-assets", "H1-7": "h1-fixed-assets",
+        "H2": "h2-construction-in-progress", "H2-1": "h2-construction-in-progress",
+        "H2-6": "h2-construction-in-progress",
+        "H2-2": "h2-construction-in-progress", "H2-3": "h2-construction-in-progress",
+        "H2-4": "h2-construction-in-progress", "H2-5": "h2-construction-in-progress",
+        "H3": "h3-investment-property", "H3-1": "h3-investment-property",
+        "H3-6": "h3-investment-property",
+        "H3-2": "h3-investment-property", "H3-3": "h3-investment-property",
+        "H3-4": "h3-investment-property", "H3-5": "h3-investment-property",
+        "H10": "h10-asset-disposal-income", "H10-1": "h10-asset-disposal-income",
+        "H10-4": "h10-asset-disposal-income",
+        "H10-2": "h10-asset-disposal-income", "H10-3": "h10-asset-disposal-income",
+    }
 
     @pytest.mark.parametrize("wp_code", _H_FORM_TABLE_CODES)
     def test_h_form_table_registered(self, wp_code):
@@ -515,10 +552,21 @@ class TestP6ExportImport:
         assert wp_code in _WP_CODE_OVERRIDE
         assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet"
 
+    @pytest.mark.parametrize("wp_code,expected_ct", list(_H_DEDICATED_CODES.items()))
+    def test_h_dedicated_registered(self, wp_code, expected_ct):
+        """已迁移到专属组件的 H 类底稿在 _WP_CODE_OVERRIDE 中注册正确。"""
+        assert wp_code in _WP_CODE_OVERRIDE
+        assert _WP_CODE_OVERRIDE[wp_code] == expected_ct
+
     def test_all_h_codes_in_mapping(self, h_class_entries):
         """所有 H 类 wp_code 在 wp_account_mapping 注册（批量导出可枚举）。"""
         mapping_codes = {e["wp_code"] for e in h_class_entries}
-        all_codes = set(self._H_FORM_TABLE_CODES + self._AUDIT_SHEET_CODES + ["H0"])
+        all_codes = set(
+            self._H_FORM_TABLE_CODES
+            + self._AUDIT_SHEET_CODES
+            + list(self._H_DEDICATED_CODES.keys())
+            + ["H0"]
+        )
         missing = all_codes - mapping_codes
         assert not missing, f"H 类缺少: {sorted(missing)}"
 

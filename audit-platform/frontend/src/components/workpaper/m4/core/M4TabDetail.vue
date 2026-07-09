@@ -665,18 +665,27 @@ function handleReview(): void {
 
 // ─── EventBus: 接收J3股份支付权益结算 + M2外币折算差异 ──────────────────────
 
-function handleJ3EquitySettled(payload: any): void {
+function handleJ3EquitySettled(payload: {
+  equitySettledAmount?: number
+  waitingPeriodAmount?: number
+  amount?: number
+}): void {
   // J3股份支付权益结算计入 → 其他资本公积区段
-  // 联动逻辑：将J3确认金额显示在明细表（集成时完善）
-  if (payload?.amount !== undefined) {
-    ElMessage.info(`接收到J3股份支付权益结算: ${payload.amount}`)
+  const amount = payload?.equitySettledAmount ?? payload?.amount
+  if (amount !== undefined) {
+    ElMessage.info(`接收到J3股份支付权益结算: ${amount}`)
   }
 }
 
-function handleM2FxDiff(payload: any): void {
+function handleM2FxDiff(payload: {
+  totalFxDiff?: number
+  fxDiffAmount?: number
+  amount?: number
+}): void {
   // M2外币出资折算差异 → 资本溢价区段
-  if (payload?.amount !== undefined) {
-    ElMessage.info(`接收到M2外币折算差异: ${payload.amount}`)
+  const amount = payload?.totalFxDiff ?? payload?.fxDiffAmount ?? payload?.amount
+  if (amount !== undefined) {
+    ElMessage.info(`接收到M2外币折算差异: ${amount}`)
   }
 }
 
@@ -737,13 +746,13 @@ onMounted(async () => {
     auditNote.value = noteResp.remark
   }
   // 订阅 J3/M2 EventBus
-  eventBus.on('j3:equity-settled' as any, handleJ3EquitySettled)
-  eventBus.on('m2:fx-diff' as any, handleM2FxDiff)
+  eventBus.on('j3:equity-settled', handleJ3EquitySettled)
+  eventBus.on('m2:fx-diff-to-m4', handleM2FxDiff)
 })
 
 onUnmounted(() => {
-  eventBus.off('j3:equity-settled' as any, handleJ3EquitySettled)
-  eventBus.off('m2:fx-diff' as any, handleM2FxDiff)
+  eventBus.off('j3:equity-settled', handleJ3EquitySettled)
+  eventBus.off('m2:fx-diff-to-m4', handleM2FxDiff)
 })
 </script>
 

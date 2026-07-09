@@ -9,13 +9,13 @@
  * 1. adjudicationVsDetail — M6-1审定表年末 vs M6-2明细表年末 交叉验证
  * 2. surplusVsM5 — M6记录的提取盈余公积 vs M5实际计提 一致性校验
  * 3. dividendVsM1 — M6记录的分配股利 vs M1实际宣告 一致性校验
- * 4. EventBus订阅 'm5:accrual-confirmed' / 'm1:declared-confirmed'
+ * 4. EventBus订阅 'm5:surplus-accrual' / 'm1:declared-confirmed'
  * 5. EventBus发布 'm6:net-profit' / 'm6:profit-distributed'
  * 6. cross_wp_references 关联 M5、M1、本年利润来源
  *
  * 联动方向：
  *   M6-1审定表期末 ↔ M6-2明细表期末 双向勾稽
- *   M5盈余公积 → 'm5:accrual-confirmed' → surplusVsM5（M6记录vs M5计提）
+ *   M5盈余公积 → 'm5:surplus-accrual' → surplusVsM5（M6记录vs M5计提）
  *   M1应付股利 → 'm1:declared-confirmed' → dividendVsM1（M6记录vs M1宣告）
  *   M6 → 'm6:net-profit' → M5/M1（驱动下游计提/分配）
  *   M6 → 'm6:profit-distributed' → M1（股利分配通知）
@@ -96,7 +96,7 @@ function parseNum(v: any): number {
 export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>>) {
   // ─── EventBus 订阅的联动数据（reactive refs） ──────────────────────────────
 
-  /** M5实际计提盈余公积合计（订阅 'm5:accrual-confirmed'） */
+  /** M5实际计提盈余公积合计（订阅 'm5:surplus-accrual'） */
   const _m5AccrualConfirmed = ref(0)
   /** M1实际宣告股利合计（订阅 'm1:declared-confirmed'） */
   const _m1DeclaredConfirmed = ref(0)
@@ -110,8 +110,19 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    *
    * 接收后自动持久化到 checklist_responses，防止刷新丢失（复盘铁律②）
    */
-  function _onM5AccrualConfirmed(payload: any): void {
-    const value = parseNum(payload?.totalAccrual ?? payload?.amount)
+  function _onM5AccrualConfirmed(payload: {
+    wpCode?: string
+    statutoryAccrual?: number
+    discretionaryAccrual?: number
+    totalAccrual?: number
+    amount?: number
+    timestamp?: number
+  }): void {
+    const value = parseNum(
+      payload?.totalAccrual
+      ?? ((payload?.statutoryAccrual ?? 0) + (payload?.discretionaryAccrual ?? 0) || undefined)
+      ?? payload?.amount,
+    )
     _m5AccrualConfirmed.value = value
     // 持久化到 checklist_responses（下次 selfLoad 可恢复，不依赖同会话事件）
     const persistItem: ChecklistResponse = {
@@ -129,7 +140,12 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    *
    * 接收后自动持久化到 checklist_responses，防止刷新丢失（复盘铁律②）
    */
-  function _onM1DeclaredConfirmed(payload: any): void {
+  function _onM1DeclaredConfirmed(payload: {
+    wpCode?: string
+    declaredAmount?: number
+    amount?: number
+    timestamp?: number
+  }): void {
     const value = parseNum(payload?.declaredAmount ?? payload?.amount)
     _m1DeclaredConfirmed.value = value
     // 持久化到 checklist_responses
@@ -143,8 +159,8 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
 
   // ─── 订阅 EventBus ─────────────────────────────────────────────────────────
 
-  eventBus.on('m5:accrual-confirmed' as any, _onM5AccrualConfirmed)
-  eventBus.on('m1:declared-confirmed' as any, _onM1DeclaredConfirmed)
+  eventBus.on('m5:surplus-accrual', _onM5AccrualConfirmed)
+  eventBus.on('m1:declared-confirmed', _onM1DeclaredConfirmed)
 
   // ─── 初始化：从 allResponses 读取已持久化的联动数据 ─────────────────────────
 
@@ -199,7 +215,7 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    *
    * 数据来源：
    * - M6记录的提取盈余公积：item_id "M6-M6-2-surplus-accrual"（remark=法定+任意盈余公积合计）
-   * - M5实际计提：EventBus 'm5:accrual-confirmed' 或持久化 "M6-cross-m5-accrual-confirmed"
+   * - M5实际计提：EventBus 'm5:surplus-accrual' 或持久化 "M6-cross-m5-accrual-confirmed"
    */
   const surplusVsM5: ComputedRef<SurplusVsM5Result> = computed(() => {
     // M6-2中记录的提取盈余公积
@@ -257,7 +273,7 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
       accrualBase: accrualBase ?? netProfit,
       timestamp: Date.now(),
     }
-    eventBus.emit('m6:net-profit' as any, payload)
+    eventBus.emit('m6:net-profit', payload)
   }
 
   /**
@@ -279,7 +295,7 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
       stockDividend: stockDividend ?? 0,
       timestamp: Date.now(),
     }
-    eventBus.emit('m6:profit-distributed' as any, payload)
+    eventBus.emit('m6:profit-distributed', payload)
   }
 
   // ─── 5. 跨底稿引用定义 ────────────────────────────────────────────────────
@@ -316,8 +332,8 @@ export function useM6CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // ─── 6. Cleanup — 组件卸载时取消 EventBus 订阅 ─────────────────────────────
 
   onScopeDispose(() => {
-    eventBus.off('m5:accrual-confirmed' as any, _onM5AccrualConfirmed)
-    eventBus.off('m1:declared-confirmed' as any, _onM1DeclaredConfirmed)
+    eventBus.off('m5:surplus-accrual', _onM5AccrualConfirmed)
+    eventBus.off('m1:declared-confirmed', _onM1DeclaredConfirmed)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────

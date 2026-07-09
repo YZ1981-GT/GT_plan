@@ -24,6 +24,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.models.core import Project, User
 from app.services import project_wizard_service
+from app.services.project_audit_year import resolve_project_audit_year
 
 logger = logging.getLogger(__name__)
 
@@ -31,55 +32,12 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 
 def _extract_project_audit_year(project: Project) -> int | None:
-    """提取项目审计年度，兜底优先级（防止 wizard_state 未填齐导致 null）：
-
-    1. wizard_state.steps.basic_info.data.audit_year (主要来源，向导走完时填)
-    2. project.audit_period_start.year（创建时填的审计期间起）
-    3. project.name 末尾的 _YYYY 后缀（命名约定 `{客户}_{年度}`）
-    返回值始终 > 2000。
-    """
-    wizard_state = project.wizard_state or {}
-    basic_info = (
-        wizard_state.get("steps", {}).get("basic_info", {}).get("data")
-        or wizard_state.get("basic_info", {}).get("data")
-        or {}
-    )
-    raw_year = basic_info.get("audit_year") or basic_info.get("year")
-    if raw_year:
-        try:
-            audit_year = int(raw_year)
-            if audit_year > 2000:
-                return audit_year
-        except (TypeError, ValueError):
-            pass
-
-    # 兜底 1：审计期间起始年
-    if project.audit_period_start:
-        try:
-            y = project.audit_period_start.year
-            if y > 2000:
-                return y
-        except (AttributeError, TypeError):
-            pass
-
-    # 兜底 2：项目名末尾 _YYYY 后缀
-    if project.name:
-        import re
-        m = re.search(r'_(\d{4})$', project.name)
-        if m:
-            try:
-                y = int(m.group(1))
-                if y > 2000:
-                    return y
-            except ValueError:
-                pass
-
-    return None
+    """提取项目审计年度（委托 project_audit_year 通用规则）。"""
+    return resolve_project_audit_year(project)
 
 
 def _to_project_response(project: Project) -> ProjectCreateResponse:
-    # 优先使用物化列 audit_year（Task 4.3），缺失时回退提取逻辑
-    audit_year = project.audit_year or _extract_project_audit_year(project)
+    audit_year = resolve_project_audit_year(project)
     return ProjectCreateResponse(
         id=project.id,
         name=project.name,

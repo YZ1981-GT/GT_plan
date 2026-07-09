@@ -1,0 +1,217 @@
+# backend/data/ledger_adapters/wp_render_schema/k4-other-current-liabilities.yaml
+# K4 其他流动负债 — 专属组件渲染 schema
+# componentType: k4-other-current-liabilities
+# 科目 2245 其他流动负债（贷方/负债类）
+# Template: K4 其他流动负债.xlsx（8 有效 sheet）
+# 公式特征：期末=期初+贷方-借方（负债类！与资产类相反）；审定=未审+AJE+RJE
+#           完整性认定为主（负债易少计）+ 分类正确性
+# 创建: 2026-07-30
+
+wp_code: K4
+wp_name: 其他流动负债
+component_type: k4-other-current-liabilities
+selfLoad: true
+template_path: backend/wp_templates/K/K4 其他流动负债.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['2245']
+related_accounts:
+  - code: '2245'
+    name: 其他流动负债
+    direction: credit
+    category: liability
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - check-eval
+  - detail-eval
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿交叉引用（cross_wp_references）
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_references:
+  - ref_id: CW-K4-001
+    source_wp: K4-1
+    target_wp: TB:2245
+    description: '审定表审定数→回写 trial_balance(2245)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K4-002
+    source_wp: K4-3
+    target_wp: A13
+    description: '调整分录→A13错报汇总（adjustment:created）'
+    direction: outbound
+    event: "adjustment:created"
+
+  - ref_id: CW-K4-003
+    source_wp: K4-1
+    target_wp: 附注
+    description: '审定表→附注披露自动刷新（substantive:adjudicated）'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K4-004
+    source_wp: K4-2
+    target_wp: K4-1
+    description: '明细表合计→审定表交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K4-005
+    source_wp: B50
+    target_wp: K4A
+    description: 'B50风险评估→K4实质性程序'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（8 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K4TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 其他流动负债实质性程序表K4A
+  # ─────────────────────────────────────────────────────────────────────────
+  其他流动负债实质性程序表K4A:
+    code: K4A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K4-1 (21行×14列, 72公式, 负债类！)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K4-1:
+    code: K4-1
+    group: core
+    dimensions: "21×14"
+    component: K4TabAdjudication
+    class_code: F-审定表
+    account_codes: ['2245']
+    formula_count: 72
+    sections:
+      - name: 其他流动负债
+        account_code: '2245'
+        direction: credit
+        balance_formula: "期末=期初+贷方-借方"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcLiabilityEndBalance, target: closing_balance, expr: "opening + credit - debit" }
+      - { name: calcTriangleReconciliation, target: triangle_diff, expr: "end - (begin + inc - dec)" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['2245']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'2245', adjudicatedAmount}" }
+    ai_section: overall-opinion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 附注披露信息（上市公司）(41行×12列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "41×12"
+    component: K4TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 附注披露信息（国有企业）(14行×12列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "14×12"
+    component: K4TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 明细表K4-2 (25行×18列, 17公式, 2区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K4-2:
+    code: K4-2
+    group: core
+    dimensions: "25×18"
+    component: K4TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 300
+    formula_count: 17
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns: [序号, 项目名称, 性质, 期初余额, 本期增加(贷方), 本期减少(借方), 期末余额]
+      - name: 检查结论
+        tab_index: 1
+        columns: [增减原因, 凭证号, 核查结论, 备注, 分类正确性, 流动性判断, 完整性, 合规性, 审计师评价, 备注2, 关联方标记]
+    import_export: true
+    add_row_prompt: itemName
+    formulas:
+      - { name: calcLiabilityDetailEnd, target: closing_balance, expr: "opening + increase(credit) - decrease(debit)" }
+    highlights:
+      - { condition: "closingBalance != opening + increase - decrease", style: red, tooltip: "期末≠期初+增(贷)-减(借)" }
+    ai_section: detail-eval
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 调整分录汇总K4-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K4-3:
+    code: K4-3
+    group: core
+    component: K4TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 其他流动负债检查表K4-4
+  # ─────────────────────────────────────────────────────────────────────────
+  其他流动负债检查表K4-4:
+    code: K4-4
+    group: inspection
+    component: K4TabCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: classification, label: 分类正确性（应否归入其他负债）, type: conclusion }
+      - { id: liquidity, label: 流动性判断（一年内到期）, type: conclusion }
+      - { id: completeness, label: 完整性（反向截止/应计未计）, type: conclusion }
+      - { id: compliance, label: 合规性（确认条件/计量/披露）, type: conclusion }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+    highlights:
+      - { condition: "conclusion == '不合规'", style: red }
+    ai_section: check-eval

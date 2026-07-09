@@ -11,151 +11,246 @@ K9管理费用底稿专属组件`k9-admin-expenses`。K循环损益类底稿（1
 
 ## Task Dependency Graph
 
-```mermaid
-graph TD
-    P0[Phase 0: 双源输入] --> P1[Phase 1: 注册+契约]
-    P1 --> P2[Phase 2: 公式引擎(损益类)+分析引擎+截止引擎+PBT]
-    P2 --> P3[Phase 3: Composable层]
-    P3 --> P4[Phase 4: Vue子组件]
-    P1 --> P5[Phase 5: 后端(损益取数)]
-    P4 --> P6[Phase 6: 集成联动]
-    P5 --> P6
-    P6 --> P7[Phase 7: 测试验收]
+```json
+{
+  "waves": [
+    {
+      "id": "wave-0",
+      "name": "Phase0 双源输入",
+      "parallel": true,
+      "tasks": [
+        "0.1",
+        "0.2"
+      ]
+    },
+    {
+      "id": "wave-1",
+      "name": "Phase1 注册+契约",
+      "tasks": [
+        "1.1",
+        "1.2"
+      ]
+    },
+    {
+      "id": "wave-2",
+      "name": "Phase2 公式/领域引擎",
+      "parallel": true,
+      "tasks": [
+        "2.1",
+        "2.2"
+      ]
+    },
+    {
+      "id": "wave-3",
+      "name": "Phase2 PBT",
+      "parallel": true,
+      "tasks": [
+        "2.3",
+        "2.4",
+        "2.5",
+        "2.6",
+        "2.7",
+        "2.8",
+        "2.9"
+      ]
+    },
+    {
+      "id": "wave-4",
+      "name": "Phase3 基础 composable",
+      "parallel": true,
+      "tasks": [
+        "3.1",
+        "3.2",
+        "3.3"
+      ]
+    },
+    {
+      "id": "wave-5",
+      "name": "Phase3 sheet composables",
+      "tasks": [
+        "3.4"
+      ]
+    },
+    {
+      "id": "wave-6",
+      "name": "Phase4 Vue 子组件",
+      "parallel": true,
+      "tasks": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "4.5",
+        "4.6"
+      ]
+    },
+    {
+      "id": "wave-7",
+      "name": "Phase5 后端三件套",
+      "parallel": true,
+      "tasks": [
+        "5.1",
+        "5.2",
+        "5.3"
+      ]
+    },
+    {
+      "id": "wave-8",
+      "name": "Phase6 集成联动",
+      "parallel": true,
+      "tasks": [
+        "6.1",
+        "6.2",
+        "6.3"
+      ]
+    },
+    {
+      "id": "wave-9",
+      "name": "Phase7 测试验收",
+      "parallel": true,
+      "tasks": [
+        "7.1",
+        "7.2",
+        "7.3"
+      ]
+    }
+  ]
+}
 ```
 
 ## Tasks
 
 ### Phase 0: 双源输入验证
 
-- [ ] 0.1 openpyxl脚本读取K9管理费用.xlsx全部12 sheet
+- [x] 0.1 openpyxl脚本读取K9管理费用.xlsx全部12 sheet
   - 产出：k9_structure_summary.json（确认K9-1 73公式/K9-4 16公式/K9-6/K9-7截止双向）
   - _Requirements: 双源输入流程_
 
-- [ ] 0.2 K管理费用循环底稿模板库md交叉验证
+- [x] 0.2 K管理费用循环底稿模板库md交叉验证
   - 核对：损益类取数/tb_ledger明细科目/实质性分析/截止双向
   - 产出：k9_conflict_resolution.md
   - _Requirements: 双源输入流程_
 
 ### Phase 1: 注册+契约测试
 
-- [ ] 1.1 注册componentType和映射
+- [x] 1.1 注册componentType和映射
   - wp_code_overrides: K9/K9-1~K9-8/K9A → 'k9-admin-expenses'
   - VALID_COMPONENT_TYPES + htmlRendererRegistry + GtK9AdminExpenses.vue骨架（sheetName v-if + selfLoad）
   - _Requirements: 1.1-1.10_
 
-- [ ] 1.2 编写注册契约测试
+- [x] 1.2 编写注册契约测试
   - _Requirements: 1.6-1.8_
 
 ### Phase 2: 公式引擎（损益类）+分析引擎+截止引擎+PBT
 
-- [ ] 2.1 创建 useK9FormulaEngine.ts（损益类！）
+- [x] 2.1 创建 useK9FormulaEngine.ts（损益类！）
   - calcAuditedAmount / calcIncomeStatementOccurrence(dr,cr)=dr-cr / calcSubtotal
   - _Requirements: 2.3-2.4, 7.1-7.4, 9.1-9.2, 9.6_
 
-- [ ] 2.2 创建 useK9AnalysisEngine.ts + useK9CutoffEngine.ts
+- [x] 2.2 创建 useK9AnalysisEngine.ts + useK9CutoffEngine.ts
   - calcYoYChange / calcRatioToRevenue / isAbnormalFluctuation / isCrossPeriod / autoSampleCutoff
   - _Requirements: 4.2-4.4, 5.3-5.4, 9.3-9.5, 9.7_
 
-- [ ]* 2.3 编写 Property CP-K9-01 PBT：审定数公式链
+- [x] 2.3 编写 Property CP-K9-01 PBT：审定数公式链
   - 断言：calcAuditedAmount(u, a, r) === u + a + r
   - **Feature: k9-admin-expenses, Property CP-K9-01: 审定数公式链**
 
-- [ ]* 2.4 编写 Property CP-K9-02 PBT：损益类发生额（借-贷）
+- [x] 2.4 编写 Property CP-K9-02 PBT：损益类发生额（借-贷）
   - 生成器：debitOcc≥0, creditOcc≥0
   - 断言：calcIncomeStatementOccurrence(dr, cr) === dr - cr
   - **Feature: k9-admin-expenses, Property CP-K9-02: 费用类发生额=借方发生-贷方发生**
 
-- [ ]* 2.5 编写 Property CP-K9-03 PBT：同比变动率
+- [x] 2.5 编写 Property CP-K9-03 PBT：同比变动率
   - 生成器：current∈R, prior≠0
   - 断言：calcYoYChange(cur, prior) === (cur - prior)/prior
   - **Feature: k9-admin-expenses, Property CP-K9-03: 同比变动率=(本期-上期)/上期**
 
-- [ ]* 2.6 编写 Property CP-K9-04 PBT：占收入比
+- [x] 2.6 编写 Property CP-K9-04 PBT：占收入比
   - 生成器：expense∈R, revenue>0
   - 断言：calcRatioToRevenue(exp, rev) === exp/rev
   - **Feature: k9-admin-expenses, Property CP-K9-04: 占收入比=费用/营业收入**
 
-- [ ]* 2.7 编写 Property CP-K9-05 PBT：异常波动判断
+- [x] 2.7 编写 Property CP-K9-05 PBT：异常波动判断
   - 断言：isAbnormalFluctuation(rate, th) === (Math.abs(rate) > th)
   - **Feature: k9-admin-expenses, Property CP-K9-05: 异常判断=|变动率|>阈值**
 
-- [ ]* 2.8 编写 Property CP-K9-06 PBT：合计行恒等
+- [x] 2.8 编写 Property CP-K9-06 PBT：合计行恒等
   - 断言：calcSubtotal(arr) === Σarr
   - **Feature: k9-admin-expenses, Property CP-K9-06: 合计行恒等**
 
-- [ ]* 2.9 编写 Property CP-K9-07 PBT：跨期判断确定性
+- [x] 2.9 编写 Property CP-K9-07 PBT：跨期判断确定性
   - 断言：sourceDate/bookDate分属不同会计期间 → isCrossPeriod=true
   - **Feature: k9-admin-expenses, Property CP-K9-07: 跨期判断确定性**
 
 ### Phase 3: Composable层
 
-- [ ] 3.1 创建 useK9FormData.ts
+- [x] 3.1 创建 useK9FormData.ts
   - selfLoad + checklist_responses + writebackTB(**发生额**，科目6602，从tb_ledger取数)
   - _Requirements: 1.9, 1.10, 2.6, 7.1-7.3_
 
-- [ ] 3.2 创建 useK9CrossSheet.ts（adjudicationVsDetail / analysisVsDetail）
+- [x] 3.2 创建 useK9CrossSheet.ts（adjudicationVsDetail / analysisVsDetail）
   - _Requirements: 2.5, 3.2, 4.6_
 
-- [ ] 3.3 创建 useK9DualMode.ts + useK9ImportExport.ts
+- [x] 3.3 创建 useK9DualMode.ts + useK9ImportExport.ts
   - _Requirements: 3.3, 8.2_
 
-- [ ] 3.4 创建 sheet-specific composables
+- [x] 3.4 创建 sheet-specific composables
   - useK9Adjudication / useK9Detail / useK9Analysis / useK9Cutoff / useK9Checks
   - _Requirements: 2~8 全部_
 
 ### Phase 4: Vue子组件
 
-- [ ] 4.1 创建 K9TabIndex.vue 底稿目录
+- [x] 4.1 创建 K9TabIndex.vue 底稿目录
   - _Requirements: 1.2_
 
-- [ ] 4.2 创建 K9TabAdjudication.vue 审定表K9-1（损益类73公式+发生额取数+按明细分行+TB回写+44行）
+- [x] 4.2 创建 K9TabAdjudication.vue 审定表K9-1（损益类73公式+发生额取数+按明细分行+TB回写+44行）
   - _Requirements: 2.1-2.7_
 
-- [ ] 4.3 创建 K9TabDetail.vue 明细表K9-2（25列3区段+tb_ledger取数+动态行+55行+导入导出）
+- [x] 4.3 创建 K9TabDetail.vue 明细表K9-2（25列3区段+tb_ledger取数+动态行+55行+导入导出）
   - _Requirements: 3.1-3.4_
 
-- [ ] 4.4 创建 K9TabSubstantiveAnalysis.vue K9-4（16公式+同比环比占比+异常标记+48行+AI辅助）
+- [x] 4.4 创建 K9TabSubstantiveAnalysis.vue K9-4（16公式+同比环比占比+异常标记+48行+AI辅助）
   - _Requirements: 4.1-4.6_
 
-- [ ] 4.5 创建 K9TabCutoffV2S.vue K9-6 + K9TabCutoffS2V.vue K9-7
+- [x] 4.5 创建 K9TabCutoffV2S.vue K9-6 + K9TabCutoffS2V.vue K9-7
   - 截止双向+自动抽样+跨期判断+跨期红标+行级抽凭
   - _Requirements: 5.1-5.6_
 
-- [ ] 4.6 创建 K9TabContractCheck.vue K9-5 + K9TabAdminCheck.vue K9-8 + K9TabAdjustment.vue + 附注（K9TabDisclosureListed/Soe.vue）
+- [x] 4.6 创建 K9TabContractCheck.vue K9-5 + K9TabAdminCheck.vue K9-8 + K9TabAdjustment.vue + 附注（K9TabDisclosureListed/Soe.vue）
   - 合同检查+综合检查+抽凭+OCR / 调整分录 / 附注双版本
   - _Requirements: 6.1-6.4, 8.1-8.2_
 
 ### Phase 5: 后端
 
-- [ ] 5.1 创建 _k9_admin_expenses.py render策略 + RENDERER_DISPATCH注册（**损益类取数**，tb_ledger发生额）
+- [x] 5.1 创建 _k9_admin_expenses.py render策略 + RENDERER_DISPATCH注册（**损益类取数**，tb_ledger发生额）
   - _Requirements: 1.6, 7.1-7.2_
 
-- [ ] 5.2 创建 _k9_import_export.py 导入导出3端点
+- [x] 5.2 创建 _k9_import_export.py 导入导出3端点
   - _Requirements: 3.3, 8.2_
 
-- [ ] 5.3 创建 _k9_ai_generate.py AI生成 + 更新 k9-admin-expenses.yaml
+- [x] 5.3 创建 _k9_ai_generate.py AI生成 + 更新 k9-admin-expenses.yaml
   - section: fluctuation-analysis / cutoff-conclusion / contract-check-eval / overall-opinion
   - _Requirements: 4.6, 8.1_
 
 ### Phase 6: 集成联动
 
-- [ ] 6.1 EventBus: TB回写(6602发生额) + substantive:adjudicated → 附注
+- [x] 6.1 EventBus: TB回写(6602发生额) + substantive:adjudicated → 附注
   - _Requirements: 2.6, 8.1_
 
-- [ ] 6.2 EventBus: adjustment:created → A13 + 附注subscribe刷新
+- [x] 6.2 EventBus: adjustment:created → A13 + 附注subscribe刷新
   - _Requirements: 8.2_
 
-- [ ] 6.3 useCutoffAutoSampling集成(序时账±5天) + 抽凭引擎 + 行级OCR + GtIndexChip + 双模式OO
+- [x] 6.3 useCutoffAutoSampling集成(序时账±5天) + 抽凭引擎 + 行级OCR + GtIndexChip + 双模式OO
   - _Requirements: 5.3, 6.3_
 
 ### Phase 7: 测试验收
 
-- [ ] 7.1 单元测试：useK9FormulaEngine + useK9AnalysisEngine + useK9CutoffEngine
+- [x] 7.1 单元测试：useK9FormulaEngine + useK9AnalysisEngine + useK9CutoffEngine
   - 损益方向(借-贷) + 同比/占比 + 异常判断 + 跨期 + 边界
   - _Requirements: CP-K9-01~07_
 
-- [ ] 7.2 集成测试：损益取数(发生额) + 实质性分析 + 截止双向 + 审定回写
+- [x] 7.2 集成测试：损益取数(发生额) + 实质性分析 + 截止双向 + 审定回写
   - _Requirements: 2.5, 4.4, 5.4, 7.1_
 
-- [ ] 7.3 Playwright E2E：打开K9→审定(验证发生额)→明细→实质性分析→截止双向→保存
+- [x] 7.3 Playwright E2E：打开K9→审定(验证发生额)→明细→实质性分析→截止双向→保存
   - _Requirements: 全部_

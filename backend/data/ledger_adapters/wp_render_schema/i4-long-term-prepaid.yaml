@@ -1,0 +1,424 @@
+# backend/data/wp_render_schema/i4-long-term-prepaid.yaml
+# I4 长期待摊费用 — 专属组件渲染 schema
+# componentType: i4-long-term-prepaid
+# 科目 1801 长期待摊费用（借方/资产类）— 标准摊销类
+# Template: I4 长期待摊费用.xlsx（12 有效 sheet）
+# 公式特征：期末=期初+增加-摊销-减少；审定=未审+AJE+RJE
+# 摊销方法：直线法(I4-6) / 工作量法(I4-7) — H折旧引擎子集
+# 创建: 2026-07-30
+
+wp_code: I4
+wp_name: 长期待摊费用
+component_type: i4-long-term-prepaid
+selfLoad: true
+template_path: backend/wp_templates/I/I4 长期待摊费用.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1801']
+related_accounts:
+  - code: '1801'
+    name: 长期待摊费用
+    direction: debit
+    category: asset
+
+special_rules:
+  amortization_methods: [straight_line, units_of_production]
+  branch_selector: true
+  triangle_reconciliation: "期末=期初+增加-摊销-减少"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（12 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    dimensions: "28×13"
+    component: I4TabIndex
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 长期待摊费用实质性程序表I4A
+  # ─────────────────────────────────────────────────────────────────────────
+  长期待摊费用实质性程序表I4A:
+    code: I4A
+    group: core
+    dimensions: "25×11"
+    component: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+      - { field: applicability, label: 适用性, type: text, width: 80 }
+    rows: 25
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表I4-1（47公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表I4-1:
+    code: I4-1
+    group: core
+    dimensions: "47×10"
+    component: I4TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1801']
+    formula_count: 47
+    columns:
+      - { field: project_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: opening_balance, label: 期初, type: number, width: 100 }
+      - { field: current_increase, label: 本期增加, type: number, width: 100 }
+      - { field: current_amortization, label: 本期摊销, type: number, width: 100 }
+      - { field: current_decrease, label: 本期减少, type: number, width: 100 }
+      - { field: closing_balance, label: 期末, type: number, width: 100, formula: "opening + increase - amortization - decrease" }
+      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_amount, label: AJE, type: number, width: 80 }
+      - { field: rje_amount, label: RJE, type: number, width: 80 }
+      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
+    formulas:
+      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + increase - amortization - decrease" }
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+    highlights:
+      - { condition: "triangle_mismatch", style: red, tooltip: "三角勾稽不平" }
+      - { condition: "tb_variance != 0", style: red }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1801']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1801', adjudicatedAmount}" }
+    footer:
+      - { type: tb_comparison, accounts: ['1801'] }
+      - { type: audit_note, label: 审计说明 }
+      - { type: audit_conclusion }
+      - { type: review_dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表I4-2（53行×25列，3区段Tab）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表I4-2:
+    code: I4-2
+    group: core
+    dimensions: "53×25"
+    component: I4TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 18
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: project_name, label: 项目名称, type: text, width: 150 }
+          - { field: start_date, label: 发生日期, type: date, width: 100 }
+          - { field: expense_type, label: 费用类型, type: select, width: 100, options: [装修费, 开办费, 租入改良, 大修理, 其他] }
+          - { field: original_amount, label: 原始金额, type: number, width: 120 }
+      - name: 摊销信息
+        tab_index: 1
+        columns:
+          - { field: amort_method, label: 摊销方法, type: select, width: 100, options: [直线法, 工作量法] }
+          - { field: total_months, label: 摊销期限(月), type: number, width: 100 }
+          - { field: elapsed_months, label: 已摊月数, type: number, width: 80 }
+          - { field: acc_amortization, label: 累计摊销, type: number, width: 110 }
+          - { field: current_amortization, label: 本期摊销, type: number, width: 100 }
+      - name: 余额信息
+        tab_index: 2
+        columns:
+          - { field: opening_balance, label: 期初余额, type: number, width: 100 }
+          - { field: current_increase, label: 本期增加, type: number, width: 100 }
+          - { field: current_decrease, label: 本期减少, type: number, width: 100 }
+          - { field: closing_balance, label: 期末余额, type: number, width: 100, formula: "opening + increase - amortization - decrease" }
+          - { field: remaining_months, label: 剩余月数, type: number, width: 80, formula: "totalMonths - elapsedMonths" }
+    formulas:
+      - { name: calcClosingBalance, target: closing_balance, expr: "opening + increase - amortization - decrease" }
+      - { name: calcRemainingMonths, target: remaining_months, expr: "totalMonths - elapsedMonths" }
+    summary_rows:
+      - { type: grand_total }
+    import_export: true
+    add_row_prompt: project_name
+    cross_refs:
+      - ref_id: CW-I4-2-001
+        target_wp: I4-1
+        description: '明细合计 → 审定表I4-1'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总I4-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总I4-3:
+    code: I4-3
+    group: core
+    dimensions: "21×10"
+    component: I4TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: adjustment_item, label: 调整事项, type: text, width: 150 }
+      - { field: entry_type, label: 类别, type: select, width: 80, options: [AJE, RJE] }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: debit_amount, label: 借方, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    highlights:
+      - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
+    import_export: false
+    add_row_prompt: adjustment_item
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+    cross_refs:
+      - ref_id: CW-I4-3-001
+        target_wp: I4-1
+        description: 'AJE/RJE汇总 → 审定表I4-1'
+        severity: required
+        direction: outbound
+      - ref_id: CW-I4-3-002
+        target_wp: A13
+        description: '调整分录 → A13错报汇总'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 摊销政策检查表I4-4
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销政策检查表I4-4:
+    code: I4-4
+    group: core
+    dimensions: "30×8"
+    component: I4TabPolicyCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS4, 企业所得税法第十三条]
+    check_items:
+      - { id: amort_method_appropriate, label: 摊销方法选择是否适当, type: conclusion, options: [适当, 不适当, 不适用] }
+      - { id: benefit_period_reasonable, label: 受益期估计是否合理, type: conclusion, options: [合理, 不合理, 不适用] }
+      - { id: policy_consistent, label: 摊销政策是否与上年一致, type: conclusion, options: [一致, 有变更, 不适用] }
+      - { id: change_treatment, label: 变更处理是否合规, type: conclusion, options: [合规, 不合规, 不适用] }
+      - { id: fully_amortized_cleared, label: 已摊完项目是否及时转销, type: conclusion, options: [已转销, 未转销, 不适用] }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 针对性检查表I4-5
+  # ─────────────────────────────────────────────────────────────────────────
+  针对性检查表I4-5:
+    code: I4-5
+    group: core
+    dimensions: "35×10"
+    component: I4TabTargetedCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS4]
+    check_items:
+      - { id: large_new_addition, label: 大额新增核查（合同/发票/金额）, type: conclusion_with_evidence }
+      - { id: benefit_period_change, label: 受益期变更（证据/影响测算）, type: conclusion_with_evidence }
+      - { id: early_termination, label: 提前终止处理（转销/损失确认）, type: conclusion_with_evidence }
+      - { id: capitalization_check, label: 费用资本化判断（是否不当资本化）, type: conclusion_with_evidence }
+      - { id: cross_period_check, label: 跨期摊销检查（起止时点准确性）, type: conclusion_with_evidence }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 摊销测算表I4-6直线法（65行×28列，39公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销测算表I4-6直线法:
+    code: I4-6
+    group: amortization
+    dimensions: "65×28"
+    component: I4TabAmortizationStraight
+    class_code: G-测算
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 39
+    columns:
+      - { field: project_name, label: 项目名称, type: text, width: 150 }
+      - { field: original_amount, label: 原始金额, type: number, width: 120 }
+      - { field: total_months, label: 摊销期限(月), type: number, width: 100 }
+      - { field: elapsed_months, label: 已摊月数, type: number, width: 80 }
+      - { field: monthly_amort, label: 月摊销额, type: number, width: 100, formula: "originalAmount / totalMonths" }
+      - { field: month01, label: 1月, type: number, width: 70 }
+      - { field: month02, label: 2月, type: number, width: 70 }
+      - { field: month03, label: 3月, type: number, width: 70 }
+      - { field: month04, label: 4月, type: number, width: 70 }
+      - { field: month05, label: 5月, type: number, width: 70 }
+      - { field: month06, label: 6月, type: number, width: 70 }
+      - { field: month07, label: 7月, type: number, width: 70 }
+      - { field: month08, label: 8月, type: number, width: 70 }
+      - { field: month09, label: 9月, type: number, width: 70 }
+      - { field: month10, label: 10月, type: number, width: 70 }
+      - { field: month11, label: 11月, type: number, width: 70 }
+      - { field: month12, label: 12月, type: number, width: 70 }
+      - { field: year_total, label: 本年摊销合计, type: number, width: 110, formula: "SUM(month01:month12)" }
+      - { field: acc_amortization, label: 累计已摊, type: number, width: 100 }
+      - { field: remaining_months, label: 剩余月数, type: number, width: 80, formula: "totalMonths - elapsedMonths" }
+      - { field: ending_balance, label: 期末余额, type: number, width: 100, formula: "originalAmount - accAmortization" }
+    formulas:
+      - { name: calcStraightLineMonthly, target: monthly_amort, expr: "originalAmount / totalMonths" }
+      - { name: calcYearTotal, target: year_total, expr: "SUM(month01..month12)" }
+      - { name: calcEndingBalance, target: ending_balance, expr: "originalAmount - accAmortization" }
+      - { name: calcRemainingMonths, target: remaining_months, expr: "totalMonths - elapsedMonths" }
+    highlights:
+      - { condition: "remaining_months <= 0", style: orange, tooltip: "已摊完待转销" }
+      - { condition: "ending_balance < 0", style: red, tooltip: "余额异常" }
+    import_export: true
+    add_row_prompt: project_name
+    cross_refs:
+      - ref_id: CW-I4-6-001
+        target_wp: I4-1
+        description: '摊销合计 → 审定表I4-1本期摊销'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 摊销测算表I4-7工作量法（65行×28列，21公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销测算表I4-7工作量法:
+    code: I4-7
+    group: amortization
+    dimensions: "65×28"
+    component: I4TabAmortizationUnits
+    class_code: G-测算
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 21
+    columns:
+      - { field: project_name, label: 项目名称, type: text, width: 150 }
+      - { field: original_amount, label: 原始金额, type: number, width: 120 }
+      - { field: total_units, label: 总预计工作量, type: number, width: 110 }
+      - { field: completed_units, label: 已完成工作量, type: number, width: 110 }
+      - { field: current_units, label: 本月工作量, type: number, width: 100 }
+      - { field: month01, label: 1月, type: number, width: 70 }
+      - { field: month02, label: 2月, type: number, width: 70 }
+      - { field: month03, label: 3月, type: number, width: 70 }
+      - { field: month04, label: 4月, type: number, width: 70 }
+      - { field: month05, label: 5月, type: number, width: 70 }
+      - { field: month06, label: 6月, type: number, width: 70 }
+      - { field: month07, label: 7月, type: number, width: 70 }
+      - { field: month08, label: 8月, type: number, width: 70 }
+      - { field: month09, label: 9月, type: number, width: 70 }
+      - { field: month10, label: 10月, type: number, width: 70 }
+      - { field: month11, label: 11月, type: number, width: 70 }
+      - { field: month12, label: 12月, type: number, width: 70 }
+      - { field: year_total, label: 本年摊销合计, type: number, width: 110, formula: "SUM(month01:month12)" }
+      - { field: acc_amortization, label: 累计已摊, type: number, width: 100 }
+      - { field: remaining_units, label: 剩余工作量, type: number, width: 100, formula: "totalUnits - completedUnits" }
+      - { field: ending_balance, label: 期末余额, type: number, width: 100, formula: "originalAmount - accAmortization" }
+    formulas:
+      - { name: calcUnitsMonthly, target: month_amort, expr: "originalAmount × (currentUnits / totalUnits)" }
+      - { name: calcYearTotal, target: year_total, expr: "SUM(month01..month12)" }
+      - { name: calcEndingBalance, target: ending_balance, expr: "originalAmount - accAmortization" }
+      - { name: calcRemainingUnits, target: remaining_units, expr: "totalUnits - completedUnits" }
+    highlights:
+      - { condition: "remaining_units <= 0", style: orange, tooltip: "工作量已用完" }
+      - { condition: "ending_balance < 0", style: red, tooltip: "余额异常" }
+    import_export: true
+    add_row_prompt: project_name
+    cross_refs:
+      - ref_id: CW-I4-7-001
+        target_wp: I4-1
+        description: '摊销合计 → 审定表I4-1本期摊销'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 附注披露信息（上市公司）（14行×13列，42公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: disclosure
+    dimensions: "14×13"
+    component: I4TabDisclosureListed
+    class_code: H-附注
+    formula_count: 42
+    variant: listed
+    columns:
+      - { field: expense_type, label: 项目类别, type: text, width: 150, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: current_increase, label: 本期增加, type: number }
+      - { field: current_amortization, label: 本期摊销, type: number }
+      - { field: current_decrease, label: 其他减少, type: number }
+      - { field: closing_balance, label: 期末余额, type: number, formula: "opening + increase - amortization - decrease" }
+      - { field: amort_method, label: 摊销方法, type: text }
+      - { field: amort_period, label: 摊销年限, type: text }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=1801" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'long_term_prepaid'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 附注披露信息（国有企业）（16行×12列，47公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: disclosure
+    dimensions: "16×12"
+    component: I4TabDisclosureSoe
+    class_code: H-附注
+    formula_count: 47
+    variant: soe
+    columns:
+      - { field: expense_type, label: 项目类别, type: text, width: 150, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: current_increase, label: 本期增加, type: number }
+      - { field: current_amortization, label: 本期摊销, type: number }
+      - { field: current_decrease, label: 其他减少, type: number }
+      - { field: closing_balance, label: 期末余额, type: number, formula: "opening + increase - amortization - decrease" }
+      - { field: remark, label: 备注, type: text }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=1801" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'long_term_prepaid'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 底稿目录索引
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录索引:
+    code: 底稿目录索引
+    group: core
+    dimensions: "12×4"
+    component: I4TabIndex
+    class_code: B-底稿目录
+    layout:
+      type: simple_index
+      columns:
+        - { field: seq, label: 序号, type: number, width: 50 }
+        - { field: sheet_name, label: Sheet名称, type: text, width: 200 }
+        - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+        - { field: status, label: 状态, type: text, width: 80 }

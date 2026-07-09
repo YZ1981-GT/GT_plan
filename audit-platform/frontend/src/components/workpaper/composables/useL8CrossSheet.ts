@@ -148,8 +148,8 @@ export function useL8CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
 
   eventBus.on('l1:interest-calculated', _onL1InterestCalculated)
   eventBus.on('l3:interest-calculated', _onL3InterestCalculated)
-  eventBus.on('l4:interest-calculated' as any, _onL4InterestCalculated)
-  eventBus.on('l5:amortization-calculated' as any, _onL5AmortizationCalculated)
+  eventBus.on('l4:interest-calculated', _onL4InterestCalculated)
+  eventBus.on('l5:amortization-calculated', _onL5AmortizationCalculated)
 
   // ─── 初始化：从 allResponses 读取已持久化的利息数据 ─────────────────────────
 
@@ -288,8 +288,8 @@ export function useL8CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   onScopeDispose(() => {
     eventBus.off('l1:interest-calculated', _onL1InterestCalculated)
     eventBus.off('l3:interest-calculated', _onL3InterestCalculated)
-    eventBus.off('l4:interest-calculated' as any, _onL4InterestCalculated)
-    eventBus.off('l5:amortization-calculated' as any, _onL5AmortizationCalculated)
+    eventBus.off('l4:interest-calculated', _onL4InterestCalculated)
+    eventBus.off('l5:amortization-calculated', _onL5AmortizationCalculated)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────

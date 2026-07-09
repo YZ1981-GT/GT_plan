@@ -15,6 +15,17 @@ export type D1AiSection =
   | 'memo-audit-conclusion'
   | 'sampling-audit-note'
   | 'sampling-audit-conclusion'
+  | 'detail-audit-procedures'
+  | 'detail-audit-note'
+  | 'detail-audit-conclusion'
+  | 'baddebt-audit-procedures'
+  | 'baddebt-audit-note'
+  | 'baddebt-audit-conclusion'
+  | 'bm-audit-procedures'
+  | 'bm-audit-note'
+  | 'bm-audit-conclusion'
+  | 'adj-note'
+  | 'adj-conclusion'
 
 export interface D1AiGenerateParams {
   section: D1AiSection
@@ -25,6 +36,22 @@ export interface D1AiGenerateParams {
 export function useD1AiGenerate(wpId: Ref<string>) {
   const aiAvailable = ref(false)
   const loading = ref(false)
+
+  function isUserCancelled(err: unknown): boolean {
+    if (!err) return false
+    if (typeof err === 'string') {
+      const v = err.toLowerCase()
+      return v === 'cancel' || v === 'close' || v === 'abort'
+    }
+    const anyErr = err as any
+    const action = String(anyErr?.action || '').toLowerCase()
+    const message = String(anyErr?.message || '').toLowerCase()
+    return action === 'cancel'
+      || action === 'close'
+      || message === 'cancel'
+      || message === 'close'
+      || message === 'abort'
+  }
 
   async function checkAiHealth(): Promise<void> {
     try {
@@ -75,7 +102,7 @@ export function useD1AiGenerate(wpId: Ref<string>) {
       })
       return text
     } catch (err: any) {
-      if (err !== 'cancel' && err?.message !== 'cancel') {
+      if (!isUserCancelled(err)) {
         ElMessage.warning('AI 生成失败')
       }
       return null

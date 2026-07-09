@@ -1065,39 +1065,55 @@ def _load_enabled_rule_codes_sync() -> set[str]:
     用于启动时 register_phase14_rules 的同步上下文。
     非 python 类型规则记 warning 并跳过。
     """
-    from sqlalchemy import create_engine as create_sync_engine, select as sync_select, text as sync_text
+    import concurrent.futures
+
+    def _in_isolated_thread() -> set[str]:
+        import asyncio
+        import sys
+
+        if sys.platform == "win32":
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        return asyncio.run(_load_enabled_rule_codes_async())
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        return pool.submit(_in_isolated_thread).result(timeout=30)
+
+
+async def _load_enabled_rule_codes_async() -> set[str]:
+    """asyncpg 裸查询，避免 lifespan greenlet 栈内 SQLAlchemy ORM/sync 引擎递归溢出。"""
+    from urllib.parse import urlparse
+
+    import asyncpg
+
     from app.core.config import settings
 
-    # 尝试用同步引擎快速查询
+    raw = str(settings.DATABASE_URL).replace("postgresql+asyncpg://", "postgresql://")
+    parsed = urlparse(raw)
+    conn = await asyncpg.connect(
+        host=parsed.hostname or "localhost",
+        port=parsed.port or 5432,
+        user=parsed.username or "postgres",
+        password=parsed.password or "",
+        database=(parsed.path or "/audit_platform").lstrip("/"),
+    )
     try:
-        from app.models.qc_rule_models import QcRuleDefinition
-        from app.models.base import Base
-        import sqlalchemy as sa_sync
+        rows = await conn.fetch(
+            "SELECT rule_code, expression_type "
+            "FROM qc_rule_definitions WHERE enabled IS TRUE"
+        )
+    finally:
+        await conn.close()
 
-        db_url = str(settings.DATABASE_URL)
-        # 转换 async URL 为 sync URL
-        if "aiosqlite" in db_url:
-            db_url = db_url.replace("sqlite+aiosqlite", "sqlite")
-        elif "asyncpg" in db_url:
-            db_url = db_url.replace("postgresql+asyncpg", "postgresql")
-
-        sync_engine = create_sync_engine(db_url, echo=False)
-        with sync_engine.connect() as conn:
-            result = conn.execute(
-                sa_sync.select(
-                    QcRuleDefinition.rule_code,
-                    QcRuleDefinition.expression_type,
-                ).where(QcRuleDefinition.enabled == sa_sync.true())
+    enabled_codes: set[str] = set()
+    for row in rows:
+        rule_code = row["rule_code"]
+        expression_type = row["expression_type"]
+        if expression_type != "python":
+            logger.warning(
+                "R6 stub: non-python rule ignored: %s (type=%s)",
+                rule_code,
+                expression_type,
             )
-            rows = result.all()
-
-        enabled_codes: set[str] = set()
-        for rule_code, expression_type in rows:
-            if expression_type != "python":
-                logger.warning("R6 stub: non-python rule ignored: %s (type=%s)", rule_code, expression_type)
-                continue
-            enabled_codes.add(rule_code)
-        sync_engine.dispose()
-        return enabled_codes
-    except Exception:
-        raise
+            continue
+        enabled_codes.add(rule_code)
+    return enabled_codes

@@ -13,20 +13,20 @@ H7生产性生物资产底稿专属组件`h7-biological-assets`。行业特殊+�
 
 ### Phase 0: 双源输入验证
 
-- [ ] 0.1 openpyxl脚本读取H7生产性生物资产.xlsx全部26 sheet
+- [x] 0.1 openpyxl脚本读取H7生产性生物资产.xlsx全部26 sheet
   - 提取：sheet名/列头/行数/公式/合并区域/数据类型
   - 产出：h7_structure_summary.json
   - 验证：26 sheet结构（含双模式sheet对）与本spec一致
   - _Requirements: 双源输入流程_
 
-- [ ] 0.2 H固定资产循环底稿模板库md交叉验证
+- [x] 0.2 H固定资产循环底稿模板库md交叉验证
   - 核对：行业适用性/双计量模式/互转规则/产量记录
   - 产出：h7_conflict_resolution.md
   - _Requirements: 双源输入流程_
 
 ### Phase 1: 注册+契约测试
 
-- [ ] 1.1 注册componentType和映射
+- [x] 1.1 注册componentType和映射
   - wp_code_overrides: H7/H7-1~H7-17/H7A → 'h7-biological-assets'
   - VALID_COMPONENT_TYPES + htmlRendererRegistry注册
   - 创建 GtH7BiologicalAssets.vue 骨架（sheetName v-if + measurementModel + 行业守卫 + selfLoad）

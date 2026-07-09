@@ -37,4 +37,25 @@ describe('useD1AiGenerate', () => {
       expect.any(Object),
     )
   })
+
+  it.each(['detail-audit-note', 'detail-audit-conclusion'] as const)(
+    'supports D1-2 section %s',
+    async (section) => {
+      vi.mocked(http.post).mockResolvedValue({
+        data: { data: { content: `${section} 初稿` } },
+      })
+      const { generate } = useD1AiGenerate(wpId)
+      const text = await generate({
+        section,
+        existingContent: '',
+        relatedContext: { sheet: 'D1-2' },
+      })
+      expect(text).toBe(`${section} 初稿`)
+      expect(http.post).toHaveBeenCalledWith(
+        '/api/workpapers/wp-d1/d1/ai-generate',
+        expect.objectContaining({ section }),
+        expect.any(Object),
+      )
+    },
+  )
 })

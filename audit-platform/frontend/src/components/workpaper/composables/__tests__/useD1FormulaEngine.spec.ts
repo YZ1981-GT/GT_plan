@@ -524,3 +524,27 @@ describe('Feature: d1-endorsement-discount, Property 12: 贴息差异高亮判�
     expect(isHighlighted(0)).toBe(false)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// D1-7 备查簿公式
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('D1-7 memo formulas', () => {
+  it('calcMemoEndingBalance rolls movement columns', async () => {
+    const { calcMemoEndingBalance } = await import('../useD1FormulaEngine')
+    expect(calcMemoEndingBalance(100, 50, 20, 10, 5)).toBe(115)
+  })
+
+  it('isHighCreditBank matches major banks', async () => {
+    const { isHighCreditBank } = await import('../useD1FormulaEngine')
+    expect(isHighCreditBank('中国工商银行股份有限公司')).toBe(true)
+    expect(isHighCreditBank('某地方农商行')).toBe(false)
+  })
+
+  it('calcUnexpiredEndorsedDiscounted requires unmatured discounted/endorsed', async () => {
+    const { calcUnexpiredEndorsedDiscounted } = await import('../useD1FormulaEngine')
+    expect(calcUnexpiredEndorsedDiscounted(1000, '已贴现', '2024-06-30', '2023-12-31')).toBe(1000)
+    expect(calcUnexpiredEndorsedDiscounted(1000, '已贴现', '2023-06-30', '2023-12-31')).toBe(0)
+    expect(calcUnexpiredEndorsedDiscounted(1000, '持有', '2024-06-30', '2023-12-31')).toBe(0)
+  })
+})

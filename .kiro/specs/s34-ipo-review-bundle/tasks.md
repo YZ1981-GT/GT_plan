@@ -85,26 +85,26 @@
   - [x] 8.3 专项 Tab 顶部 regRef「方法论上下文」区块（琥珀色左边线）
     - _Requirements: 12.2_
 
-- [ ] 9. 前端注册与完成仪表盘
-  - [ ] 9.1 htmlRendererRegistry 注册 `s34-ipo-bundle`（defineAsyncComponent, contextProps standard）
+- [x] 9. 前端注册与完成仪表盘
+  - [x] 9.1 htmlRendererRegistry 注册 `s34-ipo-bundle`（defineAsyncComponent, contextProps standard）
     - _Requirements: 1.1, 1.3, 1.4_
-  - [~] 9.2 页签栏上方完成进度仪表盘（三色，联动 overview）
+  - [x] 9.2 页签栏上方完成进度仪表盘（三色，联动 overview）
     - _Requirements: 10.2, 10.3, 10.4_
 
-- [ ] 10. PBT（fast-check，≥100 次/property）
-  - [~] 10.1 P1 skip 映射完整性 / P2 wp_id 解析 / P3 Tab 可见性
+- [x] 10. PBT（fast-check，≥100 次/property）
+  - [x] 10.1 P1 skip 映射完整性 / P2 wp_id 解析 / P3 Tab 可见性
     - _Requirements: 1.2, 2.1, 2.2, 2.4, 8.1, 8.3, 8.4, 4.1, 9.1, 9.4_
-  - [~] 10.2 P4 sheetName 路由 / P5 进度统计 / P6 法规溯源
+  - [x] 10.2 P4 sheetName 路由 / P5 进度统计 / P6 法规溯源
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 10.1, 10.2, 12.1, 12.3, 12.4_
-  - [~] 10.3 P7 readonly 透传 / P8 子表汇总公式确定性
+  - [x] 10.3 P7 readonly 透传 / P8 子表汇总公式确定性
     - _Requirements: 11.1, 11.2, 11.3, 5.2, 5.5_
 
-- [ ] 11. 集成测试与 Playwright 实测
-  - [~] 11.1 挂载 mock wp_index + S34-0 API，验证 overview→Tab、子组件渲染、regRef 上下文
+- [x] 11. 集成测试与 Playwright 实测
+  - [x] 11.1 挂载 mock wp_index + S34-0 API，验证 overview→Tab、子组件渲染、regRef 上下文
     - _Requirements: 3.1, 3.3, 4.4_
-  - [~] 11.2 Playwright：点击 S34 → 分组页签切换 → 子检查表填写重算 → 只读模式
+  - [x] 11.2 Playwright：点击 S34 → 分组页签切换 → 子检查表填写重算 → 只读模式
     - _Requirements: 4.2, 5.2, 11.1_
-  - [~] 11.3 空状态（无 S34 专项）仅显示 overview
+  - [x] 11.3 空状态（无 S34 专项）仅显示 overview
     - _Requirements: 9.4_
 
 ## Notes

@@ -37,8 +37,11 @@ vi.mock('element-plus', () => ({
   ElMessage: { error: vi.fn(), success: vi.fn(), warning: vi.fn() },
   ElDrawer: { name: 'ElDrawer', template: '<div><slot /><slot name="header" /></div>' },
   ElDialog: { name: 'ElDialog', template: '<div><slot /><slot name="footer" /></div>' },
+  ElBadge: { name: 'ElBadge', template: '<span><slot /></span>', props: ['value', 'type'] },
   ElButton: { name: 'ElButton', template: '<button><slot /></button>', props: ['disabled', 'icon', 'type', 'link', 'loading', 'circle', 'size'] },
   ElInput: { name: 'ElInput', template: '<textarea />', props: ['modelValue', 'type', 'rows', 'placeholder', 'resize'] },
+  ElSelect: { name: 'ElSelect', template: '<select><slot /></select>', props: ['modelValue', 'clearable', 'filterable', 'placeholder'] },
+  ElOption: { name: 'ElOption', template: '<option />', props: ['label', 'value'] },
 }))
 
 vi.mock('@element-plus/icons-vue', () => ({
@@ -47,6 +50,17 @@ vi.mock('@element-plus/icons-vue', () => ({
 
 import http from '@/utils/http'
 import { useReviewDialog, type GtReviewDialogProps, type ReviewMessage } from '../useReviewDialog'
+
+const DIALOG_STUBS = {
+  'el-drawer': { template: '<div class="mock-drawer"><slot /><slot name="header" /></div>', props: ['modelValue', 'size', 'direction', 'beforeClose', 'showClose'] },
+  'el-dialog': { template: '<div class="mock-dialog"><slot /><slot name="footer" /></div>', props: ['modelValue', 'width', 'title', 'closeOnClickModal'] },
+  'el-button': { template: '<button :disabled="disabled"><slot /></button>', props: ['disabled', 'icon', 'type', 'link', 'loading', 'circle', 'size'] },
+  'el-badge': { template: '<span><slot /></span>', props: ['value', 'type'] },
+  'el-input': { template: '<textarea />', props: ['modelValue', 'type', 'rows', 'placeholder', 'resize'] },
+  'el-select': { template: '<select><slot /></select>', props: ['modelValue', 'clearable', 'filterable', 'placeholder', 'multiple'] },
+  'el-option': { template: '<option />', props: ['label', 'value'] },
+  'el-switch': { template: '<input type="checkbox" />', props: ['modelValue', 'inlinePrompt', 'activeText', 'inactiveText'] },
+}
 
 // ── Helper: run composable in Vue app context ────────────────────────────────
 
@@ -337,12 +351,7 @@ describe('7.4 GtReviewDialog 组件渲染', () => {
     const wrapper = mount(GtReviewDialog, {
       props: baseProps,
       global: {
-        stubs: {
-          'el-drawer': { template: '<div class="mock-drawer"><slot /><slot name="header" /></div>', props: ['modelValue', 'size', 'direction', 'beforeClose', 'showClose'] },
-          'el-dialog': { template: '<div class="mock-dialog"><slot /><slot name="footer" /></div>', props: ['modelValue', 'width', 'title', 'closeOnClickModal'] },
-          'el-button': { template: '<button :disabled="disabled"><slot /></button>', props: ['disabled', 'icon', 'type', 'link', 'loading', 'circle', 'size'] },
-          'el-input': { template: '<textarea />', props: ['modelValue', 'type', 'rows', 'placeholder', 'resize'] },
-        },
+        stubs: DIALOG_STUBS,
       },
     })
     await nextTick()
@@ -362,12 +371,7 @@ describe('7.4 GtReviewDialog 组件渲染', () => {
     const wrapper = mount(GtReviewDialog, {
       props: readOnlyProps,
       global: {
-        stubs: {
-          'el-drawer': { template: '<div class="mock-drawer"><slot /><slot name="header" /></div>', props: ['modelValue', 'size', 'direction', 'beforeClose', 'showClose'] },
-          'el-dialog': { template: '<div class="mock-dialog"><slot /><slot name="footer" /></div>', props: ['modelValue', 'width', 'title', 'closeOnClickModal'] },
-          'el-button': { template: '<button :disabled="disabled"><slot /></button>', props: ['disabled', 'icon', 'type', 'link', 'loading', 'circle', 'size'] },
-          'el-input': { template: '<textarea />', props: ['modelValue', 'type', 'rows', 'placeholder', 'resize'] },
-        },
+        stubs: DIALOG_STUBS,
       },
     })
     await nextTick()
@@ -382,12 +386,7 @@ describe('7.4 GtReviewDialog 组件渲染', () => {
     const wrapper = mount(GtReviewDialog, {
       props: baseProps,
       global: {
-        stubs: {
-          'el-drawer': { template: '<div class="mock-drawer"><slot /><slot name="header" /></div>', props: ['modelValue', 'size', 'direction', 'beforeClose', 'showClose'] },
-          'el-dialog': { template: '<div class="mock-dialog"><slot /><slot name="footer" /></div>', props: ['modelValue', 'width', 'title', 'closeOnClickModal'] },
-          'el-button': { template: '<button :disabled="disabled"><slot /></button>', props: ['disabled', 'icon', 'type', 'link', 'loading', 'circle', 'size'] },
-          'el-input': { template: '<textarea />', props: ['modelValue', 'type', 'rows', 'placeholder', 'resize'] },
-        },
+        stubs: DIALOG_STUBS,
       },
     })
     // Wait for openDialog in onMounted

@@ -132,7 +132,11 @@ export const D1_PROC_INDEX_SHEET_MAP: Record<string, string> = {
 
   'D1-8': D1_SHEET_LABEL_MAP['D1-8'],
 
+  'D1-9': D1_SHEET_LABEL_MAP['D1-9'],
+
   'D1-10': D1_SHEET_LABEL_MAP['D1-10'],
+
+  'D1-11': D1_SHEET_LABEL_MAP['D1-11'],
 
   'D1-12': D1_SHEET_LABEL_MAP['D1-12'],
 
@@ -141,6 +145,8 @@ export const D1_PROC_INDEX_SHEET_MAP: Record<string, string> = {
   'D1-14': D1_SHEET_LABEL_MAP['D1-14'],
 
   'D1-15': D1_SHEET_LABEL_MAP['D1-15'],
+
+  'D1-16': D1_SHEET_LABEL_MAP['D1-16'],
 
 }
 

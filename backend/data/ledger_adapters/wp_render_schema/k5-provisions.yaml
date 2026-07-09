@@ -1,0 +1,340 @@
+# backend/data/ledger_adapters/wp_render_schema/k5-provisions.yaml
+# K5 预计负债 — 专属组件渲染 schema
+# componentType: k5-provisions
+# 科目 2701 预计负债（贷方/负债类）
+# Template: K5 预计负债.xlsx（11 sheets: 1索引+10业务）
+# 公式特征：期末=期初+计提-转销（负债类）；审定=未审+AJE+RJE
+#           或有事项三级可能性(CAS13) + 最佳估计数(单值/区间中值/期望值加权)
+# 创建: 2026-07-30
+
+wp_code: K5
+wp_name: 预计负债
+component_type: k5-provisions
+selfLoad: true
+template_path: backend/wp_templates/K/K5 预计负债.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['2701']
+related_accounts:
+  - code: '2701'
+    name: 预计负债
+    direction: credit
+    category: liability
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - litigation-eval
+  - warranty-conclusion
+  - decommission-conclusion
+  - contingency-disclosure
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿交叉引用（cross_wp_references）
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_references:
+  - ref_id: CW-K5-001
+    source_wp: K5-1
+    target_wp: TB:2701
+    description: '审定表审定数→回写 trial_balance(2701)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K5-002
+    source_wp: K5-3
+    target_wp: A13
+    description: '调整分录→A13错报汇总（adjustment:created）'
+    direction: outbound
+    event: "adjustment:created"
+
+  - ref_id: CW-K5-003
+    source_wp: K5-1
+    target_wp: 附注
+    description: '审定表→附注披露自动刷新（substantive:adjudicated）'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K5-004
+    source_wp: K5-2
+    target_wp: K5-1
+    description: '明细表合计→审定表交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K5-005
+    source_wp: K5-4
+    target_wp: K5-1
+    description: '产品质保测算→审定表质保行交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K5-006
+    source_wp: K5-5
+    target_wp: K5-1
+    description: '弃置费用现值→审定表弃置义务行交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K5-007
+    source_wp: K5-6
+    target_wp: K5-1
+    description: '未决诉讼预计损失→审定表诉讼行交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K5-008
+    source_wp: K5-2
+    target_wp: 附注
+    description: '明细表可能级别→附注或有负债披露（disclose项）'
+    direction: outbound
+
+  - ref_id: CW-K5-009
+    source_wp: B50
+    target_wp: K5A
+    description: 'B50风险评估→K5实质性程序'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（11 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K5TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 预计负债实质性程序表K5A
+  # ─────────────────────────────────────────────────────────────────────────
+  预计负债实质性程序表K5A:
+    code: K5A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K5-1 (25行×12列, 115公式, 负债类！)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K5-1:
+    code: K5-1
+    group: core
+    dimensions: "25×12"
+    component: K5TabAdjudication
+    class_code: F-审定表
+    account_codes: ['2701']
+    formula_count: 115
+    sections:
+      - name: 产品质量保证
+        account_code: '2701'
+        direction: credit
+        balance_formula: "期末=期初+计提-转销"
+      - name: 未决诉讼
+        account_code: '2701'
+        direction: credit
+        balance_formula: "期末=期初+计提-转销"
+      - name: 亏损合同
+        account_code: '2701'
+        direction: credit
+        balance_formula: "期末=期初+计提-转销"
+      - name: 重组义务
+        account_code: '2701'
+        direction: credit
+        balance_formula: "期末=期初+计提-转销"
+      - name: 弃置义务
+        account_code: '2701'
+        direction: credit
+        balance_formula: "期末=期初+计提-转销"
+      - name: 其他
+        account_code: '2701'
+        direction: credit
+        balance_formula: "期末=期初+计提-转销"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcLiabilityEndBalance, target: closing_balance, expr: "opening + provision - release" }
+      - { name: calcTriangleReconciliation, target: triangle_diff, expr: "end - (begin + provision - release)" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['2701']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'2701', adjudicatedAmount}" }
+    ai_section: overall-opinion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 附注披露信息（上市公司）(16行×12列 + 或有负债披露段)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "16×12"
+    component: K5TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    contingency_disclosure: true
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+    ai_section: contingency-disclosure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 附注披露信息（国有企业）(31行×14列 + 或有负债披露段)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "31×14"
+    component: K5TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    contingency_disclosure: true
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+    ai_section: contingency-disclosure
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 明细表K5-2 (42行×23列, 3区段Tab + 或有判断 + 三级色标)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K5-2:
+    code: K5-2
+    group: core
+    dimensions: "42×23"
+    component: K5TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 500
+    virtual_scroll: true
+    formula_count: 42
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns: [序号, 项目名称, 类型, 现时义务描述, 期初余额, 期末余额]
+      - name: 或有判断
+        tab_index: 1
+        columns: [可能性级别, 是否确认, 确认依据, 计量方法, 最佳估计数, 上限, 下限, 期望值]
+      - name: 审计检查
+        tab_index: 2
+        columns: [本期计提, 本期转销, 凭证号, 结论, 备注, 关联方标记, 审计师评价, 弃置标记, 质保标记]
+    import_export: true
+    add_row_prompt: itemName
+    formulas:
+      - { name: calcLiabilityDetailEnd, target: closing_balance, expr: "opening + provision - release" }
+    highlights:
+      - { condition: "closingBalance != opening + provision - release", style: red, tooltip: "期末≠期初+计提-转销" }
+      - { condition: "likelihoodLevel == 'very_likely'", style: red_bg, tooltip: "很可能(>50%)→确认预计负债" }
+      - { condition: "likelihoodLevel == 'possible'", style: orange_bg, tooltip: "可能→披露或有负债" }
+      - { condition: "likelihoodLevel == 'remote'", style: grey_bg, tooltip: "极小可能→不处理" }
+    contingency_engine: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 调整分录汇总K5-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K5-3:
+    code: K5-3
+    group: core
+    component: K5TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 产品质量保修检查表K5-4
+  # ─────────────────────────────────────────────────────────────────────────
+  产品质量保修检查表K5-4:
+    code: K5-4
+    group: contingency
+    component: K5TabWarrantyCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    formulas:
+      - { name: calcWarrantyProvision, target: expected_warranty, expr: "revenue × rate" }
+    cross_verify:
+      target_sheet: K5-1
+      target_row: 产品质量保证
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+    ai_section: warranty-conclusion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 弃置费用检查表K5-5
+  # ─────────────────────────────────────────────────────────────────────────
+  弃置费用检查表K5-5:
+    code: K5-5
+    group: contingency
+    component: K5TabDecommissionCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    formulas:
+      - { name: calcPresentValue, target: present_value, expr: "future / (1 + rate) ^ years" }
+      - { name: calcInterestAdjustment, target: interest_adj, expr: "opening_pv × rate" }
+    cross_verify:
+      target_sheet: K5-1
+      target_row: 弃置义务
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+    ai_section: decommission-conclusion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 未决诉讼检查表K5-6
+  # ─────────────────────────────────────────────────────────────────────────
+  未决诉讼检查表K5-6:
+    code: K5-6
+    group: contingency
+    component: K5TabLitigationCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    contingency_engine: true
+    check_items:
+      - { id: caseInfo, label: 案件基本情况, type: text }
+      - { id: disputeAmount, label: 涉案金额, type: number }
+      - { id: litigationStage, label: 诉讼阶段, type: select, options: [一审, 二审, 执行, 仲裁, 调解] }
+      - { id: lawyerOpinion, label: 律师意见, type: text }
+      - { id: lossLikelihood, label: 败诉可能性, type: select, options: [很可能, 可能, 极小可能] }
+      - { id: estimatedLoss, label: 预计损失, type: number }
+      - { id: isRecognized, label: 是否确认预计负债, type: conclusion }
+      - { id: disclosureRequired, label: 是否需要披露, type: conclusion }
+    cross_verify:
+      target_sheet: K5-1
+      target_row: 未决诉讼
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - row_ocr: { target: lawyer_letter, endpoint: contract-ocr }
+    ai_section: litigation-eval
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 预计负债检查表K5-7
+  # ─────────────────────────────────────────────────────────────────────────
+  预计负债检查表K5-7:
+    code: K5-7
+    group: contingency
+    component: K5TabProvisionCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: obligationExist, label: 现时义务是否存在, type: conclusion }
+      - { id: outflowLikely, label: 经济利益流出是否很可能, type: conclusion }
+      - { id: amountReliable, label: 金额能否可靠计量, type: conclusion }
+      - { id: classificationCorrect, label: 分类是否正确（流动vs非流动）, type: conclusion }
+      - { id: disclosureComplete, label: 披露是否完整, type: conclusion }
+      - { id: measureMethodAppropriate, label: 计量方法是否恰当, type: conclusion }
+      - { id: subsequentEvent, label: 期后事项影响, type: conclusion }
+    highlights:
+      - { condition: "conclusion == '不合规'", style: red }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }

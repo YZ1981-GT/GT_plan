@@ -183,12 +183,7 @@
 
       <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
 
-      <GtReviewDialog
-        v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
-        :key="reviewDialog.activationParams.value.sectionId"
-        v-bind="reviewDialog.activationParams.value"
-        @closed="reviewDialog.closeReviewDialog"
-      />
+      <GtWpReviewDialogHost />
     </template>
   </div>
 </template>
@@ -224,7 +219,7 @@ const F2TabInterviewDetail = defineAsyncComponent(() => import('./f2-special/ipo
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -298,7 +293,7 @@ const useGridFallback = computed(() => {
 
 const wpIdRef = toRef(props, 'wpId')
 const projectIdRef = toRef(props, 'projectId')
-const reviewDialog = useF2ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
+useF2ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const externalAdjudicated = useF2SpeExternalAdjudicated({
   onRefresh: () => formData.loadAll(),

@@ -94,7 +94,13 @@ export function useM5CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    *
    * 接收后自动持久化到 checklist_responses，防止刷新丢失（复盘铁律②）
    */
-  function _onM6NetProfit(payload: any): void {
+  function _onM6NetProfit(payload: {
+    wpCode?: string
+    netProfit?: number
+    accrualBase?: number
+    amount?: number
+    timestamp?: number
+  }): void {
     const value = parseNum(payload?.accrualBase ?? payload?.netProfit ?? payload?.amount)
     _m6NetProfit.value = value
     // 持久化到 checklist_responses（下次 selfLoad 可恢复，不依赖同会话事件）
@@ -108,7 +114,7 @@ export function useM5CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
 
   // ─── 订阅 EventBus ─────────────────────────────────────────────────────────
 
-  eventBus.on('m6:net-profit' as any, _onM6NetProfit)
+  eventBus.on('m6:net-profit', _onM6NetProfit)
 
   // ─── 初始化：从 allResponses 读取已持久化的联动数据 ─────────────────────────
 
@@ -210,7 +216,7 @@ export function useM5CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
       totalAccrual: statutoryAccrual + discretionaryAccrual,
       timestamp: Date.now(),
     }
-    eventBus.emit('m5:surplus-accrual' as any, payload)
+    eventBus.emit('m5:surplus-accrual', payload)
   }
 
   // ─── 4. 跨底稿引用定义 ────────────────────────────────────────────────────
@@ -237,7 +243,7 @@ export function useM5CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // ─── 5. Cleanup — 组件卸载时取消 EventBus 订阅 ─────────────────────────────
 
   onScopeDispose(() => {
-    eventBus.off('m6:net-profit' as any, _onM6NetProfit)
+    eventBus.off('m6:net-profit', _onM6NetProfit)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────

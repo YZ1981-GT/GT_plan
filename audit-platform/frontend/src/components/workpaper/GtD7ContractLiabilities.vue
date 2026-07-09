@@ -143,6 +143,13 @@
         />
       </template>
     </template>
+
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d7ReviewSection.id"
+      :section-label="d7ReviewSection.label"
+    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -156,6 +163,9 @@ import { useD7CrossSheet } from './composables/useD7CrossSheet'
 import { useD7EntryDualMode, type D7RenderMode } from './composables/useD7EntryDualMode'
 import { resolveD7SheetCode } from './composables/useD7SheetRouting'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
+import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { useD7ReviewThreads } from './composables/useD7ReviewThreads'
 import D7TabIndex from './d7/D7TabIndex.vue'
@@ -205,6 +215,7 @@ const {
 const crossSheet = useD7CrossSheet({ allResponses })
 
 const currentSheet = computed(() => resolveD7SheetCode(props.sheetName || 'D7'))
+const d7ReviewSection = computed(() => resolveCycleReviewSection('D7', currentSheet.value))
 
 const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],

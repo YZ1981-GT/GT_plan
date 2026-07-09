@@ -55,6 +55,9 @@ export interface UseD1DetailCategoryOptions {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'D1-cat-rows'
+const PROCEDURES_KEY = 'D1-cat-procedures'
+const NOTE_KEY = 'D1-cat-note'
+const CONCLUSION_KEY = 'D1-cat-conclusion'
 
 const DEFAULT_FIXED_ROWS: CategoryRow[] = [
   {
@@ -121,10 +124,20 @@ export function useD1DetailCategory(options: UseD1DetailCategoryOptions) {
   // ─── State ───────────────────────────────────────────────────────────────
 
   const rows = ref<CategoryRow[]>([...DEFAULT_FIXED_ROWS.map(r => ({ ...r }))])
+  const auditProcedures = ref<string>('')
+  const auditNote = ref<string>('')
+  const auditConclusion = ref<string>('')
 
   // ─── Deserialization (Load from allResponses) ────────────────────────────
 
+  function loadMetaFromResponses(): void {
+    auditProcedures.value = allResponses.value.get(PROCEDURES_KEY)?.remark ?? ''
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark ?? ''
+    auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
+  }
+
   function loadFromResponses(): void {
+    loadMetaFromResponses()
     const response = allResponses.value.get(STORAGE_KEY)
     const raw = response?.remark
     if (!raw) {
@@ -178,10 +191,61 @@ export function useD1DetailCategory(options: UseD1DetailCategoryOptions) {
 
   // Watch allResponses for external changes (e.g., from other tabs or OO sync)
   watch(
-    () => allResponses.value.get(STORAGE_KEY)?.remark,
-    (newRemark, oldRemark) => {
-      if (newRemark !== oldRemark && newRemark !== serializeRows()) {
-        loadFromResponses()
+    () => [
+      allResponses.value.get(STORAGE_KEY)?.remark,
+      allResponses.value.get(PROCEDURES_KEY)?.remark,
+      allResponses.value.get(NOTE_KEY)?.remark,
+      allResponses.value.get(CONCLUSION_KEY)?.remark,
+    ],
+    ([newRows, newProcedures, newNote, newConclusion], [oldRows, oldProcedures, oldNote, oldConclusion]) => {
+      if (newProcedures !== oldProcedures && newProcedures !== auditProcedures.value) {
+        auditProcedures.value = newProcedures ?? ''
+      }
+      if (newNote !== oldNote && newNote !== auditNote.value) {
+        auditNote.value = newNote ?? ''
+      }
+      if (newConclusion !== oldConclusion && newConclusion !== auditConclusion.value) {
+        auditConclusion.value = newConclusion ?? ''
+      }
+      if (newRows !== oldRows && newRows !== serializeRows()) {
+        const response = allResponses.value.get(STORAGE_KEY)
+        const raw = response?.remark
+        if (!raw) {
+          rows.value = DEFAULT_FIXED_ROWS.map(r => recalcRow({ ...r }))
+          return
+        }
+        try {
+          const parsed = JSON.parse(raw)
+          if (!Array.isArray(parsed) || parsed.length === 0) {
+            rows.value = DEFAULT_FIXED_ROWS.map(r => recalcRow({ ...r }))
+            return
+          }
+          const loadedRows: CategoryRow[] = parsed.map((r: any) => recalcRow({
+            rowId: r.rowId || generateRowId(),
+            category: r.category || '',
+            isFixed: Boolean(r.isFixed),
+            priorUnadjusted: parseNum(r.priorUnadjusted),
+            priorAje: parseNum(r.priorAje),
+            priorRje: parseNum(r.priorRje),
+            priorAudited: 0,
+            currentIncrease: parseNum(r.currentIncrease),
+            currentDecrease: parseNum(r.currentDecrease),
+            currentUnadjusted: 0,
+            currentAje: parseNum(r.currentAje),
+            currentRje: parseNum(r.currentRje),
+            currentAudited: 0,
+          }))
+          const hasBank = loadedRows.some(r => r.rowId === 'fixed-bank')
+          const hasCommercial = loadedRows.some(r => r.rowId === 'fixed-commercial')
+          if (!hasBank) loadedRows.unshift(recalcRow({ ...DEFAULT_FIXED_ROWS[0] }))
+          if (!hasCommercial) {
+            const bankIdx = loadedRows.findIndex(r => r.rowId === 'fixed-bank')
+            loadedRows.splice(bankIdx + 1, 0, recalcRow({ ...DEFAULT_FIXED_ROWS[1] }))
+          }
+          rows.value = loadedRows
+        } catch {
+          rows.value = DEFAULT_FIXED_ROWS.map(r => recalcRow({ ...r }))
+        }
       }
     },
   )
@@ -208,16 +272,25 @@ export function useD1DetailCategory(options: UseD1DetailCategoryOptions) {
   // ─── Debounce Save ───────────────────────────────────────────────────────
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let metaSaveTimer: ReturnType<typeof setTimeout> | null = null
 
   function scheduleSave(): void {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
-      persistToResponses()
+      persistRows()
     }, 2000)
   }
 
-  function persistToResponses(): void {
+  function scheduleMetaSave(): void {
+    if (metaSaveTimer) clearTimeout(metaSaveTimer)
+    metaSaveTimer = setTimeout(() => {
+      metaSaveTimer = null
+      persistMeta()
+    }, 2000)
+  }
+
+  function persistRows(): void {
     const serialized = serializeRows()
     const item: ChecklistItem = {
       item_id: STORAGE_KEY,
@@ -226,6 +299,22 @@ export function useD1DetailCategory(options: UseD1DetailCategoryOptions) {
     }
     allResponses.value.set(STORAGE_KEY, item)
     saveImmediate([item])
+  }
+
+  function persistMeta(): void {
+    const items: ChecklistItem[] = [
+      { item_id: PROCEDURES_KEY, conclusion: null, remark: auditProcedures.value || null },
+      { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value || null },
+      { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value || null },
+    ]
+    for (const item of items) {
+      allResponses.value.set(item.item_id, item)
+    }
+    saveImmediate(items)
+  }
+
+  function persistToResponses(): void {
+    persistRows()
   }
 
   // ─── Subtotal Row (computed) ─────────────────────────────────────────────
@@ -318,11 +407,32 @@ export function useD1DetailCategory(options: UseD1DetailCategoryOptions) {
 
   // ─── Cleanup ─────────────────────────────────────────────────────────────
 
+  function saveAuditProcedures(text: string): void {
+    if (isReadonly.value) return
+    auditProcedures.value = text
+    scheduleMetaSave()
+  }
+
+  function saveAuditNote(text: string): void {
+    if (isReadonly.value) return
+    auditNote.value = text
+    scheduleMetaSave()
+  }
+
+  function saveAuditConclusion(text: string): void {
+    if (isReadonly.value) return
+    auditConclusion.value = text
+    scheduleMetaSave()
+  }
+
   onBeforeUnmount(() => {
     if (saveTimer) {
       clearTimeout(saveTimer)
-      // Flush pending save
-      persistToResponses()
+      persistRows()
+    }
+    if (metaSaveTimer) {
+      clearTimeout(metaSaveTimer)
+      persistMeta()
     }
   })
 
@@ -331,8 +441,14 @@ export function useD1DetailCategory(options: UseD1DetailCategoryOptions) {
   return {
     rows,
     subtotalRow,
+    auditProcedures,
+    auditNote,
+    auditConclusion,
     addRow,
     removeRow,
     updateCell,
+    saveAuditProcedures,
+    saveAuditNote,
+    saveAuditConclusion,
   }
 }

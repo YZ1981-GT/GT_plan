@@ -276,6 +276,20 @@ describe('历史数据加载兼容（Req 1.5）', () => {
     expect(state.value.deviationStates.length).toBe(0)
     expect(state.value.cycleConclusion).toBe('')
   })
+
+  it('ensureDeviationSlots：空偏差槽位时自动创建可编辑槽位', async () => {
+    mockGet.mockResolvedValue([])
+    const composable = createComposable('C10')
+    await composable.selfLoad()
+
+    expect(composable.state.value.deviationStates.length).toBe(0)
+    composable.ensureDeviationSlots()
+    expect(composable.state.value.deviationStates.length).toBe(1)
+    expect(composable.state.value.summaryRows.length).toBe(1)
+
+    composable.updateDeviationStep(0, 'step1', '是')
+    expect(composable.state.value.deviationStates[0].step1).toBe('是')
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════

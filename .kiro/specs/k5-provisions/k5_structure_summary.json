@@ -1,0 +1,538 @@
+{
+  "file": "K5 预计负债.xlsx",
+  "source_path": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K5 预计负债.xlsx",
+  "sheet_count": 11,
+  "sheet_names": [
+    "底稿目录",
+    "实质性程序表 K5A",
+    "审定表 K5-1",
+    "附注披露信息（上市公司)",
+    "附注披露信息（国企）",
+    "明细表 K5-2",
+    "调整分录汇总 K5-3",
+    "产品质量保修检查表 K5-4",
+    "弃置费用检查表 K5-5",
+    "未决诉讼检查表 K5-6",
+    "预计负债检查表 K5-7"
+  ],
+  "科目": "2701预计负债（贷方/负债类）",
+  "sheets": {
+    "底稿目录": {
+      "row_count": 19,
+      "col_count": 6,
+      "formula_count": 0,
+      "formula_types": {},
+      "header_rows": [
+        [
+          "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        ],
+        [
+          "被审计单位："
+        ],
+        [
+          "截止日：202X年12月31日"
+        ]
+      ],
+      "formula_examples": []
+    },
+    "实质性程序表 K5A": {
+      "row_count": 35,
+      "col_count": 12,
+      "formula_count": 7,
+      "formula_types": {
+        "header_ref": 7
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "预计负债实质性程序"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!D5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "审定表 K5-1": {
+      "row_count": 25,
+      "col_count": 12,
+      "formula_count": 115,
+      "formula_types": {
+        "header_ref": 7,
+        "cross_sheet_calc": 56,
+        "local_calc": 52
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "预计负债审定表"
+        ],
+        [
+          "索引："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!D6",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "附注披露信息（上市公司)": {
+      "row_count": 16,
+      "col_count": 12,
+      "formula_count": 41,
+      "formula_types": {
+        "header_ref": 7,
+        "cross_sheet_calc": 32,
+        "local_calc": 2
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "附注披露信息（上市公司）"
+        ],
+        [
+          "索引："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!D7",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "附注披露信息（国企）": {
+      "row_count": 31,
+      "col_count": 14,
+      "formula_count": 41,
+      "formula_types": {
+        "header_ref": 7,
+        "cross_sheet_calc": 32,
+        "local_calc": 2
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "附注披露信息（国企）"
+        ],
+        [
+          "索引："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!D8",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "明细表 K5-2": {
+      "row_count": 42,
+      "col_count": 23,
+      "formula_count": 61,
+      "formula_types": {
+        "header_ref": 7,
+        "local_calc": 54
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "预计负债明细表"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!D9",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "调整分录汇总 K5-3": {
+      "row_count": 21,
+      "col_count": 10,
+      "formula_count": 7,
+      "formula_types": {
+        "header_ref": 7
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "预计负债调整分录汇总表"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D10",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "产品质量保修检查表 K5-4": {
+      "row_count": 45,
+      "col_count": 23,
+      "formula_count": 28,
+      "formula_types": {
+        "header_ref": 7,
+        "local_calc": 21
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "产品质量保修检查表"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!D11",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "弃置费用检查表 K5-5": {
+      "row_count": 31,
+      "col_count": 23,
+      "formula_count": 9,
+      "formula_types": {
+        "header_ref": 7,
+        "local_calc": 2
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "弃置费用检查表"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!D12",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "未决诉讼检查表 K5-6": {
+      "row_count": 37,
+      "col_count": 11,
+      "formula_count": 15,
+      "formula_types": {
+        "header_ref": 7,
+        "local_calc": 8
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "未决诉讼检查表"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D13",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    },
+    "预计负债检查表 K5-7": {
+      "row_count": 50,
+      "col_count": 17,
+      "formula_count": 20,
+      "formula_types": {
+        "header_ref": 7,
+        "local_calc": 10,
+        "cross_sheet_calc": 3
+      },
+      "header_rows": [
+        [
+          "致同会计师事务所"
+        ],
+        [
+          "预计负债检查表"
+        ],
+        [
+          "索引号："
+        ]
+      ],
+      "formula_examples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2",
+          "type": "header_ref"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4",
+          "type": "header_ref"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A5",
+          "type": "header_ref"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!D14",
+          "type": "header_ref"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3",
+          "type": "header_ref"
+        }
+      ]
+    }
+  },
+  "total_formula_count": 344,
+  "validation": {
+    "k5_1_sheet": "审定表 K5-1",
+    "k5_1_total_formulas": 115,
+    "k5_1_header_refs": 7,
+    "k5_1_substantive_formulas": 108,
+    "k5_1_spec_target": 73,
+    "k5_1_note": "实际108个实质公式(含跨sheet取数+本地计算)，spec预估73——差异因8行×11公式模式重复+合计行+差异行，实际更多。以源xlsx为准。",
+    "k5_2_sheet": "明细表 K5-2",
+    "k5_2_row_count": 42,
+    "k5_2_target": 42,
+    "k5_2_match": true,
+    "k5_2_col_count": 23
+  },
+  "structure_overview": {
+    "底稿目录": "19行×6列，无公式，纯文本索引",
+    "实质性程序表_K5A": "35行×12列，7公式(header引用)，审计程序清单",
+    "审定表_K5_1": "25行×12列，108实质公式。8类型行(产品质保/未决诉讼/亏损合同/重组/弃置/其他/合计/差异)×11列计算。负债类：期末=期初+计提-转销",
+    "附注_上市": "16行×12列，41公式，披露信息",
+    "附注_国企": "31行×14列，41公式，披露信息",
+    "明细表_K5_2": "42行×23列，61公式。按类型分明细+或有事项判断",
+    "调整分录_K5_3": "21行×10列，7公式，AJE/RJE汇总",
+    "产品质量保修_K5_4": "45行×23列，28公式，质保测算",
+    "弃置费用_K5_5": "31行×23列，9公式，现值折现",
+    "未决诉讼_K5_6": "37行×11列，15公式，律师函联动",
+    "预计负债检查_K5_7": "50行×17列，20公式，综合检查"
+  }
+}

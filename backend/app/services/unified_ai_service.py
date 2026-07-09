@@ -89,12 +89,25 @@ class UnifiedAIService:
     # ------------------------------------------------------------------
 
     async def health_check(self) -> dict:
-        """统一AI+OCR健康检查"""
+        """统一AI+OCR健康检查
+
+        overall 以 LLM（vLLM/Ollama）为主：文本生成可用即 healthy/degraded，
+        OCR/向量库缺失不拖垮整体状态（本地开发常见）。
+        """
         ai_health = await self._ai_service.health_check()
         ocr_health = await self._ocr_service.health_check()
 
-        overall = "healthy"
-        if ai_health.get("ollama_status") != "healthy" and ocr_health["status"] != "healthy":
+        llm_ok = (
+            ai_health.get("vllm_status") == "healthy"
+            or ai_health.get("ollama_status") == "healthy"
+        )
+        ocr_ok = ocr_health.get("status") == "healthy"
+
+        if llm_ok:
+            overall = "healthy"
+        elif ocr_ok:
+            overall = "degraded"
+        else:
             overall = "degraded"
 
         return {

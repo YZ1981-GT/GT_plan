@@ -64,6 +64,9 @@ class TestAIServiceHealthCheck:
         with patch(
             "app.services.ai_service._get_ollama_client",
             return_value=mock_client_instance,
+        ), patch(
+            "app.services.ai_service._get_llm_client",
+            side_effect=Exception("vllm down"),
         ):
             result = await service.health_check()
 

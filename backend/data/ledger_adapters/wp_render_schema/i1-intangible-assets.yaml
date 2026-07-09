@@ -1,0 +1,810 @@
+# backend/data/wp_render_schema/i1-intangible-assets.yaml
+# I1 无形资产、累计摊销及减值准备 — 专属组件渲染 schema
+# componentType: i1-intangible-assets
+# 科目 1701 无形资产（借方/资产类）+ 1702 累计摊销（贷方/备抵类）+ 1703 减值准备（贷方/备抵类）
+# Template: I1 无形资产、累计摊销及减值准备.xlsx（18 有效 sheet）
+# 公式特征：期末=期初+借方-贷方（资产类）；期末=期初+贷方-借方（备抵类）；
+#           审定=未审+AJE+RJE；三角勾稽；净值=原值-摊销-减值
+# 创建: 2026-07-25
+
+wp_code: I1
+wp_name: 无形资产、累计摊销及减值准备
+component_type: i1-intangible-assets
+selfLoad: true
+template_path: backend/wp_templates/I/I1 无形资产、累计摊销及减值准备.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1701', '1702', '1703']
+related_accounts:
+  - code: '1701'
+    name: 无形资产
+    direction: debit
+    category: asset
+  - code: '1702'
+    name: 累计摊销
+    direction: credit
+    category: contra_asset
+  - code: '1703'
+    name: 无形资产减值准备
+    direction: credit
+    category: contra_asset
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（17 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录 (32行×13列)
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    dimensions: "32×13"
+    component: I1TabIndex
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+        - { field: methodology_note, label: 关于工作底稿与审计程序索引号对应的说明, type: static_text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+        rows: 32
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 无形资产实质性程序表I1A (28行×11列)
+  # ─────────────────────────────────────────────────────────────────────────
+  无形资产实质性程序表I1A:
+    code: I1A
+    group: core
+    dimensions: "28×11"
+    component: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+      - { field: applicability, label: 适用性, type: text, width: 80 }
+    rows: 28
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表I1 (93行×9列, 51公式, 三区块)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表I1:
+    code: I1
+    group: core
+    dimensions: "93×9"
+    component: I1TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1701', '1702', '1703']
+    formula_count: 51
+    columns:
+      - { field: item, label: 项目, type: text, width: 160, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: period_increase, label: 本期增加, type: number }
+      - { field: period_decrease, label: 本期减少, type: number }
+      - { field: closing_balance, label: 期末余额, type: number, formula: "varies_by_direction" }
+      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_amount, label: AJE, type: number }
+      - { field: rje_amount, label: RJE, type: number }
+      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted_amount + aje_amount + rje_amount" }
+    sections:
+      - name: 一、无形资产—原值
+        account_code: '1701'
+        direction: debit
+        balance_formula: "期末=期初+借方-贷方"
+        rows:
+          - { item: 土地使用权, type: category }
+          - { item: 软件, type: category }
+          - { item: 专利权, type: category }
+          - { item: 特许经营权, type: category }
+          - { item: 其他无形资产, type: category }
+          - { item: 无形资产原值小计, type: subtotal }
+      - name: 二、累计摊销
+        account_code: '1702'
+        direction: credit
+        balance_formula: "期末=期初+贷方-借方"
+        rows:
+          - { item: 土地使用权, type: category }
+          - { item: 软件, type: category }
+          - { item: 专利权, type: category }
+          - { item: 特许经营权, type: category }
+          - { item: 其他, type: category }
+          - { item: 累计摊销小计, type: subtotal }
+      - name: 三、无形资产减值准备
+        account_code: '1703'
+        direction: credit
+        balance_formula: "期末=期初+贷方-借方"
+        rows:
+          - { item: 土地使用权, type: category }
+          - { item: 软件, type: category }
+          - { item: 专利权, type: category }
+          - { item: 特许经营权, type: category }
+          - { item: 其他, type: category }
+          - { item: 减值准备小计, type: subtotal }
+      - name: 无形资产净值合计
+        type: net
+        formula: "无形资产原值小计 - 累计摊销小计 - 减值准备小计"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + debit - credit", condition: "direction=debit" }
+      - { name: calcContraEndBalance, target: closing_balance, expr: "opening + credit - debit", condition: "direction=credit" }
+      - { name: calcTriangleReconciliation, target: reconciliation, expr: "closing - (opening + increase - decrease) === 0" }
+      - { name: calcNetValue, target: net_value, expr: "原值小计 - 摊销小计 - 减值小计" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "期末≠期初+增加-减少" }
+      - { condition: "tb_variance != 0", style: red }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1701', '1702', '1703']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1701', adjudicatedAmount}" }
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1702', adjudicatedAmount}" }
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1703', adjudicatedAmount}" }
+    footer:
+      - { type: tb_comparison, accounts: ['1701', '1702', '1703'] }
+      - { type: audit_note, label: 审计说明 }
+      - { type: audit_conclusion }
+      - { type: review_dialog }
+    cross_refs:
+      - ref_id: CW-I1-ADJ-001
+        target_wp: I1-2
+        description: '审定表 ← I1-2 明细表合计'
+        direction: inbound
+      - ref_id: CW-I1-ADJ-002
+        target_wp: I1-3
+        description: '审定表AJE/RJE ← I1-3 调整分录'
+        severity: required
+        direction: inbound
+      - ref_id: CW-I1-ADJ-003
+        target_wp: I1-5
+        description: '本期增加 ← I1-5 增加检查合计'
+        direction: inbound
+      - ref_id: CW-I1-ADJ-004
+        target_wp: I1-6
+        description: '本期减少 ← I1-6 减少明细合计'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表I1-2 (41行×56列, 18公式, 4区段Tab宽表)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表I1-2:
+    code: I1-2
+    group: core
+    dimensions: "41×56"
+    component: I1TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 18
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: asset_type, label: 资产类别, type: select, width: 100, options: [土地使用权, 软件, 专利权, 特许经营权, 其他] }
+          - { field: asset_name, label: 资产名称, type: text, width: 150 }
+          - { field: acquisition_date, label: 取得日期, type: date, width: 100 }
+          - { field: useful_life_months, label: 使用寿命(月), type: number, width: 90 }
+          - { field: salvage_rate, label: 残值率, type: percent, width: 70 }
+          - { field: amort_method, label: 摊销方法, type: select, width: 100, options: [直线法, 工作量法, 不摊销] }
+      - name: 原值变动
+        tab_index: 1
+        columns:
+          - { field: cost_opening, label: 原值期初, type: number, width: 100 }
+          - { field: cost_increase, label: 本期增加, type: number, width: 100 }
+          - { field: cost_decrease, label: 本期减少, type: number, width: 100 }
+          - { field: cost_closing, label: 原值期末, type: number, width: 100, formula: "cost_opening + cost_increase - cost_decrease" }
+      - name: 摊销
+        tab_index: 2
+        columns:
+          - { field: amort_opening, label: 累计摊销期初, type: number, width: 110 }
+          - { field: amort_current, label: 本期摊销, type: number, width: 100 }
+          - { field: amort_transfer_out, label: 摊销转出, type: number, width: 100 }
+          - { field: amort_closing, label: 累计摊销期末, type: number, width: 110, formula: "amort_opening + amort_current - amort_transfer_out" }
+          - { field: net_value, label: 净值, type: number, width: 100, formula: "cost_closing - amort_closing - impair_closing" }
+      - name: 减值
+        tab_index: 3
+        columns:
+          - { field: impair_opening, label: 减值期初, type: number, width: 100 }
+          - { field: impair_provision, label: 本期计提, type: number, width: 100 }
+          - { field: impair_reversal, label: 本期转回, type: number, width: 100 }
+          - { field: impair_closing, label: 减值期末, type: number, width: 100, formula: "impair_opening + impair_provision - impair_reversal" }
+    formulas:
+      - { name: calcCostClosing, target: cost_closing, expr: "opening + increase - decrease" }
+      - { name: calcAmortClosing, target: amort_closing, expr: "opening + current - transfer_out" }
+      - { name: calcImpairClosing, target: impair_closing, expr: "opening + provision - reversal" }
+      - { name: calcNetValue, target: net_value, expr: "cost_closing - amort_closing - impair_closing" }
+    summary_rows:
+      - { type: category_subtotal, group_by: asset_type }
+      - { type: grand_total }
+    highlights:
+      - { condition: "total_mismatch_adjudication", style: yellow, tooltip: "合计与审定表不一致" }
+    import_export: true
+    add_row_prompt: asset_name
+    cross_refs:
+      - ref_id: CW-I1-2-001
+        target_wp: I1
+        description: '明细表合计 → 审定表I1'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总I1-3 (21行×10列)
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总I1-3:
+    code: I1-3
+    group: core
+    dimensions: "21×10"
+    component: I1TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: adjustment_item, label: 调整事项, type: text, width: 150 }
+      - { field: entry_type, label: 类别, type: select, width: 80, options: [AJE, RJE] }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: debit_amount, label: 借方, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    highlights:
+      - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
+    import_export: true
+    add_row_prompt: adjustment_item
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+    cross_refs:
+      - ref_id: CW-I1-3-001
+        target_wp: I1
+        description: 'AJE/RJE汇总 → 审定表I1'
+        severity: required
+        direction: outbound
+      - ref_id: CW-I1-3-002
+        target_wp: A13
+        description: '调整分录 → A13错报汇总'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 无形资产摊销减值政策检查表I1-4 (32行×15列)
+  # ─────────────────────────────────────────────────────────────────────────
+  无形资产摊销减值政策检查表I1-4:
+    code: I1-4
+    group: inspection
+    dimensions: "32×15"
+    component: I1TabPolicyCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS6, CAS8]
+    check_items:
+      - { id: amort_method, label: 摊销方法选择是否适当, type: conclusion, options: [是, 否, 不适用] }
+      - { id: useful_life, label: 使用寿命确定是否合理, type: conclusion, options: [是, 否, 不适用] }
+      - { id: salvage_rate, label: 残值率确定是否合理, type: conclusion, options: [是, 否, 不适用] }
+      - { id: impair_indicator, label: 减值迹象判断是否充分, type: conclusion, options: [是, 否, 不适用] }
+      - { id: impair_test_frequency, label: 减值测试频率是否合规, type: conclusion, options: [是, 否, 不适用] }
+      - { id: policy_consistency, label: 会计政策是否前后一致, type: conclusion, options: [是, 否, 不适用] }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 无形资产增加检查表I1-5 (37行×19列)
+  # ─────────────────────────────────────────────────────────────────────────
+  无形资产增加检查表I1-5:
+    code: I1-5
+    group: inspection
+    dimensions: "37×19"
+    component: I1TabAdditionCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: asset_name, label: 名称, type: text, width: 150 }
+      - { field: acquisition_type, label: 取得方式, type: select, width: 100, options: [外购, 自行开发, 政府补助, 企业合并, 投资者投入, 其他] }
+      - { field: entry_date, label: 入账日期, type: date, width: 100 }
+      - { field: entry_amount, label: 入账金额, type: number, width: 100 }
+      - { field: contract_no, label: 合同/发票号, type: text, width: 120 }
+      - { field: payment_method, label: 支付方式, type: text, width: 80 }
+      - { field: conclusion, label: 审查结论, type: select, width: 80, options: [合规, 不合规, 待确认] }
+      - { field: attachment, label: 📎附件, type: attachment, width: 50, ocr: true }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    summary_rows:
+      - { type: grand_total, fields: [entry_amount] }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - ocr: { endpoint: "/d4/contract-ocr" }
+    import_export: true
+    add_row_prompt: asset_name
+    cross_refs:
+      - ref_id: CW-I1-5-001
+        target_wp: I1
+        description: '增加合计 → 审定表I1本期增加'
+        direction: outbound
+      - ref_id: CW-I1-5-002
+        target_wp: I2
+        description: '资本化转入 ← I2开发支出资本化'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 无形资产减少明细表I1-6 (41行×14列)
+  # ─────────────────────────────────────────────────────────────────────────
+  无形资产减少明细表I1-6:
+    code: I1-6
+    group: inspection
+    dimensions: "41×14"
+    component: I1TabDisposalCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: asset_name, label: 名称, type: text, width: 150 }
+      - { field: cost_amount, label: 原值, type: number, width: 100 }
+      - { field: acc_amort, label: 累计摊销, type: number, width: 100 }
+      - { field: impairment, label: 减值, type: number, width: 80 }
+      - { field: net_value, label: 净值, type: number, width: 100, formula: "cost_amount - acc_amort - impairment" }
+      - { field: disposal_type, label: 处置方式, type: select, width: 80, options: [出售, 报废, 到期, 其他] }
+      - { field: disposal_income, label: 处置收入, type: number, width: 100 }
+      - { field: disposal_gain_loss, label: 处置损益, type: number, width: 100, formula: "disposal_income - net_value" }
+      - { field: approval_doc, label: 审批文件, type: text, width: 100 }
+      - { field: disposal_date, label: 日期, type: date, width: 100 }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [合规, 不合规, 待确认] }
+      - { field: attachment, label: 📎附件, type: attachment, width: 50 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: calcNetValue, target: net_value, expr: "cost - accAmort - impairment" }
+      - { name: calcDisposalGainLoss, target: disposal_gain_loss, expr: "income - netValue" }
+    summary_rows:
+      - { type: grand_total, fields: [cost_amount, acc_amort, impairment, net_value, disposal_income, disposal_gain_loss] }
+    import_export: true
+    add_row_prompt: asset_name
+    cross_refs:
+      - ref_id: CW-I1-6-001
+        target_wp: I1
+        description: '减少合计 → 审定表I1本期减少'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 使用寿命检查表I1-7 (27行×17列)
+  # ─────────────────────────────────────────────────────────────────────────
+  使用寿命检查表I1-7:
+    code: I1-7
+    group: inspection
+    dimensions: "27×17"
+    component: I1TabUsefulLifeCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: asset_name, label: 名称, type: text, width: 150 }
+      - { field: original_life_months, label: 原始寿命(月), type: number, width: 90 }
+      - { field: used_months, label: 已用月数, type: number, width: 80 }
+      - { field: remaining_months, label: 剩余月数, type: number, width: 80, formula: "original_life_months - used_months" }
+      - { field: life_basis, label: 寿命依据, type: text, width: 150 }
+      - { field: is_changed, label: 本期是否变更, type: select, width: 80, options: [是, 否] }
+      - { field: change_reason, label: 变更原因, type: textarea, width: 150 }
+      - { field: is_indefinite, label: 使用寿命不确定, type: select, width: 90, options: [是, 否] }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [合理, 不合理, 待确认] }
+    highlights:
+      - { condition: "is_indefinite = '是'", style: amber, tooltip: "使用寿命不确定→不摊销，需减值测试" }
+    cross_refs:
+      - ref_id: CW-I1-7-001
+        target_wp: I1-10
+        description: '使用寿命参数 → I1-10/I1-11 摊销测算'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 无形资产权属检查表I1-8 (94行×21列, 虚拟滚动)
+  # ─────────────────────────────────────────────────────────────────────────
+  无形资产权属检查表I1-8:
+    code: I1-8
+    group: inspection
+    dimensions: "94×21"
+    component: I1TabTitleCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    virtual_scroll: true
+    max_rows: 500
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: asset_name, label: 名称, type: text, width: 150 }
+      - { field: asset_type, label: 类型, type: select, width: 100, options: [专利, 商标, 著作权, 土地使用权, 软件, 其他] }
+      - { field: cert_number, label: 证书编号, type: text, width: 120 }
+      - { field: reg_date, label: 登记日期, type: date, width: 100 }
+      - { field: valid_period, label: 有效期, type: text, width: 80 }
+      - { field: owner, label: 权利人, type: text, width: 120 }
+      - { field: is_consistent, label: 是否与账面一致, type: select, width: 80, options: [是, 否] }
+      - { field: book_value, label: 账面价值, type: number, width: 100 }
+      - { field: cert_value, label: 权证金额, type: number, width: 100 }
+      - { field: diff_amount, label: 差异金额, type: number, width: 100, formula: "book_value - cert_value" }
+      - { field: diff_note, label: 差异说明, type: textarea, width: 150 }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [合规, 不合规, 待确认] }
+    formulas:
+      - { name: calcTitleDiff, target: diff_amount, expr: "bookValue - certValue" }
+    group_by: asset_type
+    highlights:
+      - { condition: "diff_amount != 0", style: orange }
+    import_export: true
+    add_row_prompt: asset_name
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 摊销分配分析表I1-9 (29行×10列, 7公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销分配分析表I1-9:
+    code: I1-9
+    group: amortization
+    dimensions: "29×10"
+    component: I1TabAmortizationAlloc
+    class_code: G-测算
+    dynamic_rows: true
+    formula_count: 7
+    columns:
+      - { field: asset_name, label: 资产名称, type: text, width: 150 }
+      - { field: amort_total, label: 摊销总额, type: number, width: 100 }
+      - { field: admin_expense, label: 管理费用, type: number, width: 90 }
+      - { field: selling_expense, label: 销售费用, type: number, width: 90 }
+      - { field: manufacture_cost, label: 制造费用, type: number, width: 90 }
+      - { field: rd_expense, label: 研发费用, type: number, width: 90 }
+      - { field: other_expense, label: 其他, type: number, width: 80 }
+      - { field: alloc_total, label: 合计, type: number, width: 90, formula: "admin + selling + manufacture + rd + other" }
+      - { field: alloc_ratio, label: 分配比例, type: percent, width: 80 }
+      - { field: is_balanced, label: 平衡校验, type: boolean, formula: "|amort_total - alloc_total| < 0.01" }
+    formulas:
+      - { name: calcAllocTotal, target: alloc_total, expr: "admin + selling + manufacture + rd + other" }
+      - { name: validateAllocBalance, target: is_balanced, expr: "|amort_total - alloc_total| < 0.01" }
+    highlights:
+      - { condition: "!is_balanced", style: red, tooltip: "分配合计≠摊销总额" }
+    summary_rows:
+      - { type: grand_total }
+    cross_refs:
+      - ref_id: CW-I1-9-001
+        target_wp: K8
+        description: '管理费用分配 → K8管理费用'
+        direction: outbound
+      - ref_id: CW-I1-9-002
+        target_wp: K9
+        description: '销售费用分配 → K9销售费用'
+        direction: outbound
+      - ref_id: CW-I1-9-003
+        target_wp: I6
+        description: '研发费用分配 → I6研发费用'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 摊销测算表（不含减值）I1-10 (33行×28列, 30公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销测算表（不含减值）I1-10:
+    code: I1-10
+    group: amortization
+    dimensions: "33×28"
+    component: I1TabAmortizationNoImpair
+    class_code: G-测算
+    formula_count: 30
+    branch_selector:
+      group: amortization_branch
+      value: no_impairment
+      label: "不含减值（I1-10）"
+    dynamic_rows: true
+    layout_type: horizontal_matrix
+    columns:
+      - { field: asset_name, label: 资产名称, type: text, width: 150, fixed: true }
+      - { field: cost, label: 原值, type: number, width: 80 }
+      - { field: salvage, label: 残值, type: number, width: 80 }
+      - { field: acc_amort, label: 已摊销, type: number, width: 80 }
+      - { field: remaining_months, label: 剩余月数, type: number, width: 70 }
+      - { field: monthly_amort, label: 月摊销额, type: number, width: 80, formula: "(cost - salvage - acc_amort) / remaining_months" }
+      # 月份列 (M1~M12) 动态生成
+    month_columns: { start: 1, end: 12, field_prefix: "month_", type: number, width: 70 }
+    formulas:
+      - { name: calcRemainingLifeAmort, target: monthly_amort, expr: "(cost - salvage - accAmort) / remainingMonths" }
+    summary_rows:
+      - { type: grand_total, fields: [monthly_amort, month_1..month_12] }
+    cross_refs:
+      - ref_id: CW-I1-10-001
+        target_wp: I1-9
+        description: '摊销合计 → I1-9摊销分配'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 13: 摊销测算表（含减值）I1-11 (32行×28列, 63公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销测算表（含减值）I1-11:
+    code: I1-11
+    group: amortization
+    dimensions: "32×28"
+    component: I1TabAmortizationWithImpair
+    class_code: G-测算
+    formula_count: 63
+    branch_selector:
+      group: amortization_branch
+      value: with_impairment
+      label: "含减值（I1-11）"
+    dynamic_rows: true
+    layout_type: horizontal_matrix
+    columns:
+      - { field: asset_name, label: 资产名称, type: text, width: 150, fixed: true }
+      - { field: cost, label: 原值, type: number, width: 80 }
+      - { field: salvage, label: 残值, type: number, width: 80 }
+      - { field: acc_amort, label: 已摊销, type: number, width: 80 }
+      - { field: impairment, label: 减值准备, type: number, width: 80 }
+      - { field: remaining_months, label: 剩余月数, type: number, width: 70 }
+      - { field: monthly_amort, label: 月摊销额, type: number, width: 80, formula: "(cost - salvage - acc_amort - impairment) / remaining_months" }
+      - { field: impair_month, label: 减值发生月, type: number, width: 70 }
+    month_columns: { start: 1, end: 12, field_prefix: "month_", type: number, width: 70 }
+    formulas:
+      - { name: calcAmortWithImpairment, target: monthly_amort, expr: "(cost - salvage - accAmort - impairment) / remainingMonths" }
+      - { name: recalcAfterImpairment, trigger: "impair_month", expr: "重算减值后剩余基数" }
+    summary_rows:
+      - { type: grand_total, fields: [monthly_amort, month_1..month_12] }
+    cross_refs:
+      - ref_id: CW-I1-11-001
+        target_wp: I1-9
+        description: '摊销合计 → I1-9摊销分配'
+        direction: outbound
+      - ref_id: CW-I1-11-002
+        target_wp: I1-12
+        description: '减值准备 ← I1-12减值测试'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 14: 减值准备测试表I1-12 (43行×32列, 14公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  减值准备测试表I1-12:
+    code: I1-12
+    group: impairment
+    dimensions: "43×32"
+    component: I1TabImpairmentTest
+    class_code: G-测算
+    dynamic_rows: true
+    formula_count: 14
+    columns:
+      - { field: asset_name, label: 资产名称, type: text, width: 150 }
+      - { field: cost_amount, label: 账面原值, type: number, width: 100 }
+      - { field: acc_amort, label: 累计摊销, type: number, width: 100 }
+      - { field: existing_impairment, label: 减值准备, type: number, width: 100 }
+      - { field: book_value, label: 账面净值, type: number, width: 100, formula: "cost_amount - acc_amort - existing_impairment" }
+      - { field: recoverable_amount, label: 可收回金额, type: number, width: 100 }
+      - { field: should_impair, label: 应计提减值, type: number, width: 100, formula: "MAX(book_value - recoverable_amount, 0)" }
+      - { field: already_impaired, label: 已计提, type: number, width: 80 }
+      - { field: diff, label: 差额, type: number, width: 80, formula: "should_impair - already_impaired" }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [充分, 不足, 多提] }
+    formulas:
+      - { name: calcBookValue, target: book_value, expr: "cost - accAmort - existingImpairment" }
+      - { name: calcImpairmentAmount, target: should_impair, expr: "MAX(bookValue - recoverableAmount, 0)" }
+      - { name: calcDiff, target: diff, expr: "shouldImpair - alreadyImpaired" }
+    highlights:
+      - { condition: "diff != 0", style: red }
+    cross_refs:
+      - ref_id: CW-I1-12-001
+        target_wp: I1-13
+        description: '可收回金额 ← I1-13 DCF测试'
+        direction: inbound
+      - ref_id: CW-I1-12-002
+        target_wp: I1
+        description: '减值计提 → 审定表I1减值准备'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 15: 可收回金额测试I1-13 (51行×28列, 10公式, DCF)
+  # ─────────────────────────────────────────────────────────────────────────
+  可收回金额测试I1-13:
+    code: I1-13
+    group: impairment
+    dimensions: "51×28"
+    component: I1TabRecoverableTest
+    class_code: G-测算
+    dynamic_rows: true
+    formula_count: 10
+    sections:
+      - name: DCF现值测算
+        columns:
+          - { field: asset_name, label: 资产名称, type: text, width: 150 }
+          - { field: year_1_cf, label: 第1年现金流, type: number, width: 100 }
+          - { field: year_2_cf, label: 第2年现金流, type: number, width: 100 }
+          - { field: year_3_cf, label: 第3年现金流, type: number, width: 100 }
+          - { field: year_4_cf, label: 第4年现金流, type: number, width: 100 }
+          - { field: year_5_cf, label: 第5年现金流, type: number, width: 100 }
+          - { field: discount_rate, label: 折现率, type: percent, width: 80 }
+          - { field: growth_rate, label: 永续增长率, type: percent, width: 80 }
+          - { field: terminal_value, label: 终值, type: number, width: 100, formula: "year_5_cf * (1 + growth_rate) / (discount_rate - growth_rate)" }
+          - { field: dcf_present_value, label: 使用价值(DCF), type: number, width: 120, formula: "Σ(CF_i/(1+r)^i) + TV/(1+r)^5" }
+      - name: 可收回金额确定
+        columns:
+          - { field: fair_value_less_disposal, label: 公允价值-处置费用, type: number, width: 130 }
+          - { field: value_in_use, label: 使用价值, type: number, width: 100 }
+          - { field: recoverable_amount, label: 可收回金额, type: number, width: 120, formula: "MAX(fair_value_less_disposal, value_in_use)" }
+      - name: 敏感性分析
+        sensitivity:
+          discount_rate_delta: ["-1%", "+1%"]
+          growth_rate_delta: ["-0.5%", "+0.5%"]
+    formulas:
+      - { name: calcDcfPresentValue, target: dcf_present_value, expr: "Σ(CF_i/(1+r)^(i+1))" }
+      - { name: calcTerminalValue, target: terminal_value, expr: "CF5*(1+g)/(r-g)" }
+      - { name: calcRecoverableAmount, target: recoverable_amount, expr: "MAX(fairValueLessDisposal, valueInUse)" }
+    highlights:
+      - { condition: "discount_rate <= 0", style: red, tooltip: "折现率必须>0" }
+    cross_refs:
+      - ref_id: CW-I1-13-001
+        target_wp: I1-12
+        description: '可收回金额 → I1-12减值测试填入'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 16: 附注披露信息（上市公司）(64行×22列, 34公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注披露信息（上市公司）
+    group: core
+    dimensions: "64×22"
+    component: I1TabDisclosureListed
+    class_code: C-附注披露
+    formula_count: 34
+    variant: listed
+    virtual_scroll: false
+    columns:
+      - { field: item, label: 项目, type: text, width: 200 }
+      - { field: cost_opening, label: 期初余额—原值, type: number }
+      - { field: cost_increase, label: 本期增加—原值, type: number }
+      - { field: cost_decrease, label: 本期减少—原值, type: number }
+      - { field: cost_closing, label: 期末余额—原值, type: number, formula: "cost_opening + cost_increase - cost_decrease" }
+      - { field: amort_opening, label: 期初余额—累计摊销, type: number }
+      - { field: amort_increase, label: 本期增加—累计摊销, type: number }
+      - { field: amort_decrease, label: 本期减少—累计摊销, type: number }
+      - { field: amort_closing, label: 期末余额—累计摊销, type: number, formula: "amort_opening + amort_increase - amort_decrease" }
+      - { field: impair_opening, label: 期初余额—减值准备, type: number }
+      - { field: impair_increase, label: 本期增加—减值准备, type: number }
+      - { field: impair_decrease, label: 本期减少—减值准备, type: number }
+      - { field: impair_closing, label: 期末余额—减值准备, type: number, formula: "impair_opening + impair_increase - impair_decrease" }
+      - { field: book_value_closing, label: 期末账面价值, type: number, formula: "cost_closing - amort_closing - impair_closing" }
+      - { field: book_value_opening, label: 期初账面价值, type: number, formula: "cost_opening - amort_opening - impair_opening" }
+    auto_fill_source:
+      - { from: "审定表I1", fields: [cost_opening, cost_closing, amort_opening, amort_closing, impair_opening, impair_closing] }
+      - { from: "明细表I1-2", fields: [cost_increase, cost_decrease, amort_increase, amort_decrease] }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode in ['1701','1702','1703']" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{accountCode:'1701', text}" }
+    ai_sections:
+      - { id: disclosure-text-listed, label: 附注文本(上市), position: section_title_right }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 17: 附注披露信息（国有企业）(67行×14列, 26公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注披露信息（国有企业）
+    group: core
+    dimensions: "67×14"
+    component: I1TabDisclosureSoe
+    class_code: C-附注披露
+    formula_count: 26
+    variant: soe
+    virtual_scroll: false
+    columns:
+      - { field: item, label: 项目, type: text, width: 200 }
+      - { field: cost_opening, label: 年初数—原值, type: number }
+      - { field: cost_closing, label: 期末数—原值, type: number }
+      - { field: amort_opening, label: 年初数—累计摊销, type: number }
+      - { field: amort_closing, label: 期末数—累计摊销, type: number }
+      - { field: impair_opening, label: 年初数—减值准备, type: number }
+      - { field: impair_closing, label: 期末数—减值准备, type: number }
+      - { field: book_value_closing, label: 期末账面价值, type: number, formula: "cost_closing - amort_closing - impair_closing" }
+      - { field: book_value_opening, label: 年初账面价值, type: number, formula: "cost_opening - amort_opening - impair_opening" }
+    auto_fill_source:
+      - { from: "审定表I1", fields: [cost_opening, cost_closing, amort_opening, amort_closing, impair_opening, impair_closing] }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode in ['1701','1702','1703']" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{accountCode:'1701', text}" }
+    ai_sections:
+      - { id: disclosure-text-soe, label: 附注文本(国企), position: section_title_right }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI Section 清单
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ai_sections:
+  - { id: adjudication-analysis, label: 审定分析, sheet: "审定表I1" }
+  - { id: policy-check-conclusion, label: 政策检查结论, sheet: "无形资产摊销减值政策检查表I1-4" }
+  - { id: disclosure-text-listed, label: 附注文本(上市), sheet: "附注披露信息（上市公司）" }
+  - { id: disclosure-text-soe, label: 附注文本(国企), sheet: "附注披露信息（国有企业）" }
+  - { id: overall-opinion, label: 总体意见, sheet: all }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 导入导出配置（动态行表）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import_export:
+  composable: useI1ImportExport
+  sheets:
+    - { code: I1-2, name: 明细表, multi_sheet_export: true, tab_count: 4 }
+    - { code: I1-3, name: 调整分录 }
+    - { code: I1-5, name: 增加检查 }
+    - { code: I1-6, name: 减少明细 }
+    - { code: I1-8, name: 权属检查 }
+    - { code: I1-9, name: 摊销分配 }
+    - { code: I1-10, name: 摊销测算(不含减值) }
+    - { code: I1-11, name: 摊销测算(含减值) }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 摊销分支选择器
+# ═══════════════════════════════════════════════════════════════════════════════
+
+branch_selector:
+  field: amortization_branch
+  type: el-segmented
+  options:
+    - { value: no_impairment, label: "不含减值（I1-10）", sheet: I1-10 }
+    - { value: with_impairment, label: "含减值（I1-11）", sheet: I1-11 }
+  default: no_impairment
+  storage_key: i1-amort-branch
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 双模式 + 六大集成
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dual_mode:
+  composable: useI1DualMode
+  storage_key: i1-intangible-mode
+  default: html
+
+integrations:
+  version_trail: { composable: useVersionTrail, auto_snapshot: true }
+  voucher_sampling: { sheet: I1A, mode: dialog }
+  cutoff_auto_sampling: { composable: useCutoffAutoSampling }
+  event_bus:
+    subscribe: ["substantive:adjudicated", "adjustment:created"]
+    publish: ["substantive:adjudicated", "disclosure:note-text-updated"]
+  ocr: { sheets: [I1-5], endpoint: "/d4/contract-ocr" }
+  review_dialog: { provide: openReviewDialog, position: section_title_right }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用汇总
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-I1-EXT-001
+    target_wp: I2
+    description: 'I2开发支出资本化转入 → I1-5增加'
+    direction: inbound
+  - ref_id: CW-I1-EXT-002
+    target_wp: K8
+    description: 'I1-9摊销分配(管理费用) → K8'
+    direction: outbound
+  - ref_id: CW-I1-EXT-003
+    target_wp: K9
+    description: 'I1-9摊销分配(销售费用) → K9'
+    direction: outbound
+  - ref_id: CW-I1-EXT-004
+    target_wp: I6
+    description: 'I1-9摊销分配(研发费用) → I6'
+    direction: outbound
+  - ref_id: CW-I1-EXT-005
+    target_wp: A13
+    description: 'I1-3调整分录 → A13错报汇总'
+    direction: outbound

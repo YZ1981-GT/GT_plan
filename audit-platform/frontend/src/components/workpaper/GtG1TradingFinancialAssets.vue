@@ -168,12 +168,7 @@
       />
 
       <!-- 复核对话（供子组件 inject('openReviewDialog') 触发）-->
-      <GtReviewDialog
-        v-if="reviewDialog.isOpen.value && reviewDialog.activationParams.value"
-        :key="reviewDialog.activationParams.value.sectionId"
-        v-bind="reviewDialog.activationParams.value"
-        @closed="reviewDialog.closeReviewDialog"
-      />
+      <GtWpReviewDialogHost />
     </template>
   </div>
 </template>
@@ -206,7 +201,7 @@ const G1TabDerivativeCheck = defineAsyncComponent(() => import('./g1-trading-fin
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -232,7 +227,7 @@ const formData = useG1TraFinFormData({
 })
 
 // ─── 复核对话 provide（供子组件 section 标题栏复核按钮 inject('openReviewDialog')）───
-const reviewDialog = useG1ReviewDialogProvide({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+useG1ReviewDialogProvide({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

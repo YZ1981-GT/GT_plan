@@ -929,8 +929,27 @@ function isRowSelectable(row: ProgramRow): boolean {
 
 function parseLinkedWorkpapers(value: string): string[] {
   if (!value) return []
-  // Split by common separators: / , ; or newline
-  return value.split(/[/,;\n]/).map(s => s.trim()).filter(Boolean)
+  // Split by common separators (EN + CN): / , ; 、 ， ； and newline
+  const parts = value.split(/[/,;、，；\n]/).map(s => s.trim()).filter(Boolean)
+  const out: string[] = []
+
+  for (const token of parts) {
+    // 支持区间写法：D1-13至D1-16 / D1-13到16 / D1-13~16 / D1-13～D1-16
+    const m = token.match(/^([A-Z]\d+)-(\d+)\s*(?:到|至|~|～|-)\s*(?:([A-Z]\d+)-)?(\d+)$/i)
+    if (m) {
+      const base1 = (m[1] || '').toUpperCase()
+      const start = Number(m[2])
+      const base2 = (m[3] || base1).toUpperCase()
+      const end = Number(m[4])
+      if (base1 === base2 && Number.isFinite(start) && Number.isFinite(end) && end >= start && end - start <= 50) {
+        for (let i = start; i <= end; i += 1) out.push(`${base1}-${i}`)
+        continue
+      }
+    }
+    out.push(token)
+  }
+  // 去重（保序）
+  return out.filter((v, i) => out.indexOf(v) === i)
 }
 
 function handleExpandChange(row: ProgramRow, expandedRows: ProgramRow[]) {

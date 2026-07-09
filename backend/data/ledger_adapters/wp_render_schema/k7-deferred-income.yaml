@@ -1,0 +1,275 @@
+# backend/data/ledger_adapters/wp_render_schema/k7-deferred-income.yaml
+# K7 递延收益 — 专属组件渲染 schema
+# componentType: k7-deferred-income
+# 科目 2401 递延收益（贷方/负债类）
+# Template: K7 递延收益.xlsx（10 sheets: 1索引+9业务，1会计提示辅助走OO fallback）
+# 公式特征：期末=期初+收到-分摊（负债类）；审定=未审+AJE+RJE
+#           政府补助分摊引擎（CAS16）：直线分摊 + 期末余额 + 差异
+# 创建: 2026-08-01
+
+wp_code: K7
+wp_name: 递延收益
+component_type: k7-deferred-income
+selfLoad: true
+template_path: backend/wp_templates/K/K7 递延收益.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['2401']
+related_accounts:
+  - code: '2401'
+    name: 递延收益
+    direction: credit
+    category: liability
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - amort-conclusion
+  - deferred-check-eval
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿交叉引用（cross_wp_references）
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_references:
+  - ref_id: CW-K7-001
+    source_wp: K7-1
+    target_wp: TB:2401
+    description: '审定表审定数→回写 trial_balance(2401)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K7-002
+    source_wp: K7-3
+    target_wp: A13
+    description: '调整分录→A13错报汇总（adjustment:created）'
+    direction: outbound
+    event: "adjustment:created"
+
+  - ref_id: CW-K7-003
+    source_wp: K7-1
+    target_wp: 附注
+    description: '审定表→附注披露自动刷新（substantive:adjudicated）'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K7-004
+    source_wp: K7-2
+    target_wp: K7-1
+    description: '明细表合计→审定表交叉验证'
+    direction: outbound
+
+  - ref_id: CW-K7-005
+    source_wp: K7-4
+    target_wp: K7-2
+    description: '分摊测算→明细表交叉验证（企业分摊 vs 测算分摊）'
+    direction: outbound
+
+  - ref_id: CW-K7-006
+    source_wp: K7-4
+    target_wp: K10
+    description: '分摊去向→其他收益(K10) GtIndexChip联动'
+    direction: outbound
+
+  - ref_id: CW-K7-007
+    source_wp: K7-4
+    target_wp: K12
+    description: '分摊去向→营业外收入(K12) GtIndexChip联动'
+    direction: outbound
+
+  - ref_id: CW-K7-008
+    source_wp: B50
+    target_wp: K7A
+    description: 'B50风险评估→K7实质性程序'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（10 sheets，1会计提示辅助走OO fallback不组件化）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K7TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 递延收益实质性程序表K7A
+  # ─────────────────────────────────────────────────────────────────────────
+  递延收益实质性程序表K7A:
+    code: K7A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K7-1 (54行×13列, 49公式, 负债类！)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K7-1:
+    code: K7-1
+    group: core
+    dimensions: "54×13"
+    component: K7TabAdjudication
+    class_code: F-审定表
+    account_codes: ['2401']
+    formula_count: 49
+    virtual_scroll: true
+    sections:
+      - name: 与资产相关
+        account_code: '2401'
+        direction: credit
+        balance_formula: "期末=期初+收到-分摊"
+      - name: 与收益相关
+        account_code: '2401'
+        direction: credit
+        balance_formula: "期末=期初+收到-分摊"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcLiabilityEndBalance, target: closing_balance, expr: "opening + received - amortized" }
+      - { name: calcTriangleReconciliation, target: triangle_diff, expr: "end - (begin + received - amortized)" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['2401']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'2401', adjudicatedAmount}" }
+    ai_section: overall-opinion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 附注披露信息（上市公司）(18行×11列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "18×11"
+    component: K7TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 附注披露信息（国有企业）(18行×10列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "18×10"
+    component: K7TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 明细表K7-2 (41行×32列, 21公式, 3区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K7-2:
+    code: K7-2
+    group: core
+    dimensions: "41×32"
+    component: K7TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 500
+    virtual_scroll: true
+    formula_count: 21
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns: [序号, 补助项目, 批文号, 补助类型, 相关类型, 收到金额, 收到日期]
+      - name: 分摊
+        tab_index: 1
+        columns: [分摊方法, 分摊期, 期初余额, 本期收到, 本期分摊, 期末余额]
+      - name: 检查
+        tab_index: 2
+        columns: [计入科目, 凭证号, 分摊起止, 累计分摊, 剩余期限, 结论, 备注]
+    import_export: true
+    add_row_prompt: grantProject
+    formulas:
+      - { name: calcLiabilityDetailEnd, target: closing_balance, expr: "opening + received - amortized" }
+    highlights:
+      - { condition: "closingBalance != opening + received - amortized", style: red, tooltip: "期末≠期初+收到-分摊" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 调整分录汇总K7-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K7-3:
+    code: K7-3
+    group: core
+    component: K7TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 政府补助分摊测算表K7-4 (26行×27列, 23公式, 分摊引擎)
+  # ─────────────────────────────────────────────────────────────────────────
+  政府补助分摊测算表K7-4:
+    code: K7-4
+    group: amortization
+    dimensions: "26×27"
+    component: K7TabAmortizationCalc
+    class_code: F-测算表
+    formula_count: 23
+    formulas:
+      - { name: calcStraightLineAmort, target: calculated_amort, expr: "total / totalPeriods × currentPeriods" }
+      - { name: calcRemainingBalance, target: remaining_balance, expr: "max(0, total - accumulated)" }
+      - { name: calcAmortVariance, target: variance, expr: "calculated - booked" }
+    highlights:
+      - { condition: "abs(variance) > materiality", style: red, tooltip: "差异>重要性水平" }
+    cross_verify:
+      target_sheet: K7-2
+      target_field: currentAmort
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+    ai_section: amort-conclusion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 递延收益检查表K7-5
+  # ─────────────────────────────────────────────────────────────────────────
+  递延收益检查表K7-5:
+    code: K7-5
+    group: inspection
+    component: K7TabDeferredCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: grantAuthenticity, label: 补助真实性, type: conclusion }
+      - { id: approvalCompliance, label: 批文合规性, type: conclusion }
+      - { id: relatedTypeCorrect, label: 相关类型判断正确性, type: conclusion }
+      - { id: amortMethodAppropriate, label: 分摊方法适当性, type: conclusion }
+      - { id: creditAccountCorrect, label: 计入科目正确性, type: conclusion }
+      - { id: conditionSatisfied, label: 补助条件是否满足, type: conclusion }
+      - { id: returnRisk, label: 退回风险评估, type: conclusion }
+    highlights:
+      - { condition: "conclusion == '不合规'", style: red }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - row_ocr: { target: approval_document, endpoint: contract-ocr }
+    ai_section: deferred-check-eval
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 会计提示辅助（走OnlyOffice fallback，不组件化）
+  # ─────────────────────────────────────────────────────────────────────────
+  # 未匹配编码自动降级为OnlyOffice渲染

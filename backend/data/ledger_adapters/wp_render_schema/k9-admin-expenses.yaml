@@ -1,0 +1,248 @@
+# backend/data/wp_render_schema/k9-admin-expenses.yaml
+# K9 管理费用 — 专属组件渲染 schema
+# componentType: k9-admin-expenses
+# 科目 6602 管理费用（**损益类/借方科目！取发生额非余额**）
+# Template: K9 管理费用.xlsx（12 有效 sheet）
+# 公式特征：净发生额=借方-贷方；审定=未审+AJE+RJE；同比/占收入比分析；截止双向
+# K循环损益类底稿（与K8销售费用同款处理）
+
+wp_code: K9
+wp_name: 管理费用
+component_type: k9-admin-expenses
+selfLoad: true
+template_path: backend/wp_templates/K/K9 管理费用.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['6602']
+income_statement: true  # 损益类标识！
+related_accounts:
+  - code: '6602'
+    name: 管理费用
+    direction: debit
+    category: income_statement
+
+special_rules:
+  income_statement: true
+  account_direction: debit
+  net_formula: "借方发生-贷方发生"
+  source_table: "tb_ledger/tb_balance发生额列"
+  substantive_analysis: true
+  cutoff_test_bidirectional: true
+  contract_check: true
+
+formula_count: 120
+description: K循环损益类底稿（12sheet，损益类取发生额+实质性分析+截止双向+合同检查）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TB 回写配置（损益类！回写发生额而非期末余额）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+tb_writeback:
+  account_code: '6602'
+  direction: debit
+  source_sheet: K9-1
+  value_field: audited_amount  # 审定发生额
+  value_type: occurrence_amount  # 发生额非余额！
+  trigger: WORKPAPER_SAVED
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_wp_references:
+  - ref_id: CW-K9-01
+    source_wp: K9-2
+    target_wp: K9-1
+    description: '明细表合计 → 审定表K9-1净发生额'
+    direction: outbound
+  - ref_id: CW-K9-02
+    source_wp: K9-3
+    target_wp: K9-1
+    description: 'AJE/RJE汇总 → 审定表K9-1'
+    direction: outbound
+  - ref_id: CW-K9-03
+    source_wp: K9-3
+    target_wp: A13
+    description: '调整分录 → A13错报汇总'
+    direction: outbound
+  - ref_id: CW-K9-04
+    source_wp: K9-4
+    target_wp: K9-2
+    description: '实质性分析数据源 ← 明细表'
+    direction: inbound
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（12 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: K9
+    group: core
+    dimensions: "28×13"
+    component: K9TabIndex
+    class_code: B-底稿目录
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 管理费用实质性程序表K9A
+  # ─────────────────────────────────────────────────────────────────────────
+  管理费用实质性程序表K9A:
+    code: K9A
+    group: core
+    dimensions: "25×11"
+    component: a-program-console
+    class_code: A-实质性程序
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K9-1（73公式！损益类！取发生额）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K9-1:
+    code: K9-1
+    group: core
+    dimensions: "44×14"
+    component: K9TabAdjudication
+    class_code: F-审定表
+    account_codes: ['6602']
+    formula_count: 73
+    income_statement: true
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      value_type: occurrence_amount
+      accounts: ['6602']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'6602', adjudicatedAmount}" }
+      subscribe:
+        - { event: "adjustment:created", filter: "accountCode=6602" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K9-2（55行×25列）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K9-2:
+    code: K9-2
+    group: core
+    dimensions: "55×25"
+    component: K9TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 15
+    import_export: true
+    add_row_prompt: accountName
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K9-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K9-3:
+    code: K9-3
+    group: core
+    dimensions: "21×10"
+    component: K9TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 实质性分析K9-4（48行×16列，16公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  实质性分析K9-4:
+    code: K9-4
+    group: analysis
+    dimensions: "48×16"
+    component: K9TabSubstantiveAnalysis
+    class_code: F-实质性分析
+    formula_count: 16
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 合同检查表K9-5
+  # ─────────────────────────────────────────────────────────────────────────
+  合同检查表K9-5:
+    code: K9-5
+    group: inspection
+    dimensions: "30×10"
+    component: K9TabContractCheck
+    class_code: D-检查表
+    dynamic_rows: true
+    import_export: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 截止性测试(记账凭证至原始凭证)K9-6
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试(记账凭证至原始凭证)K9-6:
+    code: K9-6
+    group: cutoff
+    dimensions: "44×11"
+    component: K9TabCutoffV2S
+    class_code: F-截止测试
+    cutoff_direction: forward
+    sampling_range_days: 5
+    import_export: true
+    integrations:
+      - cutoff_auto_sampling: { direction: forward, account_prefix: '6602', days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 截止性测试(原始凭证至记账凭证)K9-7
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试(原始凭证至记账凭证)K9-7:
+    code: K9-7
+    group: cutoff
+    dimensions: "44×12"
+    component: K9TabCutoffS2V
+    class_code: F-截止测试
+    cutoff_direction: backward
+    sampling_range_days: 5
+    import_export: true
+    integrations:
+      - cutoff_auto_sampling: { direction: backward, account_prefix: '6602', days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 管理费用检查表K9-8
+  # ─────────────────────────────────────────────────────────────────────────
+  管理费用检查表K9-8:
+    code: K9-8
+    group: inspection
+    dimensions: "20×6"
+    component: K9TabAdminCheck
+    class_code: D-检查表
+    import_export: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 附注披露信息（上市公司）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: disc-listed
+    group: disclosure
+    dimensions: "42×13"
+    component: K9TabDisclosureListed
+    class_code: H-附注
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6602" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'admin_expenses'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 附注披露信息（国有企业）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: disc-soe
+    group: disclosure
+    dimensions: "42×13"
+    component: K9TabDisclosureSoe
+    class_code: H-附注
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=6602" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'admin_expenses'}" }

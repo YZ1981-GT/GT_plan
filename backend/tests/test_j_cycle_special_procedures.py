@@ -309,11 +309,16 @@ class TestTask23FullJCycleVerification:
 
     # ─── P1: 程序表注册 ──────────────────────────────────────────────────────
 
-    def test_j_program_tables_are_a_program_console(self):
-        """J1A~J3A 映射为 a-program-console。"""
-        for code in self._PROGRAM_TABLES:
-            assert _WP_CODE_OVERRIDE[code] == "a-program-console", (
-                f"{code} 应为 a-program-console，实际为 '{_WP_CODE_OVERRIDE[code]}'"
+    def test_j_program_tables_are_dedicated_components(self):
+        """J1A~J3A 映射为对应专属组件（整册内分发程序表，对齐 H1A/L1A）。"""
+        expected = {
+            "J1A": "j1-employee-compensation",
+            "J2A": "j2-defined-benefit-plan",
+            "J3A": "j3-share-based-payment",
+        }
+        for code, ct in expected.items():
+            assert _WP_CODE_OVERRIDE[code] == ct, (
+                f"{code} 应为 {ct}，实际为 '{_WP_CODE_OVERRIDE[code]}'"
             )
 
     def test_j_program_tables_in_templates(self, procedure_templates):
@@ -329,12 +334,16 @@ class TestTask23FullJCycleVerification:
 
     # ─── P2: 审定表验证 ──────────────────────────────────────────────────────
 
-    def test_j_audit_determinations_are_d_form_table(self):
-        """J1-1/J2-1/J3-1 审定表映射为 d-form-table。"""
-        audit_sheets = ["J1-1", "J2-1", "J3-1"]
-        for code in audit_sheets:
-            assert _WP_CODE_OVERRIDE[code] == "d-form-table", (
-                f"{code} 审定表应为 d-form-table，实际为 '{_WP_CODE_OVERRIDE[code]}'"
+    def test_j_audit_determinations_are_dedicated_components(self):
+        """J1-1/J2-1/J3-1 审定表映射为对应专属组件（整册内分发）。"""
+        expected = {
+            "J1-1": "j1-employee-compensation",
+            "J2-1": "j2-defined-benefit-plan",
+            "J3-1": "j3-share-based-payment",
+        }
+        for code, ct in expected.items():
+            assert _WP_CODE_OVERRIDE[code] == ct, (
+                f"{code} 审定表应为 {ct}，实际为 '{_WP_CODE_OVERRIDE[code]}'"
             )
 
     def test_j_audit_determination_schemas_exist(self):

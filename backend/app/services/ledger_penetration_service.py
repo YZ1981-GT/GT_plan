@@ -34,6 +34,11 @@ from app.models.audit_platform_models import (
 from app.services.dataset_query import get_active_filter
 
 
+def _stable_ledger_order(tbl) -> tuple:
+    """序时账分页稳定排序：同凭证多行须用 id 打破并列，否则 OFFSET 分页会漏/重行。"""
+    return (tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.id)
+
+
 class DecimalEncoder(json.JSONEncoder):
     """JSON encoder that handles Decimal and date types."""
     def default(self, o: Any) -> Any:
@@ -264,6 +269,7 @@ class LedgerPenetrationService:
         """全量序时账分录（不限科目）— 供 C24 会计分录细节测试
 
         返回 {items, total, page, page_size}。不筛科目，返回全年全部分录。
+        优化：page > 1 时跳过 COUNT 查询（前端使用首页返回的 total）。
         """
         tbl = TbLedger.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
@@ -272,7 +278,7 @@ class LedgerPenetrationService:
                 tbl.c.id, tbl.c.voucher_date, tbl.c.voucher_no,
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
-                tbl.c.summary,
+                tbl.c.summary, tbl.c.preparer,
             )
             .where(active_filter)
         )
@@ -281,14 +287,16 @@ class LedgerPenetrationService:
         if date_to:
             base = base.where(tbl.c.voucher_date <= date_to)
 
-        # 总数
-        count_stmt = sa.select(sa.func.count()).select_from(base.subquery())
-        total = (await self.db.execute(count_stmt)).scalar() or 0
+        # 总数 — 仅首页查询（后续页前端已缓存 total，跳过避免重复 COUNT）
+        total = 0
+        if page <= 1:
+            count_stmt = sa.select(sa.func.count()).select_from(base.subquery())
+            total = (await self.db.execute(count_stmt)).scalar() or 0
 
         # 分页
         offset = (page - 1) * page_size
         data_stmt = (
-            base.order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+            base.order_by(*_stable_ledger_order(tbl))
             .offset(offset).limit(page_size)
         )
         result = await self.db.execute(data_stmt)
@@ -336,7 +344,7 @@ class LedgerPenetrationService:
         # 分页
         offset = (page - 1) * page_size
         data_stmt = (
-            base.order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+            base.order_by(*_stable_ledger_order(tbl))
             .offset(offset).limit(page_size)
         )
         result = await self.db.execute(data_stmt)
@@ -432,7 +440,7 @@ class LedgerPenetrationService:
 
         offset = (page - 1) * page_size
         data_stmt = (
-            base.order_by(tbl.c.voucher_date, tbl.c.voucher_no)
+            base.order_by(*_stable_ledger_order(tbl))
             .offset(offset).limit(page_size)
         )
         result = await self.db.execute(data_stmt)
@@ -517,7 +525,7 @@ class LedgerPenetrationService:
 
         offset = (page - 1) * page_size
         data_stmt = (
-            led_base.order_by(led_tbl.c.voucher_date, led_tbl.c.voucher_no)
+            led_base.order_by(*_stable_ledger_order(led_tbl))
             .offset(offset).limit(page_size)
         )
         led_result = await self.db.execute(data_stmt)

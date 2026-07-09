@@ -32,7 +32,7 @@ const debouncedFlush = useDebounceFn(async () => {
   const items = [...pendingItems.value]
   pendingItems.value = []
   try {
-    await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items }, { _silent: true } as any)
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items }, { _silent: true } as any)
   } catch { /* silent */ }
 }, 2000)
 

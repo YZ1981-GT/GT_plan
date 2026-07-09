@@ -46,6 +46,8 @@ inclusion: always
 | migration_runner | 运行时 SQL 迁移（`backend/migrations/V*.sql`，非 alembic） |
 | ResponseWrapperMiddleware | 包装所有 2xx JSON 为 `{code,message,data}` 信封 |
 | codegraph | 代码知识图谱 MCP（搜符号/调用链/影响面，优先于 grep） |
+| gt-plan MCP | 领域 MCP：wp_lookup/spec_status/migration_status（`tools/gt-plan-mcp/`） |
+| MCP 铁律 | 选型阶梯见 memory.md §MCP 使用铁律；postgres/github/docker 默认只读 |
 | RTK | CLI token 压缩代理（shell 命令加 `rtk` 前缀） |
 | spec 三件套 | requirements.md + design.md + tasks.md |
 | PBT | Property-Based Testing（hypothesis 框架，max_examples=5） |

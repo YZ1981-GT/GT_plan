@@ -1,0 +1,631 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K11 资产减值损失.xlsx",
+  "total_sheets": 7,
+  "sheet_names": [
+    "底稿目录",
+    "实质性程序表 K11A",
+    "审定表K11-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "明细表K11-2",
+    "调整分录汇总K11-3"
+  ],
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 19,
+        "min_col": 1,
+        "max_col": 6,
+        "used_rows": 19,
+        "used_cols": 6
+      },
+      "row_count": 19,
+      "col_count": 6,
+      "formula_count": 0,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "被审计单位：",
+        "目录"
+      ],
+      "formula_samples": []
+    },
+    {
+      "sheet_name": "实质性程序表 K11A",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 23,
+        "min_col": 1,
+        "max_col": 10,
+        "used_rows": 23,
+        "used_cols": 10
+      },
+      "row_count": 23,
+      "col_count": 10,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D5"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!D5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "审定表K11-1",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 37,
+        "min_col": 1,
+        "max_col": 12,
+        "used_rows": 37,
+        "used_cols": 12
+      },
+      "row_count": 37,
+      "col_count": 12,
+      "formula_count": 190,
+      "business_formula_count": 183,
+      "formula_patterns": {
+        "unique_formula_columns": 9,
+        "rows_with_formulas": 21,
+        "estimated_pattern_count": 9,
+        "formula_column_letters": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H",
+          "I"
+        ]
+      },
+      "column_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引：",
+        "=底稿目录!D6"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='明细表K11-2'!B11"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表K11-2'!F11"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表K11-2'!G11"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表K11-2'!H11"
+        },
+        {
+          "cell": "E7",
+          "formula": "='明细表K11-2'!C11"
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表K11-2'!D11"
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表K11-2'!E11"
+        },
+        {
+          "cell": "H7",
+          "formula": "=G7-D7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息（上市公司）",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 30,
+        "min_col": 1,
+        "max_col": 27,
+        "used_rows": 30,
+        "used_cols": 27
+      },
+      "row_count": 30,
+      "col_count": 27,
+      "formula_count": 66,
+      "business_formula_count": 59,
+      "formula_patterns": {
+        "unique_formula_columns": 3,
+        "rows_with_formulas": 20,
+        "estimated_pattern_count": 3,
+        "formula_column_letters": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "column_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引：",
+        "=底稿目录!D7"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!D7"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='审定表K11-1'!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='审定表K11-1'!G7"
+        },
+        {
+          "cell": "C7",
+          "formula": "='审定表K11-1'!D7"
+        },
+        {
+          "cell": "A8",
+          "formula": "='审定表K11-1'!A8"
+        },
+        {
+          "cell": "B8",
+          "formula": "='审定表K11-1'!G8"
+        },
+        {
+          "cell": "C8",
+          "formula": "='审定表K11-1'!D8"
+        },
+        {
+          "cell": "A9",
+          "formula": "='审定表K11-1'!A9"
+        },
+        {
+          "cell": "B9",
+          "formula": "='审定表K11-1'!G9"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息（国企）",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 29,
+        "min_col": 1,
+        "max_col": 27,
+        "used_rows": 29,
+        "used_cols": 27
+      },
+      "row_count": 29,
+      "col_count": 27,
+      "formula_count": 66,
+      "business_formula_count": 59,
+      "formula_patterns": {
+        "unique_formula_columns": 3,
+        "rows_with_formulas": 20,
+        "estimated_pattern_count": 3,
+        "formula_column_letters": [
+          "A",
+          "B",
+          "C"
+        ]
+      },
+      "column_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引：",
+        "=底稿目录!D8"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!D8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A7",
+          "formula": "='审定表K11-1'!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='审定表K11-1'!G7"
+        },
+        {
+          "cell": "C7",
+          "formula": "='审定表K11-1'!D7"
+        },
+        {
+          "cell": "A8",
+          "formula": "='审定表K11-1'!A8"
+        },
+        {
+          "cell": "B8",
+          "formula": "='审定表K11-1'!G8"
+        },
+        {
+          "cell": "C8",
+          "formula": "='审定表K11-1'!D8"
+        },
+        {
+          "cell": "A9",
+          "formula": "='审定表K11-1'!A9"
+        },
+        {
+          "cell": "B9",
+          "formula": "='审定表K11-1'!G9"
+        }
+      ]
+    },
+    {
+      "sheet_name": "明细表K11-2",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 50,
+        "min_col": 1,
+        "max_col": 18,
+        "used_rows": 50,
+        "used_cols": 18
+      },
+      "row_count": 50,
+      "col_count": 18,
+      "formula_count": 114,
+      "business_formula_count": 107,
+      "formula_patterns": {
+        "unique_formula_columns": 13,
+        "rows_with_formulas": 20,
+        "estimated_pattern_count": 13,
+        "formula_column_letters": [
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H",
+          "J",
+          "K",
+          "L",
+          "M",
+          "N",
+          "O",
+          "Q"
+        ]
+      },
+      "column_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D9"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!D9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E11",
+          "formula": "=C11+D11"
+        },
+        {
+          "cell": "H11",
+          "formula": "=F11+G11"
+        },
+        {
+          "cell": "N11",
+          "formula": "=J11+K11-L11-M11"
+        },
+        {
+          "cell": "O11",
+          "formula": "=K11-L11"
+        },
+        {
+          "cell": "Q11",
+          "formula": "=IF((E11-O11)=0,\"OK\",(E11-O11))"
+        },
+        {
+          "cell": "E12",
+          "formula": "=C12+D12"
+        },
+        {
+          "cell": "H12",
+          "formula": "=F12+G12"
+        },
+        {
+          "cell": "N12",
+          "formula": "=J12+K12-L12-M12"
+        }
+      ]
+    },
+    {
+      "sheet_name": "调整分录汇总K11-3",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 22,
+        "min_col": 1,
+        "max_col": 10,
+        "used_rows": 22,
+        "used_cols": 10
+      },
+      "row_count": 22,
+      "col_count": 10,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!D10"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!D10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "K11-1_formulas": {
+      "design_estimate": 61,
+      "actual_total": 190,
+      "actual_business": 183,
+      "unique_formula_columns": 9,
+      "rows_with_formulas": 21,
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I"
+      ],
+      "interpretation": "Design预估61=唯一列模式数(9列)×部分数据行的近似。openpyxl实际183=逐单元格计数。结构确认：9个公式列, 21行含公式。",
+      "structure_confirmed": true
+    },
+    "K11-1_dimensions": {
+      "expected_rows": 37,
+      "expected_cols": 12,
+      "actual_rows": 37,
+      "actual_cols": 12,
+      "rows_pass": true,
+      "cols_pass": true
+    },
+    "K11-2_formulas": {
+      "design_estimate": 17,
+      "actual_total": 114,
+      "actual_business": 107,
+      "unique_formula_columns": 13,
+      "rows_with_formulas": 20,
+      "formula_columns": [
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "Q"
+      ],
+      "interpretation": "Design预估17=唯一列模式数(13列)的近似（实际13列×20行=107业务公式）。结构确认：13个公式列。",
+      "structure_confirmed": true
+    },
+    "K11-2_dimensions": {
+      "expected_rows": 50,
+      "expected_cols": 18,
+      "actual_rows": 50,
+      "actual_cols": 18,
+      "rows_pass": true,
+      "cols_pass": true
+    },
+    "total_sheets": {
+      "expected": 7,
+      "actual": 7,
+      "pass": true
+    }
+  },
+  "total_formulas": 450,
+  "total_business_formulas": 408,
+  "all_validations_pass": true,
+  "structure_confirmed": true,
+  "summary": {
+    "total_sheets": 7,
+    "total_formulas": 450,
+    "total_business_formulas": 408,
+    "subject_code": "6701",
+    "subject_name": "资产减值损失",
+    "income_statement_type": true,
+    "takes_occurrence_not_balance": true,
+    "note": "损益类科目！取发生额（从tb_ledger，借方=减值增加），非期末余额",
+    "formula_count_note": "Design中'K11-1 61公式/K11-2 17公式'指唯一公式列模式数的近似。openpyxl逐单元格计数：K11-1实际183业务公式（跨行重复），K11-2实际107业务公式。维度(37×12/50×18)和sheet数(7)精确匹配。结构已确认。"
+  }
+}

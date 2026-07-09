@@ -62,6 +62,9 @@ export interface UseD1BadDebtOptions {
 
 const INDIVIDUAL_STORAGE_KEY = 'D1-bd-individual-rows'
 const PORTFOLIO_STORAGE_KEY = 'D1-bd-portfolio-rows'
+const PROCEDURES_KEY = 'D1-bd-procedures'
+const NOTE_KEY = 'D1-bd-note'
+const CONCLUSION_KEY = 'D1-bd-conclusion'
 
 const DEFAULT_INDIVIDUAL_ROW: BadDebtRow = {
   rowId: 'fixed-individual',
@@ -142,6 +145,9 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
 
   const individualRows = ref<BadDebtRow[]>([recalcRow({ ...DEFAULT_INDIVIDUAL_ROW })])
   const portfolioRows = ref<BadDebtRow[]>([recalcRow({ ...DEFAULT_PORTFOLIO_ROW })])
+  const auditProcedures = ref('')
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
   // ─── Deserialization (Load from allResponses) ────────────────────────────
 
@@ -194,8 +200,15 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
     portfolioRows.value = loadRows(PORTFOLIO_STORAGE_KEY, DEFAULT_PORTFOLIO_ROW, 'portfolio')
   }
 
+  function loadMetaFromResponses(): void {
+    auditProcedures.value = allResponses.value.get(PROCEDURES_KEY)?.remark || ''
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark || ''
+    auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark || ''
+  }
+
   // Initial load
   loadFromResponses()
+  loadMetaFromResponses()
 
   // Watch allResponses for external changes
   watch(
@@ -210,6 +223,17 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
       if (newPortfolio !== oldPortfolio && newPortfolio !== serializeRows(portfolioRows.value)) {
         portfolioRows.value = loadRows(PORTFOLIO_STORAGE_KEY, DEFAULT_PORTFOLIO_ROW, 'portfolio')
       }
+    },
+  )
+
+  watch(
+    () => [
+      allResponses.value.get(PROCEDURES_KEY)?.remark,
+      allResponses.value.get(NOTE_KEY)?.remark,
+      allResponses.value.get(CONCLUSION_KEY)?.remark,
+    ],
+    () => {
+      loadMetaFromResponses()
     },
   )
 
@@ -238,12 +262,21 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
   // ─── Debounce Save ───────────────────────────────────────────────────────
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
+  let metaSaveTimer: ReturnType<typeof setTimeout> | null = null
 
   function scheduleSave(): void {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
       persistToResponses()
+    }, 2000)
+  }
+
+  function scheduleMetaSave(): void {
+    if (metaSaveTimer) clearTimeout(metaSaveTimer)
+    metaSaveTimer = setTimeout(() => {
+      metaSaveTimer = null
+      persistMeta()
     }, 2000)
   }
 
@@ -259,6 +292,36 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
     allResponses.value.set(INDIVIDUAL_STORAGE_KEY, items[0])
     allResponses.value.set(PORTFOLIO_STORAGE_KEY, items[1])
     saveImmediate(items)
+  }
+
+  function persistMeta(): void {
+    const items: ChecklistItem[] = [
+      { item_id: PROCEDURES_KEY, conclusion: null, remark: auditProcedures.value || null },
+      { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value || null },
+      { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value || null },
+    ]
+    for (const item of items) {
+      allResponses.value.set(item.item_id, item)
+    }
+    saveImmediate(items)
+  }
+
+  function saveAuditProcedures(text: string): void {
+    if (isReadonly.value) return
+    auditProcedures.value = text
+    scheduleMetaSave()
+  }
+
+  function saveAuditNote(text: string): void {
+    if (isReadonly.value) return
+    auditNote.value = text
+    scheduleMetaSave()
+  }
+
+  function saveAuditConclusion(text: string): void {
+    if (isReadonly.value) return
+    auditConclusion.value = text
+    scheduleMetaSave()
   }
 
   // ─── Subtotal Row (computed) ─────────────────────────────────────────────
@@ -406,6 +469,10 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
       clearTimeout(saveTimer)
       persistToResponses()
     }
+    if (metaSaveTimer) {
+      clearTimeout(metaSaveTimer)
+      persistMeta()
+    }
   })
 
   // ─── Return ──────────────────────────────────────────────────────────────
@@ -416,8 +483,14 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
     subtotalRow,
     eclDifference,
     eclWarning,
+    auditProcedures,
+    auditNote,
+    auditConclusion,
     addSubRow,
     removeSubRow,
     updateCell,
+    saveAuditProcedures,
+    saveAuditNote,
+    saveAuditConclusion,
   }
 }

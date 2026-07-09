@@ -76,6 +76,7 @@ async def chat_completion(
     max_tokens: int = 2000,
     stream: bool = False,
     context_documents: list[str] | None = None,
+    enable_thinking: bool | None = None,
 ) -> str | AsyncGenerator[str, None]:
     """调用 LLM chat completion API
 
@@ -104,13 +105,14 @@ async def chat_completion(
         else:
             messages = [{"role": "system", "content": context_suffix.strip()}] + messages
 
+    thinking = settings.LLM_ENABLE_THINKING if enable_thinking is None else enable_thinking
     payload = {
         "model": model or _MODEL,
         "messages": messages,
         "temperature": temperature,
         "max_tokens": max_tokens,
         "stream": stream,
-        "chat_template_kwargs": {"enable_thinking": settings.LLM_ENABLE_THINKING},
+        "chat_template_kwargs": {"enable_thinking": thinking},
     }
 
     if stream:

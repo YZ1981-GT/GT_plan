@@ -223,10 +223,41 @@ describe('useD1DetailCustomer', () => {
       updateCell(rowId, 'currentDecrease', 200)
       updateCell(rowId, 'reclassification', 50)
 
-      // priorAudited = 1000 + 0 + 0 = 1000
-      // currentUnadjusted = 1000 + 500 - 200 + 50 = 1350
+      // priorAudited = 1000
+      // currentBalance = 1000 + 500 - 200 = 1300
+      // currentUnadjusted = 1300 + 50 = 1350
       expect(rows.value[0].priorAudited).toBe(1000)
+      expect(rows.value[0].currentBalance).toBe(1300)
       expect(rows.value[0].currentUnadjusted).toBe(1350)
+    })
+
+    it('期末余额为计算列，不可通过 updateCell 覆盖', () => {
+      const options = createOptions()
+      const { rows, addRow, updateCell } = useD1DetailCustomer(options)
+
+      addRow()
+      const rowId = rows.value[0].rowId
+      updateCell(rowId, 'priorUnadjusted', 100)
+      updateCell(rowId, 'currentIncrease', 40)
+      updateCell(rowId, 'currentDecrease', 10)
+      updateCell(rowId, 'currentBalance', 9999)
+
+      expect(rows.value[0].currentBalance).toBe(130)
+    })
+  })
+
+  describe('audit meta', () => {
+    it('saveAuditNote 写入 D1-cust-note', async () => {
+      const saveImmediate = vi.fn().mockResolvedValue(undefined)
+      const options = createOptions({ saveImmediate })
+      const { saveAuditNote, auditNote } = useD1DetailCustomer(options)
+
+      saveAuditNote('按客户明细核对无误')
+      expect(auditNote.value).toBe('按客户明细核对无误')
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(saveImmediate).toHaveBeenCalled()
+      const lastCall = saveImmediate.mock.calls.at(-1)?.[0] as Array<{ item_id: string; remark: string | null }>
+      expect(lastCall.some((i) => i.item_id === 'D1-cust-note' && i.remark === '按客户明细核对无误')).toBe(true)
     })
   })
 

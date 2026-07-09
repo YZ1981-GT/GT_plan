@@ -37,6 +37,11 @@ import {
   calcSubtotal,
   calcAuditedAmount,
   calcCurrentUnadjusted,
+  calcMemoEndingBalance,
+  calcUnexpiredEndorsedDiscounted,
+  suggestCreditRating,
+  suggestDerecognized,
+  isDateBefore,
 } from './useD1FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -82,6 +87,9 @@ export interface MemoRow {
   isOverdue: string         // 是否逾期
   overdueTransferAmount: number // 逾期转应收金额
   remarkText: string        // 备注
+  attachmentId: string      // OCR附件ID
+  attachmentName: string    // OCR附件名
+  ocrStatus: string         // OCR状态: none/processing/done/failed
 }
 
 export interface ReconciliationRow {
@@ -92,6 +100,19 @@ export interface ReconciliationRow {
   currentMatured: number
   currentDiscounted: number
   endingBalance: number
+}
+
+export interface UnexpiredSummaryRow {
+  category: string
+  discountedUnexpired: number
+  pledged: number
+  endorsedUnexpired: number
+}
+
+export interface MemoRowWarning {
+  rowId: string
+  noteNumber: string
+  messages: string[]
 }
 
 export interface UseD1MemoReconciliationOptions {
@@ -106,6 +127,7 @@ export interface UseD1MemoReconciliationOptions {
 
 const MEMO_ROWS_KEY = 'D1-memo-rows'          // 存 {bankRows:[...], commercialRows:[...]} JSON
 const CUTOFF_KEY = 'D1-memo-cutoff-date'
+const PROCEDURES_KEY = 'D1-memo-procedures'
 const NOTE_KEY = 'D1-memo-note'
 const CONCLUSION_KEY = 'D1-memo-conclusion'
 
@@ -149,6 +171,9 @@ const STRING_FIELDS: Array<keyof MemoRow> = [
   'relatedParty',
   'isOverdue',
   'remarkText',
+  'attachmentId',
+  'attachmentName',
+  'ocrStatus',
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -201,6 +226,9 @@ export function emptyMemoRow(
     isOverdue: '',
     overdueTransferAmount: 0,
     remarkText: '',
+    attachmentId: '',
+    attachmentName: '',
+    ocrStatus: 'none',
   }
 }
 
@@ -244,6 +272,67 @@ function buildSummaryRow(
   return summary
 }
 
+/** 对单行应用联动公式（年末余额、未到期背书贴现、逾期、状态联动） */
+function applyRowLinkage(row: MemoRow, cutoff: string, changedField?: string): MemoRow {
+  const next = { ...row }
+
+  if (changedField === 'status') {
+    if (next.status === '已贴现') {
+      next.isDiscountedEndorsed = '是'
+      if (!next.currentDiscounted) next.currentDiscounted = next.amount
+    } else if (next.status === '已背书') {
+      next.isDiscountedEndorsed = '是'
+      if (!next.currentEndorsed) next.currentEndorsed = next.amount
+    } else if (next.status === '到期') {
+      if (!next.currentMatured) next.currentMatured = next.amount
+    }
+    if (!next.isDerecognized) {
+      const suggested = suggestDerecognized(next.status, next.acceptor, next.noteType)
+      if (suggested) next.isDerecognized = suggested
+    }
+  }
+
+  if ((changedField === 'acceptor' || changedField === 'noteType') && !next.creditRating) {
+    next.creditRating = suggestCreditRating(next.acceptor, next.noteType)
+  }
+
+  next.endingBalance = calcMemoEndingBalance(
+    next.beginningBalance,
+    next.currentReceived,
+    next.currentEndorsed,
+    next.currentMatured,
+    next.currentDiscounted,
+  )
+
+  next.unexpiredEndorsedDiscounted = calcUnexpiredEndorsedDiscounted(
+    next.amount,
+    next.status,
+    next.maturityDate,
+    cutoff,
+  )
+
+  if (cutoff && next.maturityDate && next.status === '持有') {
+    next.isOverdue = isDateBefore(next.maturityDate, cutoff) ? '是' : '否'
+  }
+
+  return next
+}
+
+function collectRowWarnings(row: MemoRow, cutoff: string): string[] {
+  const warnings: string[] = []
+  if (!row.noteNumber?.trim()) warnings.push('票据号未填写')
+  if (!row.maturityDate && (row.status === '已贴现' || row.status === '已背书')) {
+    warnings.push('贴现/背书票据缺少到期日')
+  }
+  if (cutoff && row.maturityDate && isDateBefore(row.maturityDate, cutoff) && row.status === '持有') {
+    warnings.push('已逾期但仍为持有状态')
+  }
+  if ((row.status === '已贴现' || row.status === '已背书') && !row.isDiscountedEndorsed) {
+    warnings.push('状态为贴现/背书但「审计日已贴现背书」未标记')
+  }
+  return warnings
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions) {
@@ -254,6 +343,7 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
   const cutoffDate = ref<string>('')
   const bankRows = ref<MemoRow[]>([])
   const commercialRows = ref<MemoRow[]>([])
+  const auditProcedures = ref<string>('')
   const auditNote = ref<string>('')
   const auditConclusion = ref<string>('')
   const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loading')
@@ -281,6 +371,7 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
     bankRows.value = bank
     commercialRows.value = commercial
     cutoffDate.value = allResponses.value.get(CUTOFF_KEY)?.remark ?? ''
+    auditProcedures.value = allResponses.value.get(PROCEDURES_KEY)?.remark ?? ''
     auditNote.value = allResponses.value.get(NOTE_KEY)?.remark ?? ''
     auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
   }
@@ -293,10 +384,11 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
     () => [
       allResponses.value.get(MEMO_ROWS_KEY)?.remark,
       allResponses.value.get(CUTOFF_KEY)?.remark,
+      allResponses.value.get(PROCEDURES_KEY)?.remark,
       allResponses.value.get(NOTE_KEY)?.remark,
       allResponses.value.get(CONCLUSION_KEY)?.remark,
     ],
-    ([newRows, newCutoff, newNote, newConclusion]) => {
+    ([newRows, newCutoff, newProcedures, newNote, newConclusion]) => {
       if (newRows !== undefined && newRows !== serializeMemoRows()) {
         const { bank, commercial } = loadMemoRows()
         bankRows.value = bank
@@ -304,6 +396,9 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
       }
       if (newCutoff !== undefined && newCutoff !== cutoffDate.value) {
         cutoffDate.value = newCutoff ?? ''
+      }
+      if (newProcedures !== undefined && newProcedures !== auditProcedures.value) {
+        auditProcedures.value = newProcedures ?? ''
       }
       if (newNote !== undefined && newNote !== auditNote.value) {
         auditNote.value = newNote ?? ''
@@ -339,6 +434,7 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
     const items: ChecklistItem[] = [
       { item_id: MEMO_ROWS_KEY, conclusion: null, remark: serializeMemoRows() },
       { item_id: CUTOFF_KEY, conclusion: null, remark: cutoffDate.value || null },
+      { item_id: PROCEDURES_KEY, conclusion: null, remark: auditProcedures.value || null },
       { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value || null },
       { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value || null },
     ]
@@ -492,6 +588,49 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
     return { discountedTotal, endorsedTotal }
   })
 
+  const allDataRows: ComputedRef<MemoRow[]> = computed(() => [
+    ...bankRows.value,
+    ...commercialRows.value,
+  ])
+
+  /** 未到期贴现/质押/背书汇总（对齐 Excel 底部汇总表） */
+  const unexpiredSummaryRows: ComputedRef<UnexpiredSummaryRow[]> = computed(() => {
+    const cutoff = cutoffDate.value
+    const build = (category: 'bank' | 'commercial', label: string): UnexpiredSummaryRow => {
+      const rows = category === 'bank' ? bankRows.value : commercialRows.value
+      let discountedUnexpired = 0
+      let pledged = 0
+      let endorsedUnexpired = 0
+      for (const r of rows) {
+        if (r.isPledged === '是') pledged += r.amount
+        if (r.status === '已贴现' && cutoff && r.maturityDate && !isDateBefore(r.maturityDate, cutoff)) {
+          discountedUnexpired += r.amount
+        }
+        if (r.status === '已背书' && cutoff && r.maturityDate && !isDateBefore(r.maturityDate, cutoff)) {
+          endorsedUnexpired += r.amount
+        }
+      }
+      return { category: label, discountedUnexpired, pledged, endorsedUnexpired }
+    }
+    return [
+      build('bank', '银行承兑汇票'),
+      build('commercial', '商业承兑汇票'),
+    ]
+  })
+
+  const rowWarnings: ComputedRef<MemoRowWarning[]> = computed(() => {
+    const cutoff = cutoffDate.value
+    return allDataRows.value
+      .map((row) => ({
+        rowId: row.rowId,
+        noteNumber: row.noteNumber,
+        messages: collectRowWarnings(row, cutoff),
+      }))
+      .filter((w) => w.messages.length > 0)
+  })
+
+  const warningCount = computed(() => rowWarnings.value.length)
+
   // ─── Row CRUD ────────────────────────────────────────────────────────────
 
   /** 在指定分类末尾新增一个空动态行 */
@@ -535,8 +674,9 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
       } else {
         return false
       }
+      const linked = applyRowLinkage(row, cutoffDate.value, field)
       const newRows = [...list.value]
-      newRows[idx] = row
+      newRows[idx] = linked
       list.value = newRows
       return true
     }
@@ -552,6 +692,16 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
   function setCutoffDate(value: string): void {
     if (isReadonly.value) return
     cutoffDate.value = value
+    const relink = (rows: MemoRow[]) =>
+      rows.map((r) => applyRowLinkage(r, value))
+    bankRows.value = relink(bankRows.value)
+    commercialRows.value = relink(commercialRows.value)
+    scheduleSave()
+  }
+
+  function saveAuditProcedures(text: string): void {
+    if (isReadonly.value) return
+    auditProcedures.value = text
     scheduleSave()
   }
 
@@ -588,13 +738,19 @@ export function useD1MemoReconciliation(options: UseD1MemoReconciliationOptions)
     reconciliationRows,
     hasDifference,
     endorsedStats,
+    unexpiredSummaryRows,
+    allDataRows,
+    rowWarnings,
+    warningCount,
     crossSheetStatus,
+    auditProcedures,
     auditNote,
     auditConclusion,
     addRow,
     removeRow,
     updateCell,
     setCutoffDate,
+    saveAuditProcedures,
     saveAuditNote,
     saveAuditConclusion,
   }

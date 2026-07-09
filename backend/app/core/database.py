@@ -68,8 +68,38 @@ async_session = async_sessionmaker(
 async_engine = engine
 
 # 同步引擎和会话工厂（供同步 service 函数使用）
-_sync_engine = engine.sync_engine
-SyncSession = sessionmaker(bind=_sync_engine, expire_on_commit=False)
+# 延迟初始化：模块 import 时勿访问 AsyncEngine.sync_engine，否则在 uvicorn
+# lifespan 的 greenlet 上下文中首次 connect 会触发 maximum recursion depth exceeded。
+_sync_engine = None
+_sync_session_factory = None
+
+
+def _get_sync_engine():
+    global _sync_engine
+    if _sync_engine is None:
+        _sync_engine = engine.sync_engine
+    return _sync_engine
+
+
+def _get_sync_session_factory():
+    global _sync_session_factory
+    if _sync_session_factory is None:
+        _sync_session_factory = sessionmaker(
+            bind=_get_sync_engine(), expire_on_commit=False
+        )
+    return _sync_session_factory
+
+
+# 向后兼容：旧代码 `from app.core.database import SyncSession` 仍可用
+class _SyncSessionProxy:
+    def __call__(self, *args, **kwargs):
+        return _get_sync_session_factory()(*args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(_get_sync_session_factory(), name)
+
+
+SyncSession = _SyncSessionProxy()
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

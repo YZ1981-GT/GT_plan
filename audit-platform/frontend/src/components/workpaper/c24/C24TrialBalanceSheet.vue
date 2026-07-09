@@ -92,6 +92,9 @@ defineEmits<{
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .section-title { font-weight: 600; font-size: 14px; color: #303133; }
 .c24-table { font-size: 13px; }
+.c24-table :deep(.el-table__header th),
+.c24-table :deep(.el-table__body td),
+.c24-table :deep(.cell) { font-size: 13px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; color: #409eff; }
 .text-danger { color: #f56c6c !important; }
 .unit-label { font-size: 12px; color: #909399; font-weight: normal; }

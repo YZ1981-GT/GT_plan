@@ -1,0 +1,260 @@
+<template>
+  <div class="h4-tab-disclosure-soe">
+    <!-- 方法论上下文 -->
+    <div class="methodology-context">
+      <p>附注披露信息（国有企业）：按照国资委和财政部要求，披露工程物资变动情况及相关管控信息。数据从H4-1审定表自动取数，重点关注国有资产保值增值和重大物资采购合规性。</p>
+    </div>
+
+    <!-- Section Title -->
+    <div class="section-header">
+      <span>附注披露信息（国有企业）</span>
+      <div class="section-header-actions">
+        <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions"
+          size="small" @change="dualMode.onModeChange" />
+        <el-button size="small" type="primary" link @click="handleAiGenerate" style="margin-left: 8px">
+          <el-icon><MagicStick /></el-icon> AI
+        </el-button>
+        <el-button size="small" circle @click="openReview('H4-disclosure-soe')">💬</el-button>
+      </div>
+    </div>
+
+    <!-- OnlyOffice 模式 -->
+    <GtOnlyOfficeSheet
+      v-if="dualMode.currentMode.value === 'onlyoffice'"
+      :wp-id="props.wpId"
+      :sheet-name="props.sheetName || '附注披露信息（国有企业）'"
+      :project-id="props.projectId"
+      class="disclosure-oo"
+    />
+
+    <!-- HTML 摘要视图 -->
+    <div v-else class="disclosure-summary">
+      <el-card shadow="never">
+        <template #header>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <span style="font-weight: 600">工程物资附注关键数据（自动取数）</span>
+            <el-tag v-if="autoFillData.disc_audited" size="small" type="success">已同步</el-tag>
+            <el-tag v-else size="small" type="info">待审定</el-tag>
+          </div>
+        </template>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="期初余额">
+            <span class="amt-cell">{{ fmtAmt(autoFillData.disc_begin) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="期末余额（审定）">
+            <span class="amt-cell highlight">{{ fmtAmt(autoFillData.disc_audited) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="本期增加（借方）">
+            <span class="amt-cell">{{ fmtAmt(autoFillData.disc_debit) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="本期减少（贷方）">
+            <span class="amt-cell">{{ fmtAmt(autoFillData.disc_credit) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="明细合计">
+            <span class="amt-cell">{{ fmtAmt(autoFillData.disc_detail_total) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="减值准备">
+            <span class="amt-cell">{{ fmtAmt(impairmentProvision) }}</span>
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-card>
+
+      <!-- 国企专项信息 -->
+      <el-card shadow="never" class="soe-extra-card">
+        <template #header>
+          <span style="font-weight: 600">国企专项披露信息</span>
+        </template>
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="重大采购笔数">
+            <span class="amt-cell">{{ soeData.majorPurchaseCount || '-' }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="重大采购金额">
+            <span class="amt-cell">{{ fmtAmt(soeData.majorPurchaseAmount) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="关联采购占比">
+            <span class="amt-cell" :class="{ 'rate-warn': soeData.relatedPurchaseRatio > 30 }">
+              {{ soeData.relatedPurchaseRatio ? soeData.relatedPurchaseRatio.toFixed(1) + '%' : '-' }}
+            </span>
+          </el-descriptions-item>
+          <el-descriptions-item label="超龄物资金额">
+            <span class="amt-cell">{{ fmtAmt(soeData.overageAmount) }}</span>
+          </el-descriptions-item>
+        </el-descriptions>
+      </el-card>
+
+      <!-- 附注文本编辑 -->
+      <el-card shadow="never" class="note-text-card">
+        <template #header>
+          <div class="section-header" style="margin-bottom:0">
+            <span>附注披露文本</span>
+            <div class="section-header-actions">
+              <el-button size="small" type="primary" link @click="handleAiGenerate">
+                <el-icon><MagicStick /></el-icon> AI生成
+              </el-button>
+            </div>
+          </div>
+        </template>
+        <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }"
+          placeholder="请填写附注披露文本内容..." :disabled="props.isReadonly"
+          @blur="saveNoteText" />
+      </el-card>
+    </div>
+
+    <!-- 编制提示 -->
+    <details class="edit-tips">
+      <summary>编制提示</summary>
+      <ul>
+        <li>关键数据从H4-1审定表自动取数，H4-1审定完成后自动刷新</li>
+        <li>国企需额外披露重大物资采购决策程序和合规性</li>
+        <li>关联采购占比较高时需说明商业合理性</li>
+        <li>超龄物资需评估是否存在减值迹象</li>
+        <li>需符合国资委产权管理相关披露要求</li>
+      </ul>
+    </details>
+  </div>
+</template>
+
+<script setup lang="ts">
+/**
+ * H4TabDisclosureSoe.vue — 附注披露信息（国有企业）
+ *
+ * OO-primary + HTML fallback showing key disclosure data + SOE-specific fields.
+ * Subscribe to EventBus 'substantive:adjudicated' to refresh when H4-1 audited changes.
+ * Uses disclosureAutoFill from useH4CrossSheet for auto-populated fields.
+ *
+ * Spec: .kiro/specs/h4-engineering-materials/
+ * Task: 4.10
+ * Requirements: 1.2
+ */
+import { ref, computed, defineAsyncComponent, inject, toRef, onMounted, onUnmounted } from 'vue'
+import { MagicStick } from '@element-plus/icons-vue'
+import { useH4DualMode } from '../../composables/useH4DualMode'
+import { useH4CrossSheet } from '../../composables/useH4CrossSheet'
+
+const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../../GtOnlyOfficeSheet.vue'))
+
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  allResponses: Map<string, any>
+  isReadonly: boolean
+  sheetName?: string
+}>()
+
+const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+// ─── Dual Mode ───────────────────────────────────────────────────────────────
+const dualMode = useH4DualMode({
+  wpId: toRef(props, 'wpId'),
+})
+
+// ─── Cross-Sheet Auto Fill ───────────────────────────────────────────────────
+const allResponsesRef = computed(() => props.allResponses)
+const { disclosureAutoFill } = useH4CrossSheet(allResponsesRef as any)
+const autoFillData = computed(() => disclosureAutoFill.value)
+
+// 减值准备从 allResponses 获取
+const impairmentProvision = computed(() => {
+  const resp = props.allResponses.get('H4-7-impairment-loss')
+  const n = Number(resp?.remark)
+  return Number.isFinite(n) ? n : 0
+})
+
+// ─── SOE-specific data ───────────────────────────────────────────────────────
+const soeData = computed(() => {
+  const map = props.allResponses
+  const getNum = (key: string) => {
+    const resp = map.get(key)
+    const n = Number(resp?.remark)
+    return Number.isFinite(n) ? n : 0
+  }
+  return {
+    majorPurchaseCount: getNum('H4-soe-major-purchase-count'),
+    majorPurchaseAmount: getNum('H4-soe-major-purchase-amount'),
+    relatedPurchaseRatio: getNum('H4-soe-related-purchase-ratio'),
+    overageAmount: getNum('H4-soe-overage-amount'),
+  }
+})
+
+// ─── Note Text ───────────────────────────────────────────────────────────────
+const noteText = ref('')
+const noteResp = props.allResponses.get('H4-disclosure-soe-text')
+if (noteResp?.remark) noteText.value = noteResp.remark
+
+function saveNoteText() {
+  props.allResponses.set('H4-disclosure-soe-text', {
+    item_id: 'H4-disclosure-soe-text', remark: noteText.value, conclusion: null,
+  })
+}
+
+// ─── EventBus Subscribe ──────────────────────────────────────────────────────
+let unsubscribe: (() => void) | null = null
+
+onMounted(() => {
+  const handler = (e: Event) => {
+    const detail = (e as CustomEvent).detail
+    if (detail?.wpCode === 'H4' || detail?.accountCode === '1605') {
+      console.log('[H4-Disclosure-SOE] Received substantive:adjudicated, refreshing')
+    }
+  }
+  window.addEventListener('substantive:adjudicated', handler)
+  unsubscribe = () => window.removeEventListener('substantive:adjudicated', handler)
+})
+
+onUnmounted(() => {
+  unsubscribe?.()
+})
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
+function handleAiGenerate() {
+  console.log('[H4-Disclosure-SOE] AI generate')
+}
+
+function openReview(id: string) {
+  openReviewDialog(id)
+}
+
+// ─── 金额格式化 ──────────────────────────────────────────────────────────────
+function fmtAmt(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  if (val < 0) {
+    return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+  }
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+</script>
+
+<style scoped>
+.h4-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+
+.methodology-context {
+  border-left: 4px solid #d97706;
+  background: #fffbeb;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.6;
+}
+
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px; font-weight: 600; margin-bottom: 12px;
+}
+.section-header-actions { display: flex; align-items: center; gap: 4px; }
+
+.disclosure-oo { min-height: 400px; margin-bottom: 12px; }
+
+.disclosure-summary { margin-bottom: 12px; }
+.amt-cell { font-variant-numeric: tabular-nums; }
+.highlight { color: #409eff; font-weight: 600; }
+.rate-warn { color: #e6a23c; font-weight: 600; }
+
+.soe-extra-card { margin-top: 12px; }
+.note-text-card { margin-top: 12px; }
+
+.edit-tips { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.edit-tips summary { cursor: pointer; font-weight: 500; }
+.edit-tips ul { padding-left: 20px; margin-top: 8px; }
+</style>

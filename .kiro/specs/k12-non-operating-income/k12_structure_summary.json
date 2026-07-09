@@ -1,0 +1,780 @@
+{
+  "source_file": "d:\\GT_plan\\基础数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\K 管理循环\\K12 营业外收入.xlsx",
+  "total_sheets": 9,
+  "sheet_names": [
+    "底稿目录",
+    "实质性程序表K12A",
+    "审定表K12-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "明细表K12-2",
+    "调整分录汇总K12-3",
+    "营业外收入检查表K12-4",
+    "GT_Custom"
+  ],
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 19,
+        "min_col": 1,
+        "max_col": 8,
+        "used_rows": 19,
+        "used_cols": 8
+      },
+      "row_count": 19,
+      "col_count": 8,
+      "formula_count": 0,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据：",
+        "被审计单位：",
+        "会计期间：202X年度",
+        "序号",
+        "内容",
+        "索引号",
+        "编制人：",
+        "1"
+      ],
+      "formula_samples": []
+    },
+    {
+      "sheet_name": "实质性程序表K12A",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 24,
+        "min_col": 1,
+        "max_col": 10,
+        "used_rows": 24,
+        "used_cols": 10
+      },
+      "row_count": 24,
+      "col_count": 10,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入实质性程序表",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F4",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "审定表K12-1",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 25,
+        "min_col": 1,
+        "max_col": 11,
+        "used_rows": 25,
+        "used_cols": 11
+      },
+      "row_count": 25,
+      "col_count": 11,
+      "formula_count": 80,
+      "business_formula_count": 64,
+      "formula_patterns": {
+        "unique_formula_columns": 9,
+        "rows_with_formulas": 8,
+        "estimated_pattern_count": 9,
+        "formula_column_letters": [
+          "A",
+          "B",
+          "C",
+          "D",
+          "E",
+          "G",
+          "H",
+          "I",
+          "J"
+        ]
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入审定表",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F5",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A6",
+          "formula": "='明细表K12-2'!A9"
+        },
+        {
+          "cell": "B6",
+          "formula": "='明细表K12-2'!N9"
+        },
+        {
+          "cell": "C6",
+          "formula": "='明细表K12-2'!O9"
+        },
+        {
+          "cell": "D6",
+          "formula": "='明细表K12-2'!P9"
+        },
+        {
+          "cell": "E6",
+          "formula": "=B6+C6+D6"
+        },
+        {
+          "cell": "G6",
+          "formula": "='明细表K12-2'!U9"
+        },
+        {
+          "cell": "H6",
+          "formula": "='明细表K12-2'!V9"
+        },
+        {
+          "cell": "I6",
+          "formula": "='明细表K12-2'!W9"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息（上市公司）",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 41,
+        "min_col": 1,
+        "max_col": 17,
+        "used_rows": 41,
+        "used_cols": 17
+      },
+      "row_count": 41,
+      "col_count": 17,
+      "formula_count": 38,
+      "business_formula_count": 31,
+      "formula_patterns": {
+        "unique_formula_columns": 4,
+        "rows_with_formulas": 8,
+        "estimated_pattern_count": 4,
+        "formula_column_letters": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入附注披露信息",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F6",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!F6"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A8",
+          "formula": "='审定表K12-1'!A6"
+        },
+        {
+          "cell": "B8",
+          "formula": "='审定表K12-1'!E6"
+        },
+        {
+          "cell": "C8",
+          "formula": "='审定表K12-1'!J6"
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表K12-2'!R9"
+        },
+        {
+          "cell": "A9",
+          "formula": "='审定表K12-1'!A7"
+        },
+        {
+          "cell": "B9",
+          "formula": "='审定表K12-1'!E7"
+        },
+        {
+          "cell": "C9",
+          "formula": "='审定表K12-1'!J7"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表K12-2'!R10"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息（国企）",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 29,
+        "min_col": 1,
+        "max_col": 5,
+        "used_rows": 29,
+        "used_cols": 5
+      },
+      "row_count": 29,
+      "col_count": 5,
+      "formula_count": 40,
+      "business_formula_count": 33,
+      "formula_patterns": {
+        "unique_formula_columns": 4,
+        "rows_with_formulas": 9,
+        "estimated_pattern_count": 4,
+        "formula_column_letters": [
+          "A",
+          "B",
+          "C",
+          "D"
+        ]
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入附注披露信息",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F7",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "A8",
+          "formula": "='审定表K12-1'!A6"
+        },
+        {
+          "cell": "B8",
+          "formula": "='审定表K12-1'!E6"
+        },
+        {
+          "cell": "C8",
+          "formula": "='审定表K12-1'!J6"
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表K12-2'!R9"
+        },
+        {
+          "cell": "A9",
+          "formula": "='审定表K12-1'!A7"
+        },
+        {
+          "cell": "B9",
+          "formula": "='审定表K12-1'!E7"
+        },
+        {
+          "cell": "C9",
+          "formula": "='审定表K12-1'!J7"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表K12-2'!R10"
+        }
+      ]
+    },
+    {
+      "sheet_name": "明细表K12-2",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 27,
+        "min_col": 1,
+        "max_col": 26,
+        "used_rows": 27,
+        "used_cols": 26
+      },
+      "row_count": 27,
+      "col_count": 26,
+      "formula_count": 86,
+      "business_formula_count": 79,
+      "formula_patterns": {
+        "unique_formula_columns": 24,
+        "rows_with_formulas": 9,
+        "estimated_pattern_count": 24,
+        "formula_column_letters": [
+          "B",
+          "C",
+          "D",
+          "E",
+          "F",
+          "G",
+          "H",
+          "I",
+          "J",
+          "K",
+          "L",
+          "M",
+          "N",
+          "O",
+          "P",
+          "Q",
+          "R",
+          "T",
+          "U",
+          "V",
+          "W",
+          "X",
+          "Y",
+          "Z"
+        ]
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入明细表",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F8",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "R3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Z3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "J4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "R4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "N9",
+          "formula": "=SUM(B9:M9)"
+        },
+        {
+          "cell": "Q9",
+          "formula": "=N9+O9+P9"
+        },
+        {
+          "cell": "T9",
+          "formula": "=IF($Q$16=0,0,Q9/$Q$16)"
+        },
+        {
+          "cell": "X9",
+          "formula": "=U9+V9+W9"
+        },
+        {
+          "cell": "Y9",
+          "formula": "=IF($X$16=0,0,X9/$X$16)"
+        },
+        {
+          "cell": "Z9",
+          "formula": "=IF(AND(X9=0,Q9>0),1,IF(AND(X9=0,Q9=0),0,(Q9-X9)/X9))"
+        },
+        {
+          "cell": "N10",
+          "formula": "=SUM(B10:M10)"
+        },
+        {
+          "cell": "Q10",
+          "formula": "=N10+O10+P10"
+        }
+      ]
+    },
+    {
+      "sheet_name": "调整分录汇总K12-3",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 25,
+        "min_col": 1,
+        "max_col": 10,
+        "used_rows": 25,
+        "used_cols": 10
+      },
+      "row_count": 25,
+      "col_count": 10,
+      "formula_count": 7,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入调整分录汇总表",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引：",
+        "=底稿目录!F9",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ]
+    },
+    {
+      "sheet_name": "营业外收入检查表K12-4",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 31,
+        "min_col": 1,
+        "max_col": 17,
+        "used_rows": 31,
+        "used_cols": 17
+      },
+      "row_count": 31,
+      "col_count": 17,
+      "formula_count": 10,
+      "business_formula_count": 3,
+      "formula_patterns": {
+        "unique_formula_columns": 1,
+        "rows_with_formulas": 3,
+        "estimated_pattern_count": 1,
+        "formula_column_letters": [
+          "G"
+        ]
+      },
+      "column_headers": [
+        "致同会计师事务所",
+        "营业外收入检查表",
+        "=底稿目录!A2",
+        "=底稿目录!A4",
+        "=底稿目录!A5",
+        "索引号：",
+        "=底稿目录!F10",
+        "=底稿目录!A3"
+      ],
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(G12:G21)"
+        },
+        {
+          "cell": "G23",
+          "formula": "='明细表K12-2'!Q16"
+        },
+        {
+          "cell": "G24",
+          "formula": "=G22/G23"
+        }
+      ]
+    },
+    {
+      "sheet_name": "GT_Custom",
+      "used_range": {
+        "min_row": 1,
+        "max_row": 8,
+        "min_col": 1,
+        "max_col": 2,
+        "used_rows": 8,
+        "used_cols": 2
+      },
+      "row_count": 8,
+      "col_count": 2,
+      "formula_count": 0,
+      "business_formula_count": 0,
+      "formula_patterns": {
+        "unique_formula_columns": 0,
+        "rows_with_formulas": 0,
+        "estimated_pattern_count": 0,
+        "formula_column_letters": []
+      },
+      "column_headers": [
+        "C1",
+        "Custom 1",
+        "C2",
+        "Custom 2",
+        "C3",
+        "Custom 3",
+        "C4",
+        "Custom 4"
+      ],
+      "formula_samples": []
+    }
+  ],
+  "validation": {
+    "K12-1_formulas": {
+      "design_estimate": 70,
+      "actual_total": 80,
+      "actual_business": 64,
+      "unique_formula_columns": 9,
+      "rows_with_formulas": 8,
+      "formula_columns": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "G",
+        "H",
+        "I",
+        "J"
+      ],
+      "interpretation": "Design预估70公式。openpyxl实际64业务公式（含逐行重复）。唯一公式列9个。",
+      "structure_confirmed": true
+    },
+    "K12-1_dimensions": {
+      "actual_rows": 25,
+      "actual_cols": 11
+    },
+    "K12-2_formulas": {
+      "design_estimate": 31,
+      "actual_total": 86,
+      "actual_business": 79,
+      "unique_formula_columns": 24,
+      "rows_with_formulas": 9,
+      "formula_columns": [
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "H",
+        "I",
+        "J",
+        "K",
+        "L",
+        "M",
+        "N",
+        "O",
+        "P",
+        "Q",
+        "R",
+        "T",
+        "U",
+        "V",
+        "W",
+        "X",
+        "Y",
+        "Z"
+      ],
+      "interpretation": "Design预估31公式。openpyxl实际79业务公式。唯一公式列24个。",
+      "structure_confirmed": true
+    },
+    "K12-2_dimensions": {
+      "actual_rows": 27,
+      "actual_cols": 26
+    },
+    "total_sheets": {
+      "expected": 9,
+      "actual": 9,
+      "pass": true
+    }
+  },
+  "total_formulas": 268,
+  "total_business_formulas": 210,
+  "all_validations_pass": true,
+  "structure_confirmed": true,
+  "summary": {
+    "total_sheets": 9,
+    "total_formulas": 268,
+    "total_business_formulas": 210,
+    "subject_code": "6301",
+    "subject_name": "营业外收入",
+    "income_statement_type": true,
+    "takes_occurrence_not_balance": true,
+    "note": "损益类科目！取发生额（从tb_ledger，贷方=收入增加），非期末余额。营业外收入=与日常活动无关的利得（政府补助/债务重组利得/资产盘盈/罚款收入/捐赠利得等）",
+    "formula_count_note": "Design中'K12-1 70公式/K12-2 31公式'。openpyxl逐单元格计数：K12-1实际80总公式(64业务公式，9列×8行)；K12-2实际86总公式(79业务公式，24列×9行)。Design预估70≈K12-1总80（接近）；Design预估31≈附注上市公司业务公式31（可能指附注而非明细表）。9 sheets + 维度(25×11/27×26)精确匹配。结构已确认。"
+  }
+}

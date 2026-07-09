@@ -43,7 +43,7 @@ export interface ReversalRow {
   indexRef: string              // H: 索引号
 }
 
-/** D1-16 Section 2 核销明细行（5列） */
+/** D1-16 Section 2 核销明细行（8列） */
 export interface WriteoffRow {
   id: string                    // uuid
   unitName: string              // A: 单位名称
@@ -51,6 +51,9 @@ export interface WriteoffRow {
   writeoffAmount: number        // C: 核销金额
   writeoffReason: string        // D: 核销原因
   writeoffProcedure: string     // E: 履行的核销程序
+  isRelatedPartyGenerated: string // F: 是否由关联交易产生（是/否）
+  reasonabilityAnalysis: string // G: 合理性分析
+  indexRef: string              // H: 索引号
 }
 
 /** 收回方式枚举 */
@@ -72,6 +75,8 @@ export const RECOVERY_METHODS: RecoveryMethod[] = [
 export const NOTE_NATURES: NoteNature[] = [
   '银行承兑汇票', '商业承兑汇票', '其他',
 ]
+
+export const YN_OPTIONS = ['是', '否'] as const
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 纯函数
@@ -154,6 +159,7 @@ export function getMissingWriteoffFields(row: WriteoffRow): string[] {
   if (row.writeoffAmount > 0) {
     if (!row.writeoffReason.trim()) missing.push('writeoffReason')
     if (!row.writeoffProcedure.trim()) missing.push('writeoffProcedure')
+    if (!row.reasonabilityAnalysis.trim()) missing.push('reasonabilityAnalysis')
   }
   return missing
 }
@@ -180,6 +186,8 @@ export interface UseD1WriteoffCheckOptions {
 
 const REVERSAL_ROWS_KEY = 'D1-writeoff-reversal-rows'
 const WRITEOFF_ROWS_KEY = 'D1-writeoff-writeoff-rows'
+const AUDIT_OBJECTIVE_KEY = 'D1-writeoff-audit-objective'
+const AUDIT_PROCEDURES_KEY = 'D1-writeoff-audit-procedures'
 const AUDIT_NOTE_KEY = 'D1-writeoff-audit-note'
 const AUDIT_CONCLUSION_KEY = 'D1-writeoff-audit-conclusion'
 const REVERSAL_TOTAL_KEY = 'D1-writeoff-reversal-total'
@@ -187,7 +195,7 @@ const WRITEOFF_TOTAL_KEY = 'D1-writeoff-writeoff-total'
 
 /** select 类字段（立即保存） */
 const REVERSAL_SELECT_FIELDS: Array<keyof ReversalRow> = ['recoveryMethod']
-const WRITEOFF_SELECT_FIELDS: Array<keyof WriteoffRow> = ['noteNature']
+const WRITEOFF_SELECT_FIELDS: Array<keyof WriteoffRow> = ['noteNature', 'isRelatedPartyGenerated']
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Helpers
@@ -222,6 +230,9 @@ function emptyWriteoffRow(): WriteoffRow {
     writeoffAmount: 0,
     writeoffReason: '',
     writeoffProcedure: '',
+    isRelatedPartyGenerated: '',
+    reasonabilityAnalysis: '',
+    indexRef: '',
   }
 }
 
@@ -255,6 +266,9 @@ function deserializeWriteoffRow(raw: any): WriteoffRow {
     if (typeof raw.noteNature === 'string') row.noteNature = raw.noteNature
     if (typeof raw.writeoffReason === 'string') row.writeoffReason = raw.writeoffReason
     if (typeof raw.writeoffProcedure === 'string') row.writeoffProcedure = raw.writeoffProcedure
+    if (typeof raw.isRelatedPartyGenerated === 'string') row.isRelatedPartyGenerated = raw.isRelatedPartyGenerated
+    if (typeof raw.reasonabilityAnalysis === 'string') row.reasonabilityAnalysis = raw.reasonabilityAnalysis
+    if (typeof raw.indexRef === 'string') row.indexRef = raw.indexRef
     if (raw.writeoffAmount !== undefined) row.writeoffAmount = parseNum(raw.writeoffAmount)
   }
   return row
@@ -271,6 +285,8 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
 
   const reversalRows = ref<ReversalRow[]>([])
   const writeoffRows = ref<WriteoffRow[]>([])
+  const auditObjective = ref<string>('')
+  const auditProcedures = ref<string>('')
   const auditNote = ref<string>('')
   const auditConclusion = ref<string>('')
   const isLoading = ref<boolean>(false)
@@ -306,6 +322,8 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
   function loadFromResponses(): void {
     reversalRows.value = loadReversalRows()
     writeoffRows.value = loadWriteoffRows()
+    auditObjective.value = allResponses.value.get(AUDIT_OBJECTIVE_KEY)?.remark ?? ''
+    auditProcedures.value = allResponses.value.get(AUDIT_PROCEDURES_KEY)?.remark ?? ''
     auditNote.value = allResponses.value.get(AUDIT_NOTE_KEY)?.remark ?? ''
     auditConclusion.value = allResponses.value.get(AUDIT_CONCLUSION_KEY)?.remark ?? ''
   }
@@ -318,15 +336,23 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
     () => [
       allResponses.value.get(REVERSAL_ROWS_KEY)?.remark,
       allResponses.value.get(WRITEOFF_ROWS_KEY)?.remark,
+      allResponses.value.get(AUDIT_OBJECTIVE_KEY)?.remark,
+      allResponses.value.get(AUDIT_PROCEDURES_KEY)?.remark,
       allResponses.value.get(AUDIT_NOTE_KEY)?.remark,
       allResponses.value.get(AUDIT_CONCLUSION_KEY)?.remark,
     ],
-    ([newReversalRaw, newWriteoffRaw, newNote, newConclusion]) => {
+    ([newReversalRaw, newWriteoffRaw, newObjective, newProcedures, newNote, newConclusion]) => {
       if (newReversalRaw !== undefined && newReversalRaw !== serializeReversalRows()) {
         reversalRows.value = loadReversalRows()
       }
       if (newWriteoffRaw !== undefined && newWriteoffRaw !== serializeWriteoffRows()) {
         writeoffRows.value = loadWriteoffRows()
+      }
+      if (newObjective !== undefined && newObjective !== auditObjective.value) {
+        auditObjective.value = newObjective ?? ''
+      }
+      if (newProcedures !== undefined && newProcedures !== auditProcedures.value) {
+        auditProcedures.value = newProcedures ?? ''
       }
       if (newNote !== undefined && newNote !== auditNote.value) {
         auditNote.value = newNote ?? ''
@@ -574,6 +600,30 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
 
   // ─── Section 3/4: 审计说明/结论 ───────────────────────────────────────
 
+  function saveAuditObjective(text: string): void {
+    if (isReadonly.value) return
+    auditObjective.value = text
+    const item: ChecklistItem = {
+      item_id: AUDIT_OBJECTIVE_KEY,
+      conclusion: null,
+      remark: text || null,
+    }
+    allResponses.value.set(AUDIT_OBJECTIVE_KEY, item)
+    saveDebouncedText(item)
+  }
+
+  function saveAuditProcedures(text: string): void {
+    if (isReadonly.value) return
+    auditProcedures.value = text
+    const item: ChecklistItem = {
+      item_id: AUDIT_PROCEDURES_KEY,
+      conclusion: null,
+      remark: text || null,
+    }
+    allResponses.value.set(AUDIT_PROCEDURES_KEY, item)
+    saveDebouncedText(item)
+  }
+
   function saveAuditNote(text: string): void {
     if (isReadonly.value) return
     auditNote.value = text
@@ -677,6 +727,10 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
     syncWriteoffToD14,
 
     // Section 3/4: 审计说明/结论
+    auditObjective,
+    saveAuditObjective,
+    auditProcedures,
+    saveAuditProcedures,
     auditNote,
     auditConclusion,
     saveAuditNote,

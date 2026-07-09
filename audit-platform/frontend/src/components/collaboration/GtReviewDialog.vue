@@ -20,7 +20,21 @@
         </template>
         <template v-else>
           <span class="header-title">{{ dialogTitle }}</span>
-          <el-button :icon="Close" circle size="small" @click="handleClose" />
+          <div class="header-actions">
+            <el-badge v-if="targetedUnreadCount > 0" :value="targetedUnreadCount" type="danger" class="targeted-badge">
+              <span class="targeted-badge-text">@我未读</span>
+            </el-badge>
+            <el-button
+              v-if="messages.length > 0"
+              size="small"
+              type="primary"
+              link
+              @click="enterSelectMode"
+            >
+              入复核底稿
+            </el-button>
+            <el-button :icon="Close" circle size="small" @click="handleClose" />
+          </div>
         </template>
       </div>
     </template>
@@ -41,16 +55,24 @@
         "{{ props.relatedData.selectedText }}"
       </div>
     </div>
+    <div v-if="!isMultiSelectMode" class="filter-row">
+      <el-switch
+        v-model="showOnlyTargetMe"
+        inline-prompt
+        active-text="只看发给我"
+        inactive-text="显示全部"
+      />
+    </div>
 
     <!-- 消息列表（可滚动） -->
     <div ref="messageListRef" class="message-list">
       <div v-if="isLoading" class="message-loading">加载中...</div>
-      <div v-else-if="messages.length === 0" class="message-empty">暂无消息，发送第一条吧</div>
+      <div v-else-if="filteredMessages.length === 0" class="message-empty">暂无匹配消息</div>
       <div
-        v-for="msg in messages"
+        v-for="msg in filteredMessages"
         :key="msg.id || msg._tempId"
         class="message-row"
-        :class="{ 'is-self': msg.sender_id === props.currentUser.id }"
+        :class="{ 'is-self': msg.sender_id === props.currentUser.id, 'is-targeted-to-me': isMessageTargetedToCurrentUser(msg) }"
       >
         <!-- 4.3 多选模式：左侧圆形选择框 -->
         <div
@@ -84,6 +106,11 @@
               class="bubble"
               :class="msg.sender_id === props.currentUser.id ? 'bubble-self' : 'bubble-other'"
             >
+              <div v-if="msg.target_user_name || msg.target_role" class="target-chip">
+                发送给：{{ msg.target_user_name || '未指定人员' }}<span v-if="msg.target_role">（{{ msg.target_role }}）</span>
+              </div>
+              <div v-if="msg.message_type === 'private'" class="private-chip">仅我和指定人可见</div>
+              <div v-if="isMessageTargetedToCurrentUser(msg)" class="to-me-chip">发给我</div>
               {{ msg.content }}
             </div>
             <!-- 时间 + 失败状态 -->
@@ -97,6 +124,15 @@
                 </el-button>
               </span>
               <span v-else-if="msg._status === 'sending'" class="msg-sending">发送中...</span>
+              <el-button
+                v-if="!isMultiSelectMode && msg.id"
+                link
+                size="small"
+                class="quick-export-btn"
+                @click.stop="quickExportSingle(msg.id)"
+              >
+                入底稿
+              </el-button>
             </div>
           </div>
 
@@ -122,6 +158,49 @@
 
     <!-- 底部输入区（非多选 + 有写权限） -->
     <div v-if="canWrite && !isMultiSelectMode" class="input-area">
+      <div class="target-row">
+        <el-select
+          v-model="selectedTargetUserIds"
+          multiple
+          collapse-tags
+          collapse-tags-tooltip
+          max-collapse-tags="2"
+          clearable
+          filterable
+          placeholder="指定人员（可多选）"
+          class="target-select"
+        >
+          <el-option
+            v-for="user in recipients"
+            :key="user.user_id"
+            :label="user.user_name"
+            :value="user.user_id"
+          />
+        </el-select>
+        <el-select
+          v-model="selectedTargetRole"
+          clearable
+          placeholder="指定角色（可选）"
+          class="target-select"
+        >
+          <el-option
+            v-for="role in targetRoleOptions"
+            :key="role.value"
+            :label="role.label"
+            :value="role.value"
+          />
+        </el-select>
+      </div>
+      <div class="private-row">
+        <el-switch
+          v-model="isPrivateMessage"
+          :disabled="selectedTargetUserIds.length !== 1"
+          inline-prompt
+          active-text="私密"
+          inactive-text="公开"
+        />
+        <span class="private-hint">私密消息仅发送者与指定单人可见</span>
+      </div>
       <el-input
         v-model="inputText"
         type="textarea"
@@ -171,15 +250,23 @@ const {
   isLoading,
   dialogTitle,
   messages,
+  filteredMessages,
   isMultiSelectMode,
   selectedIds,
   selectedCount,
   canExport,
+  showOnlyTargetMe,
+  targetedUnreadCount,
   isExportDialogOpen,
   exportText,
   isAiPolishing,
   canWrite,
   isCloseConfirmOpen,
+  recipients,
+  selectedTargetUserIds,
+  selectedTargetRole,
+  isPrivateMessage,
+  targetRoleOptions,
   openDialog,
   sendMessage,
   retryMessage,
@@ -188,12 +275,14 @@ const {
   toggleSelect,
   selectAll,
   exportSelected,
+  quickExportSingle,
   aiPolish,
   saveToReviewRecord,
   handleClose,
   confirmClose,
   confirmContinue,
   confirmExport,
+  isMessageTargetedToCurrentUser,
 } = useReviewDialog(props)
 
 // ── Local state ─────────────────────────────────────────────────────────────
@@ -269,7 +358,12 @@ watch(isOpen, (open, wasOpen) => {
 }
 .header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+.targeted-badge-text {
+  font-size: 12px;
+  color: #f56c6c;
 }
 
 /* 上下文摘要卡片 */
@@ -304,6 +398,11 @@ watch(isOpen, (open, wasOpen) => {
   padding-left: 8px;
   margin-top: 6px;
 }
+.filter-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
 
 /* 消息列表 */
 .message-list {
@@ -325,6 +424,10 @@ watch(isOpen, (open, wasOpen) => {
   align-items: flex-start;
   margin-bottom: 16px;
   padding: 0 4px;
+}
+.message-row.is-targeted-to-me {
+  background: #f0f9ff;
+  border-radius: 8px;
 }
 .message-row.is-self .bubble-wrapper {
   flex-direction: row-reverse;
@@ -433,6 +536,17 @@ watch(isOpen, (open, wasOpen) => {
   font-size: 11px;
   color: #f56c6c !important;
 }
+.quick-export-btn {
+  font-size: 11px;
+  color: #409eff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+.message-row:hover .quick-export-btn {
+  opacity: 1;
+  pointer-events: auto;
+}
 
 /* 多选复选框 */
 .select-checkbox {
@@ -481,5 +595,48 @@ watch(isOpen, (open, wasOpen) => {
 }
 .input-area .el-button {
   align-self: flex-end;
+}
+.private-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.private-hint {
+  font-size: 12px;
+  color: #909399;
+}
+.target-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.target-select {
+  width: 100%;
+}
+.target-chip {
+  font-size: 12px;
+  color: #606266;
+  background: #f4f4f5;
+  border-radius: 6px;
+  padding: 2px 8px;
+  margin-bottom: 6px;
+}
+.to-me-chip {
+  display: inline-block;
+  font-size: 11px;
+  color: #fff;
+  background: #409eff;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-bottom: 6px;
+}
+.private-chip {
+  display: inline-block;
+  font-size: 11px;
+  color: #8e44ad;
+  background: #f3e8ff;
+  border-radius: 6px;
+  padding: 1px 6px;
+  margin-bottom: 6px;
 }
 </style>

@@ -75,7 +75,12 @@
     <!-- 六步决策树 -->
     <div class="cct-steps-container">
       <!-- 步骤一 -->
-      <div v-if="isVisible(1)" class="cct-step-card" :class="{ 'is-active': isCurrentStep(1) }">
+      <div
+        v-if="isVisible(1)"
+        id="cct-step-1"
+        class="cct-step-card"
+        :class="{ 'is-active': isCurrentStep(1) }"
+      >
         <div class="cct-step-header">
           <span class="cct-step-num">1</span>
           <span class="cct-step-question">{{ getQuestion(1) }}</span>
@@ -92,7 +97,7 @@
           <el-radio-group
             :model-value="devState.step1"
             :disabled="readonly"
-            @change="(v: string) => onStepChange('step1', v)"
+            @update:model-value="(v: string) => onStepChange('step1', v)"
           >
             <el-radio
               v-for="opt in getOptions(1)"
@@ -117,7 +122,12 @@
       </div>
 
       <!-- 步骤二 -->
-      <div v-if="isVisible(2)" class="cct-step-card" :class="{ 'is-active': isCurrentStep(2) }">
+      <div
+        v-if="isVisible(2)"
+        id="cct-step-2"
+        class="cct-step-card"
+        :class="{ 'is-active': isCurrentStep(2) }"
+      >
         <div class="cct-step-header">
           <span class="cct-step-num">2</span>
           <span class="cct-step-question">{{ getQuestion(2) }}</span>
@@ -134,7 +144,7 @@
           <el-radio-group
             :model-value="devState.step2"
             :disabled="readonly"
-            @change="(v: string) => onStepChange('step2', v)"
+            @update:model-value="(v: string) => onStepChange('step2', v)"
           >
             <el-radio
               v-for="opt in getOptions(2)"
@@ -159,7 +169,12 @@
       </div>
 
       <!-- 步骤三 -->
-      <div v-if="isVisible(3)" class="cct-step-card" :class="{ 'is-active': isCurrentStep(3) }">
+      <div
+        v-if="isVisible(3)"
+        id="cct-step-3"
+        class="cct-step-card"
+        :class="{ 'is-active': isCurrentStep(3) }"
+      >
         <div class="cct-step-header">
           <span class="cct-step-num">3</span>
           <span class="cct-step-question">{{ getQuestion(3) }}</span>
@@ -176,7 +191,7 @@
           <el-radio-group
             :model-value="devState.step3"
             :disabled="readonly"
-            @change="(v: string) => onStepChange('step3', v)"
+            @update:model-value="(v: string) => onStepChange('step3', v)"
           >
             <el-radio
               v-for="opt in getOptions(3)"
@@ -201,7 +216,12 @@
       </div>
 
       <!-- 步骤四 -->
-      <div v-if="isVisible(4)" class="cct-step-card" :class="{ 'is-active': isCurrentStep(4) }">
+      <div
+        v-if="isVisible(4)"
+        id="cct-step-4"
+        class="cct-step-card"
+        :class="{ 'is-active': isCurrentStep(4) }"
+      >
         <div class="cct-step-header">
           <span class="cct-step-num">4</span>
           <span class="cct-step-question">{{ getQuestion(4) }}</span>
@@ -218,7 +238,7 @@
           <el-radio-group
             :model-value="devState.step4"
             :disabled="readonly"
-            @change="(v: string) => onStepChange('step4', v)"
+            @update:model-value="(v: string) => onStepChange('step4', v)"
           >
             <el-radio
               v-for="opt in getOptions(4)"
@@ -243,7 +263,7 @@
       </div>
 
       <!-- 步骤五（自动推导，无选项，显示 GtIndexChip → A14） -->
-      <div v-if="isVisible(5)" class="cct-step-card cct-step-five">
+      <div v-if="isVisible(5)" id="cct-step-5" class="cct-step-card cct-step-five">
         <div class="cct-step-header">
           <span class="cct-step-num cct-step-num-warning">5</span>
           <span class="cct-step-question">{{ getQuestion(5) }}</span>
@@ -271,7 +291,12 @@
       </div>
 
       <!-- 步骤六 -->
-      <div v-if="isVisible(6)" class="cct-step-card" :class="{ 'is-active': isCurrentStep(6) }">
+      <div
+        v-if="isVisible(6)"
+        id="cct-step-6"
+        class="cct-step-card"
+        :class="{ 'is-active': isCurrentStep(6) }"
+      >
         <div class="cct-step-header">
           <span class="cct-step-num">6</span>
           <span class="cct-step-question">{{ getQuestion(6) }}</span>
@@ -288,7 +313,7 @@
           <el-radio-group
             :model-value="devState.step6"
             :disabled="readonly"
-            @change="(v: string) => onStepChange('step6', v)"
+            @update:model-value="(v: string) => onStepChange('step6', v)"
           >
             <el-radio
               v-for="opt in getOptions(6)"
@@ -673,6 +698,15 @@ const conclusionTagType = computed(() => {
   if (conclusion.includes('缺陷') || conclusion.includes('无效')) return 'danger'
   return 'warning'
 })
+
+function scrollToStep(step: number) {
+  const el = document.getElementById(`cct-step-${step}`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
+defineExpose({ scrollToStep })
 </script>
 
 <style scoped>

@@ -40,17 +40,25 @@
               <span>偏差评价决策树 — 6步推导控制有效性</span>
             </div>
             <div class="cct-guidance-steps">
-              <div class="step-item"><span class="step-num">①</span><span class="step-text">判断是否偏差</span></div>
-              <div class="step-item"><span class="step-num">②</span><span class="step-text">确定偏差性质</span></div>
-              <div class="step-item"><span class="step-num">③</span><span class="step-text">确定应对措施</span></div>
-              <div class="step-item"><span class="step-num">④</span><span class="step-text">扩大样本验证</span></div>
-              <div class="step-item"><span class="step-num">⑤</span><span class="step-text">缺陷评价(A14)</span></div>
-              <div class="step-item"><span class="step-num">⑥</span><span class="step-text">设计缺陷判断</span></div>
+              <div
+                v-for="step in deviationGuidanceSteps"
+                :key="step.num"
+                class="step-item step-item--clickable"
+                :class="{ 'is-active': activeGuidanceStep === step.num }"
+                role="button"
+                tabindex="0"
+                @click="scrollToDeviationStep(step.num)"
+                @keydown.enter="scrollToDeviationStep(step.num)"
+              >
+                <span class="step-num">{{ step.label }}</span>
+                <span class="step-text">{{ step.text }}</span>
+              </div>
             </div>
           </div>
 
           <!-- 决策树组件（直接渲染，非弹窗） -->
           <CControlTestDecisionTree
+            ref="standaloneDecisionTreeRef"
             :wp-code="wpCode"
             :wp-id="wpId"
             :dev-index="activeDeviationIndex"
@@ -420,7 +428,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, toRef, onMounted, onBeforeUnmount, watch } from 'vue'
 import { InfoFilled, Plus, WarningFilled, MagicStick, Upload } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
@@ -447,6 +455,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 // ─── Derived ─────────────────────────────────────────────────────────────────
@@ -514,7 +523,7 @@ const { state, loading, selfLoad, flushPendingSaves,
   addControlPoint, removeControlPoint,
   updateCtrlPageText, updateCtrlPageEnum, updateCtrlPageSampleSize,
   addSample, removeSample, updateSampleDescription, updateSampleResult,
-  updateDeviationStep, writebackDefect, buildDefectSummary } =
+  updateDeviationStep, ensureDeviationSlots, writebackDefect, buildDefectSummary } =
   useCControlTestData(wpIdRef, projectIdRef, effectiveWpCodeRef, isReadonly)
 
 // ─── Dialog State ────────────────────────────────────────────────────────────
@@ -536,6 +545,24 @@ const deviationModeOptions = [
   { label: '结构化视图', value: 'structured' },
   { label: '在线编辑', value: 'online-edit' },
 ]
+
+/** 偏差评价引导步骤（可点击跳转） */
+const deviationGuidanceSteps = [
+  { num: 1, label: '①', text: '判断控制偏差' },
+  { num: 2, label: '②', text: '确定偏差性质' },
+  { num: 3, label: '③', text: '确定应对措施' },
+  { num: 4, label: '④', text: '扩大样本验证' },
+  { num: 5, label: '⑤', text: '缺陷评价(A14)' },
+  { num: 6, label: '⑥', text: '设计缺陷判断' },
+] as const
+
+const standaloneDecisionTreeRef = ref<InstanceType<typeof CControlTestDecisionTree> | null>(null)
+const activeGuidanceStep = ref<number | null>(null)
+
+function scrollToDeviationStep(step: number) {
+  activeGuidanceStep.value = step
+  standaloneDecisionTreeRef.value?.scrollToStep(step)
+}
 
 // ─── L0 → L1: Control Page helpers ──────────────────────────────────────────
 
@@ -685,12 +712,17 @@ function handleChangeDevIndex(index: number) {
   activeDeviationIndex.value = index
 }
 
-/** 独立偏差评价视图的导航处理（浏览器后退） */
-function handleDeviationNavigateStandalone(_view: string) {
-  // 独立视图模式下 navigate 回退到上一页（底稿列表或 C14 汇总表）
-  if (_view === 'summary' || _view === 'directory') {
+/** 独立偏差评价视图的导航处理 */
+function handleDeviationNavigateStandalone(view: string) {
+  if (view !== 'summary' && view !== 'directory') return
+  const code = props.wpCode || ''
+  // 独立 Cx-2 底稿（无合并包汇总 tab）→ 浏览器后退
+  if (/-\d+$/.test(code)) {
     window.history.back()
+    return
   }
+  // 合并包：切回 Cx 汇总表 tab
+  emit('navigate-sheet', `C${cycleNum.value}控制测试`)
 }
 
 // ─── Dialog Openers ──────────────────────────────────────────────────────────
@@ -988,14 +1020,21 @@ function handleFabAdd() {
 
 onMounted(async () => {
   await selfLoad()
-
-  // 独立偏差评价模式（Cx-2 底稿）：确保至少有一个 deviation state slot
-  // 否则决策树的 updateDeviationStep 会因 index >= length 而静默失败
-  if (isDeviationSheet.value && state.value.deviationStates.length === 0) {
-    // 自动创建一个默认控制点（偏差评价至少需要一个评价对象）
-    addControlPoint('控制点1')
-  }
+  syncDeviationViewState()
 })
+
+watch(
+  () => [isDeviationSheet.value, props.sheetName, loading.value] as const,
+  () => {
+    if (!loading.value) syncDeviationViewState()
+  },
+)
+
+/** 进入 Cx-2 视图时补齐偏差槽位（修复合并包 tab 切换后单选无法编辑） */
+function syncDeviationViewState() {
+  if (!isDeviationSheet.value) return
+  ensureDeviationSlots()
+}
 
 onBeforeUnmount(() => {
   flushPendingSaves()
@@ -1102,6 +1141,23 @@ onBeforeUnmount(() => {
   gap: 8px;
   font-size: 13px;
   color: #374151;
+}
+
+.step-item--clickable {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  transition: background 0.15s;
+}
+
+.step-item--clickable:hover,
+.step-item--clickable.is-active {
+  background: rgba(26, 115, 232, 0.12);
+}
+
+.step-item--clickable.is-active .step-num {
+  background: #0d47a1;
 }
 
 .step-num {

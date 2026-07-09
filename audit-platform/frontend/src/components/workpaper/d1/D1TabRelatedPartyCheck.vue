@@ -22,7 +22,7 @@
  *
  * Requirements: 4.1-4.6, 5.1-5.5, 6.1-6.5, 14.1-14.5, 18.1-18.3, 18.5, 18.7
  */
-import { inject, toRef, type Ref } from 'vue'
+import { inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD1RelatedPartyCheck } from '../composables/useD1RelatedPartyCheck'
 import {
@@ -34,6 +34,7 @@ import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormD
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -72,17 +73,20 @@ const {
   auditConclusion,
   saveAuditNote,
   saveAuditConclusion,
+  exportTemplate,
+  exportData,
+  importData,
 } = useD1RelatedPartyCheck({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: async (items: ChecklistItem[]) => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch { ElMessage.warning('保存失败，请重试') }
   },
   saveDebouncedText: (item: ChecklistItem) => {
-    http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items: [item] })
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items: [item] })
       .catch(() => { /* silent */ })
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
@@ -113,6 +117,65 @@ const GUIDANCE_TEXTS = [
   '期后回收情况对坏账准备的影响评估：关注期后已兑现或贴现的金额，评估坏账准备计提的合理性和充分性。',
 ]
 
+const wpIdRef = toRef(props, 'wpId')
+const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
+const aiLoadingNote = ref(false)
+const aiLoadingConclusion = ref(false)
+
+function buildRpAiContext(extra = ''): Record<string, unknown> {
+  return {
+    sheet: 'D1-11',
+    rowCount: rows.value.length,
+    closingBalanceTotal: summaryRow.value.closingBalance,
+    adjClosingBalance: adjClosingBalance.value,
+    reconDifference: reconDifference.value,
+    adjDataLoaded: adjDataLoaded.value,
+    guidance: extra,
+  }
+}
+
+async function handleImportUpload(file: File): Promise<boolean> {
+  const result = await importData(file)
+  if (result.success) {
+    ElMessage.success(`导入成功：${result.rowCount} 行`)
+  } else {
+    ElMessage.warning(result.errors?.[0] || '导入失败')
+  }
+  return false
+}
+
+async function generateAuditNoteWithAI() {
+  if (props.isReadonly) return
+  aiLoadingNote.value = true
+  try {
+    const text = await generateAndConfirm(
+      'sampling-audit-note',
+      auditNote.value,
+      buildRpAiContext('基于关联方余额结构、核对区差异、期后兑现及公允性判断生成审计说明。'),
+      'AI · 审计说明',
+    )
+    if (text) saveAuditNote(text)
+  } finally {
+    aiLoadingNote.value = false
+  }
+}
+
+async function generateAuditConclusionWithAI() {
+  if (props.isReadonly) return
+  aiLoadingConclusion.value = true
+  try {
+    const text = await generateAndConfirm(
+      'sampling-audit-conclusion',
+      auditConclusion.value,
+      buildRpAiContext(`核对差异：${reconDifference.value}`),
+      'AI · 审计结论',
+    )
+    if (text) saveAuditConclusion(text)
+  } finally {
+    aiLoadingConclusion.value = false
+  }
+}
+
 </script>
 
 <template>
@@ -136,6 +199,18 @@ const GUIDANCE_TEXTS = [
 
       <!-- Toolbar -->
       <div class="table-toolbar">
+        <el-button-group size="small">
+          <el-button @click="exportTemplate">导出模板</el-button>
+          <el-button @click="exportData">导出数据</el-button>
+          <el-upload
+            :show-file-list="false"
+            accept=".xlsx,.xls"
+            :before-upload="handleImportUpload"
+            style="display:inline-block"
+          >
+            <el-button size="small">导入数据</el-button>
+          </el-upload>
+        </el-button-group>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
           + 添加关联方
         </el-button>
@@ -432,8 +507,15 @@ const GUIDANCE_TEXTS = [
           @change="(v: string) => saveAuditNote(v || '')"
         />
         <div class="note-actions">
-          <el-tooltip content="AI生成（开发中）" placement="top">
-            <el-button size="small" disabled>🤖 AI</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI辅助生成审计说明' : 'AI服务暂不可用'" placement="top">
+            <el-button
+              size="small"
+              :loading="aiLoadingNote"
+              :disabled="isReadonly || !aiAvailable"
+              @click="generateAuditNoteWithAI"
+            >
+              🤖 AI
+            </el-button>
           </el-tooltip>
           <el-button
             v-if="openReviewDialog"
@@ -457,8 +539,15 @@ const GUIDANCE_TEXTS = [
           @change="(v: string) => saveAuditConclusion(v || '')"
         />
         <div class="note-actions">
-          <el-tooltip content="AI生成（开发中）" placement="top">
-            <el-button size="small" disabled>🤖 AI</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI辅助生成审计结论' : 'AI服务暂不可用'" placement="top">
+            <el-button
+              size="small"
+              :loading="aiLoadingConclusion"
+              :disabled="isReadonly || !aiAvailable"
+              @click="generateAuditConclusionWithAI"
+            >
+              🤖 AI
+            </el-button>
           </el-tooltip>
           <el-button
             v-if="openReviewDialog"

@@ -1,0 +1,112 @@
+# J3 股份支付 — 渲染 YAML 配置
+# componentType: j3-share-based-payment
+# 科目：无独立科目（跨3002/6602/2211）
+# 核心：Black-Scholes期权定价 + 等待期费用分摊
+#
+# Spec: .kiro/specs/j3-share-based-payment/
+
+component_type: j3-share-based-payment
+display_name: 股份支付
+cycle: J
+
+# 无独立科目，跨多科目联动
+cross_account: true
+no_tb_writeback: true
+account_codes:
+  - "3002"  # 资本公积（权益结算贷方）
+  - "6602"  # 管理费用（费用借方）
+  - "2211"  # 应付职工薪酬（现金结算贷方）
+
+sheets:
+  - sheet_name: "底稿目录"
+    wp_code: "J3"
+    render_mode: html
+
+  - sheet_name: "股份支付实质性程序表 J3A"
+    wp_code: "J3A"
+    render_mode: html
+    component_type_override: a-program-console
+
+  - sheet_name: "股份支付情况表J3-1"
+    wp_code: "J3-1"
+    render_mode: html
+    columns: 18
+    dynamic_rows: true
+    features:
+      - bs_pricing
+      - vesting_expense
+      - equity_cash_split
+      - import_export
+
+  - sheet_name: "股份支付检查表J3-2"
+    wp_code: "J3-2"
+    render_mode: html
+    columns: 19
+    layout: paragraph
+    features:
+      - cas11_compliance
+      - bs_param_validation
+      - ai_assist
+      - ipo_panel
+
+# 跨科目联动配置
+cross_account_linkage:
+  equity_settled:
+    target_wp_code: "M4"
+    target_account: "3002"
+    event: "share-payment:equity-settled"
+    direction: credit
+  cash_settled:
+    target_wp_code: "J1"
+    target_account: "2211"
+    event: "share-payment:cash-settled"
+    direction: credit
+  expense:
+    target_wp_codes: ["K8", "K9"]
+    target_account: "6602"
+    event: "compensation:adjusted"
+    direction: debit
+
+# BS模型参数
+bs_model:
+  params:
+    - name: S
+      label: "标的价格"
+      unit: "元"
+      validation: "> 0"
+    - name: K
+      label: "行权价格"
+      unit: "元"
+      validation: "> 0"
+    - name: T
+      label: "预期期限"
+      unit: "年"
+      validation: "> 0"
+    - name: r
+      label: "无风险利率"
+      unit: "%"
+      validation: "[0.01, 0.10]"
+    - name: sigma
+      label: "波动率"
+      unit: "%"
+      validation: "[0.10, 1.00]"
+    - name: q
+      label: "股息率"
+      unit: "%"
+      validation: ">= 0"
+      optional: true
+
+# 费用分摊公式
+vesting_formula:
+  cumulative: "totalFV × MIN(serviceYears / vestingPeriod, 1)"
+  period: "cumulative - priorCumulative"
+  remaining: "totalFV - cumulative"
+
+# IPO适用性
+ipo_applicability:
+  condition: "project_type == 'IPO'"
+  panel_visible: conditional
+  highlights:
+    - "股份支付费用对利润影响"
+    - "每股收益稀释效应"
+    - "信息披露充分性"

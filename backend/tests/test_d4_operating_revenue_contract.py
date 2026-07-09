@@ -3,7 +3,7 @@
 验证:
   1. 'd4-operating-revenue' 在 VALID_COMPONENT_TYPES 中注册
   2. wp_code_overrides.json 将 D4/D4-1~D4-36 映射为 'd4-operating-revenue'
-  3. D4A 映射为 'a-program-console'（程序表复用）
+  3. D4A 映射为 'd4-operating-revenue'（整册专属组件内分发程序表）
   4. 所有映射值均为合法 componentType
 
 Validates: Requirements 1.6, 1.7, 1.8
@@ -28,7 +28,7 @@ class TestD4ValidComponentTypes:
         assert "d4-operating-revenue" in VALID_COMPONENT_TYPES
 
     def test_a_program_console_in_valid_types(self):
-        """'a-program-console' 已注册（D4A 程序表复用）。"""
+        """'a-program-console' 已注册（函证/未专属化程序表等复用）。"""
         assert "a-program-console" in VALID_COMPONENT_TYPES
 
 
@@ -60,9 +60,9 @@ class TestD4WpCodeOverrides:
             f"实际为 {overrides_data.get(code)!r}"
         )
 
-    def test_d4a_maps_to_program_console(self, overrides_data):
-        """D4A 程序表映射为 'a-program-console'（复用通用程序表组件）。"""
-        assert overrides_data.get("D4A") == "a-program-console"
+    def test_d4a_maps_to_operating_revenue(self, overrides_data):
+        """D4A 程序表映射为 'd4-operating-revenue'（整册专属组件内分发，对齐 H1A）。"""
+        assert overrides_data.get("D4A") == "d4-operating-revenue"
 
     def test_all_d4_overrides_are_valid_types(self, overrides_data):
         """D4 系列所有映射值均在 VALID_COMPONENT_TYPES 白名单内。"""

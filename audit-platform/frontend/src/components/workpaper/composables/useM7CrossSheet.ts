@@ -232,7 +232,7 @@ export function useM7CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
       items: items ?? [],
       timestamp: Date.now(),
     }
-    eventBus.emit('m7:capital-exp-to-h1' as any, payload)
+    eventBus.emit('m7:capital-exp-to-h1', payload)
   }
 
   // ─── 4. 跨底稿引用定义 ────────────────────────────────────────────────────

@@ -93,15 +93,7 @@
       />
     </template>
 
-    <!-- 复核对话组件 -->
-    <GtReviewDialog
-      v-if="reviewDialogVisible"
-      :wp-id="props.wpId"
-      :section-id="reviewDialogSectionId"
-      :section-label="reviewDialogSectionLabel"
-      :current-user="currentUser"
-      :related-data="{ wpCode: 'L2', projectId: props.projectId }"
-    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -124,8 +116,8 @@
  */
 import { ref, computed, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
-import { useAuthStore } from '@/stores/auth'
 import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import useVersionTrail from './composables/useVersionTrail'
 
@@ -144,7 +136,7 @@ const L2TabInterestCheck = defineAsyncComponent(() => import('./l2/inspection/L2
 
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -177,15 +169,6 @@ function handleNavigate(sheetName: string) {
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
 
-// ─── Auth (for review dialog) ────────────────────────────────────────────────
-
-const authStore = useAuthStore()
-const currentUser = computed(() => ({
-  id: authStore.userId || '',
-  name: authStore.user?.full_name || authStore.username || '',
-  role: (authStore.user?.role || '审计助理') as any,
-}))
-
 /**
  * 当前激活的 sheet（由外层 GtWpRenderer 通过 sheetName prop 控制）。
  * GtWpRenderer 传入完整 sheet_name（如"审定表L2-1"），
@@ -209,23 +192,10 @@ const procedureDualMode = useCycleHtmlOoDualMode({
 })
 
 // ─── Provide openReviewDialog ────────────────────────────────────────────────
-
-/** 复核对话状态 */
-const reviewDialogVisible = ref(false)
-const reviewDialogSectionId = ref('')
-const reviewDialogSectionLabel = ref('')
-
-/**
- * 子组件 inject 后在 section 标题栏右侧放复核按钮。
- * 点击调用 openReviewDialog(sectionId, sectionLabel?) 打开复核对话面板。
- */
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  reviewDialogSectionId.value = sectionId
-  reviewDialogSectionLabel.value = sectionLabel || sectionId
-  reviewDialogVisible.value = true
-}
-
-provide('openReviewDialog', openReviewDialog)
+useWorkpaperReviewProvide({
+  wpId: toRef(props, 'wpId') as any,
+  projectId: toRef(props, 'projectId') as any,
+})
 
 // ─── 版本追踪 useVersionTrail (autoSnapshot) ────────────────────────────────
 

@@ -270,6 +270,83 @@ def _parse_sheet_rows(
         wb.close()
 
 
+@router.get("/api/workpapers/{wp_id}/h0/unreplied-entities")
+async def unreplied_entities(
+    wp_id: str,
+    sheet: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[dict[str, Any]]:
+    """从 H0-1 函证结果汇总表获取未回函被函证单位列表（供 importFromSummary）。
+
+    逻辑：找同项目 H0-1 底稿 → 读 html_data(confirmation-v1) → 过滤未回函行。
+    """
+    _validate_sheet(sheet)
+    # 1. 获取当前底稿所属 project_id
+    proj_result = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id AND is_deleted = false"),
+        {"wp_id": wp_id},
+    )
+    proj_row = proj_result.fetchone()
+    if not proj_row:
+        raise HTTPException(404, f"底稿不存在: {wp_id}")
+    project_id = proj_row.project_id
+
+    # 2. 找同项目 H0-1 底稿
+    h01_result = await db.execute(
+        sa.text("""
+            SELECT wp.parsed_data
+            FROM working_paper wp
+            JOIN wp_index wi ON wi.id = wp.wp_index_id
+            WHERE wi.wp_code = 'H0-1'
+              AND wp.project_id = :pid
+              AND wp.is_deleted = false
+              AND wi.is_deleted = false
+            LIMIT 1
+        """),
+        {"pid": str(project_id)},
+    )
+    h01_row = h01_result.fetchone()
+    if not h01_row or not h01_row.parsed_data:
+        return []
+
+    # 3. 解析 html_data → confirmation-v1 格式 rows
+    parsed = h01_row.parsed_data
+    if isinstance(parsed, str):
+        try:
+            parsed = json.loads(parsed)
+        except (json.JSONDecodeError, TypeError):
+            return []
+    if not isinstance(parsed, dict):
+        return []
+
+    html_data = parsed.get("html_data", {})
+    rows: list[dict] = []
+    # 遍历所有 sheet 找 confirmation-v1 数据
+    for _sheet_key, sheet_data in html_data.items():
+        if isinstance(sheet_data, dict) and sheet_data.get("_format") == "confirmation-v1":
+            rows = sheet_data.get("rows", [])
+            break
+
+    if not rows:
+        return []
+
+    # 4. 过滤未回函项目（match_status === '未回函' 或 is_replied === false）
+    unreplied: list[dict[str, Any]] = []
+    for r in rows:
+        match_status = r.get("match_status", "")
+        is_replied = r.get("is_replied")
+        if match_status == "未回函" or (is_replied is False and match_status != "相符"):
+            unreplied.append({
+                "entity_name": r.get("entity_name", ""),
+                "confirm_index": r.get("confirm_index", ""),
+                "account_type": r.get("account_type", "固定资产"),
+                "amount": r.get("amount", 0),
+            })
+
+    return unreplied
+
+
 @router.post("/api/workpapers/{wp_id}/h0/export-template")
 async def export_template(
     wp_id: str,

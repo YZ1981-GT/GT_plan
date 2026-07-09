@@ -9251,6 +9251,74 @@
       "note_section": null
     },
     {
+      "wp_code": "I1A",
+      "cycle": "I",
+      "wp_name": "无形资产实质性程序表",
+      "account_codes": [
+        "1701",
+        "1702",
+        "1703B"
+      ],
+      "account_name": "无形资产程序表",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "I1-9",
+      "cycle": "I",
+      "wp_name": "摊销分配分析表",
+      "account_codes": [
+        "1702"
+      ],
+      "account_name": "摊销分配",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "I1-10",
+      "cycle": "I",
+      "wp_name": "摊销测算表（不含减值）",
+      "account_codes": [
+        "1702"
+      ],
+      "account_name": "摊销测算",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "I1-11",
+      "cycle": "I",
+      "wp_name": "摊销测算表（含减值）",
+      "account_codes": [
+        "1702"
+      ],
+      "account_name": "摊销测算含减值",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "I1-12",
+      "cycle": "I",
+      "wp_name": "减值准备测试表",
+      "account_codes": [
+        "1703B"
+      ],
+      "account_name": "减值测试",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "I1-13",
+      "cycle": "I",
+      "wp_name": "可收回金额测试",
+      "account_codes": [
+        "1703B"
+      ],
+      "account_name": "可收回金额DCF",
+      "report_row": null,
+      "note_section": null
+    },
+    {
       "wp_code": "I2",
       "cycle": "I",
       "wp_name": "开发支出",

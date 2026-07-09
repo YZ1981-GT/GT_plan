@@ -159,7 +159,7 @@
     - 填充后触发 debounce 2s 自动保存
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 12. 后端 PBT 测试
+- [x] 12. 后端 PBT 测试
   - [x]* 12.1 编写 Property 1 PBT：随机抽样产生恰好 N 笔
     - **Property 1: 随机抽样产生恰好 N 笔**
     - 生成器：`st.lists(ledger_entry_strategy(), min_size=1, max_size=200)` + `st.integers(min_value=1, max_value=len)`
@@ -208,7 +208,7 @@
     - 断言：execute_sampling 两次调用结果完全相同
     - **Validates: Requirements 1.7, 3.12**
 
-- [ ] 13. 前端 PBT 测试
+- [x] 13. 前端 PBT 测试
   - [x]* 13.1 编写 Property 6 PBT：阶段隔离 — 年审永不覆盖预审
     - **Property 6: 阶段隔离 — 年审永不覆盖预审**
     - 生成器：自定义 SampledVoucher[]（mixed phases）+ fill operation（mode forced append）

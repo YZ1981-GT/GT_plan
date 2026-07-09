@@ -74,10 +74,25 @@ from ._g11_investment_income import render as render_g11_investment_income
 from ._g12_net_hedge_gains import render as render_g12_net_hedge_gains
 from ._g13_fair_value_changes import render as render_g13_fair_value_changes
 from ._g14_credit_impairment_loss import render as render_g14_credit_impairment_loss
+from ._h1_fixed_assets import render as render_h1_fixed_assets
+from ._h5_oil_gas_assets import render as render_h5_oil_gas_assets
+from ._h2_construction_in_progress import render as render_h2_construction_in_progress
+from ._h3_investment_property import render as render_h3_investment_property
+from ._h4_engineering_materials import render as render_h4_engineering_materials
+from ._h6_asset_disposal_clearing import render as render_h6_asset_disposal_clearing
+from ._h8_right_of_use_assets import render as render_h8_right_of_use_assets
+from ._h9_lease_liabilities import render as render_h9_lease_liabilities
 from ._h10_asset_disposal_income import render as render_h10_asset_disposal_income
+from ._i1_intangible_assets import render as render_i1_intangible_assets
+from ._i2_development_expenditure import render as render_i2_development_expenditure
+from ._i3_goodwill import render as render_i3_goodwill
+from ._i4_long_term_prepaid import render as render_i4_long_term_prepaid
+from ._i5_other_noncurrent_assets import render as render_i5_other_noncurrent_assets
+from ._i6_research_development_expense import render as render_i6_research_development_expense
 from ._e1_monetary_fund import render as render_e1_monetary_fund
 from ._g0_confirmation import render_g0_diff_securities, render_g0_alternative
 from ._h0_confirmation import render_h0_alternative
+from ._k0_confirmation import render_k0_alternative_k05, render_k0_alternative_k06
 from ._c1_entity_level_control import render as render_c1_entity_level_control
 from ._c_control_test import render as render_c_control_test
 from ._c22_itgc import render as render_c22_itgc
@@ -105,6 +120,7 @@ from ._m9_other_comprehensive_income import render as render_m9_other_comprehens
 from ._n1_deferred_tax_assets import render as render_n1_deferred_tax_assets
 from ._n2_taxes_payable import render as render_n2_taxes_payable
 from ._n3_deferred_tax_liabilities import render as render_n3_deferred_tax_liabilities
+from ._n4_taxes_and_surcharges import render as render_n4_taxes_and_surcharges
 from ._n5_income_tax_expense import render as render_n5_income_tax_expense
 from ._m10_other_equity_instruments import render as render_m10_other_equity_instruments
 from ._s3_policy_change import render as render_s3_policy_change
@@ -117,6 +133,22 @@ from ._s14_accounting_estimate import render as render_s14_accounting_estimate
 from ._s15_eps_roe import render as render_s15_eps_roe
 from ._s20_revenue_deduction import render as render_s20_revenue_deduction
 from ._s21_data_asset import render as render_s21_data_asset
+from ._j1_employee_compensation import render as render_j1_employee_compensation
+from ._j2_defined_benefit_plan import render as render_j2_defined_benefit_plan
+from ._j3_share_based_payment import render as render_j3_share_based_payment
+from ._k1_other_receivables import render as render_k1_other_receivables
+from ._k2_other_current_assets import render as render_k2_other_current_assets
+from ._k3_other_payables import render as render_k3_other_payables
+from ._k4_other_current_liabilities import render as render_k4_other_current_liabilities
+from ._k5_provisions import render as render_k5_provisions
+from ._k6_held_for_sale import render as render_k6_held_for_sale
+from ._k7_deferred_income import render as render_k7_deferred_income
+from ._k8_selling_expenses import render as render_k8_selling_expenses
+from ._k9_admin_expenses import render as render_k9_admin_expenses
+from ._k11_asset_impairment_loss import render as render_k11_asset_impairment_loss
+from ._k10_other_income import render as render_k10_other_income
+from ._k12_non_operating_income import render as render_k12_non_operating_income
+from ._k13_non_operating_expense import render as render_k13_non_operating_expense
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -191,10 +223,26 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "g12-net-hedge-gains": render_g12_net_hedge_gains,
     "g13-fair-value-changes": render_g13_fair_value_changes,
     "g14-credit-impairment-loss": render_g14_credit_impairment_loss,
+    "h1-fixed-assets": render_h1_fixed_assets,
+    "h5-oil-gas-assets": render_h5_oil_gas_assets,
+    "h2-construction-in-progress": render_h2_construction_in_progress,
+    "h3-investment-property": render_h3_investment_property,
+    "h4-engineering-materials": render_h4_engineering_materials,
+    "h6-asset-disposal-clearing": render_h6_asset_disposal_clearing,
+    "h8-right-of-use-assets": render_h8_right_of_use_assets,
+    "h9-lease-liabilities": render_h9_lease_liabilities,
     "h10-asset-disposal-income": render_h10_asset_disposal_income,
+    "i1-intangible-assets": render_i1_intangible_assets,
+    "i2-development-expenditure": render_i2_development_expenditure,
+    "i3-goodwill": render_i3_goodwill,
+    "i4-long-term-prepaid": render_i4_long_term_prepaid,
+    "i5-other-noncurrent-assets": render_i5_other_noncurrent_assets,
+    "i6-research-development-expense": render_i6_research_development_expense,
     "confirmation-diff-securities": render_g0_diff_securities,
     "confirmation-alternative-g06": render_g0_alternative,
     "confirmation-alternative-h05": render_h0_alternative,
+    "confirmation-alternative-k05": render_k0_alternative_k05,
+    "confirmation-alternative-k06": render_k0_alternative_k06,
     "c1-entity-level-control": render_c1_entity_level_control,
     "c-control-test": render_c_control_test,
     "c22-itgc-bundle": render_c22_itgc,
@@ -223,6 +271,7 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "n1-deferred-tax-assets": render_n1_deferred_tax_assets,
     "n2-taxes-payable": render_n2_taxes_payable,
     "n3-deferred-tax-liabilities": render_n3_deferred_tax_liabilities,
+    "n4-taxes-and-surcharges": render_n4_taxes_and_surcharges,
     "n5-income-tax-expense": render_n5_income_tax_expense,
     "s3-policy-change": render_s3_policy_change,
     "s4-nonmonetary-exchange": render_s4_nonmonetary_exchange,
@@ -234,4 +283,20 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "s15-eps-roe": render_s15_eps_roe,
     "s20-revenue-deduction": render_s20_revenue_deduction,
     "s21-data-asset": render_s21_data_asset,
+    "j1-employee-compensation": render_j1_employee_compensation,
+    "j2-defined-benefit-plan": render_j2_defined_benefit_plan,
+    "j3-share-based-payment": render_j3_share_based_payment,
+    "k1-other-receivables": render_k1_other_receivables,
+    "k2-other-current-assets": render_k2_other_current_assets,
+    "k3-other-payables": render_k3_other_payables,
+    "k4-other-current-liabilities": render_k4_other_current_liabilities,
+    "k5-provisions": render_k5_provisions,
+    "k6-held-for-sale": render_k6_held_for_sale,
+    "k7-deferred-income": render_k7_deferred_income,
+    "k8-selling-expenses": render_k8_selling_expenses,
+    "k9-admin-expenses": render_k9_admin_expenses,
+    "k11-asset-impairment-loss": render_k11_asset_impairment_loss,
+    "k10-other-income": render_k10_other_income,
+    "k12-non-operating-income": render_k12_non_operating_income,
+    "k13-non-operating-expense": render_k13_non_operating_expense,
 }

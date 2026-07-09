@@ -38,6 +38,10 @@ from app.services.wp_auto_fill_service import _resolve_auto_fill_values
 from app.services.wp_account_package_resolver import resolve_package_sheets
 from app.services.wp_render_schema_service import WpRenderSchemaService
 from app.services.wp_template_version_service import WpTemplateVersionService
+from app.services.project_audit_year import (
+    PROJECT_AUDIT_YEAR_BIZ_SQL,
+    PROJECT_AUDIT_YEAR_SQL,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,46 +66,11 @@ _SHEET_CODE_RE = re.compile(r"([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$")
 # onlyoffice-sheet），故此处显式声明：当 wp_code override ∈ 本集合时，多 sheet 分支
 # 统一采用 wp_code override（等价于 pkg_sheets 的 else 分支）。
 # 只影响 override 命中本集合的 wp_code，对其余底稿零回归。
-_WHOLE_WP_MULTISHEET_DEDICATED: set[str] = {
-    "c1-entity-level-control",
-    # C2~C15 业务循环控制测试：多 sheet 工作簿（底稿目录 + 汇总表 + Cx-1-X + 选项清单），
-    # 整册统一路由到 c-control-test，由前端 GtCControlTest 弹窗层叠分发（L0汇总+L1详情+L2偏差）。
-    "c-control-test",
-    # C22 IT 一般控制测试：单一 34-sheet 工作簿（1 主矩阵 + 33 子页），
-    # 整册统一路由到 c22-itgc-bundle，由前端 GtC22ItgcBundle 内部按 sheetName /
-    # 分组 el-tabs 分发（矩阵总览 + SA/PE/PM/NS 子页 + C21/C21-1）。
-    "c22-itgc-bundle",
-    # C23 会计分录控制测试：单一 5-sheet 工作簿，
-    # 整册统一路由到 c23-journal-entry-control，由前端 GtC23JournalControl 按 sheetName v-if 分发。
-    "c23-journal-entry-control",
-    # C24 会计分录细节测试：单一 11-sheet 工作簿，
-    # 整册统一路由到 c24-journal-entry-detail，由前端 GtC24JournalDetail 按 sheetName v-if 分发。
-    "c24-journal-entry-detail",
-    # L2 应付利息：单一 8-sheet 工作簿，
-    # 整册统一路由到 l2-interest-payable，由前端 GtL2InterestPayable 按 sheetName v-if 分发。
-    "l2-interest-payable",
-    # L4 应付债券：单一 15-sheet 工作簿（含L4-7/L4-8各2分支版本），
-    # 整册统一路由到 l4-bonds-payable，由前端 GtL4BondsPayable 按 sheetName v-if 分发。
-    "l4-bonds-payable",
-    # S4 非货币性资产交换：单一 3-sheet 工作簿（审计程序/审定表/商业实质判断），
-    # 整册统一路由到 s4-nonmonetary-exchange，由前端 GtS4NonmonetaryExchange 按 sheetName v-if 分发。
-    "s4-nonmonetary-exchange",
-    # S5 债务重组：单一 3-sheet 工作簿（审计程序/审定表/损益确认时点），
-    # 整册统一路由到 s5-debt-restructuring，由前端 GtS5DebtRestructuring 按 sheetName v-if 分发。
-    "s5-debt-restructuring",
-    # S6 大股东及关联方资金占用：单一 3-sheet 工作簿（审定表/核查程序/监管提示），
-    # 整册统一路由到 s6-fund-occupation，由前端 GtS6FundOccupation 按 sheetName v-if 分发。
-    "s6-fund-occupation",
-    # S12 利用CPA专家：单一 9-sheet 工作簿（程序表/评价/专长/恰当性/报告/多分支），
-    # 整册统一路由到 s12-cpa-expert，由前端 GtS12CpaExpert 按 sheetName v-if 分发。
-    "s12-cpa-expert",
-    # S13 利用管理层专家：单一 8-sheet 工作簿（程序表/评价/了解/适当性/报告/多分支），
-    # 整册统一路由到 s13-mgmt-expert，由前端 GtS13MgmtExpert 按 sheetName v-if 分发。
-    "s13-mgmt-expert",
-    # S14 会计估计和相关披露：单一 5-sheet 工作簿（程序表/环境/控制/风险应对/偏向迹象），
-    # 整册统一路由到 s14-accounting-estimate，由前端 GtS14AccountingEstimate 按 sheetName v-if 分发。
-    "s14-accounting-estimate",
-}
+# 单一来源：backend/app/services/dedicated_component_types.py
+# 契约：WHOLE ⊆ VALID ∩ FE；WHOLE − DISPATCH ⊆ WHITELIST ∪ CONFIRMATION
+from app.services.dedicated_component_types import DEDICATED_COMPONENT_TYPES
+
+_WHOLE_WP_MULTISHEET_DEDICATED: set[str] = set(DEDICATED_COMPONENT_TYPES)
 
 # 协作者 D0 函证精细组件（纯前端 componentType，无后端 renderer）。
 # 这些不在 _ONLYOFFICE_HTML_WHITELIST 但必须保留(不被重写成 onlyoffice-sheet)，
@@ -119,6 +88,8 @@ _CONFIRMATION_COMPONENTS: set[str] = {
     "confirmation-diff-securities",
     "confirmation-alternative-g06",
     "confirmation-alternative-h05",
+    "confirmation-alternative-k05",
+    "confirmation-alternative-k06",
     "confirmation-reliability",
     "confirmation-fraud-risk",
 }
@@ -137,6 +108,8 @@ _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-diff-securities": "diff-securities-v1",
     "confirmation-alternative-g06": "alternative-g06-v1",
     "confirmation-alternative-h05": "alternative-h05-v1",
+    "confirmation-alternative-k05": "alternative-k05-v1",
+    "confirmation-alternative-k06": "alternative-k06-v1",
     "confirmation-reliability": "reliability-v1",
     "confirmation-fraud-risk": "fraud-risk-v1",
 }
@@ -164,6 +137,31 @@ _ONLYOFFICE_HTML_WHITELIST: set[str] = {
     "bad-debt-sheet",
     "h-static-doc",
     "d4-operating-revenue",
+    "d1-notes-receivable",
+    "d2-accounts-receivable",
+    "d3-prepaid-accounts",
+    "d5-receivables-financing",
+    "d6-contract-assets",
+    "d7-contract-liabilities",
+    # A/B 多 sheet Bundle（纯前端聚合，无后端 RENDERER_DISPATCH）
+    "a10-bundle",
+    "a11-bundle",
+    "a12-bundle",
+    "a15-bundle",
+    "a16-bundle",
+    "a17-bundle",
+    "b2-bundle",
+    "b13-bundle",
+    "b19-bundle",
+    "b51-bundle",
+    # S32/S33 纯前端聚合组件（无后端 renderer）：保留 componentType，禁止改写为 onlyoffice-sheet
+    "s32-fraud-bundle",
+    "s33-ann14-bundle",
+    # K12/K13 营业外收入/支出（K13 render 策略待后续 Task，暂保留白名单）
+    "k12-non-operating-income",
+    "k13-non-operating-expense",
+    # H7 生产性生物资产（RENDERER_DISPATCH 在 Phase 5 创建，暂保留白名单）
+    "h7-biological-assets",
 }
 
 # 标准底稿编号：A~I + 数字（D1-1、E11）；CUST-01 等字母后非数字则视为自建
@@ -448,7 +446,7 @@ async def refresh_audit_sheet_from_ledger(
 
     # 获取年度
     year_result = await db.execute(
-        sa.text("SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"),
+        PROJECT_AUDIT_YEAR_SQL,
         {"pid": str(project_id)},
     )
     year_row = year_result.first()
@@ -773,9 +771,9 @@ async def _get_render_config_impl(
                        ))).scalars().all()]
     _prog_year, _prog_biz = None, "C"
     try:
-        pj = (await db.execute(sa.text(
-            "SELECT EXTRACT(YEAR FROM audit_period_end)::int, COALESCE(business_category, 'C') "
-            "FROM projects WHERE id = :pid"), {"pid": str(project_id)})).first()
+        pj = (await db.execute(
+            PROJECT_AUDIT_YEAR_BIZ_SQL, {"pid": str(project_id)}
+        )).first()
         if pj:
             _prog_year, _prog_biz = pj[0], pj[1] or "C"
     except Exception as e:  # noqa: BLE001
@@ -849,7 +847,7 @@ async def _get_render_config_impl(
         try:
             if _is_multi_sheet:
                 if _sheet_ovr:
-                    # sheet 级 override 命中（精细 confirmation-* 组件 或 D4A→a-program-console）→ 直接采用
+                    # sheet 级 override 命中（精细 confirmation-* 组件 或 *A→专属组件内分发）→ 直接采用
                     component_type = _sheet_ovr
                 elif ovr in _WHOLE_WP_MULTISHEET_DEDICATED:
                     # 整册专属组件（如 C1→c1-entity-level-control）：所有 sheet 统一路由到
@@ -961,8 +959,7 @@ async def _get_render_config_impl(
     # Step 7: auto-fill + Step 8: response
     fill_results: dict = {}
     try:
-        yr = (await db.execute(sa.text("SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"),
-              {"pid": str(project_id)})).first()
+        yr = (await db.execute(PROJECT_AUDIT_YEAR_SQL, {"pid": str(project_id)})).first()
         if yr and yr[0]:
             combined = {"sheets": {s["sheet_name"]: s["schema"] for s in sheets if isinstance(s.get("schema"), dict)}}
             try:
@@ -1003,6 +1000,7 @@ async def _get_render_config_impl(
 
     response = {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
                 "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,
+                "audit_year": _prog_year,
                 "sheets": sheets, "fill_results": fill_results, "guidance": get_wp_guidance(wp_code)}
     if sign_status is not None:
         response["sign_status"] = sign_status

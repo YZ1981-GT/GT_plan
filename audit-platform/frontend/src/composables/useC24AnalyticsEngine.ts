@@ -90,16 +90,15 @@ export interface BenfordTestResult {
 // ─── 1. 借贷平衡完整性 ─────────────────────────────────────
 
 export function calcBalanceIntegrity(entries: JournalEntry[]): BalanceIntegrityResult {
-  let debitTotal = 0
-  let creditTotal = 0
+  let debitCents = 0
+  let creditCents = 0
   for (const e of entries) {
-    debitTotal += e.debit || 0
-    creditTotal += e.credit || 0
+    debitCents += Math.round((e.debit || 0) * 100)
+    creditCents += Math.round((e.credit || 0) * 100)
   }
-  // 浮点修正：保留2位
-  debitTotal = Math.round(debitTotal * 100) / 100
-  creditTotal = Math.round(creditTotal * 100) / 100
-  const balanced = Math.abs(debitTotal - creditTotal) < 0.01
+  const debitTotal = debitCents / 100
+  const creditTotal = creditCents / 100
+  const balanced = Math.abs(debitCents - creditCents) <= 0
   return { debitTotal, creditTotal, balanced }
 }
 

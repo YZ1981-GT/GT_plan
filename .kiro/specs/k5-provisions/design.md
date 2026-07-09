@@ -51,7 +51,7 @@ audit-platform/frontend/src/components/workpaper/
 ├── k5/
 │   ├── core/
 │   │   ├── K5TabIndex.vue                   # 底稿目录
-│   │   ├── K5TabAdjudication.vue            # K5-1 审定表（负债类，73公式）
+│   │   ├── K5TabAdjudication.vue            # K5-1 审定表（负债类，108实质公式）
 │   │   ├── K5TabDetail.vue                  # K5-2 明细表（23列3区段+或有判断+42行）
 │   │   ├── K5TabAdjustment.vue              # K5-3 调整分录
 │   │   ├── K5TabDisclosureListed.vue        # 附注上市（含或有负债披露）

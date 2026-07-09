@@ -84,6 +84,15 @@ def is_numeric_field_key(key: str) -> bool:
         "investeeNetAssets", "shareOfNetAssets", "goodwill",
         "internalTransElim", "unrecognizedLoss", "equityMethodIncome",
         "currentOCI", "dividendIncome",
+        # I1 无形资产 / H1 固定资产共通数值字段
+        "costOpening", "costIncrease", "costDecrease", "costClosing",
+        "amortOpening", "amortProvision", "amortTransferOut", "amortClosing",
+        "depOpening", "depProvision", "depReversal", "depClosing",
+        "impairOpening", "impairProvision", "impairReversal", "impairClosing",
+        "accAmortization", "impairment", "difference", "audited", "unadjusted", "aje", "rje",
+        "usefulLife", "salvageRate", "entryAmount", "originalCost",
+        "amortTotal", "adminExpense", "salesExpense", "mfgExpense", "rdExpense", "otherExpense",
+        "allocTotal", "allocRatio",
     }
 
 

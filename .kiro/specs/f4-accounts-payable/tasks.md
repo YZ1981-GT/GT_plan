@@ -235,7 +235,7 @@
     - useF4DualMode：模式状态(html/onlyoffice) + 切换逻辑 + localStorage持久化
     - _Requirements: 15.1~15.4_
 
-- [ ] 9. 跨模块联动集成
+- [x] 9. 跨模块联动集成
   - [x] 9.1 版本链集成
     - 主入口集成useVersionTrail（autoSnapshot on save + "版本历史"按钮 + GtWpVersionTrail drawer）
     - provide('openReviewDialog', openReviewDialog)供子组件inject
@@ -255,8 +255,8 @@
     - F4-2: 📎OCR列（POST contract-ocr→发票金额/供应商识别→确认弹窗→merge）
     - _Requirements: 14.4_
 
-- [ ] 10. 集成测试与验收
-  - [ ] 10.1 编写集成测试
+- [x] 10. 集成测试与验收
+  - [x] 10.1 编写集成测试
     - sheetName分发正确性（12个sheet→对应组件）
     - 贷方余额公式链
     - 两级审定交叉校验（按性质===按账龄）

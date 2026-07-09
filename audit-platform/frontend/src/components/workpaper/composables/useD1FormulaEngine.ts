@@ -191,6 +191,80 @@ export function calcInterestDifference(calculated: number, booked: number): numb
   return calculated - booked
 }
 
+// ─── D1-7 备查簿公式 ─────────────────────────────────────────────────────────
+
+/** 6 家大型商业银行 + 9 家上市股份制商业银行（与 D1-6 编制提示一致） */
+export const HIGH_CREDIT_BANK_KEYWORDS = [
+  '中国银行', '农业银行', '建设银行', '工商银行', '邮储银行', '交通银行',
+  '招商银行', '浦发银行', '中信银行', '光大银行', '华夏银行', '民生银行',
+  '平安银行', '兴业银行', '浙商银行',
+]
+
+/**
+ * 备查簿年末余额 = 年初 + 本期收到 - 本期背书 - 本期到期承兑 - 本期贴现
+ */
+export function calcMemoEndingBalance(
+  beginning: number,
+  received: number,
+  endorsed: number,
+  matured: number,
+  discounted: number,
+): number {
+  return beginning + received - endorsed - matured - discounted
+}
+
+/** 承兑人名称是否属于高信用银行（子串匹配） */
+export function isHighCreditBank(acceptor: string): boolean {
+  const name = (acceptor || '').trim()
+  if (!name) return false
+  return HIGH_CREDIT_BANK_KEYWORDS.some((kw) => name.includes(kw))
+}
+
+/** 日期字符串比较：a 是否早于 b（非法日期返回 false） */
+export function isDateBefore(a: string, b: string): boolean {
+  if (!a || !b) return false
+  const ta = new Date(a).getTime()
+  const tb = new Date(b).getTime()
+  if (isNaN(ta) || isNaN(tb)) return false
+  return ta < tb
+}
+
+/**
+ * 期末未到期背书贴现金额：审计基准日尚未到期且状态为已贴现/已背书时取票面金额
+ */
+export function calcUnexpiredEndorsedDiscounted(
+  amount: number,
+  status: string,
+  maturityDate: string,
+  cutoffDate: string,
+): number {
+  if (!amount || !cutoffDate || !maturityDate) return 0
+  if (status !== '已贴现' && status !== '已背书') return 0
+  if (isDateBefore(maturityDate, cutoffDate) || maturityDate === cutoffDate) return 0
+  return amount
+}
+
+/**
+ * 终止确认建议：高信用银行承兑贴现/背书倾向终止确认；商业承兑及低信用倾向不终止确认
+ */
+export function suggestDerecognized(
+  status: string,
+  acceptor: string,
+  noteType: string,
+): string {
+  if (status !== '已贴现' && status !== '已背书') return ''
+  if (noteType.includes('商业')) return '否'
+  if (isHighCreditBank(acceptor)) return '是'
+  return '否'
+}
+
+/** 信用评级建议：高信用银行承兑默认 AA 档，商业承兑默认其他 */
+export function suggestCreditRating(acceptor: string, noteType: string): string {
+  if (noteType.includes('商业')) return '其他'
+  if (isHighCreditBank(acceptor)) return 'AA'
+  return 'A'
+}
+
 // ─── 业务模式与列报项目判定（QA矩阵IF公式） ──────────────────────────────────
 
 /**

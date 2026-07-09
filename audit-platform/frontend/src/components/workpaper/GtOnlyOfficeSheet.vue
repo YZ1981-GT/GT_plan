@@ -62,6 +62,15 @@ const editorContainer = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
 let editorInstance: any = null
 
+function updateAutoHeight(): void {
+  const el = rootEl.value
+  if (!el || isFullscreen.value) return
+  const rect = el.getBoundingClientRect()
+  // 留出页面底部呼吸区，避免贴边
+  const next = Math.max(window.innerHeight - rect.top - 16, 420)
+  el.style.setProperty('--gt-oo-auto-height', `${Math.floor(next)}px`)
+}
+
 function toggleFullscreen(): void {
   if (!isFullscreen.value) {
     // 进入全屏：优先用浏览器原生 Fullscreen API
@@ -82,6 +91,7 @@ function toggleFullscreen(): void {
     isFullscreen.value = false
     document.removeEventListener('keydown', handleEscFullscreen)
     document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    updateAutoHeight()
   }
 }
 
@@ -90,6 +100,7 @@ function handleFullscreenChange(): void {
   if (!document.fullscreenElement && isFullscreen.value) {
     isFullscreen.value = false
     document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    updateAutoHeight()
   }
 }
 
@@ -235,6 +246,8 @@ function handleFallback(reason?: string) {
 
 // ─── 生命周期 ───
 onMounted(() => {
+  updateAutoHeight()
+  window.addEventListener('resize', updateAutoHeight)
   initialize()
 })
 
@@ -250,13 +263,14 @@ onBeforeUnmount(() => {
   }
   document.removeEventListener('keydown', handleEscFullscreen)
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  window.removeEventListener('resize', updateAutoHeight)
 })
 </script>
 
 <style scoped>
 .gt-onlyoffice-sheet {
   width: 100%;
-  height: 100%;
+  height: var(--gt-oo-auto-height, calc(100dvh - 220px));
   min-height: 500px;
   display: flex;
   flex-direction: column;

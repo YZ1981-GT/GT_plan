@@ -74,7 +74,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: async (items: ChecklistItem[]) => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch { ElMessage.warning('保存失败，请重试') }
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,

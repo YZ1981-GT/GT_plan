@@ -111,7 +111,7 @@
  *
  * 集成（Phase 6）：
  * - EventBus: substantive:adjudicated(4104) / 'm6:net-profit' / 'm6:profit-distributed'
- * - 订阅: 'm5:accrual-confirmed' / 'm1:declared-confirmed' / adjustment:created
+ * - 订阅: 'm5:surplus-accrual' / 'm1:declared-confirmed' / adjustment:created
  * - 跨底稿联动: TB回写(4104) + M6净利润→M5计提基数 + M6分配股利→M1
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject

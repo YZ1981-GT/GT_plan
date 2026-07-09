@@ -1092,3 +1092,43 @@ async def test_cancel_without_expected_version_backward_compat(db_session, tree_
     await db_session.refresh(job)
     assert job.status == JobStatus.canceled
     assert job.version == 11  # 仍会自增（由 cancel 端点主动加）
+
+
+class TestGetAllLedgerEntriesStablePagination:
+    """同凭证多行时 OFFSET 分页须稳定排序，否则借贷合计会失真。"""
+
+    @pytest.mark.asyncio
+    async def test_paginated_sums_match_full_aggregate(self, db_session: AsyncSession):
+        from app.services.ledger_penetration_service import LedgerPenetrationService
+
+        # 同一凭证号 3 行：借 100+200 / 贷 300
+        for idx, (debit, credit) in enumerate([(100, 0), (200, 0), (0, 300)]):
+            db_session.add(TbLedger(
+                project_id=FAKE_PROJECT_ID, year=YEAR, company_code="001",
+                voucher_date=date(2025, 6, 1), voucher_no="记-001",
+                account_code=f"100{idx}", account_name="测试",
+                debit_amount=Decimal(str(debit)), credit_amount=Decimal(str(credit)),
+                summary="同凭证多行",
+            ))
+        await db_session.commit()
+
+        svc = LedgerPenetrationService(db_session, None)
+        page_size = 2
+        page = 1
+        debit_sum = credit_sum = 0.0
+        total = None
+        while True:
+            batch = await svc.get_all_ledger_entries(
+                FAKE_PROJECT_ID, YEAR, page=page, page_size=page_size,
+            )
+            total = batch["total"]
+            for row in batch["items"]:
+                debit_sum += float(row["debit_amount"] or 0)
+                credit_sum += float(row["credit_amount"] or 0)
+            if len(batch["items"]) < page_size:
+                break
+            page += 1
+
+        assert total == 3
+        assert round(debit_sum, 2) == 300.0
+        assert round(credit_sum, 2) == 300.0

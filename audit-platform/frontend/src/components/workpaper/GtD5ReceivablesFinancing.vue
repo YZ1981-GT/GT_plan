@@ -111,6 +111,13 @@
         />
       </template>
     </template>
+
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d5ReviewSection.id"
+      :section-label="d5ReviewSection.label"
+    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -124,6 +131,9 @@ import { useD5CrossSheet } from './composables/useD5CrossSheet'
 import { useD5EntryDualMode, type D5RenderMode } from './composables/useD5EntryDualMode'
 import { resolveD5SheetCode } from './composables/useD5SheetRouting'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
+import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { useD5ReviewThreads } from './composables/useD5ReviewThreads'
 import { parseNum } from './composables/useD5FormulaEngine'
@@ -170,6 +180,7 @@ const {
 const crossSheet = useD5CrossSheet({ allResponses })
 
 const currentSheet = computed(() => resolveD5SheetCode(props.sheetName || 'D5'))
+const d5ReviewSection = computed(() => resolveCycleReviewSection('D5', currentSheet.value))
 
 const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],

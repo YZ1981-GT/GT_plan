@@ -1,5 +1,12 @@
 /**
  * useAlternativeH05Data — H0-5 固定资产循环替代程序数据 composable
+ *
+ * Master-Detail（公司→4 区块检查表）
+ * - loadAll / persistAll（_format: alternative-h05-v1）
+ * - importFromSummary（H0-1 未回函，对标 D0-1→D0-5）
+ * - 四区块 CRUD + 合计 + 检查比例
+ *
+ * Requirements: 2, 3
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import type {
@@ -7,10 +14,11 @@ import type {
   AlternativeD05Metrics,
   CheckRow,
   BlockType,
-} from '../alternativeD05/alternativeD05Types'
-import type { AlternativeH05Payload } from '../alternativeH05Types'
+} from '../../alternativeD05/alternativeD05Types'
+import type { AlternativeH05Payload, H01UnrepliedEntity } from '../alternativeH05Types'
 import { getSumFieldsH05 } from '../blockColumnConfigsH05'
-import { calcCheckRatio as calcRatio } from './useH0FormulaEngine'
+import { calcCheckRatio as calcRatio, calcBlockTotal as calcTotal, parseNum } from './useH0FormulaEngine'
+import http from '@/utils/http'
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
@@ -21,6 +29,8 @@ function precise(n: number): number {
 }
 
 export interface UseAlternativeH05DataProps {
+  wpId: string
+  projectId: string
   htmlData: () => any
   readonly: boolean
 }
@@ -29,10 +39,12 @@ export interface UseAlternativeH05DataReturn {
   companies: Ref<AlternativeCompany[]>
   isDirty: Ref<boolean>
   selectedCompanyId: Ref<string | null>
+  loading: Ref<boolean>
   addCompany: (partial?: Partial<AlternativeCompany>) => AlternativeCompany
   deleteCompany: (companyId: string) => void
   updateCompany: (companyId: string, field: string, value: any) => void
   importCompanies: (items: Partial<AlternativeCompany>[]) => void
+  importFromSummary: () => Promise<number>
   addBlockRow: (companyId: string, blockType: BlockType) => CheckRow | undefined
   deleteBlockRow: (companyId: string, blockType: BlockType, rowId: string) => void
   updateBlockField: (companyId: string, blockType: BlockType, rowId: string, field: string, value: any) => void
@@ -41,6 +53,8 @@ export interface UseAlternativeH05DataReturn {
   getCompletionStatus: (company: AlternativeCompany) => { completed: number; total: number; rate: number }
   hasAbnormal: (company: AlternativeCompany) => boolean
   metrics: ComputedRef<AlternativeD05Metrics>
+  loadAll: () => void
+  persistAll: () => AlternativeH05Payload
   buildPayload: () => AlternativeH05Payload
 }
 
@@ -48,6 +62,13 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
   const companies = ref<AlternativeCompany[]>([])
   const isDirty = ref(false)
   const selectedCompanyId = ref<string | null>(null)
+  const loading = ref(false)
+
+  // ─── Load / Persist ───────────────────────────────────────────────────────
+
+  function loadAll() {
+    initFromHtmlData(props.htmlData())
+  }
 
   function initFromHtmlData(data: any) {
     if (!data || data._format !== 'alternative-h05-v1') {
@@ -57,6 +78,26 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     companies.value = Array.isArray(data.companies) ? data.companies.map(ensureCompanyId) : []
     isDirty.value = false
   }
+
+  function persistAll(): AlternativeH05Payload {
+    return buildPayload()
+  }
+
+  function buildPayload(): AlternativeH05Payload {
+    return {
+      _format: 'alternative-h05-v1',
+      companies: companies.value.map((company) => ({
+        ...company,
+        balance: {
+          ...company.balance,
+          ownership_check_ratio: getCheckRatio(company, 'ownership'),
+          post_acceptance_ratio: getCheckRatio(company, 'acceptance'),
+        },
+      })),
+    }
+  }
+
+  // ─── ID helpers ───────────────────────────────────────────────────────────
 
   function ensureCompanyId(company: AlternativeCompany): AlternativeCompany {
     return {
@@ -74,8 +115,12 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     return row
   }
 
-  initFromHtmlData(props.htmlData())
-  watch(() => props.htmlData(), (newData) => { initFromHtmlData(newData) }, { deep: true })
+  // ─── Init ─────────────────────────────────────────────────────────────────
+
+  loadAll()
+  watch(() => props.htmlData(), () => { loadAll() }, { deep: true })
+
+  // ─── Company CRUD ─────────────────────────────────────────────────────────
 
   function addCompany(partial?: Partial<AlternativeCompany>): AlternativeCompany {
     const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
@@ -113,6 +158,9 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     isDirty.value = true
   }
 
+  /**
+   * 批量导入公司（通用，按 confirm_index 去重）
+   */
   function importCompanies(items: Partial<AlternativeCompany>[]) {
     const existingIndexes = new Set(companies.value.map((c) => c.confirm_index).filter(Boolean))
     const deduped = items.filter((item) => !item.confirm_index || !existingIndexes.has(item.confirm_index))
@@ -135,6 +183,58 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     })
     isDirty.value = true
   }
+
+  /**
+   * 从 H0-1 函证汇总表带入未回函公司（对标 D0-1→D0-5 模式）
+   * 调用后端 API 获取 H0-1 未回函列表，按 confirm_index 去重后插入
+   * @returns 新增公司数量
+   */
+  async function importFromSummary(): Promise<number> {
+    loading.value = true
+    try {
+      const res = await http.get<H01UnrepliedEntity[]>(
+        `/api/workpapers/${props.wpId}/h0/unreplied-entities`,
+        { params: { sheet: 'H0-5' } },
+      )
+      const entities: H01UnrepliedEntity[] = res.data?.data ?? res.data ?? []
+      if (!entities.length) return 0
+
+      const existingIndexes = new Set(
+        companies.value.map((c) => c.confirm_index).filter(Boolean),
+      )
+      const newItems = entities.filter(
+        (e) => !e.confirm_index || !existingIndexes.has(e.confirm_index),
+      )
+      if (!newItems.length) return 0
+
+      const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
+      newItems.forEach((item, i) => {
+        companies.value.push({
+          _company_id: generateId(),
+          seq: maxSeq + i + 1,
+          entity_name: item.entity_name || '',
+          confirm_index: item.confirm_index,
+          _source: 'auto',
+          sampling: {},
+          balance: {
+            item_name: '固定资产',
+            closing_balance: item.confirm_amount ?? 0,
+          },
+          block1_rows: [],
+          block2_rows: [],
+          block3_rows: [],
+          block4_rows: [],
+          conclusion: {},
+        })
+      })
+      isDirty.value = true
+      return newItems.length
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // ─── Block Row CRUD ───────────────────────────────────────────────────────
 
   function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
     const key = `${blockType}_rows` as keyof AlternativeCompany
@@ -174,25 +274,28 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     isDirty.value = true
   }
 
+  // ─── Computed: totals & ratios ────────────────────────────────────────────
+
   function getBlockTotal(company: AlternativeCompany, blockType: BlockType): Record<string, number> {
     const rows = getBlockRows(company, blockType)
     const fields = getSumFieldsH05(blockType)
     const totals: Record<string, number> = {}
     for (const field of fields) {
-      let sum = 0
-      for (const row of rows) {
-        const val = Number(row[field])
-        if (!isNaN(val)) sum += val
-      }
-      totals[field] = precise(sum)
+      const amounts = rows.map((r) => parseNum(r[field]))
+      totals[field] = precise(calcTotal(amounts))
     }
     return totals
   }
 
   function getClosingBalance(company: AlternativeCompany): number {
-    return Number(company.balance?.closing_balance ?? company.balance?.ending_balance ?? 0)
+    return parseNum(company.balance?.closing_balance ?? company.balance?.ending_balance ?? 0)
   }
 
+  /**
+   * 检查比例计算
+   * - ownership: 区块②余额支持性证据合计 / 期末余额
+   * - acceptance: 区块①期后验收合计 / 期末余额
+   */
   function getCheckRatio(company: AlternativeCompany, type: 'ownership' | 'acceptance'): number | null {
     const closing = getClosingBalance(company)
     if (!closing) return null
@@ -201,6 +304,7 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
       const sum = totals.contract_amount ?? totals.invoice_amount ?? totals.payment_amount ?? 0
       return precise(calcRatio(sum, closing) * 100)
     }
+    // acceptance: block1 voucher_amount
     const totals = getBlockTotal(company, 'block1')
     const sum = totals.voucher_amount ?? 0
     return precise(calcRatio(sum, closing) * 100)
@@ -221,6 +325,8 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     }
     return false
   }
+
+  // ─── Metrics ──────────────────────────────────────────────────────────────
 
   const metrics = computed<AlternativeD05Metrics>(() => {
     let completedCount = 0
@@ -246,28 +352,16 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     }
   })
 
-  function buildPayload(): AlternativeH05Payload {
-    return {
-      _format: 'alternative-h05-v1',
-      companies: companies.value.map((company) => ({
-        ...company,
-        balance: {
-          ...company.balance,
-          ownership_check_ratio: getCheckRatio(company, 'ownership'),
-          post_acceptance_ratio: getCheckRatio(company, 'acceptance'),
-        },
-      })),
-    }
-  }
-
   return {
     companies,
     isDirty,
     selectedCompanyId,
+    loading,
     addCompany,
     deleteCompany,
     updateCompany,
     importCompanies,
+    importFromSummary,
     addBlockRow,
     deleteBlockRow,
     updateBlockField,
@@ -276,6 +370,8 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
     getCompletionStatus,
     hasAbnormal,
     metrics,
+    loadAll,
+    persistAll,
     buildPayload,
   }
 }

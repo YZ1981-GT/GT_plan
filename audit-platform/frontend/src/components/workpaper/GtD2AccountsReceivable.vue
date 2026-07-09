@@ -185,6 +185,13 @@
       />
       </template>
     </template>
+
+    <GtWpReviewRail
+      v-if="!isLoading && renderMode !== 'onlyoffice'"
+      :section-id="d2ReviewSection.id"
+      :section-label="d2ReviewSection.label"
+    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -197,6 +204,9 @@ import { useD2FormData, type ChecklistResponse } from './composables/useD2FormDa
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
 import { useD2EntryDualMode, type D2RenderMode } from './composables/useD2EntryDualMode'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
+import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
 import D2TabIndex from './d2/D2TabIndex.vue'
@@ -268,6 +278,8 @@ const currentSheet = computed(() => {
   if (name === 'D2' || name.startsWith('D2 ')) return 'D2'
   return name
 })
+
+const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 
 const dualMode = useD2EntryDualMode({
   wpId: toRef(props, 'wpId'),

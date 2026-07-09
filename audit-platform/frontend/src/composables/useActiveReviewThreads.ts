@@ -12,6 +12,7 @@ import http from '@/utils/http'
 export interface ThreadMarker {
   hasThread: boolean
   hasUnread: boolean
+  hasTargetedUnread?: boolean
 }
 
 export function useActiveReviewThreads() {
@@ -33,6 +34,7 @@ export function useActiveReviewThreads() {
           map[item.section_id] = {
             hasThread: true,
             hasUnread: !!item.has_unread,
+            hasTargetedUnread: !!item.has_targeted_unread,
           }
         }
       }
@@ -52,7 +54,7 @@ export function useActiveReviewThreads() {
   function getDotColor(sectionId: string): 'blue' | 'red' | null {
     const marker = threads.value[sectionId]
     if (!marker) return null
-    return marker.hasUnread ? 'red' : 'blue'
+    return (marker.hasUnread || marker.hasTargetedUnread) ? 'red' : 'blue'
   }
 
   return {

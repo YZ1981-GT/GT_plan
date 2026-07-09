@@ -382,7 +382,12 @@ describe('C23 readonly 禁编辑', () => {
 describe('C24 持久化 debounce 保存', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    mockGet.mockResolvedValue(buildC24Responses())
+    mockGet.mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/entries-all')) {
+        return Promise.resolve({ items: [], total: 0, page: 1, page_size: 5000 })
+      }
+      return Promise.resolve(buildC24Responses())
+    })
     mockPut.mockResolvedValue({})
     vi.mocked(ElMessage.error).mockClear()
   })
@@ -420,14 +425,17 @@ describe('C24 持久化 debounce 保存', () => {
       global: { stubs: defaultStubs },
     })
     await flushPromises()
+    await flushPromises()
+    vi.advanceTimersByTime(3000)
+    await flushPromises()
     mockPut.mockClear()
 
     const vm = wrapper.vm as any
     vm.onConclusionChange('C24-1', '借贷平衡，完整性通过')
     await flushPromises()
 
-    // Conclusion saves immediately
-    expect(mockPut).toHaveBeenCalledTimes(1)
+    // Conclusion saves immediately (+ C24-0 汇总回填第二条 PUT)
+    expect(mockPut).toHaveBeenCalledTimes(2)
     expect(mockPut).toHaveBeenCalledWith(
       '/api/workpapers/wp-c24-2/checklist-responses',
       expect.objectContaining({
@@ -510,7 +518,12 @@ describe('C24 持久化 debounce 保存', () => {
 describe('C24 readonly 禁编辑', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    mockGet.mockResolvedValue(buildC24Responses())
+    mockGet.mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/entries-all')) {
+        return Promise.resolve({ items: [], total: 0, page: 1, page_size: 5000 })
+      }
+      return Promise.resolve(buildC24Responses())
+    })
     mockPut.mockResolvedValue({})
   })
 

@@ -26,6 +26,7 @@ import sqlalchemy as sa
 from app.core.config import settings
 from app.core.database import get_db
 from app.deps import require_project_access, require_operation, check_consol_lock
+from app.services.project_audit_year import fetch_project_audit_year
 from app.models.core import User
 from app.services.feature_flags import get_feature_maturity, is_enabled
 from app.services.wopi_service import WOPIHostService
@@ -373,16 +374,7 @@ async def update_sign_status(
     if status == "signed" and is_a16_main and not sign_date:
         raise HTTPException(status_code=422, detail="A16 主版本签回时必须提供签署日期(sign_date)")
 
-    # 获取项目年度
-    year_val = 0
-    try:
-        year_q = await db.execute(sa.text(
-            "SELECT EXTRACT(YEAR FROM audit_period_end)::int FROM projects WHERE id = :pid"
-        ), {"pid": str(project_id)})
-        year_val = year_q.scalar() or 0
-    except Exception as e:
-        import logging as _logging
-        _logging.getLogger(__name__).warning("查询项目年度失败(签字) pid=%s: %s", project_id, e)
+    year_val = await fetch_project_audit_year(db, project_id) or 0
 
     # scope 确定：A16 子版本 → word_template:A16:{wp_code}，其他 → word_template:{wp_code}
     svc = FieldOverrideService(db)

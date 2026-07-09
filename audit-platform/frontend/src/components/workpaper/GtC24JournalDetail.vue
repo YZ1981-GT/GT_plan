@@ -597,9 +597,12 @@
  * Requirements: 1.1, 1.5, 3.4, 4.3, 4.4, 5.3, 5.4, 6.1, 6.2, 6.3
  */
 import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { useRoute } from 'vue-router'
+import { useProjectStore } from '@/stores/project'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useLedgerCache } from '@/composables/useLedgerCache'
 import {
   calcBalanceIntegrity,
   compareToTrialBalance,
@@ -620,6 +623,7 @@ import {
 import { useWpAiSuggest } from '@/composables/useWpAiSuggest'
 import { useC24ImportExport } from '@/composables/useC24ImportExport'
 import { fmtAmount } from '@/utils/formatters'
+import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import type { C24SummaryFormData } from './c24/C24SummarySheet.vue'
 import type { GapNote } from './c24/C24GapTestSheet.vue'
 import type { AccountRow } from './c24/C24AnomalyAccountSheet.vue'
@@ -655,8 +659,27 @@ const emit = defineEmits<{
 }>()
 
 // ─── State ───
+const route = useRoute()
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+
+/** 序时账查询年度：props > 路由 > 项目 store > 通用兜底 */
+const effectiveYear = computed(() => {
+  try {
+    const store = useProjectStore()
+    return resolveEffectiveAuditYear({
+      propYear: props.year,
+      routeYear: route?.query?.year,
+      storeAuditYear: store.auditYear,
+      storeYear: store.year,
+    })
+  } catch {
+    return resolveEffectiveAuditYear({
+      propYear: props.year,
+      routeYear: route?.query?.year,
+    })
+  }
+})
 
 const currentSheet = computed(() => {
   const name = props.sheetName || 'C24A'
@@ -930,13 +953,39 @@ function jumpFromStepToTest(linkedSheet: string): void {
   }
 }
 
-// ─── loadFromLedger 四表联动 ───
+// ─── Journal data source (序时账不重复落库全量分录) ───
+const JOURNAL_SOURCE_ITEM = 'C24-journal-source'
+type JournalDataSource = 'none' | 'ledger' | 'excel'
+const journalDataSource = ref<JournalDataSource>('none')
+
+function mapLedgerRow(r: Record<string, unknown>): JournalEntry {
+  return {
+    voucherDate: String(r.voucher_date || r.voucherDate || ''),
+    voucherNo: String(r.voucher_no || r.voucherNo || ''),
+    accountCode: String(r.account_code || r.accountCode || ''),
+    accountName: String(r.account_name || r.accountName || ''),
+    debit: Number(r.debit_amount || r.debitAmount || r.debit || 0),
+    credit: Number(r.credit_amount || r.creditAmount || r.credit || 0),
+    summary: String(r.summary || r.description || ''),
+    preparer: String(r.preparer || ''),
+    poster: String(r.poster || ''),
+    reviewer: String(r.reviewer || ''),
+  }
+}
+
+// ─── loadFromLedger 四表联动（使用项目级缓存） ───
+const ledgerCache = useLedgerCache()
+
 async function loadFromLedger(silent = false): Promise<void> {
-  if (isReadonly.value || !props.projectId || !props.year) {
+  const year = effectiveYear.value
+  if (isReadonly.value || !props.projectId || !year) {
     if (!silent) ElMessage.warning('缺少项目或年度信息，无法从序时账导入')
     return
   }
-  if (!silent) {
+
+  // 手动触发时确认覆盖（缓存命中则跳过确认 — 只是从缓存读取，秒级）
+  const hasCached = ledgerCache.hasCacheFor(props.projectId, year)
+  if (!silent && !hasCached) {
     try {
       await ElMessageBox.confirm(
         '将从序时账（全量分录）导入数据，当前已有数据将被覆盖。确定继续？',
@@ -948,55 +997,70 @@ async function loadFromLedger(silent = false): Promise<void> {
     }
   }
 
-  const loading = silent ? null : ElMessage({ message: '正在从序时账拉取分录...', type: 'info', duration: 0 })
-  try {
-    // Paginated fetch - up to 50000 entries
-    const allEntries: JournalEntry[] = []
-    let page = 1
-    const pageSize = 5000
-    let hasMore = true
-    while (hasMore) {
-      const res = await api.get<any>(`/api/projects/${props.projectId}/ledger/entries-all`, {
-        params: {
-          year: parseInt(props.year),
-          page,
-          page_size: pageSize,
-        },
-      } as any)
-      const rows: any[] = Array.isArray(res) ? res : (res as any)?.data?.items || (res as any)?.data || (res as any)?.items || []
-      for (const r of rows) {
-        allEntries.push({
-          voucherDate: r.voucher_date || r.voucherDate || '',
-          voucherNo: r.voucher_no || r.voucherNo || '',
-          accountCode: r.account_code || r.accountCode || '',
-          accountName: r.account_name || r.accountName || '',
-          debit: Number(r.debit_amount || r.debit || 0),
-          credit: Number(r.credit_amount || r.credit || 0),
-          summary: r.summary || r.description || '',
-          preparer: r.preparer || '',
-          poster: r.poster || '',
-          reviewer: r.reviewer || '',
-        })
-      }
-      hasMore = rows.length === pageSize
-      page++
-      // Safety: cap at 50000
-      if (allEntries.length >= 50000) break
-    }
+  let loadingMsg: { close: () => void } | null = null
+  if (!silent && !hasCached) {
+    loadingMsg = ElMessage({ message: '正在从序时账拉取分录...', type: 'info', duration: 0 })
+  }
 
-    if (allEntries.length === 0) {
+  // 抑制全局超时弹窗
+  ;(globalThis as any).__suppressTimeoutToast = true
+  try {
+    const cached = await ledgerCache.getEntries(props.projectId, year, {
+      force: !silent && !hasCached, // 手动触发 + 无缓存 → 强制拉取
+      onProgress: (loaded, total) => {
+        if (loadingMsg && total > 0) {
+          loadingMsg.close()
+          loadingMsg = ElMessage({
+            message: `正在导入分录 ${loaded.toLocaleString()} / ${total.toLocaleString()}...`,
+            type: 'info',
+            duration: 0,
+          })
+        }
+      },
+    })
+
+    if (cached.length === 0) {
       if (!silent) ElMessage.warning('序时账中暂无分录数据，请确认已导入序时账')
       return
     }
 
-    journalEntries.value = allEntries
-    if (!silent) ElMessage.success(`成功导入 ${allEntries.length} 条分录，正在运行分析...`)
+    // 映射缓存数据到 JournalEntry
+    journalEntries.value = cached.map(r => mapLedgerRow(r as unknown as Record<string, unknown>))
+    journalDataSource.value = 'ledger'
+
+    const cacheInfo = ledgerCache.getCacheInfo()
+    if (!silent) {
+      const suffix = cacheInfo && !cacheInfo.complete ? '（数据可能不完整）' : ''
+      ElMessage.success(`成功加载 ${cached.length.toLocaleString()} 条分录${hasCached ? '（缓存）' : ''}，正在运行分析...${suffix}`)
+    }
     runAllAnalytics()
     debounceSave()
   } catch (err: any) {
-    if (!silent) ElMessage.error('从序时账导入失败：' + (err?.message || '网络错误'))
+    if (!silent) {
+      const isTimeout = err?.code === 'ECONNABORTED' || err?.message?.includes('timeout')
+      if (isTimeout) {
+        ElMessage.error('序时账分录量较大，请求超时。建议稍后重试或使用 Excel 导入。')
+      } else if (err?.message !== '用户取消') {
+        ElMessage.error('从序时账导入失败：' + (err?.message || '网络错误'))
+      }
+    }
+    // 即使失败，缓存中如果有部分数据也可使用
+    const cacheInfo = ledgerCache.getCacheInfo()
+    if (cacheInfo && cacheInfo.count > 0 && journalEntries.value.length === 0) {
+      const partial = await ledgerCache.getEntries(props.projectId, year)
+      if (partial.length > 0) {
+        journalEntries.value = partial.map(r => mapLedgerRow(r as unknown as Record<string, unknown>))
+        journalDataSource.value = 'ledger'
+        runAllAnalytics()
+        debounceSave()
+        if (!silent) {
+          ElMessage.warning(`已加载部分分录（${partial.length.toLocaleString()} 条），可能不完整`)
+        }
+      }
+    }
   } finally {
-    loading?.close()
+    ;(globalThis as any).__suppressTimeoutToast = false
+    loadingMsg?.close()
   }
 }
 
@@ -1360,8 +1424,29 @@ async function persistAll() {
     items.push({ item_id: itemId, conclusion: val || null, remark: null })
   }
 
-  // Journal entries stored as JSON in remark
-  items.push({ item_id: 'C24-journal-entries', conclusion: null, remark: JSON.stringify(journalEntries.value) })
+  // 序时账导入：只存来源元数据，避免 30 万+ 行 JSON 撑爆请求体
+  if (journalDataSource.value === 'ledger') {
+    items.push({
+      item_id: JOURNAL_SOURCE_ITEM,
+      conclusion: null,
+      remark: JSON.stringify({
+        source: 'ledger',
+        year: effectiveYear.value,
+        count: journalEntries.value.length,
+        importedAt: new Date().toISOString(),
+      }),
+    })
+    items.push({ item_id: 'C24-journal-entries', conclusion: null, remark: '[]' })
+  } else {
+    items.push({ item_id: 'C24-journal-entries', conclusion: null, remark: JSON.stringify(journalEntries.value) })
+    if (journalEntries.value.length > 0) {
+      items.push({
+        item_id: JOURNAL_SOURCE_ITEM,
+        conclusion: null,
+        remark: JSON.stringify({ source: 'excel', count: journalEntries.value.length }),
+      })
+    }
+  }
 
   // Gap notes
   gapNotes.value.forEach((gn, i) => {
@@ -1385,11 +1470,12 @@ async function persistAll() {
     remark: JSON.stringify({ enabledRules: enabledRules.value, params: ruleParams.value }),
   })
 
-  // Anomaly notes
-  anomalyNotes.value.forEach((an, i) => {
-    items.push({ item_id: `C24-5-row-${i}-checkContent`, conclusion: null, remark: an.checkContent || null })
-    items.push({ item_id: `C24-5-row-${i}-conclusion`, conclusion: an.conclusion || null, remark: null })
-    items.push({ item_id: `C24-5-row-${i}-indexRef`, conclusion: null, remark: an.indexRef || null })
+  // Anomaly notes — JSON 打包存储（避免逐行存储产生百万级记录）
+  const filledNotes = anomalyNotes.value.filter(an => an.checkContent || an.conclusion || an.indexRef)
+  items.push({
+    item_id: 'C24-5-anomaly-notes',
+    conclusion: null,
+    remark: filledNotes.length > 0 ? JSON.stringify(filledNotes) : null,
   })
 
   // Holidays
@@ -1455,10 +1541,31 @@ async function selfLoad() {
     conclusions.value['C24-5'] = map.get('C24-5-conclusion')?.conclusion || ''
     conclusions.value['benford'] = map.get('C24-benford-conclusion')?.conclusion || ''
 
-    // Journal entries
+    // Journal entries / data source
+    journalDataSource.value = 'none'
+    const sourceRemark = map.get(JOURNAL_SOURCE_ITEM)?.remark
+    if (sourceRemark) {
+      try {
+        const meta = JSON.parse(sourceRemark) as { source?: string; year?: number }
+        if (meta.source === 'ledger') {
+          journalDataSource.value = 'ledger'
+        } else if (meta.source === 'excel') {
+          journalDataSource.value = 'excel'
+        }
+      } catch { /* ignore */ }
+    }
+
     const jeRemark = map.get('C24-journal-entries')?.remark
-    if (jeRemark) {
-      try { journalEntries.value = JSON.parse(jeRemark) } catch { journalEntries.value = [] }
+    if (journalDataSource.value !== 'ledger' && jeRemark) {
+      try {
+        const parsed = JSON.parse(jeRemark)
+        journalEntries.value = Array.isArray(parsed) ? parsed : []
+        if (journalEntries.value.length > 0 && journalDataSource.value === 'none') {
+          journalDataSource.value = 'excel'
+        }
+      } catch { journalEntries.value = [] }
+    } else {
+      journalEntries.value = []
     }
 
     // Holidays
@@ -1506,17 +1613,35 @@ async function selfLoad() {
     }
 
     // Anomaly notes
+    // Anomaly notes — 从 JSON 打包格式加载（兼容旧逐行格式）
+    const anomalyNotesJson = map.get('C24-5-anomaly-notes')?.remark
     const loadedAnomalyNotes: AnomalyNote[] = []
-    for (let i = 0; i < 500; i++) {
-      const cc = map.get(`C24-5-row-${i}-checkContent`)
-      const conc = map.get(`C24-5-row-${i}-conclusion`)
-      const idxRef = map.get(`C24-5-row-${i}-indexRef`)
-      if (!cc && !conc && !idxRef) break
-      loadedAnomalyNotes.push({
-        checkContent: cc?.remark || '',
-        conclusion: conc?.conclusion || '',
-        indexRef: idxRef?.remark || '',
-      })
+    if (anomalyNotesJson) {
+      try {
+        const parsed = JSON.parse(anomalyNotesJson)
+        if (Array.isArray(parsed)) {
+          for (const an of parsed) {
+            loadedAnomalyNotes.push({
+              checkContent: an.checkContent || '',
+              conclusion: an.conclusion || '',
+              indexRef: an.indexRef || '',
+            })
+          }
+        }
+      } catch { /* ignore parse errors */ }
+    } else {
+      // 兼容旧格式（逐行存储，最多读 500 行）
+      for (let i = 0; i < 500; i++) {
+        const cc = map.get(`C24-5-row-${i}-checkContent`)
+        const conc = map.get(`C24-5-row-${i}-conclusion`)
+        const idxRef = map.get(`C24-5-row-${i}-indexRef`)
+        if (!cc && !conc && !idxRef) break
+        loadedAnomalyNotes.push({
+          checkContent: cc?.remark || '',
+          conclusion: conc?.conclusion || '',
+          indexRef: idxRef?.remark || '',
+        })
+      }
     }
     anomalyNotes.value = loadedAnomalyNotes
 
@@ -1538,24 +1663,38 @@ async function selfLoad() {
     console.warn('[GtC24JournalDetail] selfLoad failed:', err)
   } finally {
     isLoading.value = false
-    // 独立子底稿场景：selfLoad完成但无分录数据 + 非程序表/汇总页 → 自动从序时账拉取
-    if (
-      journalEntries.value.length === 0
-      && currentSheet.value !== 'C24A'
+    const canAutoImport = props.projectId
+      && effectiveYear.value
+      && !isReadonly.value
       && currentSheet.value !== 'C24-0'
       && currentSheet.value !== '假期清单'
       && currentSheet.value !== '本福特-数据'
-      && props.projectId
-      && props.year
-      && !isReadonly.value
-    ) {
-      loadFromLedger(true)
+
+    // 序时账来源：重新从 ledger 拉全量（不读 checklist 大 JSON）
+    if (canAutoImport && journalDataSource.value === 'ledger') {
+      await loadFromLedger(true)
+      return
+    }
+
+    // 无分录时首次自动从序时账拉取（含 C24A 主控台）
+    if (canAutoImport && journalEntries.value.length === 0) {
+      await loadFromLedger(true)
     }
   }
 }
 
 // ─── Lifecycle ───
-onMounted(() => { selfLoad() })
+onMounted(async () => {
+  if (props.projectId) {
+    try {
+      const store = useProjectStore()
+      if (store.projectId !== props.projectId || !store.auditYear) {
+        await store.loadProjectContext(props.projectId)
+      }
+    } catch { /* unit tests without pinia */ }
+  }
+  await selfLoad()
+})
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: selfLoad })
 </script>

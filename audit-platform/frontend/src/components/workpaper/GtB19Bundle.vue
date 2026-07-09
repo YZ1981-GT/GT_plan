@@ -1,18 +1,19 @@
 <script setup lang="ts">
 /**
- * GtB19Bundle — B19 审计工作方案聚合组件
+ * GtB19Bundle — B19 识别关联方程序表
  *
- * 将 B19 程序表 + B19-1 审计方案附件 聚合为 Bundle，
- * 内部通过 el-tabs 分发渲染各子底稿。
+ * Excel 内含：
+ * - B19识别关联方程序表 → 程序表
+ * - B19-1管理层提供的关联方清单 → 同文件 sheet（wp_code_overrides 中 B19-1=skip，无独立底稿）
+ *
+ * B19-1 必须用父 wpId + OnlyOffice 打开对应 sheet，禁止按独立 wp_index 加载。
  */
-import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import GtAProgramConsole from './GtAProgramConsole.vue'
 
-const GtDForm = defineAsyncComponent(() => import('./GtDForm/GtDForm.vue'))
+const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
-// ─── Props ───
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -20,74 +21,68 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-// ─── Tab 配置（静态） ───
+const RP_LIST_SHEET = 'B19-1管理层提供的关联方清单'
+
 const TABS = [
-  { id: 'program', label: '程序表', wpCode: null },
-  { id: 'B19-1', label: 'B19-1 审计方案附件', wpCode: 'B19-1' },
+  {
+    id: 'program',
+    label: '程序表',
+    aliases: ['program', 'B19识别关联方程序表', '识别关联方程序表'],
+  },
+  {
+    id: 'B19-1',
+    label: 'B19-1 管理层提供的关联方清单',
+    aliases: [
+      'B19-1',
+      RP_LIST_SHEET,
+      '管理层提供的关联方清单',
+    ],
+  },
 ]
 
-// ─── State ───
 const route = useRoute()
-const active = ref('')
-const wpIndex = ref<WpIndexItem[]>([])
-const loading = ref(false)
+const active = ref('program')
 
-// ─── wp_id 解析 ───
-const wpIdMap = computed<Record<string, string>>(() => {
-  const map: Record<string, string> = {}
-  for (const item of wpIndex.value) {
-    if (item.wp_code?.startsWith('B19-')) {
-      map[item.wp_code] = item.id
-    }
+function resolveTabId(raw?: string | null): string {
+  if (!raw) return 'program'
+  const s = String(raw).trim()
+  for (const t of TABS) {
+    if (t.id === s) return t.id
+    if (t.aliases.some((a) => a === s || s.includes(a) || a.includes(s))) return t.id
   }
-  return map
+  return 'program'
+}
+
+watch(() => props.sheetName, () => {
+  active.value = resolveActiveTab()
 })
 
-// ─── 仅显示程序表 tab + wp_index 中存在的子底稿 Tab ───
-const visibleTabs = computed(() =>
-  TABS.filter(t => t.wpCode === null || !!wpIdMap.value[t.wpCode])
+watch(
+  () => [route.query.view, route.query.sheet] as const,
+  () => {
+    active.value = resolveActiveTab()
+  },
 )
 
-// ─── sheetName 路由 ───
-watch(() => props.sheetName, (v) => {
-  if (v && visibleTabs.value.some(t => t.id === v)) {
-    active.value = v
-  }
-})
+function resolveActiveTab(): string {
+  // 优先用 ?view= / ?sheet= 中的 B19-1 意图，再回退 props.sheetName
+  const view = route.query.view as string | undefined
+  const qSheet = route.query.sheet as string | undefined
+  if (view) return resolveTabId(view)
+  if (qSheet && resolveTabId(qSheet) === 'B19-1') return 'B19-1'
+  return resolveTabId(props.sheetName || qSheet)
+}
 
-watch(() => route.query.sheet as string | undefined, (v) => {
-  if (v && visibleTabs.value.some(t => t.id === v)) {
-    active.value = v
-  }
-})
-
-// ─── Lifecycle ───
-onMounted(async () => {
-  loading.value = true
-  try {
-    if (props.projectId) {
-      wpIndex.value = await getWpIndex(props.projectId)
-    }
-  } catch {
-    wpIndex.value = []
-  } finally {
-    loading.value = false
-  }
-
-  const sheet = props.sheetName || (route.query.sheet as string)
-  if (sheet && visibleTabs.value.some(t => t.id === sheet)) {
-    active.value = sheet
-  } else {
-    active.value = visibleTabs.value[0]?.id || ''
-  }
+onMounted(() => {
+  active.value = resolveActiveTab()
 })
 </script>
 
 <template>
-  <div class="gt-b19-bundle" v-loading="loading">
+  <div class="gt-b19-bundle">
     <el-tabs v-model="active">
       <el-tab-pane
-        v-for="t in visibleTabs"
+        v-for="t in TABS"
         :key="t.id"
         :label="t.label"
         :name="t.id"
@@ -99,13 +94,33 @@ onMounted(async () => {
           :embedded="true"
           :readonly="readonly"
         />
-        <GtDForm
-          v-else-if="t.wpCode === 'B19-1'"
-          :wp-id="wpIdMap[t.wpCode]"
-          form-type="d-form-table"
-          :readonly="readonly"
-        />
+        <div v-else-if="t.id === 'B19-1'" class="gt-b19-bundle__rp-list">
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            title="被审计单位关联方清单"
+            description="在此维护管理层提供的关联方名称与关系。各循环明细表（如 D1-3）将据此自动匹配「关联关系」列。"
+            class="gt-b19-bundle__alert"
+          />
+          <GtOnlyOfficeSheet
+            :wp-id="wpId"
+            :sheet-name="RP_LIST_SHEET"
+            :project-id="projectId"
+            :readonly="readonly"
+          />
+        </div>
       </el-tab-pane>
     </el-tabs>
   </div>
 </template>
+
+<style scoped>
+.gt-b19-bundle__alert {
+  margin-bottom: 12px;
+}
+
+.gt-b19-bundle__rp-list {
+  min-height: 480px;
+}
+</style>

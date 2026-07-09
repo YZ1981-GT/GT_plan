@@ -94,4 +94,4 @@ async def resolve_auto_data_source(
 # 触发各域子模块的 @auto_resolver 装饰器注册
 # 放在 auto_resolver 定义之后（文件末尾），避免循环导入
 # ═══════════════════════════════════════════════════════════════════════════════
-from . import _adjustments, _consol, _control_b, _cycle, _completion, _misstatement_aggregation, _tax_income, _going_concern, _a17_ch08, _d3_prepaid, _f1_prepaid, _f2_inventory, _d4_revenue, _d5_receivables_financing, _d6_contract_assets, _d7_contract_liabilities, _s_transaction  # noqa: E402,F401
+from . import _adjustments, _consol, _control_b, _cycle, _completion, _misstatement_aggregation, _tax_income, _going_concern, _a17_ch08, _d3_prepaid, _f1_prepaid, _f2_inventory, _d4_revenue, _d5_receivables_financing, _d6_contract_assets, _d7_contract_liabilities, _s_transaction, _h1_fixed_assets, _h2_construction_in_progress, _h3_investment_property  # noqa: E402,F401

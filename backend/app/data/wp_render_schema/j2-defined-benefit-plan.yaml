@@ -1,0 +1,144 @@
+# J2 长期应付职工薪酬-设定受益计划净资产 渲染Schema
+# 科目：2221（贷方/负债类）
+# 期末=期初+贷方-借方
+# Spec: .kiro/specs/j2-defined-benefit-plan/
+
+component_type: j2-defined-benefit-plan
+account_code: "2221"
+direction: credit
+formula: "end = begin + credit - debit"
+
+sheets:
+  - name: 底稿目录
+    wp_code: J2A
+    type: index
+
+  - name: 长期应付职工薪酬实质性程序表 J2A
+    wp_code: J2A
+    type: program_table
+
+  - name: 审定表J2-1
+    wp_code: J2-1
+    type: adjudication
+    sections:
+      - label: 设定受益计划
+        sub_items:
+          - 离职后福利
+          - 其他长期职工福利
+      - label: 辞退福利
+      - label: 合计（自动计算）
+      - label: 减：一年内到期
+    columns:
+      - 项目名称
+      - 期初未审数
+      - 期初账项调整
+      - 期初审定数
+      - 期末未审数
+      - 期末账项调整
+      - 期末审定数
+      - 变动额（未审vs审定）
+      - 变动率
+      - 变动额（审定vs审定）
+      - 变动率
+      - 原因分析
+
+  - name: 附注披露信息（上市公司）
+    wp_code: J2附注(上市)
+    type: disclosure
+    version: listed
+    row_count: 99
+    col_count: 4
+    sections:
+      - 长期应付职工薪酬汇总
+      - 设定受益计划变动
+      - 精算假设
+      - 敏感性分析
+      - 未折现福利预计到期分析
+
+  - name: 附注披露信息（国有企业）
+    wp_code: J2附注(国企)
+    type: disclosure
+    version: soe
+    row_count: 78
+    col_count: 7
+    columns:
+      - 项目
+      - 期初数
+      - 本期增加
+      - 本期减少
+      - 期末数
+
+  - name: 明细表J2-2
+    wp_code: J2-2
+    type: detail
+    row_count: 90
+    col_count: 14
+    dbo_elements:
+      - 期初DBO
+      - 当期服务成本
+      - 利息费用
+      - 精算损失
+      - 精算利得
+      - 已支付福利
+      - 期末DBO
+    extra_columns:
+      - 计划资产公允价值
+      - 净负债
+
+  - name: 调整分录汇总表J2-3
+    wp_code: J2-3
+    type: adjustment
+    columns:
+      - 调整事项说明
+      - 类别
+      - 报表项目
+      - 科目名称
+      - 附注项目
+      - 借方调整金额
+      - 贷方调整金额
+      - 索引
+      - 备注
+
+  - name: 计提情况检查表J2-4
+    wp_code: J2-4
+    type: accrual_check
+    features:
+      - actuarial_assumptions_panel
+      - isa620_expert_reliance
+      - assumption_comparison
+      - sensitivity_analysis
+      - accrual_conclusion
+
+actuarial_engine:
+  formula_chain:
+    dbo_end: "begin + service_cost + interest_cost + loss - gain - paid"
+    interest_cost: "begin_dbo × discount_rate"
+    net_liability: "dbo - plan_asset_fv"
+  assumptions:
+    discount_rate:
+      range: [0.02, 0.08]
+      source: "国债到期收益率"
+    salary_growth_rate:
+      range: [0.03, 0.15]
+      source: "企业薪酬政策"
+    mortality_rate:
+      range: [0.0001, 0.05]
+      source: "生命表"
+    turnover_rate:
+      range: [0.01, 0.30]
+      source: "行业经验"
+
+integration:
+  tb_writeback:
+    account_code: "2221"
+    field: audited_amount
+    source: 审定表J2-1合计行期末审定数
+  event_bus:
+    - event: "substantive:adjudicated"
+      payload: {accountCode: "2221", direction: "credit"}
+    - event: "actuarial:assumption-changed"
+      target: B51
+      payload: {changes: [], source: "J2-4"}
+  cross_wp_references:
+    - {source: J2-4, target: B51, reason: "精算假设→会计估计"}
+    - {source: J2A, target: S12, reason: "精算师利用→ISA620"}

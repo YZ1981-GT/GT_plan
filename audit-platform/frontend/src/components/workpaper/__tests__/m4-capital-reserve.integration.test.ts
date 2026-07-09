@@ -3,7 +3,7 @@
  *
  * 覆盖：
  * 1. EventBus J3→M4 linkage: 'j3:equity-settled' → useM4CrossSheet.shareBasedVsJ3 更新
- * 2. EventBus M2→M4 linkage: 'm2:fx-diff' → useM4CrossSheet.fxDiffVsM2 更新
+ * 2. EventBus M2→M4 linkage: 'm2:fx-diff-to-m4' → useM4CrossSheet.fxDiffVsM2 更新
  * 3. TB writeback: writebackTB(auditedAmount) → PUT /trial-balance/writeback + EventBus 'substantive:adjudicated'
  * 4. Cross-sheet validation: adjudicationVsDetail.isMatch 审定表 vs 明细表勾稽
  * 5. Share-based diff threshold: shareBasedVsJ3.isConsistent 阈值逻辑
@@ -89,7 +89,7 @@ describe('集成测试 — EventBus J3→M4 linkage (Req 4.1-4.3)', () => {
       expect(shareBasedVsJ3.value.isConsistent).toBe(false)
 
       // 模拟 J3 发出 equity-settled 事件
-      eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 5000 })
+      eventBus.emit('j3:equity-settled', { equitySettledAmount: 5000 })
 
       // 更新后: J3金额=5000, 账面=5000 → diff=0
       expect(shareBasedVsJ3.value.diff).toBe(0)
@@ -108,7 +108,7 @@ describe('集成测试 — EventBus J3→M4 linkage (Req 4.1-4.3)', () => {
       const { shareBasedVsJ3 } = useM4CrossSheet(responses)
 
       // 模拟 J3 事件发送 5000
-      eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 5000 })
+      eventBus.emit('j3:equity-settled', { equitySettledAmount: 5000 })
 
       // diff = 5000 - 4800 = 200 > DIFF_THRESHOLD
       expect(shareBasedVsJ3.value.diff).toBe(200)
@@ -127,7 +127,7 @@ describe('集成测试 — EventBus J3→M4 linkage (Req 4.1-4.3)', () => {
       const { shareBasedVsJ3 } = useM4CrossSheet(responses)
 
       // 使用 amount 字段（降级兼容路径）
-      eventBus.emit('j3:equity-settled' as any, { amount: 3000 })
+      eventBus.emit('j3:equity-settled', { amount: 3000 })
 
       expect(shareBasedVsJ3.value.diff).toBe(0)
       expect(shareBasedVsJ3.value.isConsistent).toBe(true)
@@ -137,7 +137,7 @@ describe('集成测试 — EventBus J3→M4 linkage (Req 4.1-4.3)', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Section 2: EventBus M2→M4 linkage — 'm2:fx-diff' → fxDiffVsM2
+// Section 2: EventBus M2→M4 linkage — 'm2:fx-diff-to-m4' → fxDiffVsM2
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('集成测试 — EventBus M2→M4 linkage (Req 4.5)', () => {
@@ -146,7 +146,7 @@ describe('集成测试 — EventBus M2→M4 linkage (Req 4.5)', () => {
     onHandlers.clear()
   })
 
-  it('emit m2:fx-diff → fxDiffVsM2 computed 更新', () => {
+  it('emit m2:fx-diff-to-m4 → fxDiffVsM2 computed 更新', () => {
     const responses = createResponses([
       ['M4-M4-2-premium-fx-diff-change', '1200'],
     ])
@@ -160,7 +160,7 @@ describe('集成测试 — EventBus M2→M4 linkage (Req 4.5)', () => {
       expect(fxDiffVsM2.value.isConsistent).toBe(false)
 
       // 模拟 M2 发出 fx-diff 事件
-      eventBus.emit('m2:fx-diff' as any, { fxDiffAmount: 1200 })
+      eventBus.emit('m2:fx-diff-to-m4', { fxDiffAmount: 1200 })
 
       // 更新后: M2金额=1200, M4变动=1200 → diff=0
       expect(fxDiffVsM2.value.diff).toBe(0)
@@ -178,7 +178,7 @@ describe('集成测试 — EventBus M2→M4 linkage (Req 4.5)', () => {
     scope.run(() => {
       const { fxDiffVsM2 } = useM4CrossSheet(responses)
 
-      eventBus.emit('m2:fx-diff' as any, { fxDiffAmount: 1500 })
+      eventBus.emit('m2:fx-diff-to-m4', { fxDiffAmount: 1500 })
 
       // diff = 1500 - 1000 = 500 > DIFF_THRESHOLD
       expect(fxDiffVsM2.value.diff).toBe(500)
@@ -196,7 +196,7 @@ describe('集成测试 — EventBus M2→M4 linkage (Req 4.5)', () => {
     scope.run(() => {
       const { fxDiffVsM2 } = useM4CrossSheet(responses)
 
-      eventBus.emit('m2:fx-diff' as any, { amount: 800 })
+      eventBus.emit('m2:fx-diff-to-m4', { amount: 800 })
 
       expect(fxDiffVsM2.value.diff).toBe(0)
       expect(fxDiffVsM2.value.isConsistent).toBe(true)
@@ -396,7 +396,7 @@ describe('集成测试 — Share-based diff threshold (Req 4.4)', () => {
       const { shareBasedVsJ3 } = useM4CrossSheet(responses)
 
       // 发送与账面完全一致的J3金额
-      eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 5000 })
+      eventBus.emit('j3:equity-settled', { equitySettledAmount: 5000 })
 
       expect(shareBasedVsJ3.value.diff).toBe(0)
       expect(shareBasedVsJ3.value.isConsistent).toBe(true)
@@ -414,7 +414,7 @@ describe('集成测试 — Share-based diff threshold (Req 4.4)', () => {
       const { shareBasedVsJ3 } = useM4CrossSheet(responses)
 
       // 精确控制: 设 J3 = 5000.005, diff = 0.005 < DIFF_THRESHOLD(0.01)
-      eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 5000.005 })
+      eventBus.emit('j3:equity-settled', { equitySettledAmount: 5000.005 })
 
       expect(Math.abs(shareBasedVsJ3.value.diff)).toBeLessThanOrEqual(DIFF_THRESHOLD)
       expect(shareBasedVsJ3.value.isConsistent).toBe(true)
@@ -432,7 +432,7 @@ describe('集成测试 — Share-based diff threshold (Req 4.4)', () => {
       const { shareBasedVsJ3 } = useM4CrossSheet(responses)
 
       // diff = 5100 - 5000 = 100 >> DIFF_THRESHOLD
-      eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 5100 })
+      eventBus.emit('j3:equity-settled', { equitySettledAmount: 5100 })
 
       expect(shareBasedVsJ3.value.diff).toBe(100)
       expect(shareBasedVsJ3.value.isConsistent).toBe(false)
@@ -475,10 +475,10 @@ describe('集成测试 — EventBus cleanup on scope dispose (Req 4.6)', () => {
       useM4CrossSheet(responses)
     })
 
-    // 确认 on 被调用了两次（j3:equity-settled + m2:fx-diff）
+    // 确认 on 被调用了两次（j3:equity-settled + m2:fx-diff-to-m4）
     expect(eventBus.on).toHaveBeenCalledTimes(2)
     expect(eventBus.on).toHaveBeenCalledWith('j3:equity-settled', expect.any(Function))
-    expect(eventBus.on).toHaveBeenCalledWith('m2:fx-diff', expect.any(Function))
+    expect(eventBus.on).toHaveBeenCalledWith('m2:fx-diff-to-m4', expect.any(Function))
 
     // 停止 scope → 触发 onScopeDispose
     scope.stop()
@@ -486,7 +486,7 @@ describe('集成测试 — EventBus cleanup on scope dispose (Req 4.6)', () => {
     // off 应该也被调用两次
     expect(eventBus.off).toHaveBeenCalledTimes(2)
     expect(eventBus.off).toHaveBeenCalledWith('j3:equity-settled', expect.any(Function))
-    expect(eventBus.off).toHaveBeenCalledWith('m2:fx-diff', expect.any(Function))
+    expect(eventBus.off).toHaveBeenCalledWith('m2:fx-diff-to-m4', expect.any(Function))
   })
 
   it('scope.stop() 后事件不再响应', () => {
@@ -501,14 +501,14 @@ describe('集成测试 — EventBus cleanup on scope dispose (Req 4.6)', () => {
     })
 
     // scope active 时事件触发有效
-    eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 2000 })
+    eventBus.emit('j3:equity-settled', { equitySettledAmount: 2000 })
     expect(crossSheet!.shareBasedVsJ3.value.diff).toBe(1000) // 2000-1000
 
     // 停止 scope（off 会从 onHandlers 移除 handler）
     scope.stop()
 
     // 此时再 emit 不应触发更新（handler 已移除）
-    eventBus.emit('j3:equity-settled' as any, { equitySettledAmount: 9999 })
+    eventBus.emit('j3:equity-settled', { equitySettledAmount: 9999 })
 
     // diff 应仍为之前的值（handler 被移除了，不会再更新）
     expect(crossSheet!.shareBasedVsJ3.value.diff).toBe(1000)

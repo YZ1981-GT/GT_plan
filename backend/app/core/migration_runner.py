@@ -295,15 +295,12 @@ class MigrationRunner:
         - PostgreSQL：在一条**独立**连接上 ``pg_advisory_lock(key)`` 阻塞获取，
           退出时 ``pg_advisory_unlock(key)``。advisory lock 绑定 session（连接），
           故必须在同一连接 acquire/release，且持锁期间该连接保持打开。
-          锁是"建议性"的：不阻塞其他连接执行迁移 SQL，只阻塞其他同样想拿这把锁的进程，
-          从而把多 worker 的迁移串行化。
         - 非 PG（SQLite 等）：无 advisory lock 概念，直接 yield（不加锁）。
 
-        失败兜底：获取锁过程出现异常时记 WARNING 并降级为不加锁执行（不阻塞启动，
-        与 lifespan 整体"迁移失败不阻塞"策略一致）。
+        失败兜底：获取锁过程出现异常时记 WARNING 并降级为不加锁执行（不阻塞启动）。
+        单 yield：避免 except 分支二次 yield 与 greenlet_spawn 嵌套导致递归溢出。
         """
         if self._engine.dialect.name != "postgresql":
-            # SQLite / 其他方言：无 advisory lock，直接执行
             yield
             return
 
@@ -320,18 +317,13 @@ class MigrationRunner:
                 "[Migration] 已获取 advisory lock(%s)，开始串行迁移",
                 _MIGRATION_ADVISORY_LOCK_KEY,
             )
-            yield
         except Exception as lock_err:
-            # 获取锁失败 → 降级不加锁（保持启动不阻塞）。
-            # 注意：若 yield 内部（迁移本身）抛错，run_pending 内层已自行兜住，
-            # 不会到这里；这里只兜"加锁机制本身"的异常。
-            if not locked:
-                logger.warning(
-                    "[Migration] advisory lock 获取失败，降级为不加锁执行: %s", lock_err
-                )
-                yield
-            else:
-                raise
+            logger.warning(
+                "[Migration] advisory lock 获取失败，降级为不加锁执行: %s", lock_err
+            )
+
+        try:
+            yield
         finally:
             if conn is not None:
                 if locked:

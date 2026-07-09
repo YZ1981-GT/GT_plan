@@ -1,0 +1,644 @@
+# backend/data/ledger_adapters/wp_render_schema/i2-development-expenditure.yaml
+# I2 开发支出 — 专属组件渲染 schema
+# componentType: i2-development-expenditure
+# 科目 1717 开发支出（借方/资产类）
+# Template: I2 开发支出.xlsx（21 有效 sheet）
+# 公式特征：期末=期初+借方-贷方（资产类）；审定=未审+AJE+RJE；
+#           三角勾稽（期末=期初+增加-减少）；CAS6五条件资本化
+# 核心：CAS6五条件 + I6↔I2双向联动 + I1转入 + 4类检查 + 截止双向
+# 创建: 2026-07-26
+
+wp_code: I2
+wp_name: 开发支出
+component_type: i2-development-expenditure
+selfLoad: true
+template_path: backend/wp_templates/I/I2 开发支出.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1717']
+related_accounts:
+  - code: '1717'
+    name: 开发支出
+    direction: debit
+    category: asset
+
+features:
+  - selfLoad
+  - dualMode
+  - importExport
+  - eventBus
+  - cas6Capitalization
+  - crossWpLinkage
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（20 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: I2
+    group: core
+    dimensions: "30×13"
+    component: I2TabIndex
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+        rows: 30
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 开发支出实质性程序表I2A
+  # ─────────────────────────────────────────────────────────────────────────
+  开发支出实质性程序表I2A:
+    code: I2A
+    group: core
+    dimensions: "32×11"
+    component: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+      - { field: applicability, label: 适用性, type: text, width: 80 }
+    rows: 32
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表I2-1 (32行×10列, 61公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表I2-1:
+    code: I2-1
+    group: core
+    dimensions: "32×10"
+    component: I2TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1717']
+    formula_count: 61
+    columns:
+      - { field: item, label: 项目, type: text, width: 160, readonly: true }
+      - { field: opening_balance, label: 期初余额, type: number }
+      - { field: capitalized, label: 本期增加(资本化), type: number }
+      - { field: transfer_intangible, label: 本期减少(转无形), type: number }
+      - { field: transfer_expense, label: 本期减少(转费用), type: number }
+      - { field: closing_balance, label: 期末余额, type: number, formula: "opening + capitalized - transfer_intangible - transfer_expense" }
+      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_amount, label: AJE, type: number }
+      - { field: rje_amount, label: RJE, type: number }
+      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted_amount + aje_amount + rje_amount" }
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + capitalized - transferIntangible - transferExpense" }
+      - { name: calcTriangleReconciliation, target: reconciliation, expr: "closing - (opening + increase - decrease) === 0" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "期末≠期初+增加-减少" }
+      - { condition: "tb_variance != 0", style: red }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1717']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1717', adjudicatedAmount}" }
+        - { event: "development:capitalized-to-intangible", payload: "{transferAmount}" }
+    footer:
+      - { type: tb_comparison, accounts: ['1717'] }
+      - { type: audit_note, label: 审计说明 }
+      - { type: audit_conclusion }
+      - { type: review_dialog }
+    cross_refs:
+      - ref_id: CW-I2-ADJ-001
+        target_wp: I2-2
+        description: '审定表 ← I2-2 明细表合计'
+        direction: inbound
+      - ref_id: CW-I2-ADJ-002
+        target_wp: I2-3
+        description: '审定表AJE/RJE ← I2-3 调整分录'
+        direction: inbound
+      - ref_id: CW-I2-ADJ-003
+        target_wp: I1-5
+        description: '转无形资产列 → I1-5增加检查'
+        direction: outbound
+      - ref_id: CW-I2-ADJ-004
+        target_wp: I6
+        description: 'I2资本化 + I6费用化 = 研发总额(VR-I6-01)'
+        direction: bidirectional
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表I2-2 (51行×61列, 4区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表I2-2:
+    code: I2-2
+    group: core
+    dimensions: "51×61"
+    component: I2TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 7
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: project_name, label: 项目名称, type: text, width: 150 }
+          - { field: approval_date, label: 立项日期, type: date, width: 100 }
+          - { field: rd_phase, label: 研发阶段, type: select, width: 100, options: [研究阶段, 开发阶段, 已资本化, 已结转] }
+          - { field: capitalization_start, label: 资本化起始日, type: date, width: 100 }
+          - { field: total_budget, label: 预算总额, type: number, width: 100 }
+      - name: 本期投入
+        tab_index: 1
+        columns:
+          - { field: material_cost, label: 材料费, type: number, width: 90 }
+          - { field: labor_cost, label: 人工费, type: number, width: 90 }
+          - { field: depreciation, label: 折旧摊销, type: number, width: 90 }
+          - { field: other_cost, label: 其他费用, type: number, width: 90 }
+          - { field: period_total, label: 本期投入合计, type: number, width: 100, formula: "material + labor + depreciation + other" }
+      - name: 资本化
+        tab_index: 2
+        columns:
+          - { field: cumulative_capitalized, label: 累计资本化金额, type: number, width: 110 }
+          - { field: current_capitalized, label: 本期资本化, type: number, width: 100 }
+          - { field: transfer_to_i1, label: 转入无形资产, type: number, width: 100 }
+          - { field: closing_balance, label: 期末余额, type: number, width: 100, formula: "cumulative + current - transferToI1" }
+      - name: 期末汇总
+        tab_index: 3
+        columns:
+          - { field: total_expense, label: 费用化累计, type: number, width: 100 }
+          - { field: total_capitalized, label: 资本化累计, type: number, width: 100 }
+          - { field: rd_total, label: 研发总额, type: number, width: 100, formula: "totalExpense + totalCapitalized" }
+    formulas:
+      - { name: calcPeriodTotal, target: period_total, expr: "material + labor + depreciation + other" }
+      - { name: calcClosingBalance, target: closing_balance, expr: "cumulative + current - transferToI1" }
+    summary_rows:
+      - { type: grand_total }
+    import_export: true
+    add_row_prompt: project_name
+    cross_refs:
+      - ref_id: CW-I2-2-001
+        target_wp: I2-1
+        description: '明细表合计 → 审定表I2-1'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总I2-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总I2-3:
+    code: I2-3
+    group: core
+    dimensions: "21×10"
+    component: I2TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: adjustment_item, label: 调整事项, type: text, width: 150 }
+      - { field: entry_type, label: 类别, type: select, width: 80, options: [AJE, RJE] }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: debit_amount, label: 借方, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 会计政策检查I2-4
+  # ─────────────────────────────────────────────────────────────────────────
+  会计政策检查I2-4:
+    code: I2-4
+    group: inspection
+    dimensions: "35×15"
+    component: I2TabPolicyCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS6]
+    check_items:
+      - { id: phase_distinction, label: 研究与开发阶段划分标准是否恰当, type: conclusion, options: [是, 否, 不适用] }
+      - { id: capitalization_criteria, label: 资本化条件判断是否符合CAS6第9条, type: conclusion, options: [是, 否, 不适用] }
+      - { id: capitalization_timing, label: 资本化时点确定是否准确, type: conclusion, options: [是, 否, 不适用] }
+      - { id: expense_allocation, label: 费用归集和分配是否合理, type: conclusion, options: [是, 否, 不适用] }
+      - { id: amort_policy, label: 资本化完成后摊销政策是否适当, type: conclusion, options: [是, 否, 不适用] }
+      - { id: policy_consistency, label: 会计政策是否前后一致, type: conclusion, options: [是, 否, 不适用] }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 实质性分析I2-5 (51行×16列, 31公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  实质性分析I2-5:
+    code: I2-5
+    group: core
+    dimensions: "51×16"
+    component: I2TabAnalysis
+    class_code: G-测算
+    formula_count: 31
+    columns:
+      - { field: project_name, label: 项目, type: text, width: 150 }
+      - { field: opening_balance, label: 期初余额, type: number, width: 100 }
+      - { field: period_increase, label: 本期增加, type: number, width: 100 }
+      - { field: period_decrease, label: 本期减少, type: number, width: 100 }
+      - { field: closing_balance, label: 期末余额, type: number, width: 100 }
+      - { field: prior_balance, label: 上年期末, type: number, width: 100 }
+      - { field: change_rate, label: 变动率(%), type: percent, width: 80, formula: "(closing - prior) / prior" }
+      - { field: expected_value, label: 预期值, type: number, width: 100 }
+      - { field: variance, label: 差异, type: number, width: 100, formula: "closing - expected" }
+      - { field: is_material, label: 超阈值, type: boolean, width: 60 }
+    formulas:
+      - { name: calcChangeRate, target: change_rate, expr: "(closing - prior) / prior" }
+      - { name: calcVariance, target: variance, expr: "closing - expected" }
+    highlights:
+      - { condition: "is_material = true", style: red, tooltip: "差异超重要性水平" }
+    ai_assist:
+      section: analysis-anomaly
+      button_position: section_title_right
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 资本化时点判断I2-6（CAS6五条件核心！）(45行×66列)
+  # ─────────────────────────────────────────────────────────────────────────
+  资本化时点判断I2-6:
+    code: I2-6
+    group: inspection
+    dimensions: "45×66"
+    component: I2TabCapitalization
+    class_code: D-段落检查
+    formula_count: 7
+    is_core: true
+    cas6_conditions:
+      - { id: 1, name: 技术可行性, description: "完成该无形资产以使其能够使用或出售在技术上具有可行性" }
+      - { id: 2, name: 完成意图, description: "具有完成该无形资产并使用或出售的意图" }
+      - { id: 3, name: 使用或出售能力, description: "能够证明运用该无形资产生产的产品存在市场或无形资产自身存在市场" }
+      - { id: 4, name: 未来经济利益, description: "有足够的技术、财务资源和其他资源支持" }
+      - { id: 5, name: 资源充足, description: "归属于该无形资产开发阶段的支出能够可靠地计量" }
+    check_per_project: true
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+      cas6_article_9: true
+    ai_assist:
+      section: cas6-suggestion
+      button_position: section_title_right
+    cross_refs:
+      - ref_id: CW-I2-6-001
+        target_wp: I2-2
+        description: '资本化时点 → I2-2明细表"资本化起点"列'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 研发项目构成明细表I2-7 (25行×73列, 5区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  研发项目构成明细表I2-7:
+    code: I2-7
+    group: inspection
+    dimensions: "25×73"
+    component: I2TabProjectDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    formula_count: 8
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: project_name, label: 项目名称, type: text, width: 150 }
+          - { field: project_code, label: 项目编号, type: text, width: 100 }
+          - { field: start_date, label: 起始日期, type: date, width: 100 }
+          - { field: expected_end, label: 预计完成, type: date, width: 100 }
+          - { field: project_leader, label: 负责人, type: text, width: 80 }
+      - name: 材料费
+        tab_index: 1
+        columns:
+          - { field: material_direct, label: 直接材料, type: number, width: 90 }
+          - { field: material_auxiliary, label: 辅助材料, type: number, width: 90 }
+          - { field: material_total, label: 材料费合计, type: number, width: 100, formula: "direct + auxiliary" }
+      - name: 人工费
+        tab_index: 2
+        columns:
+          - { field: labor_salary, label: 工资薪金, type: number, width: 90 }
+          - { field: labor_social, label: 社保公积金, type: number, width: 90 }
+          - { field: labor_welfare, label: 福利费, type: number, width: 90 }
+          - { field: labor_total, label: 人工费合计, type: number, width: 100, formula: "salary + social + welfare" }
+      - name: 折旧摊销
+        tab_index: 3
+        columns:
+          - { field: dep_equipment, label: 设备折旧, type: number, width: 90 }
+          - { field: dep_building, label: 房屋折旧, type: number, width: 90 }
+          - { field: dep_software, label: 软件摊销, type: number, width: 90 }
+          - { field: dep_total, label: 折旧摊销合计, type: number, width: 100, formula: "equipment + building + software" }
+      - name: 其他费用
+        tab_index: 4
+        columns:
+          - { field: design_cost, label: 设计费, type: number, width: 90 }
+          - { field: testing_cost, label: 试验费, type: number, width: 90 }
+          - { field: outsource_cost, label: 委外费, type: number, width: 90 }
+          - { field: other_misc, label: 其他杂费, type: number, width: 90 }
+          - { field: other_total, label: 其他费用合计, type: number, width: 100, formula: "design + testing + outsource + misc" }
+    summary_rows:
+      - { type: grand_total }
+    import_export: true
+    add_row_prompt: project_name
+    cross_refs:
+      - ref_id: CW-I2-7-001
+        target_wp: I2-2
+        description: '项目构成合计 → I2-2 明细表'
+        direction: outbound
+      - ref_id: CW-I2-7-002
+        target_wp: I2-8
+        description: '材料费明细 ← I2-8 材料投入检查'
+        direction: inbound
+      - ref_id: CW-I2-7-003
+        target_wp: I2-9
+        description: '人工费 ← I2-9 人员认定'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 研发材料投入检查表I2-8
+  # ─────────────────────────────────────────────────────────────────────────
+  研发材料投入检查表I2-8:
+    code: I2-8
+    group: inspection
+    dimensions: "30×15"
+    component: I2TabMaterialCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: material_name, label: 品名, type: text, width: 120 }
+      - { field: quantity, label: 数量, type: number, width: 70 }
+      - { field: unit_price, label: 单价, type: number, width: 80 }
+      - { field: amount, label: 金额, type: number, width: 100, formula: "quantity * unit_price" }
+      - { field: requisition_no, label: 领用单号, type: text, width: 100 }
+      - { field: project_name, label: 所属项目, type: text, width: 120 }
+      - { field: conclusion, label: 审核结论, type: select, width: 80, options: [合规, 不合规, 待确认] }
+      - { field: attachment, label: 📎附件, type: attachment, width: 50, ocr: true }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - ocr: { endpoint: "/d4/contract-ocr" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 研发人员认定检查表I2-9
+  # ─────────────────────────────────────────────────────────────────────────
+  研发人员认定检查表I2-9:
+    code: I2-9
+    group: inspection
+    dimensions: "30×15"
+    component: I2TabStaffCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: staff_name, label: 姓名, type: text, width: 80 }
+      - { field: position, label: 岗位, type: text, width: 80 }
+      - { field: qualification, label: 资质/学历, type: text, width: 100 }
+      - { field: project_name, label: 参与项目, type: text, width: 120 }
+      - { field: work_ratio, label: 研发工作占比(%), type: percent, width: 80 }
+      - { field: conclusion, label: 认定结论, type: select, width: 80, options: [认定, 不认定, 待确认] }
+      - { field: remark, label: 备注, type: text, width: 100 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 研发人员工时检查表I2-10
+  # ─────────────────────────────────────────────────────────────────────────
+  研发人员工时检查表I2-10:
+    code: I2-10
+    group: inspection
+    dimensions: "30×18"
+    component: I2TabWorkHourCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: staff_name, label: 人员, type: text, width: 80 }
+      - { field: project_name, label: 项目, type: text, width: 120 }
+      - { field: month, label: 月份, type: text, width: 60 }
+      - { field: total_hours, label: 总工时, type: number, width: 70 }
+      - { field: rd_hours, label: 研发工时, type: number, width: 70 }
+      - { field: rd_ratio, label: 占比(%), type: percent, width: 70, formula: "rd_hours / total_hours" }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [合理, 不合理, 待确认] }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 13: 委外研发检查表I2-11
+  # ─────────────────────────────────────────────────────────────────────────
+  委外研发检查表I2-11:
+    code: I2-11
+    group: inspection
+    dimensions: "25×16"
+    component: I2TabOutsourceCheck
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: supplier, label: 供应商, type: text, width: 120 }
+      - { field: contract_no, label: 合同号, type: text, width: 100 }
+      - { field: contract_amount, label: 合同金额, type: number, width: 100 }
+      - { field: paid_amount, label: 已付款, type: number, width: 100 }
+      - { field: deliverable, label: 交付物, type: text, width: 120 }
+      - { field: acceptance_date, label: 验收日期, type: date, width: 100 }
+      - { field: conclusion, label: 验收结论, type: select, width: 80, options: [合格, 不合格, 待验收] }
+      - { field: attachment, label: 📎附件, type: attachment, width: 50, ocr: true }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - ocr: { endpoint: "/d4/contract-ocr" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 14: 针对性检查表I2-12
+  # ─────────────────────────────────────────────────────────────────────────
+  针对性检查表I2-12:
+    code: I2-12
+    group: inspection
+    dimensions: "25×12"
+    component: I2TabTargetedCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: rd_deduction, label: 研发费用加计扣除合规性, type: conclusion, options: [合规, 不合规, 不适用] }
+      - { id: cap_ratio, label: 资本化比例合理性, type: conclusion, options: [合理, 不合理, 待确认] }
+      - { id: project_progress, label: 项目进度与资本化金额匹配性, type: conclusion, options: [匹配, 不匹配, 待确认] }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 15: 截止性测试（账到单据）I2-13
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试（账到单据）I2-13:
+    code: I2-13
+    group: cutoff
+    dimensions: "25×12"
+    component: I2TabCutoffForward
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: entry_date, label: 记账日期, type: date, width: 100 }
+      - { field: amount, label: 金额, type: number, width: 100 }
+      - { field: period, label: 记账期间, type: text, width: 80 }
+      - { field: doc_date, label: 单据日期, type: date, width: 100 }
+      - { field: belong_period, label: 归属期间, type: text, width: 80 }
+      - { field: is_cross_period, label: 是否跨期, type: select, width: 70, options: [是, 否] }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [正确, 跨期, 待确认] }
+    integrations:
+      - cutoff_auto_sampling: { direction: forward, days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 16: 截止性测试（单据到账）I2-14
+  # ─────────────────────────────────────────────────────────────────────────
+  截止性测试（单据到账）I2-14:
+    code: I2-14
+    group: cutoff
+    dimensions: "25×12"
+    component: I2TabCutoffBackward
+    class_code: F-检查表
+    dynamic_rows: true
+    columns:
+      - { field: doc_date, label: 单据日期, type: date, width: 100 }
+      - { field: amount, label: 金额, type: number, width: 100 }
+      - { field: doc_period, label: 单据期间, type: text, width: 80 }
+      - { field: entry_date, label: 记账日期, type: date, width: 100 }
+      - { field: entry_period, label: 记账期间, type: text, width: 80 }
+      - { field: is_cross_period, label: 是否跨期, type: select, width: 70, options: [是, 否] }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [正确, 跨期, 待确认] }
+    integrations:
+      - cutoff_auto_sampling: { direction: backward, days: 5 }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 17: 减值准备测试表I2-15
+  # ─────────────────────────────────────────────────────────────────────────
+  减值准备测试表I2-15:
+    code: I2-15
+    group: impairment
+    dimensions: "30×14"
+    component: I2TabImpairment
+    class_code: G-测算
+    dynamic_rows: true
+    columns:
+      - { field: project_name, label: 项目, type: text, width: 150 }
+      - { field: book_value, label: 账面价值, type: number, width: 100 }
+      - { field: recoverable_amount, label: 可收回金额, type: number, width: 100 }
+      - { field: should_impair, label: 应计提减值, type: number, width: 100, formula: "MAX(book_value - recoverable_amount, 0)" }
+      - { field: already_impaired, label: 已计提, type: number, width: 80 }
+      - { field: diff, label: 差额, type: number, width: 80, formula: "should_impair - already_impaired" }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [充分, 不足, 多提] }
+    formulas:
+      - { name: calcImpairmentAmount, target: should_impair, expr: "MAX(bookValue - recoverableAmount, 0)" }
+    highlights:
+      - { condition: "diff != 0", style: red }
+    cross_refs:
+      - ref_id: CW-I2-15-001
+        target_wp: I2-16
+        description: '可收回金额 ← I2-16 DCF测试'
+        direction: inbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 18: 可收回金额测试I2-16 (DCF)
+  # ─────────────────────────────────────────────────────────────────────────
+  可收回金额测试I2-16:
+    code: I2-16
+    group: impairment
+    dimensions: "40×20"
+    component: I2TabRecoverable
+    class_code: G-测算
+    sections:
+      - name: DCF现值测算
+        columns:
+          - { field: project_name, label: 项目, type: text, width: 150 }
+          - { field: discount_rate, label: 折现率, type: percent, width: 80 }
+          - { field: growth_rate, label: 永续增长率, type: percent, width: 80 }
+          - { field: dcf_value, label: 使用价值(DCF), type: number, width: 120 }
+      - name: 可收回金额确定
+        columns:
+          - { field: fair_value_less_disposal, label: 公允价值-处置费用, type: number, width: 130 }
+          - { field: value_in_use, label: 使用价值, type: number, width: 100 }
+          - { field: recoverable_amount, label: 可收回金额, type: number, width: 120, formula: "MAX(fair_value, value_in_use)" }
+    cross_refs:
+      - ref_id: CW-I2-16-001
+        target_wp: I2-15
+        description: '可收回金额 → I2-15 减值测试'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 19: 附注披露信息（上市公司）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: I2-disc-listed
+    group: core
+    dimensions: "58×7"
+    component: I2TabDisclosureListed
+    class_code: H-附注
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode='1717'" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{section:'i2', variant:'listed'}" }
+    ai_assist:
+      section: disclosure
+      button_position: section_title_right
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 20: 附注披露信息（国有企业）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: I2-disc-soe
+    group: core
+    dimensions: "17×8"
+    component: I2TabDisclosureSoe
+    class_code: H-附注
+    variant: soe
+    formula_count: 41
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode='1717'" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{section:'i2', variant:'soe'}" }
+    ai_assist:
+      section: disclosure
+      button_position: section_title_right
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_linkage:
+  - target: I6
+    type: bidirectional
+    description: "I6费用化 + I2资本化 = 研发总额（VR-I6-01）"
+    event: "research:expense-updated"
+  - target: I1-5
+    type: outbound
+    description: "I2转无形资产 → I1-5增加检查"
+    event: "development:capitalized-to-intangible"
+  - target: I2-8
+    type: inbound
+    description: "I2-8材料检查 → I2-7构成明细"
+  - target: I2-9
+    type: inbound
+    description: "I2-9人员认定 → I2-7构成明细"
+  - target: I2-10
+    type: inbound
+    description: "I2-10工时检查 → I2-7构成明细"
+  - target: I2-11
+    type: inbound
+    description: "I2-11委外研发 → I2-7构成明细"

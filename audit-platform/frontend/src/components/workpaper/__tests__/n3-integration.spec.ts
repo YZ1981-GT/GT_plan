@@ -423,7 +423,7 @@ describe('集成测试 — EventBus: deferred-tax:liability-updated (Req 6.2)', 
     ])
 
     const received: any[] = []
-    eventBus.on('deferred-tax:liability-updated' as any, (payload: any) => {
+    eventBus.on('deferred-tax:liability-updated', (payload: any) => {
       received.push(payload)
     })
 
@@ -451,7 +451,7 @@ describe('集成测试 — EventBus: deferred-tax:liability-updated (Req 6.2)', 
     ])
 
     const received: any[] = []
-    eventBus.on('deferred-tax:liability-updated' as any, (payload: any) => {
+    eventBus.on('deferred-tax:liability-updated', (payload: any) => {
       received.push(payload)
     })
 

@@ -615,14 +615,26 @@ function _restoreRows(): void {
 }
 
 // ─── EventBus（M5/M1联动） ───────────────────────────────────────────────────
-function handleM5AccrualConfirmed(payload: any) {
-  const amount = Number(payload?.amount) || 0
+function handleM5AccrualConfirmed(payload: {
+  totalAccrual?: number
+  statutoryAccrual?: number
+  discretionaryAccrual?: number
+  amount?: number
+}) {
+  const amount = Number(
+    payload?.totalAccrual
+    ?? ((payload?.statutoryAccrual ?? 0) + (payload?.discretionaryAccrual ?? 0) || undefined)
+    ?? payload?.amount,
+  ) || 0
   surplusLinkageRef.value = amount
   setSurplusLinkage(amount)
 }
 
-function handleM1DeclaredConfirmed(payload: any) {
-  const amount = Number(payload?.amount) || 0
+function handleM1DeclaredConfirmed(payload: {
+  declaredAmount?: number
+  amount?: number
+}) {
+  const amount = Number(payload?.declaredAmount ?? payload?.amount) || 0
   dividendLinkageRef.value = amount
   setDividendLinkage(amount)
 }
@@ -636,15 +648,15 @@ onMounted(async () => {
   const noteResp = formData.allResponses.value.get('M6-2-auditNote')
   if (noteResp?.remark) auditNote.value = noteResp.remark
   // 订阅M5/M1联动
-  eventBus.on('m5:accrual-confirmed' as any, handleM5AccrualConfirmed)
-  eventBus.on('m1:declared-confirmed' as any, handleM1DeclaredConfirmed)
-  eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
+  eventBus.on('m5:surplus-accrual', handleM5AccrualConfirmed)
+  eventBus.on('m1:declared-confirmed', handleM1DeclaredConfirmed)
+  eventBus.on('adjustment:created', handleAdjustmentCreated)
 })
 
 onUnmounted(() => {
-  eventBus.off('m5:accrual-confirmed' as any, handleM5AccrualConfirmed)
-  eventBus.off('m1:declared-confirmed' as any, handleM1DeclaredConfirmed)
-  eventBus.off('adjustment:created' as any, handleAdjustmentCreated)
+  eventBus.off('m5:surplus-accrual', handleM5AccrualConfirmed)
+  eventBus.off('m1:declared-confirmed', handleM1DeclaredConfirmed)
+  eventBus.off('adjustment:created', handleAdjustmentCreated)
 })
 </script>
 

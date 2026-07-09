@@ -246,13 +246,19 @@ export function useM5AccrualTest(
    * 事件名: 'm6:net-profit'
    */
   function subscribeM6(): void {
-    const handler = (payload: M6NetProfitPayload) => {
-      netProfit.value = payload.netProfit ?? 0
+    const handler = (payload: {
+      netProfit?: number
+      priorLossOffset?: number
+      accrualBase?: number
+      amount?: number
+      timestamp?: number
+    }) => {
+      netProfit.value = payload.netProfit ?? payload.accrualBase ?? payload.amount ?? 0
       priorLossOffset.value = payload.priorLossOffset ?? 0
       m6DataReady.value = true
     }
-    eventBus.on('m6:net-profit' as any, handler)
-    _unsubM6 = () => eventBus.off('m6:net-profit' as any, handler)
+    eventBus.on('m6:net-profit', handler)
+    _unsubM6 = () => eventBus.off('m6:net-profit', handler)
   }
 
   function unsubscribeM6(): void {
@@ -320,7 +326,7 @@ export function useM5AccrualTest(
     })
 
     // 发布M5→M6（ADR-3: M5计提盈余公积→M6可供分配利润）
-    eventBus.emit('m5:surplus-accrual' as any, {
+    eventBus.emit('m5:surplus-accrual', {
       wpCode: 'M5',
       statutoryAccrual: statutoryEstimated.value,
       discretionaryAccrual: discretionaryEstimated.value,

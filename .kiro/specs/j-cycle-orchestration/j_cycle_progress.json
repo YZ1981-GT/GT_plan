@@ -1,0 +1,112 @@
+{
+  "_description": "J循环进度看板 - 多子代理状态同步",
+  "last_updated": "2026-07-15T00:00:00Z",
+  "specs": [
+    {
+      "spec_id": "j1-employee-compensation",
+      "display_name": "J1 应付职工薪酬",
+      "current_wave": "wave-9",
+      "status": "completed",
+      "total_waves": 10,
+      "cross_cycle_deps_ready": {
+        "k8_selling_expenses_wave1": true,
+        "k9_admin_expenses_wave1": true
+      },
+      "notes": "16sheet/38任务全绿/12 Tab组件+15 composable+后端3py+薪酬测算+K8K9联动"
+    },
+    {
+      "spec_id": "j2-defined-benefit-plan",
+      "display_name": "J2 设定受益计划",
+      "current_wave": "wave-9",
+      "status": "completed",
+      "total_waves": 10,
+      "cross_cycle_deps_ready": {
+        "b51_accounting_estimate_skeleton": true
+      },
+      "notes": "7sheet/28任务全绿/8子组件+10 composable+后端3py+DBO精算+ISA620+B51联动"
+    },
+    {
+      "spec_id": "j3-share-based-payment",
+      "display_name": "J3 股份支付",
+      "current_wave": "wave-9",
+      "status": "completed",
+      "total_waves": 10,
+      "cross_cycle_deps_ready": {
+        "m4_capital_reserve_skeleton": true,
+        "j1_skeleton": true
+      },
+      "notes": "3sheet/28任务全绿/3子组件+8 composable+后端3py+BlackScholes+M4J1联动"
+    }
+  ],
+  "meta_waves": [
+    {
+      "id": "meta-wave-0",
+      "name": "全循环 Phase0 双源输入",
+      "status": "completed",
+      "parallel": true,
+      "max_agents": 3,
+      "specs_involved": ["j1-employee-compensation", "j2-defined-benefit-plan", "j3-share-based-payment"]
+    },
+    {
+      "id": "meta-wave-1",
+      "name": "共享注册批量（串行）",
+      "status": "completed",
+      "parallel": false,
+      "max_agents": 1,
+      "specs_involved": ["_batch_j_registration"]
+    },
+    {
+      "id": "meta-wave-2",
+      "name": "锚定模板 J3 单 spec 全流程",
+      "status": "completed",
+      "parallel": false,
+      "max_agents": 1,
+      "specs_involved": ["j3-share-based-payment"]
+    },
+    {
+      "id": "meta-wave-3",
+      "name": "J2 精算单路",
+      "status": "completed",
+      "parallel": false,
+      "max_agents": 1,
+      "specs_involved": ["j2-defined-benefit-plan"],
+      "depends_on_specs": ["b51"]
+    },
+    {
+      "id": "meta-wave-4",
+      "name": "J1 重型单路",
+      "status": "completed",
+      "parallel": false,
+      "max_agents": 1,
+      "specs_involved": ["j1-employee-compensation"],
+      "depends_on_specs": ["k8-selling-expenses", "k9-admin-expenses"]
+    },
+    {
+      "id": "meta-wave-5",
+      "name": "跨循环联动验收",
+      "status": "completed",
+      "parallel": true,
+      "max_agents": 3,
+      "specs_involved": ["j1-employee-compensation", "j2-defined-benefit-plan", "j3-share-based-payment"]
+    },
+    {
+      "id": "meta-wave-6",
+      "name": "全循环集成闸门",
+      "status": "completed",
+      "parallel": false,
+      "max_agents": 1,
+      "specs_involved": ["_j_cycle_integration"]
+    }
+  ],
+  "orchestration_rules": {
+    "max_parallel_subagents": 3,
+    "shared_file_conflict_strategy": "meta-wave-1 批量注册，禁止多子代理并行写共享文件",
+    "anchor_order": "J3 → J2 → J1"
+  },
+  "completion_summary": {
+    "total_tasks": 13,
+    "completed_tasks": 13,
+    "status": "all_complete",
+    "completed_at": "2026-07-15T00:00:00Z"
+  }
+}

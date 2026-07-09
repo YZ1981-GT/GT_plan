@@ -57,14 +57,15 @@ export interface UseD1BusinessModeOptions {
 
 const BASIS_STORAGE_KEY = 'D1-bm-basis-rows'
 const QA_STORAGE_KEY = 'D1-bm-qa-matrix'
+const PROCEDURES_KEY = 'D1-bm-procedures'
 const NOTE_KEY = 'D1-bm-note'
 const CONCLUSION_KEY = 'D1-bm-conclusion'
 
-/** 3个固定业务模式依据行 */
+/** 3个固定业务模式依据行（对齐 Excel 模板组合名称） */
 const FIXED_BASIS_ROWS: BusinessModeRow[] = [
   {
     rowId: 'fixed-high-bank',
-    combinationName: '高信用银行承兑汇票',
+    combinationName: '信用等级高的银行承兑汇票',
     businessMode: '',
     basis: '',
     indexRef: '',
@@ -73,7 +74,7 @@ const FIXED_BASIS_ROWS: BusinessModeRow[] = [
   },
   {
     rowId: 'fixed-low-bank',
-    combinationName: '低信用银行承兑汇票',
+    combinationName: '信用等级低的银行承兑汇票',
     businessMode: '',
     basis: '',
     indexRef: '',
@@ -99,8 +100,12 @@ const QA_QUESTIONS: string[] = [
   'Q4: 是否同时以收取合同现金流量和出售金融资产为目标？',
 ]
 
-/** QA矩阵固定列头（3组合） */
-const QA_COLUMNS: string[] = ['高信用银行承兑', '低信用银行承兑', '商业承兑']
+/** QA矩阵固定列头（3组合，对齐 Excel） */
+const QA_COLUMNS: string[] = [
+  '信用等级高的银行承兑汇票',
+  '信用等级低的银行承兑汇票',
+  '商业承兑汇票',
+]
 
 /** 生成 4×3 全空的 QA cells 网格 */
 function emptyCells(): QACell[][] {
@@ -130,6 +135,7 @@ export function useD1BusinessMode(options: UseD1BusinessModeOptions) {
 
   const basisRows = ref<BusinessModeRow[]>(cloneFixedBasisRows())
   const qaMatrix = ref<QAMatrix>(defaultQAMatrix())
+  const auditProcedures = ref<string>('')
   const auditNote = ref<string>('')
   const auditConclusion = ref<string>('')
 
@@ -190,6 +196,7 @@ export function useD1BusinessMode(options: UseD1BusinessModeOptions) {
   function loadFromResponses(): void {
     basisRows.value = loadBasisRows()
     qaMatrix.value = loadQAMatrix()
+    auditProcedures.value = allResponses.value.get(PROCEDURES_KEY)?.remark ?? ''
     auditNote.value = allResponses.value.get(NOTE_KEY)?.remark ?? ''
     auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
   }
@@ -202,15 +209,19 @@ export function useD1BusinessMode(options: UseD1BusinessModeOptions) {
     () => [
       allResponses.value.get(BASIS_STORAGE_KEY)?.remark,
       allResponses.value.get(QA_STORAGE_KEY)?.remark,
+      allResponses.value.get(PROCEDURES_KEY)?.remark,
       allResponses.value.get(NOTE_KEY)?.remark,
       allResponses.value.get(CONCLUSION_KEY)?.remark,
     ],
-    ([newBasis, newQa, newNote, newConclusion]) => {
+    ([newBasis, newQa, newProcedures, newNote, newConclusion]) => {
       if (newBasis !== undefined && newBasis !== serializeBasisRows(basisRows.value)) {
         basisRows.value = loadBasisRows()
       }
       if (newQa !== undefined && newQa !== serializeQAMatrix(qaMatrix.value)) {
         qaMatrix.value = loadQAMatrix()
+      }
+      if (newProcedures !== undefined && newProcedures !== auditProcedures.value) {
+        auditProcedures.value = newProcedures ?? ''
       }
       if (newNote !== undefined && newNote !== auditNote.value) {
         auditNote.value = newNote ?? ''
@@ -259,6 +270,7 @@ export function useD1BusinessMode(options: UseD1BusinessModeOptions) {
     const basisSerialized = serializeBasisRows(basisRows.value)
     const items: ChecklistItem[] = [
       { item_id: BASIS_STORAGE_KEY, conclusion: null, remark: basisSerialized },
+      { item_id: PROCEDURES_KEY, conclusion: null, remark: auditProcedures.value || null },
       { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value || null },
       { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value || null },
     ]
@@ -322,6 +334,13 @@ export function useD1BusinessMode(options: UseD1BusinessModeOptions) {
     saveImmediate([item])
   }
 
+  /** 保存审计过程 → debounce 保存 */
+  function saveAuditProcedures(text: string): void {
+    if (isReadonly.value) return
+    auditProcedures.value = text
+    scheduleSave()
+  }
+
   /** 保存审计说明 → debounce 保存 */
   function saveAuditNote(text: string): void {
     if (isReadonly.value) return
@@ -352,10 +371,12 @@ export function useD1BusinessMode(options: UseD1BusinessModeOptions) {
     qaMatrix,
     businessModeResults,
     reportItemResults,
+    auditProcedures,
     auditNote,
     auditConclusion,
     updateBasisRow,
     updateQACell,
+    saveAuditProcedures,
     saveAuditNote,
     saveAuditConclusion,
   }

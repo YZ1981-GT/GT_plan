@@ -1,0 +1,448 @@
+# backend/data/wp_render_schema/i3-goodwill.yaml
+# I3 商誉 — 专属组件渲染 schema
+# componentType: i3-goodwill
+# 科目 1711 商誉（借方/资产类）— 商誉不摊销！仅年度减值测试
+# Template: I3 商誉.xlsx（15 有效 sheet）
+# 公式特征：期末=期初+新并购-减值（不摊销！）；审定=未审+AJE+RJE
+# 减值分摊：先冲商誉再按比例分摊至CGU其他资产
+# 创建: 2026-07-30
+
+wp_code: I3
+wp_name: 商誉
+component_type: i3-goodwill
+selfLoad: true
+template_path: backend/wp_templates/I/I3 商誉.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1711']
+related_accounts:
+  - code: '1711'
+    name: 商誉
+    direction: debit
+    category: asset
+
+special_rules:
+  no_amortization: true
+  impairment_only: true
+  impairment_not_reversible: true
+  allocation_rule: "先冲商誉再分摊至资产组其他资产"
+  dcf_core: true
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（12 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    dimensions: "28×13"
+    component: I3TabIndex
+    class_code: B-底稿目录
+    layout:
+      left_panel:
+        - { field: entity_name, label: 被审计单位, type: text, readonly: true }
+        - { field: period_end, label: 截止日, type: text, readonly: true }
+        - { field: preparer, label: 编制人, type: text }
+        - { field: reviewer, label: 复核人, type: text }
+      right_panel:
+        type: directory_table
+        columns:
+          - { field: seq, label: 序号, type: number, width: 50 }
+          - { field: content, label: 内容, type: text, width: 200 }
+          - { field: index_no, label: 索引号, type: index_chip, width: 80 }
+          - { field: remark, label: 备注, type: text, width: 120 }
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 商誉实质性程序表I3A
+  # ─────────────────────────────────────────────────────────────────────────
+  商誉实质性程序表I3A:
+    code: I3A
+    group: core
+    dimensions: "25×11"
+    component: a-program-console
+    class_code: A-实质性程序
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50 }
+      - { field: procedure, label: 审计程序, type: text, width: 300 }
+      - { field: category, label: 程序分类, type: text, width: 80 }
+      - { field: assertion, label: 财务报表的认定, type: text, width: 100 }
+      - { field: executor, label: 执行人, type: text, width: 80, editable: true }
+      - { field: exec_date, label: 执行日期, type: date, width: 100, editable: true }
+      - { field: conclusion, label: 结论, type: text, width: 100, editable: true }
+      - { field: auto_data, label: 自动取数, type: text, width: 80, auto_source: true }
+      - { field: index_ref, label: 底稿索引号, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100, editable: true }
+      - { field: applicability, label: 适用性, type: text, width: 80 }
+    rows: 25
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表I3-1（商誉不摊销！66公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表I3-1:
+    code: I3-1
+    group: core
+    dimensions: "56×13"
+    component: I3TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1711']
+    formula_count: 66
+    columns:
+      - { field: investee, label: 被投资单位, type: text, width: 150, readonly: true }
+      - { field: initial_recognition, label: 初始确认, type: number, width: 100 }
+      - { field: opening_balance, label: 期初余额, type: number, width: 100 }
+      - { field: new_acquisition, label: 本期增加(新并购), type: number, width: 120 }
+      - { field: impairment, label: 本期减少(减值), type: number, width: 120 }
+      - { field: closing_balance, label: 期末余额, type: number, width: 100, formula: "opening + new_acquisition - impairment" }
+      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje_amount, label: AJE, type: number, width: 80 }
+      - { field: rje_amount, label: RJE, type: number, width: 80 }
+      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
+      - { field: impairment_reserve, label: 减值准备, type: number, width: 100 }
+      - { field: net_value, label: 净额, type: number, width: 100, formula: "closing_balance - impairment_reserve" }
+    formulas:
+      - { name: calcGoodwillEndBalance, target: closing_balance, expr: "opening + newAcquisition - impairment" }
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcNetValue, target: net_value, expr: "closingBalance - impairmentReserve" }
+    highlights:
+      - { condition: "new_acquisition != 0", style: yellow, tooltip: "本期有新并购商誉确认" }
+      - { condition: "tb_variance != 0", style: red }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1711']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1711', adjudicatedAmount}" }
+    footer:
+      - { type: tb_comparison, accounts: ['1711'] }
+      - { type: audit_note, label: 审计说明 }
+      - { type: audit_conclusion }
+      - { type: review_dialog }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表I3-2（29行×30列，3区段Tab）
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表I3-2:
+    code: I3-2
+    group: core
+    dimensions: "29×30"
+    component: I3TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 100
+    formula_count: 12
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns:
+          - { field: investee, label: 被投资单位, type: text, width: 150 }
+          - { field: acquisition_date, label: 并购日期, type: date, width: 100 }
+          - { field: merger_consideration, label: 合并对价, type: number, width: 120 }
+          - { field: net_asset_fv, label: 被购方净资产公允, type: number, width: 130 }
+          - { field: equity_ratio, label: 持股比例(%), type: percent, width: 80 }
+      - name: 入账价值
+        tab_index: 1
+        columns:
+          - { field: merger_cost, label: 合并成本, type: number, width: 120 }
+          - { field: identifiable_net_asset_fv, label: 可辨认净资产公允, type: number, width: 140 }
+          - { field: goodwill_original, label: 商誉原值, type: number, width: 100, formula: "merger_cost - identifiable_net_asset_fv" }
+          - { field: recognition_basis, label: 确认依据, type: text, width: 150 }
+      - name: 减值情况
+        tab_index: 2
+        columns:
+          - { field: goodwill_original_cost, label: 商誉原值, type: number, width: 100 }
+          - { field: acc_impairment, label: 累计减值, type: number, width: 100 }
+          - { field: current_impairment, label: 本期减值, type: number, width: 100 }
+          - { field: ending_net_value, label: 期末净额, type: number, width: 100, formula: "goodwill_original_cost - acc_impairment" }
+    formulas:
+      - { name: calcInitialGoodwill, target: goodwill_original, expr: "mergerCost - identifiableNetAssetFV" }
+      - { name: calcEndingNetValue, target: ending_net_value, expr: "original - accImpairment" }
+    summary_rows:
+      - { type: grand_total }
+    import_export: true
+    add_row_prompt: investee
+    cross_refs:
+      - ref_id: CW-I3-2-001
+        target_wp: I3-1
+        description: '明细合计 → 审定表I3-1'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总I3-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总I3-3:
+    code: I3-3
+    group: core
+    dimensions: "21×10"
+    component: I3TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    columns:
+      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
+      - { field: adjustment_item, label: 调整事项, type: text, width: 150 }
+      - { field: entry_type, label: 类别, type: select, width: 80, options: [AJE, RJE] }
+      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: account_name, label: 科目名称, type: text, width: 120 }
+      - { field: summary, label: 摘要, type: text, width: 150 }
+      - { field: debit_amount, label: 借方, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
+      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: isDebitCreditBalanced, target: balance_check, expr: "|SUM(debits) - SUM(credits)| < 0.01" }
+    highlights:
+      - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
+    import_export: true
+    add_row_prompt: adjustment_item
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+    cross_refs:
+      - ref_id: CW-I3-3-001
+        target_wp: I3-1
+        description: 'AJE/RJE汇总 → 审定表I3-1'
+        severity: required
+        direction: outbound
+      - ref_id: CW-I3-3-002
+        target_wp: A13
+        description: '调整分录 → A13错报汇总'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 入账价值测算表I3-4（22行×13列，12公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  入账价值测算表I3-4:
+    code: I3-4
+    group: core
+    dimensions: "22×13"
+    component: I3TabInitialValue
+    class_code: G-测算
+    dynamic_rows: true
+    formula_count: 12
+    columns:
+      - { field: investee, label: 被投资单位, type: text, width: 150 }
+      - { field: merger_cost, label: 合并成本, type: number, width: 120 }
+      - { field: consideration_type, label: 对价形式, type: text, width: 100 }
+      - { field: contingent_consideration, label: 或有对价, type: number, width: 100 }
+      - { field: transaction_costs, label: 交易费用, type: number, width: 100 }
+      - { field: identifiable_net_asset_fv, label: 可辨认净资产公允, type: number, width: 140 }
+      - { field: minority_interest, label: 少数股东权益, type: number, width: 110 }
+      - { field: goodwill, label: 商誉, type: number, width: 100, formula: "merger_cost - identifiable_net_asset_fv" }
+      - { field: recognition_date, label: 确认日期, type: date, width: 100 }
+      - { field: remark, label: 备注, type: text, width: 120 }
+    formulas:
+      - { name: calcInitialGoodwill, target: goodwill, expr: "mergerCost - identifiableNetAssetFV" }
+    import_export: true
+    add_row_prompt: investee
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 针对性检查表I3-5
+  # ─────────────────────────────────────────────────────────────────────────
+  针对性检查表I3-5:
+    code: I3-5
+    group: core
+    dimensions: "35×12"
+    component: I3TabTargetedCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    standards_ref: [CAS8, CAS20]
+    check_items:
+      - { id: impairment_indicator, label: 减值迹象识别是否充分, type: conclusion, options: [是, 否, 不适用] }
+      - { id: cgu_division, label: CGU划分是否合理一致, type: conclusion, options: [是, 否, 不适用] }
+      - { id: goodwill_allocation, label: 商誉分摊至CGU是否恰当, type: conclusion, options: [是, 否, 不适用] }
+      - { id: test_frequency, label: 年度减值测试是否按时执行, type: conclusion, options: [是, 否, 不适用] }
+      - { id: no_reversal, label: 是否存在减值转回(不允许!), type: conclusion, options: [无转回, 发现转回] }
+    guidance:
+      top_area: blue_gradient_steps
+      methodology_context: amber_left_border
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 商誉减值测试I3-6（70行×12列，CGU分摊）
+  # ─────────────────────────────────────────────────────────────────────────
+  商誉减值测试I3-6:
+    code: I3-6
+    group: impairment
+    dimensions: "70×12"
+    component: I3TabImpairmentTest
+    class_code: G-测算
+    dynamic_rows: true
+    columns:
+      - { field: cgu_name, label: CGU名称, type: text, width: 150 }
+      - { field: includes_goodwill, label: 包含商誉, type: number, width: 100 }
+      - { field: other_assets_book, label: 其他资产账面, type: number, width: 120 }
+      - { field: total_book_value, label: 资产组账面(含商誉), type: number, width: 140, formula: "includes_goodwill + other_assets_book" }
+      - { field: recoverable_amount, label: 可收回金额, type: number, width: 120 }
+      - { field: impairment_amount, label: 减值金额, type: number, width: 100, formula: "MAX(total_book - recoverable, 0)" }
+      - { field: goodwill_impairment, label: 商誉分摊减值, type: number, width: 120, formula: "MIN(impairment, goodwill)" }
+      - { field: other_impairment, label: 其他资产分摊, type: number, width: 120, formula: "impairment - goodwill_impairment" }
+      - { field: goodwill_net_after, label: 减值后商誉, type: number, width: 110, formula: "goodwill - goodwill_impairment" }
+      - { field: conclusion, label: 结论, type: select, width: 80, options: [无减值, 需减值, 待确认] }
+    formulas:
+      - { name: calcTotalBookValue, target: total_book_value, expr: "goodwill + otherAssetsBook" }
+      - { name: calcImpairmentAmount, target: impairment_amount, expr: "MAX(totalBook - recoverable, 0)" }
+      - { name: calcGoodwillImpairment, target: goodwill_impairment, expr: "MIN(impairment, goodwill)" }
+      - { name: calcOtherImpairment, target: other_impairment, expr: "impairment - goodwillImpairment" }
+    highlights:
+      - { condition: "impairment_amount > 0", style: red, tooltip: "需计提减值" }
+      - { condition: "goodwill_impairment >= includes_goodwill", style: orange, tooltip: "商誉已冲至零" }
+    import_export: true
+    add_row_prompt: cgu_name
+    cross_refs:
+      - ref_id: CW-I3-6-001
+        target_wp: I3-7
+        description: '可收回金额 ← I3-7 DCF测试'
+        direction: inbound
+      - ref_id: CW-I3-6-002
+        target_wp: I3-1
+        description: '减值金额 → 审定表I3-1'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 可收回金额测试I3-7（DCF核心，100行×16列，22公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  可收回金额测试I3-7:
+    code: I3-7
+    group: impairment
+    dimensions: "100×16"
+    component: I3TabRecoverableTest
+    class_code: G-测算
+    dynamic_rows: true
+    virtual_scroll: true
+    max_rows: 500
+    formula_count: 22
+    sections:
+      - name: DCF现金流预测(5年)
+        columns:
+          - { field: cgu_name, label: CGU名称, type: text, width: 120 }
+          - { field: forecast_year, label: 预测年份, type: text, width: 80 }
+          - { field: revenue, label: 营业收入, type: number, width: 110 }
+          - { field: cost_of_goods, label: 营业成本, type: number, width: 110 }
+          - { field: operating_profit, label: 营业利润, type: number, width: 100, formula: "revenue - cost_of_goods" }
+          - { field: income_tax, label: 所得税, type: number, width: 90 }
+          - { field: depreciation, label: 折旧摊销, type: number, width: 100 }
+          - { field: capex, label: 资本支出, type: number, width: 100 }
+          - { field: working_capital_change, label: 营运资金变动, type: number, width: 110 }
+          - { field: free_cash_flow, label: 自由现金流, type: number, width: 110, formula: "profit - tax + dep - capex - wc_change" }
+      - name: 折现计算
+        columns:
+          - { field: wacc_rate, label: 折现率(WACC), type: percent, width: 100 }
+          - { field: discount_factor, label: 折现因子, type: number, width: 90, formula: "1/(1+WACC)^n" }
+          - { field: present_value, label: 现值, type: number, width: 100, formula: "FCF × discount_factor" }
+          - { field: growth_rate, label: 永续增长率, type: percent, width: 100 }
+          - { field: terminal_value, label: 终值, type: number, width: 110, formula: "FCF_n×(1+g)/(WACC-g)" }
+          - { field: terminal_value_pv, label: 终值现值, type: number, width: 100, formula: "TV/(1+WACC)^n" }
+      - name: 可收回金额确定
+        summary_fields:
+          - { field: pv_sum, label: 预测期现值合计, formula: "Σ(present_value)" }
+          - { field: tv_pv, label: 终值现值, formula: "terminal_value_pv" }
+          - { field: value_in_use, label: 使用价值(DCF), formula: "pv_sum + tv_pv" }
+          - { field: fair_value_less_disposal, label: 公允价值-处置费用 }
+          - { field: recoverable_amount, label: 可收回金额, formula: "MAX(fair_value, value_in_use)" }
+      - name: 敏感性分析
+        sensitivity:
+          discount_rate_delta: ["-1%", "+1%"]
+          growth_rate_delta: ["-0.5%", "+0.5%"]
+          revenue_delta: ["-10%", "+10%"]
+    formulas:
+      - { name: calcFreeCashFlow, expr: "operatingProfit - tax + depreciation - capex - wcChange" }
+      - { name: calcDiscountFactor, expr: "1 / (1 + wacc)^year" }
+      - { name: calcPresentValue, expr: "fcf × discountFactor" }
+      - { name: calcTerminalValue, expr: "lastFCF × (1 + g) / (wacc - g)" }
+      - { name: calcRecoverableAmount, expr: "MAX(fairValue - disposal, valueInUse)" }
+    highlights:
+      - { condition: "wacc <= growth_rate", style: red, tooltip: "折现率必须大于增长率!" }
+    import_export: true
+    cross_refs:
+      - ref_id: CW-I3-7-001
+        target_wp: I3-6
+        description: '可收回金额 → I3-6减值测试'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 复核公司减值测试过程I3-8（153行×12列，大表）
+  # ─────────────────────────────────────────────────────────────────────────
+  复核公司减值测试过程及结论I3-8:
+    code: I3-8
+    group: impairment
+    dimensions: "153×12"
+    component: I3TabReviewProcess
+    class_code: D-段落检查
+    virtual_scroll: true
+    layout_type: paragraph
+    sections:
+      - { name: 一、假设审阅, type: review_section }
+      - { name: 二、模型检查, type: review_section }
+      - { name: 三、参数合理性, type: review_section }
+      - { name: 四、计算验证, type: review_section }
+      - { name: 五、结论评价, type: review_section }
+    check_items:
+      - { id: assumption_review, label: 管理层关键假设是否合理, type: conclusion_with_evidence }
+      - { id: model_check, label: 估值模型是否适当, type: conclusion_with_evidence }
+      - { id: parameter_reasonableness, label: 折现率/增长率是否合理, type: conclusion_with_evidence }
+      - { id: calculation_verify, label: 数学计算是否正确, type: conclusion_with_evidence }
+      - { id: overall_conclusion, label: 整体结论, type: conclusion, options: [合理, 基本合理, 不合理, 需调整] }
+    cross_refs:
+      - ref_id: CW-I3-8-001
+        target_wp: I3-6
+        description: '复核结论 → I3-6减值测试评价'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 11: 附注披露信息（上市公司）（41行×8列，38公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: disclosure
+    dimensions: "41×8"
+    component: I3TabDisclosureListed
+    class_code: H-附注
+    formula_count: 38
+    variant: listed
+    columns:
+      - { field: cgu_name, label: CGU/被投资单位, type: text, width: 150, readonly: true }
+      - { field: goodwill_original, label: 商誉原值, type: number }
+      - { field: acc_impairment_opening, label: 期初累计减值, type: number }
+      - { field: current_impairment, label: 本期减值, type: number }
+      - { field: acc_impairment_closing, label: 期末累计减值, type: number, formula: "opening + current" }
+      - { field: net_value, label: 账面价值, type: number, formula: "original - acc_closing" }
+      - { field: recoverable_method, label: 可收回金额确定方法, type: text }
+      - { field: key_assumptions, label: 关键假设, type: textarea }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=1711" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'goodwill'}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 12: 附注披露信息（国有企业）（31行×7列，31公式）
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: disclosure
+    dimensions: "31×7"
+    component: I3TabDisclosureSoe
+    class_code: H-附注
+    formula_count: 31
+    variant: soe
+    columns:
+      - { field: cgu_name, label: CGU/被投资单位, type: text, width: 150, readonly: true }
+      - { field: goodwill_original, label: 商誉原值, type: number }
+      - { field: acc_impairment_opening, label: 期初累计减值, type: number }
+      - { field: current_impairment, label: 本期减值, type: number }
+      - { field: acc_impairment_closing, label: 期末累计减值, type: number, formula: "opening + current" }
+      - { field: net_value, label: 账面价值, type: number, formula: "original - acc_closing" }
+      - { field: remark, label: 备注, type: text }
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", filter: "accountCode=1711" }
+      publish:
+        - { event: "disclosure:note-text-updated", payload: "{noteId:'goodwill'}" }

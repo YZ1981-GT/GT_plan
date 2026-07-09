@@ -22,6 +22,8 @@ from pathlib import Path
 
 import httpx
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # OCR 服务 URL（环境变量配置，为空则走 in-process fallback）
@@ -184,10 +186,14 @@ class UnifiedOCRService:
                     return await self._mineru_fallback(image_path)
 
     async def health_check(self) -> dict:
-        """OCR引擎健康检查"""
+        """OCR引擎健康检查（禁用 MinerU 时不探测，避免拖慢 /api/ai/health）"""
         paddle_ok = self._check_paddle_available()
         tesseract_ok = self._check_tesseract_available()
-        mineru_ok = await self._check_mineru_available()
+        if getattr(settings, "MINERU_ENABLED", False):
+            mineru_ok = await self._check_mineru_available()
+        else:
+            mineru_ok = False
+            self._mineru_available = False
 
         return {
             "status": "healthy" if (paddle_ok or tesseract_ok or mineru_ok) else "unhealthy",

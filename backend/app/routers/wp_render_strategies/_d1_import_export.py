@@ -123,7 +123,7 @@ _D1_9_HEADERS: list[str] = [
 
 # D1-6 业务模式依据表 5列表头（仅依据表，QA矩阵跳过）
 _D1_6_HEADERS: list[str] = [
-    "组合名称", "业务模式", "具体依据", "索引号", "备注",
+    "组合名称", "被审计单位管理应收票据业务模式", "具体依据", "索引号", "备注",
 ]
 
 _SHEET_HEADERS: dict[str, list[str]] = {
@@ -176,7 +176,8 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "item_id", "项目", "结论", "内容",
     ],
     "D1-5": [
-        "序号", "类别", "借方科目", "贷方科目", "金额", "说明",
+        "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
+        "借方调整金额", "贷方调整金额", "索引",
     ],
     "D1-15": [
         "债务人名称", "审定余额", "预期信用损失率", "应计提",
@@ -200,7 +201,176 @@ _SHEET_ITEM_ID: dict[str, str | list[str]] = {
     "D1-12": "D1-pledge-rows",
     "D1-13": "D1-sampling-vouching-rows",
     "D1-15": ["D1-ecl-portfolio-rows", "D1-ecl-individual-rows"],
+    "D1-5": "D1-entry-rows",
 }
+
+_D1_5_LEGACY_HEADERS: list[str] = [
+    "序号", "类别", "借方科目", "贷方科目", "金额", "说明",
+]
+
+_D1_5_HEADER_ALIASES: dict[str, str] = {
+    "摘要": "调整事项说明",
+    "说明": "调整事项说明",
+    "调整事项说明": "调整事项说明",
+    "分类": "类别",
+    "类别（报表调整/账项调整/其他）": "类别",
+    "类别(报表调整/账项调整/其他)": "类别",
+    "会计科目": "科目名称",
+    "借方": "借方调整金额",
+    "贷方": "贷方调整金额",
+    "借方调整金额": "借方调整金额",
+    "贷方调整金额": "贷方调整金额",
+    "索引号": "索引",
+    "索引": "索引",
+}
+
+
+def _normalize_d1_5_headers(headers: list[str]) -> list[str]:
+    return [_D1_5_HEADER_ALIASES.get(h.strip(), h.strip()) if h else "" for h in headers]
+
+
+def _is_d1_5_legacy_headers(headers: list[str]) -> bool:
+    normalized = set(_normalize_d1_5_headers(headers))
+    return {"借方科目", "贷方科目", "金额"}.issubset(normalized) or set(_D1_5_LEGACY_HEADERS).issubset(
+        {h for h in headers if h}
+    )
+
+
+def _write_d1_5_title_block(ws: Any) -> int:
+    """写入 D1-5 标题区（对齐 Excel 底稿），返回表头行号。"""
+    title_font = Font(bold=True, size=14)
+    meta_font = Font(size=11)
+    header_font = Font(bold=True, size=11)
+    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    headers = _SHEET_HEADERS["D1-5"]
+
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    c1 = ws.cell(row=1, column=1, value="致同会计师事务所")
+    c1.font = title_font
+    c1.alignment = Alignment(horizontal="center")
+
+    ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=len(headers))
+    c2 = ws.cell(row=2, column=1, value="应收票据调整分录汇总表")
+    c2.font = title_font
+    c2.alignment = Alignment(horizontal="center")
+
+    ws.cell(row=3, column=1, value="被审计单位名称").font = meta_font
+    ws.cell(row=3, column=4, value="编制人").font = meta_font
+    ws.cell(row=3, column=6, value="编制日期").font = meta_font
+    ws.cell(row=3, column=8, value="索引号: D1-5").font = meta_font
+
+    ws.cell(row=4, column=1, value="截止日: 202X年12月31日").font = meta_font
+    ws.cell(row=4, column=4, value="复核人").font = meta_font
+    ws.cell(row=4, column=6, value="复核日期").font = meta_font
+    ws.cell(row=4, column=8, value="页次").font = meta_font
+
+    header_row = 5
+    for col_idx, col_name in enumerate(headers, 1):
+        cell = ws.cell(row=header_row, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        ws.column_dimensions[cell.column_letter].width = max(len(col_name) * 2 + 4, 12)
+
+    ws.freeze_panes = f"A{header_row + 1}"
+    return header_row
+
+
+async def _add_d1_5_data_validation(
+    ws: Any, wp_id: str, db: AsyncSession, headers: list[str],
+) -> None:
+    """为 D1-5 模板的报表项目/科目名称/附注项目列添加下拉（参照 D4-4）。"""
+    import sqlalchemy as sa
+    from openpyxl.worksheet.datavalidation import DataValidation
+
+    result = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+        {"wp_id": wp_id},
+    )
+    row = result.fetchone()
+    if not row:
+        return
+    project_id = str(row.project_id)
+
+    result = await db.execute(
+        sa.text("""
+            SELECT DISTINCT standard_account_code, account_name
+            FROM trial_balance
+            WHERE project_id = :pid
+            ORDER BY standard_account_code
+        """),
+        {"pid": project_id},
+    )
+    tb_rows = result.fetchall()
+    if not tb_rows:
+        return
+
+    account_options = [f"{r.standard_account_code}-{r.account_name}" for r in tb_rows]
+    seen_names: set[str] = set()
+    report_item_options: list[str] = []
+    for r in tb_rows:
+        if r.account_name and r.account_name not in seen_names:
+            seen_names.add(r.account_name)
+            report_item_options.append(r.account_name)
+    note_item_options = report_item_options
+
+    ws_data = ws.parent.create_sheet("_数据源")
+    ws_data.sheet_state = "hidden"
+    for i, opt in enumerate(account_options[:500], start=1):
+        ws_data.cell(row=i, column=1, value=opt)
+    for i, opt in enumerate(report_item_options[:500], start=1):
+        ws_data.cell(row=i, column=2, value=opt)
+    for i, opt in enumerate(note_item_options[:500], start=1):
+        ws_data.cell(row=i, column=3, value=opt)
+
+    def col_letter(col_name: str) -> str | None:
+        try:
+            idx = headers.index(col_name) + 1
+            return chr(64 + idx) if idx <= 26 else None
+        except ValueError:
+            return None
+
+    account_col = col_letter("科目名称")
+    report_col = col_letter("报表项目")
+    note_col = col_letter("附注项目")
+    max_row = 502
+    data_start = 6
+
+    if account_col:
+        dv = DataValidation(
+            type="list",
+            formula1=f"=_数据源!$A$1:$A${min(len(account_options), 500)}",
+            allow_blank=True,
+        )
+        dv.add(f"{account_col}{data_start}:{account_col}{max_row}")
+        ws.add_data_validation(dv)
+    if report_col:
+        dv = DataValidation(
+            type="list",
+            formula1=f"=_数据源!$B$1:$B${min(len(report_item_options), 500)}",
+            allow_blank=True,
+        )
+        dv.add(f"{report_col}{data_start}:{report_col}{max_row}")
+        ws.add_data_validation(dv)
+    if note_col:
+        dv = DataValidation(
+            type="list",
+            formula1=f"=_数据源!$C$1:$C${min(len(note_item_options), 500)}",
+            allow_blank=True,
+        )
+        dv.add(f"{note_col}{data_start}:{note_col}{max_row}")
+        ws.add_data_validation(dv)
+
+    category_col = col_letter("类别")
+    if category_col:
+        dv = DataValidation(
+            type="list",
+            formula1='"账项调整,报表调整,其他"',
+            allow_blank=True,
+        )
+        dv.add(f"{category_col}{data_start}:{category_col}{max_row}")
+        ws.add_data_validation(dv)
 
 _D1_13_SECTION_POPULATION = "--- 抽样总体 ---"
 _D1_13_SECTION_SPECIFIC = "--- 特定样本 ---"
@@ -224,6 +394,7 @@ _D1_16_REVERSAL_HEADERS: list[str] = [
 ]
 _D1_16_WRITEOFF_HEADERS: list[str] = [
     "单位名称", "应收票据的性质", "核销金额", "核销原因", "履行的核销程序",
+    "是否由关联交易产生", "合理性分析", "索引号",
 ]
 
 
@@ -264,8 +435,169 @@ def _col_val(row: tuple, actual_headers: list[str], col_name: str) -> Any:
         return None
 
 
-def _create_template_wb(sheet_code: str) -> Workbook:
-    """创建空白模板xlsx（含表头+格式，无数据行）"""
+def _normalize_header_cell(val: Any) -> str:
+    if val is None:
+        return ""
+    return str(val).strip()
+
+
+def _fill_forward_headers(cells: list[str]) -> list[str]:
+    """横向合并单元格：空单元格继承左侧非空表头（openpyxl 仅在左上角存值）。"""
+    filled: list[str] = []
+    last = ""
+    for c in cells:
+        if c:
+            last = c
+            filled.append(c)
+        else:
+            filled.append(last)
+    return filled
+
+
+def _score_header_row(actual: list[str], expected: list[str]) -> int:
+    """按期望列命中数打分；忽略空列。"""
+    actual_set = {h for h in actual if h}
+    return sum(1 for h in expected if h in actual_set)
+
+
+def _find_header_row(
+    ws: Any,
+    expected_headers: list[str],
+    *,
+    max_scan: int = 20,
+) -> tuple[int, list[str]]:
+    """在前 max_scan 行中定位表头行，兼容标题行 / 多行合并表头。
+
+    策略：
+    1. 对每一行取原始值，并做横向 fill-forward（模拟横向合并）。
+    2. 若上一行存在分组标题，将空叶子格用上一行同列值补全（纵向合并后叶子行空白）。
+    3. 选择与 expected_headers 命中最多的行；至少命中一半（或 ≥3）才采纳，否则回退第 1 行。
+    """
+    if not expected_headers:
+        return 1, []
+
+    best_row = 1
+    best_headers: list[str] = []
+    best_score = -1
+    prev_filled: list[str] = []
+
+    for r in range(1, max_scan + 1):
+        try:
+            raw = [
+                _normalize_header_cell(c.value)
+                for c in next(ws.iter_rows(min_row=r, max_row=r))
+            ]
+        except StopIteration:
+            break
+        if not any(raw):
+            continue
+
+        filled = _fill_forward_headers(raw)
+        # 纵向合并：叶子行空列用上一行同列补全（仅补空位，不覆盖已有叶子名）
+        if prev_filled:
+            merged: list[str] = []
+            for i, cur in enumerate(filled):
+                if cur:
+                    merged.append(cur)
+                elif i < len(prev_filled) and prev_filled[i]:
+                    merged.append(prev_filled[i])
+                else:
+                    merged.append("")
+            candidate = merged
+        else:
+            candidate = filled
+
+        score = _score_header_row(candidate, expected_headers)
+        # 优先叶子行：若本行已含多数叶子列名，加分
+        leaf_hits = sum(1 for h in expected_headers if h in set(raw) and h)
+        score = score * 10 + leaf_hits
+
+        if score > best_score:
+            best_score = score
+            best_row = r
+            # 导入匹配用「实际出现的列名」：优先本行非空，否则用 fill/纵向补全结果
+            best_headers = [
+                (raw[i] if i < len(raw) and raw[i] else candidate[i] if i < len(candidate) else "")
+                for i in range(max(len(raw), len(candidate)))
+            ]
+        prev_filled = filled
+
+    min_required = max(3, (len(expected_headers) + 1) // 2)
+    if _score_header_row(best_headers, expected_headers) < min_required:
+        # 回退第 1 行
+        try:
+            best_headers = [
+                _normalize_header_cell(c.value)
+                for c in next(ws.iter_rows(min_row=1, max_row=1))
+            ]
+        except StopIteration:
+            best_headers = []
+        best_row = 1
+
+    return best_row, best_headers
+
+
+def _append_guidance_sheet(wb: Workbook, sheet_code: str) -> None:
+    """附加「编制说明」工作表（对齐 D4-2）。"""
+    guidance = _get_guidance_text(sheet_code)
+    if not guidance:
+        return
+    ws_guide = wb.create_sheet("编制说明")
+    ws_guide.append(["编制说明"])
+    ws_guide.append([])
+    for line in guidance:
+        ws_guide.append([line])
+    ws_guide.column_dimensions["A"].width = 80
+
+
+def _write_flat_headers(ws: Any, headers: list[str], row: int = 1) -> None:
+    header_font = Font(bold=True, size=11)
+    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    for col_idx, col_name in enumerate(headers, 1):
+        cell = ws.cell(row=row, column=col_idx, value=col_name)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        ws.column_dimensions[cell.column_letter].width = max(len(col_name) * 2 + 4, 12)
+
+
+def _write_d1_4_multi_headers(ws: Any) -> int:
+    """D1-4 双行合并表头：第1行分组，第2行叶子列；返回叶子表头行号。"""
+    headers = _SHEET_HEADERS["D1-4"]
+    # 分组：(标题, 起始列1-based, 跨列数)
+    groups = [
+        ("项目", 1, 1),
+        ("期初余额", 2, 3),       # 期初未审/AJE/RJE
+        ("本期增加", 5, 2),       # 本期计提/收回
+        ("本期减少", 7, 3),       # 转回/核销/其他
+        ("期末余额", 10, 2),      # 期末AJE/RJE
+    ]
+    group_font = Font(bold=True, size=11)
+    group_fill = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+    align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    for title, start, span in groups:
+        end = start + span - 1
+        if span > 1:
+            ws.merge_cells(start_row=1, start_column=start, end_row=1, end_column=end)
+        cell = ws.cell(row=1, column=start, value=title)
+        cell.font = group_font
+        cell.fill = group_fill
+        cell.alignment = align
+
+    _write_flat_headers(ws, headers, row=2)
+    # 项目列纵向合并
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=1)
+    cell = ws.cell(row=1, column=1, value="项目")
+    cell.font = group_font
+    cell.fill = group_fill
+    cell.alignment = align
+    return 2
+
+
+def _create_template_wb(sheet_code: str, *, include_guidance: bool = True) -> Workbook:
+    """创建空白模板xlsx（含表头+格式+编制说明）"""
     wb = Workbook()
     ws = wb.active
     ws.title = sheet_code
@@ -275,6 +607,7 @@ def _create_template_wb(sheet_code: str) -> Workbook:
         section_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
         header_font = Font(bold=True, size=11)
         header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+        blank_rows_per_section = 10
         r = 1
         cell = ws.cell(row=r, column=1, value=_D1_16_SECTION_REVERSAL)
         cell.font = section_font
@@ -284,16 +617,24 @@ def _create_template_wb(sheet_code: str) -> Workbook:
             cell = ws.cell(row=r, column=col_idx, value=name)
             cell.font = header_font
             cell.fill = header_fill
-        r = 4
+        # 转回检查预留10行空白数据行，便于直接填写
+        for data_row in range(r + 1, r + blank_rows_per_section + 1):
+            ws.cell(row=data_row, column=1, value="")
+        r += blank_rows_per_section + 1
         cell = ws.cell(row=r, column=1, value=_D1_16_SECTION_WRITEOFF)
         cell.font = section_font
         cell.fill = section_fill
-        r = 5
+        r += 1
         for col_idx, name in enumerate(_D1_16_WRITEOFF_HEADERS, 1):
             cell = ws.cell(row=r, column=col_idx, value=name)
             cell.font = header_font
             cell.fill = header_fill
+        # 核销检查预留10行空白数据行
+        for data_row in range(r + 1, r + blank_rows_per_section + 1):
+            ws.cell(row=data_row, column=1, value="")
         ws.freeze_panes = "A2"
+        if include_guidance:
+            _append_guidance_sheet(wb, sheet_code)
         return wb
 
     if sheet_code == "D1-13":
@@ -320,21 +661,47 @@ def _create_template_wb(sheet_code: str) -> Workbook:
         r = write_section(_D1_13_SECTION_VOUCHING, _SHEET_HEADERS["D1-13"], r)
         write_section(_D1_13_SECTION_CONCLUSION, _D1_13_CONCLUSION_HEADERS, r)
         ws.freeze_panes = "A2"
+        if include_guidance:
+            _append_guidance_sheet(wb, sheet_code)
+        return wb
+
+    # D1-5：标题区 + 表头（对齐 Excel 底稿）
+    if sheet_code == "D1-5":
+        _write_d1_5_title_block(ws)
+        if include_guidance:
+            _append_guidance_sheet(wb, sheet_code)
         return wb
 
     headers = _SHEET_HEADERS[sheet_code]
-    header_font = Font(bold=True, size=11)
-    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    header_row = 1
 
-    for col_idx, col_name in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col_idx, value=col_name)
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-        ws.column_dimensions[cell.column_letter].width = max(len(col_name) * 2 + 4, 12)
+    # D1-4：双行合并表头 + 预填单项/组合结构
+    if sheet_code == "D1-4":
+        header_row = _write_d1_4_multi_headers(ws)
+        section_font = Font(bold=True, size=11, color="333333")
+        section_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+        # 按单项计提 + 3 空子行
+        r = header_row + 1
+        cell = ws.cell(row=r, column=1, value="按单项计提")
+        cell.font = section_font
+        cell.fill = section_fill
+        for _ in range(3):
+            r += 1
+            ws.cell(row=r, column=1, value="")
+        r += 1
+        cell = ws.cell(row=r, column=1, value="按组合计提")
+        cell.font = section_font
+        cell.fill = section_fill
+        for _ in range(3):
+            r += 1
+            ws.cell(row=r, column=1, value="")
+        ws.freeze_panes = f"A{header_row + 1}"
+        if include_guidance:
+            _append_guidance_sheet(wb, sheet_code)
+        return wb
 
-    # D1-15 特殊处理：添加双section分隔行
+    _write_flat_headers(ws, headers, row=1)
+
     if sheet_code == "D1-1":
         for row_key, label in _D1_1_ROWS:
             ws.append([row_key, label, *[None] * (len(headers) - 2)])
@@ -343,52 +710,53 @@ def _create_template_wb(sheet_code: str) -> Workbook:
         for item_id, label in _D1_14_ROWS:
             ws.append([item_id, label, None, None])
 
-    # D1-15 特殊处理：添加双section分隔行
     if sheet_code == "D1-15":
         section_font = Font(bold=True, size=11, color="333333")
         section_fill = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
         section_align = Alignment(horizontal="center", vertical="center")
 
-        # Row 2: 按组合计提 section header
         cell = ws.cell(row=2, column=1, value="--- 按组合计提 ---")
         cell.font = section_font
         cell.fill = section_fill
         cell.alignment = section_align
 
-        # Rows 3-7: 5 empty placeholder rows for portfolio
         for r in range(3, 8):
             for c in range(1, len(headers) + 1):
                 ws.cell(row=r, column=c, value=None)
 
-        # Row 8: 按单项计提 section header
         cell = ws.cell(row=8, column=1, value="--- 按单项计提 ---")
         cell.font = section_font
         cell.fill = section_fill
         cell.alignment = section_align
 
-        # Rows 9-11: 3 empty placeholder rows for individual
         for r in range(9, 12):
             for c in range(1, len(headers) + 1):
                 ws.cell(row=r, column=c, value=None)
 
     ws.freeze_panes = "A2"
+    if include_guidance:
+        _append_guidance_sheet(wb, sheet_code)
     return wb
 
 
-def _validate_columns(ws: Any, sheet_code: str) -> list[str]:
-    """校验列头，返回不匹配的列名列表"""
+def _validate_columns_against(
+    actual_headers: list[str],
+    sheet_code: str,
+) -> list[str]:
+    """按已识别的表头校验列名，返回缺失列名列表。"""
     expected = set(_SHEET_HEADERS[sheet_code])
-    actual: list[str] = []
-    for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-        if cell.value is not None:
-            actual.append(str(cell.value).strip())
+    actual = [h for h in actual_headers if h]
 
-    # D1-15 额外校验列数必须为8
     if sheet_code == "D1-15" and len(actual) != 8:
         return [f"列数应为8，实际为{len(actual)}"]
 
-    missing = [h for h in expected if h not in actual]
-    return missing
+    return [h for h in expected if h not in actual]
+
+
+def _validate_columns(ws: Any, sheet_code: str) -> list[str]:
+    """校验列头（兼容旧调用：自动定位表头行）。"""
+    _, actual_headers = _find_header_row(ws, _SHEET_HEADERS[sheet_code])
+    return _validate_columns_against(actual_headers, sheet_code)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -768,10 +1136,13 @@ def _parse_d1_4_row(row: tuple, actual_headers: list[str]) -> dict:
 
 def _parse_d1_6_row(row: tuple, actual_headers: list[str]) -> dict:
     """D1-6 业务模式依据表行解析（动态行，isFixed=False）"""
+    mode = _col_val(row, actual_headers, "被审计单位管理应收票据业务模式")
+    if mode in (None, ""):
+        mode = _col_val(row, actual_headers, "业务模式")
     return {
         "rowId": str(uuid4()),
         "combinationName": _safe_str(_col_val(row, actual_headers, "组合名称")),
-        "businessMode": _safe_str(_col_val(row, actual_headers, "业务模式")),
+        "businessMode": _safe_str(mode),
         "basis": _safe_str(_col_val(row, actual_headers, "具体依据")),
         "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
         "remark": _safe_str(_col_val(row, actual_headers, "备注")),
@@ -1058,7 +1429,97 @@ def _is_d1_13_section_marker(row: tuple) -> str | None:
     return None
 
 
-def _export_d1_5_row(idx: int, data: dict[str, str | float]) -> list:
+def _export_d1_5_row(data: dict) -> list:
+    return [
+        _safe_str(data.get("description", data.get("desc", ""))),
+        _safe_str(data.get("category", data.get("type", "账项调整"))),
+        _safe_str(data.get("reportItem", "")),
+        _safe_str(data.get("accountName", data.get("debit", data.get("credit", "")))),
+        _safe_str(data.get("noteItem", "")),
+        _safe_float(data.get("debitAmount", 0)),
+        _safe_float(data.get("creditAmount", 0)),
+        _safe_str(data.get("indexRef", "")),
+    ]
+
+
+def _parse_d1_5_row(row: tuple, actual_headers: list[str]) -> dict:
+    normalized = _normalize_d1_5_headers(actual_headers)
+    return {
+        "rowId": str(uuid4()),
+        "description": _safe_str(_col_val(row, normalized, "调整事项说明")),
+        "category": _map_d1_5_category(_safe_str(_col_val(row, normalized, "类别"))),
+        "reportItem": _safe_str(_col_val(row, normalized, "报表项目")),
+        "accountName": _safe_str(_col_val(row, normalized, "科目名称")),
+        "noteItem": _safe_str(_col_val(row, normalized, "附注项目")),
+        "debitAmount": _safe_float(_col_val(row, normalized, "借方调整金额")),
+        "creditAmount": _safe_float(_col_val(row, normalized, "贷方调整金额")),
+        "indexRef": _safe_str(_col_val(row, normalized, "索引")),
+        "isPushedToAdjTable": False,
+    }
+
+
+def _map_d1_5_category(raw: str) -> str:
+    if raw in ("AJE", "账项调整"):
+        return "账项调整"
+    if raw in ("RJE", "报表调整"):
+        return "报表调整"
+    if raw in ("其他",):
+        return "其他"
+    return raw or "账项调整"
+
+
+def _parse_d1_5_legacy_row(row: tuple, actual_headers: list[str], seq: int) -> list[dict]:
+    """旧版单列金额格式 → 拆分为借/贷两行（对齐 D4-4 双列模型）。"""
+    entry_type = _safe_str(_col_val(row, actual_headers, "类别")) or "AJE"
+    category = _map_d1_5_category(entry_type)
+    debit_acct = _safe_str(_col_val(row, actual_headers, "借方科目"))
+    credit_acct = _safe_str(_col_val(row, actual_headers, "贷方科目"))
+    amount = _safe_float(_col_val(row, actual_headers, "金额"))
+    desc = _safe_str(_col_val(row, actual_headers, "说明"))
+    rows: list[dict] = []
+    if debit_acct and amount:
+        rows.append({
+            "rowId": str(uuid4()),
+            "description": desc,
+            "category": category,
+            "reportItem": "",
+            "accountName": debit_acct,
+            "noteItem": "",
+            "debitAmount": amount,
+            "creditAmount": 0,
+            "indexRef": "",
+            "isPushedToAdjTable": False,
+        })
+    if credit_acct and amount:
+        rows.append({
+            "rowId": str(uuid4()),
+            "description": desc,
+            "category": category,
+            "reportItem": "",
+            "accountName": credit_acct,
+            "noteItem": "",
+            "debitAmount": 0,
+            "creditAmount": amount,
+            "indexRef": "",
+            "isPushedToAdjTable": False,
+        })
+    if not rows and (desc or amount):
+        rows.append({
+            "rowId": str(uuid4()),
+            "description": desc,
+            "category": category,
+            "reportItem": "",
+            "accountName": debit_acct or credit_acct,
+            "noteItem": "",
+            "debitAmount": amount if debit_acct else 0,
+            "creditAmount": amount if credit_acct and not debit_acct else 0,
+            "indexRef": "",
+            "isPushedToAdjTable": False,
+        })
+    return rows
+
+
+def _export_d1_5_row_legacy(idx: int, data: dict[str, str | float]) -> list:
     return [
         idx,
         _safe_str(data.get("type", "")),
@@ -1089,10 +1550,13 @@ def _export_d1_16_writeoff_row(data: dict) -> list:
         _safe_float(data.get("writeoffAmount")),
         _safe_str(data.get("writeoffReason", "")),
         _safe_str(data.get("writeoffProcedure", "")),
+        _safe_str(data.get("isRelatedPartyGenerated", "")),
+        _safe_str(data.get("reasonabilityAnalysis", "")),
+        _safe_str(data.get("indexRef", "")),
     ]
 
 
-def _parse_d1_5_row(row: tuple, actual_headers: list[str], seq: int) -> dict:
+def _parse_d1_5_row_legacy_single(row: tuple, actual_headers: list[str], seq: int) -> dict:
     return {
         "type": _safe_str(_col_val(row, actual_headers, "类别")) or "AJE",
         "debit": _safe_str(_col_val(row, actual_headers, "借方科目")),
@@ -1101,6 +1565,133 @@ def _parse_d1_5_row(row: tuple, actual_headers: list[str], seq: int) -> dict:
         "desc": _safe_str(_col_val(row, actual_headers, "说明")),
         "seq": int(_safe_float(_col_val(row, actual_headers, "序号"))) or seq,
     }
+
+
+async def _load_d1_5_entries(wp_id: str, db: AsyncSession) -> list[dict]:
+    """加载 D1-5 调整分录：优先 JSON，兼容 legacy 分散存储。"""
+    json_rows = await _load_remark_json(wp_id, "D1-entry-rows", db)
+    if isinstance(json_rows, list) and json_rows:
+        return json_rows
+
+    import sqlalchemy as sa
+
+    count_row = await db.execute(
+        sa.text(
+            "SELECT remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id = 'D1-entry-count' LIMIT 1"
+        ),
+        {"wp_id": wp_id},
+    )
+    count_val = count_row.fetchone()
+    count = int(_safe_float(count_val.remark if count_val and count_val.remark else 0))
+    entries: list[dict] = []
+    for i in range(1, count + 1):
+        fields = ["type", "debit", "credit", "amount", "desc"]
+        data: dict[str, str | float] = {}
+        for f in fields:
+            item_id = f"D1-entry-{i}-{f}"
+            if f == "type":
+                res = await db.execute(
+                    sa.text(
+                        "SELECT conclusion, remark FROM checklist_responses "
+                        "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+                    ),
+                    {"wp_id": wp_id, "item_id": item_id},
+                )
+                r = res.fetchone()
+                data["type"] = _safe_str(r.conclusion if r else "")
+            else:
+                res = await db.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+                    ),
+                    {"wp_id": wp_id, "item_id": item_id},
+                )
+                r = res.fetchone()
+                data[f] = r.remark if r and r.remark else (0 if f == "amount" else "")
+        # legacy → 新结构（拆借/贷行）
+        for leg in _parse_d1_5_legacy_row(
+            (
+                None,
+                data.get("type"),
+                data.get("debit"),
+                data.get("credit"),
+                data.get("amount"),
+                data.get("desc"),
+            ),
+            _D1_5_LEGACY_HEADERS,
+            i,
+        ):
+            entries.append(leg)
+    return entries
+
+
+async def _persist_d1_5_entries(wp_id: str, rows: list[dict], db: AsyncSession) -> None:
+    """写入 D1-entry-rows JSON，并同步 legacy keys 供旧逻辑读取。"""
+    import sqlalchemy as sa
+
+    remark_json = json.dumps(rows, ensure_ascii=False)
+    await db.execute(
+        sa.text("""
+            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :wp_id, 'D1-entry-rows', :remark, NOW())
+            ON CONFLICT (wp_id, item_id)
+            DO UPDATE SET remark = :remark, updated_at = NOW()
+        """),
+        {"id": str(uuid4()), "wp_id": wp_id, "remark": remark_json},
+    )
+
+    await db.execute(
+        sa.text("DELETE FROM checklist_responses WHERE wp_id = :wp_id AND item_id LIKE 'D1-entry-%' AND item_id != 'D1-entry-rows'"),
+        {"wp_id": wp_id},
+    )
+
+    aje_total = sum(
+        max(_safe_float(r.get("debitAmount")), _safe_float(r.get("creditAmount")))
+        for r in rows
+        if _map_d1_5_category(_safe_str(r.get("category"))) == "账项调整"
+    )
+    rje_total = sum(
+        max(_safe_float(r.get("debitAmount")), _safe_float(r.get("creditAmount")))
+        for r in rows
+        if _map_d1_5_category(_safe_str(r.get("category"))) == "报表调整"
+    )
+
+    legacy_items: list[tuple[str, str | None, str | None]] = [
+        ("D1-entry-count", None, str(len(rows))),
+        ("D1-adj-bank-acceptance-aje-dr", None, str(aje_total)),
+        ("D1-adj-bank-acceptance-rje-dr", None, str(rje_total)),
+    ]
+    for i, row in enumerate(rows, start=1):
+        cat = _map_d1_5_category(_safe_str(row.get("category")))
+        entry_type = "AJE" if cat == "账项调整" else ("RJE" if cat == "报表调整" else "AJE")
+        amt = max(_safe_float(row.get("debitAmount")), _safe_float(row.get("creditAmount")))
+        legacy_items.extend([
+            (f"D1-entry-{i}-type", entry_type, None),
+            (f"D1-entry-{i}-debit", None, _safe_str(row.get("accountName")) if _safe_float(row.get("debitAmount")) else ""),
+            (f"D1-entry-{i}-credit", None, _safe_str(row.get("accountName")) if _safe_float(row.get("creditAmount")) else ""),
+            (f"D1-entry-{i}-amount", None, str(amt)),
+            (f"D1-entry-{i}-desc", None, _safe_str(row.get("description"))),
+        ])
+
+    for item_id, conclusion, remark in legacy_items:
+        await db.execute(
+            sa.text("""
+                INSERT INTO checklist_responses (id, wp_id, item_id, conclusion, remark, updated_at)
+                VALUES (:id, :wp_id, :item_id, :conclusion, :remark, NOW())
+                ON CONFLICT (wp_id, item_id)
+                DO UPDATE SET conclusion = :conclusion, remark = :remark, updated_at = NOW()
+            """),
+            {
+                "id": str(uuid4()),
+                "wp_id": wp_id,
+                "item_id": item_id,
+                "conclusion": conclusion,
+                "remark": remark,
+            },
+        )
+    await db.commit()
 
 
 def _parse_d1_16_reversal_row(row: tuple, actual_headers: list[str]) -> dict:
@@ -1125,6 +1716,9 @@ def _parse_d1_16_writeoff_row(row: tuple, actual_headers: list[str]) -> dict:
         "writeoffAmount": _safe_float(_col_val(row, actual_headers, "核销金额")),
         "writeoffReason": _safe_str(_col_val(row, actual_headers, "核销原因")),
         "writeoffProcedure": _safe_str(_col_val(row, actual_headers, "履行的核销程序")),
+        "isRelatedPartyGenerated": _safe_str(_col_val(row, actual_headers, "是否由关联交易产生")),
+        "reasonabilityAnalysis": _safe_str(_col_val(row, actual_headers, "合理性分析")),
+        "indexRef": _safe_str(_col_val(row, actual_headers, "索引号")),
     }
 
 
@@ -1190,54 +1784,15 @@ async def _upsert_d1_cell(db: AsyncSession, wp_id: str, item_id: str, remark: st
     )
 
 
-async def _load_d1_5_entries(wp_id: str, db: AsyncSession) -> list[dict]:
-    import sqlalchemy as sa
-
-    count_row = await db.execute(
-        sa.text(
-            "SELECT remark FROM checklist_responses "
-            "WHERE wp_id = :wp_id AND item_id = 'D1-entry-count' LIMIT 1"
-        ),
-        {"wp_id": wp_id},
-    )
-    count_val = count_row.fetchone()
-    count = int(_safe_float(count_val.remark if count_val and count_val.remark else 0))
-    entries: list[dict] = []
-    for i in range(1, count + 1):
-        fields = ["type", "debit", "credit", "amount", "desc"]
-        data: dict[str, str | float] = {}
-        for f in fields:
-            item_id = f"D1-entry-{i}-{f}"
-            if f == "type":
-                res = await db.execute(
-                    sa.text(
-                        "SELECT conclusion, remark FROM checklist_responses "
-                        "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-                    ),
-                    {"wp_id": wp_id, "item_id": item_id},
-                )
-                r = res.fetchone()
-                data["type"] = _safe_str(r.conclusion if r else "")
-            else:
-                res = await db.execute(
-                    sa.text(
-                        "SELECT remark FROM checklist_responses "
-                        "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-                    ),
-                    {"wp_id": wp_id, "item_id": item_id},
-                )
-                r = res.fetchone()
-                data[f] = r.remark if r and r.remark else (0 if f == "amount" else "")
-        entries.append(data)
-    return entries
-
-
 async def _export_d1_5_data(wp_id: str, db: AsyncSession) -> StreamingResponse:
     entries = await _load_d1_5_entries(wp_id, db)
-    wb = _create_template_wb("D1-5")
+    wb = _create_template_wb("D1-5", include_guidance=False)
     ws = wb.active
-    for i, entry in enumerate(entries, start=1):
-        ws.append(_export_d1_5_row(i, entry))
+    data_start = 6  # 标题区 1-4 + 表头 5
+    for i, entry in enumerate(entries):
+        row_values = _export_d1_5_row(entry)
+        for col_idx, val in enumerate(row_values, start=1):
+            ws.cell(row=data_start + i, column=col_idx, value=val)
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -1371,60 +1926,46 @@ async def _import_d1_5_data(
     ws: Any,
     actual_headers: list[str],
     db: AsyncSession,
+    data_start: int = 6,
 ) -> dict[str, Any]:
-    import sqlalchemy as sa
-
     parsed: list[dict] = []
     row_count = 0
     truncated = False
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    legacy = _is_d1_5_legacy_headers(actual_headers)
+    normalized = actual_headers if legacy else _normalize_d1_5_headers(actual_headers)
+
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
+        # 跳过标题/metadata 行
+        first = _safe_str(row[0] if row else "")
+        if first in ("致同会计师事务所", "应收票据调整分录汇总表", "被审计单位名称", "截止日: 202X年12月31日"):
+            continue
+        if first.startswith("索引号") or first.startswith("页次"):
+            continue
+
         row_count += 1
         if row_count > _ROW_LIMIT:
             truncated = True
             break
-        parsed.append(_parse_d1_5_row(row, actual_headers, row_count))
 
-    # 清除旧 entry keys（批量写入新数据）
-    await db.execute(
-        sa.text("DELETE FROM checklist_responses WHERE wp_id = :wp_id AND item_id LIKE 'D1-entry-%'"),
-        {"wp_id": wp_id},
-    )
+        if legacy:
+            parsed.extend(_parse_d1_5_legacy_row(row, actual_headers, row_count))
+        else:
+            item = _parse_d1_5_row(row, normalized)
+            if not item.get("description") and not item.get("accountName"):
+                if item.get("debitAmount") == 0 and item.get("creditAmount") == 0:
+                    continue
+            parsed.append(item)
 
-    items_to_write: list[tuple[str, str | None, str | None]] = [
-        ("D1-entry-count", None, str(len(parsed))),
-    ]
-    for i, entry in enumerate(parsed, start=1):
-        items_to_write.append((f"D1-entry-{i}-type", entry["type"], None))
-        items_to_write.append((f"D1-entry-{i}-debit", None, entry["debit"]))
-        items_to_write.append((f"D1-entry-{i}-credit", None, entry["credit"]))
-        items_to_write.append((f"D1-entry-{i}-amount", None, str(entry["amount"])))
-        items_to_write.append((f"D1-entry-{i}-desc", None, entry["desc"]))
-
-    for item_id, conclusion, remark in items_to_write:
-        await db.execute(
-            sa.text("""
-                INSERT INTO checklist_responses (id, wp_id, item_id, conclusion, remark, updated_at)
-                VALUES (:id, :wp_id, :item_id, :conclusion, :remark, NOW())
-                ON CONFLICT (wp_id, item_id)
-                DO UPDATE SET conclusion = :conclusion, remark = :remark, updated_at = NOW()
-            """),
-            {
-                "id": str(uuid4()),
-                "wp_id": wp_id,
-                "item_id": item_id,
-                "conclusion": conclusion,
-                "remark": remark,
-            },
-        )
-    await db.commit()
+    await _persist_d1_5_entries(wp_id, parsed, db)
 
     result: dict[str, Any] = {
         "ok": True,
         "imported_count": len(parsed),
         "row_count": len(parsed),
         "field_count": len(_SHEET_HEADERS["D1-5"]),
+        "detected_header_row": data_start - 1,
     }
     if truncated:
         result["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
@@ -1437,13 +1978,14 @@ async def _import_d1_1_data(
     ws: Any,
     actual_headers: list[str],
     db: AsyncSession,
+    data_start: int = 2,
 ) -> dict[str, Any]:
     rows_data: list[dict[str, Any]] = []
     row_count = 0
     truncated = False
     valid_row_keys = {rk for rk, _ in _D1_1_ROWS}
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
         parsed_row_key = _safe_str(_col_val(row, actual_headers, "行键"))
@@ -1503,6 +2045,7 @@ async def _import_d1_14_data(
     ws: Any,
     actual_headers: list[str],
     db: AsyncSession,
+    data_start: int = 2,
 ) -> dict[str, Any]:
     import sqlalchemy as sa
 
@@ -1510,7 +2053,7 @@ async def _import_d1_14_data(
     truncated = False
     valid_item_ids = {item_id for item_id, _ in _D1_14_ROWS}
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
         rows_count += 1
@@ -1856,12 +2399,17 @@ async def _import_d1_13_data(
 async def d1_export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码: D1-2, D1-3, D1-4, D1-6, D1-7, D1-8, D1-8T, D1-9, D1-15"),
+    include_guidance: bool = Query(True, description="是否包含编制说明"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出空白xlsx模板（含表头+格式，无数据行）"""
+    """导出空白xlsx模板（含表头+格式+编制说明，无业务数据行）"""
     _validate_sheet(sheet)
 
-    wb = _create_template_wb(sheet)
+    wb = _create_template_wb(sheet, include_guidance=include_guidance)
+    if sheet == "D1-5":
+        ws = wb.active
+        await _add_d1_5_data_validation(ws, wp_id, db, _SHEET_HEADERS["D1-5"])
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -1938,24 +2486,32 @@ async def d1_export_data(
             except (json.JSONDecodeError, TypeError):
                 pass
 
-    # 生成 xlsx
-    wb = _create_template_wb(sheet)
-    ws = wb.active
-
-    export_fn = {
-        "D1-2": _export_d1_2_row,
-        "D1-3": _export_d1_3_row,
-        "D1-4": _export_d1_4_row,
-        "D1-6": _export_d1_6_row,
-        "D1-8": _export_d1_8_row,
-        "D1-8T": _export_d1_8_row,
-        "D1-9": _export_d1_9_row,
-        "D1-10": _export_d1_10_row,
-        "D1-11": _export_d1_11_row,
-        "D1-12": _export_d1_12_row,
-    }[sheet]
-    for i, data_row in enumerate(rows_data, start=1):
-        ws.append(export_fn(data_row))
+    # 生成 xlsx（数据导出不含编制说明占位结构；D1-4 单独写双行表头）
+    if sheet == "D1-4":
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "D1-4"
+        header_row = _write_d1_4_multi_headers(ws)
+        ws.freeze_panes = f"A{header_row + 1}"
+        for data_row in rows_data:
+            ws.append(_export_d1_4_row(data_row))
+    else:
+        wb = _create_template_wb(sheet, include_guidance=False)
+        ws = wb.active
+        export_fn = {
+            "D1-2": _export_d1_2_row,
+            "D1-3": _export_d1_3_row,
+            "D1-4": _export_d1_4_row,
+            "D1-6": _export_d1_6_row,
+            "D1-8": _export_d1_8_row,
+            "D1-8T": _export_d1_8_row,
+            "D1-9": _export_d1_9_row,
+            "D1-10": _export_d1_10_row,
+            "D1-11": _export_d1_11_row,
+            "D1-12": _export_d1_12_row,
+        }[sheet]
+        for data_row in rows_data:
+            ws.append(export_fn(data_row))
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -2135,15 +2691,34 @@ async def d1_import_data(
     if ws is None:
         raise HTTPException(400, "xlsx文件中无活动工作表")
 
-    # 验证列头
-    actual_headers = [
-        str(cell.value).strip() if cell.value else ""
-        for cell in next(ws.iter_rows(min_row=1, max_row=1))
-    ]
+    # 自动定位表头行（兼容标题行 / 多行合并表头）
+    expected_headers = _SHEET_HEADERS.get(sheet, [])
+    if sheet in ("D1-16", "D1-13"):
+        header_row, actual_headers = 1, []
+        missing_cols: list[str] = []
+    elif sheet == "D1-5":
+        header_row, actual_headers = _find_header_row(ws, expected_headers)
+        if _is_d1_5_legacy_headers(actual_headers):
+            present = {h for h in actual_headers if h}
+            missing_cols = [h for h in _D1_5_LEGACY_HEADERS if h not in present and h != "序号"]
+        else:
+            normalized = _normalize_d1_5_headers(actual_headers)
+            missing_cols = _validate_columns_against(normalized, sheet)
+    else:
+        header_row, actual_headers = _find_header_row(ws, expected_headers)
+        missing_cols = _validate_columns_against(actual_headers, sheet)
 
-    missing_cols = _validate_columns(ws, sheet) if sheet not in ("D1-16", "D1-13") else []
     if missing_cols:
-        raise HTTPException(400, detail={"message": "列名不匹配", "invalid_columns": missing_cols})
+        raise HTTPException(
+            400,
+            detail={
+                "message": "列名不匹配",
+                "invalid_columns": missing_cols,
+                "detected_header_row": header_row,
+            },
+        )
+
+    data_start = header_row + 1
 
     if sheet == "D1-16":
         result = await _import_d1_16_data(wp_id, ws, db)
@@ -2151,12 +2726,12 @@ async def d1_import_data(
         return result
 
     if sheet == "D1-1":
-        result = await _import_d1_1_data(wp_id, ws, actual_headers, db)
+        result = await _import_d1_1_data(wp_id, ws, actual_headers, db, data_start=data_start)
         wb.close()
         return result
 
     if sheet == "D1-14":
-        result = await _import_d1_14_data(wp_id, ws, actual_headers, db)
+        result = await _import_d1_14_data(wp_id, ws, actual_headers, db, data_start=data_start)
         wb.close()
         return result
 
@@ -2166,25 +2741,25 @@ async def d1_import_data(
         return result
 
     if sheet == "D1-5":
-        result = await _import_d1_5_data(wp_id, ws, actual_headers, db)
+        result = await _import_d1_5_data(wp_id, ws, actual_headers, db, data_start=data_start)
         wb.close()
         return result
 
     # D1-15 特殊处理：双section格式导入
     if sheet == "D1-15":
-        result = await _import_d1_15_data(wp_id, ws, actual_headers, db)
+        result = await _import_d1_15_data(wp_id, ws, actual_headers, db, data_start=data_start)
         wb.close()
         return result
 
     # D1-7 特殊处理：拆分为 {bankRows, commercialRows} dict存储
     if sheet == "D1-7":
-        result = await _import_d1_7_data(wp_id, ws, actual_headers, db)
+        result = await _import_d1_7_data(wp_id, ws, actual_headers, db, data_start=data_start)
         wb.close()
         return result
 
     # D1-4 特殊处理：按单项/按组合拆分写入
     if sheet == "D1-4":
-        result = await _import_d1_4_data(wp_id, ws, actual_headers, db)
+        result = await _import_d1_4_data(wp_id, ws, actual_headers, db, data_start=data_start)
         wb.close()
         return result
 
@@ -2204,7 +2779,7 @@ async def d1_import_data(
     truncated = False
     row_count = 0
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
         row_count += 1
@@ -2241,6 +2816,7 @@ async def d1_import_data(
         "imported_count": len(rows_data),
         "row_count": len(rows_data),
         "field_count": len(_SHEET_HEADERS[sheet]),
+        "detected_header_row": header_row,
     }
     if truncated:
         result_data["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断至{_ROW_LIMIT}行"
@@ -2254,6 +2830,7 @@ async def _import_d1_4_data(
     ws: Any,
     actual_headers: list[str],
     db: AsyncSession,
+    data_start: int = 2,
 ) -> dict[str, Any]:
     """D1-4 坏账准备：按「按组合计提」分界拆分为 individual / portfolio 两组写入"""
     import sqlalchemy as sa
@@ -2264,22 +2841,62 @@ async def _import_d1_4_data(
     truncated = False
     row_count = 0
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
         label = _safe_str(_col_val(row, actual_headers, "项目"))
+        # 跳过模板空占位行（无项目名且金额全空）
+        if not label and all(
+            _safe_float(_col_val(row, actual_headers, c)) == 0
+            for c in (
+                "期初未审", "期初AJE", "期初RJE",
+                "本期计提", "本期收回", "本期转回", "本期核销", "本期其他",
+                "期末AJE", "期末RJE",
+            )
+        ):
+            continue
         if label == "按组合计提":
             current_section = "portfolio"
+        elif label == "按单项计提":
+            current_section = "individual"
         row_count += 1
         if row_count > _ROW_LIMIT:
             truncated = True
             break
         parsed = _parse_d1_4_row(row, actual_headers)
         parsed["category"] = current_section
+        if label == "按单项计提":
+            parsed["rowId"] = "fixed-individual"
+            parsed["isSubRow"] = False
+        elif label == "按组合计提":
+            parsed["rowId"] = "fixed-portfolio"
+            parsed["isSubRow"] = False
+        else:
+            parsed["isSubRow"] = True
+            if not parsed.get("rowId"):
+                parsed["rowId"] = f"sub-{uuid4()}"
         if current_section == "portfolio":
             portfolio_rows.append(parsed)
         else:
             individual_rows.append(parsed)
+
+    # 确保两组至少有父行
+    if not any(r.get("rowId") == "fixed-individual" for r in individual_rows):
+        individual_rows.insert(0, {
+            "rowId": "fixed-individual", "category": "individual",
+            "label": "按单项计提", "isSubRow": False,
+            "priorUnadjusted": 0, "priorAje": 0, "priorRje": 0,
+            "currentProvision": 0, "currentRecovery": 0, "currentReversal": 0,
+            "currentWriteOff": 0, "currentOther": 0, "currentAje": 0, "currentRje": 0,
+        })
+    if not any(r.get("rowId") == "fixed-portfolio" for r in portfolio_rows):
+        portfolio_rows.insert(0, {
+            "rowId": "fixed-portfolio", "category": "portfolio",
+            "label": "按组合计提", "isSubRow": False,
+            "priorUnadjusted": 0, "priorAje": 0, "priorRje": 0,
+            "currentProvision": 0, "currentRecovery": 0, "currentReversal": 0,
+            "currentWriteOff": 0, "currentOther": 0, "currentAje": 0, "currentRje": 0,
+        })
 
     for item_id, rows in [
         ("D1-bd-individual-rows", individual_rows),
@@ -2305,6 +2922,7 @@ async def _import_d1_4_data(
         "field_count": len(_SHEET_HEADERS["D1-4"]),
         "individual_count": len(individual_rows),
         "portfolio_count": len(portfolio_rows),
+        "detected_header_row": data_start - 1,
     }
     if truncated:
         result["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断至{_ROW_LIMIT}行"
@@ -2317,6 +2935,7 @@ async def _import_d1_15_data(
     ws: Any,
     actual_headers: list[str],
     db: AsyncSession,
+    data_start: int = 2,
 ) -> dict[str, Any]:
     """D1-15 双section格式导入：解析section分隔符，分别写入组合行和单项行"""
     import sqlalchemy as sa
@@ -2331,7 +2950,7 @@ async def _import_d1_15_data(
     found_portfolio_marker = False
     found_individual_marker = False
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
 
@@ -2414,6 +3033,7 @@ async def _import_d1_7_data(
     ws: Any,
     actual_headers: list[str],
     db: AsyncSession,
+    data_start: int = 2,
 ) -> dict[str, Any]:
     """D1-7 备查簿导入：按"票据类型"列拆分为 bank/commercial 两组，写回dict存储。"""
     import sqlalchemy as sa
@@ -2423,7 +3043,7 @@ async def _import_d1_7_data(
     truncated = False
     total_count = 0
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=data_start, values_only=True):
         if all(v is None for v in row):
             continue
         total_count += 1
@@ -2523,16 +3143,243 @@ async def d1_ecl_import_data(
     if ws is None:
         raise HTTPException(400, "xlsx文件中无活动工作表")
 
-    # 验证列头
-    actual_headers = [
-        str(cell.value).strip() if cell.value else ""
-        for cell in next(ws.iter_rows(min_row=1, max_row=1))
-    ]
-
-    missing_cols = _validate_columns(ws, "D1-15")
+    # 验证列头（自动定位，兼容多行合并表头）
+    header_row, actual_headers = _find_header_row(ws, _SHEET_HEADERS["D1-15"])
+    missing_cols = _validate_columns_against(actual_headers, "D1-15")
     if missing_cols:
         raise HTTPException(400, detail={"message": "列名不匹配", "invalid_columns": missing_cols})
 
-    result = await _import_d1_15_data(wp_id, ws, actual_headers, db)
+    result = await _import_d1_15_data(wp_id, ws, actual_headers, db, data_start=header_row + 1)
     wb.close()
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 编制说明文本（导出模板时附加，对齐 D4-2）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_SHEET_GUIDANCE: dict[str, list[str]] = {
+    "D1-1": [
+        "D1-1 应收票据审定表 编制说明",
+        "",
+        "一、本表目的",
+        "列示应收票据原值及坏账准备的期初/期末未审、AJE、RJE，形成审定数并与试算平衡表勾稽。",
+        "",
+        "二、填写要求",
+        "1. 「行键」列请勿修改（系统识别用）。",
+        "2. 填写各行期初/期末未审、AJE、RJE及原因分析。",
+        "3. 审定金额由系统自动计算，导入时忽略计算列。",
+        "",
+        "三、注意事项",
+        "1. 请勿删除或改名「编制说明」以外的数据表表头。",
+        "2. 若在表头上方插入标题行，导入时会自动识别表头行。",
+        "3. 本表合计应与总账/试算平衡表一致。",
+    ],
+    "D1-2": [
+        "D1-2 原值明细表（按类别）编制说明",
+        "",
+        "一、本表目的",
+        "按票据种类（银行承兑汇票/商业承兑汇票等）列示原值期初、本期增减及期末调整。",
+        "",
+        "二、填写要求",
+        "1. 「票据种类」：填写类别名称，建议与审定表分类一致。",
+        "2. 「期初未审/期初AJE/期初RJE」：填写期初账面及调整。",
+        "3. 「本期增加/本期减少」：填写本期发生额。",
+        "4. 「期末AJE/期末RJE」：填写期末调整。",
+        "5. 期初审定、期末余额、期末审定由系统自动计算，导入时忽略。",
+        "",
+        "三、注意事项",
+        "1. 不要改动表头列名；可在表头上方增加标题行，系统会自动定位表头。",
+        "2. 本表合计应与 D1-1 原值行、总账勾稽。",
+        "3. 单次导入不超过 500 行。",
+    ],
+    "D1-3": [
+        "D1-3 原值明细表（按客户）编制说明",
+        "",
+        "一、本表目的",
+        "按客户列示应收票据原值明细，识别关联方，并与 D1-2/总账勾稽。",
+        "",
+        "二、填写要求",
+        "1. 「客户名称」「公司代码」「关联关系」：关联关系可由系统按 B19 清单自动匹配，也可手工填写。",
+        "2. 「期初未审/期初AJE/期初RJE」：期初数据。",
+        "3. 「本期增加/本期减少」：本期发生。",
+        "4. 「期末余额」：若导出含此列，导入时仍以「期初审定+增加-减少」重算为准。",
+        "5. 「重分类」：被审计单位重分类调整。",
+        "6. 「期末AJE/期末RJE」：期末调整。",
+        "7. 期初审定、期末余额、期末未审、期末审定由系统自动计算。",
+        "",
+        "三、注意事项",
+        "1. 请保持表头列名与模板一致；多行合并表头时以叶子列名行为准。",
+        "2. 关联方清单请在 B19-1「管理层提供的关联方清单」维护。",
+        "3. 本表合计应与 D1-2、D1-1 勾稽。",
+        "4. 单次导入不超过 500 行。",
+    ],
+    "D1-4": [
+        "D1-4 坏账准备明细表 编制说明",
+        "",
+        "一、本表目的",
+        "列示应收票据坏账准备按单项计提、按组合计提的期初、本期变动及期末余额，并与 D1-15 ECL、D1-16 转回核销勾稽。",
+        "",
+        "二、表头说明（双行合并）",
+        "第1行为分组标题（期初余额/本期增加/本期减少/期末余额），第2行为叶子列名。",
+        "导入时系统自动识别叶子表头行，请勿删除或改名叶子列。",
+        "叶子列：项目、期初未审、期初AJE、期初RJE、本期计提、本期收回、本期转回、本期核销、本期其他、期末AJE、期末RJE。",
+        "",
+        "三、填写要求",
+        "1. 先填写「按单项计提」父行及其子行（子项名称写在「项目」列）。",
+        "2. 再填写「按组合计提」父行及其子行。",
+        "3. 「按组合计提」行是分区标记，导入时以此切换到组合段，请保留该行文字。",
+        "4. 期初审定、期末未审、期末审定由系统自动计算，导入时忽略。",
+        "5. 公式：期初审定=期初未审+期初AJE+期初RJE；",
+        "   期末未审=期初审定+本期计提+本期收回-本期转回-本期核销+本期其他；",
+        "   期末审定=期末未审+期末AJE+期末RJE。",
+        "",
+        "四、注意事项",
+        "1. 空占位行可保留，导入时会自动跳过。",
+        "2. 小计行无需填写，页面自动汇总。",
+        "3. 本表期末审定应与 D1-15 ECL 测算结果核对；转回/核销应与 D1-16 勾稽。",
+        "4. 单次导入不超过 500 行。",
+    ],
+    "D1-6": [
+        "D1-6 应收票据业务模式分析 编制说明",
+        "",
+        "一、本表目的",
+        "记录各票据组合的业务模式及依据，并通过分类判断矩阵确定列报项目（应收票据/应收款项融资等）。",
+        "",
+        "二、填写要求",
+        "1. 表(一)填写组合名称、被审计单位管理应收票据业务模式、具体依据、索引号、备注。",
+        "2. 三组合固定行请勿删除；业务模式可选：以收取合同现金流量为目标 / 以收取合同现金流量和出售金融资产为目标 / 其他。",
+        "3. 表(二)分类判断 QA 矩阵仅在页面填写，不支持 Excel 导入导出。",
+        "",
+        "三、编制参考",
+        "1. 低信用银行承兑、商业承兑汇票贴现/背书通常不导致终止确认，一般不改变「收取合同现金流量」业务模式。",
+        "2. 高信用银行承兑若频繁贴现/背书，可能为「收取合同现金流量和出售金融资产」目标，列报应收款项融资。",
+        "3. 应在组合层次评价业务模式，可与 D1-7 备查簿、D1-8 贴现背书明细勾稽。",
+        "",
+        "四、注意事项",
+        "保持表头列名不变；可在表头上方加标题行；单次导入不超过 500 行。",
+    ],
+    "D1-7": [
+        "D1-7 备查簿 编制说明",
+        "",
+        "一、本表目的",
+        "登记应收票据备查簿明细（银行承兑/商业承兑），支撑存在性与完整性核对。",
+        "",
+        "二、填写要求",
+        "1. 「票据类型」必须填写，导入时据此拆分为银行/商业两组。",
+        "2. 其余列按模板表头填写；金额类列填数字。",
+        "",
+        "三、注意事项",
+        "勿改表头；单次不超过 500 行。",
+    ],
+    "D1-8": [
+        "D1-8 已贴现明细 编制说明",
+        "",
+        "一、本表目的",
+        "列示已贴现票据明细，评价终止确认及会计处理是否正确。",
+        "",
+        "二、注意事项",
+        "保持表头一致；可在表头上方插入标题行。",
+    ],
+    "D1-8T": [
+        "D1-8T 已背书明细 编制说明",
+        "",
+        "一、本表目的",
+        "列示已背书转让票据明细，评价终止确认及会计处理是否正确。",
+        "",
+        "二、注意事项",
+        "保持表头一致；可在表头上方插入标题行。",
+    ],
+    "D1-9": [
+        "D1-9 贴息检查表 编制说明",
+        "",
+        "一、本表目的",
+        "复核贴现利息计算是否正确。",
+        "",
+        "二、填写要求",
+        "填写票面金额、利率、日期、贴现率、账面贴现利息等；",
+        "贴息天数/应计贴现利息/差异为计算列，导入时忽略。",
+        "",
+        "三、注意事项",
+        "保持表头一致。",
+    ],
+    "D1-10": [
+        "D1-10 监盘表 编制说明",
+        "填写监盘票据明细及差异说明；保持表头一致。",
+    ],
+    "D1-11": [
+        "D1-11 关联方检查表 编制说明",
+        "填写关联方应收票据余额及发生额；保持表头一致。",
+    ],
+    "D1-12": [
+        "D1-12 质押检查表 编制说明",
+        "填写质押票据明细；保持表头一致。",
+    ],
+    "D1-13": [
+        "D1-13 一般检查（抽样）编制说明",
+        "本模板含多 section（抽样总体/特定样本/凭证核对/结论），请按各 section 表头填写，勿删除 section 标题行。",
+    ],
+    "D1-14": [
+        "D1-14 会计政策检查 编制说明",
+        "按「item_id/项目」行填写结论与内容，勿改 item_id。",
+    ],
+    "D1-15": [
+        "D1-15 ECL 测算表 编制说明",
+        "",
+        "一、本表目的",
+        "按组合/单项测算预期信用损失，并与 D1-4 坏账准备勾稽。",
+        "",
+        "二、填写要求",
+        "保留「--- 按组合计提 ---」「--- 按单项计提 ---」分隔行；",
+        "应计提、差异为计算列，导入时忽略。",
+        "",
+        "三、注意事项",
+        "保持表头一致；可在表头上方加标题行。",
+    ],
+    "D1-5": [
+        "D1-5 应收票据调整分录汇总表 编制说明",
+        "",
+        "一、本表目的",
+        "汇总记录 D1 应收票据循环审计中发现的所有需要调整的会计分录。",
+        "确认后自动更新 D1-1 审定表 AJE/RJE 列，并可推送至 A13 错报汇总表。",
+        "",
+        "二、填写要求",
+        "1. 「调整事项说明」：简要描述调整原因（对应底稿 Excel「调整事项说明」列）。",
+        "2. 「类别」：账项调整(AJE) / 报表调整(RJE) / 其他。",
+        "3. 「报表项目」「科目名称」「附注项目」：可从下拉选择试算表科目。",
+        "4. 「借方调整金额」「贷方调整金额」：同一调整分录借贷必须平衡。",
+        "5. 「索引」：填写关联底稿索引（如 D1-3、D1-15）。",
+        "",
+        "三、表头说明",
+        "模板第1-4行为标题/编制信息区，第5行为表头，数据从第6行起填写。",
+        "若在表头上方插入行，导入时系统会自动识别表头行。",
+        "",
+        "四、注意事项",
+        "1. 勿修改表头列名；支持导入旧版简化模板（借方科目/贷方科目/金额）。",
+        "2. 单次导入不超过 500 行。",
+        "3. 与调整分录模块联动时，涉及 1121 应收票据科目的分录会自动同步。",
+    ],
+    "D1-16": [
+        "D1-16 转回/核销检查 编制说明",
+        "按转回、核销两个 section 分别填写；勿删除 section 标题行。",
+    ],
+}
+
+_GENERIC_GUIDANCE: list[str] = [
+    "编制说明",
+    "",
+    "一、使用方法",
+    "1. 在数据表按表头列填写；不要修改表头列名。",
+    "2. 可在表头上方插入标题行，导入时系统会自动识别表头。",
+    "3. 若存在多行合并表头，以叶子列名行为准。",
+    "4. 单次导入建议不超过 500 行。",
+    "",
+    "二、注意事项",
+    "1. 仅支持 .xlsx 格式。",
+    "2. 计算列（如审定金额）导入时会被忽略，由系统重算。",
+]
+
+
+def _get_guidance_text(sheet_code: str) -> list[str]:
+    """获取 sheet 对应的编制说明文本"""
+    return _SHEET_GUIDANCE.get(sheet_code, _GENERIC_GUIDANCE)

@@ -26,6 +26,9 @@ router = APIRouter(prefix="/api", tags=["review-dialog"])
 class CreateMessageRequest(BaseModel):
     content: str
     message_type: str = "text"
+    target_user_id: str | None = None
+    target_user_name: str | None = None
+    target_role: str | None = None
 
 class AiGenerateRequest(BaseModel):
     section_id: str
@@ -40,6 +43,9 @@ class ReviewMessageResponse(BaseModel):
     sender_role: str
     content: str
     message_type: str
+    target_user_id: str | None = None
+    target_user_name: str | None = None
+    target_role: str | None = None
     created_at: str
 
 class ReviewThreadResponse(BaseModel):
@@ -51,6 +57,12 @@ class ReviewThreadResponse(BaseModel):
 class AiGenerateResponse(BaseModel):
     generated_text: str
     is_stub: bool = False
+
+
+class ReviewRecipient(BaseModel):
+    user_id: str
+    user_name: str
+    role: str | None = None
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -64,14 +76,35 @@ def _map_user_role(user: User) -> str:
     return _ROLE_MAP.get(role_val, "审计助理")
 
 async def _check_project_access(db: AsyncSession, user: User, project_id: UUID) -> None:
-    """验证用户对项目有权限 (users → staff_members → project_assignments)."""
-    row = (await db.execute(text(
+    """验证用户对项目有权限。
+
+    与 deps.require_project_access 对齐：
+    - admin / partner 跳过委派检查（可访问全部项目）
+    - 其余用户：project_users 或 staff_members→project_assignments 任一命中即可
+    """
+    role_val = user.role.value if hasattr(user.role, "value") else str(user.role)
+    if role_val in ("admin", "partner"):
+        return
+
+    uid, pid = str(user.id), str(project_id)
+
+    pu = (await db.execute(text(
+        "SELECT 1 FROM project_users pu "
+        "WHERE pu.user_id = :uid AND pu.project_id = :pid "
+        "AND pu.is_deleted = false LIMIT 1"
+    ), {"uid": uid, "pid": pid})).fetchone()
+    if pu is not None:
+        return
+
+    pa = (await db.execute(text(
         "SELECT 1 FROM project_assignments pa JOIN staff_members sm ON sm.id = pa.staff_id "
         "WHERE sm.user_id = :uid AND pa.project_id = :pid "
         "AND pa.is_deleted = false AND sm.is_deleted = false LIMIT 1"
-    ), {"uid": str(user.id), "pid": str(project_id)})).fetchone()
-    if row is None:
-        raise HTTPException(status_code=403, detail="无权访问该项目的复核对话")
+    ), {"uid": uid, "pid": pid})).fetchone()
+    if pa is not None:
+        return
+
+    raise HTTPException(status_code=403, detail="无权访问该项目的复核对话")
 
 async def _get_project_id_for_wp(db: AsyncSession, wp_id: str) -> UUID:
     row = (await db.execute(
@@ -86,6 +119,7 @@ async def _get_project_id_for_wp(db: AsyncSession, wp_id: str) -> UUID:
 class ActiveThreadItem(BaseModel):
     section_id: str
     has_unread: bool = False
+    has_targeted_unread: bool = False
 
 @router.get("/review-threads/active", response_model=list[ActiveThreadItem])
 async def list_active_threads(
@@ -101,18 +135,42 @@ async def list_active_threads(
         "SELECT rt.section_id, "
         "  CASE WHEN EXISTS ("
         "    SELECT 1 FROM review_messages rm "
-        "    WHERE rm.thread_id = rt.id AND rm.sender_id != :uid "
+        "    WHERE rm.thread_id = rt.id AND rm.sender_id != CAST(:uid AS uuid) "
+        "    AND (rm.message_type <> 'private' OR rm.sender_id = CAST(:uid AS uuid) OR rm.target_user_id = CAST(:uid AS uuid) "
+        "      OR (rm.target_user_name IS NOT NULL AND rm.target_user_name LIKE :uname_like)) "
         "    AND rm.created_at > COALESCE("
         "      (SELECT MAX(rm2.created_at) FROM review_messages rm2 "
-        "       WHERE rm2.thread_id = rt.id AND rm2.sender_id = :uid), "
+        "       WHERE rm2.thread_id = rt.id AND rm2.sender_id = CAST(:uid AS uuid)), "
         "      rt.created_at"
         "    )"
-        "  ) THEN true ELSE false END AS has_unread "
+        "  ) THEN true ELSE false END AS has_unread, "
+        "  CASE WHEN EXISTS ("
+        "    SELECT 1 FROM review_messages rm "
+        "    WHERE rm.thread_id = rt.id AND rm.sender_id != CAST(:uid AS uuid) "
+        "    AND (rm.target_user_id = CAST(:uid AS uuid) "
+        "      OR (rm.target_user_name IS NOT NULL AND rm.target_user_name LIKE :uname_like)) "
+        "    AND rm.created_at > COALESCE("
+        "      (SELECT MAX(rm2.created_at) FROM review_messages rm2 "
+        "       WHERE rm2.thread_id = rt.id AND rm2.sender_id = CAST(:uid AS uuid)), "
+        "      rt.created_at"
+        "    )"
+        "  ) THEN true ELSE false END AS has_targeted_unread "
         "FROM review_threads rt "
         "WHERE rt.wp_id = :wid AND rt.status = 'open'"
-    ), {"wid": wp_id, "uid": str(current_user.id)})).fetchall()
+    ), {
+        "wid": wp_id,
+        "uid": str(current_user.id),
+        "uname_like": f"%{current_user.username}%",
+    })).fetchall()
 
-    return [ActiveThreadItem(section_id=r[0], has_unread=bool(r[1])) for r in rows]
+    return [
+        ActiveThreadItem(
+            section_id=r[0],
+            has_unread=bool(r[1]),
+            has_targeted_unread=bool(r[2]),
+        )
+        for r in rows
+    ]
 
 # ── GET /api/review-threads ──────────────────────────────────────────────────
 
@@ -147,19 +205,57 @@ async def get_or_create_thread(
     thread_id = str(row[0])
     msgs = (await db.execute(text(
         "SELECT rm.id, rm.thread_id, rm.sender_id, u.username, rm.sender_role, "
-        "rm.content, rm.message_type, rm.created_at "
+        "rm.content, rm.message_type, rm.target_user_id, rm.target_user_name, rm.target_role, rm.created_at "
         "FROM review_messages rm JOIN users u ON u.id = rm.sender_id "
-        "WHERE rm.thread_id = :tid ORDER BY rm.created_at ASC"
-    ), {"tid": thread_id})).fetchall()
+        "WHERE rm.thread_id = :tid "
+        "AND (rm.message_type <> 'private' OR rm.sender_id = CAST(:uid AS uuid) OR rm.target_user_id = CAST(:uid AS uuid) "
+        "  OR (rm.target_user_name IS NOT NULL AND rm.target_user_name LIKE :uname_like)) "
+        "ORDER BY rm.created_at ASC"
+    ), {
+        "tid": thread_id,
+        "uid": str(current_user.id),
+        "uname_like": f"%{current_user.username}%",
+    })).fetchall()
 
     messages = [
         ReviewMessageResponse(
             id=str(m[0]), thread_id=str(m[1]), sender_id=str(m[2]),
             sender_name=m[3], sender_role=m[4], content=m[5],
-            message_type=m[6], created_at=m[7].isoformat() if m[7] else "",
+            message_type=m[6], target_user_id=str(m[7]) if m[7] else None,
+            target_user_name=m[8], target_role=m[9],
+            created_at=m[10].isoformat() if m[10] else "",
         ) for m in msgs
     ]
     return ReviewThreadResponse(id=thread_id, thread_key=row[1], status=row[2], messages=messages)
+
+
+@router.get("/review-dialog/recipients", response_model=list[ReviewRecipient])
+async def list_review_recipients(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ReviewRecipient]:
+    """返回当前底稿所属项目可选接收人列表。"""
+    project_id = await _get_project_id_for_wp(db, wp_id)
+    await _check_project_access(db, current_user, project_id)
+    rows = (await db.execute(text(
+        "SELECT DISTINCT u.id::text AS user_id, "
+        "COALESCE(sm.name, u.username) AS user_name, "
+        "u.role::text AS role "
+        "FROM users u "
+        "LEFT JOIN staff_members sm ON sm.user_id = u.id AND sm.is_deleted = false "
+        "WHERE u.is_deleted = false AND ("
+        " EXISTS ("
+        "   SELECT 1 FROM project_users pu "
+        "   WHERE pu.user_id = u.id AND pu.project_id = :pid AND pu.is_deleted = false"
+        " ) OR EXISTS ("
+        "   SELECT 1 FROM project_assignments pa "
+        "   WHERE pa.staff_id = sm.id AND pa.project_id = :pid AND pa.is_deleted = false"
+        " )"
+        ") "
+        "ORDER BY user_name ASC"
+    ), {"pid": str(project_id)})).fetchall()
+    return [ReviewRecipient(user_id=str(r[0]), user_name=r[1], role=r[2]) for r in rows]
 
 # ── POST /api/review-threads/{thread_id}/messages ────────────────────────────
 
@@ -181,14 +277,23 @@ async def create_message(
 
     project_id = UUID(str(trow[2]))
     await _check_project_access(db, current_user, project_id)
+    if body.message_type == "private" and not body.target_user_id:
+        raise HTTPException(status_code=400, detail="私密消息必须指定接收人")
     sender_role = _map_user_role(current_user)
     msg_id = uuid4()
 
     await db.execute(text(
-        "INSERT INTO review_messages (id, thread_id, sender_id, sender_role, content, message_type) "
-        "VALUES (:id, :tid, :sid, :role, :content, :mtype)"
+        "INSERT INTO review_messages ("
+        "id, thread_id, sender_id, sender_role, content, message_type, "
+        "target_user_id, target_user_name, target_role"
+        ") VALUES ("
+        ":id, :tid, :sid, :role, :content, :mtype, "
+        ":target_user_id, :target_user_name, :target_role"
+        ")"
     ), {"id": str(msg_id), "tid": thread_id, "sid": str(current_user.id),
-        "role": sender_role, "content": body.content, "mtype": body.message_type})
+        "role": sender_role, "content": body.content, "mtype": body.message_type,
+        "target_user_id": body.target_user_id, "target_user_name": body.target_user_name,
+        "target_role": body.target_role})
     await db.execute(text("UPDATE review_threads SET updated_at = now() WHERE id = :tid"), {"tid": thread_id})
     await db.commit()
 
@@ -204,6 +309,8 @@ async def create_message(
                 "id": str(msg_id), "sender_id": str(current_user.id),
                 "sender_name": current_user.username, "sender_role": sender_role,
                 "content": body.content, "message_type": body.message_type,
+                "target_user_id": body.target_user_id, "target_user_name": body.target_user_name,
+                "target_role": body.target_role,
                 "created_at": created_at,
             },
         })
@@ -213,7 +320,9 @@ async def create_message(
     return ReviewMessageResponse(
         id=str(msg_id), thread_id=thread_id, sender_id=str(current_user.id),
         sender_name=current_user.username, sender_role=sender_role,
-        content=body.content, message_type=body.message_type, created_at=created_at,
+        content=body.content, message_type=body.message_type,
+        target_user_id=body.target_user_id, target_user_name=body.target_user_name,
+        target_role=body.target_role, created_at=created_at,
     )
 
 # ── POST /api/workpapers/{wp_id}/review-dialog/ai-generate ──────────────────

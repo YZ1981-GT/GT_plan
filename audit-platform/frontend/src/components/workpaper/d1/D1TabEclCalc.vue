@@ -53,7 +53,7 @@ const fmtAmount = computed(() => displayPrefs.fmtAmount)
 async function saveImmediate(items: any[]): Promise<void> {
   if (props.isReadonly) return
   try {
-    await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
   } catch {
     ElMessage.warning('保存失败，请重试')
   }
@@ -65,7 +65,7 @@ async function debouncedSave(items: any[]): Promise<void> {
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(async () => {
     try {
-      await http.post(`/api/workpapers/${props.wpId}/checklist-responses/batch`, { items })
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
     } catch {
       ElMessage.warning('保存失败，请重试')
     }
@@ -88,8 +88,10 @@ const {
   grandTotalRow,
   materialityThreshold,
   exceedsMateriality,
+  auditProcedures,
   auditNote,
   auditConclusion,
+  saveAuditProcedures,
   saveAuditNote,
   saveAuditConclusion,
   isLoading,
@@ -110,15 +112,7 @@ const {
 
 // ─── Import File Input ───────────────────────────────────────────────────────
 
-const fileInput = ref<HTMLInputElement | null>(null)
-
-function triggerImport() {
-  fileInput.value?.click()
-}
-
-async function handleImport(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
+async function handleImport(file: File) {
   if (!file) return
   try {
     await importData(file)
@@ -126,9 +120,8 @@ async function handleImport(event: Event) {
     hydrate()
   } catch {
     ElMessage.error('导入失败，请检查文件格式')
-  } finally {
-    input.value = ''
   }
+  return false
 }
 
 // ─── AI Generate ─────────────────────────────────────────────────────────────
@@ -137,6 +130,13 @@ const wpIdRef = toRef(props, 'wpId')
 const { generateAndConfirm, aiAvailable } = useD1AiGenerate(wpIdRef)
 const aiLoadingNote = ref(false)
 const aiLoadingConclusion = ref(false)
+const aiLoadingProcedures = ref(false)
+
+const AUDIT_OBJECTIVES = [
+  '应收票据坏账准备金额已恰当计提并反映于财务报表；',
+  '组合计提与单项计提分类清晰且不存在重复计提；',
+  '计提依据、索引及差异分析能够支撑审计判断。',
+]
 
 function buildEclContext(): string {
   // 收集差异汇总+重要性+各行最大差异
@@ -178,6 +178,24 @@ async function generateAuditNoteWithAI() {
     }
   } finally {
     aiLoadingNote.value = false
+  }
+}
+
+async function generateAuditProceduresWithAI() {
+  aiLoadingProcedures.value = true
+  try {
+    const text = await generateAndConfirm(
+      'ecl-audit-note',
+      `【审计过程】${auditProcedures.value || '（未填写）'}\n${buildEclContext()}`,
+      { guidance: guidanceContent, section: 'D1-15-audit-procedures' },
+      'AI · 审计过程',
+    )
+    if (text) {
+      auditProcedures.value = text
+      saveAuditProcedures()
+    }
+  } finally {
+    aiLoadingProcedures.value = false
   }
 }
 
@@ -237,14 +255,22 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
     <!-- Dual Mode Switch + Toolbar -->
     <div class="toolbar">
       <div style="flex:1" />
-      <el-button size="small" @click="exportTemplate">导出模板</el-button>
-      <el-button size="small" @click="exportData">导出数据</el-button>
-      <el-button size="small" @click="triggerImport">导入数据</el-button>
+      <el-button-group size="small">
+        <el-button @click="exportTemplate">导出模板</el-button>
+        <el-button @click="exportData">导出数据</el-button>
+        <el-upload
+          :show-file-list="false"
+          accept=".xlsx"
+          :before-upload="handleImport"
+          style="display:inline-block"
+        >
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
       <el-button size="small" type="primary" @click="pullFromD1_4" :disabled="!d1_4DataAvailable">
         从D1-4取数
       </el-button>
       <span v-if="!d1_4DataAvailable" class="d1-4-hint">⚠️ D1-4坏账准备明细表尚未填写</span>
-      <input type="file" ref="fileInput" accept=".xlsx" hidden @change="handleImport" />
     </div>
 
     <div>
@@ -256,6 +282,29 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
           <h4>坏账准备测算 D1-15</h4>
           <GtReviewTrigger section-id="D1-ecl-header" />
         </div>
+        <details class="methodology-collapse" open>
+          <summary class="methodology-summary">📖 审计目标与审计过程（点击展开/收起）</summary>
+          <div class="methodology-body">
+            <p class="method-title"><strong>一、审计目标：</strong></p>
+            <ol class="method-objectives">
+              <li v-for="(item, i) in AUDIT_OBJECTIVES" :key="'obj-' + i">{{ item }}</li>
+            </ol>
+            <div class="method-title-row">
+              <p class="method-title"><strong>二、审计过程：</strong></p>
+              <el-tooltip :content="aiAvailable ? 'AI辅助生成审计过程' : 'AI服务暂不可用'" placement="top">
+                <el-button size="small" :loading="aiLoadingProcedures" :disabled="isReadonly || !aiAvailable" @click="generateAuditProceduresWithAI">🤖 AI</el-button>
+              </el-tooltip>
+            </div>
+            <el-input
+              v-model="auditProcedures"
+              type="textarea"
+              :rows="3"
+              :disabled="isReadonly"
+              placeholder="请填写审计过程..."
+              @input="saveAuditProcedures"
+            />
+          </div>
+        </details>
         <!-- Section 1: 按组合计提 -->
         <el-divider content-position="left">一、按组合计提坏账准备测算</el-divider>
         <el-table :data="portfolioRows" border size="small" class="ecl-table">
@@ -599,8 +648,62 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
   align-items: center;
 }
 
+.methodology-collapse {
+  margin-bottom: 16px;
+  border-radius: 6px;
+  border: 1px solid #faecd8;
+  border-left: 3px solid #e6a23c;
+  background: #fffbf0;
+}
+
+.methodology-summary {
+  cursor: pointer;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #b88230;
+}
+
+.methodology-body {
+  padding: 8px 14px 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.method-title {
+  margin: 8px 0 4px;
+  font-size: 13px;
+}
+
+.method-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.method-title-row .method-title {
+  margin: 0;
+}
+
+.method-objectives {
+  margin: 0 0 8px 1.2em;
+  padding: 0;
+}
+
 .ecl-table {
   margin-top: 8px;
+}
+
+.ecl-table :deep(.el-table__header th),
+.ecl-table :deep(.el-table__body td),
+.ecl-table :deep(.el-input__inner),
+.ecl-table :deep(.el-textarea__inner),
+.ecl-table :deep(.el-input__wrapper),
+.ecl-table :deep(.el-textarea__wrapper) {
+  font-size: 13px;
 }
 
 .sum-row {

@@ -921,6 +921,27 @@
       "external_cards": ["adjustment_impact"], "downstream": ["report", "sign_off"], "known_conflicts": []
     },
     {
+      "account_package_id": "K0_management_cycle_confirmation",
+      "cycle": "K", "account_code": "1221,2241", "account_name": "管理循环函证",
+      "report_row": null, "note_section": null,
+      "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
+      "primary_wp_code": "K0", "control_panel_sheet": "K0A", "source_wp_codes": ["K0"],
+      "schema_refs": [], "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "底稿目录", "sheet_type": "index", "source_wp_code": "K0" },
+        { "sheet_name": "函证程序表K0A", "sheet_type": "control_panel", "source_wp_code": "K0" },
+        { "sheet_name": "函证结果汇总表K0-1", "sheet_type": "procedure", "source_wp_code": "K0" },
+        { "sheet_name": "核实被函证单位信息K0-2", "sheet_type": "grid_table", "source_wp_code": "K0" },
+        { "sheet_name": "跟函函证过程控制K0-3", "sheet_type": "grid_table", "source_wp_code": "K0" },
+        { "sheet_name": "函证差异调节表K0-4", "sheet_type": "grid_table", "source_wp_code": "K0" },
+        { "sheet_name": "其他应收款替代程序K0-5", "sheet_type": "grid_table", "source_wp_code": "K0" },
+        { "sheet_name": "其他应付款替代程序K0-6", "sheet_type": "grid_table", "source_wp_code": "K0" },
+        { "sheet_name": "邮件传真回函可靠性验证K0-7", "sheet_type": "procedure", "source_wp_code": "K0" },
+        { "sheet_name": "函证程序舞弊风险评价表K0-8", "sheet_type": "grid_table", "source_wp_code": "K0" }
+      ],
+      "external_cards": ["confirmation_summary"], "downstream": ["report", "sign_off"], "known_conflicts": []
+    },
+    {
       "account_code": "C2",
       "account_name": "销售与收款循环控制测试",
       "standard_code": "C2",

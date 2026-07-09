@@ -1,6 +1,15 @@
 """审计作业平台 — FastAPI 应用入口"""
 
 import os
+import sys
+
+# FastAPI 每个 include_router 会嵌套一层 merged_lifespan（当前约 950+ 层）。
+# 进入 lifespan 主体时栈已深约 6000+ 帧，其中的迁移/门禁子调用会再叠加，
+# 因此上限需留足余量（默认 1000 会溢出，4000 仍不够导致迁移与门禁降级）。
+_MIN_RECURSION_FOR_LIFESPAN = 10000
+if sys.getrecursionlimit() < _MIN_RECURSION_FOR_LIFESPAN:
+    sys.setrecursionlimit(_MIN_RECURSION_FOR_LIFESPAN)
+
 os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
 
 from contextlib import asynccontextmanager
@@ -40,7 +49,8 @@ async def lifespan(app: FastAPI):
     log_level = os.getenv("LOG_LEVEL", "WARNING").upper()
     setup_logging(level=log_level, json_format=False)
 
-    await _run_migrations()
+    if os.environ.get("GT_BOOTSTRAP_DONE") != "1":
+        await _run_migrations()
 
     # 标记迁移完成 → readyz 探针开始返回就绪
     from app.core.runtime_state import migration_state

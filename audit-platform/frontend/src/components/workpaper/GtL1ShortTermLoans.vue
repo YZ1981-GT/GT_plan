@@ -128,15 +128,7 @@
       />
     </template>
 
-    <!-- 复核对话组件（Phase 6.3） -->
-    <GtReviewDialog
-      v-if="reviewDialogVisible"
-      :wp-id="props.wpId"
-      :section-id="reviewDialogSectionId"
-      :section-label="reviewDialogSectionLabel"
-      :current-user="currentUser"
-      :related-data="{ wpCode: 'L1', projectId: props.projectId }"
-    />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -159,11 +151,11 @@
  */
 import { ref, computed, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
-import { useAuthStore } from '@/stores/auth'
 import { useL1FormData } from '@/composables/useL1FormData'
 import { useL1Adjudication } from '@/composables/useL1Adjudication'
 import { useL1CrossSheet } from '@/composables/useL1CrossSheet'
 import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import useVersionTrail from './composables/useVersionTrail'
 
@@ -189,7 +181,7 @@ const L1TabStLoanCheck = defineAsyncComponent(() => import('./l1/inspection/L1Ta
 
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -221,15 +213,6 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
-
-// ─── Auth (for review dialog) ────────────────────────────────────────────────
-
-const authStore = useAuthStore()
-const currentUser = computed(() => ({
-  id: authStore.userId || '',
-  name: authStore.user?.full_name || authStore.username || '',
-  role: (authStore.user?.role || '审计助理') as any,
-}))
 
 // ─── FormData (provide/inject pattern for child components) ──────────────────
 
@@ -280,23 +263,10 @@ const procedureDualMode = useCycleHtmlOoDualMode({
 })
 
 // ─── Provide openReviewDialog ────────────────────────────────────────────────
-
-/** 复核对话状态 */
-const reviewDialogVisible = ref(false)
-const reviewDialogSectionId = ref('')
-const reviewDialogSectionLabel = ref('')
-
-/**
- * 子组件 inject 后在 section 标题栏右侧放复核按钮。
- * 点击调用 openReviewDialog(sectionId, sectionLabel?) 打开复核对话面板。
- */
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  reviewDialogSectionId.value = sectionId
-  reviewDialogSectionLabel.value = sectionLabel || sectionId
-  reviewDialogVisible.value = true
-}
-
-provide('openReviewDialog', openReviewDialog)
+useWorkpaperReviewProvide({
+  wpId: toRef(props, 'wpId') as any,
+  projectId: toRef(props, 'projectId') as any,
+})
 
 // ─── 版本追踪 useVersionTrail (autoSnapshot) ────────────────────────────────
 

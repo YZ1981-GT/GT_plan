@@ -1,0 +1,129 @@
+# J1 应付职工薪酬 — 渲染配置 YAML
+# 科目: 2211 应付职工薪酬（贷方/负债类）
+# 公式: 期末=期初+贷方(增加)-借方(减少)
+# Spec: .kiro/specs/j1-employee-compensation/
+
+component_type: j1-employee-compensation
+account_code: "2211"
+direction: credit
+liability_formula: "end = begin + credit - debit"
+
+sheets:
+  - sheet_name: "底稿目录"
+    wp_code: "J1"
+    type: index
+
+  - sheet_name: "应付职工薪酬实质性程序表 J1A"
+    wp_code: "J1A"
+    type: program
+
+  - sheet_name: "审定表J1-1"
+    wp_code: "J1-1"
+    type: adjudication
+    formulas: 57
+    categories:
+      - short_term
+      - post_employment
+      - severance
+      - other_long_term
+
+  - sheet_name: "附注披露信息（上市公司）"
+    wp_code: "J1附注(上市)"
+    type: disclosure
+    variant: listed
+    columns: ["项目", "上年年末数", "本期增加", "本期减少", "期末数"]
+
+  - sheet_name: "附注披露信息（国有企业）"
+    wp_code: "J1附注(国企)"
+    type: disclosure
+    variant: soe
+    columns: ["项目", "期初余额", "本期增加", "本期减少", "期末余额"]
+
+  - sheet_name: "明细表J1-2"
+    wp_code: "J1-2"
+    type: detail
+    columns: 14
+    import_export: true
+
+  - sheet_name: "调整分录汇总表J1-3"
+    wp_code: "J1-3"
+    type: adjustment
+
+  - sheet_name: "月度分析表J1-4"
+    wp_code: "J1-4"
+    type: monthly_analysis
+    columns: 16
+    months: 12
+    features:
+      - trend_chart
+      - fluctuation_highlight
+      - prior_year_compare
+
+  - sheet_name: "与同行业对比分析表J1-5"
+    wp_code: "J1-5"
+    type: industry_compare
+    columns: 13
+    features:
+      - diff_rate
+      - range_display
+
+  - sheet_name: "计提情况检查表J1-6"
+    wp_code: "J1-6"
+    type: accrual_check
+    columns: 11
+    formulas:
+      - "salary_estimate = headcount × avg_salary × months"
+      - "insurance_estimate = base × rate × months"
+      - "housing_fund = base × rate × months"
+      - "diff_rate = (actual - estimated) / estimated"
+    import_export: true
+
+  - sheet_name: "分配情况检查表J1-7"
+    wp_code: "J1-7"
+    type: allocation_check
+    columns: 13
+    linkage:
+      - target: K8
+        field: selling_expense
+      - target: K9
+        field: admin_expense
+    import_export: true
+    validation: allocation_closure
+
+  - sheet_name: "检查表J1-8"
+    wp_code: "J1-8"
+    type: general_check
+    columns: 16
+    sections:
+      - credit_check
+      - debit_check
+      - post_period
+    import_export: true
+
+  - sheet_name: "非货币性福利检查表J1-9"
+    wp_code: "J1-9"
+    type: non_monetary_check
+    columns: 13
+    import_export: true
+
+  - sheet_name: "辞退福利检查表J1-10"
+    wp_code: "J1-10"
+    type: severance_check
+    columns: 10
+    cas9_conditions: 4
+    import_export: true
+
+cross_wp_references:
+  - source: J1-7
+    target: K8
+    field: selling_expense_salary
+    event: "compensation:adjusted"
+  - source: J1-7
+    target: K9
+    field: admin_expense_salary
+    event: "compensation:adjusted"
+
+tb_writeback:
+  account_code: "2211"
+  field: audited_end_balance
+  source_sheet: "J1-1"

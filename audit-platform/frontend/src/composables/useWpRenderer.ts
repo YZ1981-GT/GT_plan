@@ -106,6 +106,8 @@ export interface RenderConfig {
   delegated_module?: string
   /** 重定向目标路径（如 /materiality） */
   target_path?: string
+  /** 项目审计年度（project_audit_year 通用规则） */
+  audit_year?: number | null
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

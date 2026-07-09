@@ -1,0 +1,302 @@
+# backend/data/ledger_adapters/wp_render_schema/k2-other-current-assets.yaml
+# K2 其他流动资产 — 专属组件渲染 schema
+# componentType: k2-other-current-assets
+# 科目 1231 其他流动资产（借方/资产类）
+# Template: K2 其他流动资产.xlsx（10 有效 sheet）
+# 公式特征：期末=期初+借方-贷方（资产类）；审定=未审+AJE+RJE；
+#           直线法摊销=成本/总期数×本期期数；进度法=成本×(本期进度-上期进度)
+# 创建: 2026-07-30
+
+wp_code: K2
+wp_name: 其他流动资产
+component_type: k2-other-current-assets
+selfLoad: true
+template_path: backend/wp_templates/K/K2 其他流动资产.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+account_codes: ['1231']
+related_accounts:
+  - code: '1231'
+    name: 其他流动资产
+    direction: debit
+    category: asset
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AI 辅助生成 sections
+# ═══════════════════════════════════════════════════════════════════════════════
+ai_sections:
+  - amort-conclusion
+  - classification-eval
+  - overall-opinion
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿交叉引用（cross_wp_references）
+# ═══════════════════════════════════════════════════════════════════════════════
+cross_wp_references:
+  - ref_id: CW-K2-001
+    source_wp: K2-1
+    target_wp: TB:1231
+    description: '审定表审定数→回写 trial_balance(1231)'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K2-002
+    source_wp: K2-3
+    target_wp: A13
+    description: '调整分录→A13错报汇总（adjustment:created）'
+    direction: outbound
+    event: "adjustment:created"
+
+  - ref_id: CW-K2-003
+    source_wp: K2-1
+    target_wp: 附注
+    description: '审定表→附注披露自动刷新（substantive:adjudicated）'
+    direction: outbound
+    event: "substantive:adjudicated"
+
+  - ref_id: CW-K2-004
+    source_wp: K2-4
+    target_wp: K2-5
+    description: '合同取得成本→摊销测算交叉验证'
+    direction: bidirectional
+
+  - ref_id: CW-K2-005
+    source_wp: K2-4
+    target_wp: K2-1
+    description: '合同取得成本合计→审定表'
+    direction: outbound
+
+  - ref_id: CW-K2-006
+    source_wp: B50
+    target_wp: K2A
+    description: 'B50风险评估→K2实质性程序'
+    direction: inbound
+
+  - ref_id: CW-K2-007
+    source_wp: K2
+    target_wp: K1
+    description: 'K2其他流动资产↔K1其他应收款（关联科目勾稽）'
+    direction: bidirectional
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 定义（10 sheets）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 1: 底稿目录
+  # ─────────────────────────────────────────────────────────────────────────
+  底稿目录:
+    code: 底稿目录
+    group: core
+    component: K2TabIndex
+    class_code: B-底稿目录
+    progress_bar: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 2: 其他流动资产实质性程序表K2A
+  # ─────────────────────────────────────────────────────────────────────────
+  其他流动资产实质性程序表K2A:
+    code: K2A
+    group: core
+    component: a-program-console
+    class_code: A-实质性程序
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - cutoff_auto_sampling: true
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 3: 审定表K2-1 (23行×16列, 85公式)
+  # ─────────────────────────────────────────────────────────────────────────
+  审定表K2-1:
+    code: K2-1
+    group: core
+    dimensions: "23×16"
+    component: K2TabAdjudication
+    class_code: F-审定表
+    account_codes: ['1231']
+    formula_count: 85
+    sections:
+      - name: 其他流动资产
+        account_code: '1231'
+        direction: debit
+        balance_formula: "期末=期初+借方-贷方"
+    formulas:
+      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
+      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + debit - credit" }
+      - { name: calcTriangleReconciliation, target: triangle_diff, expr: "end - (begin + inc - dec)" }
+    highlights:
+      - { condition: "triangle_diff != 0", style: red, tooltip: "三角勾稽不平" }
+    writeback:
+      target: trial_balance.audited_amount
+      trigger: WORKPAPER_SAVED
+      key_field: account_code
+      value_field: audited_amount
+      accounts: ['1231']
+    event_bus:
+      publish:
+        - { event: "substantive:adjudicated", payload: "{accountCode:'1231', adjudicatedAmount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 4: 明细表K2-2 (30行×18列, 17公式, 2区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  明细表K2-2:
+    code: K2-2
+    group: core
+    dimensions: "30×18"
+    component: K2TabDetail
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 300
+    formula_count: 17
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns: [序号, 项目名称, 性质, 期初余额, 本期增加, 本期减少, 期末余额]
+      - name: 检查结论
+        tab_index: 1
+        columns: [增加原因, 减少原因, 凭证号, 金额准确, 分类恰当, 仍为流动, 可回收性, 核查结论, 备注, 相关合同, 审计师评价]
+    import_export: true
+    add_row_prompt: projectName
+    formulas:
+      - { name: calcDetailEnd, target: closing_balance, expr: "opening + increase - decrease" }
+    highlights:
+      - { condition: "closingBalance != opening + increase - decrease", style: red, tooltip: "期末≠期初+增加-减少" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 5: 调整分录汇总K2-3
+  # ─────────────────────────────────────────────────────────────────────────
+  调整分录汇总K2-3:
+    code: K2-3
+    group: core
+    component: K2TabAdjustment
+    class_code: F-调整分录
+    dynamic_rows: true
+    import_export: true
+    event_bus:
+      publish:
+        - { event: "adjustment:created", payload: "{entryType, accountCode, amount}" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 6: 合同取得成本明细表K2-4 (32行×23列, 57公式, 3区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  合同取得成本明细表K2-4:
+    code: K2-4
+    group: amortization
+    dimensions: "32×23"
+    component: K2TabContractCost
+    class_code: F-明细表
+    dynamic_rows: true
+    max_rows: 200
+    formula_count: 57
+    tab_sections:
+      - name: 合同信息
+        tab_index: 0
+        columns: [合同编号, 客户名称, 合同金额, 取得成本类型, 取得成本金额, 是否增量成本, 预期可收回, 与合同直接相关, 是否资本化]
+      - name: 摊销信息
+        tab_index: 1
+        columns: [期初余额, 本期增加, 本期摊销, 期末余额]
+      - name: 检查结论
+        tab_index: 2
+        columns: [摊销方法, 摊销期, 起始日期, 到期日期, 凭证号, 核查结论, 备注, 关联K2-5行号, 差异金额, 审计师评价]
+    import_export: true
+    add_row_prompt: contractNo
+    formulas:
+      - { name: calcContractCostEnd, target: closing_balance, expr: "opening + increase - amortization" }
+      - { name: calcCapitalizationCheck, target: is_capitalized, expr: "isIncremental AND expectedRecoverable AND directlyRelated" }
+    highlights:
+      - { condition: "isCapitalized == false", style: orange, tooltip: "未满足资本化条件" }
+    cross_refs:
+      - ref_id: CW-K2-4-001
+        target_wp: K2-5
+        description: '合同成本 → K2-5摊销测算交叉验证'
+        direction: outbound
+      - ref_id: CW-K2-4-002
+        target_wp: K2-1
+        description: '合同成本合计 → K2-1审定表'
+        direction: outbound
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 7: 摊销测算表K2-5 (66行×28列, 37公式, 2区段Tab)
+  # ─────────────────────────────────────────────────────────────────────────
+  摊销测算表K2-5:
+    code: K2-5
+    group: amortization
+    dimensions: "66×28"
+    component: K2TabAmortization
+    class_code: G-测算
+    virtual_scroll: true
+    max_rows: 200
+    formula_count: 37
+    tab_sections:
+      - name: 基础信息
+        tab_index: 0
+        columns: [合同编号, 客户名称, 取得成本金额, 摊销方法, 摊销期, 起始日期, 到期日期, 已摊销期数, 剩余期数]
+      - name: 测算比较
+        tab_index: 1
+        columns: [本期期数, 本期进度, 上期进度, 测算摊销, 累计摊销, 摊余成本, 企业摊销, 差异, 差异率, 超重要性, 结论, 备注]
+    import_export: true
+    formulas:
+      - { name: calcStraightLineAmort, target: calculated_amort, expr: "cost / totalPeriods * currentPeriods", condition: "method=straight_line" }
+      - { name: calcProgressAmort, target: calculated_amort, expr: "cost * (currentProgress - priorProgress)", condition: "method=progress" }
+      - { name: calcAmortizedBalance, target: amortized_balance, expr: "cost - accumulated" }
+      - { name: calcAmortVariance, target: variance, expr: "calculated - booked" }
+    highlights:
+      - { condition: "exceedsMateriality == true", style: red, tooltip: "差异超重要性水平" }
+    cross_refs:
+      - ref_id: CW-K2-5-001
+        target_wp: K2-4
+        description: '摊销测算 ← K2-4合同成本明细'
+        direction: inbound
+    ai_section: amort-conclusion
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 8: 其他流动资产检查表K2-6
+  # ─────────────────────────────────────────────────────────────────────────
+  其他流动资产检查表K2-6:
+    code: K2-6
+    group: inspection
+    component: K2TabCheck
+    class_code: D-段落检查
+    layout_type: paragraph
+    check_items:
+      - { id: classification, label: 分类正确性（流动vs非流动）, type: conclusion }
+      - { id: liquidity, label: 流动性判断（是否仍为流动资产）, type: conclusion }
+      - { id: recoverability, label: 可回收性评估, type: conclusion }
+      - { id: capitalization, label: 资本化合理性（CAS14三条件）, type: conclusion }
+    integrations:
+      - voucher_sampling_engine: { mode: dialog }
+      - ocr: { endpoint: "/d4/contract-ocr" }
+    ai_section: classification-eval
+    highlights:
+      - { condition: "conclusion == '不合规'", style: red }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 9: 附注披露信息（上市公司）(13行×13列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（上市公司）:
+    code: 附注-上市
+    group: core
+    dimensions: "13×13"
+    component: K2TabDisclosureListed
+    class_code: D-附注披露
+    variant: listed
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Sheet 10: 附注披露信息（国有企业）(13行×13列)
+  # ─────────────────────────────────────────────────────────────────────────
+  附注披露信息（国有企业）:
+    code: 附注-国企
+    group: core
+    dimensions: "13×13"
+    component: K2TabDisclosureSoe
+    class_code: D-附注披露
+    variant: soe
+    event_bus:
+      subscribe:
+        - { event: "substantive:adjudicated", action: "refresh" }
+        - { event: "adjustment:created", action: "refresh" }
