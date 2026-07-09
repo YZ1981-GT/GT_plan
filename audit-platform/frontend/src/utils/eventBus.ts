@@ -335,8 +335,19 @@ export type Events = {
     timestamp: number
   }
 
+  // 附注文本更新（Disclosure → Adjudication 双向同步）
+  'disclosure:note-text-updated': {
+    wpCode: string
+    section?: string
+    timestamp: number
+  }
+
   // useStaleSummaryFull 订阅的细粒度事件（payload 不强约束，由 SSE bridge / 业务方按需 emit）
-  'adjustment:created': void
+  'adjustment:created': {
+    wpCode: string
+    timestamp: number
+    [key: string]: any
+  } | void
   'adjustment:updated': void
   'adjustment:deleted': void
   'dataset:activated': void
@@ -422,6 +433,33 @@ export type Events = {
 
   // A17-2-1 KAM 更新（联动 A17-1 第十二章）
   'kam:updated': { count: number; summaries: { index: number; basic: string }[] }
+
+  // N 税费循环递延所得税联动（n1-deferred-tax-assets / n3-deferred-tax-liabilities Task 6.1）
+  'deferred-tax:asset-updated': {
+    wpCode: string
+    accountCode: string
+    auditedAmount: number
+    /** 本期变动额 = 期末 - 期初（供N5核对递延所得税费用） */
+    periodChange?: number
+    change?: number
+    source?: string
+    timestamp: number
+  }
+  'deferred-tax:liability-updated': {
+    wpCode: string
+    accountCode: string
+    auditedAmount: number
+    periodChange?: number
+    change?: number
+    source?: string
+    timestamp: number
+  }
+
+  // D~N 附注刷新通知（主入口订阅 → selfLoad 重新加载数据）
+  'disclosure:refresh': {
+    wpCode?: string
+    timestamp: number
+  } | void
 
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void

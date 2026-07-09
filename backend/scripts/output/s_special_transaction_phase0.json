@@ -1,0 +1,557 @@
+{
+  "workpapers_analyzed": 14,
+  "errors": [],
+  "dispatch_table": {
+    "S1": {
+      "file": "S1 对被审计单位违反法规行为的考虑2019.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "违反法规行为S1",
+          "type": "other",
+          "rows": 78,
+          "cols": 9,
+          "formulas": 1
+        },
+        {
+          "sheetName": "S1-1对法律法规的考虑记录表",
+          "type": "regulation",
+          "rows": 95,
+          "cols": 10,
+          "formulas": 1
+        },
+        {
+          "sheetName": "S1-2沟通记录",
+          "type": "communication",
+          "rows": 35,
+          "cols": 5,
+          "formulas": 1
+        }
+      ]
+    },
+    "S10": {
+      "file": "S10 对环境事项的考虑.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "对环境事项的考虑S10",
+          "type": "other",
+          "rows": 48,
+          "cols": 5,
+          "formulas": 4
+        },
+        {
+          "sheetName": "审定表S10-1",
+          "type": "adjudication",
+          "rows": 25,
+          "cols": 6,
+          "formulas": 4
+        },
+        {
+          "sheetName": "附、内控调查表S10-2",
+          "type": "internal_control",
+          "rows": 64,
+          "cols": 8,
+          "formulas": 4
+        },
+        {
+          "sheetName": "说明",
+          "type": "description",
+          "rows": 82,
+          "cols": 1,
+          "formulas": 0
+        },
+        {
+          "sheetName": "环境法规",
+          "type": "regulation",
+          "rows": 152,
+          "cols": 1,
+          "formulas": 0
+        }
+      ]
+    },
+    "S11": {
+      "file": "S11 利用服务机构活动.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "对被审计单位使用服务机构的考虑S11",
+          "type": "other",
+          "rows": 38,
+          "cols": 10,
+          "formulas": 1
+        }
+      ]
+    },
+    "S12": {
+      "file": "S12 利用专家（注册会计师的专家）的工作.xlsx",
+      "componentType": "s12-cpa-expert",
+      "sheets": [
+        {
+          "sheetName": "S12 利用专家的工作程序表",
+          "type": "program",
+          "rows": 60,
+          "cols": 11,
+          "formulas": 0
+        },
+        {
+          "sheetName": "S12-1 评价胜任能力、专业素质和客观性",
+          "type": "evaluation",
+          "rows": 43,
+          "cols": 12,
+          "formulas": 2
+        },
+        {
+          "sheetName": "S12-1-1 评价专家的客观性",
+          "type": "evaluation",
+          "rows": 44,
+          "cols": 12,
+          "formulas": 2
+        },
+        {
+          "sheetName": "S12-2 了解专家的专长领域",
+          "type": "understanding",
+          "rows": 39,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S12-3 评价专家工作的恰当性",
+          "type": "evaluation",
+          "rows": 44,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S12-3-1 注册会计师的专家的报告",
+          "type": "report",
+          "rows": 39,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S12-3-2 利用专家评价管理层的工作的适当性",
+          "type": "evaluation",
+          "rows": 155,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S12-3-3 利用专家评价管理层的工作(股份支付)",
+          "type": "evaluation",
+          "rows": 99,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S12-3-4 利用专家评价管理层的工作(金融工具公允价值）",
+          "type": "evaluation",
+          "rows": 110,
+          "cols": 12,
+          "formulas": 4
+        }
+      ]
+    },
+    "S13": {
+      "file": "S13 利用管理层的专家编制的信息形成审计证据.xlsx",
+      "componentType": "s13-mgmt-expert",
+      "sheets": [
+        {
+          "sheetName": "S13 利用管理层的专家形成审计证据程序表",
+          "type": "program",
+          "rows": 36,
+          "cols": 10,
+          "formulas": 0
+        },
+        {
+          "sheetName": "S13-1 评价胜任能力、专业素质和客观性",
+          "type": "evaluation",
+          "rows": 44,
+          "cols": 12,
+          "formulas": 2
+        },
+        {
+          "sheetName": "S13-2 了解专家的工作",
+          "type": "understanding",
+          "rows": 46,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S13-3 评价管理层专家工作的适当性",
+          "type": "evaluation",
+          "rows": 54,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S13-3-1 管理层专家的报告",
+          "type": "report",
+          "rows": 35,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S13-3-2 评价管理层专家工作的适当性",
+          "type": "evaluation",
+          "rows": 151,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S13-3-3 评价管理层专家工作的适当性(股份支付)",
+          "type": "evaluation",
+          "rows": 95,
+          "cols": 12,
+          "formulas": 4
+        },
+        {
+          "sheetName": "S13-3-4 评价管理层专家工作的适当性(金融工具公允价值)",
+          "type": "evaluation",
+          "rows": 131,
+          "cols": 12,
+          "formulas": 4
+        }
+      ]
+    },
+    "S14": {
+      "file": "S14 会计估计和相关披露.xlsx",
+      "componentType": "s14-accounting-estimate",
+      "sheets": [
+        {
+          "sheetName": "S14程序表",
+          "type": "program",
+          "rows": 67,
+          "cols": 9,
+          "formulas": 0
+        },
+        {
+          "sheetName": "S14-1了解被审计单位及其环境（会计估计相关）",
+          "type": "understanding",
+          "rows": 35,
+          "cols": 11,
+          "formulas": 0
+        },
+        {
+          "sheetName": "S14-2了解与会计估计相关的控制",
+          "type": "understanding",
+          "rows": 81,
+          "cols": 11,
+          "formulas": 0
+        },
+        {
+          "sheetName": "S14-3应对评估的重大错报风险（会计估计相关）",
+          "type": "evaluation",
+          "rows": 73,
+          "cols": 11,
+          "formulas": 0
+        },
+        {
+          "sheetName": "S14-4管理层偏向的迹象",
+          "type": "bias_indication",
+          "rows": 24,
+          "cols": 11,
+          "formulas": 0
+        }
+      ]
+    },
+    "S16": {
+      "file": "S16 套期活动.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "套期活动S16",
+          "type": "other",
+          "rows": 38,
+          "cols": 5,
+          "formulas": 1
+        }
+      ]
+    },
+    "S17": {
+      "file": "S17 非经常性损益.xls",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "审计程序S17",
+          "type": "program",
+          "rows": 16,
+          "cols": 8,
+          "formulas": 0
+        },
+        {
+          "sheetName": "审定表S17-1",
+          "type": "adjudication",
+          "rows": 41,
+          "cols": 6,
+          "formulas": 0
+        },
+        {
+          "sheetName": "审核表（合并）S17-2",
+          "type": "review",
+          "rows": 42,
+          "cols": 8,
+          "formulas": 0
+        },
+        {
+          "sheetName": "审核表（个别报表）S17-3",
+          "type": "review",
+          "rows": 33,
+          "cols": 6,
+          "formulas": 0
+        },
+        {
+          "sheetName": "提示（供参考，不打印）",
+          "type": "other",
+          "rows": 29,
+          "cols": 4,
+          "formulas": 0
+        },
+        {
+          "sheetName": "与营业外收支等核对表S17-11",
+          "type": "reconciliation",
+          "rows": 91,
+          "cols": 8,
+          "formulas": 0
+        },
+        {
+          "sheetName": "非经常性损益项目的所得税影响S17-21",
+          "type": "non_recurring",
+          "rows": 20,
+          "cols": 7,
+          "formulas": 0
+        }
+      ]
+    },
+    "S2": {
+      "file": "S2 首次接受委托时对期初余额的审计2019.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "首次接受委托时对期初余额的审计S2",
+          "type": "other",
+          "rows": 27,
+          "cols": 5,
+          "formulas": 4
+        }
+      ]
+    },
+    "S4": {
+      "file": "S4 非货币性资产交换202401.xlsx",
+      "componentType": "s4-nonmonetary-exchange",
+      "sheets": [
+        {
+          "sheetName": "非货币性资产交换审计程序S4",
+          "type": "program",
+          "rows": 38,
+          "cols": 6,
+          "formulas": 4
+        },
+        {
+          "sheetName": "审定表S4-1",
+          "type": "adjudication",
+          "rows": 32,
+          "cols": 8,
+          "formulas": 4
+        },
+        {
+          "sheetName": "商业实质的判断S4-2",
+          "type": "judgment_commercial_substance",
+          "rows": 37,
+          "cols": 8,
+          "formulas": 5
+        }
+      ]
+    },
+    "S5": {
+      "file": "S5 债务重组202401.xlsx",
+      "componentType": "s5-debt-restructuring",
+      "sheets": [
+        {
+          "sheetName": "债务重组审计程序S5",
+          "type": "program",
+          "rows": 57,
+          "cols": 6,
+          "formulas": 4
+        },
+        {
+          "sheetName": "审定表S5-1",
+          "type": "adjudication",
+          "rows": 49,
+          "cols": 9,
+          "formulas": 7
+        },
+        {
+          "sheetName": "债务重组损益确认时点S5-2",
+          "type": "judgment_timing",
+          "rows": 36,
+          "cols": 11,
+          "formulas": 4
+        }
+      ]
+    },
+    "S6": {
+      "file": "S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx",
+      "componentType": "s6-fund-occupation",
+      "sheets": [
+        {
+          "sheetName": "审定表S6-1",
+          "type": "adjudication",
+          "rows": 25,
+          "cols": 7,
+          "formulas": 4
+        },
+        {
+          "sheetName": "对大股东及关联方资金占用和违规担保情况审核程序S6 ",
+          "type": "program",
+          "rows": 143,
+          "cols": 9,
+          "formulas": 4
+        },
+        {
+          "sheetName": "会计监管风险提示第9号——上市公司控股股东资金占用及其审计",
+          "type": "regulatory_reference",
+          "rows": 150,
+          "cols": 1,
+          "formulas": 0
+        },
+        {
+          "sheetName": "Sheet2",
+          "type": "other",
+          "rows": 6,
+          "cols": 6,
+          "formulas": 0
+        }
+      ]
+    },
+    "S8": {
+      "file": "S8 租赁.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "审定表S8-1",
+          "type": "adjudication",
+          "rows": 25,
+          "cols": 6,
+          "formulas": 4
+        },
+        {
+          "sheetName": "租赁S8",
+          "type": "other",
+          "rows": 46,
+          "cols": 5,
+          "formulas": 4
+        }
+      ]
+    },
+    "S9": {
+      "file": "S9 对电子商务的考虑.xlsx",
+      "componentType": "a-program-console",
+      "sheets": [
+        {
+          "sheetName": "对电子商务的考虑S9",
+          "type": "other",
+          "rows": 38,
+          "cols": 5,
+          "formulas": 4
+        },
+        {
+          "sheetName": "审定表S9-1",
+          "type": "adjudication",
+          "rows": 25,
+          "cols": 7,
+          "formulas": 4
+        },
+        {
+          "sheetName": "内部控制调查表S9-2",
+          "type": "internal_control",
+          "rows": 66,
+          "cols": 8,
+          "formulas": 4
+        },
+        {
+          "sheetName": "程序说明",
+          "type": "description",
+          "rows": 61,
+          "cols": 9,
+          "formulas": 0
+        },
+        {
+          "sheetName": "电子商务法律法规",
+          "type": "regulation",
+          "rows": 98,
+          "cols": 5,
+          "formulas": 0
+        }
+      ]
+    }
+  },
+  "engine_spec": {
+    "useS4FormulaEngine": {
+      "functions": {
+        "calcExchangeGainLoss": {
+          "input": {
+            "inFairValue": "number (换入资产公允价值)",
+            "outFairValue": "number (换出资产公允价值)",
+            "outBookValue": "number (换出资产账面价值)",
+            "taxes": "number (相关税费)"
+          },
+          "output": {
+            "gainLoss": "number (换出资产损益 = outFairValue - outBookValue)",
+            "inCost": "number (换入资产成本 = outFairValue + taxes)"
+          }
+        },
+        "judgeApplicable": {
+          "input": {
+            "exclusions": "boolean[6] (6项排除情形, true=属于该情形)",
+            "cashflowDifferent": "boolean (现金流量风险/时间/金额显著不同)"
+          },
+          "output": "boolean (是否适用非货币性资产交换准则: 所有exclusions为false→适用)"
+        },
+        "judgeCommercialSubstance": {
+          "input": {
+            "exclusions": "boolean[6]",
+            "cashflowDifferent": "boolean"
+          },
+          "output": "boolean (是否具有商业实质 = cashflowDifferent)"
+        }
+      }
+    },
+    "useS5FormulaEngine": {
+      "functions": {
+        "calcCreditorGainLoss": {
+          "input": {
+            "origBook": "number (债权原账面价值)",
+            "origFair": "number (债权原公允价值)",
+            "recvFair": "number (收到资产公允价值)",
+            "otherCost": "number (其他相关费用)"
+          },
+          "output": "number (债权人重组损益)"
+        },
+        "calcDebtorGainLoss": {
+          "input": {
+            "debtBook": "number (所清偿债务账面价值)",
+            "assetBook": "number (转让资产账面价值)",
+            "equityFair": "number (权益工具公允价值)"
+          },
+          "output": "number (债务人重组损益 = debtBook - assetBook - equityFair)"
+        }
+      }
+    },
+    "resolveExpertSubSheet": {
+      "input": "ExpertDomain: 'general' | 'share-based-payment' | 'financial-instrument-fair-value'",
+      "output_mapping": {
+        "S12": {
+          "general": "S12-3-2 利用专家评价管理层的工作的适当性",
+          "share-based-payment": "S12-3-3 利用专家评价管理层的工作(股份支付)",
+          "financial-instrument-fair-value": "S12-3-4 利用专家评价管理层的工作(金融工具公允价值)"
+        },
+        "S13": {
+          "general": "S13-3-2 评价管理层专家工作的适当性",
+          "share-based-payment": "S13-3-3 评价管理层专家工作的适当性(股份支付)",
+          "financial-instrument-fair-value": "S13-3-4 评价管理层专家工作的适当性(金融工具公允价值)"
+        }
+      }
+    }
+  }
+}

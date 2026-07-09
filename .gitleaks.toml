@@ -34,6 +34,8 @@ paths = [
   '''(?i)\.venv/''',
   # 后端测试目录（fixture 可能含假密钥）
   '''(?i)backend/tests/''',
+  # 前端测试目录（业务 fixture key，非真实密钥）
+  '''(?i)audit-platform/frontend/.*/__tests__/''',
   # gitleaks 自身配置（本文件含规则示例字符串）
   '''(?i)\.gitleaks\.toml$''',
 ]
@@ -57,4 +59,8 @@ regexes = [
   '''audit_archive''',
   # 空值 token / key（=后无内容或仅空白）
   '''(?i)(PAPERLESS_TOKEN|HF_TOKEN|CLOUD_S3_ACCESS_KEY|CLOUD_S3_SECRET_KEY|CLOUD_SMB_PASSWORD|CLOUD_SFTP_PASSWORD|CLOUD_S3_REGION)=\s*$''',
+  # 底稿业务存储 key / 类型名（非密钥，被 generic-api-key 误报）
+  '''M10JudgmentDimension''',
+  '''M2-M2-5-verify-rows''',
+  '''perpetual-bond-[0-9]+''',
 ]

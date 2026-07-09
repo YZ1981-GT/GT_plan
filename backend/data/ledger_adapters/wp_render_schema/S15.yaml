@@ -1,0 +1,68 @@
+# S15 每股收益和净资产收益率 — 专属渲染 schema
+# component_type: s15-eps-roe
+# Template: S15 每股收益和净资产收益率.xlsx
+# 整册统一路由到 GtS15EpsRoe，前端按 sheetName v-if 分发
+
+wp_code: S15
+wp_name: 每股收益和净资产收益率
+component_type: s15-eps-roe
+template_path: backend/wp_templates/S/S15 每股收益和净资产收益率.xlsx
+template_version: v2025-R5
+applicable_standards: [listed_standalone, listed_consolidated]
+
+# 整册专属组件：前端按 sheetName v-if 分发
+whole_workbook_dedicated: true
+
+sheets:
+  - sheet_name: 审定表S15-1
+    internal_type: sheet-adjudication
+    description: 每股收益/净资产收益率审定表
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 审计程序S15
+    internal_type: sheet-audit-program
+    description: 每股收益/净资产收益率审计程序表
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 基本每股收益计算表S15-2
+    internal_type: sheet-basic-eps
+    description: 加权平均股数 + 基本每股收益（归母/扣非）
+    has_formulas: true
+    formula_count: 6
+
+  - sheet_name: 稀释每股收益计算表S15-3
+    internal_type: sheet-diluted-eps
+    description: 稀释性潜在普通股影响 + 稀释EPS
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: 净资产收益率计算S15-4
+    internal_type: sheet-roe
+    description: 全面摊薄ROE + 加权平均ROE（本年/上年双栏对比）
+    has_formulas: true
+    formula_count: 29
+
+# 跳过的 sheet
+skip_sheets:
+  - 表头（请先填写）
+
+# 公式引擎元数据
+formula_engine:
+  name: useS15FormulaEngine
+  type: pure_function
+  functions:
+    - calcWeightedAvgShares: "b = b0 + b1 + (c1×c2/m0 + d1×d2/m0) - (e1×e2/m0) - b4"
+    - calcBasicEps: "eps = a1/b; epsEx = a2/b (b=0 → unable)"
+    - calcDilutedRoe: "fullyDiluted = P/E; weightedAvg = P/(E0+NP/2+Ei×Mi/M0-Ej×Mj/M0+Ek×Mk/M0)"
+  zero_protection:
+    - "m0=0 → unable (报告期月份数不能为零)"
+    - "b=0 → unable (加权平均股数为零无法计算EPS)"
+    - "E=0 → unable (净资产为零无法计算ROE)"
+
+# 双期对比
+dual_period:
+  current_year: true
+  prior_year: true
+  structure: "S15-4 row2-26 本年, row43-60 上年（同结构双栏）"

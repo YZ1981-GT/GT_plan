@@ -7941,10 +7941,62 @@
         "B"
       ],
       "direction": "source_to_target"
+    },
+    {
+      "ref_id": "CW-403",
+      "description": "G8 其他权益工具投资公允价值变动→M9 OCI核对(不可重分类)",
+      "source_wp": "G8",
+      "source_sheet": "审定表G8-1",
+      "source_cell": "公允价值变动(税后)",
+      "targets": [
+        {
+          "wp_code": "M9",
+          "sheet": "其他综合收益核对表M9-4",
+          "cell": "G8来源金额(税后)",
+          "formula": "=WP('G8','审定表G8-1','公允价值变动(税后)')",
+          "cell_label": "G8公允价值变动→OCI核对",
+          "address": "M9:其他综合收益核对表M9-4:G8来源金额(税后)"
+        }
+      ],
+      "category": "equity_cycle",
+      "severity": "warning",
+      "source_cell_label": "G8公允价值变动(税后净额)",
+      "source_address": "G8:审定表G8-1:公允价值变动(税后)",
+      "cycle_membership": [
+        "G",
+        "M"
+      ],
+      "direction": "source_to_target"
+    },
+    {
+      "ref_id": "CW-404",
+      "description": "J2 设定受益计划重计量→M9 OCI核对(不可重分类)",
+      "source_wp": "J2",
+      "source_sheet": "审定表J2-1",
+      "source_cell": "重计量变动(税后)",
+      "targets": [
+        {
+          "wp_code": "M9",
+          "sheet": "其他综合收益核对表M9-4",
+          "cell": "J2来源金额(税后)",
+          "formula": "=WP('J2','审定表J2-1','重计量变动(税后)')",
+          "cell_label": "J2重计量→OCI核对",
+          "address": "M9:其他综合收益核对表M9-4:J2来源金额(税后)"
+        }
+      ],
+      "category": "equity_cycle",
+      "severity": "warning",
+      "source_cell_label": "J2设定受益计划重计量(税后净额)",
+      "source_address": "J2:审定表J2-1:重计量变动(税后)",
+      "cycle_membership": [
+        "J",
+        "M"
+      ],
+      "direction": "source_to_target"
     }
   ],
   "stats": {
-    "total_references": 400,
+    "total_references": 402,
     "by_category": {
       "internal": 61,
       "revenue_cycle": 35,
@@ -7971,7 +8023,7 @@
       "cash_cycle": 2,
       "expense_cycle": 2,
       "debt_cycle": 2,
-      "equity_cycle": 18,
+      "equity_cycle": 20,
       "tax_cycle": 14,
       "scope_driver": 2,
       "feedback": 2,
@@ -7984,11 +8036,11 @@
       "materiality_linkage": 10,
       "control_test_linkage": 9
     },
-    "coverage_note": "覆盖 D-N 实质性程序(CW-01~CW-58) + B/C/A/S 计划/控制/完成/特定项目跨模块引用(CW-59~CW-88) + E1 货币资金优化扩展(CW-89~CW-107 + CW-108~CW-135) + D 销售循环反向回填(CW-136) + D 销售循环跨底稿引用(CW-137~CW-175) 共 175 条。 + F 采购存货循环跨底稿引用(CW-176~CW-210, 共 35 条) + H 固定资产循环跨底稿引用(CW-211~CW-242, 共 32 条) + I 无形资产循环跨底稿引用(共 29 条) + G 投资循环跨底稿引用（CW-267~CW-292, 共 26 条，含 G0→G7 反向回填 1 条） + J 职工薪酬循环跨底稿引用(CW-293~CW-312, 共 20 条) + K 管理循环跨底稿引用(CW-313~CW-332, 共 20 条) + L 筹资循环跨底稿引用(CW-333~CW-352, 共 20 条) + M 权益循环跨底稿引用(CW-353~CW-369, 共 17 条) + N 税金循环跨底稿引用(CW-370~CW-381, 共 12 条) + B/C→各循环联动(CW-382~CW-400, 共 19 条: B15 重要性水平→10 循环抽样范围 + C 控制测试结论→9 循环实质性程序范围)",
+    "coverage_note": "覆盖 D-N 实质性程序(CW-01~CW-58) + B/C/A/S 计划/控制/完成/特定项目跨模块引用(CW-59~CW-88) + E1 货币资金优化扩展(CW-89~CW-107 + CW-108~CW-135) + D 销售循环反向回填(CW-136) + D 销售循环跨底稿引用(CW-137~CW-175) 共 175 条。 + F 采购存货循环跨底稿引用(CW-176~CW-210, 共 35 条) + H 固定资产循环跨底稿引用(CW-211~CW-242, 共 32 条) + I 无形资产循环跨底稿引用(共 29 条) + G 投资循环跨底稿引用（CW-267~CW-292, 共 26 条，含 G0→G7 反向回填 1 条） + J 职工薪酬循环跨底稿引用(CW-293~CW-312, 共 20 条) + K 管理循环跨底稿引用(CW-313~CW-332, 共 20 条) + L 筹资循环跨底稿引用(CW-333~CW-352, 共 20 条) + M 权益循环跨底稿引用(CW-353~CW-369, 共 17 条) + N 税金循环跨底稿引用(CW-370~CW-381, 共 12 条) + B/C→各循环联动(CW-382~CW-400, 共 19 条: B15 重要性水平→10 循环抽样范围 + C 控制测试结论→9 循环实质性程序范围) + G8/J2→M9 OCI核对联动(CW-403~CW-404, 共 2 条)",
     "naming_resolved": 81,
     "naming_unresolved": 26,
     "naming_rate": "75.7%",
-    "total": 400
+    "total": 402
   },
   "naming_rule": {
     "format": "{wp_code}:{sheet_name}:{cell_coordinate}",

@@ -46,7 +46,7 @@ L3长期借款底稿的专属HTML精美组件构建。将现有通用渲染升�
 - **LTLoan_Check_L3_9**: 长期借款检查表L3-9
 - **Cross_Sheet_Engine**: 跨sheet引擎 + L2/L8联动 + 重分类
 - **Formula_Engine**: 前端公式引擎composable（负债类！贷方科目）
-- **Interest_Engine**: 利息测算引擎（本金×利率×天数/360，核心纯函数）
+- **Interest_Engine**: 利息测算引擎（本金×利率×天数/365，核心纯函数）
 - **Reclass_Engine**: 一年内到期重分类引擎（纯函数）
 - **Trial_Balance_Writeback**: 审定数回写（科目2501）
 - **EventBus**: 进程内事件总线
@@ -106,7 +106,7 @@ L3长期借款底稿的专属HTML精美组件构建。将现有通用渲染升�
 #### Acceptance Criteria
 
 1. THE Interest_Calc_L3_5 SHALL 显示列：借款合同号 | 本金 | 年利率 | 计息起始日 | 计息天数 | 测算利息 | 账载利息 | 差异
-2. THE Interest_Engine SHALL 实现：测算利息=本金×年利率×计息天数/360
+2. THE Interest_Engine SHALL 实现：测算利息=本金×年利率×计息天数/365
 3. THE Interest_Engine SHALL 实现差异=测算利息-账载利息
 4. WHEN |差异|>阈值时 SHALL 红色高亮
 5. THE Interest_Calc_L3_5 SHALL 合计测算利息 → EventBus publish 'l3:interest-calculated'（供L2/L8订阅）
@@ -174,7 +174,7 @@ L3长期借款底稿的专属HTML精美组件构建。将现有通用渲染升�
 
 #### Acceptance Criteria
 
-1. THE Interest_Engine SHALL calcInterest(principal, annualRate, days): 利息=本金×年利率×天数/360
+1. THE Interest_Engine SHALL calcInterest(principal, annualRate, days): 利息=本金×年利率×天数/365
 2. THE Interest_Engine SHALL calcOverdueDays / calcPledgeRatio
 3. THE Reclass_Engine SHALL calcCurrentPortion(dueDate, reportDate, amount): 一年内到期金额
 4. THE 引擎 SHALL 处理边界：天数为0利息=0；到期日在一年外时一年内到期=0

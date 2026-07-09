@@ -198,7 +198,7 @@ const tooltipContent = computed(() => {
   }
 
   if (resolveStatus.value === 'not_exists') {
-    return '底稿不存在或被裁剪'
+    return '底稿不存在'
   }
 
   if (resolveStatus.value === 'trimmed') {

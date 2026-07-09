@@ -85,6 +85,38 @@ from ._c23_journal_control import render as render_c23_journal_control
 from ._c24_journal_detail import render as render_c24_journal_detail
 from ._c25_internal_audit import render as render_c25_internal_audit
 from ._c26_info_processing import render as render_c26_info_processing
+from ._l1_short_term_loans import render as render_l1_short_term_loans
+from ._l2_interest_payable import render as render_l2_interest_payable
+from ._l3_long_term_loans import render as render_l3_long_term_loans
+from ._l4_bonds_payable import render as render_l4_bonds_payable
+from ._l5_long_term_payables import render as render_l5_long_term_payables
+from ._l6_special_payables import render as render_l6_special_payables
+from ._l7_other_noncurrent_liabilities import render as render_l7_other_noncurrent_liabilities
+from ._l8_financial_expenses import render as render_l8_financial_expenses
+from ._m1_dividends_payable import render as render_m1_dividends_payable
+from ._m2_paid_in_capital import render as render_m2_paid_in_capital
+from ._m3_treasury_stock import render as render_m3_treasury_stock
+from ._m4_capital_reserve import render as render_m4_capital_reserve
+from ._m5_surplus_reserve import render as render_m5_surplus_reserve
+from ._m6_retained_earnings import render as render_m6_retained_earnings
+from ._m7_special_reserve import render as render_m7_special_reserve
+from ._m8_general_risk_reserve import render as render_m8_general_risk_reserve
+from ._m9_other_comprehensive_income import render as render_m9_other_comprehensive_income
+from ._n1_deferred_tax_assets import render as render_n1_deferred_tax_assets
+from ._n2_taxes_payable import render as render_n2_taxes_payable
+from ._n3_deferred_tax_liabilities import render as render_n3_deferred_tax_liabilities
+from ._n5_income_tax_expense import render as render_n5_income_tax_expense
+from ._m10_other_equity_instruments import render as render_m10_other_equity_instruments
+from ._s3_policy_change import render as render_s3_policy_change
+from ._s4_nonmonetary_exchange import render as render_s4_nonmonetary_exchange
+from ._s5_debt_restructuring import render as render_s5_debt_restructuring
+from ._s6_fund_occupation import render as render_s6_fund_occupation
+from ._s12_cpa_expert import render as render_s12_cpa_expert
+from ._s13_mgmt_expert import render as render_s13_mgmt_expert
+from ._s14_accounting_estimate import render as render_s14_accounting_estimate
+from ._s15_eps_roe import render as render_s15_eps_roe
+from ._s20_revenue_deduction import render as render_s20_revenue_deduction
+from ._s21_data_asset import render as render_s21_data_asset
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -170,4 +202,36 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "c24-journal-entry-detail": render_c24_journal_detail,
     "c25-internal-audit-reliance": render_c25_internal_audit,
     "c26-info-processing-control": render_c26_info_processing,
+    "l1-short-term-loans": render_l1_short_term_loans,
+    "l2-interest-payable": render_l2_interest_payable,
+    "l3-long-term-loans": render_l3_long_term_loans,
+    "l4-bonds-payable": render_l4_bonds_payable,
+    "l5-long-term-payables": render_l5_long_term_payables,
+    "l6-special-payables": render_l6_special_payables,
+    "l7-other-noncurrent-liabilities": render_l7_other_noncurrent_liabilities,
+    "l8-financial-expenses": render_l8_financial_expenses,
+    "m1-dividends-payable": render_m1_dividends_payable,
+    "m2-paid-in-capital": render_m2_paid_in_capital,
+    "m3-treasury-stock": render_m3_treasury_stock,
+    "m4-capital-reserve": render_m4_capital_reserve,
+    "m5-surplus-reserve": render_m5_surplus_reserve,
+    "m6-retained-earnings": render_m6_retained_earnings,
+    "m7-special-reserve": render_m7_special_reserve,
+    "m8-general-risk-reserve": render_m8_general_risk_reserve,
+    "m9-other-comprehensive-income": render_m9_other_comprehensive_income,
+    "m10-other-equity-instruments": render_m10_other_equity_instruments,
+    "n1-deferred-tax-assets": render_n1_deferred_tax_assets,
+    "n2-taxes-payable": render_n2_taxes_payable,
+    "n3-deferred-tax-liabilities": render_n3_deferred_tax_liabilities,
+    "n5-income-tax-expense": render_n5_income_tax_expense,
+    "s3-policy-change": render_s3_policy_change,
+    "s4-nonmonetary-exchange": render_s4_nonmonetary_exchange,
+    "s5-debt-restructuring": render_s5_debt_restructuring,
+    "s6-fund-occupation": render_s6_fund_occupation,
+    "s12-cpa-expert": render_s12_cpa_expert,
+    "s13-mgmt-expert": render_s13_mgmt_expert,
+    "s14-accounting-estimate": render_s14_accounting_estimate,
+    "s15-eps-roe": render_s15_eps_roe,
+    "s20-revenue-deduction": render_s20_revenue_deduction,
+    "s21-data-asset": render_s21_data_asset,
 }

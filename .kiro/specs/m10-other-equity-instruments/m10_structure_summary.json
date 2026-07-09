@@ -1,0 +1,3151 @@
+{
+  "source_file": "M10 其他权益工具.xlsx",
+  "total_sheets": 11,
+  "sheet_names": [
+    "底稿目录",
+    "其他权益工具实质性程序表 M10A",
+    "其他权益工具实质性程序表 Q10A (修订前)",
+    "审定表M10-1",
+    "附注披露信息核对（上市公司）",
+    "附注披露信息核对（国企）",
+    "明细表M10-2",
+    "调整分录汇总M10-3",
+    "负债与权益区分检查表M10-4",
+    "其他权益工具检查表M10-5",
+    "GT_Custom"
+  ],
+  "skip_sheets": [
+    "其他权益工具实质性程序表 Q10A (修订前)"
+  ],
+  "active_sheets": [
+    "底稿目录",
+    "其他权益工具实质性程序表 M10A",
+    "审定表M10-1",
+    "附注披露信息核对（上市公司）",
+    "附注披露信息核对（国企）",
+    "明细表M10-2",
+    "调整分录汇总M10-3",
+    "负债与权益区分检查表M10-4",
+    "其他权益工具检查表M10-5",
+    "GT_Custom"
+  ],
+  "active_sheet_count": 10,
+  "key_sheets": {
+    "M10-1_审定表": {
+      "title": "审定表M10-1",
+      "size": "38×14",
+      "total_formula_count": 86,
+      "business_formula_count": 79,
+      "header_ref_count": 7,
+      "formula_patterns": [
+        "=IF(AND(REF=0,REF=0),\"\",IF(AND(REF=0,REF>0),1,REF/REF))",
+        "=IF(AND(REF=0,REF=0),0,IF(AND(REF=0,REF>0),1,(REF-REF)/REF))",
+        "=REF+REF+REF",
+        "=REF-REF",
+        "=SUM(REF,REF,REF)",
+        "=SUM(REF:REF)"
+      ],
+      "business_formula_rows": 15
+    },
+    "M10-2_明细表": {
+      "title": "明细表M10-2",
+      "size": "45×30",
+      "total_formula_count": 125,
+      "business_formula_count": 118,
+      "header_ref_count": 7,
+      "formula_patterns": [
+        "=REF+REF+REF",
+        "=REF+REF-REF",
+        "=REF-REF",
+        "=SUM(REF,REF)",
+        "=SUM(REF:REF )",
+        "=SUM(REF:REF)"
+      ],
+      "business_formula_rows": 13
+    },
+    "M10-4_区分检查": {
+      "title": "负债与权益区分检查表M10-4",
+      "size": "64×8",
+      "total_formula_count": 7,
+      "business_formula_count": 0,
+      "header_ref_count": 7,
+      "formula_patterns": []
+    }
+  },
+  "sheets": [
+    {
+      "title": "底稿目录",
+      "dimensions": "A1:H19",
+      "max_row": 19,
+      "max_column": 8,
+      "size": "19×8",
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ],
+      "merged_count": 3,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "被审计单位："
+        },
+        {
+          "col": "D",
+          "value": "序号"
+        },
+        {
+          "col": "E",
+          "value": "内容"
+        },
+        {
+          "col": "F",
+          "value": "索引号"
+        }
+      ],
+      "formula_cells": [],
+      "formula_count": 0,
+      "business_formula_cells": [],
+      "business_formula_count": 0,
+      "header_ref_count": 0,
+      "formula_patterns": [],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "截止日：202X年12月31日",
+            "D": "1",
+            "E": "其他权益工具实质性程序表 ",
+            "F": "M10A"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "编制人：",
+            "D": "2",
+            "E": "其他权益工具审定表",
+            "F": "M10-1"
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "编制日期：",
+            "D": "3",
+            "E": "附注披露信息(上市公司)",
+            "G": "无需打印"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "复核人：",
+            "D": "4",
+            "E": "附注披露信息(国企)",
+            "G": "无需打印"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "复核日期：",
+            "D": "5",
+            "E": "其他权益工具明细表",
+            "F": "M10-2"
+          }
+        }
+      ],
+      "business_formula_rows": 0
+    },
+    {
+      "title": "其他权益工具实质性程序表 M10A",
+      "dimensions": "A1:L24",
+      "max_row": 24,
+      "max_column": 12,
+      "size": "24×12",
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "A9:F9",
+        "G9:I9",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "A1:I1",
+        "A15:A16",
+        "G8:I8",
+        "C15:C16",
+        "I15:I16"
+      ],
+      "merged_count": 19,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具实质性程序"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_count": 6,
+      "business_formula_cells": [],
+      "business_formula_count": 0,
+      "header_ref_count": 6,
+      "formula_patterns": [],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "C": "[FORMULA] =底稿目录!A4",
+            "E": "[FORMULA] =底稿目录!A5",
+            "H": "索引号：",
+            "I": "M10A"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "C": "[FORMULA] =底稿目录!A6",
+            "E": "[FORMULA] =底稿目录!A7",
+            "H": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、本账户涉及的科目"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "其他权益工具"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "二、审计目标与认定的对应关系"
+          }
+        }
+      ],
+      "business_formula_rows": 0
+    },
+    {
+      "title": "其他权益工具实质性程序表 Q10A (修订前)",
+      "dimensions": "A1:M43",
+      "max_row": 43,
+      "max_column": 13,
+      "size": "43×13",
+      "merged_cells": [
+        "B22:C22",
+        "B31:C31",
+        "L28:M28",
+        "E32:H32",
+        "I26:J26",
+        "E37:H37",
+        "A8:B9",
+        "B21:C21",
+        "I16:J16",
+        "I25:J25",
+        "E24:H24",
+        "I18:J18",
+        "B38:C38",
+        "I42:J42",
+        "B40:C40",
+        "B24:C24",
+        "L17:M24",
+        "I20:J20",
+        "B33:C33",
+        "J8:J9",
+        "E34:H34",
+        "B32:C32",
+        "B26:C26",
+        "B41:C41",
+        "E27:H27",
+        "B35:C35",
+        "E36:H36",
+        "I30:J30",
+        "B16:C16",
+        "B25:C25",
+        "A11:B11",
+        "B18:C18",
+        "B27:C27",
+        "E22:H22",
+        "I32:J32",
+        "I41:J41",
+        "E21:H21",
+        "I43:J43",
+        "E23:H23",
+        "B29:C29",
+        "I24:J24",
+        "B37:C37",
+        "I33:J33",
+        "E38:H38",
+        "I17:J17",
+        "I35:J35",
+        "E40:H40",
+        "A10:B10",
+        "I19:J19",
+        "A2:J2",
+        "E26:H26",
+        "E16:H16",
+        "E25:H25",
+        "B43:C43",
+        "E18:H18",
+        "B42:C42",
+        "I37:J37",
+        "B17:C17",
+        "A12:B12",
+        "I21:J21",
+        "E39:H39",
+        "B19:C19",
+        "B34:C34",
+        "E20:H20",
+        "B28:C28",
+        "E29:H29",
+        "I23:J23",
+        "B30:C30",
+        "E31:H31",
+        "L25:M27",
+        "B20:C20",
+        "I34:J34",
+        "I27:J27",
+        "I36:J36",
+        "E41:H41",
+        "B39:C39",
+        "E43:H43",
+        "B23:C23",
+        "I22:J22",
+        "I28:J28",
+        "E33:H33",
+        "E42:H42",
+        "A1:J1",
+        "E17:H17",
+        "E35:H35",
+        "I39:J39",
+        "E19:H19",
+        "C8:G8",
+        "E28:H28",
+        "I29:J29",
+        "L38:M42",
+        "I38:J38",
+        "L29:M37",
+        "E30:H30",
+        "A13:B13",
+        "B36:C36",
+        "I31:J31",
+        "I40:J40"
+      ],
+      "merged_count": 98,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具实质性程序"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_count": 6,
+      "business_formula_cells": [],
+      "business_formula_count": 0,
+      "header_ref_count": 6,
+      "formula_patterns": [],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "C": "[FORMULA] =底稿目录!A4",
+            "F": "[FORMULA] =底稿目录!A5",
+            "I": "索引号：",
+            "J": "Q10A"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "C": "[FORMULA] =底稿目录!A6",
+            "F": "[FORMULA] =底稿目录!A7",
+            "I": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、本账户涉及的科目"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "其他权益工具"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "二、重大错报风险需从实质性程序获取的保证程度"
+          }
+        }
+      ],
+      "business_formula_rows": 0
+    },
+    {
+      "title": "审定表M10-1",
+      "dimensions": "A1:N38",
+      "max_row": 38,
+      "max_column": 14,
+      "size": "38×14",
+      "merged_cells": [
+        "A5:A6",
+        "A2:L2",
+        "J5:K5",
+        "A1:L1",
+        "B5:E5",
+        "F5:I5",
+        "L5:L6"
+      ],
+      "merged_count": 7,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具审定表"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E8",
+          "formula": "=B8+C8+D8"
+        },
+        {
+          "cell": "I8",
+          "formula": "=F8+G8+H8"
+        },
+        {
+          "cell": "J8",
+          "formula": "=I8-E8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(E8=0,I8=0),\"\",IF(AND(E8=0,I8>0),1,J8/E8))"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9+C9+D9"
+        },
+        {
+          "cell": "I9",
+          "formula": "=F9+G9+H9"
+        },
+        {
+          "cell": "J9",
+          "formula": "=I9-E9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(E9=0,I9=0),\"\",IF(AND(E9=0,I9>0),1,J9/E9))"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10+C10+D10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=F10+G10+H10"
+        },
+        {
+          "cell": "J10",
+          "formula": "=I10-E10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(E10=0,I10=0),\"\",IF(AND(E10=0,I10>0),1,J10/E10))"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E8:E10)"
+        },
+        {
+          "cell": "F11",
+          "formula": "=SUM(F8:F10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(G8:G10)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=SUM(H8:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(I8:I10)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=I11-E11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(AND(E11=0,I11=0),\"\",IF(AND(E11=0,I11>0),1,J11/E11))"
+        },
+        {
+          "cell": "E13",
+          "formula": "=B13+C13+D13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=F13+G13+H13"
+        },
+        {
+          "cell": "J13",
+          "formula": "=I13-E13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=IF(AND(E13=0,I13=0),\"\",IF(AND(E13=0,I13>0),1,J13/E13))"
+        },
+        {
+          "cell": "E14",
+          "formula": "=B14+C14+D14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=F14+G14+H14"
+        },
+        {
+          "cell": "J14",
+          "formula": "=I14-E14"
+        },
+        {
+          "cell": "K14",
+          "formula": "=IF(AND(E14=0,I14=0),\"\",IF(AND(E14=0,I14>0),1,J14/E14))"
+        },
+        {
+          "cell": "E15",
+          "formula": "=B15+C15+D15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=F15+G15+H15"
+        },
+        {
+          "cell": "J15",
+          "formula": "=I15-E15"
+        },
+        {
+          "cell": "K15",
+          "formula": "=IF(AND(E15=0,I15=0),\"\",IF(AND(E15=0,I15>0),1,J15/E15))"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B13:B15)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C13:C15)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=SUM(D13:D15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E13:E15)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F13:F15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G13:G15)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H13:H15)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=SUM(I13:I15)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=I16-E16"
+        },
+        {
+          "cell": "K16",
+          "formula": "=IF(AND(E16=0,I16=0),\"\",IF(AND(E16=0,I16>0),1,J16/E16))"
+        },
+        {
+          "cell": "E18",
+          "formula": "=B18+C18+D18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=F18+G18+H18"
+        },
+        {
+          "cell": "J18",
+          "formula": "=I18-E18"
+        },
+        {
+          "cell": "K18",
+          "formula": "=IF(AND(E18=0,I18=0),\"\",IF(AND(E18=0,I18>0),1,J18/E18))"
+        },
+        {
+          "cell": "E19",
+          "formula": "=B19+C19+D19"
+        },
+        {
+          "cell": "I19",
+          "formula": "=F19+G19+H19"
+        },
+        {
+          "cell": "J19",
+          "formula": "=I19-E19"
+        },
+        {
+          "cell": "K19",
+          "formula": "=IF(AND(E19=0,I19=0),\"\",IF(AND(E19=0,I19>0),1,J19/E19))"
+        },
+        {
+          "cell": "E20",
+          "formula": "=B20+C20+D20"
+        },
+        {
+          "cell": "I20",
+          "formula": "=F20+G20+H20"
+        },
+        {
+          "cell": "J20",
+          "formula": "=I20-E20"
+        },
+        {
+          "cell": "K20",
+          "formula": "=IF(AND(E20=0,I20=0),\"\",IF(AND(E20=0,I20>0),1,J20/E20))"
+        },
+        {
+          "cell": "B21",
+          "formula": "=SUM(B18:B20)"
+        },
+        {
+          "cell": "C21",
+          "formula": "=SUM(C18:C20)"
+        },
+        {
+          "cell": "D21",
+          "formula": "=SUM(D18:D20)"
+        },
+        {
+          "cell": "E21",
+          "formula": "=SUM(E18:E20)"
+        },
+        {
+          "cell": "F21",
+          "formula": "=SUM(F18:F20)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=SUM(G18:G20)"
+        },
+        {
+          "cell": "H21",
+          "formula": "=SUM(H18:H20)"
+        },
+        {
+          "cell": "I21",
+          "formula": "=SUM(I18:I20)"
+        },
+        {
+          "cell": "J21",
+          "formula": "=I21-E21"
+        },
+        {
+          "cell": "K21",
+          "formula": "=IF(AND(E21=0,I21=0),\"\",IF(AND(E21=0,I21>0),1,J21/E21))"
+        },
+        {
+          "cell": "B22",
+          "formula": "=SUM(B11,B16,B21)"
+        },
+        {
+          "cell": "C22",
+          "formula": "=SUM(C11,C16,C21)"
+        },
+        {
+          "cell": "D22",
+          "formula": "=SUM(D11,D16,D21)"
+        },
+        {
+          "cell": "E22",
+          "formula": "=SUM(E11,E16,E21)"
+        },
+        {
+          "cell": "F22",
+          "formula": "=SUM(F11,F16,F21)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(G11,G16,G21)"
+        },
+        {
+          "cell": "H22",
+          "formula": "=SUM(H11,H16,H21)"
+        },
+        {
+          "cell": "I22",
+          "formula": "=SUM(I11,I16,I21)"
+        },
+        {
+          "cell": "J22",
+          "formula": "=I22-E22"
+        },
+        {
+          "cell": "K22",
+          "formula": "=IF(AND(E22=0,I22=0),\"\",IF(AND(E22=0,I22>0),1,J22/E22))"
+        },
+        {
+          "cell": "E24",
+          "formula": "=E22-E23"
+        },
+        {
+          "cell": "I24",
+          "formula": "=I22-I23"
+        },
+        {
+          "cell": "E26",
+          "formula": "=IF(AND(E22=0,I22=0),0,IF(AND(E22=0,I22>0),1,(I22-E22)/E22))"
+        }
+      ],
+      "formula_count": 86,
+      "business_formula_cells": [
+        {
+          "cell": "E8",
+          "formula": "=B8+C8+D8"
+        },
+        {
+          "cell": "I8",
+          "formula": "=F8+G8+H8"
+        },
+        {
+          "cell": "J8",
+          "formula": "=I8-E8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(E8=0,I8=0),\"\",IF(AND(E8=0,I8>0),1,J8/E8))"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9+C9+D9"
+        },
+        {
+          "cell": "I9",
+          "formula": "=F9+G9+H9"
+        },
+        {
+          "cell": "J9",
+          "formula": "=I9-E9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(E9=0,I9=0),\"\",IF(AND(E9=0,I9>0),1,J9/E9))"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10+C10+D10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=F10+G10+H10"
+        },
+        {
+          "cell": "J10",
+          "formula": "=I10-E10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(E10=0,I10=0),\"\",IF(AND(E10=0,I10>0),1,J10/E10))"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E8:E10)"
+        },
+        {
+          "cell": "F11",
+          "formula": "=SUM(F8:F10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(G8:G10)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=SUM(H8:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(I8:I10)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=I11-E11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(AND(E11=0,I11=0),\"\",IF(AND(E11=0,I11>0),1,J11/E11))"
+        },
+        {
+          "cell": "E13",
+          "formula": "=B13+C13+D13"
+        },
+        {
+          "cell": "I13",
+          "formula": "=F13+G13+H13"
+        },
+        {
+          "cell": "J13",
+          "formula": "=I13-E13"
+        },
+        {
+          "cell": "K13",
+          "formula": "=IF(AND(E13=0,I13=0),\"\",IF(AND(E13=0,I13>0),1,J13/E13))"
+        },
+        {
+          "cell": "E14",
+          "formula": "=B14+C14+D14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=F14+G14+H14"
+        },
+        {
+          "cell": "J14",
+          "formula": "=I14-E14"
+        },
+        {
+          "cell": "K14",
+          "formula": "=IF(AND(E14=0,I14=0),\"\",IF(AND(E14=0,I14>0),1,J14/E14))"
+        },
+        {
+          "cell": "E15",
+          "formula": "=B15+C15+D15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=F15+G15+H15"
+        },
+        {
+          "cell": "J15",
+          "formula": "=I15-E15"
+        },
+        {
+          "cell": "K15",
+          "formula": "=IF(AND(E15=0,I15=0),\"\",IF(AND(E15=0,I15>0),1,J15/E15))"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B13:B15)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C13:C15)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=SUM(D13:D15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E13:E15)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F13:F15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G13:G15)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H13:H15)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=SUM(I13:I15)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=I16-E16"
+        },
+        {
+          "cell": "K16",
+          "formula": "=IF(AND(E16=0,I16=0),\"\",IF(AND(E16=0,I16>0),1,J16/E16))"
+        },
+        {
+          "cell": "E18",
+          "formula": "=B18+C18+D18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=F18+G18+H18"
+        },
+        {
+          "cell": "J18",
+          "formula": "=I18-E18"
+        },
+        {
+          "cell": "K18",
+          "formula": "=IF(AND(E18=0,I18=0),\"\",IF(AND(E18=0,I18>0),1,J18/E18))"
+        },
+        {
+          "cell": "E19",
+          "formula": "=B19+C19+D19"
+        },
+        {
+          "cell": "I19",
+          "formula": "=F19+G19+H19"
+        },
+        {
+          "cell": "J19",
+          "formula": "=I19-E19"
+        },
+        {
+          "cell": "K19",
+          "formula": "=IF(AND(E19=0,I19=0),\"\",IF(AND(E19=0,I19>0),1,J19/E19))"
+        },
+        {
+          "cell": "E20",
+          "formula": "=B20+C20+D20"
+        },
+        {
+          "cell": "I20",
+          "formula": "=F20+G20+H20"
+        },
+        {
+          "cell": "J20",
+          "formula": "=I20-E20"
+        },
+        {
+          "cell": "K20",
+          "formula": "=IF(AND(E20=0,I20=0),\"\",IF(AND(E20=0,I20>0),1,J20/E20))"
+        },
+        {
+          "cell": "B21",
+          "formula": "=SUM(B18:B20)"
+        },
+        {
+          "cell": "C21",
+          "formula": "=SUM(C18:C20)"
+        },
+        {
+          "cell": "D21",
+          "formula": "=SUM(D18:D20)"
+        },
+        {
+          "cell": "E21",
+          "formula": "=SUM(E18:E20)"
+        },
+        {
+          "cell": "F21",
+          "formula": "=SUM(F18:F20)"
+        },
+        {
+          "cell": "G21",
+          "formula": "=SUM(G18:G20)"
+        },
+        {
+          "cell": "H21",
+          "formula": "=SUM(H18:H20)"
+        },
+        {
+          "cell": "I21",
+          "formula": "=SUM(I18:I20)"
+        },
+        {
+          "cell": "J21",
+          "formula": "=I21-E21"
+        },
+        {
+          "cell": "K21",
+          "formula": "=IF(AND(E21=0,I21=0),\"\",IF(AND(E21=0,I21>0),1,J21/E21))"
+        },
+        {
+          "cell": "B22",
+          "formula": "=SUM(B11,B16,B21)"
+        },
+        {
+          "cell": "C22",
+          "formula": "=SUM(C11,C16,C21)"
+        },
+        {
+          "cell": "D22",
+          "formula": "=SUM(D11,D16,D21)"
+        },
+        {
+          "cell": "E22",
+          "formula": "=SUM(E11,E16,E21)"
+        },
+        {
+          "cell": "F22",
+          "formula": "=SUM(F11,F16,F21)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(G11,G16,G21)"
+        },
+        {
+          "cell": "H22",
+          "formula": "=SUM(H11,H16,H21)"
+        },
+        {
+          "cell": "I22",
+          "formula": "=SUM(I11,I16,I21)"
+        },
+        {
+          "cell": "J22",
+          "formula": "=I22-E22"
+        },
+        {
+          "cell": "K22",
+          "formula": "=IF(AND(E22=0,I22=0),\"\",IF(AND(E22=0,I22>0),1,J22/E22))"
+        },
+        {
+          "cell": "E24",
+          "formula": "=E22-E23"
+        },
+        {
+          "cell": "I24",
+          "formula": "=I22-I23"
+        },
+        {
+          "cell": "E26",
+          "formula": "=IF(AND(E22=0,I22=0),0,IF(AND(E22=0,I22>0),1,(I22-E22)/E22))"
+        }
+      ],
+      "business_formula_count": 79,
+      "header_ref_count": 7,
+      "formula_patterns": [
+        "=IF(AND(REF=0,REF=0),\"\",IF(AND(REF=0,REF>0),1,REF/REF))",
+        "=IF(AND(REF=0,REF=0),0,IF(AND(REF=0,REF>0),1,(REF-REF)/REF))",
+        "=REF+REF+REF",
+        "=REF-REF",
+        "=SUM(REF,REF,REF)",
+        "=SUM(REF:REF)"
+      ],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "E": "[FORMULA] =底稿目录!A4",
+            "H": "[FORMULA] =底稿目录!A5",
+            "K": "索引号：",
+            "L": "[FORMULA] =底稿目录!F4"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "E": "[FORMULA] =底稿目录!A6",
+            "H": "[FORMULA] =底稿目录!A7",
+            "K": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "项目",
+            "B": "期初数",
+            "F": "期末数",
+            "J": "本期与上期审定数比较",
+            "L": "原因分析"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "B": "未审数",
+            "C": "账项调整",
+            "D": "重分类调整",
+            "E": "审定数",
+            "F": "未审数",
+            "G": "账项调整",
+            "H": "重分类调整",
+            "I": "审定数",
+            "J": "变动额",
+            "K": "变动率"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "一、优先股"
+          }
+        }
+      ],
+      "business_formula_rows": 15
+    },
+    {
+      "title": "附注披露信息核对（上市公司）",
+      "dimensions": "A1:S47",
+      "max_row": 47,
+      "max_column": 19,
+      "size": "47×19",
+      "merged_cells": [
+        "A25:C25",
+        "A1:J1",
+        "A22:J22",
+        "A17:J17",
+        "A2:J2",
+        "A26:A27",
+        "A16:J16",
+        "A21:J21",
+        "A15:J15",
+        "A35:J35",
+        "A20:J20",
+        "A24:J24",
+        "B26:C26",
+        "F26:G26",
+        "D26:E26",
+        "A19:J19",
+        "H26:I26"
+      ],
+      "merged_count": 17,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具附注披露信息"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G13",
+          "formula": "=SUM(G7:G12)"
+        },
+        {
+          "cell": "B34",
+          "formula": "=SUM(B28:B33)"
+        },
+        {
+          "cell": "C34",
+          "formula": "=SUM(C28:C33)"
+        },
+        {
+          "cell": "D34",
+          "formula": "=SUM(D28:D33)"
+        },
+        {
+          "cell": "E34",
+          "formula": "=SUM(E28:E33)"
+        },
+        {
+          "cell": "F34",
+          "formula": "=SUM(F28:F33)"
+        },
+        {
+          "cell": "G34",
+          "formula": "=SUM(G28:G33)"
+        },
+        {
+          "cell": "H34",
+          "formula": "=SUM(H28:H33)"
+        },
+        {
+          "cell": "I34",
+          "formula": "=SUM(I28:I33)"
+        }
+      ],
+      "formula_count": 15,
+      "business_formula_cells": [
+        {
+          "cell": "G13",
+          "formula": "=SUM(G7:G12)"
+        },
+        {
+          "cell": "B34",
+          "formula": "=SUM(B28:B33)"
+        },
+        {
+          "cell": "C34",
+          "formula": "=SUM(C28:C33)"
+        },
+        {
+          "cell": "D34",
+          "formula": "=SUM(D28:D33)"
+        },
+        {
+          "cell": "E34",
+          "formula": "=SUM(E28:E33)"
+        },
+        {
+          "cell": "F34",
+          "formula": "=SUM(F28:F33)"
+        },
+        {
+          "cell": "G34",
+          "formula": "=SUM(G28:G33)"
+        },
+        {
+          "cell": "H34",
+          "formula": "=SUM(H28:H33)"
+        },
+        {
+          "cell": "I34",
+          "formula": "=SUM(I28:I33)"
+        }
+      ],
+      "business_formula_count": 9,
+      "header_ref_count": 6,
+      "formula_patterns": [
+        "=SUM(REF:REF)"
+      ],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "D": "[FORMULA] =底稿目录!A4",
+            "G": "[FORMULA] =底稿目录!A5",
+            "I": "索引号："
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "D": "[FORMULA] =底稿目录!A6",
+            "G": "[FORMULA] =底稿目录!A7",
+            "I": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "附注披露信息（上市公司）"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "发行在外的金融工具",
+            "B": "发行时间",
+            "C": "会计分类",
+            "D": "股利率或利息率",
+            "E": "发行价格",
+            "F": "数量",
+            "G": "金额",
+            "H": "到期日或续期情况",
+            "I": "转股条件",
+            "J": "转换情况"
+          }
+        }
+      ],
+      "business_formula_rows": 2
+    },
+    {
+      "title": "附注披露信息核对（国企）",
+      "dimensions": "A1:S12",
+      "max_row": 12,
+      "max_column": 19,
+      "size": "12×19",
+      "merged_cells": [
+        "D6:E6",
+        "A1:J1",
+        "B6:C6",
+        "H6:I6",
+        "F6:G6",
+        "A2:J2",
+        "A6:A7"
+      ],
+      "merged_count": 7,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具附注披露信息"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E8:E10)"
+        },
+        {
+          "cell": "F11",
+          "formula": "=SUM(F8:F10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(G8:G10)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=SUM(H8:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(I8:I10)"
+        }
+      ],
+      "formula_count": 14,
+      "business_formula_cells": [
+        {
+          "cell": "B11",
+          "formula": "=SUM(B8:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C8:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D8:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E8:E10)"
+        },
+        {
+          "cell": "F11",
+          "formula": "=SUM(F8:F10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(G8:G10)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=SUM(H8:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(I8:I10)"
+        }
+      ],
+      "business_formula_count": 8,
+      "header_ref_count": 6,
+      "formula_patterns": [
+        "=SUM(REF:REF)"
+      ],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "D": "[FORMULA] =底稿目录!A4",
+            "G": "[FORMULA] =底稿目录!A5",
+            "J": "索引号："
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "D": "[FORMULA] =底稿目录!A6",
+            "G": "[FORMULA] =底稿目录!A7",
+            "J": "页次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "附注披露信息（国企）"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "发行在外的金融工具",
+            "B": "期初",
+            "D": "本期增加",
+            "F": "本期减少",
+            "H": "期末"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "B": "数量",
+            "C": "账面价值",
+            "D": "数量",
+            "E": "账面价值",
+            "F": "数量",
+            "G": "账面价值",
+            "H": "数量",
+            "I": "账面价值"
+          }
+        }
+      ],
+      "business_formula_rows": 1
+    },
+    {
+      "title": "明细表M10-2",
+      "dimensions": "A1:AD45",
+      "max_row": 45,
+      "max_column": 30,
+      "size": "45×30",
+      "merged_cells": [
+        "U9:V9",
+        "H9:H10",
+        "AA9:AA10",
+        "AB9:AB10",
+        "Y9:Z9",
+        "C9:C10",
+        "E9:E10",
+        "A2:AD2",
+        "K9:N9",
+        "O9:R9",
+        "B9:B10",
+        "D9:D10",
+        "F9:F10",
+        "AC9:AC10",
+        "S9:T9",
+        "W9:X9",
+        "G9:G10",
+        "A9:A10",
+        "AD9:AD10",
+        "I9:J9",
+        "A1:AD1"
+      ],
+      "merged_count": 21,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具明细表"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AD3",
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "N4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "N12",
+          "formula": "=L12-M12"
+        },
+        {
+          "cell": "R12",
+          "formula": "=SUM(P12:Q12)"
+        },
+        {
+          "cell": "S12",
+          "formula": "=I12+K12-O12"
+        },
+        {
+          "cell": "T12",
+          "formula": "=J12+N12-R12"
+        },
+        {
+          "cell": "Y12",
+          "formula": "=S12+U12-W12"
+        },
+        {
+          "cell": "Z12",
+          "formula": "=T12+V12-X12"
+        },
+        {
+          "cell": "N13",
+          "formula": "=L13-M13"
+        },
+        {
+          "cell": "R13",
+          "formula": "=SUM(P13:Q13)"
+        },
+        {
+          "cell": "S13",
+          "formula": "=I13+K13-O13"
+        },
+        {
+          "cell": "T13",
+          "formula": "=J13+N13-R13"
+        },
+        {
+          "cell": "Y13",
+          "formula": "=S13+U13-W13"
+        },
+        {
+          "cell": "Z13",
+          "formula": "=T13+V13-X13"
+        },
+        {
+          "cell": "N14",
+          "formula": "=L14-M14"
+        },
+        {
+          "cell": "R14",
+          "formula": "=SUM(P14:Q14)"
+        },
+        {
+          "cell": "S14",
+          "formula": "=I14+K14-O14"
+        },
+        {
+          "cell": "T14",
+          "formula": "=J14+N14-R14"
+        },
+        {
+          "cell": "Y14",
+          "formula": "=S14+U14-W14"
+        },
+        {
+          "cell": "Z14",
+          "formula": "=T14+V14-X14"
+        },
+        {
+          "cell": "H15",
+          "formula": "=SUM(H12:H14)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=SUM(J12:J14)"
+        },
+        {
+          "cell": "K15",
+          "formula": "=SUM(K12:K14)"
+        },
+        {
+          "cell": "M15",
+          "formula": "=SUM(M12:M14)"
+        },
+        {
+          "cell": "N15",
+          "formula": "=SUM(N12:N14)"
+        },
+        {
+          "cell": "O15",
+          "formula": "=SUM(O12:O14)"
+        },
+        {
+          "cell": "Q15",
+          "formula": "=SUM(Q12:Q14)"
+        },
+        {
+          "cell": "R15",
+          "formula": "=SUM(R12:R14)"
+        },
+        {
+          "cell": "S15",
+          "formula": "=SUM(S12:S14)"
+        },
+        {
+          "cell": "T15",
+          "formula": "=SUM(T12:T14)"
+        },
+        {
+          "cell": "U15",
+          "formula": "=U14+U13+U12"
+        },
+        {
+          "cell": "V15",
+          "formula": "=V14+V13+V12"
+        },
+        {
+          "cell": "W15",
+          "formula": "=W14+W13+W12"
+        },
+        {
+          "cell": "X15",
+          "formula": "=X14+X13+X12"
+        },
+        {
+          "cell": "Y15",
+          "formula": "=SUM(Y12:Y14)"
+        },
+        {
+          "cell": "Z15",
+          "formula": "=SUM(Z12:Z14)"
+        },
+        {
+          "cell": "N17",
+          "formula": "=L17-M17"
+        },
+        {
+          "cell": "R17",
+          "formula": "=SUM(P17:Q17)"
+        },
+        {
+          "cell": "S17",
+          "formula": "=I17+K17-O17"
+        },
+        {
+          "cell": "T17",
+          "formula": "=J17+N17-R17"
+        },
+        {
+          "cell": "Y17",
+          "formula": "=S17+U17-W17"
+        },
+        {
+          "cell": "Z17",
+          "formula": "=T17+V17-X17"
+        },
+        {
+          "cell": "N18",
+          "formula": "=L18-M18"
+        },
+        {
+          "cell": "R18",
+          "formula": "=SUM(P18:Q18)"
+        },
+        {
+          "cell": "S18",
+          "formula": "=I18+K18-O18"
+        },
+        {
+          "cell": "T18",
+          "formula": "=J18+N18-R18"
+        },
+        {
+          "cell": "Y18",
+          "formula": "=S18+U18-W18"
+        },
+        {
+          "cell": "Z18",
+          "formula": "=T18+V18-X18"
+        },
+        {
+          "cell": "N19",
+          "formula": "=L19-M19"
+        },
+        {
+          "cell": "R19",
+          "formula": "=SUM(P19:Q19)"
+        },
+        {
+          "cell": "S19",
+          "formula": "=I19+K19-O19"
+        },
+        {
+          "cell": "T19",
+          "formula": "=J19+N19-R19"
+        },
+        {
+          "cell": "Y19",
+          "formula": "=S19+U19-W19"
+        },
+        {
+          "cell": "Z19",
+          "formula": "=T19+V19-X19"
+        },
+        {
+          "cell": "H20",
+          "formula": "=SUM(H17:H19)"
+        },
+        {
+          "cell": "J20",
+          "formula": "=SUM(J17:J19)"
+        },
+        {
+          "cell": "K20",
+          "formula": "=SUM(K17:K19)"
+        },
+        {
+          "cell": "M20",
+          "formula": "=SUM(M17:M19)"
+        },
+        {
+          "cell": "N20",
+          "formula": "=SUM(N17:N19)"
+        },
+        {
+          "cell": "O20",
+          "formula": "=SUM(O17:O19)"
+        },
+        {
+          "cell": "Q20",
+          "formula": "=SUM(Q17:Q19)"
+        },
+        {
+          "cell": "R20",
+          "formula": "=SUM(R17:R19)"
+        },
+        {
+          "cell": "S20",
+          "formula": "=SUM(S17:S19)"
+        },
+        {
+          "cell": "T20",
+          "formula": "=SUM(T17:T19)"
+        },
+        {
+          "cell": "U20",
+          "formula": "=U19+U18+U17"
+        },
+        {
+          "cell": "V20",
+          "formula": "=V19+V18+V17"
+        },
+        {
+          "cell": "W20",
+          "formula": "=W19+W18+W17"
+        },
+        {
+          "cell": "X20",
+          "formula": "=X19+X18+X17"
+        },
+        {
+          "cell": "Y20",
+          "formula": "=SUM(Y17:Y19)"
+        },
+        {
+          "cell": "Z20",
+          "formula": "=SUM(Z17:Z19)"
+        },
+        {
+          "cell": "N22",
+          "formula": "=L22-M22"
+        },
+        {
+          "cell": "R22",
+          "formula": "=SUM(P22:Q22)"
+        },
+        {
+          "cell": "S22",
+          "formula": "=I22+K22-O22"
+        },
+        {
+          "cell": "T22",
+          "formula": "=J22+N22-R22"
+        },
+        {
+          "cell": "Y22",
+          "formula": "=S22+U22-W22"
+        },
+        {
+          "cell": "Z22",
+          "formula": "=T22+V22-X22"
+        },
+        {
+          "cell": "N23",
+          "formula": "=L23-M23"
+        },
+        {
+          "cell": "R23",
+          "formula": "=SUM(P23:Q23)"
+        },
+        {
+          "cell": "S23",
+          "formula": "=I23+K23-O23"
+        },
+        {
+          "cell": "T23",
+          "formula": "=J23+N23-R23"
+        },
+        {
+          "cell": "Y23",
+          "formula": "=S23+U23-W23"
+        },
+        {
+          "cell": "Z23",
+          "formula": "=T23+V23-X23"
+        },
+        {
+          "cell": "N24",
+          "formula": "=L24-M24"
+        },
+        {
+          "cell": "R24",
+          "formula": "=SUM(P24:Q24)"
+        },
+        {
+          "cell": "S24",
+          "formula": "=I24+K24-O24"
+        },
+        {
+          "cell": "T24",
+          "formula": "=J24+N24-R24"
+        },
+        {
+          "cell": "Y24",
+          "formula": "=S24+U24-W24"
+        },
+        {
+          "cell": "Z24",
+          "formula": "=T24+V24-X24"
+        },
+        {
+          "cell": "H25",
+          "formula": "=SUM(H22:H24)"
+        },
+        {
+          "cell": "J25",
+          "formula": "=SUM(J22:J24)"
+        },
+        {
+          "cell": "K25",
+          "formula": "=SUM(K22:K24)"
+        },
+        {
+          "cell": "M25",
+          "formula": "=SUM(M22:M24)"
+        },
+        {
+          "cell": "N25",
+          "formula": "=SUM(N22:N24)"
+        },
+        {
+          "cell": "O25",
+          "formula": "=SUM(O22:O24)"
+        },
+        {
+          "cell": "Q25",
+          "formula": "=SUM(Q22:Q24)"
+        },
+        {
+          "cell": "R25",
+          "formula": "=SUM(R22:R24)"
+        },
+        {
+          "cell": "S25",
+          "formula": "=SUM(S22:S24)"
+        },
+        {
+          "cell": "T25",
+          "formula": "=SUM(T22:T24 )"
+        },
+        {
+          "cell": "U25",
+          "formula": "=U24+U23+U22"
+        },
+        {
+          "cell": "V25",
+          "formula": "=V24+V23+V22"
+        },
+        {
+          "cell": "W25",
+          "formula": "=W24+W23+W22"
+        },
+        {
+          "cell": "X25",
+          "formula": "=X24+X23+X22"
+        },
+        {
+          "cell": "Y25",
+          "formula": "=S25+U25-W25"
+        },
+        {
+          "cell": "Z25",
+          "formula": "=T25+V25-X25"
+        },
+        {
+          "cell": "H26",
+          "formula": "=SUM(H15,H20)"
+        },
+        {
+          "cell": "J26",
+          "formula": "=SUM(J15,J20)"
+        },
+        {
+          "cell": "K26",
+          "formula": "=SUM(K15,K20)"
+        },
+        {
+          "cell": "M26",
+          "formula": "=SUM(M15,M20)"
+        },
+        {
+          "cell": "N26",
+          "formula": "=SUM(N15,N20)"
+        },
+        {
+          "cell": "O26",
+          "formula": "=SUM(O15,O20)"
+        },
+        {
+          "cell": "Q26",
+          "formula": "=SUM(Q15,Q20)"
+        },
+        {
+          "cell": "R26",
+          "formula": "=SUM(R15,R20)"
+        },
+        {
+          "cell": "S26",
+          "formula": "=SUM(S15,S20)"
+        },
+        {
+          "cell": "T26",
+          "formula": "=SUM(T15,T20)"
+        },
+        {
+          "cell": "U26",
+          "formula": "=U25+U20+U15"
+        },
+        {
+          "cell": "V26",
+          "formula": "=V25+V20+V15"
+        },
+        {
+          "cell": "W26",
+          "formula": "=W25+W20+W15"
+        },
+        {
+          "cell": "X26",
+          "formula": "=X25+X20+X15"
+        },
+        {
+          "cell": "Y26",
+          "formula": "=S26+U26-W26"
+        },
+        {
+          "cell": "Z26",
+          "formula": "=T26+V26-X26"
+        }
+      ],
+      "formula_count": 125,
+      "business_formula_cells": [
+        {
+          "cell": "N12",
+          "formula": "=L12-M12"
+        },
+        {
+          "cell": "R12",
+          "formula": "=SUM(P12:Q12)"
+        },
+        {
+          "cell": "S12",
+          "formula": "=I12+K12-O12"
+        },
+        {
+          "cell": "T12",
+          "formula": "=J12+N12-R12"
+        },
+        {
+          "cell": "Y12",
+          "formula": "=S12+U12-W12"
+        },
+        {
+          "cell": "Z12",
+          "formula": "=T12+V12-X12"
+        },
+        {
+          "cell": "N13",
+          "formula": "=L13-M13"
+        },
+        {
+          "cell": "R13",
+          "formula": "=SUM(P13:Q13)"
+        },
+        {
+          "cell": "S13",
+          "formula": "=I13+K13-O13"
+        },
+        {
+          "cell": "T13",
+          "formula": "=J13+N13-R13"
+        },
+        {
+          "cell": "Y13",
+          "formula": "=S13+U13-W13"
+        },
+        {
+          "cell": "Z13",
+          "formula": "=T13+V13-X13"
+        },
+        {
+          "cell": "N14",
+          "formula": "=L14-M14"
+        },
+        {
+          "cell": "R14",
+          "formula": "=SUM(P14:Q14)"
+        },
+        {
+          "cell": "S14",
+          "formula": "=I14+K14-O14"
+        },
+        {
+          "cell": "T14",
+          "formula": "=J14+N14-R14"
+        },
+        {
+          "cell": "Y14",
+          "formula": "=S14+U14-W14"
+        },
+        {
+          "cell": "Z14",
+          "formula": "=T14+V14-X14"
+        },
+        {
+          "cell": "H15",
+          "formula": "=SUM(H12:H14)"
+        },
+        {
+          "cell": "J15",
+          "formula": "=SUM(J12:J14)"
+        },
+        {
+          "cell": "K15",
+          "formula": "=SUM(K12:K14)"
+        },
+        {
+          "cell": "M15",
+          "formula": "=SUM(M12:M14)"
+        },
+        {
+          "cell": "N15",
+          "formula": "=SUM(N12:N14)"
+        },
+        {
+          "cell": "O15",
+          "formula": "=SUM(O12:O14)"
+        },
+        {
+          "cell": "Q15",
+          "formula": "=SUM(Q12:Q14)"
+        },
+        {
+          "cell": "R15",
+          "formula": "=SUM(R12:R14)"
+        },
+        {
+          "cell": "S15",
+          "formula": "=SUM(S12:S14)"
+        },
+        {
+          "cell": "T15",
+          "formula": "=SUM(T12:T14)"
+        },
+        {
+          "cell": "U15",
+          "formula": "=U14+U13+U12"
+        },
+        {
+          "cell": "V15",
+          "formula": "=V14+V13+V12"
+        },
+        {
+          "cell": "W15",
+          "formula": "=W14+W13+W12"
+        },
+        {
+          "cell": "X15",
+          "formula": "=X14+X13+X12"
+        },
+        {
+          "cell": "Y15",
+          "formula": "=SUM(Y12:Y14)"
+        },
+        {
+          "cell": "Z15",
+          "formula": "=SUM(Z12:Z14)"
+        },
+        {
+          "cell": "N17",
+          "formula": "=L17-M17"
+        },
+        {
+          "cell": "R17",
+          "formula": "=SUM(P17:Q17)"
+        },
+        {
+          "cell": "S17",
+          "formula": "=I17+K17-O17"
+        },
+        {
+          "cell": "T17",
+          "formula": "=J17+N17-R17"
+        },
+        {
+          "cell": "Y17",
+          "formula": "=S17+U17-W17"
+        },
+        {
+          "cell": "Z17",
+          "formula": "=T17+V17-X17"
+        },
+        {
+          "cell": "N18",
+          "formula": "=L18-M18"
+        },
+        {
+          "cell": "R18",
+          "formula": "=SUM(P18:Q18)"
+        },
+        {
+          "cell": "S18",
+          "formula": "=I18+K18-O18"
+        },
+        {
+          "cell": "T18",
+          "formula": "=J18+N18-R18"
+        },
+        {
+          "cell": "Y18",
+          "formula": "=S18+U18-W18"
+        },
+        {
+          "cell": "Z18",
+          "formula": "=T18+V18-X18"
+        },
+        {
+          "cell": "N19",
+          "formula": "=L19-M19"
+        },
+        {
+          "cell": "R19",
+          "formula": "=SUM(P19:Q19)"
+        },
+        {
+          "cell": "S19",
+          "formula": "=I19+K19-O19"
+        },
+        {
+          "cell": "T19",
+          "formula": "=J19+N19-R19"
+        },
+        {
+          "cell": "Y19",
+          "formula": "=S19+U19-W19"
+        },
+        {
+          "cell": "Z19",
+          "formula": "=T19+V19-X19"
+        },
+        {
+          "cell": "H20",
+          "formula": "=SUM(H17:H19)"
+        },
+        {
+          "cell": "J20",
+          "formula": "=SUM(J17:J19)"
+        },
+        {
+          "cell": "K20",
+          "formula": "=SUM(K17:K19)"
+        },
+        {
+          "cell": "M20",
+          "formula": "=SUM(M17:M19)"
+        },
+        {
+          "cell": "N20",
+          "formula": "=SUM(N17:N19)"
+        },
+        {
+          "cell": "O20",
+          "formula": "=SUM(O17:O19)"
+        },
+        {
+          "cell": "Q20",
+          "formula": "=SUM(Q17:Q19)"
+        },
+        {
+          "cell": "R20",
+          "formula": "=SUM(R17:R19)"
+        },
+        {
+          "cell": "S20",
+          "formula": "=SUM(S17:S19)"
+        },
+        {
+          "cell": "T20",
+          "formula": "=SUM(T17:T19)"
+        },
+        {
+          "cell": "U20",
+          "formula": "=U19+U18+U17"
+        },
+        {
+          "cell": "V20",
+          "formula": "=V19+V18+V17"
+        },
+        {
+          "cell": "W20",
+          "formula": "=W19+W18+W17"
+        },
+        {
+          "cell": "X20",
+          "formula": "=X19+X18+X17"
+        },
+        {
+          "cell": "Y20",
+          "formula": "=SUM(Y17:Y19)"
+        },
+        {
+          "cell": "Z20",
+          "formula": "=SUM(Z17:Z19)"
+        },
+        {
+          "cell": "N22",
+          "formula": "=L22-M22"
+        },
+        {
+          "cell": "R22",
+          "formula": "=SUM(P22:Q22)"
+        },
+        {
+          "cell": "S22",
+          "formula": "=I22+K22-O22"
+        },
+        {
+          "cell": "T22",
+          "formula": "=J22+N22-R22"
+        },
+        {
+          "cell": "Y22",
+          "formula": "=S22+U22-W22"
+        },
+        {
+          "cell": "Z22",
+          "formula": "=T22+V22-X22"
+        },
+        {
+          "cell": "N23",
+          "formula": "=L23-M23"
+        },
+        {
+          "cell": "R23",
+          "formula": "=SUM(P23:Q23)"
+        },
+        {
+          "cell": "S23",
+          "formula": "=I23+K23-O23"
+        },
+        {
+          "cell": "T23",
+          "formula": "=J23+N23-R23"
+        },
+        {
+          "cell": "Y23",
+          "formula": "=S23+U23-W23"
+        },
+        {
+          "cell": "Z23",
+          "formula": "=T23+V23-X23"
+        },
+        {
+          "cell": "N24",
+          "formula": "=L24-M24"
+        },
+        {
+          "cell": "R24",
+          "formula": "=SUM(P24:Q24)"
+        },
+        {
+          "cell": "S24",
+          "formula": "=I24+K24-O24"
+        },
+        {
+          "cell": "T24",
+          "formula": "=J24+N24-R24"
+        },
+        {
+          "cell": "Y24",
+          "formula": "=S24+U24-W24"
+        },
+        {
+          "cell": "Z24",
+          "formula": "=T24+V24-X24"
+        },
+        {
+          "cell": "H25",
+          "formula": "=SUM(H22:H24)"
+        },
+        {
+          "cell": "J25",
+          "formula": "=SUM(J22:J24)"
+        },
+        {
+          "cell": "K25",
+          "formula": "=SUM(K22:K24)"
+        },
+        {
+          "cell": "M25",
+          "formula": "=SUM(M22:M24)"
+        },
+        {
+          "cell": "N25",
+          "formula": "=SUM(N22:N24)"
+        },
+        {
+          "cell": "O25",
+          "formula": "=SUM(O22:O24)"
+        },
+        {
+          "cell": "Q25",
+          "formula": "=SUM(Q22:Q24)"
+        },
+        {
+          "cell": "R25",
+          "formula": "=SUM(R22:R24)"
+        },
+        {
+          "cell": "S25",
+          "formula": "=SUM(S22:S24)"
+        },
+        {
+          "cell": "T25",
+          "formula": "=SUM(T22:T24 )"
+        },
+        {
+          "cell": "U25",
+          "formula": "=U24+U23+U22"
+        },
+        {
+          "cell": "V25",
+          "formula": "=V24+V23+V22"
+        },
+        {
+          "cell": "W25",
+          "formula": "=W24+W23+W22"
+        },
+        {
+          "cell": "X25",
+          "formula": "=X24+X23+X22"
+        },
+        {
+          "cell": "Y25",
+          "formula": "=S25+U25-W25"
+        },
+        {
+          "cell": "Z25",
+          "formula": "=T25+V25-X25"
+        },
+        {
+          "cell": "H26",
+          "formula": "=SUM(H15,H20)"
+        },
+        {
+          "cell": "J26",
+          "formula": "=SUM(J15,J20)"
+        },
+        {
+          "cell": "K26",
+          "formula": "=SUM(K15,K20)"
+        },
+        {
+          "cell": "M26",
+          "formula": "=SUM(M15,M20)"
+        },
+        {
+          "cell": "N26",
+          "formula": "=SUM(N15,N20)"
+        },
+        {
+          "cell": "O26",
+          "formula": "=SUM(O15,O20)"
+        },
+        {
+          "cell": "Q26",
+          "formula": "=SUM(Q15,Q20)"
+        },
+        {
+          "cell": "R26",
+          "formula": "=SUM(R15,R20)"
+        },
+        {
+          "cell": "S26",
+          "formula": "=SUM(S15,S20)"
+        },
+        {
+          "cell": "T26",
+          "formula": "=SUM(T15,T20)"
+        },
+        {
+          "cell": "U26",
+          "formula": "=U25+U20+U15"
+        },
+        {
+          "cell": "V26",
+          "formula": "=V25+V20+V15"
+        },
+        {
+          "cell": "W26",
+          "formula": "=W25+W20+W15"
+        },
+        {
+          "cell": "X26",
+          "formula": "=X25+X20+X15"
+        },
+        {
+          "cell": "Y26",
+          "formula": "=S26+U26-W26"
+        },
+        {
+          "cell": "Z26",
+          "formula": "=T26+V26-X26"
+        }
+      ],
+      "business_formula_count": 118,
+      "header_ref_count": 7,
+      "formula_patterns": [
+        "=REF+REF+REF",
+        "=REF+REF-REF",
+        "=REF-REF",
+        "=SUM(REF,REF)",
+        "=SUM(REF:REF )",
+        "=SUM(REF:REF)"
+      ],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "G": "[FORMULA] =底稿目录!A4",
+            "N": "[FORMULA] =底稿目录!A5",
+            "AC": "索引号：",
+            "AD": "[FORMULA] =底稿目录!F7"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "G": "[FORMULA] =底稿目录!A6",
+            "N": "[FORMULA] =底稿目录!A7",
+            "AC": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、审计目标"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "1.资产负债表中记录的其他综合收益是存在的，且已经记录在恰当的账户中。",
+            "I": "2.所有应记录的其他综合收益均已记录，所有应当包括在财务报表中的相关披露均已包括。"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "3.其他综合收益以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。"
+          }
+        }
+      ],
+      "business_formula_rows": 13
+    },
+    {
+      "title": "调整分录汇总M10-3",
+      "dimensions": "A1:J33",
+      "max_row": 33,
+      "max_column": 10,
+      "size": "33×10",
+      "merged_cells": [
+        "A1:J1",
+        "A25:J25",
+        "A2:J2"
+      ],
+      "merged_count": 3,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具调整分录汇总表"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_count": 7,
+      "business_formula_cells": [],
+      "business_formula_count": 0,
+      "header_ref_count": 7,
+      "formula_patterns": [],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "D": "[FORMULA] =底稿目录!A4",
+            "G": "[FORMULA] =底稿目录!A5",
+            "I": "索引号：",
+            "J": "[FORMULA] =底稿目录!F8"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "D": "[FORMULA] =底稿目录!A6",
+            "G": "[FORMULA] =底稿目录!A7",
+            "I": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "调整事项说明",
+            "B": "类别（报表调整/账项调整/其他）",
+            "C": "报表项目",
+            "D": "科目名称",
+            "E": "附注项目",
+            "F": "……",
+            "G": "借方调整金额",
+            "H": "贷方调整金额",
+            "I": "索引",
+            "J": "备注"
+          }
+        }
+      ],
+      "business_formula_rows": 0
+    },
+    {
+      "title": "负债与权益区分检查表M10-4",
+      "dimensions": "A1:H64",
+      "max_row": 64,
+      "max_column": 8,
+      "size": "64×8",
+      "merged_cells": [
+        "A31:B31",
+        "A30:B30",
+        "B54:C54",
+        "A17:A19",
+        "A11:B11",
+        "A20:A22",
+        "D46:H46",
+        "B56:C56",
+        "A58:H62",
+        "D40:H40",
+        "B43:C43",
+        "D45:H45",
+        "A2:F2",
+        "B52:C52",
+        "D52:H52",
+        "B48:C48",
+        "A44:A48",
+        "A55:A56",
+        "D49:H49",
+        "D41:H41",
+        "A24:A26",
+        "A27:B27",
+        "B53:C53",
+        "D48:H48",
+        "A12:B12",
+        "B44:C44",
+        "D53:H53",
+        "D47:H47",
+        "D43:H43",
+        "B41:C42",
+        "C20:C22",
+        "B50:C51",
+        "A14:B14",
+        "A41:A43",
+        "A23:B23",
+        "B40:C40",
+        "B49:C49",
+        "D56:H56",
+        "A53:A54",
+        "B55:C55",
+        "B46:C47",
+        "D55:H55",
+        "A28:A29",
+        "D42:H42",
+        "A1:F1",
+        "B45:C45",
+        "A15:A16",
+        "A13:B13",
+        "D51:H51",
+        "D54:H54",
+        "A49:A52",
+        "D50:H50",
+        "D44:H44"
+      ],
+      "merged_count": 53,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "金融负债和权益工具的区分检查表"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "formula_count": 7,
+      "business_formula_cells": [],
+      "business_formula_count": 0,
+      "header_ref_count": 7,
+      "formula_patterns": [],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "C": "[FORMULA] =底稿目录!A4",
+            "D": "[FORMULA] =底稿目录!A5",
+            "E": "索引号：",
+            "F": "[FORMULA] =底稿目录!F9"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "C": "[FORMULA] =底稿目录!A6",
+            "D": "[FORMULA] =底稿目录!A7",
+            "E": "页  次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、审计目标"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "1.检查被审计单位发行的优先股、永续债等工具已按照企业会计准则的规定在财务报表中作出恰当列报和披露。"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "二、审计过程"
+          }
+        }
+      ],
+      "business_formula_rows": 0
+    },
+    {
+      "title": "其他权益工具检查表M10-5",
+      "dimensions": "A1:P33",
+      "max_row": 33,
+      "max_column": 16,
+      "size": "33×16",
+      "merged_cells": [
+        "I9:M9",
+        "A19:C19",
+        "H9:H10",
+        "A9:G9",
+        "A1:P1",
+        "P9:P10",
+        "N9:N10",
+        "O9:O10",
+        "A21:C21",
+        "A20:C20",
+        "A2:P2"
+      ],
+      "merged_count": 11,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "致同会计师事务所"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "其他权益工具检查表"
+        }
+      ],
+      "formula_cells": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F19",
+          "formula": "=SUM(F11:F18)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=SUM(G11:G18)"
+        },
+        {
+          "cell": "F20",
+          "formula": "='明细表M10-2'!R26"
+        },
+        {
+          "cell": "G20",
+          "formula": "='明细表M10-2'!N26"
+        },
+        {
+          "cell": "F21",
+          "formula": "=F19/F20"
+        },
+        {
+          "cell": "G21",
+          "formula": "=G19/G20"
+        }
+      ],
+      "formula_count": 13,
+      "business_formula_cells": [
+        {
+          "cell": "F19",
+          "formula": "=SUM(F11:F18)"
+        },
+        {
+          "cell": "G19",
+          "formula": "=SUM(G11:G18)"
+        },
+        {
+          "cell": "F20",
+          "formula": "='明细表M10-2'!R26"
+        },
+        {
+          "cell": "G20",
+          "formula": "='明细表M10-2'!N26"
+        },
+        {
+          "cell": "F21",
+          "formula": "=F19/F20"
+        },
+        {
+          "cell": "G21",
+          "formula": "=G19/G20"
+        }
+      ],
+      "business_formula_count": 6,
+      "header_ref_count": 7,
+      "formula_patterns": [
+        "='明细表REF-2'!REF",
+        "=REF/REF",
+        "=SUM(REF:REF)"
+      ],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A2",
+            "E": "[FORMULA] =底稿目录!A4",
+            "H": "[FORMULA] =底稿目录!A5",
+            "O": "索引号：",
+            "P": "[FORMULA] =底稿目录!F10"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "[FORMULA] =底稿目录!A3",
+            "E": "[FORMULA] =底稿目录!A6",
+            "H": "[FORMULA] =底稿目录!A7",
+            "O": "页   次："
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "一、审计目标:"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "1.其他综合收益以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "二、测试："
+          }
+        }
+      ],
+      "business_formula_rows": 3
+    },
+    {
+      "title": "GT_Custom",
+      "dimensions": "A1:B8",
+      "max_row": 8,
+      "max_column": 2,
+      "size": "8×2",
+      "merged_cells": [],
+      "merged_count": 0,
+      "headers_row1": [
+        {
+          "col": "A",
+          "value": "C1"
+        },
+        {
+          "col": "B",
+          "value": "Custom 1"
+        }
+      ],
+      "headers_row2": [
+        {
+          "col": "A",
+          "value": "C2"
+        },
+        {
+          "col": "B",
+          "value": "Custom 2"
+        }
+      ],
+      "formula_cells": [],
+      "formula_count": 0,
+      "business_formula_cells": [],
+      "business_formula_count": 0,
+      "header_ref_count": 0,
+      "formula_patterns": [],
+      "sample_data_rows": [
+        {
+          "row": 3,
+          "data": {
+            "A": "C3",
+            "B": "Custom 3"
+          }
+        },
+        {
+          "row": 4,
+          "data": {
+            "A": "C4",
+            "B": "Custom 4"
+          }
+        },
+        {
+          "row": 5,
+          "data": {
+            "A": "C5",
+            "B": "Custom 5"
+          }
+        },
+        {
+          "row": 6,
+          "data": {
+            "A": "C6",
+            "B": "Custom 6"
+          }
+        },
+        {
+          "row": 7,
+          "data": {
+            "A": "C7",
+            "B": "Custom 7"
+          }
+        }
+      ],
+      "business_formula_rows": 0
+    }
+  ],
+  "total_formulas": 279,
+  "validation": {
+    "M10-1_formula_count": 79,
+    "M10-2_size": "45×30",
+    "M10-2_formula_count": 118,
+    "M10-4_size": "64×8"
+  }
+}

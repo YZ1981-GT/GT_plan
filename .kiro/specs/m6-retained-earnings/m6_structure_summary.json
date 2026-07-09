@@ -1,0 +1,1746 @@
+{
+  "source_file": "d:\\GT_plan\\backend\\wp_templates\\M\\M6 未分配利润.xlsx",
+  "total_sheets": 10,
+  "sheet_names": [
+    "底稿目录",
+    "未分配利润实质性程序表 M6A ",
+    "未分配利润实质性程序表 Q6A  (修订前)",
+    "审定表M6-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表M6-2",
+    "调整分录汇总M6-3",
+    "未分配利润检查表M6-4",
+    "GT_Custom"
+  ],
+  "skip_sheets": [
+    "未分配利润实质性程序表 Q6A  (修订前)",
+    "GT_Custom"
+  ],
+  "active_sheets": [
+    "底稿目录",
+    "未分配利润实质性程序表 M6A ",
+    "审定表M6-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表M6-2",
+    "调整分录汇总M6-3",
+    "未分配利润检查表M6-4"
+  ],
+  "sheets": {
+    "底稿目录": {
+      "dimensions": "19×8",
+      "max_row": 19,
+      "max_col": 8,
+      "headers": [
+        {
+          "col": 1,
+          "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        },
+        {
+          "row": 2,
+          "value": "被审计单位："
+        },
+        {
+          "row": 3,
+          "value": "截止日：202X年12月31日"
+        },
+        {
+          "row": 4,
+          "value": "编制人："
+        },
+        {
+          "row": 5,
+          "value": "编制日期："
+        },
+        {
+          "row": 6,
+          "value": "复核人："
+        },
+        {
+          "row": 7,
+          "value": "复核日期："
+        },
+        {
+          "row": 9,
+          "value": "关于工作底稿与审计程序索引号对应的说明"
+        },
+        {
+          "row": 10,
+          "value": "1.编制的审计工作底稿应与审计程序对应。审计项目组应根据被审计单位实际情况和风险评估情况在实质性程序表中裁剪、修改或增加审计程序，根据实际执行的审计程序完成相应"
+        },
+        {
+          "row": 14,
+          "value": "2.获取的支持性证据应与审计底稿或程序对应。审计项目组在完成底稿时获取的支持性证据应根据底稿索引号编制下一级按自然顺序排序的索引号（如D1-2-1、D1-2-2"
+        },
+        {
+          "row": 17,
+          "value": "3.工作底稿索引号的编码规则：实质性程序索引号按循环从“D”到“N”,循环内账户以顺序号排列，模板中底稿索引号按账户顺序+自然数顺序（即模板中索引号按二级自然顺"
+        }
+      ],
+      "formula_count": 0,
+      "formulas": [],
+      "skip": false
+    },
+    "未分配利润实质性程序表 M6A ": {
+      "dimensions": "23×12",
+      "max_row": 23,
+      "max_col": 12,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润实质性程序"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、本账户涉及的科目"
+        },
+        {
+          "row": 6,
+          "value": "未分配利润"
+        },
+        {
+          "row": 7,
+          "value": "二、审计目标与认定的对应关系"
+        },
+        {
+          "row": 8,
+          "value": "审计目标"
+        },
+        {
+          "row": 9,
+          "value": "A. 资产负债表中记录的资本公积是存在的，且已经记录在恰当的账户中"
+        },
+        {
+          "row": 10,
+          "value": "B. 所有应记录的资本公积均已记录，所有应当包括在财务报表中的相关披露均已包括"
+        },
+        {
+          "row": 11,
+          "value": "C. 记录的资本公积由被审计单位拥有或控制"
+        },
+        {
+          "row": 12,
+          "value": "D. 资本公积以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 13,
+          "value": "E. 资本公积已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的"
+        },
+        {
+          "row": 14,
+          "value": "三、计划实施的实质性程序"
+        },
+        {
+          "row": 15,
+          "value": "序号"
+        },
+        {
+          "row": 17,
+          "value": "1"
+        },
+        {
+          "row": 18,
+          "value": "2"
+        },
+        {
+          "row": 19,
+          "value": "3"
+        },
+        {
+          "row": 20,
+          "value": "4"
+        },
+        {
+          "row": 21,
+          "value": "5"
+        },
+        {
+          "row": 22,
+          "value": "6"
+        },
+        {
+          "row": 23,
+          "value": "7"
+        }
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "skip": false
+    },
+    "未分配利润实质性程序表 Q6A  (修订前)": {
+      "dimensions": "52×13",
+      "max_row": 52,
+      "max_col": 13,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润实质性程序"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、本账户涉及的科目"
+        },
+        {
+          "row": 6,
+          "value": "未分配利润"
+        },
+        {
+          "row": 7,
+          "value": "二、重大错报风险需从实质性程序获取的保证程度"
+        },
+        {
+          "row": 8,
+          "value": "审计目标与认定对应关系"
+        },
+        {
+          "row": 10,
+          "value": "A. 资产负债表中记录的专项储备是存在的。"
+        },
+        {
+          "row": 11,
+          "value": "B. 所有应记录的专项储备均已记录，专项储备的增减变动符合法律、法规和合同、章程的规定。"
+        },
+        {
+          "row": 12,
+          "value": "C. 专项储备以恰当的金额包括在财务报表中。"
+        },
+        {
+          "row": 13,
+          "value": "D. 专项储备已按照企业会计准则的规定在财务报表中作出恰当列报和披露。"
+        },
+        {
+          "row": 15,
+          "value": "三、计划实施的实质性程序"
+        },
+        {
+          "row": 16,
+          "value": "序号"
+        },
+        {
+          "row": 17,
+          "value": "（一）"
+        },
+        {
+          "row": 18,
+          "value": "（二）"
+        },
+        {
+          "row": 19,
+          "value": "1"
+        },
+        {
+          "row": 20,
+          "value": "2"
+        },
+        {
+          "row": 21,
+          "value": "3"
+        },
+        {
+          "row": 22,
+          "value": "4"
+        },
+        {
+          "row": 23,
+          "value": "5"
+        },
+        {
+          "row": 24,
+          "value": "6"
+        },
+        {
+          "row": 25,
+          "value": "（三）"
+        },
+        {
+          "row": 26,
+          "value": "1"
+        },
+        {
+          "row": 27,
+          "value": "2"
+        },
+        {
+          "row": 28,
+          "value": "（四）"
+        },
+        {
+          "row": 29,
+          "value": "1"
+        },
+        {
+          "row": 30,
+          "value": "2"
+        },
+        {
+          "row": 31,
+          "value": "（五）"
+        },
+        {
+          "row": 32,
+          "value": "1"
+        },
+        {
+          "row": 33,
+          "value": "2"
+        },
+        {
+          "row": 34,
+          "value": "（六）"
+        },
+        {
+          "row": 35,
+          "value": "1"
+        },
+        {
+          "row": 36,
+          "value": "2"
+        },
+        {
+          "row": 37,
+          "value": "3"
+        },
+        {
+          "row": 38,
+          "value": "4"
+        },
+        {
+          "row": 39,
+          "value": "（1）"
+        },
+        {
+          "row": 40,
+          "value": "（2）"
+        },
+        {
+          "row": 41,
+          "value": "（3）"
+        },
+        {
+          "row": 42,
+          "value": "（4）"
+        },
+        {
+          "row": 43,
+          "value": "（5）"
+        },
+        {
+          "row": 44,
+          "value": "5"
+        },
+        {
+          "row": 45,
+          "value": "（七）"
+        },
+        {
+          "row": 46,
+          "value": "1"
+        },
+        {
+          "row": 47,
+          "value": "2"
+        },
+        {
+          "row": 48,
+          "value": "（1）"
+        },
+        {
+          "row": 49,
+          "value": "（2）"
+        },
+        {
+          "row": 50,
+          "value": "（3）"
+        },
+        {
+          "row": 51,
+          "value": "（4）"
+        },
+        {
+          "row": 52,
+          "value": "（八）"
+        }
+      ],
+      "formula_count": 6,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "skip": true
+    },
+    "审定表M6-1": {
+      "dimensions": "47×12",
+      "max_row": 47,
+      "max_col": 12,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润审定表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "项目名称"
+        },
+        {
+          "row": 7,
+          "value": "未分配利润"
+        },
+        {
+          "row": 10,
+          "value": "合计"
+        },
+        {
+          "row": 11,
+          "value": "试算平衡表数"
+        },
+        {
+          "row": 12,
+          "value": "差异数"
+        },
+        {
+          "row": 13,
+          "value": "1、审计说明"
+        },
+        {
+          "row": 14,
+          "value": "（1）期末余额较期初余额增加（负数为减少）："
+        },
+        {
+          "row": 15,
+          "value": "主要原因（比例超过30%的）："
+        },
+        {
+          "row": 18,
+          "value": "（2）利润分配情况及当年利润分配预案情况说明。"
+        },
+        {
+          "row": 22,
+          "value": "2、审计结论"
+        },
+        {
+          "row": 25,
+          "value": "\n"
+        }
+      ],
+      "formula_count": 33,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M6-2'!B25"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M6-2'!C25"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表M6-2'!D25"
+        },
+        {
+          "cell": "E7",
+          "formula": "='明细表M6-2'!E25"
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表M6-2'!F25"
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表M6-2'!G25"
+        },
+        {
+          "cell": "H7",
+          "formula": "='明细表M6-2'!H25"
+        },
+        {
+          "cell": "I7",
+          "formula": "='明细表M6-2'!I25"
+        },
+        {
+          "cell": "J7",
+          "formula": "=E7-I7"
+        },
+        {
+          "cell": "K7",
+          "formula": "=IF(AND(E7=0,J7=0),0,IF(AND(E7=0,J7>0),1,J7/E7))"
+        },
+        {
+          "cell": "J8",
+          "formula": "=E8-I8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(E8=0,J8=0),0,IF(AND(E8=0,J8>0),1,J8/E8))"
+        },
+        {
+          "cell": "J9",
+          "formula": "=E9-I9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(E9=0,J9=0),0,IF(AND(E9=0,J9>0),1,J9/E9))"
+        },
+        {
+          "cell": "B10",
+          "formula": "=SUM(B7:B9)"
+        },
+        {
+          "cell": "C10",
+          "formula": "=SUM(C7:C9)"
+        },
+        {
+          "cell": "D10",
+          "formula": "=SUM(D7:D9)"
+        },
+        {
+          "cell": "E10",
+          "formula": "=SUM(E7:E9)"
+        },
+        {
+          "cell": "F10",
+          "formula": "=SUM(F7:F9)"
+        },
+        {
+          "cell": "G10",
+          "formula": "=SUM(G7:G9)"
+        },
+        {
+          "cell": "H10",
+          "formula": "=SUM(H7:H9)"
+        },
+        {
+          "cell": "I10",
+          "formula": "=SUM(I7:I9)"
+        },
+        {
+          "cell": "J10",
+          "formula": "=E10-I10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(E10=0,J10=0),0,IF(AND(E10=0,J10>0),1,J10/E10))"
+        },
+        {
+          "cell": "E12",
+          "formula": "=E10-E11"
+        },
+        {
+          "cell": "I12",
+          "formula": "=I10-I11"
+        }
+      ],
+      "skip": false
+    },
+    "附注披露信息（上市公司）": {
+      "dimensions": "30×19",
+      "max_row": 30,
+      "max_col": 19,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润附注披露信息（上市公司）"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "未分配利润"
+        },
+        {
+          "row": 6,
+          "value": "项  目"
+        },
+        {
+          "row": 7,
+          "value": "调整前 上期末未分配利润"
+        },
+        {
+          "row": 8,
+          "value": "调整 期初未分配利润合计数（调增+，调减-）"
+        },
+        {
+          "row": 9,
+          "value": "调整后 期初未分配利润"
+        },
+        {
+          "row": 10,
+          "value": "加：本期归属于母公司所有者的净利润"
+        },
+        {
+          "row": 11,
+          "value": "    其他（例如：盈余公积弥补亏损）"
+        },
+        {
+          "row": 12,
+          "value": "减：提取法定盈余公积"
+        },
+        {
+          "row": 13,
+          "value": "    提取任意盈余公积"
+        },
+        {
+          "row": 14,
+          "value": "    提取一般风险准备"
+        },
+        {
+          "row": 15,
+          "value": "    应付普通股股利"
+        },
+        {
+          "row": 16,
+          "value": "    应付其他权益持有者的股利"
+        },
+        {
+          "row": 17,
+          "value": "    转作股本的普通股股利"
+        },
+        {
+          "row": 18,
+          "value": "    其他"
+        },
+        {
+          "row": 19,
+          "value": "期末未分配利润"
+        },
+        {
+          "row": 20,
+          "value": "其中：子公司当年提取的盈余公积归属于母公司的金额"
+        },
+        {
+          "row": 21,
+          "value": "说明：（对期初未分配利润进行调整的，各项调整原因及金额。）"
+        },
+        {
+          "row": 22,
+          "value": "调整本期期初未分配利润明细："
+        },
+        {
+          "row": 23,
+          "value": "（1）由于《企业会计准则》及其相关新规定进行追溯调整，影响期初未分配利润XX元。"
+        },
+        {
+          "row": 24,
+          "value": "（2）由于会计政策变更，影响期初未分配利润XX元。"
+        },
+        {
+          "row": 25,
+          "value": "（3）由于重大会计差错更正，影响期初未分配利润XX元。"
+        },
+        {
+          "row": 26,
+          "value": "（4）由于同一控制导致的合并范围变更，影响期初未分配利润XX元。"
+        },
+        {
+          "row": 27,
+          "value": "（5）其他调整合计影响期初未分配利润XX元。"
+        },
+        {
+          "row": 28,
+          "value": "会计政策变更对期初未分配利润的影响参见附注二、38；前期差错更正对期初未分配利润的影响参见附注十四、1。"
+        },
+        {
+          "row": 29,
+          "value": "根据[XX文件]及公司章程的规定，本公司可供股东分配利润为按中国会计准则编制的报表数与按国际财务报告准则编制报表数两者孰低的金额。(请列明利润分配依据。)"
+        },
+        {
+          "row": 30,
+          "value": "(对于首次公开发行证券的公司，如果发行前的滚存利润经股东大会决议由新老股东共同享有，应明确予以说明。如果发行前的滚存利润经股东大会决议在发行前进行分配并由老股东"
+        }
+      ],
+      "formula_count": 26,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M6-2'!E10"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M6-2'!I10"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表M6-2'!E11+'明细表M6-2'!E12"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表M6-2'!I11+'明细表M6-2'!I12"
+        },
+        {
+          "cell": "B9",
+          "formula": "=B7+B8"
+        },
+        {
+          "cell": "C9",
+          "formula": "=C7+C8"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表M6-2'!E15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表M6-2'!I15"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表M6-2'!E14"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表M6-2'!I14"
+        },
+        {
+          "cell": "B12",
+          "formula": "='明细表M6-2'!E17"
+        },
+        {
+          "cell": "C12",
+          "formula": "='明细表M6-2'!I17"
+        },
+        {
+          "cell": "B13",
+          "formula": "='明细表M6-2'!E18"
+        },
+        {
+          "cell": "C13",
+          "formula": "='明细表M6-2'!I18"
+        },
+        {
+          "cell": "B15",
+          "formula": "='明细表M6-2'!E19"
+        },
+        {
+          "cell": "C15",
+          "formula": "='明细表M6-2'!I19"
+        },
+        {
+          "cell": "B17",
+          "formula": "='明细表M6-2'!E20"
+        },
+        {
+          "cell": "C17",
+          "formula": "='明细表M6-2'!I20"
+        },
+        {
+          "cell": "B19",
+          "formula": "=B9+B10+B11-SUM(B12:B17)"
+        },
+        {
+          "cell": "C19",
+          "formula": "=C9+C10+C11-SUM(C12:C17)"
+        }
+      ],
+      "skip": false
+    },
+    "附注披露信息（国有企业）": {
+      "dimensions": "19×18",
+      "max_row": 19,
+      "max_col": 18,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润附注披露信息（国有企业）"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "未分配利润"
+        },
+        {
+          "row": 6,
+          "value": "项  目"
+        },
+        {
+          "row": 7,
+          "value": "上年年末余额"
+        },
+        {
+          "row": 8,
+          "value": "期初调整金额"
+        },
+        {
+          "row": 9,
+          "value": "本期年初余额"
+        },
+        {
+          "row": 10,
+          "value": "本期增加额"
+        },
+        {
+          "row": 11,
+          "value": "其中：本期净利润转入"
+        },
+        {
+          "row": 12,
+          "value": "      其他调整因素"
+        },
+        {
+          "row": 13,
+          "value": "本期减少额"
+        },
+        {
+          "row": 14,
+          "value": "其中：本期提取盈余公积数"
+        },
+        {
+          "row": 15,
+          "value": "      本期提取一般风险准备"
+        },
+        {
+          "row": 16,
+          "value": "      本期分配现金股利数"
+        },
+        {
+          "row": 17,
+          "value": "      转增资本"
+        },
+        {
+          "row": 18,
+          "value": "      其他减少"
+        },
+        {
+          "row": 19,
+          "value": "本期期末余额"
+        }
+      ],
+      "formula_count": 26,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M6-2'!E10"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M6-2'!I10"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表M6-2'!E12+'明细表M6-2'!E11"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表M6-2'!I12+'明细表M6-2'!I11"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表M6-2'!E13"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表M6-2'!I13"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表M6-2'!E15+'明细表M6-2'!E14"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表M6-2'!I15+'明细表M6-2'!I14"
+        },
+        {
+          "cell": "B11",
+          "formula": "='明细表M6-2'!E15"
+        },
+        {
+          "cell": "C11",
+          "formula": "='明细表M6-2'!I15"
+        },
+        {
+          "cell": "B13",
+          "formula": "='明细表M6-2'!E16"
+        },
+        {
+          "cell": "C13",
+          "formula": "='明细表M6-2'!I16"
+        },
+        {
+          "cell": "B14",
+          "formula": "='明细表M6-2'!E17+'明细表M6-2'!E18"
+        },
+        {
+          "cell": "C14",
+          "formula": "='明细表M6-2'!I17+'明细表M6-2'!I18"
+        },
+        {
+          "cell": "B16",
+          "formula": "='明细表M6-2'!E19"
+        },
+        {
+          "cell": "C16",
+          "formula": "='明细表M6-2'!I19"
+        },
+        {
+          "cell": "B17",
+          "formula": "='明细表M6-2'!E20"
+        },
+        {
+          "cell": "C17",
+          "formula": "='明细表M6-2'!I20"
+        },
+        {
+          "cell": "B19",
+          "formula": "=B9+B10-B13"
+        },
+        {
+          "cell": "C19",
+          "formula": "=C9+C10-C13"
+        }
+      ],
+      "skip": false
+    },
+    "明细表M6-2": {
+      "dimensions": "32×19",
+      "max_row": 32,
+      "max_col": 19,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润明细表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1.资本公积已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的。"
+        },
+        {
+          "row": 7,
+          "value": "二、审计过程："
+        },
+        {
+          "row": 8,
+          "value": "内容"
+        },
+        {
+          "row": 10,
+          "value": "一、上年年末余额"
+        },
+        {
+          "row": 11,
+          "value": "加：会计政策变更"
+        },
+        {
+          "row": 12,
+          "value": "前期差错更正"
+        },
+        {
+          "row": 13,
+          "value": "二、本年年初余额"
+        },
+        {
+          "row": 14,
+          "value": "三、盈余公积补亏"
+        },
+        {
+          "row": 15,
+          "value": "四、本期净利润"
+        },
+        {
+          "row": 16,
+          "value": "五、利润分配"
+        },
+        {
+          "row": 17,
+          "value": "1、提取法定盈余公积"
+        },
+        {
+          "row": 18,
+          "value": "2、提取任意盈余公积"
+        },
+        {
+          "row": 19,
+          "value": "3、应付现金股利"
+        },
+        {
+          "row": 20,
+          "value": "4、转作股本的股利"
+        },
+        {
+          "row": 21,
+          "value": "5、其他"
+        },
+        {
+          "row": 22,
+          "value": "六、所有者权益内部结转"
+        },
+        {
+          "row": 23,
+          "value": "1、盈余公积弥补亏损"
+        },
+        {
+          "row": 24,
+          "value": "2、其他"
+        },
+        {
+          "row": 25,
+          "value": "七、本年年末余额"
+        },
+        {
+          "row": 26,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 29,
+          "value": "四、审计结论："
+        },
+        {
+          "row": 31,
+          "value": "1、审计说明可以概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
+        },
+        {
+          "row": 32,
+          "value": "2、审计结论可参考：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项(或审计范围受到限制无法获取充分"
+        }
+      ],
+      "formula_count": 63,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10+C10+D10"
+        },
+        {
+          "cell": "I10",
+          "formula": "=F10+G10+H10"
+        },
+        {
+          "cell": "E11",
+          "formula": "=B11+C11+D11"
+        },
+        {
+          "cell": "I11",
+          "formula": "=F11+G11+H11"
+        },
+        {
+          "cell": "E12",
+          "formula": "=B12+C12+D12"
+        },
+        {
+          "cell": "I12",
+          "formula": "=F12+G12+H12"
+        },
+        {
+          "cell": "B13",
+          "formula": "=B10+B11+B12"
+        },
+        {
+          "cell": "C13",
+          "formula": "=C10+C11+C12"
+        },
+        {
+          "cell": "D13",
+          "formula": "=D10+D11+D12"
+        },
+        {
+          "cell": "E13",
+          "formula": "=E10+E11+E12"
+        },
+        {
+          "cell": "F13",
+          "formula": "=F10+F11+F12"
+        },
+        {
+          "cell": "G13",
+          "formula": "=G10+G11+G12"
+        },
+        {
+          "cell": "H13",
+          "formula": "=H10+H11+H12"
+        },
+        {
+          "cell": "I13",
+          "formula": "=F13+G13+H13"
+        },
+        {
+          "cell": "E14",
+          "formula": "=B14+C14+D14"
+        },
+        {
+          "cell": "I14",
+          "formula": "=F14+G14+H14"
+        },
+        {
+          "cell": "E15",
+          "formula": "=B15+C15+D15"
+        },
+        {
+          "cell": "I15",
+          "formula": "=F15+G15+H15"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B17:B21)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C17:C21)"
+        },
+        {
+          "cell": "D16",
+          "formula": "=SUM(D17:D21)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E17:E21)"
+        },
+        {
+          "cell": "F16",
+          "formula": "=SUM(F17:F21)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G17:G21)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H17:H21)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=F16+G16+H16"
+        },
+        {
+          "cell": "E17",
+          "formula": "=B17+C17+D17"
+        },
+        {
+          "cell": "I17",
+          "formula": "=F17+G17+H17"
+        },
+        {
+          "cell": "E18",
+          "formula": "=B18+C18+D18"
+        },
+        {
+          "cell": "I18",
+          "formula": "=F18+G18+H18"
+        },
+        {
+          "cell": "E19",
+          "formula": "=B19+C19+D19"
+        },
+        {
+          "cell": "I19",
+          "formula": "=F19+G19+H19"
+        },
+        {
+          "cell": "E20",
+          "formula": "=B20+C20+D20"
+        },
+        {
+          "cell": "I20",
+          "formula": "=F20+G20+H20"
+        },
+        {
+          "cell": "E21",
+          "formula": "=B21+C21+D21"
+        },
+        {
+          "cell": "I21",
+          "formula": "=F21+G21+H21"
+        },
+        {
+          "cell": "B22",
+          "formula": "=SUM(B23:B24)"
+        },
+        {
+          "cell": "C22",
+          "formula": "=SUM(C23:C24)"
+        },
+        {
+          "cell": "D22",
+          "formula": "=SUM(D23:D24)"
+        },
+        {
+          "cell": "E22",
+          "formula": "=SUM(E23:E24)"
+        },
+        {
+          "cell": "F22",
+          "formula": "=SUM(F23:F24)"
+        },
+        {
+          "cell": "G22",
+          "formula": "=SUM(G23:G24)"
+        },
+        {
+          "cell": "H22",
+          "formula": "=SUM(H23:H24)"
+        },
+        {
+          "cell": "I22",
+          "formula": "=F22+G22+H22"
+        },
+        {
+          "cell": "E23",
+          "formula": "=B23+C23+D23"
+        },
+        {
+          "cell": "I23",
+          "formula": "=F23+G23+H23"
+        },
+        {
+          "cell": "E24",
+          "formula": "=B24+C24+D24"
+        },
+        {
+          "cell": "I24",
+          "formula": "=F24+G24+H24"
+        },
+        {
+          "cell": "B25",
+          "formula": "=B13+B14+B15-B16"
+        },
+        {
+          "cell": "C25",
+          "formula": "=C13+C14+C15-C16"
+        },
+        {
+          "cell": "D25",
+          "formula": "=D13+D14+D15-D16"
+        },
+        {
+          "cell": "E25",
+          "formula": "=E13+E14+E15-E16"
+        },
+        {
+          "cell": "F25",
+          "formula": "=F13+F14+F15-F16"
+        },
+        {
+          "cell": "G25",
+          "formula": "=G13+G14+G15-G16"
+        },
+        {
+          "cell": "H25",
+          "formula": "=H13+H14+H15-H16"
+        },
+        {
+          "cell": "I25",
+          "formula": "=F25+G25+H25"
+        }
+      ],
+      "skip": false
+    },
+    "调整分录汇总M6-3": {
+      "dimensions": "32×10",
+      "max_row": 32,
+      "max_col": 10,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润调整分录汇总表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "调整事项说明"
+        }
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "F4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "skip": false
+    },
+    "未分配利润检查表M6-4": {
+      "dimensions": "32×16",
+      "max_row": 32,
+      "max_col": 16,
+      "headers": [
+        {
+          "col": 1,
+          "value": "致同会计师事务所"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "未分配利润检查表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、测试目标："
+        },
+        {
+          "row": 6,
+          "value": "通过凭证抽查，验证未分配利润业务的存在/发生、计价和分摊。"
+        },
+        {
+          "row": 7,
+          "value": "二、测试："
+        },
+        {
+          "row": 8,
+          "value": "测试内容说明：1.原始凭证是否齐全； 2.记账凭证与原始凭证是否相符；3.账务处理是否正确；4.是否记录于恰当的会计期间；5.……"
+        },
+        {
+          "row": 9,
+          "value": "记账凭证"
+        },
+        {
+          "row": 10,
+          "value": "日期"
+        },
+        {
+          "row": 17,
+          "value": "四、审计说明："
+        },
+        {
+          "row": 22,
+          "value": "五、审计结论："
+        }
+      ],
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "skip": false
+    },
+    "GT_Custom": {
+      "dimensions": "8×2",
+      "max_row": 8,
+      "max_col": 2,
+      "headers": [
+        {
+          "col": 1,
+          "value": "C1"
+        },
+        {
+          "col": 2,
+          "value": "Custom 1"
+        }
+      ],
+      "row_labels": [
+        {
+          "row": 1,
+          "value": "C1"
+        },
+        {
+          "row": 2,
+          "value": "C2"
+        },
+        {
+          "row": 3,
+          "value": "C3"
+        },
+        {
+          "row": 4,
+          "value": "C4"
+        },
+        {
+          "row": 5,
+          "value": "C5"
+        },
+        {
+          "row": 6,
+          "value": "C6"
+        },
+        {
+          "row": 7,
+          "value": "C7"
+        },
+        {
+          "row": 8,
+          "value": "C8"
+        }
+      ],
+      "formula_count": 0,
+      "formulas": [],
+      "skip": true
+    }
+  },
+  "validations": {
+    "M6-1_adjudication": {
+      "sheet_name": "审定表M6-1",
+      "expected_formulas": 33,
+      "actual_formulas": 33,
+      "match": true,
+      "dimensions": "47×12"
+    },
+    "M6-2_detail": {
+      "sheet_name": "明细表M6-2",
+      "expected_dimensions": "32×19",
+      "actual_dimensions": "32×19",
+      "dimensions_match": true,
+      "total_formula_cells": 63,
+      "cross_ref_rows": [
+        3,
+        4
+      ],
+      "distribution_chain_rows": [
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "distribution_chain_count": 16,
+      "spec_expected_chain": 13,
+      "chain_approx_match": true,
+      "note": "13公式结转链 ≈ 16 formula rows in distribution chain (rows 10-25). Spec estimate=13 is approximate. 63 total formula cells across 19 columns."
+    }
+  }
+}

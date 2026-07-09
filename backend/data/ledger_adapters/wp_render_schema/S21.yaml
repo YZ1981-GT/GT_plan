@@ -1,0 +1,69 @@
+# S21 数据资产 — 专属渲染 schema
+# component_type: s21-data-asset
+# Template: S21 数据资产.xlsx
+# 整册统一路由到 GtS21DataAsset，前端按 sheetName v-if 分发
+
+wp_code: S21
+wp_name: 数据资产
+component_type: s21-data-asset
+template_path: backend/wp_templates/S/S21 数据资产.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+
+# 整册专属组件：前端按 sheetName v-if 分发
+whole_workbook_dedicated: true
+
+sheets:
+  - sheet_name: 数据资产S21
+    internal_type: sheet-program
+    description: 数据资产审计程序表
+    has_formulas: true
+    formula_count: 1
+
+  - sheet_name: 数据资产的基本情况S21-1
+    internal_type: sheet-basic-info
+    description: 数据资产基本情况登记（名称/类型/取得方式/确认日期/成本等）
+    has_formulas: true
+    formula_count: 6
+
+  - sheet_name: 开发支出资本化分析表S21-2
+    internal_type: sheet-capitalization
+    description: 核心计算表 — 5项条件判断 + 按月归集12列 + 类目合计/占比
+    has_formulas: true
+    formula_count: 43
+
+  - sheet_name: 成本归集与分摊检查表S21-3
+    internal_type: sheet-cost-allocation
+    description: 成本归集准确性与分摊合理性检查（多维度核对）
+    has_formulas: true
+    formula_count: 6
+
+  - sheet_name: 摊销政策检查表S21-4
+    internal_type: sheet-amortization
+    description: 摊销政策合理性检查（使用寿命/摊销方法/残值等）
+    has_formulas: true
+    formula_count: 6
+
+# 跳过的 sheet
+skip_sheets:
+  - 表头（请先填写）
+
+# 公式引擎元数据
+formula_engine:
+  name: useS21FormulaEngine
+  type: pure_function
+  functions:
+    - calcCapitalization: |
+        categoryTotals[k] = SUM(monthly[k][0..11])  — 各类目12月横向求和
+        total = SUM(categoryTotals)                   — 资本化总额
+        categoryRatios[k] = categoryTotals[k] / total — 各类目占比
+        monthlyTotals[m] = SUM(各类目该月)            — 各月纵向求和
+        monthlyRatios[m] = monthlyTotals[m] / total   — 各月占比
+  zero_protection:
+    - "total=0 → ratios 不可计算"
+  capitalization_conditions:
+    - 技术可行性
+    - 使用或出售意图
+    - 市场需求或内部使用价值
+    - 技术和财力资源
+    - 支出能够可靠计量

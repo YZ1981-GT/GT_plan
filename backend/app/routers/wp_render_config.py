@@ -80,6 +80,27 @@ _WHOLE_WP_MULTISHEET_DEDICATED: set[str] = {
     # L2 应付利息：单一 8-sheet 工作簿，
     # 整册统一路由到 l2-interest-payable，由前端 GtL2InterestPayable 按 sheetName v-if 分发。
     "l2-interest-payable",
+    # L4 应付债券：单一 15-sheet 工作簿（含L4-7/L4-8各2分支版本），
+    # 整册统一路由到 l4-bonds-payable，由前端 GtL4BondsPayable 按 sheetName v-if 分发。
+    "l4-bonds-payable",
+    # S4 非货币性资产交换：单一 3-sheet 工作簿（审计程序/审定表/商业实质判断），
+    # 整册统一路由到 s4-nonmonetary-exchange，由前端 GtS4NonmonetaryExchange 按 sheetName v-if 分发。
+    "s4-nonmonetary-exchange",
+    # S5 债务重组：单一 3-sheet 工作簿（审计程序/审定表/损益确认时点），
+    # 整册统一路由到 s5-debt-restructuring，由前端 GtS5DebtRestructuring 按 sheetName v-if 分发。
+    "s5-debt-restructuring",
+    # S6 大股东及关联方资金占用：单一 3-sheet 工作簿（审定表/核查程序/监管提示），
+    # 整册统一路由到 s6-fund-occupation，由前端 GtS6FundOccupation 按 sheetName v-if 分发。
+    "s6-fund-occupation",
+    # S12 利用CPA专家：单一 9-sheet 工作簿（程序表/评价/专长/恰当性/报告/多分支），
+    # 整册统一路由到 s12-cpa-expert，由前端 GtS12CpaExpert 按 sheetName v-if 分发。
+    "s12-cpa-expert",
+    # S13 利用管理层专家：单一 8-sheet 工作簿（程序表/评价/了解/适当性/报告/多分支），
+    # 整册统一路由到 s13-mgmt-expert，由前端 GtS13MgmtExpert 按 sheetName v-if 分发。
+    "s13-mgmt-expert",
+    # S14 会计估计和相关披露：单一 5-sheet 工作簿（程序表/环境/控制/风险应对/偏向迹象），
+    # 整册统一路由到 s14-accounting-estimate，由前端 GtS14AccountingEstimate 按 sheetName v-if 分发。
+    "s14-accounting-estimate",
 }
 
 # 协作者 D0 函证精细组件（纯前端 componentType，无后端 renderer）。

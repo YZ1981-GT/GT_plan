@@ -144,4 +144,7 @@ export function useF5ImportExport(opts: { wpId: Ref<string> }) {
   return useWorkpaperImportExport({ wpId: opts.wpId, apiPrefix: 'f5' })
 }
 
+/** S 类计算型底稿（S20/S21）— 独立 composable，此处仅 re-export */
+export { useSEstimateImportExport } from './useSEstimateImportExport'
+
 export default useWorkpaperImportExport

@@ -161,6 +161,38 @@ export type HtmlComponentType =
   | 'c26-info-processing-control'
   | 'l1-short-term-loans'
   | 'l2-interest-payable'
+  | 'l3-long-term-loans'
+  | 'l4-bonds-payable'
+  | 'l5-long-term-payables'
+  | 'l6-special-payables'
+  | 'l7-other-noncurrent-liabilities'
+  | 'l8-financial-expenses'
+  | 'm1-dividends-payable'
+  | 'm2-paid-in-capital'
+  | 'm3-treasury-stock'
+  | 'm4-capital-reserve'
+  | 'm5-surplus-reserve'
+  | 'm6-retained-earnings'
+  | 'm7-special-reserve'
+  | 'm8-general-risk-reserve'
+  | 'm9-other-comprehensive-income'
+  | 'm10-other-equity-instruments'
+  | 'n1-deferred-tax-assets'
+  | 'n2-taxes-payable'
+  | 'n3-deferred-tax-liabilities'
+  | 'n5-income-tax-expense'
+  | 's3-policy-change'
+  | 's4-nonmonetary-exchange'
+  | 's5-debt-restructuring'
+  | 's6-fund-occupation'
+  | 's12-cpa-expert'
+  | 's13-mgmt-expert'
+  | 's14-accounting-estimate'
+  | 's15-eps-roe'
+  | 's20-revenue-deduction'
+  | 's21-data-asset'
+  | 's32-fraud-bundle'
+  | 's33-ann14-bundle'
   | 'review-bundle'
 
 /**
@@ -1363,6 +1395,262 @@ const REGISTRY_LIST: HtmlRendererEntry[] = [
     icon: '💸',
     label: 'L2 应付利息',
     emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l3-long-term-loans',
+    component: defineAsyncComponent(() => import('./GtL3LongTermLoans.vue')),
+    icon: '🏛️',
+    label: 'L3 长期借款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l4-bonds-payable',
+    component: defineAsyncComponent(() => import('./GtL4BondsPayable.vue')),
+    icon: '📜',
+    label: 'L4 应付债券',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l5-long-term-payables',
+    component: defineAsyncComponent(() => import('./GtL5LongTermPayables.vue')),
+    icon: '💳',
+    label: 'L5 长期应付款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l6-special-payables',
+    component: defineAsyncComponent(() => import('./GtL6SpecialPayables.vue')),
+    icon: '🏛️',
+    label: 'L6 专项应付款',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l7-other-noncurrent-liabilities',
+    component: defineAsyncComponent(() => import('./GtL7OtherNoncurrentLiabilities.vue')),
+    icon: '📋',
+    label: 'L7 其他非流动负债',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'l8-financial-expenses',
+    component: defineAsyncComponent(() => import('./GtL8FinancialExpenses.vue')),
+    icon: '💰',
+    label: 'L8 财务费用',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm1-dividends-payable',
+    component: defineAsyncComponent(() => import('./GtM1DividendsPayable.vue')),
+    icon: '💸',
+    label: 'M1 应付股利',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm2-paid-in-capital',
+    component: defineAsyncComponent(() => import('./GtM2PaidInCapital.vue')),
+    icon: '🏦',
+    label: 'M2 实收资本（股本）',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm3-treasury-stock',
+    component: defineAsyncComponent(() => import('./GtM3TreasuryStock.vue')),
+    icon: '📦',
+    label: 'M3 库存股',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm4-capital-reserve',
+    component: defineAsyncComponent(() => import('./GtM4CapitalReserve.vue')),
+    icon: '💰',
+    label: 'M4 资本公积',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm5-surplus-reserve',
+    component: defineAsyncComponent(() => import('./GtM5SurplusReserve.vue')),
+    icon: '📊',
+    label: 'M5 盈余公积',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm6-retained-earnings',
+    component: defineAsyncComponent(() => import('./GtM6RetainedEarnings.vue')),
+    icon: '💰',
+    label: 'M6 未分配利润',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm7-special-reserve',
+    component: defineAsyncComponent(() => import('./GtM7SpecialReserve.vue')),
+    icon: '🛡️',
+    label: 'M7 专项储备',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm8-general-risk-reserve',
+    component: defineAsyncComponent(() => import('./GtM8GeneralRiskReserve.vue')),
+    icon: '⚠️',
+    label: 'M8 一般风险准备',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm9-other-comprehensive-income',
+    component: defineAsyncComponent(() => import('./GtM9OtherComprehensiveIncome.vue')),
+    icon: '🌈',
+    label: 'M9 其他综合收益',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'm10-other-equity-instruments',
+    component: defineAsyncComponent(() => import('./GtM10OtherEquityInstruments.vue')),
+    icon: '📜',
+    label: 'M10 其他权益工具',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'n1-deferred-tax-assets',
+    component: defineAsyncComponent(() => import('./GtN1DeferredTaxAssets.vue')),
+    icon: '🧾',
+    label: 'N1 递延所得税资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'n2-taxes-payable',
+    component: defineAsyncComponent(() => import('./GtN2TaxesPayable.vue')),
+    icon: '🧾',
+    label: 'N2 应交税费',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'n3-deferred-tax-liabilities',
+    component: defineAsyncComponent(() => import('./GtN3DeferredTaxLiabilities.vue')),
+    icon: '🧾',
+    label: 'N3 递延所得税负债',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 'n5-income-tax-expense',
+    component: defineAsyncComponent(() => import('./GtN5IncomeTaxExpense.vue')),
+    icon: '🧾',
+    label: 'N5 所得税费用',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's3-policy-change',
+    component: defineAsyncComponent(() => import('./s3-policy-change/GtS3PolicyChange.vue')),
+    icon: '📋',
+    label: 'S3 会计政策变更',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's4-nonmonetary-exchange',
+    component: defineAsyncComponent(() => import('./s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue')),
+    icon: '🔄',
+    label: 'S4 非货币性资产交换',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's5-debt-restructuring',
+    component: defineAsyncComponent(() => import('./s5-debt-restructuring/GtS5DebtRestructuring.vue')),
+    icon: '📑',
+    label: 'S5 债务重组',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's6-fund-occupation',
+    component: defineAsyncComponent(() => import('./s6-fund-occupation/GtS6FundOccupation.vue')),
+    icon: '💰',
+    label: 'S6 资金占用',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's12-cpa-expert',
+    component: defineAsyncComponent(() => import('./s12-cpa-expert/GtS12CpaExpert.vue')),
+    icon: '👨‍💼',
+    label: 'S12 注册会计师专家',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's13-mgmt-expert',
+    component: defineAsyncComponent(() => import('./s13-mgmt-expert/GtS13MgmtExpert.vue')),
+    icon: '👨‍💻',
+    label: 'S13 管理层专家',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's14-accounting-estimate',
+    component: defineAsyncComponent(() => import('./s14-accounting-estimate/GtS14AccountingEstimate.vue')),
+    icon: '🧮',
+    label: 'S14 会计估计',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's15-eps-roe',
+    component: defineAsyncComponent(() => import('./s15-eps-roe/GtS15EpsRoe.vue')),
+    icon: '📊',
+    label: 'S15 每股收益与净资产收益率',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's20-revenue-deduction',
+    component: defineAsyncComponent(() => import('./s20-revenue-deduction/GtS20RevenueDeduction.vue')),
+    icon: '💹',
+    label: 'S20 营业收入扣除',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's21-data-asset',
+    component: defineAsyncComponent(() => import('./s21-data-asset/GtS21DataAsset.vue')),
+    icon: '💾',
+    label: 'S21 数据资产',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's32-fraud-bundle',
+    component: defineAsyncComponent(() => import('./s32-fraud-bundle/GtS32Bundle.vue')),
+    icon: '🚨',
+    label: 'S32 舞弊核查聚合',
+    emits: [],
+    contextProps: 'standard',
+  },
+  {
+    componentType: 's33-ann14-bundle',
+    component: defineAsyncComponent(() => import('./s33-ann14-bundle/GtS33Bundle.vue')),
+    icon: '📋',
+    label: 'S33 14号公告核查聚合',
+    emits: [],
     contextProps: 'standard',
   },
   {

@@ -347,6 +347,66 @@ async def _resolve_eps_data(db: AsyncSession, project_id: UUID, year: int, **kw)
     }
 
 
+@auto_resolver("s3_policy_change_data")
+async def _resolve_s3_policy_change(db: AsyncSession, project_id: UUID, year: int, **kw):
+    """S3 会计政策变更：读取调整涉及的各科目期初/期末余额.
+
+    数据来源: trial_balance 表（资产/负债/权益类科目 unadjusted_amount + audited_amount）
+    返回结构: {"summary": str, "opening_balances": dict, "closing_balances": dict, "adjustment_accounts": list}
+    """
+    # 读取资产负债类科目（1xxx~4xxx）的未审数和审定数
+    sql = sa.text("""
+        SELECT standard_account_code,
+               unadjusted_amount,
+               aje_adjustment,
+               audited_amount
+        FROM trial_balance
+        WHERE project_id = :pid AND year = :year
+              AND (standard_account_code LIKE '1%'
+                   OR standard_account_code LIKE '2%'
+                   OR standard_account_code LIKE '3%'
+                   OR standard_account_code LIKE '4%')
+              AND (is_deleted = false OR is_deleted IS NULL)
+        ORDER BY standard_account_code
+    """)
+    result = await db.execute(sql, {"pid": str(project_id), "year": year})
+    rows = result.fetchall()
+
+    opening_balances: dict[str, float] = {}
+    closing_balances: dict[str, float] = {}
+    adjustment_accounts: list[dict] = []
+
+    for row in rows:
+        code = row[0]
+        unadj = float(row[1] or 0)
+        aje = float(row[2] or 0)
+        audited = float(row[3] or 0)
+
+        opening_balances[code] = unadj
+        closing_balances[code] = audited
+
+        # 有调整的科目标记为调整涉及科目
+        if abs(aje) > 0.01:
+            adjustment_accounts.append({
+                "account_code": code,
+                "unadjusted": unadj,
+                "adjustment": aje,
+                "audited": audited,
+            })
+
+    account_count = len(rows)
+    adj_count = len(adjustment_accounts)
+
+    return {
+        "summary": f"资产负债科目 {account_count} 个，{adj_count} 个涉及调整",
+        "opening_balances": opening_balances,
+        "closing_balances": closing_balances,
+        "adjustment_accounts": adjustment_accounts,
+        "total_accounts": account_count,
+        "adjusted_accounts": adj_count,
+    }
+
+
 @auto_resolver("non_recurring_items_from_tb")
 async def _resolve_non_recurring_items(db: AsyncSession, project_id: UUID, year: int, **kw):
     """S17 非经常性损益：读取营业外收支科目审定金额。

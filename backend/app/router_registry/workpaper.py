@@ -206,6 +206,31 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_render_strategies._g5_long_term_receivable_import_export import router as g5_import_export
     from app.routers.wp_render_strategies._g5_long_term_receivable_ai import router as g5_ai_generate
     from app.routers.l1_short_term_loans import router as l1_import_export
+    from app.routers.wp_render_strategies._c24_import_export import router as c24_import_export
+    from app.routers.l2_interest_payable import router as l2_interest_payable
+    from app.routers.l3_long_term_loans import router as l3_long_term_loans
+    from app.routers.l4_bonds_payable import router as l4_bonds_payable
+    from app.routers.l5_long_term_payables import router as l5_long_term_payables
+    from app.routers.l6_special_payables import router as l6_special_payables
+    from app.routers.l7_other_noncurrent_liabilities import router as l7_other_noncurrent_liabilities
+    from app.routers.l8_financial_expenses import router as l8_financial_expenses
+    from app.routers.m1_dividends_payable import router as m1_dividends_payable
+    from app.routers.m2_paid_in_capital import router as m2_paid_in_capital
+    from app.routers.m3_treasury_stock import router as m3_treasury_stock
+    from app.routers.m4_capital_reserve import router as m4_capital_reserve
+    from app.routers.m5_surplus_reserve import router as m5_surplus_reserve
+    from app.routers.m6_retained_earnings import router as m6_retained_earnings
+    from app.routers.m7_special_reserve import router as m7_special_reserve
+    from app.routers.m8_general_risk_reserve import router as m8_general_risk_reserve
+    from app.routers.m9_other_comprehensive_income import router as m9_other_comprehensive_income
+    from app.routers.m10_other_equity_instruments import router as m10_other_equity_instruments
+    from app.routers.n1_deferred_tax_assets import router as n1_deferred_tax_assets
+    from app.routers.n2_taxes_payable import router as n2_taxes_payable
+    from app.routers.n3_deferred_tax_liabilities import router as n3_deferred_tax_liabilities
+    from app.routers.n5_income_tax_expense import router as n5_income_tax_expense
+    from app.routers.s_estimate_calculation import router as s_estimate_calculation
+    from app.routers.s_transaction_calculation import router as s_transaction_calculation
+    from app.routers.s34_checklist_router import router as s34_checklist
     from app.routers.issue_hints import router as issue_hints
     from app.routers.workpaper_summaries import router as workpaper_summaries
     from app.routers.wp_render_registry import router as wp_render_registry
@@ -219,7 +244,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
         "生命周期": [working_paper, wp_editor, wp_batch_domain, wp_relation_domain, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review_domain, wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
         "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_trace, wp_disclosure_sync, wp_onlyoffice],
-        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export, f1_import_export, f2_import_export, f2_val_import_export, f2_spe_import_export, f2_st_import_export, f3_import_export, f4_import_export, f5_import_export, g0_import_export, h0_import_export, g1_import_export, g2_import_export, g3_import_export, g4_main_import_export, g4_sppi_import_export, g4_ecl_import_export, g5_import_export, g6_main_import_export, g6_sppi_import_export, g6_ecl_import_export, g7_main_import_export, g7_method_import_export, g7_sub_import_export, g8_import_export, g8_validate, g9_import_export, g9_validate, g10_import_export, g10_validate, g11_import_export, g11_validate, g12_import_export, g13_import_export, g14_import_export, h10_import_export, h10_validate, l1_import_export],
+        "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export, f1_import_export, f2_import_export, f2_val_import_export, f2_spe_import_export, f2_st_import_export, f3_import_export, f4_import_export, f5_import_export, g0_import_export, h0_import_export, g1_import_export, g2_import_export, g3_import_export, g4_main_import_export, g4_sppi_import_export, g4_ecl_import_export, g5_import_export, g6_main_import_export, g6_sppi_import_export, g6_ecl_import_export, g7_main_import_export, g7_method_import_export, g7_sub_import_export, g8_import_export, g8_validate, g9_import_export, g9_validate, g10_import_export, g10_validate, g11_import_export, g11_validate, g12_import_export, g13_import_export, g14_import_export, h10_import_export, h10_validate, l1_import_export, c24_import_export, l2_interest_payable, l3_long_term_loans, l4_bonds_payable, l5_long_term_payables, l6_special_payables, l7_other_noncurrent_liabilities, l8_financial_expenses, m1_dividends_payable, m2_paid_in_capital, m3_treasury_stock, m4_capital_reserve, m5_surplus_reserve, m6_retained_earnings, m7_special_reserve, m8_general_risk_reserve, m9_other_comprehensive_income, m10_other_equity_instruments, n1_deferred_tax_assets, n2_taxes_payable, n3_deferred_tax_liabilities, n5_income_tax_expense, s_estimate_calculation, s_transaction_calculation, s34_checklist],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],

@@ -299,3 +299,76 @@ async def consistency_check(
     svc = TrialBalanceService(db)
     issues = await svc.check_consistency(project_id, year, company_code)
     return {"consistent": len(issues) == 0, "issues": issues}
+
+
+# ─── TB Writeback (D~N 专属组件审定数直接回写) ────────────────────────────────
+
+from pydantic import BaseModel
+
+
+class TBWritebackBody(BaseModel):
+    """前端 D~N 专属组件审定数回写请求体"""
+    account_code: str
+    audited_amount: float
+
+
+@router.put("/writeback")
+async def writeback_audited_amount(
+    project_id: UUID,
+    body: TBWritebackBody,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """D~N 专属组件审定数直接回写到 trial_balance.audited_amount。
+
+    前端调用方：所有 useXFormData.writebackTB(amount) composable（L1~L8/D1~D7/F1~F5/G系列等）。
+    按 project_id + account_code 匹配 trial_balance 行并更新 audited_amount。
+    成功后失效 TB 缓存并发布 TRIAL_BALANCE_UPDATED 事件。
+    """
+    import sqlalchemy as sa
+    from decimal import Decimal
+    from app.models.audit_platform_models import TrialBalance
+
+    # 查找匹配行（取最新年度）
+    stmt = (
+        sa.select(TrialBalance)
+        .where(
+            TrialBalance.project_id == project_id,
+            TrialBalance.standard_account_code == body.account_code,
+            TrialBalance.is_deleted == sa.false(),
+        )
+        .order_by(TrialBalance.year.desc())
+        .limit(1)
+    )
+    result = await db.execute(stmt)
+    row = result.scalar_one_or_none()
+
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"试算表中未找到科目 {body.account_code}，请先导入试算表数据",
+        )
+
+    # 更新 audited_amount
+    row.audited_amount = Decimal(str(body.audited_amount))
+    await db.flush()
+    await db.commit()
+
+    # 失效 TB 缓存
+    cache_svc = CacheService(redis)
+    await cache_svc.invalidate_tb_cache(project_id, row.year)
+
+    # 发布 TRIAL_BALANCE_UPDATED 事件（触发报表重算/A13汇总等下游）
+    await event_bus.publish_immediate(EventPayload(
+        event_type=EventType.TRIAL_BALANCE_UPDATED,
+        project_id=project_id,
+        year=row.year,
+        account_codes=[body.account_code],
+    ))
+
+    return {
+        "message": "回写成功",
+        "account_code": body.account_code,
+        "audited_amount": str(row.audited_amount),
+    }

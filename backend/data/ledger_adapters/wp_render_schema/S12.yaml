@@ -1,0 +1,78 @@
+# S12 利用专家（注册会计师的专家）的工作 — 专属渲染 schema
+# component_type: s12-cpa-expert
+# Template: S12 利用专家（注册会计师的专家）的工作.xlsx
+# 整册统一路由到 GtS12CpaExpert，前端按 sheetName v-if 分发
+
+wp_code: S12
+wp_name: 利用专家（注册会计师的专家）的工作
+component_type: s12-cpa-expert
+template_path: backend/wp_templates/S/S12 利用专家（注册会计师的专家）的工作.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+
+# 整册专属组件：前端按 sheetName v-if 分发
+whole_workbook_dedicated: true
+
+sheets:
+  - sheet_name: S12 利用专家的工作程序表
+    internal_type: sheet-program
+    description: 利用CPA专家的工作程序表
+    has_formulas: false
+    formula_count: 0
+
+  - sheet_name: S12-1 评价胜任能力、专业素质和客观性
+    internal_type: sheet-evaluation
+    description: 评价专家胜任能力、专业素质和客观性
+    has_formulas: true
+    formula_count: 2
+
+  - sheet_name: S12-1-1 评价专家的客观性
+    internal_type: sheet-evaluation
+    description: 评价专家客观性的详细检查
+    has_formulas: true
+    formula_count: 2
+
+  - sheet_name: S12-2 了解专家的专长领域
+    internal_type: sheet-understanding
+    description: 了解CPA专家的专长领域
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: S12-3 评价专家工作的恰当性
+    internal_type: sheet-evaluation
+    description: 评价专家工作恰当性概览
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: S12-3-1 注册会计师的专家的报告
+    internal_type: sheet-report
+    description: 专家报告记录
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: S12-3-2 利用专家评价管理层的工作的适当性
+    internal_type: sheet-evaluation-general
+    description: 通用评价（general domain）
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: S12-3-3 利用专家评价管理层的工作(股份支付)
+    internal_type: sheet-evaluation-share-payment
+    description: 股份支付专项评价（share-based-payment domain）
+    has_formulas: true
+    formula_count: 4
+
+  - sheet_name: S12-3-4 利用专家评价管理层的工作(金融工具公允价值）
+    internal_type: sheet-evaluation-fair-value
+    description: 金融工具公允价值专项评价（financial-instrument-fair-value domain）
+    has_formulas: true
+    formula_count: 4
+
+# 多分支渲染
+domain_branches:
+  field: expert_domain
+  options:
+    general: S12-3-2
+    share-based-payment: S12-3-3
+    financial-instrument-fair-value: S12-3-4
+  default: general

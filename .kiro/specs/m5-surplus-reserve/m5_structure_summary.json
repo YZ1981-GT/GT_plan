@@ -1,0 +1,1890 @@
+{
+  "source_file": "M5 盈余公积.xlsx",
+  "source_path": "d:\\GT_plan\\数据\\致同通用审计程序及底稿模板（2025年修订）\\1.致同审计程序及底稿模板（2025年）\\4.风险应对-实质性程序（D-N）\\M 权益循环\\M5 盈余公积.xlsx",
+  "total_sheets": 10,
+  "sheet_names": [
+    "底稿目录",
+    "盈余公积实质性程序表 M5A",
+    "审定表M5-1",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "明细表M5-2",
+    "调整分录汇总M5-3",
+    "盈余公积计提检查表M5-4",
+    "盈余公积检查表M5-5",
+    "GT_Custom"
+  ],
+  "sheets": {
+    "底稿目录": {
+      "sheet_name": "底稿目录",
+      "dimensions": "A1:H20",
+      "max_row": 20,
+      "max_column": 8,
+      "non_empty_rows": 13,
+      "non_empty_cols": 6,
+      "formula_count": 0,
+      "formulas": [],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "被审计单位："
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "截止日：202X年12月31日"
+            },
+            {
+              "col": "D",
+              "value": "序号"
+            },
+            {
+              "col": "E",
+              "value": "内容"
+            },
+            {
+              "col": "F",
+              "value": "索引号"
+            },
+            {
+              "col": "G",
+              "value": "备注"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "编制人："
+            },
+            {
+              "col": "D",
+              "value": "1"
+            },
+            {
+              "col": "E",
+              "value": "盈余公积实质性程序表"
+            },
+            {
+              "col": "F",
+              "value": "M5A"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "编制日期："
+            },
+            {
+              "col": "D",
+              "value": "2"
+            },
+            {
+              "col": "E",
+              "value": "审定表"
+            },
+            {
+              "col": "F",
+              "value": "M5-1"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 3,
+      "merged_cells": [
+        "A14:A16",
+        "A17:A19",
+        "A10:A13"
+      ]
+    },
+    "盈余公积实质性程序表 M5A": {
+      "sheet_name": "盈余公积实质性程序表 M5A",
+      "dimensions": "A1:L23",
+      "max_row": 23,
+      "max_column": 12,
+      "non_empty_rows": 23,
+      "non_empty_cols": 10,
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积实质性程序"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "H",
+              "value": "索引号："
+            },
+            {
+              "col": "I",
+              "value": "=底稿目录!F4"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "H",
+              "value": "页  次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、本账户涉及的科目"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 20,
+      "merged_cells": [
+        "G10:I10",
+        "G13:I13",
+        "A12:F12",
+        "A2:I2",
+        "A8:F8",
+        "B15:B16",
+        "A10:F10",
+        "A13:F13",
+        "A9:F9",
+        "A5:B5",
+        "G9:I9",
+        "G12:I12",
+        "G11:I11",
+        "A11:F11",
+        "D15:H15",
+        "A1:I1",
+        "A15:A16",
+        "G8:I8",
+        "C15:C16",
+        "I15:I16"
+      ]
+    },
+    "审定表M5-1": {
+      "sheet_name": "审定表M5-1",
+      "dimensions": "A1:L48",
+      "max_row": 48,
+      "max_column": 12,
+      "non_empty_rows": 19,
+      "non_empty_cols": 12,
+      "formula_count": 59,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "I4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M5-2'!B12"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M5-2'!H12"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表M5-2'!I12"
+        },
+        {
+          "cell": "E7",
+          "formula": "='明细表M5-2'!N12"
+        },
+        {
+          "cell": "F7",
+          "formula": "='明细表M5-2'!G12"
+        },
+        {
+          "cell": "G7",
+          "formula": "='明细表M5-2'!H12+'明细表M5-2'!J12-'明细表M5-2'!K12"
+        },
+        {
+          "cell": "H7",
+          "formula": "='明细表M5-2'!I12+'明细表M5-2'!L12-'明细表M5-2'!M12"
+        },
+        {
+          "cell": "I7",
+          "formula": "='明细表M5-2'!Q12"
+        },
+        {
+          "cell": "J7",
+          "formula": "=I7-E7"
+        },
+        {
+          "cell": "K7",
+          "formula": "=IF(AND(B7=0,J7=0),0,IF(AND(B7=0,J7>0),1,J7/B7))"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表M5-2'!B13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表M5-2'!H13"
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表M5-2'!I13"
+        },
+        {
+          "cell": "E8",
+          "formula": "='明细表M5-2'!N13"
+        },
+        {
+          "cell": "F8",
+          "formula": "='明细表M5-2'!G13"
+        },
+        {
+          "cell": "G8",
+          "formula": "='明细表M5-2'!H13+'明细表M5-2'!J13-'明细表M5-2'!K13"
+        },
+        {
+          "cell": "H8",
+          "formula": "='明细表M5-2'!I13+'明细表M5-2'!L13-'明细表M5-2'!M13"
+        },
+        {
+          "cell": "I8",
+          "formula": "='明细表M5-2'!Q13"
+        },
+        {
+          "cell": "J8",
+          "formula": "=I8-E8"
+        },
+        {
+          "cell": "K8",
+          "formula": "=IF(AND(B8=0,J8=0),0,IF(AND(B8=0,J8>0),1,J8/B8))"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表M5-2'!B14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表M5-2'!H14"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表M5-2'!I14"
+        },
+        {
+          "cell": "E9",
+          "formula": "='明细表M5-2'!N14"
+        },
+        {
+          "cell": "F9",
+          "formula": "='明细表M5-2'!G14"
+        },
+        {
+          "cell": "G9",
+          "formula": "='明细表M5-2'!H14+'明细表M5-2'!J14-'明细表M5-2'!K14"
+        },
+        {
+          "cell": "H9",
+          "formula": "='明细表M5-2'!I14+'明细表M5-2'!L14-'明细表M5-2'!M14"
+        },
+        {
+          "cell": "I9",
+          "formula": "='明细表M5-2'!Q14"
+        },
+        {
+          "cell": "J9",
+          "formula": "=I9-E9"
+        },
+        {
+          "cell": "K9",
+          "formula": "=IF(AND(B9=0,J9=0),0,IF(AND(B9=0,J9>0),1,J9/B9))"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表M5-2'!B15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表M5-2'!H15"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表M5-2'!I15"
+        },
+        {
+          "cell": "E10",
+          "formula": "='明细表M5-2'!N15"
+        },
+        {
+          "cell": "F10",
+          "formula": "='明细表M5-2'!G15"
+        },
+        {
+          "cell": "G10",
+          "formula": "='明细表M5-2'!H15+'明细表M5-2'!J15-'明细表M5-2'!K15"
+        },
+        {
+          "cell": "H10",
+          "formula": "='明细表M5-2'!I15+'明细表M5-2'!L15-'明细表M5-2'!M15"
+        },
+        {
+          "cell": "I10",
+          "formula": "='明细表M5-2'!Q15"
+        },
+        {
+          "cell": "J10",
+          "formula": "=I10-E10"
+        },
+        {
+          "cell": "K10",
+          "formula": "=IF(AND(B10=0,J10=0),0,IF(AND(B10=0,J10>0),1,J10/B10))"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B7:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C7:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D7:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E7:E10)"
+        },
+        {
+          "cell": "F11",
+          "formula": "=SUM(F7:F10)"
+        },
+        {
+          "cell": "G11",
+          "formula": "=SUM(G7:G10)"
+        },
+        {
+          "cell": "H11",
+          "formula": "=SUM(H7:H10)"
+        },
+        {
+          "cell": "I11",
+          "formula": "=SUM(I7:I10)"
+        },
+        {
+          "cell": "J11",
+          "formula": "=I11-E11"
+        },
+        {
+          "cell": "K11",
+          "formula": "=IF(AND(B11=0,J11=0),0,IF(AND(B11=0,J11>0),1,J11/B11))"
+        },
+        {
+          "cell": "E13",
+          "formula": "=E11-E12"
+        },
+        {
+          "cell": "I13",
+          "formula": "=I11-I12"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积审定表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "I",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "K",
+              "value": "索引号："
+            },
+            {
+              "col": "L",
+              "value": "=底稿目录!F5"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "I",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "K",
+              "value": "页  次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "项目名称"
+            },
+            {
+              "col": "B",
+              "value": "期初数"
+            },
+            {
+              "col": "F",
+              "value": "期末数"
+            },
+            {
+              "col": "J",
+              "value": "本期审定数与上期\n审定数的比较"
+            },
+            {
+              "col": "L",
+              "value": "原因分析"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 8,
+      "merged_cells": [
+        "A5:A6",
+        "A2:L2",
+        "J5:K5",
+        "D15:E15",
+        "A1:L1",
+        "B5:E5",
+        "F5:I5",
+        "L5:L6"
+      ]
+    },
+    "附注披露信息（上市公司）": {
+      "sheet_name": "附注披露信息（上市公司）",
+      "dimensions": "A1:P12",
+      "max_row": 12,
+      "max_column": 16,
+      "non_empty_rows": 12,
+      "non_empty_cols": 5,
+      "formula_count": 26,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M5-2'!N12"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M5-2'!O12"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表M5-2'!P12"
+        },
+        {
+          "cell": "E7",
+          "formula": "=B7+C7-D7"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表M5-2'!N13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表M5-2'!O13"
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表M5-2'!P13"
+        },
+        {
+          "cell": "E8",
+          "formula": "=B8+C8-D8"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表M5-2'!N14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表M5-2'!O14"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表M5-2'!P14"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9+C9-D9"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表M5-2'!N15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表M5-2'!O15"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表M5-2'!P15"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10+C10-D10"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B7:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C7:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D7:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E7:E10)"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积附注披露信息（上市公司）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "D",
+              "value": "索引号："
+            },
+            {
+              "col": "E",
+              "value": "M5-1"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "D",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 2,
+      "merged_cells": [
+        "A2:E2",
+        "A1:E1"
+      ]
+    },
+    "附注披露信息（国有企业）": {
+      "sheet_name": "附注披露信息（国有企业）",
+      "dimensions": "A1:P12",
+      "max_row": 12,
+      "max_column": 16,
+      "non_empty_rows": 12,
+      "non_empty_cols": 5,
+      "formula_count": 26,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "B7",
+          "formula": "='明细表M5-2'!N12"
+        },
+        {
+          "cell": "C7",
+          "formula": "='明细表M5-2'!O12"
+        },
+        {
+          "cell": "D7",
+          "formula": "='明细表M5-2'!P12"
+        },
+        {
+          "cell": "E7",
+          "formula": "=B7+C7-D7"
+        },
+        {
+          "cell": "B8",
+          "formula": "='明细表M5-2'!N13"
+        },
+        {
+          "cell": "C8",
+          "formula": "='明细表M5-2'!O13"
+        },
+        {
+          "cell": "D8",
+          "formula": "='明细表M5-2'!P13"
+        },
+        {
+          "cell": "E8",
+          "formula": "=B8+C8-D8"
+        },
+        {
+          "cell": "B9",
+          "formula": "='明细表M5-2'!N14"
+        },
+        {
+          "cell": "C9",
+          "formula": "='明细表M5-2'!O14"
+        },
+        {
+          "cell": "D9",
+          "formula": "='明细表M5-2'!P14"
+        },
+        {
+          "cell": "E9",
+          "formula": "=B9+C9-D9"
+        },
+        {
+          "cell": "B10",
+          "formula": "='明细表M5-2'!N15"
+        },
+        {
+          "cell": "C10",
+          "formula": "='明细表M5-2'!O15"
+        },
+        {
+          "cell": "D10",
+          "formula": "='明细表M5-2'!P15"
+        },
+        {
+          "cell": "E10",
+          "formula": "=B10+C10-D10"
+        },
+        {
+          "cell": "B11",
+          "formula": "=SUM(B7:B10)"
+        },
+        {
+          "cell": "C11",
+          "formula": "=SUM(C7:C10)"
+        },
+        {
+          "cell": "D11",
+          "formula": "=SUM(D7:D10)"
+        },
+        {
+          "cell": "E11",
+          "formula": "=SUM(E7:E10)"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积附注披露信息（国有企业）"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "D",
+              "value": "索引号："
+            },
+            {
+              "col": "E",
+              "value": "M5-1"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "D",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 2,
+      "merged_cells": [
+        "A2:E2",
+        "A1:E1"
+      ]
+    },
+    "明细表M5-2": {
+      "sheet_name": "明细表M5-2",
+      "dimensions": "A1:Q38",
+      "max_row": 38,
+      "max_column": 17,
+      "non_empty_rows": 34,
+      "non_empty_cols": 17,
+      "formula_count": 41,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "Q3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "K4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "G12",
+          "formula": "=B12+C12-E12"
+        },
+        {
+          "cell": "N12",
+          "formula": "=B12+H12+I12"
+        },
+        {
+          "cell": "O12",
+          "formula": "=C12+J12+L12"
+        },
+        {
+          "cell": "P12",
+          "formula": "=E12+K12+M12"
+        },
+        {
+          "cell": "Q12",
+          "formula": "=N12+O12-P12"
+        },
+        {
+          "cell": "G13",
+          "formula": "=B13+C13-E13"
+        },
+        {
+          "cell": "N13",
+          "formula": "=B13+H13+I13"
+        },
+        {
+          "cell": "O13",
+          "formula": "=C13+J13+L13"
+        },
+        {
+          "cell": "P13",
+          "formula": "=E13+K13+M13"
+        },
+        {
+          "cell": "Q13",
+          "formula": "=N13+O13-P13"
+        },
+        {
+          "cell": "G14",
+          "formula": "=B14+C14-E14"
+        },
+        {
+          "cell": "N14",
+          "formula": "=B14+H14+I14"
+        },
+        {
+          "cell": "O14",
+          "formula": "=C14+J14+L14"
+        },
+        {
+          "cell": "P14",
+          "formula": "=E14+K14+M14"
+        },
+        {
+          "cell": "Q14",
+          "formula": "=N14+O14-P14"
+        },
+        {
+          "cell": "G15",
+          "formula": "=B15+C15-E15"
+        },
+        {
+          "cell": "N15",
+          "formula": "=B15+H15+I15"
+        },
+        {
+          "cell": "O15",
+          "formula": "=C15+J15+L15"
+        },
+        {
+          "cell": "P15",
+          "formula": "=E15+K15+M15"
+        },
+        {
+          "cell": "Q15",
+          "formula": "=N15+O15-P15"
+        },
+        {
+          "cell": "B16",
+          "formula": "=SUM(B12:B15)"
+        },
+        {
+          "cell": "C16",
+          "formula": "=SUM(C12:C15)"
+        },
+        {
+          "cell": "E16",
+          "formula": "=SUM(E12:E15)"
+        },
+        {
+          "cell": "G16",
+          "formula": "=SUM(G12:G15)"
+        },
+        {
+          "cell": "H16",
+          "formula": "=SUM(H12:H15)"
+        },
+        {
+          "cell": "I16",
+          "formula": "=SUM(I12:I15)"
+        },
+        {
+          "cell": "J16",
+          "formula": "=SUM(J12:J15)"
+        },
+        {
+          "cell": "K16",
+          "formula": "=SUM(K12:K15)"
+        },
+        {
+          "cell": "L16",
+          "formula": "=SUM(L12:L15)"
+        },
+        {
+          "cell": "M16",
+          "formula": "=SUM(M12:M15)"
+        },
+        {
+          "cell": "N16",
+          "formula": "=SUM(N12:N15)"
+        },
+        {
+          "cell": "O16",
+          "formula": "=SUM(O12:O15)"
+        },
+        {
+          "cell": "P16",
+          "formula": "=SUM(P12:P15)"
+        },
+        {
+          "cell": "Q16",
+          "formula": "=SUM(Q12:Q15)"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积明细表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "P",
+              "value": "索引号："
+            },
+            {
+              "col": "Q",
+              "value": "=底稿目录!F8"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "K",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "P",
+              "value": "页  次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 22,
+      "merged_cells": [
+        "P10:P11",
+        "N9:Q9",
+        "H9:I9",
+        "A1:Q1",
+        "G10:G11",
+        "M10:M11",
+        "J9:K9",
+        "Q10:Q11",
+        "C10:D10",
+        "E10:F10",
+        "B9:G9",
+        "B10:B11",
+        "A9:A11",
+        "L10:L11",
+        "N10:N11",
+        "A2:Q2",
+        "I10:I11",
+        "L9:M9",
+        "K10:K11",
+        "O10:O11",
+        "H10:H11",
+        "J10:J11"
+      ]
+    },
+    "调整分录汇总M5-3": {
+      "sheet_name": "调整分录汇总M5-3",
+      "dimensions": "A1:J24",
+      "max_row": 24,
+      "max_column": 10,
+      "non_empty_rows": 5,
+      "non_empty_cols": 10,
+      "formula_count": 7,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "G4",
+          "formula": "=底稿目录!A7"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积调整分录汇总表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "I",
+              "value": "索引号："
+            },
+            {
+              "col": "J",
+              "value": "=底稿目录!F9"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "D",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "G",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "I",
+              "value": "页  次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "调整事项说明"
+            },
+            {
+              "col": "B",
+              "value": "类别（报表调整/账项调整/其他）"
+            },
+            {
+              "col": "C",
+              "value": "报表项目"
+            },
+            {
+              "col": "D",
+              "value": "科目名称"
+            },
+            {
+              "col": "E",
+              "value": "附注项目"
+            },
+            {
+              "col": "F",
+              "value": "……"
+            },
+            {
+              "col": "G",
+              "value": "借方调整金额"
+            },
+            {
+              "col": "H",
+              "value": "贷方调整金额"
+            },
+            {
+              "col": "I",
+              "value": "索引"
+            },
+            {
+              "col": "J",
+              "value": "备注"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 2,
+      "merged_cells": [
+        "A1:J1",
+        "A2:J2"
+      ]
+    },
+    "盈余公积计提检查表M5-4": {
+      "sheet_name": "盈余公积计提检查表M5-4",
+      "dimensions": "A1:I42",
+      "max_row": 42,
+      "max_column": 9,
+      "non_empty_rows": 34,
+      "non_empty_cols": 4,
+      "formula_count": 14,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "B3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "B4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "D9",
+          "formula": "=B9+C9"
+        },
+        {
+          "cell": "D10",
+          "formula": "=B10+C10"
+        },
+        {
+          "cell": "B11",
+          "formula": "=B9-B10"
+        },
+        {
+          "cell": "C11",
+          "formula": "=C9-C10"
+        },
+        {
+          "cell": "D11",
+          "formula": "=B11+C11"
+        },
+        {
+          "cell": "B13",
+          "formula": "=B11*B12"
+        },
+        {
+          "cell": "C13",
+          "formula": "=C11*C12"
+        },
+        {
+          "cell": "D13",
+          "formula": "=D11*D12"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积计提检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "D",
+              "value": "索引号：M5-4"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "B",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "C",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "D",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 2,
+      "merged_cells": [
+        "A1:D1",
+        "A2:D2"
+      ]
+    },
+    "盈余公积检查表M5-5": {
+      "sheet_name": "盈余公积检查表M5-5",
+      "dimensions": "A1:Q35",
+      "max_row": 35,
+      "max_column": 17,
+      "non_empty_rows": 22,
+      "non_empty_cols": 16,
+      "formula_count": 13,
+      "formulas": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F11"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "E4",
+          "formula": "=底稿目录!A6"
+        },
+        {
+          "cell": "H4",
+          "formula": "=底稿目录!A7"
+        },
+        {
+          "cell": "F18",
+          "formula": "=SUM(F11:F17)"
+        },
+        {
+          "cell": "G18",
+          "formula": "=SUM(G11:G17)"
+        },
+        {
+          "cell": "F19",
+          "formula": "='明细表M5-2'!P16"
+        },
+        {
+          "cell": "G19",
+          "formula": "='明细表M5-2'!O16"
+        },
+        {
+          "cell": "F20",
+          "formula": "=F18/F19"
+        },
+        {
+          "cell": "G20",
+          "formula": "=G18/G19"
+        }
+      ],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "盈余公积检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": "O",
+              "value": "索引号："
+            },
+            {
+              "col": "P",
+              "value": "=底稿目录!F11"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": "E",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": "H",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": "O",
+              "value": "页    次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "一、测试目标："
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 11,
+      "merged_cells": [
+        "I9:M9",
+        "A19:C19",
+        "H9:H10",
+        "A9:G9",
+        "A1:P1",
+        "N9:N10",
+        "P9:P10",
+        "O9:O10",
+        "A18:C18",
+        "A20:C20",
+        "A2:P2"
+      ]
+    },
+    "GT_Custom": {
+      "sheet_name": "GT_Custom",
+      "dimensions": "A1:B8",
+      "max_row": 8,
+      "max_column": 2,
+      "non_empty_rows": 8,
+      "non_empty_cols": 2,
+      "formula_count": 0,
+      "formulas": [],
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C1"
+            },
+            {
+              "col": "B",
+              "value": "Custom 1"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C2"
+            },
+            {
+              "col": "B",
+              "value": "Custom 2"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C3"
+            },
+            {
+              "col": "B",
+              "value": "Custom 3"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C4"
+            },
+            {
+              "col": "B",
+              "value": "Custom 4"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": "A",
+              "value": "C5"
+            },
+            {
+              "col": "B",
+              "value": "Custom 5"
+            }
+          ]
+        }
+      ],
+      "merged_cells_count": 0,
+      "merged_cells": []
+    }
+  },
+  "formula_summary": {
+    "total_formulas": 193,
+    "by_sheet": {
+      "底稿目录": 0,
+      "盈余公积实质性程序表 M5A": 7,
+      "审定表M5-1": 59,
+      "附注披露信息（上市公司）": 26,
+      "附注披露信息（国有企业）": 26,
+      "明细表M5-2": 41,
+      "调整分录汇总M5-3": 7,
+      "盈余公积计提检查表M5-4": 14,
+      "盈余公积检查表M5-5": 13,
+      "GT_Custom": 0
+    }
+  },
+  "validation": {
+    "M5-1_审定表": {
+      "sheet_name": "审定表M5-1",
+      "formula_count": 59,
+      "expected_in_spec": 57,
+      "header_ref_formulas": 7,
+      "business_formulas": 52,
+      "note": "59 total = 7 header refs(底稿目录) + 52 business(明细表引用+SUM+差异+变动率). Spec估57含误差2，实际结构以xlsx为准"
+    },
+    "M5-2_明细表": {
+      "sheet_name": "明细表M5-2",
+      "formula_count": 41,
+      "expected_in_spec": 12,
+      "header_ref_formulas": 7,
+      "business_formulas": 34,
+      "note": "41 total = 7 header refs + 34 business(每行5公式×4行=20 row-level + 14 SUM合计). Spec估12仅计独立公式类型数，实际含行扩展"
+    },
+    "M5-4_计提检查": {
+      "sheet_name": "盈余公积计提检查表M5-4",
+      "formula_count": 14,
+      "expected_in_spec": 11,
+      "header_ref_formulas": 6,
+      "business_formulas": 8,
+      "note": "14 total = 6 header refs + 8 business(计提基数合计+差异+应计提). Spec估11含误差3"
+    }
+  },
+  "analysis": {
+    "总结": "M5盈余公积.xlsx 含10有效sheet，总公式193个",
+    "结构确认": {
+      "底稿目录": "A1:H20, 无公式, 纯静态目录/参数存储",
+      "盈余公积实质性程序表 M5A": "A1:L23, 7公式(全header ref), 复用a-program-console",
+      "审定表M5-1": "A1:L48, 59公式, 48行×12列, 双区块(法定+任意+合计行+差异行), 核心=明细表引用+SUM+变动率IF",
+      "附注披露信息（上市公司）": "A1:P12, 26公式, 从明细表M5-2引用NOP列+SUM",
+      "附注披露信息（国有企业）": "A1:P12, 26公式, 结构与上市公司完全一致",
+      "明细表M5-2": "A1:Q38, 41公式, 38行×17列, 法定+任意分区4行data+1合计, 公式: G=B+C-E期末 / N=B+H+I审定期初 / O=C+J+L审定贷方 / P=E+K+M审定借方 / Q=N+O-P审定期末",
+      "调整分录汇总M5-3": "A1:J24, 7公式(全header ref), 标准调整分录模板",
+      "盈余公积计提检查表M5-4": "A1:I42, 14公式, 42行×9列(4列有数据), 法定/任意/合计3列×(合计+差异+应计提)=8 business",
+      "盈余公积检查表M5-5": "A1:Q35, 13公式, 含SUM汇总+明细引用+比率计算",
+      "GT_Custom": "A1:B8, 无公式, 自定义参数(C1-C8)"
+    },
+    "公式分类统计": {
+      "header_ref（底稿目录引用）": "~40个（各sheet 6-7个）",
+      "business_formulas（业务公式）": "~153个",
+      "跨sheet引用": "审定表M5-1→明细表M5-2 / 附注→明细表M5-2 / 检查表M5-5→明细表M5-2",
+      "核心公式类型": [
+        "权益类期末: G=B+C-E (期初+贷方-借方)",
+        "审定数: N=期初+AJE期初, O=贷方+AJE贷方, P=借方+AJE借方, Q=N+O-P",
+        "变动率: K=IF(AND(B=0,J=0),0,IF(AND(B=0,J>0),1,J/B))",
+        "计提测试: D=B+C(合计), 差异=B9-B10, 应计提=差异×比例",
+        "SUM合计: 各sheet合计行"
+      ]
+    },
+    "权益类科目方向确认": "期末=期初+贷方(计提)-借方(转增/弥补), 与设计文档一致",
+    "M5-4计提检查结构": {
+      "行结构": "row8=表头(法定/任意/合计), row9=本年净利润, row10=弥补以前年度亏损, row11=计提基数(=净利润-弥补), row12=计提比例(10%), row13=应计提(=基数×比例)",
+      "列结构": "B=法定盈余公积, C=任意盈余公积, D=合计",
+      "核心公式链": "计提基数D11=B11+C11 → 应计提D13=D11×D12"
+    },
+    "M5-2明细表列结构": {
+      "A": "项目/类别",
+      "B": "期初(未审)",
+      "C": "本期贷方(未审计提)",
+      "E": "本期借方(未审转增/弥补)",
+      "G": "期末=B+C-E(未审)",
+      "H-I": "AJE(期初调整/贷方调整)",
+      "J-K": "AJE(贷方/借方)",
+      "L-M": "RJE(贷方/借方)",
+      "N": "审定期初=B+H+I",
+      "O": "审定贷方=C+J+L",
+      "P": "审定借方=E+K+M",
+      "Q": "审定期末=N+O-P"
+    }
+  }
+}

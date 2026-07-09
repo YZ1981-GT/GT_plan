@@ -1,0 +1,3494 @@
+{
+  "source_file": "d:\\GT_plan\\backend\\wp_templates\\L\\L4 应付债券.xlsx",
+  "total_sheets": 16,
+  "sheet_names": [
+    "底稿目录",
+    "应付债券实质性程序表L4A ",
+    "审定表L4-1",
+    "附注披露信息核对（上市公司）",
+    "附注披露信息核对（国企）",
+    "应付债券明细表L4-2",
+    "划分为金融负债的其他金融工具明细表L4-3",
+    "调整分录汇总L4-4",
+    "权益与负债划分检查表L4-5",
+    "应付债券初始计量L4-6",
+    "应付债券后续计量(到期一次还本付息)L4-7",
+    "应付债券后续计量(分期付息到期一次还本)L4-7",
+    "应付债券账面核对(到期一次还本付息)L4-8",
+    "应付债券账面核对(分期付息到期一次还本) L4-8",
+    "应付债券检查表L4-9",
+    "GT_Custom"
+  ],
+  "validations": {
+    "L4-2_has_89_columns": true,
+    "L4-7A_exists_bullet": true,
+    "L4-7B_exists_installment": true,
+    "L4-8A_exists_bullet": true,
+    "L4-8B_exists_installment": true,
+    "L4-5_equity_liability_check": true,
+    "total_sheets": 16
+  },
+  "validation_details": {
+    "L4-2": {
+      "actual_columns": 89,
+      "confirmed_wide_table": true,
+      "note": "实际列数=89，✅确认极宽表"
+    },
+    "L4-5": {
+      "sheet_name": "权益与负债划分检查表L4-5",
+      "dims": "61×15"
+    },
+    "L4-7A": {
+      "sheet_name": "应付债券后续计量(到期一次还本付息)L4-7",
+      "dims": "27×35"
+    },
+    "L4-7B": {
+      "sheet_name": "应付债券后续计量(分期付息到期一次还本)L4-7",
+      "dims": "26×34"
+    },
+    "L4-8A": {
+      "sheet_name": "应付债券账面核对(到期一次还本付息)L4-8",
+      "dims": "38×28"
+    },
+    "L4-8B": {
+      "sheet_name": "应付债券账面核对(分期付息到期一次还本) L4-8",
+      "dims": "38×37"
+    }
+  },
+  "sheets": [
+    {
+      "sheet_name": "底稿目录",
+      "dimensions": "23×7",
+      "max_row": 23,
+      "max_column": 7,
+      "formula_count": 1,
+      "formula_samples": [
+        {
+          "cell": "E16",
+          "formula": "='应付债券检查表L4-9'!A2"
+        }
+      ],
+      "merged_cells_count": 3,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "被审计单位："
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "序号"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "内容"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "索引号"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "截止日：202X年12月31日"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "1"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "应付债券实质性程序表"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "L4A "
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "编制人："
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "2"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "应付债券审定表"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "L4-1"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "编制日期："
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "3"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "附注披露信息(上市公司)"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "无需打印"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "底稿开列时，可先在以下单元格填写有关内容，以便其他底稿引用有关数据："
+        },
+        {
+          "row": 2,
+          "value": "被审计单位："
+        },
+        {
+          "row": 3,
+          "value": "截止日：202X年12月31日"
+        },
+        {
+          "row": 4,
+          "value": "编制人："
+        },
+        {
+          "row": 5,
+          "value": "编制日期："
+        },
+        {
+          "row": 6,
+          "value": "复核人："
+        },
+        {
+          "row": 7,
+          "value": "复核日期："
+        },
+        {
+          "row": 9,
+          "value": "关于工作底稿与审计程序索引号对应的说明"
+        },
+        {
+          "row": 10,
+          "value": "1.编制的审计工作底稿应与审计程序对应。审计项目组应根据被审计单位实际情况和风险评估情况在实质性程序表中裁剪、修改或增加"
+        },
+        {
+          "row": 14,
+          "value": "2.获取的支持性证据应与审计底稿或程序对应。审计项目组在完成底稿时获取的支持性证据应根据底稿索引号编制下一级按自然顺序排"
+        },
+        {
+          "row": 17,
+          "value": "3.工作底稿索引号的编码规则：实质性程序索引号按循环从“D”到“N”,循环内账户以顺序号排列，模板中底稿索引号按账户顺序"
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券实质性程序表L4A ",
+      "dimensions": "27×19",
+      "max_row": 27,
+      "max_column": 19,
+      "formula_count": 6,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "C4",
+          "formula": "=底稿目录!A6"
+        }
+      ],
+      "merged_cells_count": 21,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券实质性程序"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "索引号："
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "L4A "
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "页  次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、本账户涉及的科目"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券实质性程序"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、本账户涉及的科目"
+        },
+        {
+          "row": 6,
+          "value": "应付债券"
+        },
+        {
+          "row": 7,
+          "value": "二、审计目标与认定的对应关系"
+        },
+        {
+          "row": 8,
+          "value": "审计目标"
+        },
+        {
+          "row": 9,
+          "value": "A. 资产负债表中记录的应付债券是存在的，且已记录于恰当的账户"
+        },
+        {
+          "row": 10,
+          "value": "B. 所有应记录的应付债券均已记录，所有应当包括在财务报表中的相关披露均已包括"
+        },
+        {
+          "row": 11,
+          "value": "C. 记录的应付债券是被审计单位应当履行的偿还义务"
+        },
+        {
+          "row": 12,
+          "value": "D. 应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 13,
+          "value": "E. 应付债券已被恰当地汇总或分解且表述清楚，相关披露在按照企业会计准则的编制基础下是相关的、可理解的"
+        },
+        {
+          "row": 14,
+          "value": "三、计划实施的实质性程序"
+        },
+        {
+          "row": 15,
+          "value": "序号"
+        },
+        {
+          "row": 17,
+          "value": "1"
+        },
+        {
+          "row": 18,
+          "value": "2"
+        },
+        {
+          "row": 19,
+          "value": "3"
+        },
+        {
+          "row": 20,
+          "value": "4"
+        },
+        {
+          "row": 21,
+          "value": "5"
+        },
+        {
+          "row": 22,
+          "value": "6"
+        },
+        {
+          "row": 23,
+          "value": "7"
+        },
+        {
+          "row": 24,
+          "value": "9"
+        },
+        {
+          "row": 25,
+          "value": "10"
+        },
+        {
+          "row": 26,
+          "value": "11"
+        },
+        {
+          "row": 27,
+          "value": "12"
+        }
+      ]
+    },
+    {
+      "sheet_name": "审定表L4-1",
+      "dimensions": "22×19",
+      "max_row": 22,
+      "max_column": 19,
+      "formula_count": 140,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "R3",
+          "formula": "=底稿目录!F4"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 8,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券审定表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 17,
+              "col_letter": "Q",
+              "value": "索引："
+            },
+            {
+              "col": 18,
+              "col_letter": "R",
+              "value": "=底稿目录!F4"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 17,
+              "col_letter": "Q",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "项目"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "期初数"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "期末数"
+            },
+            {
+              "col": 14,
+              "col_letter": "N",
+              "value": "本期未审数与上期\n审定数的比较"
+            },
+            {
+              "col": 16,
+              "col_letter": "P",
+              "value": "本期审定数与上期\n审定数的比较"
+            },
+            {
+              "col": 18,
+              "col_letter": "R",
+              "value": "原因分析"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券审定表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "项目"
+        },
+        {
+          "row": 7,
+          "value": "(一)普通应付债券"
+        },
+        {
+          "row": 8,
+          "value": "（1）成本"
+        },
+        {
+          "row": 9,
+          "value": "（2）利息调整"
+        },
+        {
+          "row": 10,
+          "value": "（3）应计利息"
+        },
+        {
+          "row": 11,
+          "value": "小计"
+        },
+        {
+          "row": 12,
+          "value": "（二）可转换公司债券"
+        },
+        {
+          "row": 13,
+          "value": "（1）成本"
+        },
+        {
+          "row": 14,
+          "value": "（2）利息调整"
+        },
+        {
+          "row": 15,
+          "value": "（3）应计利息"
+        },
+        {
+          "row": 16,
+          "value": "小计"
+        },
+        {
+          "row": 17,
+          "value": "划分为金融负债的其他金融工具"
+        },
+        {
+          "row": 18,
+          "value": "合计"
+        },
+        {
+          "row": 19,
+          "value": "1、审计说明："
+        },
+        {
+          "row": 22,
+          "value": "2、审计结论："
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息核对（上市公司）",
+      "dimensions": "72×19",
+      "max_row": 72,
+      "max_column": 19,
+      "formula_count": 219,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        }
+      ],
+      "merged_cells_count": 24,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券附注披露信息"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "返回目录"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "索引号："
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "附注披露信息（上市公司）"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券附注披露信息"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "附注披露信息（上市公司）"
+        },
+        {
+          "row": 6,
+          "value": "项  目"
+        },
+        {
+          "row": 7,
+          "value": "='应付债券明细表L4-2'!B15"
+        },
+        {
+          "row": 8,
+          "value": "='应付债券明细表L4-2'!B16"
+        },
+        {
+          "row": 9,
+          "value": "='应付债券明细表L4-2'!B19"
+        },
+        {
+          "row": 10,
+          "value": "='应付债券明细表L4-2'!B20"
+        },
+        {
+          "row": 11,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A13"
+        },
+        {
+          "row": 12,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A14"
+        },
+        {
+          "row": 13,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A15"
+        },
+        {
+          "row": 14,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A16"
+        },
+        {
+          "row": 15,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A17"
+        },
+        {
+          "row": 16,
+          "value": "合  计"
+        },
+        {
+          "row": 17,
+          "value": "（1）应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）"
+        },
+        {
+          "row": 18,
+          "value": "债券名称"
+        },
+        {
+          "row": 19,
+          "value": "='应付债券明细表L4-2'!B15"
+        },
+        {
+          "row": 20,
+          "value": "='应付债券明细表L4-2'!B16"
+        },
+        {
+          "row": 21,
+          "value": "='应付债券明细表L4-2'!B17"
+        },
+        {
+          "row": 22,
+          "value": "='应付债券明细表L4-2'!B18"
+        },
+        {
+          "row": 23,
+          "value": "='应付债券明细表L4-2'!B19"
+        },
+        {
+          "row": 24,
+          "value": "='应付债券明细表L4-2'!B20"
+        },
+        {
+          "row": 25,
+          "value": "小  计"
+        },
+        {
+          "row": 26,
+          "value": "应付债券（续）"
+        },
+        {
+          "row": 27,
+          "value": "债券名称"
+        },
+        {
+          "row": 28,
+          "value": "='应付债券明细表L4-2'!B15"
+        },
+        {
+          "row": 29,
+          "value": "='应付债券明细表L4-2'!B16"
+        },
+        {
+          "row": 30,
+          "value": "='应付债券明细表L4-2'!B19"
+        }
+      ]
+    },
+    {
+      "sheet_name": "附注披露信息核对（国企）",
+      "dimensions": "61×19",
+      "max_row": 61,
+      "max_column": 19,
+      "formula_count": 175,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        },
+        {
+          "cell": "D4",
+          "formula": "=底稿目录!A6"
+        }
+      ],
+      "merged_cells_count": 23,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券附注披露信息"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "返回目录"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 10,
+              "col_letter": "J",
+              "value": "索引号："
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 10,
+              "col_letter": "J",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "附注披露信息（国企）"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券附注披露信息"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "附注披露信息（国企）"
+        },
+        {
+          "row": 6,
+          "value": "项  目"
+        },
+        {
+          "row": 7,
+          "value": "='应付债券明细表L4-2'!B15"
+        },
+        {
+          "row": 8,
+          "value": "='应付债券明细表L4-2'!B16"
+        },
+        {
+          "row": 9,
+          "value": "='应付债券明细表L4-2'!B19"
+        },
+        {
+          "row": 10,
+          "value": "='应付债券明细表L4-2'!B20"
+        },
+        {
+          "row": 11,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A13"
+        },
+        {
+          "row": 12,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A14"
+        },
+        {
+          "row": 13,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A15"
+        },
+        {
+          "row": 14,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A16"
+        },
+        {
+          "row": 15,
+          "value": "='划分为金融负债的其他金融工具明细表L4-3'!A17"
+        },
+        {
+          "row": 16,
+          "value": "合  计"
+        },
+        {
+          "row": 17,
+          "value": "债券名称"
+        },
+        {
+          "row": 18,
+          "value": "='应付债券明细表L4-2'!B15"
+        },
+        {
+          "row": 19,
+          "value": "='应付债券明细表L4-2'!B16"
+        },
+        {
+          "row": 20,
+          "value": "='应付债券明细表L4-2'!B19"
+        },
+        {
+          "row": 21,
+          "value": "='应付债券明细表L4-2'!B20"
+        },
+        {
+          "row": 22,
+          "value": "小计"
+        },
+        {
+          "row": 23,
+          "value": "减：一年内到期的应付债券"
+        },
+        {
+          "row": 24,
+          "value": "合计"
+        },
+        {
+          "row": 25,
+          "value": "注：企业需说明可转换公司债券的转股条件、转股时间等情况。"
+        },
+        {
+          "row": 26,
+          "value": "【根据中国证券监督管理委员会证监发行字[200x]XX号核准，本公司于200X年X月X日至200X年X月X日公开发行XX"
+        },
+        {
+          "row": 27,
+          "value": "本公司发行的可转换公司债券的票面利率为X%，利息按季支付，200X年X月X日为第一次派息日。转股期自发行之日起(200X"
+        },
+        {
+          "row": 28,
+          "value": "可转换公司债券发行时的初始转股价格为每股人民币X元，本公司在200X年X月X日实施200X年度每股派发现金股息人民币X元"
+        },
+        {
+          "row": 29,
+          "value": "（3）划分为金融负债的其他金融工具"
+        },
+        {
+          "row": 30,
+          "value": "【公司发行其他金融工具并划分为金融负债的，应分项披露其基本情况、期初余额、期末余额和本期增减变动情况，以及划分至金融负债"
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券明细表L4-2",
+      "dimensions": "35×89",
+      "max_row": 35,
+      "max_column": 89,
+      "formula_count": 374,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "K3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "W3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "AH3",
+          "formula": "=底稿目录!F7"
+        },
+        {
+          "cell": "AR3",
+          "formula": "=底稿目录!A4"
+        }
+      ],
+      "merged_cells_count": 42,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": 35,
+              "col_letter": "AI",
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": 59,
+              "col_letter": "BG",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券明细表(未审数)"
+            },
+            {
+              "col": 35,
+              "col_letter": "AI",
+              "value": "应付债券明细表(审计调整)"
+            },
+            {
+              "col": 59,
+              "col_letter": "BG",
+              "value": "应付债券明细表(审定数)"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 23,
+              "col_letter": "W",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 33,
+              "col_letter": "AG",
+              "value": "索引号："
+            },
+            {
+              "col": 34,
+              "col_letter": "AH",
+              "value": "=底稿目录!F7"
+            },
+            {
+              "col": 44,
+              "col_letter": "AR",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 52,
+              "col_letter": "AZ",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 57,
+              "col_letter": "BE",
+              "value": "索引号："
+            },
+            {
+              "col": 58,
+              "col_letter": "BF",
+              "value": "=底稿目录!F7"
+            },
+            {
+              "col": 70,
+              "col_letter": "BR",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 78,
+              "col_letter": "BZ",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 87,
+              "col_letter": "CI",
+              "value": "索引号："
+            },
+            {
+              "col": 88,
+              "col_letter": "CJ",
+              "value": "=底稿目录!F7"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 23,
+              "col_letter": "W",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 33,
+              "col_letter": "AG",
+              "value": "页次："
+            },
+            {
+              "col": 44,
+              "col_letter": "AR",
+              "value": "复核人："
+            },
+            {
+              "col": 52,
+              "col_letter": "AZ",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 57,
+              "col_letter": "BE",
+              "value": "页次："
+            },
+            {
+              "col": 70,
+              "col_letter": "BR",
+              "value": "复核人："
+            },
+            {
+              "col": 78,
+              "col_letter": "BZ",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 87,
+              "col_letter": "CI",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券明细表(未审数)"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 11,
+          "value": "序号"
+        },
+        {
+          "row": 14,
+          "value": "（一）普通应付债券"
+        },
+        {
+          "row": 17,
+          "value": "小计"
+        },
+        {
+          "row": 18,
+          "value": "（二）可转换/可交换公司债券"
+        },
+        {
+          "row": 21,
+          "value": "小计"
+        },
+        {
+          "row": 22,
+          "value": "合计"
+        },
+        {
+          "row": 30,
+          "value": "提示："
+        },
+        {
+          "row": 31,
+          "value": "1、本科目核算企业为筹集（长期）资金而发行债券的本金和利息。企业发行的可转换公司债券，应将负债和权益成份进行分拆。分拆后"
+        },
+        {
+          "row": 32,
+          "value": "2、含一年内到期的应付债券。"
+        },
+        {
+          "row": 33,
+          "value": "3、如新发行债券，应在“备注”栏中说明证券主管部门批准文号，发行日期、付息日期等内容。"
+        },
+        {
+          "row": 34,
+          "value": "4.审计说明可以概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况"
+        },
+        {
+          "row": 35,
+          "value": "5.审计结论可参考：A、未见异常。 B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。  C、由于存在以下"
+        }
+      ]
+    },
+    {
+      "sheet_name": "划分为金融负债的其他金融工具明细表L4-3",
+      "dimensions": "27×40",
+      "max_row": 27,
+      "max_column": 40,
+      "formula_count": 88,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "S3",
+          "formula": "=底稿目录!F8"
+        },
+        {
+          "cell": "Z3",
+          "formula": "=底稿目录!A4"
+        }
+      ],
+      "merged_cells_count": 34,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            },
+            {
+              "col": 20,
+              "col_letter": "T",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券明细表-划分为金融负债的其他金融工具（未审数）"
+            },
+            {
+              "col": 20,
+              "col_letter": "T",
+              "value": "应付债券明细表（审计调整+审定数）"
+            },
+            {
+              "col": 40,
+              "col_letter": "AN",
+              "value": "返回目录"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 18,
+              "col_letter": "R",
+              "value": "索引号："
+            },
+            {
+              "col": 19,
+              "col_letter": "S",
+              "value": "=底稿目录!F8"
+            },
+            {
+              "col": 26,
+              "col_letter": "Z",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 32,
+              "col_letter": "AF",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 38,
+              "col_letter": "AL",
+              "value": "索引号："
+            },
+            {
+              "col": 39,
+              "col_letter": "AM",
+              "value": "L4-3"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 18,
+              "col_letter": "R",
+              "value": "页次："
+            },
+            {
+              "col": 26,
+              "col_letter": "Z",
+              "value": "复核人："
+            },
+            {
+              "col": 32,
+              "col_letter": "AF",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 38,
+              "col_letter": "AL",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券明细表-划分为金融负债的其他金融工具（未审数）"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 10,
+          "value": "发行在外的金融工具"
+        },
+        {
+          "row": 18,
+          "value": "合计"
+        },
+        {
+          "row": 24,
+          "value": "提示："
+        },
+        {
+          "row": 25,
+          "value": "1、本科目核算企业为筹集（长期）资金而发行债券的本金和利息。企业发行的可转换公司债券，应将负债和权益成份进行分拆，分拆后"
+        },
+        {
+          "row": 26,
+          "value": "2.审计说明可以概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况"
+        },
+        {
+          "row": 27,
+          "value": "3.审计结论可参考：A、未见异常。 B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。  C、由于存在以下"
+        }
+      ]
+    },
+    {
+      "sheet_name": "调整分录汇总L4-4",
+      "dimensions": "23×11",
+      "max_row": 23,
+      "max_column": 11,
+      "formula_count": 7,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "J3",
+          "formula": "=底稿目录!F9"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 3,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券调整分录汇总表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "索引："
+            },
+            {
+              "col": 10,
+              "col_letter": "J",
+              "value": "=底稿目录!F9"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "调整事项说明"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "类别（报表调整/账项调整/其他）"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "报表项目"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "科目名称"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "附注项目"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "……"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "借方调整金额"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "贷方调整金额"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "索引"
+            },
+            {
+              "col": 10,
+              "col_letter": "J",
+              "value": "备注"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券调整分录汇总表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "调整事项说明"
+        },
+        {
+          "row": 23,
+          "value": "注：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。项目组可根据项目实际情况选择是否使用该底"
+        }
+      ]
+    },
+    {
+      "sheet_name": "权益与负债划分检查表L4-5",
+      "dimensions": "61×15",
+      "max_row": 61,
+      "max_column": 15,
+      "formula_count": 8,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "I3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "N3",
+          "formula": "=底稿目录!F10"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 38,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "权益与负债划分检查表"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 13,
+              "col_letter": "M",
+              "value": "索引号："
+            },
+            {
+              "col": 14,
+              "col_letter": "N",
+              "value": "=底稿目录!F10"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 9,
+              "col_letter": "I",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 13,
+              "col_letter": "M",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "权益与负债划分检查表"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标"
+        },
+        {
+          "row": 6,
+          "value": "1.资产负债表中记录的应付债券是存在的，且已经记录在恰当的账户中；2.应付债券以恰当的金额包括在财务报表中，与之相关的计"
+        },
+        {
+          "row": 7,
+          "value": "二、审计过程"
+        },
+        {
+          "row": 8,
+          "value": "发行在外的金融工具"
+        },
+        {
+          "row": 20,
+          "value": "合计"
+        },
+        {
+          "row": 22,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 25,
+          "value": "四、审计结论"
+        },
+        {
+          "row": 28,
+          "value": "提示："
+        },
+        {
+          "row": 29,
+          "value": "1"
+        },
+        {
+          "row": 30,
+          "value": "项目"
+        },
+        {
+          "row": 31,
+          "value": "本金的赎回"
+        },
+        {
+          "row": 34,
+          "value": "股息支付"
+        },
+        {
+          "row": 39,
+          "value": "赎回选择权"
+        },
+        {
+          "row": 43,
+          "value": "剩余利润分配"
+        },
+        {
+          "row": 45,
+          "value": "转股权条款"
+        },
+        {
+          "row": 48,
+          "value": "2.优先股划分为权益工具需满足的条件（须同时满足）：\n（1）不构成支付义务，即发行方能够无条件避免支付。为满足这一条件，"
+        },
+        {
+          "row": 53,
+          "value": "3.将一项优先股划分为权益还是金融负债，还需要考虑的其他因素：\n（1）以前期间股利发放情况，例如历史上每年均支付自主决定"
+        },
+        {
+          "row": 61,
+          "value": "4.会计提示第78号—优先股永续债可转换公司债券"
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券初始计量L4-6",
+      "dimensions": "53×27",
+      "max_row": 53,
+      "max_column": 27,
+      "formula_count": 84,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "C3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!F11"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 4,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券初始计量"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "索引号："
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!F11"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 3,
+              "col_letter": "C",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券初始计量"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1. 所有应记录的应付债券均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+        },
+        {
+          "row": 7,
+          "value": "2.应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 8,
+          "value": "二、审计过程："
+        },
+        {
+          "row": 9,
+          "value": "计息期初："
+        },
+        {
+          "row": 10,
+          "value": "利息费用测算："
+        },
+        {
+          "row": 11,
+          "value": "项目"
+        },
+        {
+          "row": 12,
+          "value": "后续计量方式"
+        },
+        {
+          "row": 13,
+          "value": "债券种类"
+        },
+        {
+          "row": 14,
+          "value": "债券名称"
+        },
+        {
+          "row": 15,
+          "value": "债权期限"
+        },
+        {
+          "row": 16,
+          "value": "计息基数-面值/本金"
+        },
+        {
+          "row": 17,
+          "value": "合同利率"
+        },
+        {
+          "row": 18,
+          "value": "发行价格"
+        },
+        {
+          "row": 19,
+          "value": "发行费用"
+        },
+        {
+          "row": 20,
+          "value": "利息调整初始确认金额"
+        },
+        {
+          "row": 21,
+          "value": "起息日"
+        },
+        {
+          "row": 22,
+          "value": "到期日"
+        },
+        {
+          "row": 23,
+          "value": "本期计息天数"
+        },
+        {
+          "row": 24,
+          "value": "实际利率"
+        },
+        {
+          "row": 25,
+          "value": "按合同利率计算的应付利息"
+        },
+        {
+          "row": 26,
+          "value": "期初应付本金余额"
+        },
+        {
+          "row": 27,
+          "value": "期末应付本金余额"
+        },
+        {
+          "row": 28,
+          "value": "确认的利息费用"
+        },
+        {
+          "row": 29,
+          "value": "应付本金减少"
+        },
+        {
+          "row": 30,
+          "value": "—利息调整"
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券后续计量(到期一次还本付息)L4-7",
+      "dimensions": "27×35",
+      "max_row": 27,
+      "max_column": 35,
+      "formula_count": 40,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F12"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 7,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券后续计量(到期一次还本付息)"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "索引号："
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!F12"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券后续计量(到期一次还本付息)"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1.资产负债表中记录的应付债券是存在的，且已经记录在恰当的账户中；"
+        },
+        {
+          "row": 7,
+          "value": "2.所有应记录的应付债券均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+        },
+        {
+          "row": 8,
+          "value": "3.应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 9,
+          "value": "二、审计过程："
+        },
+        {
+          "row": 10,
+          "value": "1、债券信息"
+        },
+        {
+          "row": 11,
+          "value": "计息期初："
+        },
+        {
+          "row": 12,
+          "value": "序号："
+        },
+        {
+          "row": 15,
+          "value": "2、后续计量过程"
+        },
+        {
+          "row": 16,
+          "value": "期间"
+        },
+        {
+          "row": 18,
+          "value": "第一期"
+        },
+        {
+          "row": 19,
+          "value": "第二期"
+        },
+        {
+          "row": 20,
+          "value": "最后一期"
+        },
+        {
+          "row": 21,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 22,
+          "value": "1.利息费用计入财务费用XX元、计入在建工程XX元，计入存货XX元，……"
+        },
+        {
+          "row": 25,
+          "value": "四、审计结论："
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券后续计量(分期付息到期一次还本)L4-7",
+      "dimensions": "26×34",
+      "max_row": 26,
+      "max_column": 34,
+      "formula_count": 52,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "F3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F13"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 7,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券后续计量(分期付息到期一次还本)"
+            },
+            {
+              "col": 24,
+              "col_letter": "X",
+              "value": "2、本期利息计提情况"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "索引号："
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!F13"
+            },
+            {
+              "col": 24,
+              "col_letter": "X",
+              "value": "债券名称"
+            },
+            {
+              "col": 25,
+              "col_letter": "Y",
+              "value": "票面金额"
+            },
+            {
+              "col": 26,
+              "col_letter": "Z",
+              "value": "票面年利率"
+            },
+            {
+              "col": 27,
+              "col_letter": "AA",
+              "value": "开始日期"
+            },
+            {
+              "col": 28,
+              "col_letter": "AB",
+              "value": "结束日期"
+            },
+            {
+              "col": 29,
+              "col_letter": "AC",
+              "value": "计息天数"
+            },
+            {
+              "col": 30,
+              "col_letter": "AD",
+              "value": "应计利息"
+            },
+            {
+              "col": 31,
+              "col_letter": "AE",
+              "value": "已计利息"
+            },
+            {
+              "col": 32,
+              "col_letter": "AF",
+              "value": "差异"
+            },
+            {
+              "col": 33,
+              "col_letter": "AG",
+              "value": "差异原因"
+            },
+            {
+              "col": 34,
+              "col_letter": "AH",
+              "value": "备注"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 6,
+              "col_letter": "F",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "页次："
+            },
+            {
+              "col": 29,
+              "col_letter": "AC",
+              "value": "=IF(DATEDIF(AA4,AB4,\"d\"),DATEDIF(AA4,AB4,\"d\")+1,0)"
+            },
+            {
+              "col": 30,
+              "col_letter": "AD",
+              "value": "=ROUND(Y4*Z4/365*AC4,2)"
+            },
+            {
+              "col": 32,
+              "col_letter": "AF",
+              "value": "=AD4-AE4"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标:"
+            },
+            {
+              "col": 29,
+              "col_letter": "AC",
+              "value": "=IF(DATEDIF(AA5,AB5,\"d\"),DATEDIF(AA5,AB5,\"d\")+1,0)"
+            },
+            {
+              "col": 30,
+              "col_letter": "AD",
+              "value": "=ROUND(Y5*Z5/360*AC5,2)"
+            },
+            {
+              "col": 32,
+              "col_letter": "AF",
+              "value": "=AD5-AE5"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券后续计量(分期付息到期一次还本)"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1.资产负债表中记录的应付债券是存在的，且已经记录在恰当的账户中；"
+        },
+        {
+          "row": 7,
+          "value": "2.所有应记录的应付债券均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+        },
+        {
+          "row": 8,
+          "value": "3.应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 9,
+          "value": "二、审计过程："
+        },
+        {
+          "row": 10,
+          "value": "1、债券信息"
+        },
+        {
+          "row": 11,
+          "value": "计息期初："
+        },
+        {
+          "row": 12,
+          "value": "序号："
+        },
+        {
+          "row": 14,
+          "value": "2、后续计量过程"
+        },
+        {
+          "row": 15,
+          "value": "期间"
+        },
+        {
+          "row": 17,
+          "value": "初始计量"
+        },
+        {
+          "row": 18,
+          "value": "第一期"
+        },
+        {
+          "row": 19,
+          "value": "第二期"
+        },
+        {
+          "row": 20,
+          "value": "最后一期"
+        },
+        {
+          "row": 21,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 22,
+          "value": "1.利息费用计入财务费用XX元、计入在建工程XX元，计入存货XX元，……"
+        },
+        {
+          "row": 24,
+          "value": "四、审计结论："
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券账面核对(到期一次还本付息)L4-8",
+      "dimensions": "38×28",
+      "max_row": 38,
+      "max_column": 28,
+      "formula_count": 39,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F14"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 28,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券账面核对(到期一次还本付息)"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "索引号："
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!F14"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券账面核对(到期一次还本付息)"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1.资产负债表中记录的应付债券是存在的，且已经记录在恰当的账户中；"
+        },
+        {
+          "row": 7,
+          "value": "2.所有应记录的应付债券均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+        },
+        {
+          "row": 8,
+          "value": "3.应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 9,
+          "value": "二、审计过程："
+        },
+        {
+          "row": 10,
+          "value": "1、期末余额测算"
+        },
+        {
+          "row": 11,
+          "value": "序号"
+        },
+        {
+          "row": 13,
+          "value": "1"
+        },
+        {
+          "row": 14,
+          "value": "2"
+        },
+        {
+          "row": 15,
+          "value": "3"
+        },
+        {
+          "row": 16,
+          "value": "2、利息测算"
+        },
+        {
+          "row": 17,
+          "value": "序号"
+        },
+        {
+          "row": 19,
+          "value": "1"
+        },
+        {
+          "row": 20,
+          "value": "2"
+        },
+        {
+          "row": 21,
+          "value": "3"
+        },
+        {
+          "row": 22,
+          "value": "3、“利息调整”摊销分配测算"
+        },
+        {
+          "row": 23,
+          "value": "序号"
+        },
+        {
+          "row": 29,
+          "value": "序号"
+        },
+        {
+          "row": 34,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 36,
+          "value": "四、审计结论："
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券账面核对(分期付息到期一次还本) L4-8",
+      "dimensions": "38×37",
+      "max_row": 38,
+      "max_column": 37,
+      "formula_count": 39,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "D3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "G3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "L3",
+          "formula": "=底稿目录!F15"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 28,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券账面核对(分期付息到期一次还本)"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "索引号："
+            },
+            {
+              "col": 12,
+              "col_letter": "L",
+              "value": "=底稿目录!F15"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 4,
+              "col_letter": "D",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 7,
+              "col_letter": "G",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 11,
+              "col_letter": "K",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券账面核对(分期付息到期一次还本)"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1.资产负债表中记录的应付债券是存在的，且已经记录在恰当的账户中；"
+        },
+        {
+          "row": 7,
+          "value": "2.所有应记录的应付债券均已记录，所有应当包括在财务报表中的相关披露均已包括；"
+        },
+        {
+          "row": 8,
+          "value": "3.应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 9,
+          "value": "二、审计过程："
+        },
+        {
+          "row": 10,
+          "value": "1、期末余额测算"
+        },
+        {
+          "row": 11,
+          "value": "序号"
+        },
+        {
+          "row": 13,
+          "value": "1"
+        },
+        {
+          "row": 14,
+          "value": "2"
+        },
+        {
+          "row": 15,
+          "value": "3"
+        },
+        {
+          "row": 16,
+          "value": "2、利息测算"
+        },
+        {
+          "row": 17,
+          "value": "序号"
+        },
+        {
+          "row": 19,
+          "value": "1"
+        },
+        {
+          "row": 20,
+          "value": "2"
+        },
+        {
+          "row": 21,
+          "value": "3"
+        },
+        {
+          "row": 22,
+          "value": "3、“利息调整”摊销分配测算"
+        },
+        {
+          "row": 23,
+          "value": "序号"
+        },
+        {
+          "row": 29,
+          "value": "序号"
+        },
+        {
+          "row": 34,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 36,
+          "value": "四、审计结论："
+        }
+      ]
+    },
+    {
+      "sheet_name": "应付债券检查表L4-9",
+      "dimensions": "31×28",
+      "max_row": 31,
+      "max_column": 28,
+      "formula_count": 13,
+      "formula_samples": [
+        {
+          "cell": "A3",
+          "formula": "=底稿目录!A2"
+        },
+        {
+          "cell": "E3",
+          "formula": "=底稿目录!A4"
+        },
+        {
+          "cell": "H3",
+          "formula": "=底稿目录!A5"
+        },
+        {
+          "cell": "P3",
+          "formula": "=底稿目录!F16"
+        },
+        {
+          "cell": "A4",
+          "formula": "=底稿目录!A3"
+        }
+      ],
+      "merged_cells_count": 12,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "致同会计师事务所"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "应付债券检查底稿"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A2"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "=底稿目录!A4"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A5"
+            },
+            {
+              "col": 15,
+              "col_letter": "O",
+              "value": "索引号："
+            },
+            {
+              "col": 16,
+              "col_letter": "P",
+              "value": "=底稿目录!F16"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "=底稿目录!A3"
+            },
+            {
+              "col": 5,
+              "col_letter": "E",
+              "value": "=底稿目录!A6"
+            },
+            {
+              "col": 8,
+              "col_letter": "H",
+              "value": "=底稿目录!A7"
+            },
+            {
+              "col": 15,
+              "col_letter": "O",
+              "value": "页次："
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "一、审计目标:"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "致同会计师事务所"
+        },
+        {
+          "row": 2,
+          "value": "应付债券检查底稿"
+        },
+        {
+          "row": 3,
+          "value": "=底稿目录!A2"
+        },
+        {
+          "row": 4,
+          "value": "=底稿目录!A3"
+        },
+        {
+          "row": 5,
+          "value": "一、审计目标:"
+        },
+        {
+          "row": 6,
+          "value": "1.资产负债表中记录的应付债券是存在的，且已经记录在恰当的账户中；     2.记录的应付债券由被审计单位拥有或控制；"
+        },
+        {
+          "row": 7,
+          "value": "3.应付债券以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述 "
+        },
+        {
+          "row": 8,
+          "value": "二、测试："
+        },
+        {
+          "row": 9,
+          "value": "测试内容说明：1.原始凭证是否齐全； 2.记账凭证与原始凭证是否相符；3.账务处理是否正确；4.是否记录于恰当的会计期间"
+        },
+        {
+          "row": 10,
+          "value": "记账凭证"
+        },
+        {
+          "row": 11,
+          "value": "日期"
+        },
+        {
+          "row": 22,
+          "value": "合计"
+        },
+        {
+          "row": 23,
+          "value": "本期发生额"
+        },
+        {
+          "row": 24,
+          "value": "检查比例"
+        },
+        {
+          "row": 25,
+          "value": "三、审计说明："
+        },
+        {
+          "row": 30,
+          "value": "四、审计结论："
+        }
+      ]
+    },
+    {
+      "sheet_name": "GT_Custom",
+      "dimensions": "8×2",
+      "max_row": 8,
+      "max_column": 2,
+      "formula_count": 0,
+      "formula_samples": [],
+      "merged_cells_count": 0,
+      "headers": [
+        {
+          "row": 1,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "C1"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "Custom 1"
+            }
+          ]
+        },
+        {
+          "row": 2,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "C2"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "Custom 2"
+            }
+          ]
+        },
+        {
+          "row": 3,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "C3"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "Custom 3"
+            }
+          ]
+        },
+        {
+          "row": 4,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "C4"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "Custom 4"
+            }
+          ]
+        },
+        {
+          "row": 5,
+          "cells": [
+            {
+              "col": 1,
+              "col_letter": "A",
+              "value": "C5"
+            },
+            {
+              "col": 2,
+              "col_letter": "B",
+              "value": "Custom 5"
+            }
+          ]
+        }
+      ],
+      "first_column_sample": [
+        {
+          "row": 1,
+          "value": "C1"
+        },
+        {
+          "row": 2,
+          "value": "C2"
+        },
+        {
+          "row": 3,
+          "value": "C3"
+        },
+        {
+          "row": 4,
+          "value": "C4"
+        },
+        {
+          "row": 5,
+          "value": "C5"
+        },
+        {
+          "row": 6,
+          "value": "C6"
+        },
+        {
+          "row": 7,
+          "value": "C7"
+        },
+        {
+          "row": 8,
+          "value": "C8"
+        }
+      ]
+    }
+  ]
+}

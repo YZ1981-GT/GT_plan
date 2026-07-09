@@ -1,0 +1,220 @@
+<template>
+  <div class="s3-ifrs9-adjust">
+    <!-- 方法论上下文 -->
+    <div class="methodology-context">
+      <div class="context-content">
+        <p>
+          首次执行新金融工具准则的调整（CAS 22/23/24）：按照新准则对金融资产和金融负债进行重新分类和计量，
+          差异调入留存收益或其他综合收益。调整差异 = 新准则账面价值 - 原准则账面价值。
+        </p>
+      </div>
+    </div>
+
+    <el-card shadow="never" class="audit-section">
+      <template #header>
+        <div class="section-header">
+          <span>首次执行新金融工具准则的调整 S3-4</span>
+          <div class="header-actions">
+            <el-button
+              v-if="!isReadonly"
+              size="small"
+              type="primary"
+              @click="handleSave"
+            >保存</el-button>
+            <el-button size="small" @click="handleReview">复核</el-button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 调整差异表（41个公式） -->
+      <el-table
+        :data="adjustmentItems"
+        border
+        stripe
+        style="width: 100%; font-size: 13px"
+        :cell-class-name="cellClassName"
+      >
+        <el-table-column type="index" label="序号" width="60" />
+        <el-table-column prop="accountItem" label="科目/项目" min-width="220" />
+        <el-table-column prop="oldStandard" label="原准则账面价值" min-width="150" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.oldStandard"
+              :precision="2"
+              :controls="false"
+              style="width: 130px"
+            />
+            <span v-else>{{ fmt(row.oldStandard) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="newStandard" label="新准则账面价值" min-width="150" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.newStandard"
+              :precision="2"
+              :controls="false"
+              style="width: 130px"
+            />
+            <span v-else>{{ fmt(row.newStandard) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="调整差异" min-width="140" align="right">
+          <template #default="{ row, $index }">
+            <span class="formula-cell" title="差异 = 新准则账面 - 原准则账面">
+              {{ fmt(diffs[$index]) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="非经常性损益" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.isNonRecurring" type="warning" size="small">非经常性</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <!-- 合计行 -->
+      <div class="total-row">
+        <span>调整差异合计：</span>
+        <span class="formula-cell total-amount" title="合计 = SUM(各项差异)">
+          {{ fmt(totalDiff) }}
+        </span>
+      </div>
+    </el-card>
+
+    <!-- 编制提示 -->
+    <details class="edit-hints">
+      <summary>编制提示</summary>
+      <p>S3-4 记录首次执行新金融工具准则（CAS 22/23/24）的调整差异。</p>
+      <p>公式：调整差异 = 新准则账面价值 - 原准则账面价值（公式列不可手工覆盖）。</p>
+      <p>源模板含 41 个公式，均为 G{r} = F{r} - D{r} 结构。</p>
+    </details>
+  </div>
+</template>
+
+<script setup lang="ts">
+/**
+ * GtS3Ifrs9Adjust.vue — S3-4 首次执行新金融工具准则的调整
+ *
+ * 功能：
+ * - 调整差异 = 新准则账面 - 原准则账面（41个公式）
+ * - 使用 calcAdjustmentDiff 纯函数
+ * - 非经常性损益标注
+ * - 公式列只读不可覆盖
+ */
+import { ref, computed, inject } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
+import { calcAdjustmentDiff } from '../composables/useS3AdjustmentEngine'
+
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  isReadonly: boolean
+}>()
+
+const openReviewDialog = inject<(sectionId: string, label?: string) => void>('openReviewDialog')
+
+function fmt(val: number | null | undefined): string {
+  return fmtAmount(val, 2)
+}
+
+interface AdjustmentItem {
+  accountItem: string
+  oldStandard: number
+  newStandard: number
+  isNonRecurring: boolean
+}
+
+const adjustmentItems = ref<AdjustmentItem[]>([
+  { accountItem: '以公允价值计量且其变动计入当期损益的金融资产', oldStandard: 0, newStandard: 0, isNonRecurring: false },
+  { accountItem: '以公允价值计量且其变动计入其他综合收益的金融资产', oldStandard: 0, newStandard: 0, isNonRecurring: false },
+  { accountItem: '以摊余成本计量的金融资产', oldStandard: 0, newStandard: 0, isNonRecurring: false },
+  { accountItem: '以公允价值计量且其变动计入当期损益的金融负债', oldStandard: 0, newStandard: 0, isNonRecurring: false },
+  { accountItem: '以摊余成本计量的金融负债', oldStandard: 0, newStandard: 0, isNonRecurring: false },
+  { accountItem: '信用减值损失准备', oldStandard: 0, newStandard: 0, isNonRecurring: true },
+])
+
+// 使用公式引擎计算差异
+const diffs = computed(() => {
+  const input = { items: adjustmentItems.value.map(i => ({ oldStandard: i.oldStandard, newStandard: i.newStandard })) }
+  return calcAdjustmentDiff(input).diffs
+})
+
+const totalDiff = computed(() => {
+  const input = { items: adjustmentItems.value.map(i => ({ oldStandard: i.oldStandard, newStandard: i.newStandard })) }
+  return calcAdjustmentDiff(input).totalDiff
+})
+
+function cellClassName({ column }: any): string {
+  if (column?.label === '调整差异') return 'formula-col'
+  return ''
+}
+
+function handleSave() {
+  // TODO: 保存调整数据
+}
+
+function handleReview() {
+  openReviewDialog?.('s3-ifrs9-adjust', '首次执行新金融工具准则的调整 S3-4')
+}
+</script>
+
+<style scoped>
+.s3-ifrs9-adjust {
+  padding: 12px;
+}
+.methodology-context {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border-left: 3px solid #e6a23c;
+  background-color: #fdf6ec;
+  border-radius: 4px;
+}
+.methodology-context .context-content p {
+  margin: 0;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+.formula-cell {
+  border-bottom: 1px dashed #909399;
+  cursor: help;
+}
+:deep(.formula-col) {
+  background-color: #fafafa;
+}
+.total-row {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.total-amount {
+  font-size: 15px;
+  color: #303133;
+}
+.edit-hints {
+  margin-top: 16px;
+  font-size: 12px;
+  color: #909399;
+}
+.edit-hints summary {
+  cursor: pointer;
+  user-select: none;
+}
+</style>

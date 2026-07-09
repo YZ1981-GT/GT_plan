@@ -288,6 +288,58 @@ describe('GtIndexChip — 点击跳转', () => {
   })
 })
 
+describe('GtIndexChip — 灰态兜底（Req 10.3）', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('引用底稿不存在时显示灰态 chip（info 类型 + disabled class）', async () => {
+    mockApiGet.mockResolvedValue({ exists: false })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'S4-1', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    const tag = wrapper.find('.el-tag-stub')
+    expect(tag.exists()).toBe(true)
+    expect(tag.attributes('data-type')).toBe('info')
+    expect(tag.classes()).toContain('gt-index-chip--disabled')
+  })
+
+  it('灰态 chip 的 tooltip 显示"底稿不存在"', async () => {
+    mockApiGet.mockResolvedValue({ exists: false })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'B10', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    const tooltip = wrapper.find('.el-tooltip-stub')
+    expect(tooltip.attributes('data-content')).toBe('底稿不存在')
+  })
+
+  it('灰态 chip 点击不触发导航', async () => {
+    mockApiGet.mockResolvedValue({ exists: false })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'S17', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    await wrapper.find('.el-tag-stub').trigger('click')
+    expect(mockPush).not.toHaveBeenCalled()
+    expect(wrapper.emitted('click')).toBeFalsy()
+  })
+
+  it('灰态 chip 仍渲染文本值（value 可读）', async () => {
+    mockApiGet.mockResolvedValue({ exists: false })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'S14-1', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    expect(wrapper.text()).toContain('S14-1')
+  })
+})
+
 describe('GtIndexChip — 边缘 case', () => {
   beforeEach(() => {
     vi.clearAllMocks()

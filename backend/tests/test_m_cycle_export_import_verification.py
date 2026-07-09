@@ -145,19 +145,21 @@ class TestP0Registration:
         type_counts: dict[str, int] = {}
         for ct in m_codes.values():
             type_counts[ct] = type_counts.get(ct, 0) + 1
-        # 10 c-note-table (M1~M10 parent)
-        assert type_counts.get("c-note-table", 0) == 10
+        # 9 c-note-table (M2~M10 parent; M1 parent → m1-dividends-payable)
+        assert type_counts.get("c-note-table", 0) == 9
         # 10 a-program-console (M1A~M10A)
         assert type_counts.get("a-program-console", 0) == 10
-        # d-form-table: 审定表 + 调整分录 + 结构化检查
-        assert type_counts.get("d-form-table", 0) >= 25
-        # audit-sheet: 明细/变动/勾稽/损益联动
-        assert type_counts.get("audit-sheet", 0) >= 14
+        # d-form-table: 审定表 + 调整分录 + 结构化检查（M1-1/M1-3/M1-4 已升级专属）
+        assert type_counts.get("d-form-table", 0) >= 22
+        # audit-sheet: 明细/变动/勾稽/损益联动（M1-2 已升级专属）
+        assert type_counts.get("audit-sheet", 0) >= 13
+        # m1-dividends-payable 专属组件（M1/M1-1~M1-6）
+        assert type_counts.get("m1-dividends-payable", 0) >= 4
 
-    @pytest.mark.parametrize("wp_code", ["M1-1", "M2-1", "M3-1", "M4-1", "M5-1",
-                                          "M6-1", "M7-1", "M8-1", "M9-1", "M10-1"])
+    @pytest.mark.parametrize("wp_code", ["M2-1", "M3-1", "M4-1", "M5-1",
+                                          "M7-1", "M8-1", "M9-1", "M10-1"])
     def test_audit_determination_tables_are_d_form(self, wp_code):
-        """M{n}-1 审定表映射为 d-form-table。"""
+        """M{n}-1 审定表映射为 d-form-table（M1-1/M6-1 已升级为专属组件）。"""
         assert _WP_CODE_OVERRIDE.get(wp_code) == "d-form-table"
 
     def test_m8_applicable_when(self, m_class_entries):
@@ -352,13 +354,13 @@ class TestP3AddressRegistry:
 class TestP4SpecialProcedures:
     """P4: 特殊程序验证。"""
 
-    def test_m6_2_is_audit_sheet(self):
-        """M6-2 勾稽表映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("M6-2") == "audit-sheet"
+    def test_m6_2_is_m6_retained_earnings(self):
+        """M6-2 明细表映射为 m6-retained-earnings（专属组件）。"""
+        assert _WP_CODE_OVERRIDE.get("M6-2") == "m6-retained-earnings"
 
-    def test_m6_5_is_audit_sheet(self):
-        """M6-5 损益联动验证映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("M6-5") == "audit-sheet"
+    def test_m6_5_is_m6_retained_earnings(self):
+        """M6-5 损益联动验证映射为 m6-retained-earnings（专属组件）。"""
+        assert _WP_CODE_OVERRIDE.get("M6-5") == "m6-retained-earnings"
 
     def test_m2_3_is_d_form_table(self):
         """M2-3 验资报告核实映射为 d-form-table。"""
@@ -466,12 +468,12 @@ class TestP6ExportImport:
     """P6: 导入导出基础设施验证。"""
 
     _M_FORM_TABLE_CODES = [
-        "M1-1", "M1-3", "M1-4",
+        # M1-1, M1-3, M1-4 → m1-dividends-payable（专属组件）
+        # M6-1, M6-3, M6-4, M6-6 → m6-retained-earnings（专属组件）
         "M2-1", "M2-3", "M2-4", "M2-5", "M2-6",
         "M3-1", "M3-3", "M3-4",
         "M4-1", "M4-4", "M4-5", "M4-6",
         "M5-1", "M5-3", "M5-4",
-        "M6-1", "M6-3", "M6-4", "M6-6",
         "M7-1", "M7-3", "M7-4",
         "M8-1", "M8-3", "M8-4",
         "M9-1", "M9-3", "M9-6",
@@ -479,12 +481,12 @@ class TestP6ExportImport:
     ]
 
     _AUDIT_SHEET_CODES = [
-        "M1-2",
+        # M1-2 → m1-dividends-payable（专属组件）
+        # M6-2, M6-5 → m6-retained-earnings（专属组件）
         "M2-2",
         "M3-2",
         "M4-2", "M4-3",
         "M5-2",
-        "M6-2", "M6-5",
         "M7-2",
         "M8-2",
         "M9-2", "M9-4", "M9-5",
@@ -503,10 +505,28 @@ class TestP6ExportImport:
         assert wp_code in _WP_CODE_OVERRIDE
         assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet"
 
+    # M1 专属组件 m1-dividends-payable
+    _M1_SPECIALIST_CODES = ["M1-1", "M1-2", "M1-3", "M1-4"]
+
+    @pytest.mark.parametrize("wp_code", _M1_SPECIALIST_CODES)
+    def test_m1_specialist_registered(self, wp_code):
+        """M1 应付股利底稿映射为 m1-dividends-payable 专属组件。"""
+        assert wp_code in _WP_CODE_OVERRIDE
+        assert _WP_CODE_OVERRIDE[wp_code] == "m1-dividends-payable"
+
+    # M6 专属组件 m6-retained-earnings
+    _M6_SPECIALIST_CODES = ["M6-1", "M6-2", "M6-3", "M6-4", "M6-5", "M6-6"]
+
+    @pytest.mark.parametrize("wp_code", _M6_SPECIALIST_CODES)
+    def test_m6_specialist_registered(self, wp_code):
+        """M6 未分配利润底稿映射为 m6-retained-earnings 专属组件。"""
+        assert wp_code in _WP_CODE_OVERRIDE
+        assert _WP_CODE_OVERRIDE[wp_code] == "m6-retained-earnings"
+
     def test_all_m_codes_in_mapping(self, m_class_entries):
         """所有 M 类 wp_code 在 wp_account_mapping 注册（批量导出可枚举）。"""
         mapping_codes = {e["wp_code"] for e in m_class_entries}
-        all_codes = set(self._M_FORM_TABLE_CODES + self._AUDIT_SHEET_CODES)
+        all_codes = set(self._M_FORM_TABLE_CODES + self._AUDIT_SHEET_CODES + self._M1_SPECIALIST_CODES + self._M6_SPECIALIST_CODES)
         missing = all_codes - mapping_codes
         assert not missing, f"M 类缺少: {sorted(missing)}"
 
@@ -540,5 +560,6 @@ class TestP6ExportImport:
         type_counts: dict[str, int] = {}
         for ct in m_codes.values():
             type_counts[ct] = type_counts.get(ct, 0) + 1
-        assert type_counts.get("d-form-table", 0) >= 25
-        assert type_counts.get("audit-sheet", 0) >= 14
+        assert type_counts.get("d-form-table", 0) >= 22
+        assert type_counts.get("audit-sheet", 0) >= 13
+        assert type_counts.get("m1-dividends-payable", 0) >= 4

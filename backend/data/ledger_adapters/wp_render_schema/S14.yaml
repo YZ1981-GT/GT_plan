@@ -1,0 +1,55 @@
+# S14 会计估计和相关披露 — 专属渲染 schema
+# component_type: s14-accounting-estimate
+# Template: S14 会计估计和相关披露.xlsx
+# 整册统一路由到 GtS14AccountingEstimate，前端按 sheetName v-if 分发
+
+wp_code: S14
+wp_name: 会计估计和相关披露
+component_type: s14-accounting-estimate
+template_path: backend/wp_templates/S/S14 会计估计和相关披露.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+
+# 整册专属组件：前端按 sheetName v-if 分发
+whole_workbook_dedicated: true
+
+sheets:
+  - sheet_name: S14程序表
+    internal_type: sheet-program
+    description: 会计估计审计程序表
+    has_formulas: false
+    formula_count: 0
+
+  - sheet_name: S14-1了解被审计单位及其环境（会计估计相关）
+    internal_type: sheet-understanding
+    description: 了解被审计单位及其环境中与会计估计相关的部分
+    has_formulas: false
+    formula_count: 0
+
+  - sheet_name: S14-2了解与会计估计相关的控制
+    internal_type: sheet-control
+    description: 了解与会计估计相关的内部控制
+    has_formulas: false
+    formula_count: 0
+
+  - sheet_name: S14-3应对评估的重大错报风险（会计估计相关）
+    internal_type: sheet-risk-response
+    description: 应对重大错报风险的进一步审计程序
+    has_formulas: false
+    formula_count: 0
+
+  - sheet_name: S14-4管理层偏向的迹象
+    internal_type: sheet-bias-indication
+    description: 评价管理层偏向的迹象
+    has_formulas: false
+    formula_count: 0
+
+# 适用准则
+applicable_standard: CAS 13 / ISA 540
+
+# 风险评估层级
+risk_assessment:
+  inherent_risk: true
+  control_risk: true
+  detection_risk: true
+  bias_detection: true

@@ -1,0 +1,84 @@
+# backend/data/wp_render_schema/M3-1.yaml
+# 库存股审定表 — m3-treasury-stock 渲染 schema
+# Requirements: §2（M3-1 审定表，权益备抵类借方科目！）
+# Design: §3 审定表（按回购批次分类+小计）
+# Template: M3 库存股.xlsx
+
+wp_code: M3-1
+wp_name: 库存股审定表
+component_type: m3-treasury-stock
+template_path: backend/wp_templates/M/M3 库存股.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '4002'
+    name: 库存股
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Sheet 映射（前端 sheetName v-if 分发）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+sheets:
+  底稿目录:
+    tab_component: M3TabIndex
+    description: 底稿目录与导航
+  库存股实质性程序表M3A:
+    tab_component: GtAProgramConsole
+    description: 实质性程序表（复用通用组件）
+  审定表M3-1:
+    tab_component: M3TabAdjudication
+    description: 库存股审定表（权益备抵借方！期末=期初+借-贷）
+  附注披露信息（上市公司）:
+    tab_component: M3TabDisclosureListed
+    description: 上市公司库存股附注披露
+  明细表M3-2:
+    tab_component: M3TabDetail
+    description: 库存股明细表（按回购批次列示，19列3区段Tab）
+  调整分录汇总M3-3:
+    tab_component: M3TabAdjustment
+    description: 调整分录汇总（借贷平衡校验）
+  外币投资汇率测算表M3-4:
+    tab_component: M3TabFxInvest
+    description: 外币回购汇率折算
+  库存股检查表M3-5:
+    tab_component: M3TabTreasuryCheck
+    description: 回购/注销核对（核对清单+审计结论）
+  参考－会计规定:
+    tab_component: skip
+    description: 会计规定辅助（OnlyOffice fallback或跳过）
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 公式方向元数据（权益备抵类铁律！）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+formula_direction:
+  account_code: '4002'
+  account_name: 库存股
+  direction: debit  # 借方/权益备抵类！
+  end_balance_formula: begin + debit - credit  # 期末=期初+借方-贷方
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  match_pattern: "^M3-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+cross_refs:
+  - ref_id: CW-M3-1-001
+    target_wp: M3-2
+    target_field: 合计
+    description: '审定表 → M3-2 明细合计交叉验证'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-M3-1-002
+    target_wp: M3-5
+    target_field: 回购核对
+    description: '审定表 → M3-5 回购/注销核对'
+    severity: recommended
+    direction: outbound

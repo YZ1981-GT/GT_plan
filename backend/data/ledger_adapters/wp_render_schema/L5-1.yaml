@@ -1,0 +1,103 @@
+# backend/data/ledger_adapters/wp_render_schema/L5-1.yaml
+# 长期应付款审定表 — 专属组件渲染 schema
+# Requirements: §1.6（L5 长期应付款）
+# Design: §2 审定表负债类双区块 + 未确认融资费用备抵 + 净额
+# Template: L5 长期应付款.xlsx
+#
+# 特殊结构：双区块（一、长期应付款贷方/负债 → 二、未确认融资费用借方/备抵 → 净额合计）
+# 核心公式：负债类期末=期初+贷方-借方；备抵类期末=期初+借方-贷方；净额=应付款-未确认
+
+wp_code: L5-1
+wp_name: 长期应付款审定表
+component_type: l5-long-term-payables
+template_path: backend/wp_templates/L/L5 长期应付款.xlsx
+template_version: v2025-R5
+applicable_standards: [soe_standalone, listed_standalone, soe_consolidated, listed_consolidated]
+related_accounts:
+  - code: '2701'
+    name: 长期应付款
+  - code: '2702'
+    name: 未确认融资费用
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 审定表 — 双区块结构
+# 区块一：长期应付款（贷方/负债类）按款项类型分行
+# 区块二：未确认融资费用（借方/备抵类）按款项对应分行
+# 净额合计：长期应付款 - 未确认融资费用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+income_statement_type: false
+amount_source: closing_balance
+
+dynamic_rows: true
+row_template:
+  group_key: payable_item
+  row_type: payable_row
+  fields: &payable_fields
+    - { field: item_name, label: 款项名称, type: text }
+    - { field: creditor, label: 债权人, type: text }
+    - { field: begin_balance, label: 期初余额, type: number }
+    - { field: credit_amount, label: 贷方发生额, type: number }
+    - { field: debit_amount, label: 借方发生额, type: number }
+    - { field: end_balance, label: 期末余额, type: number, formula: "begin_balance + credit_amount - debit_amount" }
+    - { field: unadjusted_amount, label: 未审金额, type: number, auto_source: trial_balance.unadjusted_amount }
+    - { field: aje_amount, label: 审计调整, type: number }
+    - { field: rje_amount, label: 重分类调整, type: number }
+    - { field: audited_amount, label: 审定金额, type: number, formula: "unadjusted_amount + aje_amount + rje_amount" }
+    - { field: prior_year_audited, label: 上年审定金额, type: number, auto_source: trial_balance.prior_audited }
+    - { field: variance_amount, label: 变动金额, type: number, formula: "audited_amount - prior_year_audited" }
+    - { field: variance_pct, label: 变动比例, type: percent, formula: "variance_amount / prior_year_audited" }
+    - { field: variance_note, label: 差异说明, type: textarea }
+
+sections:
+  - name: 长期应付款合计
+    row_type: total
+    formula_source: "SUM(all payable_item rows)"
+    fields: *payable_fields
+
+  - name: 未确认融资费用
+    row_type: contra_liability
+    direction: debit
+    formula_note: "期末=期初+借方-贷方（备抵类）"
+
+  - name: 长期应付款净额
+    row_type: net_total
+    formula_note: "净额=长期应付款合计-未确认融资费用"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 联动配置
+# ═══════════════════════════════════════════════════════════════════════════════
+
+writeback:
+  target: trial_balance.audited_amount
+  trigger: WORKPAPER_SAVED
+  handler: _on_d_audit_determination_saved
+  match_pattern: "^[D-N]\\d+-1$"
+  key_field: account_code
+  value_field: audited_amount
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 跨底稿引用
+# ═══════════════════════════════════════════════════════════════════════════════
+
+cross_refs:
+  - ref_id: CW-L5-1-001
+    target_wp: L5-4
+    target_field: 调整分录汇总
+    description: '审定表调整金额 → L5-4 调整分录汇总'
+    severity: required
+    direction: outbound
+
+  - ref_id: CW-L5-1-002
+    target_wp: L5-5
+    target_field: 摊销测算表
+    description: '未确认融资费用 ← L5-5 摊销测算表期末余额验证'
+    severity: required
+    direction: inbound
+
+  - ref_id: CW-L5-1-003
+    target_wp: L8
+    target_field: 财务费用利息支出
+    description: '未确认融资费用本期摊销 → L8 财务费用（利息支出）'
+    severity: info
+    direction: outbound
