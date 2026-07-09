@@ -32,86 +32,86 @@ H7生产性生物资产底稿专属组件`h7-biological-assets`。行业特殊+�
   - 创建 GtH7BiologicalAssets.vue 骨架（sheetName v-if + measurementModel + 行业守卫 + selfLoad）
   - _Requirements: 1.1-1.9, 1.11, 1.13_
 
-- [ ] 1.2 编写注册契约测试
+- [x] 1.2 编写注册契约测试
   - htmlRendererRegistry / VALID_COMPONENT_TYPES / wp_code_overrides / RENDERER_DISPATCH
   - _Requirements: 1.6, 1.7, 1.8_
 
-- [ ] 1.3 创建 useH7IndustryGuard.ts + useH7MeasurementModel.ts
+- [x] 1.3 创建 useH7IndustryGuard.ts + useH7MeasurementModel.ts
   - 行业守卫：check industry IN ['agriculture','forestry','livestock','fishery']
   - 计量模式：el-segmented + 4对sheet显隐 + 数据独立存储
   - _Requirements: 1.11-1.14, 13.1-13.3, 14.1-14.4_
 
 ### Phase 2: 公式引擎+PBT
 
-- [ ] 2.1 创建 `useH7FormulaEngine.ts`
+- [x] 2.1 创建 `useH7FormulaEngine.ts`
   - calcAuditedAmount / calcAssetEndBalance / calcContraEndBalance / calcFairEndBalance
   - calcNetValue / calcSubtotal / calcChangeRate / calcPriceDiffRate / calcFairValueDiffRate
   - _Requirements: 2.3-2.5, 8.2, 10.3_
 
-- [ ] 2.2 创建 `useH7DepreciationEngine.ts`
+- [x] 2.2 创建 `useH7DepreciationEngine.ts`
   - calcStraightLine / calcMonthlyDep / calcDepAfterImpairment / calcAccDep
   - _Requirements: 11.1-11.4_
 
-- [ ] 2.3 创建 `useH7TransferEngine.ts`
+- [x] 2.3 创建 `useH7TransferEngine.ts`
   - calcProdToConsumable / calcProdToPublic / calcTransferDiff
   - _Requirements: 8.4-8.5_
 
-- [ ]* 2.4 编写 Property P1 PBT：审定数公式链
+- [x]* 2.4 编写 Property P1 PBT：审定数公式链
   - 生成器：fc.float({min:-1e9, max:1e9}) × 3
   - 断言：calcAuditedAmount(u, a, r) === u + a + r
   - **Feature: h7-biological-assets, Property P1: 审定数公式链**
 
-- [ ]* 2.5 编写 Property P2 PBT：资产类期末余额
+- [x]* 2.5 编写 Property P2 PBT：资产类期末余额
   - 生成器：fc.float({min:0, max:1e9}) × 3
   - 断言：calcAssetEndBalance(b, d, c) === b + d - c
   - **Feature: h7-biological-assets, Property P2: 资产类期末余额**
 
-- [ ]* 2.6 编写 Property P3 PBT：备抵类期末余额
+- [x]* 2.6 编写 Property P3 PBT：备抵类期末余额
   - 生成器：fc.float({min:0, max:1e9}) × 3
   - 断言：calcContraEndBalance(b, d, c) === b + c - d
   - **Feature: h7-biological-assets, Property P3: 备抵类期末余额**
 
-- [ ]* 2.7 编写 Property P4 PBT：公允价值模式期末
+- [x]* 2.7 编写 Property P4 PBT：公允价值模式期末
   - 生成器：fc.float({min:-1e9, max:1e9}) × 4
   - 断言：calcFairEndBalance(b, i, d, fc) === b + i - d + fc
   - **Feature: h7-biological-assets, Property P4: 公允模式期末**
 
-- [ ]* 2.8 编写 Property P5 PBT：直线法折旧
+- [x]* 2.8 编写 Property P5 PBT：直线法折旧
   - 生成器：cost>0, salvageRate∈[0,1), usefulLife>0
   - 断言：calcStraightLine(cost, rate, life) === cost×(1-rate)/life
   - **Feature: h7-biological-assets, Property P5: 直线法折旧**
 
-- [ ]* 2.9 编写 Property P6 PBT：月折旧
+- [x]* 2.9 编写 Property P6 PBT：月折旧
   - 生成器：fc.float({min:0, max:1e8})
   - 断言：calcMonthlyDep(annual) === annual / 12
   - **Feature: h7-biological-assets, Property P6: 月折旧**
 
-- [ ]* 2.10 编写 Property P7 PBT：互转差额
+- [x]* 2.10 编写 Property P7 PBT：互转差额
   - 生成器：fc.float({min:0, max:1e9}) × 2
   - 断言：calcTransferDiff(out, in) === out - in
   - **Feature: h7-biological-assets, Property P7: 互转差额**
 
-- [ ]* 2.11 编写 Property P8 PBT：合计行恒等
+- [x]* 2.11 编写 Property P8 PBT：合计行恒等
   - 生成器：fc.array(fc.float, {minLength:1, maxLength:50})
   - 断言：calcSubtotal(arr) === Σarr
   - **Feature: h7-biological-assets, Property P8: 合计行恒等**
 
-- [ ]* 2.12 编写 Property P9 PBT：净值公式
+- [x]* 2.12 编写 Property P9 PBT：净值公式
   - 生成器：fc.float({min:0, max:1e9}) × 3
   - 断言：calcNetValue(c, d, i) === c - d - i
   - **Feature: h7-biological-assets, Property P9: 净值公式**
 
-- [ ]* 2.13 编写 Property P10 PBT：变动率
+- [x]* 2.13 编写 Property P10 PBT：变动率
   - 生成器：current≥0, prior>0
   - 断言：calcChangeRate(c, p) === (c-p)/p × 100
   - **Feature: h7-biological-assets, Property P10: 变动率公式**
 
-- [ ]* 2.14 编写 Property P11 PBT：公允价值差异率
+- [x]* 2.14 编写 Property P11 PBT：公允价值差异率
   - 生成器：assessed>0, book>0
   - 断言：calcFairValueDiffRate(a, b) === (a-b)/b × 100
   - **Feature: h7-biological-assets, Property P11: 公允价值差异率**
 
-- [ ]* 2.15 编写 Property P12 PBT：减值后折旧
+- [x]* 2.15 编写 Property P12 PBT：减值后折旧
   - 生成器：netValue>0, salvageRate∈[0,1), remainLife>0
   - 断言：calcDepAfterImpairment(nv, rate, life) === nv×(1-rate)/life
   - **Feature: h7-biological-assets, Property P12: 减值后折旧**
