@@ -118,19 +118,19 @@ H7生产性生物资产底稿专属组件`h7-biological-assets`。行业特殊+�
 
 ### Phase 3: Composable层
 
-- [ ] 3.1 创建 useH7FormData.ts
+- [x] 3.1 创建 useH7FormData.ts
   - selfLoad + checklist_responses + writebackTB(1621+累计折旧)
   - _Requirements: 1.9, 1.10, 2.7_
 
-- [ ] 3.2 创建 useH7CrossSheet.ts
+- [x] 3.2 创建 useH7CrossSheet.ts
   - adjudicationVsDetail / depreciationVsAdjudication / transferDiffCheck
   - _Requirements: 2.6, 7.6_
 
-- [ ] 3.3 创建 useH7DualMode.ts + useH7ImportExport.ts
+- [x] 3.3 创建 useH7DualMode.ts + useH7ImportExport.ts
   - 双模式切换 + 导入导出三级
   - _Requirements: 3.4_
 
-- [ ] 3.4 创建 sheet-specific composables（16个）
+- [x] 3.4 创建 sheet-specific composables（16个）
   - useH7AdjudicationCost / useH7AdjudicationFair / useH7DetailCost / useH7DetailFair
   - useH7Adjustment / useH7PolicyCheck / useH7Analysis
   - useH7AdditionCheck / useH7DisposalCheck / useH7Stocktake
@@ -140,91 +140,91 @@ H7生产性生物资产底稿专属组件`h7-biological-assets`。行业特殊+�
 
 ### Phase 4: Vue子组件
 
-- [ ] 4.1 创建 H7TabIndex.vue 底稿目录
+- [x] 4.1 创建 H7TabIndex.vue 底稿目录
   - 26行sheet列表+进度条+行业标识+计量模式指示
   - _Requirements: 1.2_
 
-- [ ] 4.2 创建 H7TabAdjudicationCost/Fair.vue 审定表（双版本）
+- [x] 4.2 创建 H7TabAdjudicationCost/Fair.vue 审定表（双版本）
   - 成本51公式双区块 / 公允51公式单区块 + TB回写
   - _Requirements: 2.1-2.8_
 
-- [ ] 4.3 创建 H7TabDetailCost/Fair.vue 明细表（双版本）
+- [x] 4.3 创建 H7TabDetailCost/Fair.vue 明细表（双版本）
   - 成本51列3区段 / 公允47列3区段 + 动态行 + 导入导出
   - _Requirements: 3.1-3.4_
 
-- [ ] 4.4 创建 H7TabAdjustment.vue + H7TabPolicyCheck.vue + H7TabAnalysis.vue
+- [x] 4.4 创建 H7TabAdjustment.vue + H7TabPolicyCheck.vue + H7TabAnalysis.vue
   - 调整10列 + CAS5政策段落 + 分析OO
   - _Requirements: 4.1-4.4_
 
-- [ ] 4.5 创建 H7TabAdditionCost/Fair.vue + H7TabDisposalCost/Fair.vue（4个）
+- [x] 4.5 创建 H7TabAdditionCost/Fair.vue + H7TabDisposalCost/Fair.vue（4个）
   - 增加22/21列 + 减少24/25列 + 抽凭 + OCR
   - _Requirements: 5.1-5.5_
 
-- [ ] 4.6 创建 H7TabStocktakePlan/Check/Summary.vue 监盘三阶段
+- [x] 4.6 创建 H7TabStocktakePlan/Check/Summary.vue 监盘三阶段
   - 计划15列 + 检查17列 + 小结叙述式 + 数据流联动
   - _Requirements: 6.1-6.4_
 
-- [ ] 4.7 创建 H7TabDepreciationNoImpair/WithImpair.vue + H7TabDepreciationAlloc.vue
+- [x] 4.7 创建 H7TabDepreciationNoImpair/WithImpair.vue + H7TabDepreciationAlloc.vue
   - 折旧分支选择器 + OO渲染 + 分配11公式 + 仅成本模式
   - _Requirements: 7.1-7.6_
 
-- [ ] 4.8 创建 H7TabFairValueReview.vue
+- [x] 4.8 创建 H7TabFairValueReview.vue
   - 公允价值复核13列 + 差异率计算 + 公允模式核心
   - _Requirements: 8.1-8.2_
 
-- [ ] 4.9 创建 H7TabTransferReview.vue + H7TabProductionRecord.vue
+- [x] 4.9 创建 H7TabTransferReview.vue + H7TabProductionRecord.vue
   - 互转审核21列三方向 + 产量记录（H7独有）
   - _Requirements: 8.3-8.5, 9.1-9.5_
 
-- [ ] 4.10 创建 H7TabImpairment.vue + H7TabRecoverable.vue
+- [x] 4.10 创建 H7TabImpairment.vue + H7TabRecoverable.vue
   - 减值OO + DCF OO（仅成本模式）
   - _Requirements: 10.1-10.2_
 
-- [ ] 4.11 创建 H7TabRelatedParty.vue
+- [x] 4.11 创建 H7TabRelatedParty.vue
   - 15列+价差率+动态行+统计摘要
   - _Requirements: 10.3-10.4_
 
-- [ ] 4.12 创建 H7TabDisclosureListed/Soe.vue
+- [x] 4.12 创建 H7TabDisclosureListed/Soe.vue
   - 附注嵌套表
   - _Requirements: 1.2_
 
 ### Phase 5: 后端
 
-- [ ] 5.1 创建 h7_biological_assets_renderer.py
+- [x] 5.1 创建 h7_biological_assets_renderer.py
   - RENDERER_DISPATCH + 行业校验
   - _Requirements: 1.6, 13.3_
 
-- [ ] 5.2 创建 h7_biological_assets.py 路由（4端点）
+- [x] 5.2 创建 h7_biological_assets.py 路由（4端点）
   - /h7/export-template | /h7/export-data | /h7/import-data | /h7/industry-check
   - _Requirements: 3.4, 13.3_
 
-- [ ] 5.3 创建 h7_biological_assets_service.py
+- [x] 5.3 创建 h7_biological_assets_service.py
   - 业务逻辑+行业判断+折旧验证+互转验证
   - _Requirements: 11.1-11.4, 13.1-13.3_
 
 ### Phase 6: 集成
 
-- [ ] 6.1 EventBus集成
+- [x] 6.1 EventBus集成
   - publish 'substantive:adjudicated'（H7-1→附注）
   - publish 'adjustment:created'（H7-3→A13）
   - publish depletion allocation（H7-12→D5）
   - _Requirements: 12.1-12.4_
 
-- [ ] 6.2 跨底稿联动
+- [x] 6.2 跨底稿联动
   - H7折旧分配→D5 + H7审定→TB回写 + H7处置→H10
   - _Requirements: 12.1-12.4_
 
 ### Phase 7: 测试
 
-- [ ] 7.1 单元测试：useH7FormulaEngine + useH7DepreciationEngine + useH7TransferEngine
+- [x] 7.1 单元测试：useH7FormulaEngine + useH7DepreciationEngine + useH7TransferEngine
   - 边界：零值/大数/NaN/公允模式切换
   - _Requirements: P1-P12_
 
-- [ ] 7.2 集成测试：双计量模式+行业守卫+跨sheet
+- [x] 7.2 集成测试：双计量模式+行业守卫+跨sheet
   - 模式切换数据隔离 / 行业拦截 / 审定↔明细一致
   - _Requirements: 2.6, 13.1-13.3, 14.1-14.4_
 
-- [ ] 7.3 Playwright E2E
+- [x] 7.3 Playwright E2E
   - 完整流程：行业选择→打开H7→切换模式→审定→折旧→监盘→产量→保存
   - _Requirements: 全部_
 

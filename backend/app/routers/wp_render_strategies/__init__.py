@@ -76,6 +76,7 @@ from ._g13_fair_value_changes import render as render_g13_fair_value_changes
 from ._g14_credit_impairment_loss import render as render_g14_credit_impairment_loss
 from ._h1_fixed_assets import render as render_h1_fixed_assets
 from ._h5_oil_gas_assets import render as render_h5_oil_gas_assets
+from ._h7_biological_assets import render as render_h7_biological_assets
 from ._h2_construction_in_progress import render as render_h2_construction_in_progress
 from ._h3_investment_property import render as render_h3_investment_property
 from ._h4_engineering_materials import render as render_h4_engineering_materials
@@ -225,6 +226,7 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "g14-credit-impairment-loss": render_g14_credit_impairment_loss,
     "h1-fixed-assets": render_h1_fixed_assets,
     "h5-oil-gas-assets": render_h5_oil_gas_assets,
+    "h7-biological-assets": render_h7_biological_assets,
     "h2-construction-in-progress": render_h2_construction_in_progress,
     "h3-investment-property": render_h3_investment_property,
     "h4-engineering-materials": render_h4_engineering_materials,
