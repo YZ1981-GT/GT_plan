@@ -645,7 +645,16 @@ class LinkageGraphBuilder:
         )
 
     def _parse_uri_parts(self, uri: str) -> tuple[str, str]:
-        """从 URI 解析 module 和 code。"""
+        """从 URI 或 addr_id 解析 module 和 code。
+
+        支持两种格式：
+        - 旧格式: 'WP:D2:明细表D2-2:E100' → ('WP', 'D2')
+        - addr_id: 'D2/D2-2/E100' → ('WP', 'D2')
+        """
+        if "/" in uri and ":" not in uri:
+            # addr_id 格式: D2/D2-2/E100 → module=WP, code=D2
+            parts = uri.split("/")
+            return "WP", parts[0] if parts else ""
         parts = uri.split(":", 2)
         module = parts[0] if len(parts) > 0 else ""
         code = parts[1] if len(parts) > 1 else ""

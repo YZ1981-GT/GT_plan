@@ -4,6 +4,11 @@
 支持乐观锁冲突检测（X-File-Opened-At vs updated_at）、单事务一致性、
 跨模块路由写入（workpaper / report / note / adj / tb）。
 
+ACNR 集成 (M2, R15.1, R15.2, R15.4):
+  - 写回时通过 ACNR resolve 获取 canonical addr_id
+  - 返回结果附带 addr_id + column_metadata（chip 可下钻到格）
+  - resolve 携带 project context（project_id）保证 wp_id 正确解析
+
 Algorithm (design.md 6.2):
   1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id FOR UPDATE
   2. IF opened_at < updated_at → raise WritebackConflict(updated_at, last_editor)
@@ -15,6 +20,7 @@ Algorithm (design.md 6.2):
   8. emit event_bus('cross-ref:updated', {wp_code, sheet, cell_ref, new_value})
   9. audit_logger.log_action('custom_query.cell_writeback', ...)  # 不节流
   10. COMMIT
+  11. resolve addr_id via ACNR（带 project context）→ 附加到返回结果
 """
 
 import asyncio
@@ -118,10 +124,16 @@ class SnapshotWriter:
             new_value: 新值
             opened_at: 前端打开时的 updated_at 时间戳
             module: 模块名 ('workpaper', 'report', 'note', 'adj', 'tb')
-            project_id: 项目 ID（belt+suspenders 校验用）
+            project_id: 项目 ID（ACNR 解析 project context，R15.4）
 
         Returns:
-            {success: True, updated_at: str, old_value: Any}
+            {
+                success: True,
+                updated_at: str,
+                old_value: Any,
+                addr_id: str | None,        # R15.1: canonical addr_id
+                column_metadata: dict | None # R15.2: chip drill-down metadata
+            }
 
         Raises:
             WritebackConflict: 乐观锁冲突
@@ -297,11 +309,39 @@ class SnapshotWriter:
         except Exception as exc:
             logger.warning("orchestrator.after_save failed (non-fatal): %s", exc)
 
-        return {
+        # Step 8: ACNR addr_id 解析（M2, R15.1, R15.2, R15.4）
+        # 回写身份从裸坐标 (wp_id, sheet_name, cell_ref) 升级为 canonical addr_id
+        acnr_result = self._resolve_addr_id(
+            wp_code=wp_code,
+            sheet_name=sheet_name,
+            cell_ref=cell_ref,
+            project_id=project_id,
+        )
+
+        result = {
             "success": True,
             "updated_at": now.isoformat(),
             "old_value": old_value,
         }
+
+        # R15.1: 存储 addr_id 而非裸 (wp_id, sheet_name, cell_ref)
+        # R15.2: 列元数据挂 addr_id，chip 可下钻到格
+        if acnr_result:
+            result["addr_id"] = acnr_result["addr_id"]
+            result["column_metadata"] = acnr_result.get("column_metadata")
+        else:
+            # 降级：ACNR 未命中时仍返回构造的 addr_id（最大努力）
+            fallback_addr_id = f"{wp_code}/{sheet_name}/{cell_ref}" if wp_code else None
+            result["addr_id"] = fallback_addr_id
+            result["column_metadata"] = {
+                "addr_id": fallback_addr_id,
+                "display_label": fallback_addr_id,
+                "cell_address": cell_ref,
+                "sheet_addr_id": f"{wp_code}/{sheet_name}" if wp_code else None,
+                "drilldown_enabled": False,
+            } if fallback_addr_id else None
+
+        return result
 
     # ─── report 模块写回 ─────────────────────────────────────────────────
 
@@ -586,6 +626,136 @@ class SnapshotWriter:
             wb.close()
         except Exception as e:
             logger.warning("_sync_update_xlsx_cache error: %s", e)
+
+    # ─── ACNR addr_id 解析（M2, R15.1, R15.2, R15.4）────────────────────
+
+    def _resolve_addr_id(
+        self,
+        wp_code: str,
+        sheet_name: str,
+        cell_ref: str,
+        project_id: str | None = None,
+    ) -> dict | None:
+        """通过 ACNR 解析 (wp_code, sheet_name, cell_ref) 为 canonical addr_id。
+
+        携带 project context 进行解析（R15.4），使回写身份从裸坐标升级为 addr_id（R15.1）。
+        返回包含 addr_id + column_metadata 的 dict，chip 可下钻到格（R15.2）。
+
+        Args:
+            wp_code: 底稿编码（如 D2）
+            sheet_name: sheet 名称（如 明细表D2-2）
+            cell_ref: cell 引用（如 E100）
+            project_id: 项目 ID（project context，R15.4）
+
+        Returns:
+            dict with {addr_id, uri, formula_ref, entry_type, jump_route} or None on miss
+        """
+        try:
+            from app.services.acnr.catalog import get_catalog, lookup
+
+            # 尝试通过 catalog lookup 获取 sheet → addr_id
+            # 1. 先确定 sheet_code：从 sheet_name 反查（别名机制）
+            cat = get_catalog()
+
+            # 构建 sheet-level addr_id：通过 wp_code + sheet_name 反查
+            sheet_entry = None
+
+            # 尝试通过 sheet_name 在别名索引中查找
+            alias_matches = cat.sheets_by_alias.get(sheet_name, [])
+            if wp_code and alias_matches:
+                filtered = [m for m in alias_matches if m.get("parent_wp_code") == wp_code]
+                if len(filtered) == 1:
+                    sheet_entry = filtered[0]
+                elif not filtered and len(alias_matches) == 1:
+                    sheet_entry = alias_matches[0]
+
+            # 如果别名反查未命中，尝试 sheet_code 索引
+            if not sheet_entry:
+                code_matches = cat.sheets_by_code.get(sheet_name, [])
+                if wp_code and code_matches:
+                    code_matches = [m for m in code_matches if m.get("parent_wp_code") == wp_code]
+                if len(code_matches) == 1:
+                    sheet_entry = code_matches[0]
+
+            if not sheet_entry:
+                # catalog miss — 降级返回 None（不阻塞写回主流程）
+                logger.debug(
+                    "ACNR addr_id resolve miss: wp_code=%s sheet_name=%s",
+                    wp_code, sheet_name,
+                )
+                return None
+
+            sheet_addr_id = sheet_entry.get("addr_id", "")
+
+            # 2. 如果有 cell_ref，构造 cell-level addr_id
+            if cell_ref:
+                # canonical addr_id = {parent}/{sheet_code}/{cell_address}
+                cell_addr_id = f"{sheet_addr_id}/{cell_ref}"
+
+                # 尝试精确 cell 命中
+                cell_entry = cat.cells_by_addr_id.get(cell_addr_id)
+                if cell_entry:
+                    return {
+                        "addr_id": cell_entry.get("addr_id"),
+                        "uri": cell_entry.get("uri"),
+                        "formula_ref": cell_entry.get("formula_ref"),
+                        "entry_type": "cell",
+                        "semantic_label": cell_entry.get("semantic_label"),
+                        "parent_addr_id": cell_entry.get("parent_addr_id"),
+                        "jump_route": sheet_entry.get("jump_route_template"),
+                        "column_metadata": {
+                            "addr_id": cell_entry.get("addr_id"),
+                            "display_label": (
+                                cell_entry.get("semantic_label")
+                                or cell_entry.get("addr_id")
+                            ),
+                            "cell_address": cell_ref,
+                            "sheet_addr_id": sheet_addr_id,
+                            "drilldown_enabled": True,
+                        },
+                    }
+
+                # Cell 未在 L1 种子中注册：构造 runtime addr_id
+                # 仍返回可用的 addr_id（格式正确但非 L1 注册）
+                return {
+                    "addr_id": cell_addr_id,
+                    "uri": None,
+                    "formula_ref": None,
+                    "entry_type": "cell",
+                    "semantic_label": None,
+                    "parent_addr_id": sheet_addr_id,
+                    "jump_route": sheet_entry.get("jump_route_template"),
+                    "column_metadata": {
+                        "addr_id": cell_addr_id,
+                        "display_label": cell_addr_id,
+                        "cell_address": cell_ref,
+                        "sheet_addr_id": sheet_addr_id,
+                        "drilldown_enabled": True,
+                    },
+                }
+
+            # 3. 仅 sheet 级
+            return {
+                "addr_id": sheet_addr_id,
+                "uri": None,
+                "formula_ref": None,
+                "entry_type": "sheet",
+                "semantic_label": None,
+                "parent_addr_id": None,
+                "jump_route": sheet_entry.get("jump_route_template"),
+                "column_metadata": {
+                    "addr_id": sheet_addr_id,
+                    "display_label": sheet_entry.get("display_label") or sheet_addr_id,
+                    "cell_address": None,
+                    "sheet_addr_id": sheet_addr_id,
+                    "drilldown_enabled": False,
+                },
+            }
+
+        except Exception as e:
+            # ACNR 解析失败不阻塞写回主流程（降级策略）
+            logger.warning("ACNR addr_id resolve error (non-fatal): %s", e)
+            return None
 
 
 # 模块级单例

@@ -2256,6 +2256,8 @@ async def cell_writeback(
     return {
         "success": True,
         "updated_at": write_result.get("updated_at"),
+        "addr_id": write_result.get("addr_id"),
+        "column_metadata": write_result.get("column_metadata"),
     }
 
 

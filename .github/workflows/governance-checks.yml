@@ -208,6 +208,18 @@ jobs:
       - name: Check CCR resolve (report mode)
         run: python backend/scripts/acnr/check_ccr_resolve.py
 
+  check-sheet-labels-generated:
+    # ACNR R3.2/R18.1: dSheetLabels.ts 生成一致性守卫（禁手改）
+    # 验证前端 D-cycle sheet labels 文件与生成器输出一致
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check dSheetLabels.ts is generated (not hand-edited)
+        run: python backend/scripts/acnr/check_sheet_labels_generated.py
+
   hotspot-baseline-check:
     # P2-1.3: 新增裸组件/重复能力/超大文件检查
     # 对比 baseline，只有新增超标文件才触发（历史债务不阻塞）

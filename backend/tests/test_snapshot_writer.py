@@ -741,3 +741,397 @@ class TestCellWritebackE2E:
             )
 
         assert exc_info.value.latest_updated_at == now
+
+
+# ---------------------------------------------------------------------------
+# ACNR addr_id 集成测试（M2, R15.1, R15.2, R15.4）
+# Feature: acnr, Task 16.1: snapshot_writer 回写 addr_id
+# ---------------------------------------------------------------------------
+
+
+class TestSnapshotWriterAcnrAddrId:
+    """snapshot_writer 回写时附带 ACNR addr_id + column_metadata。
+
+    R15.1: 存 addr_id 而非裸 (wp_id, sheet_name, cell_ref)
+    R15.2: 列元数据挂 addr_id，chip 可下钻到格
+    R15.4: 回写解析带 project context
+    """
+
+    @pytest.mark.asyncio
+    async def test_write_result_contains_addr_id(self):
+        """成功写回后结果包含 addr_id 字段。
+
+        **Validates: Requirements 15.1**
+        """
+        sheet_name = "明细表D2-2"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 6, 1, "old")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-000000000001"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
+                return mock_result
+            elif "UPDATE" in stmt_str:
+                return MagicMock()
+            return MagicMock(first=MagicMock(return_value=None))
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+
+        # Mock ACNR catalog to return a known sheet entry
+        mock_catalog = MagicMock()
+        mock_sheet_entry = {
+            "addr_id": "D2/D2-2",
+            "parent_wp_code": "D2",
+            "sheet_code": "D2-2",
+            "sheet_name": "明细表D2-2",
+            "display_label": "底稿 > D2 > 明细表D2-2",
+            "jump_route_template": "/workpapers/{wp_id}?sheet=D2-2",
+        }
+        mock_catalog.sheets_by_alias = {"明细表D2-2": [mock_sheet_entry]}
+        mock_catalog.sheets_by_code = {"D2-2": [mock_sheet_entry]}
+        mock_catalog.cells_by_addr_id = {}
+
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+            with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
+                result = await snapshot_writer.write_cell(
+                    db=mock_db,
+                    user=_make_mock_user(),
+                    wp_id="wp-001",
+                    sheet_name=sheet_name,
+                    cell_ref="B7",
+                    new_value=42,
+                    opened_at=now,
+                    project_id=project_id,
+                )
+
+        assert result["success"] is True
+        # R15.1: addr_id 存在且格式正确
+        assert result["addr_id"] is not None
+        assert "D2" in result["addr_id"]
+
+    @pytest.mark.asyncio
+    async def test_write_result_contains_column_metadata_for_drilldown(self):
+        """写回结果包含 column_metadata，chip 可下钻到格。
+
+        **Validates: Requirements 15.2**
+        """
+        sheet_name = "明细表D2-2"
+        cell_ref = "E100"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 99, 4, "old_val")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-000000000002"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
+                return mock_result
+            elif "UPDATE" in stmt_str:
+                return MagicMock()
+            return MagicMock(first=MagicMock(return_value=None))
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+
+        # Mock ACNR catalog with a registered cell entry
+        mock_catalog = MagicMock()
+        mock_sheet_entry = {
+            "addr_id": "D2/D2-2",
+            "parent_wp_code": "D2",
+            "sheet_code": "D2-2",
+            "sheet_name": "明细表D2-2",
+            "display_label": "底稿 > D2 > 明细表D2-2",
+            "jump_route_template": "/workpapers/{wp_id}?sheet=D2-2",
+        }
+        mock_cell_entry = {
+            "addr_id": "D2/D2-2/E100",
+            "parent_addr_id": "D2/D2-2",
+            "uri": "wp://D2/明细表D2-2#E100",
+            "formula_ref": "WP('D2','明细表D2-2','合计行-期末余额')",
+            "semantic_label": "合计行-期末余额",
+            "cell_address": "E100",
+        }
+        mock_catalog.sheets_by_alias = {"明细表D2-2": [mock_sheet_entry]}
+        mock_catalog.sheets_by_code = {"D2-2": [mock_sheet_entry]}
+        mock_catalog.cells_by_addr_id = {"D2/D2-2/E100": mock_cell_entry}
+
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+            with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
+                result = await snapshot_writer.write_cell(
+                    db=mock_db,
+                    user=_make_mock_user(),
+                    wp_id="wp-001",
+                    sheet_name=sheet_name,
+                    cell_ref=cell_ref,
+                    new_value=99999.99,
+                    opened_at=now,
+                    project_id=project_id,
+                )
+
+        assert result["success"] is True
+        # R15.2: column_metadata 存在且含 drill-down 信息
+        assert result["column_metadata"] is not None
+        meta = result["column_metadata"]
+        assert meta["addr_id"] == "D2/D2-2/E100"
+        assert meta["drilldown_enabled"] is True
+        assert meta["cell_address"] == "E100"
+        assert meta["sheet_addr_id"] == "D2/D2-2"
+        # 语义标签作为 display_label
+        assert "合计行-期末余额" in meta["display_label"]
+
+    @pytest.mark.asyncio
+    async def test_write_carries_project_context(self):
+        """回写解析携带 project context（R15.4）。
+
+        **Validates: Requirements 15.4**
+        """
+        sheet_name = "Sheet1"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-000000000003"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
+                return mock_result
+            elif "UPDATE" in stmt_str:
+                return MagicMock()
+            return MagicMock(first=MagicMock(return_value=None))
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+
+        # 验证 _resolve_addr_id 被调用且带 project_id
+        writer = SnapshotWriter()
+        resolve_calls = []
+        original_resolve = writer._resolve_addr_id
+
+        def tracking_resolve(wp_code, sheet_name, cell_ref, project_id=None):
+            resolve_calls.append({
+                "wp_code": wp_code,
+                "sheet_name": sheet_name,
+                "cell_ref": cell_ref,
+                "project_id": project_id,
+            })
+            return None  # 模拟 miss
+
+        writer._resolve_addr_id = tracking_resolve
+
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+
+            await writer.write_cell(
+                db=mock_db,
+                user=_make_mock_user(),
+                wp_id="wp-001",
+                sheet_name=sheet_name,
+                cell_ref="A1",
+                new_value="new",
+                opened_at=now,
+                project_id=project_id,
+            )
+
+        # R15.4: resolve 必须携带 project_id
+        assert len(resolve_calls) == 1
+        assert resolve_calls[0]["project_id"] == project_id
+        assert resolve_calls[0]["wp_code"] == "D2"
+        assert resolve_calls[0]["sheet_name"] == sheet_name
+        assert resolve_calls[0]["cell_ref"] == "A1"
+
+    @pytest.mark.asyncio
+    async def test_acnr_miss_falls_back_gracefully(self):
+        """ACNR catalog miss 时降级返回构造的 addr_id，不阻塞写回。
+
+        **Validates: Requirements 15.1**
+        """
+        sheet_name = "未注册Sheet"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-000000000004"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "X9", "", project_id)
+                return mock_result
+            elif "UPDATE" in stmt_str:
+                return MagicMock()
+            return MagicMock(first=MagicMock(return_value=None))
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+
+        # Mock catalog that returns empty for all lookups (miss)
+        mock_catalog = MagicMock()
+        mock_catalog.sheets_by_alias = {}
+        mock_catalog.sheets_by_code = {}
+        mock_catalog.cells_by_addr_id = {}
+
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+            with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
+                result = await snapshot_writer.write_cell(
+                    db=mock_db,
+                    user=_make_mock_user(),
+                    wp_id="wp-001",
+                    sheet_name=sheet_name,
+                    cell_ref="A1",
+                    new_value="new",
+                    opened_at=now,
+                    project_id=project_id,
+                )
+
+        # 写回仍然成功（不阻塞）
+        assert result["success"] is True
+        # 降级 addr_id 仍有值（最大努力）
+        assert result["addr_id"] is not None
+        assert "X9" in result["addr_id"]
+        # column_metadata 降级但仍存在
+        assert result["column_metadata"] is not None
+        assert result["column_metadata"]["drilldown_enabled"] is False
+
+    @pytest.mark.asyncio
+    async def test_acnr_error_does_not_block_write(self):
+        """ACNR 解析异常时不阻塞写回主流程（降级策略）。
+
+        **Validates: Requirements 15.1**
+        """
+        sheet_name = "Sheet1"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-000000000005"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
+                return mock_result
+            elif "UPDATE" in stmt_str:
+                return MagicMock()
+            return MagicMock(first=MagicMock(return_value=None))
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+
+        # Mock catalog that raises an exception
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+            with patch(
+                "app.services.acnr.catalog.get_catalog",
+                side_effect=RuntimeError("catalog not loaded"),
+            ):
+                result = await snapshot_writer.write_cell(
+                    db=mock_db,
+                    user=_make_mock_user(),
+                    wp_id="wp-001",
+                    sheet_name=sheet_name,
+                    cell_ref="A1",
+                    new_value="new",
+                    opened_at=now,
+                    project_id=project_id,
+                )
+
+        # 写回成功不受 ACNR 故障影响
+        assert result["success"] is True
+        assert result["updated_at"] is not None
+        # 降级 addr_id 仍有值
+        assert result["addr_id"] == "D2/Sheet1/A1"
+
+    @pytest.mark.asyncio
+    async def test_cell_in_l1_seeds_gets_rich_metadata(self):
+        """L1 种子中注册的 cell 获得完整 addr_id + uri + formula_ref + semantic_label。
+
+        **Validates: Requirements 15.1, 15.2**
+        """
+        writer = SnapshotWriter()
+
+        # Mock catalog with registered cell
+        mock_catalog = MagicMock()
+        mock_sheet_entry = {
+            "addr_id": "D2/D2-2",
+            "parent_wp_code": "D2",
+            "sheet_code": "D2-2",
+            "sheet_name": "明细表D2-2",
+            "display_label": "底稿 > D2 > 明细表D2-2",
+            "jump_route_template": "/workpapers/{wp_id}?sheet=D2-2",
+        }
+        mock_cell_entry = {
+            "addr_id": "D2/D2-2/E100",
+            "parent_addr_id": "D2/D2-2",
+            "uri": "wp://D2/明细表D2-2#E100",
+            "formula_ref": "WP('D2','明细表D2-2','合计行-期末余额')",
+            "semantic_label": "合计行-期末余额",
+            "cell_address": "E100",
+        }
+        mock_catalog.sheets_by_alias = {"明细表D2-2": [mock_sheet_entry]}
+        mock_catalog.sheets_by_code = {}
+        mock_catalog.cells_by_addr_id = {"D2/D2-2/E100": mock_cell_entry}
+
+        with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
+            result = writer._resolve_addr_id(
+                wp_code="D2",
+                sheet_name="明细表D2-2",
+                cell_ref="E100",
+                project_id="test-project-id",
+            )
+
+        assert result is not None
+        assert result["addr_id"] == "D2/D2-2/E100"
+        assert result["uri"] == "wp://D2/明细表D2-2#E100"
+        assert result["formula_ref"] == "WP('D2','明细表D2-2','合计行-期末余额')"
+        assert result["entry_type"] == "cell"
+        assert result["semantic_label"] == "合计行-期末余额"
+        # column_metadata for chip drill-down
+        meta = result["column_metadata"]
+        assert meta["drilldown_enabled"] is True
+        assert meta["addr_id"] == "D2/D2-2/E100"
+
+    @pytest.mark.asyncio
+    async def test_unregistered_cell_gets_constructed_addr_id(self):
+        """未在 L1 种子注册的 cell 仍获得构造的 addr_id（runtime 格式）。
+
+        **Validates: Requirements 15.1**
+        """
+        writer = SnapshotWriter()
+
+        # Mock catalog: sheet exists but cell not registered
+        mock_catalog = MagicMock()
+        mock_sheet_entry = {
+            "addr_id": "D2/D2-2",
+            "parent_wp_code": "D2",
+            "sheet_code": "D2-2",
+            "sheet_name": "明细表D2-2",
+            "jump_route_template": "/workpapers/{wp_id}?sheet=D2-2",
+        }
+        mock_catalog.sheets_by_alias = {"明细表D2-2": [mock_sheet_entry]}
+        mock_catalog.sheets_by_code = {}
+        mock_catalog.cells_by_addr_id = {}  # cell not registered
+
+        with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
+            result = writer._resolve_addr_id(
+                wp_code="D2",
+                sheet_name="明细表D2-2",
+                cell_ref="B7",
+                project_id="test-project-id",
+            )
+
+        assert result is not None
+        # 构造的 addr_id 格式正确
+        assert result["addr_id"] == "D2/D2-2/B7"
+        assert result["entry_type"] == "cell"
+        assert result["parent_addr_id"] == "D2/D2-2"
+        # 仍支持 drill-down（但无语义标签）
+        meta = result["column_metadata"]
+        assert meta["drilldown_enabled"] is True
+        assert meta["cell_address"] == "B7"

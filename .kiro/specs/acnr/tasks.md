@@ -178,13 +178,13 @@
 
 ### 里程碑 M2 — bulk 试点 + 消费者切换 + 披露工厂
 
-- [ ] 15. bulk manifest
-  - [ ] 15.1 实现 `manifest.py` 的 `list_import_export(project_id, cycle?)` + D 循环 bulk manifest 生成
+- [x] 15. bulk manifest
+  - [x] 15.1 实现 `manifest.py` 的 `list_import_export(project_id, cycle?)` + D 循环 bulk manifest 生成
     - I/E 路由只认 catalog 的 api_prefix + item_id
     - _Requirements: 18.6_
 
-- [ ] 16. 高级查询库回写 addr_id
-  - [ ] 16.1 改造 `snapshot_writer` 回写 `addr_id`，快照列元数据挂载 addr_id
+- [x] 16. 高级查询库回写 addr_id
+  - [x] 16.1 改造 `snapshot_writer` 回写 `addr_id`，快照列元数据挂载 addr_id
     - 回写解析携带 project context
     - _Requirements: 15.1, 15.2, 15.4_
 
@@ -194,7 +194,7 @@
     - _Requirements: 14.1, 14.2, 15.3_
   - [ ] 17.2 改造 `GtIndexChip` 调 `resolve(ns:target)` 获取 addr_id + jump_route（不自行 parse）
     - _Requirements: 11.2, 11.3, 13.3_
-  - [ ] 17.3 改造 `FormulaReverseIndex` 边端点使用 addr_id（重命名 sheet 边不断裂）
+  - [x] 17.3 改造 `FormulaReverseIndex` 边端点使用 addr_id（重命名 sheet 边不断裂）
     - _Requirements: 14.3_
 
 - [ ] 18. 附注披露工厂
@@ -202,8 +202,8 @@
     - 登记 note 子域坐标 `note/{note_code}/{row_key}`；`disclosure:note-text-updated` payload 携带 addr_id；审定表/明细表取数经 `resolve()`
     - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
-- [ ] 19. labels 生成与守卫
-  - [ ] 19.1 生成 `audit-platform/frontend/src/generated/dSheetLabels.ts` + 实现 `check-sheet-labels-generated` CI（禁手改）
+- [x] 19. labels 生成与守卫
+  - [x] 19.1 生成 `audit-platform/frontend/src/generated/dSheetLabels.ts` + 实现 `check-sheet-labels-generated` CI（禁手改）
     - _Requirements: 3.2, 18.1_
 
 - [ ] 20. Checkpoint（M2）

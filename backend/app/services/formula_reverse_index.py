@@ -1,15 +1,18 @@
 """FormulaReverseIndex — 反向联动索引 (Sprint 3)
 
 被引用方 → 引用方 反向索引：
-- "TB:1122::期末余额" → ["WP:D2:审定表D2-1:未审数", "REPORT:BS-005::当期金额"]
-- "WP:H1:折旧分配分析表H1-13:销售费用折旧" → ["WP:K8:审定表K8-1:折旧"]
+- "TB:1122::期末余额" → ["D2/D2-1/未审数", "REPORT:BS-005::当期金额"]
+- "H1/H1-13/销售费用折旧" → ["K8/K8-1/折旧"]
+
+边端点使用 addr_id 格式（如 D2/D2-2/E100），重命名 sheet 不断裂（R14.3）。
+非 wp 域（TB/REPORT/NOTE/ADJ）保留原格式（如 TB:1122::期末余额）。
 
 数据源：
 1. prefill_formula_mapping.json — 解析 =TB()/=WP()/=ADJ()/=NOTE() 公式
 2. report_config DB — 解析 TB()/SUM_TB()/ROW() 公式
 3. cross_wp_references.json — targets[].formula 中的 =WP() 引用
 
-Validates: Requirements F9, F10, F11, F12, F13, F14, F15
+Validates: Requirements F9, F10, F11, F12, F13, F14, F15, 14.3
 """
 
 from __future__ import annotations
@@ -45,6 +48,75 @@ _RE_NOTE = re.compile(r"NOTE\('([^']+)','([^']+)','([^']+)'\)")
 _RE_PREV = re.compile(r"PREV\('([^']+)','([^']+)','([^']+)'\)")
 # ROW('BS-009')
 _RE_ROW = re.compile(r"ROW\('([^']+)'\)")
+
+
+# ─── addr_id edge conversion helpers ────────────────────────────────────────
+
+
+def _wp_edge_to_addr_id(wp_code: str, sheet: str, cell_or_label: str) -> str:
+    """将 WP 类边端点转换为 addr_id 格式（R14.3）。
+
+    使用 ACNR catalog 解析 sheet_name → sheet_code，保证重命名 sheet 时
+    addr_id（基于 sheet_code）不变。
+
+    Parameters
+    ----------
+    wp_code : str
+        父底稿码（= WP() 第一参），如 'D2'
+    sheet : str
+        Sheet 名称或编码，如 '明细表D2-2' 或 'D2-2'
+    cell_or_label : str
+        单元格或语义标签，如 'E100' 或 '期末余额'
+
+    Returns
+    -------
+    str
+        addr_id 格式，如 'D2/D2-2/E100'。
+        如果 catalog 无法解析则 fallback 为 '{wp_code}/{sheet}/{cell}'。
+    """
+    try:
+        from app.services.acnr.catalog import _formula_ref_to_addr_id
+    except ImportError:
+        # ACNR 未安装时 fallback
+        if cell_or_label:
+            return f"{wp_code}/{sheet}/{cell_or_label}"
+        return f"{wp_code}/{sheet}"
+
+    # 构造 formula_ref 并尝试用 catalog 解析
+    if cell_or_label:
+        formula_ref = f"WP('{wp_code}','{sheet}','{cell_or_label}')"
+    else:
+        formula_ref = f"WP('{wp_code}','{sheet}')"
+
+    addr_id = _formula_ref_to_addr_id(formula_ref)
+    if addr_id:
+        return addr_id
+
+    # Fallback: 直接拼 addr_id 格式
+    if cell_or_label:
+        return f"{wp_code}/{sheet}/{cell_or_label}"
+    return f"{wp_code}/{sheet}"
+
+
+def _legacy_uri_to_addr_id(uri: str) -> str:
+    """将旧格式 URI（WP:D2:明细表D2-2:E100）转为 addr_id 格式。
+
+    非 WP 域保持原格式不变（TB/REPORT/NOTE/ADJ 等）。
+    """
+    parts = uri.split(":", 3)
+    if len(parts) < 2:
+        return uri
+
+    module = parts[0]
+    if module != "WP":
+        # 非 wp 域保持原格式
+        return uri
+
+    wp_code = parts[1] if len(parts) > 1 else ""
+    sheet = parts[2] if len(parts) > 2 else ""
+    label = parts[3] if len(parts) > 3 else ""
+
+    return _wp_edge_to_addr_id(wp_code, sheet, label)
 
 
 class FormulaReverseIndex:
@@ -91,36 +163,54 @@ class FormulaReverseIndex:
         return dict(self._index)
 
     def query(self, changed_uri: str) -> list[str]:
-        """返回引用方 URI 列表（"谁引用了 changed_uri"）。
+        """返回引用方列表（"谁引用了 changed_uri"）。
 
         Parameters
         ----------
         changed_uri : str
-            变更源 URI，格式 {module}:{code}:{sheet_name}:{label}
+            变更源标识，支持两种格式：
+            - addr_id 格式：如 'D2/D2-2/E100'（优先）
+            - 旧格式 URI：如 'WP:D2:明细表D2-2:E100'（自动转为 addr_id 再查）
+            - 非 wp 域格式：如 'TB:1122::期末余额'（保持原格式查询）
 
         Returns
         -------
         list[str]
-            引用了 changed_uri 的 URI 列表
+            引用了 changed_uri 的端点列表（addr_id 格式或非 wp 域原格式）
         """
         if not self._built:
             logger.warning("FormulaReverseIndex.query called before build()")
             return []
 
+        # 如果是旧格式 WP:xx:xx:xx，先转为 addr_id
+        query_key = changed_uri
+        if ":" in changed_uri:
+            parts = changed_uri.split(":", 3)
+            if parts[0] == "WP":
+                query_key = _legacy_uri_to_addr_id(changed_uri)
+
         results: list[str] = []
 
         # Exact match
-        if changed_uri in self._index:
-            results.extend(self._index[changed_uri])
+        if query_key in self._index:
+            results.extend(self._index[query_key])
 
         # Prefix match for broader queries (e.g., "TB:1122::" matches "TB:1122::期末余额")
-        # Only do prefix match if exact match yields nothing and URI has empty trailing segments
+        # Also supports addr_id prefix match (e.g., "D2/D2-2" matches "D2/D2-2/E100")
         if not results:
-            parts = changed_uri.split(":")
-            if len(parts) >= 2:
-                prefix = f"{parts[0]}:{parts[1]}:"
+            if ":" in query_key:
+                # Non-wp domain prefix matching
+                parts = query_key.split(":")
+                if len(parts) >= 2:
+                    prefix = f"{parts[0]}:{parts[1]}:"
+                    for key, refs in self._index.items():
+                        if key.startswith(prefix) and key != query_key:
+                            results.extend(refs)
+            elif "/" in query_key:
+                # addr_id prefix matching (e.g., "D2/D2-2" matches "D2/D2-2/E100")
+                prefix = query_key + "/"
                 for key, refs in self._index.items():
-                    if key.startswith(prefix) and key != changed_uri:
+                    if key.startswith(prefix) and key != query_key:
                         results.extend(refs)
 
         # Deduplicate while preserving order
@@ -139,8 +229,9 @@ class FormulaReverseIndex:
         """解析 prefill_formula_mapping.json 中的 =TB()/=WP()/=ADJ()/=NOTE() 公式。
 
         每条 mapping 的 cells[].formula 引用了某个源 URI，
-        而 cell 本身属于某个底稿（WP:{wp_code}:{sheet}:{cell_ref}）。
-        反向索引：源 URI → 引用方底稿 URI。
+        而 cell 本身属于某个底稿。
+        边端点使用 addr_id 格式（WP 域），使重命名 sheet 时边不断裂（R14.3）。
+        反向索引：源 addr_id/URI → 引用方 addr_id/URI。
         """
         path = DATA_DIR / "prefill_formula_mapping.json"
         if not path.exists():
@@ -165,10 +256,10 @@ class FormulaReverseIndex:
                 if not formula:
                     continue
 
-                # The referencing URI (who uses the source)
-                referencing_uri = f"WP:{wp_code}:{sheet}:{cell_ref}"
+                # The referencing endpoint uses addr_id format (R14.3)
+                referencing_uri = _wp_edge_to_addr_id(wp_code, sheet, cell_ref)
 
-                # Parse formula to find source URIs
+                # Parse formula to find source URIs (also converted to addr_id where applicable)
                 source_uris = self._parse_formula_sources(formula)
                 for source_uri in source_uris:
                     self._index[source_uri].append(referencing_uri)
@@ -223,7 +314,8 @@ class FormulaReverseIndex:
         """解析 cross_wp_references.json 中的跨底稿引用。
 
         每条 reference 的 source → targets 表示 source 底稿引用了 target 底稿。
-        反向索引：target URI → source URI（"target 被 source 引用"）。
+        边端点使用 addr_id 格式（WP 域），使重命名 sheet 时边不断裂（R14.3）。
+        反向索引：target addr_id → source addr_id（"target 被 source 引用"）。
         """
         path = DATA_DIR / "cross_wp_references.json"
         if not path.exists():
@@ -242,8 +334,8 @@ class FormulaReverseIndex:
             source_sheet = ref.get("source_sheet", "")
             source_label = ref.get("source_cell_label", ref.get("source_cell", ""))
 
-            # The referencing URI (who does the referencing)
-            referencing_uri = f"WP:{source_wp}:{source_sheet}:{source_label}"
+            # The referencing endpoint uses addr_id format (R14.3)
+            referencing_uri = _wp_edge_to_addr_id(source_wp, source_sheet, source_label)
 
             targets = ref.get("targets", [])
             for target in targets:
@@ -251,14 +343,17 @@ class FormulaReverseIndex:
                 target_sheet = target.get("sheet", "")
                 target_label = target.get("cell_label", target.get("cell", ""))
 
-                # The source URI (who is being referenced)
-                source_uri = f"WP:{target_wp}:{target_sheet}:{target_label}"
+                # The source (being referenced) also uses addr_id format
+                source_uri = _wp_edge_to_addr_id(target_wp, target_sheet, target_label)
                 self._index[source_uri].append(referencing_uri)
 
     # ─── Formula Parsing Helpers ─────────────────────────────────────
 
     def _parse_formula_sources(self, formula: str) -> list[str]:
-        """解析预填充公式，返回被引用的源 URI 列表。"""
+        """解析预填充公式，返回被引用的源 addr_id/URI 列表。
+
+        WP/PREV 类引用返回 addr_id 格式（R14.3），其他域保持原格式。
+        """
         uris: list[str] = []
         if not formula:
             return uris
@@ -278,20 +373,20 @@ class FormulaReverseIndex:
             code, adj_type = m.groups()
             uris.append(f"ADJ:{code}::{adj_type}")
 
-        # =WP('H1','折旧分配分析表H1-13','销售费用折旧') → WP:H1:折旧分配分析表H1-13:销售费用折旧
+        # =WP('H1','折旧分配分析表H1-13','销售费用折旧') → addr_id (R14.3)
         for m in _RE_WP.finditer(formula):
             wp, sheet, field = m.groups()
-            uris.append(f"WP:{wp}:{sheet}:{field}")
+            uris.append(_wp_edge_to_addr_id(wp, sheet, field))
 
         # =NOTE('5.7','应收账款','期末余额') → NOTE:5.7:应收账款:期末余额
         for m in _RE_NOTE.finditer(formula):
             section, name, field = m.groups()
             uris.append(f"NOTE:{section}:{name}:{field}")
 
-        # =PREV('D2','审定表D2-1','审定数') → WP:D2:审定表D2-1:审定数
+        # =PREV('D2','审定表D2-1','审定数') → addr_id (R14.3)
         for m in _RE_PREV.finditer(formula):
             wp, sheet, field = m.groups()
-            uris.append(f"WP:{wp}:{sheet}:{field}")
+            uris.append(_wp_edge_to_addr_id(wp, sheet, field))
 
         return uris
 
