@@ -95,8 +95,16 @@ def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
             continue
         groups = [g for g in m.groups() if g is not None]
 
-        if fn_name in ('TB', 'SUM_TB', 'PREV'):
+        if fn_name in ('TB', 'SUM_TB'):
             return build_uri('tb', groups[0], cell=groups[1])
+        elif fn_name == 'PREV':
+            # PREV has dual semantics per grammar_v1:
+            # 2-arg PREV('code','col') → tb domain (prior year balance)
+            # 3-arg PREV('parent','sheet','cell') → wp domain (prior year workpaper)
+            if len(groups) >= 3 and groups[2]:
+                return build_uri('wp', groups[0], path=groups[1], cell=groups[2])
+            else:
+                return build_uri('tb', groups[0], cell=groups[1])
         elif fn_name in ('ROW', 'SUM_ROW'):
             # ROW('BS-002') → report://BS/BS-002
             code = groups[0]
@@ -112,8 +120,16 @@ def formula_ref_to_uri(formula_ref: str) -> Optional[str]:
             col_label = groups[2] if len(groups) > 2 else '期末'
             return build_uri('note', section, row_label, col_label)
         elif fn_name == 'WP':
-            # 单元格/列名走 path，避免 wp://D11#B5 被解析为 source=D11#B5
-            return build_uri('wp', groups[0], path=groups[1])
+            # R10.3: 保留第三参（语义名/cell 不丢弃）
+            # 3 参 standard: WP('parent','sheet_name','cell|semantic') → wp://parent/sheet_name#cell
+            # 2 参 custom_flat: WP('wp_code','cell') → wp://wp_code/cell
+            # 2 参 standard sheet-level: WP('parent','sheet_name') → wp://parent/sheet_name
+            if len(groups) >= 3 and groups[2]:
+                # 3 参：wp://parent/sheet_name#cell_or_semantic
+                return build_uri('wp', groups[0], path=groups[1], cell=groups[2])
+            else:
+                # 2 参：单元格/列名走 path
+                return build_uri('wp', groups[0], path=groups[1])
         elif fn_name == 'AUX':
             account = groups[0]
             dim = groups[1] if len(groups) > 1 else ''
@@ -151,11 +167,15 @@ def uri_to_formula_ref(uri: str) -> Optional[str]:
     elif domain == 'wp':
         if path == 'xref' and cell:
             return None
+        if cell and path:
+            # 3 参 standard: wp://parent/sheet_name#cell → WP('parent','sheet_name','cell')
+            return f"WP('{source}','{path}','{cell}')"
         if not path and not cell:
             rest = uri.split('://', 1)[-1]
             if '#' in rest and '/' not in rest.split('#', 1)[0]:
                 wp_source, _, addr = rest.partition('#')
                 return f"WP('{wp_source}','{addr}')"
+        # 2 参: path only (custom_flat or standard sheet-level)
         addr = cell or path
         return f"WP('{source}','{addr}')"
     elif domain == 'aux':
@@ -593,6 +613,85 @@ async def _build_custom_wp_cell_entries(
     return entries
 
 
+def _merge_catalog_cell_entries(
+    entries: list[AddressEntry], project_id: str, year: int
+) -> list[AddressEntry]:
+    """合并 ACNR catalog 的 CellCatalogEntry 到现有地址条目。
+
+    使 D 循环 473 种子坐标在公式选址器可被搜索到。
+    按 formula_ref 去重，避免与已有条目产生重复。
+
+    Requirements: R4.2, R4.5
+    """
+    try:
+        from app.services.acnr.catalog import get_catalog
+    except ImportError:
+        logger.debug("ACNR catalog 模块不可用，跳过 catalog merge")
+        return entries
+
+    try:
+        cat = get_catalog()
+    except Exception as e:
+        logger.warning("ACNR catalog 加载失败，跳过 merge: %s", e)
+        return entries
+
+    if not cat.cells_by_addr_id:
+        return entries
+
+    # 构建已有条目的 formula_ref 集合用于去重
+    existing_refs: set[str] = {e.formula_ref for e in entries if e.formula_ref}
+
+    for cell in cat.cells_by_addr_id.values():
+        formula_ref = cell.get("formula_ref", "")
+        if not formula_ref or formula_ref in existing_refs:
+            continue
+
+        # 从 parent sheet 获取展示信息
+        parent_addr_id = cell.get("parent_addr_id", "")
+        parent_sheet = cat.sheets_by_addr_id.get(parent_addr_id, {})
+        parent_wp_code = parent_sheet.get("parent_wp_code", "") or cell.get("addr_id", "").split("/")[0]
+        sheet_name = parent_sheet.get("sheet_name", "")
+        sheet_code = parent_sheet.get("sheet_code", "")
+        cycle = parent_sheet.get("cycle", "")
+
+        cell_address = cell.get("cell_address", "")
+        semantic_label = cell.get("semantic_label", "")
+        uri = cell.get("uri", "") or build_uri("wp", parent_wp_code, path=sheet_name, cell=cell_address)
+
+        # 构建人类可读 label
+        label_parts = [f"底稿 > {parent_wp_code}"]
+        if sheet_name:
+            label_parts.append(f"> {sheet_name}")
+        if semantic_label:
+            label_parts.append(f"> {semantic_label}")
+        elif cell_address:
+            label_parts.append(f"> {cell_address}")
+        label = " ".join(label_parts)
+
+        # 构建 tags
+        tags = ["底稿", "种子坐标"]
+        if cycle:
+            tags.append(cycle)
+        if sheet_name:
+            tags.append(sheet_name)
+
+        entries.append(AddressEntry(
+            uri=uri,
+            domain="wp",
+            source=parent_wp_code,
+            path=sheet_code or sheet_name,
+            cell=cell_address or semantic_label,
+            label=label,
+            wp_code=parent_wp_code,
+            formula_ref=formula_ref,
+            jump_route=build_jump_route(uri, project_id, year),
+            tags=tags,
+        ))
+        existing_refs.add(formula_ref)
+
+    return entries
+
+
 async def build_workpaper_entries(db, project_id: str, year: int) -> list[AddressEntry]:
     """从底稿映射构建地址条目"""
     import json
@@ -667,6 +766,13 @@ async def build_workpaper_entries(db, project_id: str, year: int) -> list[Addres
         entries.extend(custom_entries)
     except Exception as e:
         logger.warning(f"build_workpaper_entries custom cells error: {e}")
+
+    # M1: 合并 ACNR catalog 的 CellCatalogEntry，使 D 循环 473 种子坐标
+    # 在公式选址器可被搜索到 (R4.2, R4.5)
+    try:
+        entries = _merge_catalog_cell_entries(entries, project_id, year)
+    except Exception as e:
+        logger.warning(f"build_workpaper_entries catalog merge error: {e}")
 
     return entries
 

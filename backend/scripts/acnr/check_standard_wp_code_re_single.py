@@ -68,12 +68,8 @@ ALLOWED_PATHS: set[str] = {
     "scripts/acnr",
 }
 
-# 已知遗留位置（M1 task 8.1 迁移后移除）
-# 这些文件暂时放行，但 CI 输出 warning 提醒需迁移
-LEGACY_WHITELIST: dict[str, str] = {
-    "app/routers/wp_render_config.py": "遗留: 将在 M1 task 8.1 迁移至 grammar_v1 import",
-    "app/routers/wp_index_resolve.py": "遗留: 将在 M1 task 8.1 迁移至 grammar_v1 import",
-}
+# 已知遗留位置（已完成迁移，保留空 dict 结构以备将来需要）
+LEGACY_WHITELIST: dict[str, str] = {}
 
 # 排除目录（相对于 BACKEND_DIR）
 EXCLUDED_DIRS: set[str] = {

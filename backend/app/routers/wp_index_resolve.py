@@ -23,6 +23,8 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.models.procedure_models import ProcedureInstance
+from app.services.acnr.grammar import STANDARD_WP_CODE_RE, STANDARD_WP_CODE_RE_STR
+
 from app.models.workpaper_models import WpIndex
 
 logger = logging.getLogger(__name__)
@@ -66,7 +68,15 @@ STRICT_RE = re.compile(
     r"^(wp|sheet|cell|Note|TB|Adj|Att|EQCR|Calc|Sample|Confirm):(.+)$",
     re.IGNORECASE,
 )
-LOOSE_RE = re.compile(r"^[A-S]\d+(?:-\d+)*[A-Z]?$", re.IGNORECASE)
+# Loose mode pattern: 基于 STANDARD_WP_CODE_RE (^[A-S]\d) 扩展完整底稿码匹配
+# 格式: [A-S]\d+(-\d+)*[A-Z]? (如 D2, D2-1, A1-17, D2-1A)
+LOOSE_RE = re.compile(
+    STANDARD_WP_CODE_RE_STR + r"+(?:-\d+)*[A-Z]?$", re.IGNORECASE
+)
+# 提取 parent_wp_code 的模式（如 D2-2 → D2）：基于 STANDARD_WP_CODE_RE
+_PARENT_WP_CODE_RE = re.compile(
+    r"(" + STANDARD_WP_CODE_RE_STR.lstrip("^") + r"+)", re.IGNORECASE
+)
 GT_CUSTOM_RE = re.compile(r"^GT_Custom", re.IGNORECASE)
 
 
@@ -113,7 +123,7 @@ def _parse_ref(ref: str) -> tuple[str, int, str] | None:
         layer = NAMESPACE_LAYER_MAP[ns]
         return (ns, layer, raw_target)
 
-    # Loose mode: workpaper code pattern [A-S]\d+(-\d+)*[A-Z]?
+    # Loose mode: workpaper code pattern (STANDARD_WP_CODE_RE + suffixes)
     normalized = trimmed.upper()
 
     # Cell reference with ! separator
@@ -151,14 +161,14 @@ async def _check_wp_exists(
     if ns == "wp":
         wp_code = target.upper()
     elif ns == "sheet":
-        match = re.match(r"^([A-S]\d+)", target, re.IGNORECASE)
+        match = _PARENT_WP_CODE_RE.match(target)
         if match:
             wp_code = match.group(1).upper()
         else:
             wp_code = target.upper()
     elif ns == "cell":
         sheet_part = target.split("!")[0] if "!" in target else target
-        match = re.match(r"^([A-S]\d+)", sheet_part, re.IGNORECASE)
+        match = _PARENT_WP_CODE_RE.match(sheet_part)
         if match:
             wp_code = match.group(1).upper()
         else:

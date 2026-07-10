@@ -164,8 +164,9 @@ _ONLYOFFICE_HTML_WHITELIST: set[str] = {
     "h7-biological-assets",
 }
 
-# 标准底稿编号：A~I + 数字（D1-1、E11）；CUST-01 等字母后非数字则视为自建
-_STANDARD_WP_CODE = re.compile(r"^[A-I]\d", re.IGNORECASE)
+# 标准底稿编号判定：统一使用 ACNR grammar_v1 的 STANDARD_WP_CODE_RE (R12.2)
+# 旧版 [A-I]\d 已修正为 [A-S]\d，覆盖 J~S 循环（R12.4, R12.5）
+from app.services.acnr.grammar import is_standard_wp_code as _is_standard_wp_code_fn
 
 
 # ─── sheet_type 推断辅助（Task 2.1: schema 显式 > 启发式 > null）─────────────
@@ -333,7 +334,7 @@ async def _has_custom_procedure(
 
 
 def _looks_like_standard_wp_code(wp_code: str) -> bool:
-    return bool(_STANDARD_WP_CODE.search((wp_code or "").strip()))
+    return _is_standard_wp_code_fn(wp_code)
 
 
 async def _maybe_custom_classifications(

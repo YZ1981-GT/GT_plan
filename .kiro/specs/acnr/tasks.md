@@ -98,9 +98,9 @@
 ### 里程碑 M1 — 运行时接线 + 语法实现 + resolve_instance + 失效收口 + 端点统一
 
 - [ ] 7. `formula_grammar.py` WP/PREV 2+3 参与无损往返
-  - [ ] 7.1 在 `formula_grammar.py` 实现 `WP()`/`PREV()` 的 2 参与 3 参解析（具备实际解析能力方可标完成）
+  - [x] 7.1 在 `formula_grammar.py` 实现 `WP()`/`PREV()` 的 2 参与 3 参解析（具备实际解析能力方可标完成）
     - _Requirements: 10.2, 10.5_
-  - [ ] 7.2 修复 `formula_ref_to_uri()` 保留第三参（语义名不丢弃），并接入 `grammar.py` 互转
+  - [x] 7.2 修复 `formula_ref_to_uri()` 保留第三参（语义名不丢弃），并接入 `grammar.py` 互转
     - _Requirements: 10.3_
   - [ ]* 7.3 编写 formula_ref ↔ uri 无损往返属性测试
     - **Property 5: formula_ref ↔ uri 无损往返（含 2/3 参 WP/PREV 及五域）**
@@ -109,18 +109,18 @@
     - **Property 3: URI profile 往返保持（standard/custom_flat）**
     - **Validates: Requirements 9.1, 9.2, 9.4, 9.5**
 
-- [ ] 8. STANDARD_WP_CODE_RE 单一常量共享
-  - [ ] 8.1 让 `wp_render_config.py` 与 `wp_index_resolve.py` 从 grammar_v1 import `STANDARD_WP_CODE_RE`，删除各自 `[A-I]\d`/`[A-S]\d` 副本
+- [x] 8. STANDARD_WP_CODE_RE 单一常量共享
+  - [x] 8.1 让 `wp_render_config.py` 与 `wp_index_resolve.py` 从 grammar_v1 import `STANDARD_WP_CODE_RE`，删除各自 `[A-I]\d`/`[A-S]\d` 副本
     - _Requirements: 12.2_
   - [ ]* 8.2 编写标准码判定收敛属性测试
     - **Property 9: 标准码判定收敛（J1/S3 判为标准，[A-I]\d 误判消除）**
     - **Validates: Requirements 12.4, 12.5**
 
-- [ ] 9. 运行时接线（种子进选址器 + 自定义登记）
-  - [ ] 9.1 改造 `build_workpaper_entries()` 合并来自 catalog 的 Cell 条目
+- [x] 9. 运行时接线（种子进选址器 + 自定义登记）
+  - [x] 9.1 改造 `build_workpaper_entries()` 合并来自 catalog 的 Cell 条目
     - 使 D 循环 473 种子坐标在公式选址器可被搜索到；坐标登记即可被 `resolve()` 搜索，不依赖 `build_workpaper_entries()` 执行状态
     - _Requirements: 4.2, 4.5_
-  - [ ] 9.2 实现 `runtime.py` 的 `register_custom()` 登记 RuntimeCellEntry（保存后 parsed_data 提交调用）
+  - [x] 9.2 实现 `runtime.py` 的 `register_custom()` 登记 RuntimeCellEntry（保存后 parsed_data 提交调用）
     - 校验 `project_id` + wp 归属；自定义 addr_id 仅存 L2/L3 不落全局 L1
     - _Requirements: 23.3, 24.1, 24.2_
   - [ ]* 9.3 编写自定义写入项目归属校验属性测试
