@@ -45,14 +45,16 @@
 - [ ] 4. 引擎编排 composable 扩展（useVoucherSampling）
   - 承接新参数（置信度/可容忍/预期错报）与建议样本量留痕；`loadTolerableMisstatement(projectId)` 从重要性/B15 取数（失败允许手填）
   - 错报推断状态（actualMisstatement 录入 → projectMisstatement → UML → conclusion）；重抽原因必填；seed 展示；历史不覆盖
+  - 确认填充时经 useVersionTrail 生成含方法/时间/执行人的版本快照
   - cutoff-fill/voucher-history 载荷扩展（前端侧字段），后端未就绪时兼容兜底
-  - _Requirements: 15.3, 15.4, 16.1, 16.2, 16.3, 18.1, 22.1, 22.2, 22.3_
+  - _Requirements: 9.1, 15.3, 15.4, 16.1, 16.2, 16.3, 18.1, 22.1, 22.2, 22.3_
 
 - [ ] 5. 抽凭引擎 UI 扩展（GtVoucherSamplingEngine + 子对话框）
-  - `SamplingConfigDialog`：新增置信度/可容忍错报/预期错报录入 + 建议样本量展示与覆盖 + 参数校验提示
+  - `SamplingConfigDialog`：五种方法选择 + 各方法必填参数（MUS 样本量/特定项目阈值/分层边界与样本量）+ 总体范围（借贷方向/日期区间/科目）+ 缺参阻断提示；新增置信度/可容忍错报/预期错报录入 + 建议样本量展示与覆盖 + 参数校验提示
+  - `SamplingPreviewDialog`：样本列表人工增删勾选 + 同凭证号去重 + 特定选取原因录入并随样本回填
   - 引擎主体：MUS 抽样间隔展示 + 高值必选标识列；总体完整性校验区（总体↔账面差异告警）；错报推断区（录入实际错报→UML→结论建议，人工确认）
-  - `SamplingHistoryDrawer`：回显 seed / 重抽原因 / 间隔 / 结论
-  - _Requirements: 17.1, 17.4, 18.5, 18.6, 18.7, 19.1, 19.3, 20.1, 22.2_
+  - `SamplingHistoryDrawer`：回显 seed / 重抽原因 / 间隔 / 结论；重抽保留历史批次 + 两批次对比（新增/移除/保留凭证号）+ 撤销最近批次
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2, 6.3, 6.4, 6.5, 9.2, 9.3, 9.4, 17.1, 17.4, 18.5, 18.6, 18.7, 19.1, 19.3, 20.1, 22.2_
 
 - [ ] 6. D3-7 行级附件 + OCR 闭环（useD3VoucherCheck 扩展）
   - 新增 `OCR_FIELD_MAP`/`mapOcrToVoucherFields`/`handleRowOcr`（复用 `/d4/contract-ocr` 范式 → ElMessageBox 确认 → merge 保留已填值 → 低置信度标注）
