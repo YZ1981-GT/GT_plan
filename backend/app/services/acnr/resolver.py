@@ -1,27 +1,75 @@
-"""ACNR Resolver — resolve_instance + ProjectBinding
+"""ACNR Resolver — 统一 resolve 决策树 + resolve_instance + ProjectBinding
 
+resolve() 是平台四大消费库的唯一解析入口（R5），执行完整决策树。
 resolve_instance(project_id, parent_wp_code, sheet_code) 是平台唯一的 wp_id
 解析出口 (R13.1)。通过运行时查询 WpIndex → WorkingPaper 链实现 ProjectBinding。
 
+决策树（design.md §6.1.1）：
+  1. grammar 规范化（URI profile + 索引 ns 映射）
+  2. 若带 project_id：先应用 L2 overlay 补丁（R5.2, R5.8）
+  3. L1 CellCatalogEntry 精确 match
+  4. L1 SheetCatalogEntry + aliases → cell 级 match
+     └─ 多命中 → disambiguation（candidates[] / HTTP 409）（R5.5）
+  5. 同 sheet semantic_label 包含匹配
+  6. L3 RuntimeCellEntry（project-scoped）
+  7. 非 wp 域（tb/report/note/aux）→ 委托 V1 动态 build（R5.7）
+  8. miss → metrics + 相近项推荐（candidates ≤ 5）（R5.6）
+
 M1 阶段 ProjectBinding 为运行时查询（非物化缓存），M2+ 可选 DB 物化。
 
-Requirements: 6.1, 6.2, 6.3, 6.4, 13.1
+Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 13.1
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WpIndex, WorkingPaper
-from app.services.acnr.catalog import get_catalog
+from app.services.acnr.catalog import (
+    get_catalog,
+    _uri_to_addr_id,
+    _formula_ref_to_addr_id,
+    _index_ref_to_addr_id,
+    _find_candidates,
+    _hit_cell_response,
+    _hit_response,
+    _ambiguous_response,
+    _build_jump_route,
+)
+from app.services.acnr.overlay import get_project_overlay, ProjectOverlay
+from app.services.acnr.runtime import get_runtime_entries, RuntimeCellEntry
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Metrics (R5.6 — miss 指标) ──────────────────────────────────────────────
+
+_resolve_metrics: dict[str, int] = {"hit": 0, "miss": 0, "ambiguous": 0, "v1_delegate": 0}
+
+
+def get_resolve_metrics() -> dict[str, int]:
+    """返回 resolve 调用指标（可观测）。"""
+    return dict(_resolve_metrics)
+
+
+def reset_resolve_metrics() -> None:
+    """重置指标（测试用）。"""
+    for k in _resolve_metrics:
+        _resolve_metrics[k] = 0
+
+
+# ─── Non-wp Domain Detection (R5.7) ──────────────────────────────────────────
+
+_NON_WP_DOMAINS = {"tb", "report", "note", "aux"}
+_NON_WP_URI_PREFIXES = ("tb://", "report://", "note://", "aux://")
+_NON_WP_FORMULA_FUNCS = ("TB(", "ROW(", "SUM_ROW(", "SUM_TB(", "REPORT(", "NOTE(", "AUX(")
+_NON_WP_INDEX_NS = {"tb", "note", "adj", "att", "eqcr", "calc", "sample", "confirm"}
 
 
 # ─── Result Types ─────────────────────────────────────────────────────────────
@@ -61,7 +109,510 @@ class ResolveInstanceResult:
     candidates: Optional[list[dict]] = None
 
 
-# ─── Core resolver function ───────────────────────────────────────────────────
+# ─── Full Resolve Decision Tree (R5.1) ────────────────────────────────────────
+
+
+@dataclass
+class ResolveResult:
+    """full_resolve() 返回值 — 统一响应契约。
+
+    R5.3: 命中返回 found=True + addr_id + entry_type + cell_address + semantic_label
+           + formula_ref + uri + jump_route
+    R5.4: 带 project_id 且命中时附 wp_id
+    R5.5: 同 sheet 多候选 → found=False + error="ambiguous" + candidates
+    R5.6: miss → found=False + candidates ≤ 5
+    R5.7: 非 wp 域 → 委托 V1 动态 build 返回统一契约
+    """
+
+    found: bool
+    addr_id: Optional[str] = None
+    entry_type: Optional[str] = None
+    cell_address: Optional[str] = None
+    semantic_label: Optional[str] = None
+    formula_ref: Optional[str] = None
+    uri: Optional[str] = None
+    jump_route: Optional[str] = None
+    wp_id: Optional[str] = None  # R5.4: 带 project_id 时附加
+    error: Optional[str] = None
+    candidates: Optional[list[dict]] = None
+    # 内部元数据
+    source_layer: Optional[str] = None  # "L1_cell" / "L1_sheet" / "L2" / "L3" / "V1"
+
+
+def _detect_non_wp_domain(
+    uri: str | None,
+    formula_ref: str | None,
+    index_ref: str | None,
+) -> str | None:
+    """检测输入是否为非 wp 域（tb/report/note/aux）。
+
+    返回域名（如 "tb"）或 None（wp 域 / 无法判定）。
+    """
+    if uri:
+        for prefix in _NON_WP_URI_PREFIXES:
+            if uri.startswith(prefix):
+                return prefix.split("://")[0]
+
+    if formula_ref:
+        upper = formula_ref.strip().upper()
+        for func in _NON_WP_FORMULA_FUNCS:
+            if upper.startswith(func):
+                return func.rstrip("(").lower()
+                # 映射 ROW/SUM_ROW → report, SUM_TB → tb
+        # 细粒度映射
+        if upper.startswith("ROW(") or upper.startswith("SUM_ROW(") or upper.startswith("REPORT("):
+            return "report"
+        if upper.startswith("TB(") or upper.startswith("SUM_TB("):
+            return "tb"
+        if upper.startswith("NOTE("):
+            return "note"
+        if upper.startswith("AUX("):
+            return "aux"
+
+    if index_ref and ":" in index_ref:
+        ns = index_ref.split(":", 1)[0].lower()
+        if ns in _NON_WP_INDEX_NS:
+            return ns if ns in _NON_WP_DOMAINS else "report"  # adj/att/etc → 外部模块
+
+    return None
+
+
+def _delegate_v1(
+    uri: str | None,
+    formula_ref: str | None,
+    index_ref: str | None,
+    domain: str,
+) -> ResolveResult:
+    """委托 V1 address_registry 解析非 wp 域，返回统一契约（R5.7）。
+
+    消费者无需区分数据来自 L1 JSON 还是 V1 动态 build（R22.3, R22.5）。
+    """
+    from app.services.address_registry import (
+        parse_uri as v1_parse_uri,
+        formula_ref_to_uri as v1_formula_ref_to_uri,
+        uri_to_formula_ref as v1_uri_to_formula_ref,
+        build_uri as v1_build_uri,
+    )
+
+    # 标准化：确保有 URI
+    resolved_uri = uri
+    if not resolved_uri and formula_ref:
+        resolved_uri = v1_formula_ref_to_uri(formula_ref)
+    if not resolved_uri and index_ref and ":" in index_ref:
+        ns, target = index_ref.split(":", 1)
+        ns_lower = ns.lower()
+        # 按 grammar_v1 索引命名空间映射表
+        if ns_lower == "tb":
+            # TB:1001 → tb://1001#审定数（默认列=审定数，R11.2）
+            resolved_uri = v1_build_uri("tb", target, cell="审定数")
+        elif ns_lower == "note":
+            # Note:五、3 → note://五、3
+            resolved_uri = v1_build_uri("note", target)
+        else:
+            # 外部模块（Adj/Att/EQCR/Calc/Sample/Confirm）
+            # 首期只登记不解析物理格（R11.4），返回 miss
+            return ResolveResult(
+                found=False,
+                error="external_module_not_resolved",
+                candidates=[],
+                source_layer="V1",
+            )
+
+    if not resolved_uri:
+        _resolve_metrics["miss"] += 1
+        return ResolveResult(found=False, candidates=[], source_layer="V1")
+
+    # 解析 URI
+    parts = v1_parse_uri(resolved_uri)
+    if not parts:
+        _resolve_metrics["miss"] += 1
+        return ResolveResult(found=False, candidates=[], source_layer="V1")
+
+    # 构造统一契约（R5.7：同一出口统一响应）
+    resolved_formula_ref = formula_ref
+    if not resolved_formula_ref:
+        resolved_formula_ref = v1_uri_to_formula_ref(resolved_uri)
+
+    _resolve_metrics["v1_delegate"] += 1
+    return ResolveResult(
+        found=True,
+        addr_id=f"{parts['domain']}://{parts['source']}/{parts['path']}"
+        if parts["path"]
+        else f"{parts['domain']}://{parts['source']}",
+        entry_type=parts["domain"],
+        cell_address=parts.get("cell"),
+        semantic_label=None,
+        formula_ref=resolved_formula_ref,
+        uri=resolved_uri,
+        jump_route=None,  # jump_route 需要 project context，调用方自行 build
+        source_layer="V1",
+    )
+
+
+async def full_resolve(
+    *,
+    uri: str | None = None,
+    formula_ref: str | None = None,
+    addr_id: str | None = None,
+    index_ref: str | None = None,
+    project_id: str | None = None,
+    db: AsyncSession | None = None,
+) -> ResolveResult:
+    """统一 resolve 决策树入口 — 四库唯一解析方法（R5.1）。
+
+    输入接受四种语法（五域 URI / WP() 公式 / 索引 ns:target / 裸 addr_id），
+    按设计文档 §6.1.1 的八步决策树依次执行，输出统一 canonical 响应。
+
+    Args:
+        uri: 五域 URI（如 wp://D2/明细表D2-2#E100）
+        formula_ref: 公式引用（如 WP('D2','明细表D2-2','E100')）
+        addr_id: 裸 addr_id（如 D2/D2-2/E100）
+        index_ref: 索引命名空间引用（如 cell:D2-2!E100）
+        project_id: 项目 ID（有值时触发 L2 overlay 和 wp_id 附加）
+        db: 数据库会话（resolve_instance 需要，project_id 时必传）
+
+    Returns:
+        ResolveResult — 统一响应契约
+
+    Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8
+    """
+    cat = get_catalog()
+    overlay = get_project_overlay()
+
+    # ─── Step 7 (前置判断): 非 wp 域检测 → 委托 V1（R5.7）──────────────
+    non_wp_domain = _detect_non_wp_domain(uri, formula_ref, index_ref)
+    if non_wp_domain:
+        return _delegate_v1(uri, formula_ref, index_ref, non_wp_domain)
+
+    # ─── Step 1: grammar 规范化 → 推导 addr_id ──────────────────────────
+    resolved_addr_id: str | None = None
+    if addr_id:
+        resolved_addr_id = addr_id
+    elif uri:
+        resolved_addr_id = _uri_to_addr_id(uri)
+    elif formula_ref:
+        resolved_addr_id = _formula_ref_to_addr_id(formula_ref)
+    elif index_ref:
+        resolved_addr_id = _index_ref_to_addr_id(index_ref)
+
+    if not resolved_addr_id:
+        # 无法解析输入
+        _resolve_metrics["miss"] += 1
+        query = uri or formula_ref or addr_id or index_ref or ""
+        candidates = _find_candidates(query, max_results=5)
+        return ResolveResult(found=False, candidates=candidates, source_layer=None)
+
+    # ─── Step 2: 若带 project_id → 先应用 L2 overlay（R5.2, R5.8）────
+    # overlay 修改的是 catalog 的 sheet 条目（sheet_name_aliases 等），
+    # 使得后续匹配使用项目级补丁后的数据
+    project_aliases: dict[str, list[str]] = {}
+    if project_id:
+        project_aliases = overlay.get_project_aliases(project_id)
+
+    # ─── Step 3: L1 CellCatalogEntry 精确 match ─────────────────────────
+    cell_entry = cat.cells_by_addr_id.get(resolved_addr_id)
+    if cell_entry:
+        result = _build_cell_resolve_result(cell_entry, project_id, overlay)
+        # R5.4: 带 project_id 时附 wp_id
+        if project_id and db:
+            result = await _attach_wp_id(result, project_id, db)
+        _resolve_metrics["hit"] += 1
+        return result
+
+    # ─── Step 4: L1 SheetCatalogEntry + aliases → cell 级 match ──────────
+    # 4a. 先尝试 sheet 精确匹配
+    sheet_entry = cat.sheets_by_addr_id.get(resolved_addr_id)
+    if sheet_entry:
+        # 如果 project_id 存在，应用单条目 overlay
+        if project_id:
+            sheet_entry = overlay.apply_to_single(project_id, sheet_entry)
+        result = _build_sheet_resolve_result(sheet_entry, project_id, overlay)
+        if project_id and db:
+            result = await _attach_wp_id(result, project_id, db)
+        _resolve_metrics["hit"] += 1
+        return result
+
+    # 4b. 尝试 addr_id 的 sheet 部分（前两段）+ 别名匹配
+    parts = resolved_addr_id.split("/")
+    if len(parts) >= 2:
+        # 尝试 parent/sheet_code 作为 sheet addr_id + 末段作为 cell_desc
+        sheet_addr_id = f"{parts[0]}/{parts[1]}"
+        cell_desc = "/".join(parts[2:]) if len(parts) > 2 else None
+
+        sheet_entry = cat.sheets_by_addr_id.get(sheet_addr_id)
+        if sheet_entry and cell_desc:
+            # 在该 sheet 下搜索 cell
+            cells = cat.cells_by_parent.get(sheet_addr_id, [])
+
+            # 精确 cell_address 匹配
+            exact = [c for c in cells if c.get("cell_address") == cell_desc]
+            if len(exact) == 1:
+                result = _build_cell_resolve_result(exact[0], project_id, overlay)
+                if project_id and db:
+                    result = await _attach_wp_id(result, project_id, db)
+                _resolve_metrics["hit"] += 1
+                return result
+
+            # 多命中 → ambiguous (R5.5)
+            if len(exact) > 1:
+                _resolve_metrics["ambiguous"] += 1
+                return ResolveResult(
+                    found=False,
+                    error="ambiguous",
+                    candidates=[
+                        {
+                            "addr_id": c.get("addr_id"),
+                            "display_label": c.get("semantic_label") or c.get("addr_id"),
+                            "score": 1.0,
+                        }
+                        for c in exact
+                    ],
+                    source_layer="L1_cell",
+                )
+
+            # ─── Step 5: semantic_label 包含匹配 ────────────────────────
+            semantic = [
+                c for c in cells
+                if cell_desc and cell_desc in (c.get("semantic_label") or "")
+            ]
+            if len(semantic) == 1:
+                result = _build_cell_resolve_result(semantic[0], project_id, overlay)
+                if project_id and db:
+                    result = await _attach_wp_id(result, project_id, db)
+                _resolve_metrics["hit"] += 1
+                return result
+            if len(semantic) > 1:
+                _resolve_metrics["ambiguous"] += 1
+                return ResolveResult(
+                    found=False,
+                    error="ambiguous",
+                    candidates=[
+                        {
+                            "addr_id": c.get("addr_id"),
+                            "display_label": c.get("semantic_label") or c.get("addr_id"),
+                            "score": 1.0,
+                        }
+                        for c in semantic
+                    ],
+                    source_layer="L1_cell",
+                )
+
+    # 4c. 单段 → 裸 sheet_code 匹配
+    if len(parts) == 1:
+        code_matches = cat.sheets_by_code.get(parts[0], [])
+        # 应用项目别名补充
+        if project_id:
+            code_matches = overlay.apply(project_id, code_matches) if code_matches else code_matches
+        if len(code_matches) == 1:
+            result = _build_sheet_resolve_result(code_matches[0], project_id, overlay)
+            if project_id and db:
+                result = await _attach_wp_id(result, project_id, db)
+            _resolve_metrics["hit"] += 1
+            return result
+        if len(code_matches) > 1:
+            _resolve_metrics["ambiguous"] += 1
+            return ResolveResult(
+                found=False,
+                error="ambiguous",
+                candidates=[
+                    {
+                        "addr_id": e.get("addr_id"),
+                        "display_label": e.get("display_label") or e.get("sheet_name") or e.get("addr_id"),
+                        "score": 1.0,
+                    }
+                    for e in code_matches
+                ],
+                source_layer="L1_sheet",
+            )
+
+    # 4d. 别名反查（含项目级别名）
+    if len(parts) >= 2:
+        # 尝试 parts[1] 作为别名
+        alias_key = parts[1] if len(parts) >= 2 else parts[0]
+        alias_matches = cat.sheets_by_alias.get(alias_key, [])
+        # 加上项目别名
+        if project_id and project_aliases:
+            for aid, aliases in project_aliases.items():
+                if alias_key in aliases:
+                    extra = cat.sheets_by_addr_id.get(aid)
+                    if extra and extra not in alias_matches:
+                        alias_matches = alias_matches + [extra]
+
+        # 按 parent_wp_code 过滤
+        if parts[0] and alias_matches:
+            filtered = [m for m in alias_matches if m.get("parent_wp_code") == parts[0]]
+            if filtered:
+                alias_matches = filtered
+
+        if len(alias_matches) == 1 and len(parts) > 2:
+            # 有 cell 部分
+            cell_desc = "/".join(parts[2:])
+            cells = cat.cells_by_parent.get(alias_matches[0].get("addr_id", ""), [])
+            exact = [c for c in cells if c.get("cell_address") == cell_desc]
+            if len(exact) == 1:
+                result = _build_cell_resolve_result(exact[0], project_id, overlay)
+                if project_id and db:
+                    result = await _attach_wp_id(result, project_id, db)
+                _resolve_metrics["hit"] += 1
+                return result
+            # semantic 包含
+            semantic = [c for c in cells if cell_desc in (c.get("semantic_label") or "")]
+            if len(semantic) == 1:
+                result = _build_cell_resolve_result(semantic[0], project_id, overlay)
+                if project_id and db:
+                    result = await _attach_wp_id(result, project_id, db)
+                _resolve_metrics["hit"] += 1
+                return result
+
+        elif len(alias_matches) == 1:
+            result = _build_sheet_resolve_result(alias_matches[0], project_id, overlay)
+            if project_id and db:
+                result = await _attach_wp_id(result, project_id, db)
+            _resolve_metrics["hit"] += 1
+            return result
+
+    # ─── Step 6: L3 RuntimeCellEntry（project-scoped）────────────────────
+    if project_id:
+        runtime_entries = get_runtime_entries(project_id)
+        if runtime_entries:
+            # 精确匹配 addr_id
+            rt_entry = runtime_entries.get(resolved_addr_id)
+            if rt_entry:
+                result = _build_runtime_resolve_result(rt_entry)
+                _resolve_metrics["hit"] += 1
+                return result
+
+            # 尝试按 cell_address + wp_code 模糊搜索 L3
+            for rt_addr_id, rt_entry in runtime_entries.items():
+                # 检查 resolved_addr_id 是否匹配 runtime entry 的子字段
+                if (
+                    resolved_addr_id == rt_entry.cell_address
+                    or resolved_addr_id.endswith(f"/{rt_entry.cell_address}")
+                    or (rt_entry.wp_code and resolved_addr_id.startswith(rt_entry.wp_code))
+                ):
+                    result = _build_runtime_resolve_result(rt_entry)
+                    _resolve_metrics["hit"] += 1
+                    return result
+
+    # ─── Step 8: miss → metrics + 相近项推荐（≤5）（R5.6）─────────────────
+    _resolve_metrics["miss"] += 1
+    candidates = _find_candidates(resolved_addr_id, max_results=5)
+    return ResolveResult(found=False, candidates=candidates, source_layer=None)
+
+
+# ─── Resolve Result Builders ──────────────────────────────────────────────────
+
+
+def _build_cell_resolve_result(
+    cell: dict,
+    project_id: str | None,
+    overlay: ProjectOverlay,
+) -> ResolveResult:
+    """从 L1 CellCatalogEntry 构建命中响应（R5.3）。"""
+    cat = get_catalog()
+    parent_id = cell.get("parent_addr_id", "")
+    parent = cat.sheets_by_addr_id.get(parent_id)
+
+    jump_route: str | None = None
+    if parent:
+        template = parent.get("jump_route_template", "")
+        jump_route = template  # wp_id 由 _attach_wp_id 后续填充
+
+    return ResolveResult(
+        found=True,
+        addr_id=cell.get("addr_id"),
+        entry_type="cell",
+        cell_address=cell.get("cell_address"),
+        semantic_label=cell.get("semantic_label"),
+        formula_ref=cell.get("formula_ref"),
+        uri=cell.get("uri"),
+        jump_route=jump_route,
+        source_layer="L1_cell",
+    )
+
+
+def _build_sheet_resolve_result(
+    sheet: dict,
+    project_id: str | None,
+    overlay: ProjectOverlay,
+) -> ResolveResult:
+    """从 L1 SheetCatalogEntry 构建命中响应。"""
+    return ResolveResult(
+        found=True,
+        addr_id=sheet.get("addr_id"),
+        entry_type="sheet",
+        cell_address=None,
+        semantic_label=None,
+        formula_ref=None,
+        uri=None,
+        jump_route=sheet.get("jump_route_template"),
+        source_layer="L1_sheet",
+    )
+
+
+def _build_runtime_resolve_result(entry: RuntimeCellEntry) -> ResolveResult:
+    """从 L3 RuntimeCellEntry 构建命中响应。"""
+    return ResolveResult(
+        found=True,
+        addr_id=entry.addr_id,
+        entry_type="runtime_cell",
+        cell_address=entry.cell_address,
+        semantic_label=entry.semantic_label,
+        formula_ref=entry.formula_ref,
+        uri=entry.uri,
+        jump_route=None,  # runtime entry 无 jump_route_template，需显式 resolve_instance
+        wp_id=entry.wp_id or None,
+        source_layer="L3",
+    )
+
+
+async def _attach_wp_id(
+    result: ResolveResult,
+    project_id: str,
+    db: AsyncSession,
+) -> ResolveResult:
+    """R5.4: 带 project_id 且 L1 命中 → 通过 resolve_instance 附 wp_id。
+
+    解析 addr_id 的 parent_wp_code + sheet_code → 查 WpIndex → 获取 wp_id。
+    成功时同时更新 jump_route（模板填充 wp_id）。
+    """
+    if not result.found or not result.addr_id:
+        return result
+
+    parts = result.addr_id.split("/")
+    if len(parts) < 2:
+        return result
+
+    parent_wp_code = parts[0]
+    sheet_code = parts[1]
+
+    try:
+        instance_result = await resolve_instance(
+            db=db,
+            project_id=UUID(project_id),
+            parent_wp_code=parent_wp_code,
+            sheet_code=sheet_code,
+        )
+        if instance_result.found and instance_result.wp_id:
+            result.wp_id = str(instance_result.wp_id)
+            # 用解析到的 wp_id 填充 jump_route 模板
+            if result.jump_route and "{wp_id}" in result.jump_route:
+                result.jump_route = result.jump_route.replace(
+                    "{wp_id}", str(instance_result.wp_id)
+                )
+            elif instance_result.jump_route:
+                result.jump_route = instance_result.jump_route
+    except Exception as e:
+        # 附加 wp_id 失败不影响解析结果（命中仍为 True）
+        logger.debug(
+            "attach_wp_id failed: project=%s addr=%s error=%s",
+            project_id, result.addr_id, e,
+        )
+
+    return result
+
+
+# ─── Core resolve_instance function ──────────────────────────────────────────
 
 
 async def resolve_instance(

@@ -127,14 +127,14 @@
     - **Property 13: 自定义写入项目归属校验（防 IDOR）**
     - **Validates: Requirements 24.1**
 
-- [ ] 10. resolve_instance + ProjectOverlay + Resolver 决策树
+- [x] 10. resolve_instance + ProjectOverlay + Resolver 决策树
   - [x] 10.1 实现 `resolve_instance(project_id, parent_wp_code, sheet_code)` + ProjectBinding（运行时查 `WpIndex`）
     - 唯一 wp_id 出口；返回 jump_route 模板 + 已填充 wp_id；多实例返回 disambiguation，除非显式传 wp_id
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - [x] 10.2 实现 `overlay.py` L2 补丁应用 + 归属校验
     - 带 project_id 时在 L1 命中前先应用 overlay；即使最终 ambiguous 仍先应用 overlay
     - _Requirements: 5.2, 5.8, 24.1_
-  - [ ] 10.3 实现 `resolver.py` 完整决策树（L2 overlay → L1 Cell 精确 → L1 Sheet+aliases → semantic_label 包含 → L3 Runtime → 非 wp 域委托 V1 → miss 推荐）
+  - [x] 10.3 实现 `resolver.py` 完整决策树（L2 overlay → L1 Cell 精确 → L1 Sheet+aliases → semantic_label 包含 → L3 Runtime → 非 wp 域委托 V1 → miss 推荐）
     - 命中带 project context 附 wp_id；非 wp 域经同一出口委托 V1 返回统一契约；miss 记指标
     - _Requirements: 5.1, 5.3, 5.4, 5.5, 5.6, 5.7_
   - [ ]* 10.4 编写多语法一致性解析属性测试
