@@ -86,6 +86,17 @@ async function onAiAnalysisNote(): Promise<void> {
 
 <template>
   <div class="d2-tab-analysis">
+    <div class="tab-header">
+      <h4>应收账款分析程序 D2-5</h4>
+      <GtReviewTrigger section-id="D2-analysis-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>通过周转率、账龄、集中度等分析程序识别应收账款异常波动与潜在错报风险，为实质性程序提供方向。</p>
+      </template>
+    </el-alert>
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-tag type="info" size="small">分析程序</el-tag>
@@ -188,13 +199,28 @@ async function onAiAnalysisNote(): Promise<void> {
         </el-form-item>
       </el-form>
     </el-card>
+
+    <details class="guidance-fold">
+      <summary>📋 编制提示</summary>
+      <p>周转率 = 营业收入 / 平均应收账款；周转天数 = 365 / 周转率。较上期显著变动需分析原因（信用政策变化、收入确认、坏账）。</p>
+      <p>账龄分布：长账龄占比上升往往预示回收风险与坏账计提不足，应与 D2-3/D2-9 交叉验证。</p>
+      <p>前五大集中度过高需关注客户信用风险与关联方交易（联动 D2-6）。</p>
+      <p>分析程序发现的异常应追查至明细并在实质性程序中重点测试。</p>
+    </details>
   </div>
 </template>
 
 <style scoped>
 .d2-tab-analysis { padding: 12px; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .warning-alert { margin-bottom: 12px; }
 .warn-chip { margin-left: 8px; vertical-align: middle; }
 .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }

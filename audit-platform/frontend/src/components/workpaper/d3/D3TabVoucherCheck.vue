@@ -1,5 +1,12 @@
 <template>
 <div class="d3-voucher-check">
+  <!-- 审计目标 -->
+  <el-alert type="info" :closable="false" show-icon class="audit-objective">
+    <template #title>
+      <strong>审计目标</strong>：通过抽样检查本期增减变动及期后结转凭证，验证预收账款发生的真实性、完整性与截止准确性，识别跨期确认与虚构预收（CAS 1301 审计证据 / CAS 1313 截止测试）。
+    </template>
+  </el-alert>
+
   <!-- 抽样参数区 -->
   <div class="sampling-params-card">
     <h4 class="card-title section-header-row">
@@ -174,11 +181,14 @@
             @change="(val: string) => updateCell('current', row.rowId, 'indexRef', val)" />
         </template>
       </el-table-column>
-      <el-table-column label="异常" width="80">
+      <el-table-column label="异常标记" width="130">
         <template #default="{ row }">
-          <el-input v-model="row.isAbnormal" size="small" :disabled="isReadonly"
-            :class="{ 'abnormal-cell': row.isAbnormal }"
-            @change="(val: string) => updateCell('current', row.rowId, 'isAbnormal', val)" />
+          <el-select v-model="row.isAbnormal" size="small" :disabled="isReadonly" clearable filterable allow-create
+            default-first-option placeholder="正常"
+            :class="{ 'abnormal-cell': !!row.isAbnormal }"
+            @change="(val: string) => updateCell('current', row.rowId, 'isAbnormal', val || '')">
+            <el-option v-for="opt in ABNORMAL_OPTIONS" :key="opt" :label="opt" :value="opt" />
+          </el-select>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="50" v-if="!isReadonly">
@@ -283,11 +293,14 @@
             @change="(val: string) => updateCell('postPeriod', row.rowId, 'indexRef', val)" />
         </template>
       </el-table-column>
-      <el-table-column label="异常" width="80">
+      <el-table-column label="异常标记" width="130">
         <template #default="{ row }">
-          <el-input v-model="row.isAbnormal" size="small" :disabled="isReadonly"
-            :class="{ 'abnormal-cell': row.isAbnormal }"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'isAbnormal', val)" />
+          <el-select v-model="row.isAbnormal" size="small" :disabled="isReadonly" clearable filterable allow-create
+            default-first-option placeholder="正常"
+            :class="{ 'abnormal-cell': !!row.isAbnormal }"
+            @change="(val: string) => updateCell('postPeriod', row.rowId, 'isAbnormal', val || '')">
+            <el-option v-for="opt in ABNORMAL_OPTIONS" :key="opt" :label="opt" :value="opt" />
+          </el-select>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="50" v-if="!isReadonly">
@@ -311,6 +324,14 @@
     style="margin: 12px 0"
   />
 
+  <!-- 编制提示 -->
+  <details class="guidance-fold">
+    <summary>📋 编制提示（CAS 1301 审计证据 / CAS 1313 截止测试）</summary>
+    <p>1. 本期增减变动：核对凭证与原始单据（合同、收款凭据、发票），验证预收款发生的真实性与金额准确性；</p>
+    <p>2. 期后结转：检查资产负债表日后预收款结转确认收入的凭证，判断收入截止是否正确、有无提前/滞后确认；</p>
+    <p>3. 异常标记后请在备注说明具体异常，跨期疑点应关联收入截止测试（D4）并评估对报表的影响。</p>
+  </details>
+
 </div>
 </template>
 
@@ -319,7 +340,7 @@
  * D3TabVoucherCheck.vue — D3-7 凭证检查表
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
-import { computed, type Ref } from 'vue'
+import { computed, toRef, type Ref } from 'vue'
 import { useD3VoucherCheck } from '../composables/useD3VoucherCheck'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -332,13 +353,18 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const {
   samplingParams,
@@ -352,9 +378,9 @@ const {
   updateCell,
   updateSamplingParams,
 } = useD3VoucherCheck({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
@@ -364,6 +390,9 @@ const progressPct = computed(() => {
   if (!samplingParams.value.targetSampleSize) return 0
   return Math.min(100, Math.round((samplingParams.value.currentSampleSize / samplingParams.value.targetSampleSize) * 100))
 })
+
+/** 异常标记常用枚举（可点选 + 允许自定义输入） */
+const ABNORMAL_OPTIONS = ['跨期疑点', '金额异常', '无原始凭证', '对方科目异常', '重复入账', '其他异常']
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -413,7 +442,7 @@ const {
 import { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import { parseNum } from '../composables/useD3FormulaEngine'
 
-const crossSheet = useD3CrossSheet({ allResponses: props.allResponses })
+const crossSheet = useD3CrossSheet({ allResponses: allResponsesRef })
 
 /** D3-2 Z列（期后结转）合计 vs D3-7 (2)期后结转贷方合计 交叉验证 */
 const postPeriodCrossValidation = computed(() => {
@@ -421,7 +450,7 @@ const postPeriodCrossValidation = computed(() => {
   if (d37Total === 0) return ''
 
   // 从 D3-2 明细行聚合 Z列合计
-  const detResp = props.allResponses.value.get('D3-det-rows')
+  const detResp = allResponsesRef.value.get('D3-det-rows')
   let d32ZTotal = 0
   if (detResp?.remark) {
     try {
@@ -435,11 +464,15 @@ const postPeriodCrossValidation = computed(() => {
   return `D3-2期后结转（Z列）合计 ${d32ZTotal.toLocaleString()} 元 ≠ D3-7期后结转贷方合计 ${d37Total.toLocaleString()} 元，差额 ${diff.toLocaleString()} 元`
 })
 
-const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-7')
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wpIdRef, 'D3-7')
 </script>
 
 <style scoped>
 .d3-voucher-check { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.guidance-fold { margin-top: 16px; font-size: 12px; color: #606266; background: #f9fafb; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
+.guidance-fold summary { cursor: pointer; font-weight: 600; color: #409eff; }
+.guidance-fold p { margin: 6px 0 0; line-height: 1.6; }
 .sampling-params-card { padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .section-header-row { display: flex; align-items: center; gap: 8px; }

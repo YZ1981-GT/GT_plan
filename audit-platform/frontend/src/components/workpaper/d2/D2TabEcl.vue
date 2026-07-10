@@ -5,12 +5,16 @@
  * D2-9: 8列 + 合计 + 差异高亮
  * D2-10: 折现法 + 迁徙率矩阵
  */
-import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { useD2Ecl, type EclSingleRow, type MigrationRateRow, type EclDiscountRow } from '../composables/useD2Ecl'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import type { ImportableSheet } from '../composables/useD2ImportExport'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import D2ReferenceBlock from './D2ReferenceBlock.vue'
+import { ECL_REFERENCE_SECTIONS, ECL_REFERENCE_SOURCE } from '../composables/d2ReferenceExamples'
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -81,10 +85,73 @@ function fmtPct(v: number): string {
   if (v === 0) return '-'
   return (v * 100).toFixed(2) + '%'
 }
+
+/** 百分比输入辅助：内部存小数，UI 用百分数 */
+function toPctInput(v: number): number {
+  return Number((v * 100).toFixed(4))
+}
+function fromPctInput(v: number | null): number {
+  return (Number(v) || 0) / 100
+}
+
+// ─── 审计说明（inline 存储）─────────────────────────────────────────────────
+const NOTE_KEY = 'D2-ecl-note'
+const auditNote = ref('')
+onMounted(() => { auditNote.value = props.allResponses.get(NOTE_KEY)?.remark || '' })
+
+function saveNote(v: string): void {
+  if (props.isReadonly) return
+  auditNote.value = v
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: v }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+}
+
+const { aiAvailable, generateAndConfirm } = useD2AiGenerate(toRef(props, 'wpId'))
+const aiLoadingNote = ref(false)
+
+async function generateNoteAI(): Promise<void> {
+  if (props.isReadonly) return
+  aiLoadingNote.value = true
+  try {
+    const text = await generateAndConfirm('ecl-note', auditNote.value, {
+      sheet: props.eclFocus,
+      singleCount: singleRows.value.length,
+      singleShouldProvision: singleTotal.value.shouldProvision,
+      singleDifference: singleTotal.value.difference,
+    }, 'AI · 预期信用损失说明')
+    if (text) saveNote(text)
+  } finally { aiLoadingNote.value = false }
+}
+
+const GUIDANCE_TEXTS = [
+  '预期信用损失（ECL，CAS 22）：以违约概率（PD）、违约损失率（LGD）、违约风险敞口（EAD）为基础，结合前瞻性信息计量减值准备。',
+  '单项测算（D2-9）：对单项金额重大或存在客观减值证据的应收款单独测算，应计提 = 审定余额 × 预期损失率。',
+  '计量测试（D2-10）：组合按账龄迁徙率连乘推算预期损失率，或采用现金流折现法（多情景概率加权）。',
+  '前瞻性调整：应考虑宏观经济指标（GDP、行业景气度等）对损失率的影响；迁徙率较上期大幅变动需说明原因（联动 D2-8）。',
+]
 </script>
 
 <template>
   <div class="d2-tab-ecl">
+    <div class="tab-header">
+      <h4>{{ eclFocus === 'D2-10' ? '预期信用损失计量测试 D2-10' : eclFocus === 'D2-9' ? '应收坏账准备测算 D2-9' : '预期信用损失（D2-9 / D2-10）' }}</h4>
+      <GtReviewTrigger section-id="D2-ecl-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>测算并验证应收账款预期信用损失，评价单项/组合计提方法、损失率及前瞻性调整的合理性（CAS 22）。</p>
+      </template>
+    </el-alert>
+
+    <!-- 源模板示例内嵌编制参考 -->
+    <D2ReferenceBlock
+      title="ECL 计量编制参考（三要素 / 账龄对照 / 单项概率加权 / 前瞻性打分卡）"
+      :source="ECL_REFERENCE_SOURCE"
+      :sections="ECL_REFERENCE_SECTIONS as any"
+    />
+
     <div class="tab-toolbar">
       <div v-if="importExportEnabled" class="toolbar-left">
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
@@ -112,25 +179,43 @@ function fmtPct(v: number): string {
               <GtReviewDot row-prefix="D2-ecl" :row-key="row.rowId" />
             </template>
           </el-table-column>
-          <el-table-column label="审定余额" width="120" align="right">
-            <template #default="{ row }">{{ displayPrefs.fmtAmount(row.auditedBalance) }}</template>
+          <el-table-column label="审定余额" width="130" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditedBalance', v || 0)" />
+              <span v-else>{{ displayPrefs.fmtAmount(row.auditedBalance) }}</span>
+            </template>
           </el-table-column>
-          <el-table-column label="预期损失率" width="100" align="right">
-            <template #default="{ row }">{{ fmtPct(row.expectedLossRate) }}</template>
+          <el-table-column label="预期损失率%" width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.expectedLossRate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'expectedLossRate', fromPctInput(v))" />
+              <span v-else>{{ fmtPct(row.expectedLossRate) }}</span>
+            </template>
           </el-table-column>
           <el-table-column label="应计提" width="120" align="right">
-            <template #default="{ row }">{{ displayPrefs.fmtAmount(row.shouldProvision) }}</template>
+            <template #default="{ row }">
+              <el-tooltip content="= 审定余额 × 预期损失率（自动计算）" placement="top">
+                <span class="calc-cell">{{ displayPrefs.fmtAmount(row.shouldProvision) }}</span>
+              </el-tooltip>
+            </template>
           </el-table-column>
-          <el-table-column label="实际余额" width="120" align="right">
-            <template #default="{ row }">{{ displayPrefs.fmtAmount(row.actualBalance) }}</template>
+          <el-table-column label="实际余额" width="130" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="row.actualBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'actualBalance', v || 0)" />
+              <span v-else>{{ displayPrefs.fmtAmount(row.actualBalance) }}</span>
+            </template>
           </el-table-column>
           <el-table-column label="差异" width="110" align="right">
             <template #default="{ row }">
-              <span :style="{ color: row.difference !== 0 ? '#f56c6c' : '' }">{{ displayPrefs.fmtAmount(row.difference) }}</span>
+              <el-tooltip content="= 实际余额 − 应计提（自动计算）" placement="top">
+                <span class="calc-cell" :style="{ color: row.difference !== 0 ? '#f56c6c' : '' }">{{ displayPrefs.fmtAmount(row.difference) }}</span>
+              </el-tooltip>
             </template>
           </el-table-column>
-          <el-table-column label="计提依据" min-width="100">
-            <template #default="{ row }">{{ row.basis || '-' }}</template>
+          <el-table-column label="计提依据" min-width="120">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly" :model-value="row.basis" size="small" placeholder="计提依据" @change="(v: string) => updateCell(row.rowId, 'basis', v)" />
+              <span v-else>{{ row.basis || '-' }}</span>
+            </template>
           </el-table-column>
           <el-table-column label="操作" width="60" v-if="!isReadonly">
             <template #default="{ row }">
@@ -193,36 +278,77 @@ function fmtPct(v: number): string {
             <span class="sub-title">组合迁徙率矩阵</span>
           </div>
           <el-table :data="migrationMatrix" border size="small" style="width: 100%">
-            <el-table-column prop="agingBand" label="账龄段" width="100" />
-            <el-table-column label="第1年" width="90" align="right">
-              <template #default="{ row }">{{ fmtPct(row.year1Rate) }}</template>
+            <el-table-column prop="agingBand" label="账龄段" width="120">
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly" :model-value="row.agingBand" size="small" placeholder="账龄段" @change="(v: string) => updateCell(row.rowId, 'agingBand', v)" />
+                <span v-else>{{ row.agingBand }}</span>
+              </template>
             </el-table-column>
-            <el-table-column label="第2年" width="90" align="right">
-              <template #default="{ row }">{{ fmtPct(row.year2Rate) }}</template>
+            <el-table-column label="第1年%" width="110" align="right">
+              <template #default="{ row }">
+                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year1Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'year1Rate', fromPctInput(v))" />
+                <span v-else>{{ fmtPct(row.year1Rate) }}</span>
+              </template>
             </el-table-column>
-            <el-table-column label="第3年" width="90" align="right">
-              <template #default="{ row }">{{ fmtPct(row.year3Rate) }}</template>
+            <el-table-column label="第2年%" width="110" align="right">
+              <template #default="{ row }">
+                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year2Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'year2Rate', fromPctInput(v))" />
+                <span v-else>{{ fmtPct(row.year2Rate) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="第3年%" width="110" align="right">
+              <template #default="{ row }">
+                <el-input-number v-if="!isReadonly" :model-value="toPctInput(row.year3Rate)" size="small" :controls="false" :precision="2" :min="0" :max="100" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'year3Rate', fromPctInput(v))" />
+                <span v-else>{{ fmtPct(row.year3Rate) }}</span>
+              </template>
             </el-table-column>
             <el-table-column label="平均迁徙率" width="100" align="right">
-              <template #default="{ row }">{{ fmtPct(row.avgRate) }}</template>
+              <template #default="{ row }"><span class="calc-cell">{{ fmtPct(row.avgRate) }}</span></template>
             </el-table-column>
             <el-table-column label="预期损失率" width="110" align="right">
               <template #default="{ row }">
-                <span style="font-weight:600">{{ fmtPct(row.expectedLossRate) }}</span>
+                <el-tooltip content="账龄段迁徙率连乘（自动计算）" placement="top">
+                  <span class="calc-cell" style="font-weight:600">{{ fmtPct(row.expectedLossRate) }}</span>
+                </el-tooltip>
               </template>
             </el-table-column>
           </el-table>
         </div>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 审计说明 -->
+    <div class="section-subtitle">
+      审计说明
+      <GtReviewTrigger section-id="D2-ecl-note" />
+      <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+        <el-button size="small" text type="primary" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI 生成</el-button>
+      </el-tooltip>
+      <el-button v-if="openReviewDialog" size="small" text @click="openReviewDialog('D2-ecl-note')">💬 复核</el-button>
+    </div>
+    <el-input type="textarea" autosize :model-value="auditNote" placeholder="记录 ECL 测算方法、损失率依据、前瞻性调整及计提充分性评价..." :disabled="isReadonly" @change="saveNote" />
+
+    <details class="guidance-fold">
+      <summary>📋 编制提示</summary>
+      <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
+    </details>
   </div>
 </template>
 
 <style scoped>
 .d2-tab-ecl { padding: 12px; }
 .d2-tab-ecl :deep(.single-mode > .el-tabs__header) { display: none; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
+.calc-cell { color: #909399; font-variant-numeric: tabular-nums; }
+.section-subtitle { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .section-actions { margin-bottom: 10px; display: flex; gap: 8px; }
 .total-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 8px;

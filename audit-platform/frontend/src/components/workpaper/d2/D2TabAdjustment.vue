@@ -7,6 +7,8 @@ import { ref, inject, toRef, type Ref } from 'vue'
 import { useD2Adjustment, type AdjustmentEntry } from '../composables/useD2Adjustment'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -66,6 +68,17 @@ function handlePushToA13() {
 
 <template>
   <div class="d2-tab-adjustment">
+    <div class="tab-header">
+      <h4>调整分录汇总表 D2-4</h4>
+      <GtReviewTrigger section-id="D2-adjustment-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>汇总应收账款相关审计调整（AJE）与重分类调整（RJE），确保借贷平衡并推送至 A13 未更正错报汇总。</p>
+      </template>
+    </el-alert>
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
@@ -131,8 +144,11 @@ function handlePushToA13() {
           <span v-else>{{ row.accountName || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="附注项目" width="100">
-        <template #default="{ row }">{{ row.noteItem || '-' }}</template>
+      <el-table-column label="附注项目" width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.noteItem" size="small" placeholder="附注项目" @change="(v: string) => updateEntry(row.rowId, 'noteItem', v)" />
+          <span v-else>{{ row.noteItem || '-' }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="借方金额" width="120" align="right">
         <template #default="{ row }">
@@ -160,8 +176,13 @@ function handlePushToA13() {
           <span v-else>{{ displayPrefs.fmtAmount(row.creditAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="索引" width="80">
-        <template #default="{ row }">{{ row.indexRef || '-' }}</template>
+      <el-table-column label="索引号" width="140">
+        <template #default="{ row }">
+          <div class="index-cell">
+            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="索引号" @change="(v: string) => updateEntry(row.rowId, 'indexRef', v)" />
+            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
+          </div>
+        </template>
       </el-table-column>
       <el-table-column label="操作" width="60" v-if="!isReadonly">
         <template #default="{ row }">
@@ -182,8 +203,14 @@ function handlePushToA13() {
 
 <style scoped>
 .d2-tab-adjustment { padding: 12px; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
+.index-cell { display: flex; align-items: center; gap: 6px; }
+.index-cell .el-input { flex: 1; }
 .balance-bar {
   display: flex; gap: 24px; align-items: center;
   padding: 10px 12px; margin-top: 10px;

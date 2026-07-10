@@ -115,6 +115,7 @@
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :applicable-standards="applicableStandards"
         />
         <D3TabDisclosureSoe
           v-else-if="currentSheet === '附注国企'"
@@ -125,6 +126,7 @@
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :applicable-standards="applicableStandards"
         />
 
         <D3TabIndex

@@ -120,20 +120,25 @@
  * D3TabAdjustment.vue — D3-3 调整分录汇总表
  * 10列表 + 借贷平衡 + 推送A13
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, toRef, type Ref } from 'vue'
 import { useD3Adjustment } from '../composables/useD3Adjustment'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const selectedRowIds = ref<string[]>([])
 
@@ -148,15 +153,15 @@ const {
   updateCell,
   pushToA13,
 } = useD3Adjustment({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-3')
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wpIdRef, 'D3-3')
 
 function onSelectionChange(selection: any[]) {
   selectedRowIds.value = selection.map((r: any) => r.rowId)

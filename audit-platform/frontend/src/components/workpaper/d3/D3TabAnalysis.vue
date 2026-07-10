@@ -1,5 +1,12 @@
 <template>
 <div class="d3-analysis">
+  <!-- 审计目标 -->
+  <el-alert type="info" :closable="false" show-icon class="audit-objective">
+    <template #title>
+      <strong>审计目标</strong>：通过借贷方发生额分析与 Top5 债务人集中度分析，识别预收账款的异常波动、大额集中与舞弊风险，为实质性程序提供方向（CAS 1231 分析程序）。
+    </template>
+  </el-alert>
+
   <!-- 集中度警告 -->
   <el-alert
     v-if="top5ConcentrationWarning"
@@ -116,6 +123,14 @@
         placeholder="对预收账款借贷方发生额变动、Top5集中度等进行分析性复核说明..."
       />
     </div>
+
+    <!-- 编制提示 -->
+    <details class="guidance-fold">
+      <summary>📋 编制提示（CAS 1231 分析程序）</summary>
+      <p>1. 借/贷方发生额分析：与序时账发生额、收入确认（D4）勾稽，差额行标红须查明原因；</p>
+      <p>2. Top5 债务人集中度超阈值时，关注大额预收的商业实质与后续履约能力；</p>
+      <p>3. 变动比例超 30% 的债务人应结合合同与业务背景分析，异常波动纳入进一步检查范围。</p>
+    </details>
   </div>
 </div>
 </template>
@@ -125,7 +140,7 @@
  * D3TabAnalysis.vue — D3-4 分析表
  * 4区块卡片：借方/贷方/Top5/审计说明
  */
-import { computed, type Ref } from 'vue'
+import { computed, toRef, type Ref } from 'vue'
 import { isChangeRateExceeding } from '../composables/useD3FormulaEngine'
 import { useD3Analysis } from '../composables/useD3Analysis'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
@@ -138,14 +153,19 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   crossSheet: ReturnType<typeof useD3CrossSheet>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const {
   sections,
@@ -155,19 +175,19 @@ const {
   debitRows,
   creditRows,
 } = useD3Analysis({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(wpIdRef)
 
-const debitImportExport = useD3TabImportExport(props.wpId, 'D3-4-debit')
-const creditImportExport = useD3TabImportExport(props.wpId, 'D3-4-credit')
+const debitImportExport = useD3TabImportExport(wpIdRef, 'D3-4-debit')
+const creditImportExport = useD3TabImportExport(wpIdRef, 'D3-4-credit')
 const onExportDebitTemplate = debitImportExport.onExportTemplate
 const onExportDebitData = debitImportExport.onExportData
 const onImportDebitFile = debitImportExport.onImportFile
@@ -216,6 +236,10 @@ function isRateHigh(rate: number | '' | 'N/A'): boolean {
 
 <style scoped>
 .d3-analysis { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.guidance-fold { margin-top: 16px; font-size: 12px; color: #606266; background: #f9fafb; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
+.guidance-fold summary { cursor: pointer; font-weight: 600; color: #409eff; }
+.guidance-fold p { margin: 6px 0 0; line-height: 1.6; }
 .analysis-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
 .card-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .card-header-row .card-title { margin-bottom: 0; }

@@ -77,6 +77,17 @@ function fmtPct(v: number): string {
 
 <template>
   <div class="d2-tab-policy">
+    <div class="tab-header">
+      <h4>坏账准备计提会计政策检查 D2-8</h4>
+      <GtReviewTrigger section-id="D2-policy-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>评价被审计单位应收账款坏账准备计提会计政策的适当性与一致性，检查历史损失率/迁徙率模型的合理性（CAS 22）。</p>
+      </template>
+    </el-alert>
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <span class="progress-text">已完成: {{ completedCount }} / {{ totalCount }}</span>
@@ -260,6 +271,10 @@ function fmtPct(v: number): string {
 
 <style scoped>
 .d2-tab-policy { padding: 12px; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 12px; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; }

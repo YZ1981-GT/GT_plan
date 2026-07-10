@@ -211,14 +211,19 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   crossSheet: ReturnType<typeof useD3CrossSheet>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -230,18 +235,18 @@ const {
   auditNotes,
   updateCell,
 } = useD3Adjudication({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(wpIdRef)
 
-const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-1')
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wpIdRef, 'D3-1')
 
 async function genAgingReason() {
   if (props.isReadonly) return

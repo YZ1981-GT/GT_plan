@@ -158,6 +158,17 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
 <template>
   <div class="d2-tab-detail">
+    <div class="tab-header">
+      <h4>应收账款明细表 D2-2</h4>
+      <GtReviewTrigger section-id="D2-detail-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>核实应收账款客户明细的完整性与准确性，按账龄/信用风险组合归集，驱动审定表 SUMIF 汇总与 ECL 计提。</p>
+      </template>
+    </el-alert>
+
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
@@ -415,6 +426,10 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
 <style scoped>
 .d2-tab-detail { padding: 12px; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(p) { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .toolbar-right { display: flex; align-items: center; }

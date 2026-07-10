@@ -1,5 +1,12 @@
 <template>
 <div class="d3-detail">
+  <!-- 审计目标 -->
+  <el-alert type="info" :closable="false" show-icon class="audit-objective">
+    <template #title>
+      <strong>审计目标</strong>：核实预收账款明细的完整性、准确性与列报，验证期初/期末审定数与账龄勾稽，识别关联方、款项性质及超期未结转情况（CAS 1101 / CAS 14 收入）。
+    </template>
+  </el-alert>
+
   <!-- 搜索 + 工具栏 -->
   <div class="detail-toolbar">
     <el-input
@@ -297,6 +304,14 @@
         :model-value="auditNote3" @update:model-value="auditNote3 = $event" />
     </div>
   </div>
+
+  <!-- 编制提示 -->
+  <details class="guidance-fold">
+    <summary>📋 编制提示（CAS 1101 / CAS 14 收入）</summary>
+    <p>1. 期末审定数 = 期末未审 + AJE + RJE，须与审定表（D3-1）及序时账勾稽一致；核对行「核对行」差额应为 0；</p>
+    <p>2. 按款项性质区分预收销售款、合同负债等，关联方类型非「非关联方」的行需在 D3-6 进一步检查；</p>
+    <p>3. 期后结转（Z列）与 D3-7 期后结转检查联动，超期未结转需在审计说明(3)中说明原因与处理计划。</p>
+  </details>
 </div>
 </template>
 
@@ -305,7 +320,7 @@
  * D3TabDetail.vue — D3-2 明细表
  * 27列宽表 + 款项性质/关联方下拉 + 公式链自动计算 + 搜索 + 导入
  */
-import { computed, ref, watch, type Ref } from 'vue'
+import { computed, ref, watch, toRef, type Ref } from 'vue'
 import { useD3Detail } from '../composables/useD3Detail'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
@@ -317,13 +332,18 @@ import type { ChecklistResponse } from '../composables/useD3FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const relatedParties = ref<string[]>([])
 const auditNote1 = ref('')
@@ -332,9 +352,9 @@ const auditNote3 = ref('')
 
 watch(
   () => [
-    props.allResponses.value.get('D3-det-note-change')?.remark,
-    props.allResponses.value.get('D3-det-note-contract')?.remark,
-    props.allResponses.value.get('D3-det-note-longterm')?.remark,
+    allResponsesRef.value.get('D3-det-note-change')?.remark,
+    allResponsesRef.value.get('D3-det-note-contract')?.remark,
+    allResponsesRef.value.get('D3-det-note-longterm')?.remark,
   ],
   ([n1, n2, n3]) => {
     auditNote1.value = n1 || ''
@@ -348,7 +368,7 @@ watch(auditNote1, (val) => { props.debouncedSave('D3-det-note-change', { remark:
 watch(auditNote2, (val) => { props.debouncedSave('D3-det-note-contract', { remark: val }) })
 watch(auditNote3, (val) => { props.debouncedSave('D3-det-note-longterm', { remark: val }) })
 
-const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(wpIdRef)
 
 const {
   rows,
@@ -361,9 +381,9 @@ const {
   removeRow,
   updateCell,
 } = useD3Detail({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
@@ -413,7 +433,7 @@ const { tableHeight: wideTableHeight, wrapperStyle, minTableWidth } = useWorkpap
 // ─── D3-7 期后结转联动 ──────────────────────────────────────────────────────
 import { useD3CrossSheet } from '../composables/useD3CrossSheet'
 
-const crossSheet = useD3CrossSheet({ allResponses: props.allResponses })
+const crossSheet = useD3CrossSheet({ allResponses: allResponsesRef })
 
 /** 当 D3-7 有期后结转金额但 D3-2 Z列为空时，显示黄色提示 */
 const postPeriodLinkageWarning = computed(() => {
@@ -468,11 +488,15 @@ async function genDetailContract() {
   if (text) auditNote2.value = text
 }
 
-const { onExportTemplate, onExportData, onImportFile, onImportFromAuxBalance } = useD3TabImportExport(props.wpId, 'D3-2')
+const { onExportTemplate, onExportData, onImportFile, onImportFromAuxBalance } = useD3TabImportExport(wpIdRef, 'D3-2')
 </script>
 
 <style scoped>
 .d3-detail { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.guidance-fold { margin-top: 16px; font-size: 12px; color: #606266; background: #f9fafb; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
+.guidance-fold summary { cursor: pointer; font-weight: 600; color: #409eff; }
+.guidance-fold p { margin: 6px 0 0; line-height: 1.6; }
 .detail-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-actions { display: flex; gap: 8px; }
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }

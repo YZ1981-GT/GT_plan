@@ -500,6 +500,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
   <div class="d2-tab-adjudication">
     <div class="tab-header">
       <h4>应收账款审定表 D2-1</h4>
+      <GtReviewTrigger section-id="D2-adj-header" />
       <div class="toolbar-right">
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
         <el-button size="small" @click="onExportData">导出数据</el-button>
@@ -508,6 +509,12 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
         </el-upload>
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>汇总应收账款期初/本期变动/期末审定数，核对明细表、ECL 与试算平衡表，确认科目 1122 余额的真实、完整、准确。</p>
+      </template>
+    </el-alert>
 
     <el-alert v-if="detailCrossValidation" type="warning" :closable="false" class="cross-alert">
       {{ detailCrossValidation }}
@@ -740,7 +747,9 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
   font-size: 13px;
   color: #303133;
 }
-.toolbar-right { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(p) { margin: 0; font-size: 13px; line-height: 1.6; }
 .tb-alert { margin-bottom: 12px; }
 .cross-alert { margin-bottom: 12px; }
 .warn-chip { margin-left: 8px; vertical-align: middle; }

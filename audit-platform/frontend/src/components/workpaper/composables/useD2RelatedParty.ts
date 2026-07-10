@@ -38,6 +38,8 @@ export interface RelatedPartyRow {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'D2-related-party-rows'
+const NOTE_KEY = 'D2-related-party-note'
+const CONCLUSION_KEY = 'D2-related-party-conclusion'
 
 /** 需要SUM求和的金额字段 */
 const NUMERIC_SUM_FIELDS: (keyof RelatedPartyRow)[] = [
@@ -107,6 +109,8 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
   // ─── State ─────────────────────────────────────────────────────────────
 
   const rows = ref<RelatedPartyRow[]>([])
+  const auditNote = ref('')
+  const auditConclusion = ref('')
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   // ─── Load from allResponses ────────────────────────────────────────────
@@ -114,6 +118,8 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
   function loadRows(): void {
     const resp = allResponses.value.get(STORAGE_KEY)
     rows.value = parseRows(resp?.remark)
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark ?? ''
+    auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
   }
 
   watch(
@@ -241,6 +247,25 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
     }
   }
 
+  function saveText(key: string, value: string): void {
+    if (isReadonly.value) return
+    const item = { item_id: key, conclusion: null, remark: value }
+    allResponses.value.set(key, item)
+    try {
+      window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+    } catch { /* silent */ }
+  }
+
+  function saveAuditNote(value: string): void {
+    auditNote.value = value
+    saveText(NOTE_KEY, value)
+  }
+
+  function saveAuditConclusion(value: string): void {
+    auditConclusion.value = value
+    saveText(CONCLUSION_KEY, value)
+  }
+
   // ─── Lifecycle ─────────────────────────────────────────────────────────
 
   onBeforeUnmount(() => {
@@ -256,11 +281,15 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
   return {
     rows,
     totalRow,
+    auditNote,
+    auditConclusion,
     addRow,
     removeRow,
     updateCell,
     importFromDetail,
     loadRows,
+    saveAuditNote,
+    saveAuditConclusion,
   }
 }
 

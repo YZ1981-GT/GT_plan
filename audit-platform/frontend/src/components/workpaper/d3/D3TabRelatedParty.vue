@@ -1,5 +1,12 @@
 <template>
 <div class="d3-related-party">
+  <!-- 审计目标 -->
+  <el-alert type="info" :closable="false" show-icon class="audit-objective">
+    <template #title>
+      <strong>审计目标</strong>：检查关联方预收账款的真实性、交易定价公允性与披露充分性，识别通过预收款进行的利益输送或收入操纵（CAS 36 关联方披露）。
+    </template>
+  </el-alert>
+
   <!-- 工具栏 -->
   <div class="rp-toolbar">
     <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加关联方</el-button>
@@ -25,6 +32,7 @@
           <el-input v-model="row.partyName" size="small" :disabled="isReadonly"
             @change="(val: string) => updateCell(row.rowId, 'partyName', val)" />
           <GtIndexChip target="D3-2" :label="row.partyName" />
+          <GtReviewDot row-prefix="D3-rp" :row-key="row.rowId" />
         </template>
       </template>
     </el-table-column>
@@ -145,6 +153,14 @@
       placeholder="审计结论..."
     />
   </div>
+
+  <!-- 编制提示 -->
+  <details class="guidance-fold">
+    <summary>📋 编制提示（CAS 36 关联方披露）</summary>
+    <p>1. 核对关联方名单与项目关联方清单一致，关注未识别的隐性关联方（同一控制人、关键管理人员近亲属等）；</p>
+    <p>2. 检查关联方预收款的商业实质与定价公允性，警惕通过预收款调节收入或占用资金；</p>
+    <p>3. 复核关联方交易在附注中的披露是否完整（关系、金额、未结算余额、款项性质）。</p>
+  </details>
 </div>
 </template>
 
@@ -153,7 +169,7 @@
  * D3TabRelatedParty.vue — D3-6 关联方检查表
  * 10列表 + 行内公式(期末=期初+贷方-借方) + 从D3-2导入 + 复核
  */
-import { computed, type Ref } from 'vue'
+import { computed, toRef, type Ref } from 'vue'
 import { useD3RelatedParty } from '../composables/useD3RelatedParty'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
@@ -163,16 +179,22 @@ import type { ChecklistResponse } from '../composables/useD3FormData'
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import GtReviewDot from '../GtReviewDot.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   crossSheet: ReturnType<typeof useD3CrossSheet>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const {
   rows,
@@ -184,15 +206,15 @@ const {
   updateCell,
   importFromCrossSheet,
 } = useD3RelatedParty({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(wpIdRef)
 
 async function genRelatedPartyNote() {
   if (props.isReadonly) return
@@ -219,11 +241,15 @@ function fmtAmount(val: number | null | undefined): string {
   return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
-const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(props.wpId, 'D3-6')
+const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wpIdRef, 'D3-6')
 </script>
 
 <style scoped>
 .d3-related-party { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.guidance-fold { margin-top: 16px; font-size: 12px; color: #606266; background: #f9fafb; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
+.guidance-fold summary { cursor: pointer; font-weight: 600; color: #409eff; }
+.guidance-fold p { margin: 6px 0 0; line-height: 1.6; }
 .rp-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
 .subtotal-label { font-weight: 700; }
 .subtotal-val { font-weight: 700; }

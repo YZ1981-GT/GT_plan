@@ -59,7 +59,8 @@
         "browser_file_upload",
         "browser_fill_form",
         "browser_network_request",
-        "browser_run_code_unsafe"
+        "browser_run_code_unsafe",
+        "browser_find"
       ]
     },
     "postgres": {
@@ -102,7 +103,7 @@
       "disabled": false
     },
     "gt-plan": {
-      "command": "python",
+      "command": "D:/GT_plan/.venv/Scripts/python.exe",
       "args": [
         "D:/GT_plan/tools/gt-plan-mcp/server.py"
       ],

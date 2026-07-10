@@ -47,7 +47,7 @@
       "envFile": "${workspaceFolder}/.cursor/mcp.env"
     },
     "gt-plan": {
-      "command": "python",
+      "command": "${workspaceFolder}/.venv/Scripts/python.exe",
       "args": ["${workspaceFolder}/tools/gt-plan-mcp/server.py"],
       "env": {
         "GT_PLAN_ROOT": "${workspaceFolder}"

@@ -5,10 +5,12 @@
  * 自动跨期判定, 红色警告header, 底部汇总
  * 集成 GtCutoffAutoSampling 自动提取（Task 11.1）
  */
-import { inject, toRef, computed, type Ref } from 'vue'
+import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
 import { useD2Cutoff, type CutoffSample } from '../composables/useD2Cutoff'
+import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
 import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 import type { ExtractedVoucher, FillMode } from '../composables/useCutoffAutoSampling'
 
 const props = defineProps<{
@@ -60,6 +62,49 @@ const year = computed(() => {
   }
   return new Date().getFullYear() - 1
 })
+
+// ─── 审计说明/结论（inline 存储）────────────────────────────────────────────
+const CONCLUSION_KEY = 'D2-cutoff-conclusion'
+const auditConclusion = ref('')
+
+onMounted(() => {
+  auditConclusion.value = props.allResponses.get(CONCLUSION_KEY)?.remark || ''
+})
+
+function saveConclusion(v: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = v
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: v }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+}
+
+const wpIdRef = toRef(props, 'wpId')
+const { aiAvailable, generateAndConfirm } = useD2AiGenerate(wpIdRef)
+const aiLoadingConclusion = ref(false)
+
+async function generateConclusionAI(): Promise<void> {
+  if (props.isReadonly) return
+  aiLoadingConclusion.value = true
+  try {
+    const text = await generateAndConfirm('cutoff-note', auditConclusion.value, {
+      sheet: 'D2-cutoff',
+      checked: samples.value.length,
+      cutoffCount: cutoffCount.value,
+      cutoffTotalAmount: cutoffTotalAmount.value,
+    }, 'AI · 截止测试结论')
+    if (text) saveConclusion(text)
+  } finally { aiLoadingConclusion.value = false }
+}
+
+const openReviewDialog2 = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+const GUIDANCE_TEXTS = [
+  '截止测试目的：验证收入及应收账款是否记录于正确的会计期间，防止跨期确认（提前/延后确认收入）。',
+  '测试范围：一般选取资产负债表日前后各若干天（如 ±5～10 天）的销售/发货/开票记录，核对收入确认与发货、验收、开票凭证的日期匹配性。',
+  '跨期判定：若收入确认日期与实际发货/验收期间跨越资产负债表日，则标记为跨期，需评估对当期收入及应收账款的影响金额。',
+  '重大跨期错报应提出调整分录（AJE），并关注管理层是否存在人为调节收入的动机。',
+]
 
 // ─── 自动提取填充处理 (Task 11.1) ──────────────────────────────────────────
 
@@ -121,9 +166,20 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
 
 <template>
   <div class="d2-tab-cutoff">
+    <div class="tab-header">
+      <h4>应收账款截止测试</h4>
+      <GtReviewTrigger section-id="D2-cutoff-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>核实收入及应收账款是否记录于正确的会计期间，识别资产负债表日前后的跨期确认错报。</p>
+      </template>
+    </el-alert>
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample">添加样本</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample">+ 添加样本</el-button>
       </div>
     </div>
 
@@ -214,8 +270,11 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
           <span v-else>{{ row.conclusion || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="备注" min-width="100">
-        <template #default="{ row }">{{ row.remark || '-' }}</template>
+      <el-table-column label="备注" min-width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注" @change="(v: string) => updateCell(row.rowId, 'remark', v)" />
+          <span v-else>{{ row.remark || '-' }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="来源" width="80" align="center">
         <template #default="{ row }">
@@ -237,13 +296,40 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
       <span>跨期笔数: <b :style="{ color: cutoffCount > 0 ? '#f56c6c' : '' }">{{ cutoffCount }}</b></span>
       <span>跨期金额: {{ displayPrefs.fmtAmount(cutoffTotalAmount) }}</span>
     </div>
+
+    <!-- 审计结论 -->
+    <div class="section-subtitle">审计结论</div>
+    <div class="note-section">
+      <el-input type="textarea" autosize :model-value="auditConclusion" placeholder="请输入截止测试结论..." :disabled="isReadonly" @change="saveConclusion" />
+      <div class="note-actions">
+        <el-tooltip :content="aiAvailable ? 'AI 辅助生成结论' : 'AI 服务暂不可用'" placement="top">
+          <el-button size="small" :loading="aiLoadingConclusion" :disabled="isReadonly || !aiAvailable" @click="generateConclusionAI">🤖 AI</el-button>
+        </el-tooltip>
+        <el-button v-if="openReviewDialog2" size="small" @click="openReviewDialog2('D2-cutoff-conclusion')">💬 复核</el-button>
+      </div>
+    </div>
+
+    <details class="guidance-fold">
+      <summary>📋 编制提示</summary>
+      <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
+    </details>
   </div>
 </template>
 
 <style scoped>
 .d2-tab-cutoff { padding: 12px; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
+.section-subtitle { font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
+.note-section { margin-bottom: 8px; }
+.note-actions { margin-top: 6px; display: flex; gap: 8px; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .auto-extract-section { margin-bottom: 12px; }
 .auto-extract-section :deep(.el-collapse-item__header) { font-size: 13px; font-weight: 500; }
 .cutoff-alert { margin-bottom: 12px; }

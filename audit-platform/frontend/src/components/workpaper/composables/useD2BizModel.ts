@@ -43,6 +43,8 @@ export interface BizModelGroup {
 
 const JUDGMENTS_KEY = 'D2-bizmodel-judgments'
 const GROUPS_KEY = 'D2-bizmodel-groups'
+const NOTE_KEY = 'D2-bizmodel-note'
+const CONCLUSION_KEY = 'D2-bizmodel-conclusion'
 
 /** 默认4个判断问题 */
 const DEFAULT_JUDGMENTS: BizModelJudgment[] = [
@@ -134,6 +136,8 @@ export function useD2BizModel(options: UseD2BaseOptions) {
 
   const judgments = ref<BizModelJudgment[]>(DEFAULT_JUDGMENTS.map(j => ({ ...j })))
   const groups = ref<BizModelGroup[]>([])
+  const auditNote = ref('')
+  const auditConclusion = ref('')
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   // ─── Load from allResponses ────────────────────────────────────────────
@@ -144,6 +148,9 @@ export function useD2BizModel(options: UseD2BaseOptions) {
 
     const gResp = allResponses.value.get(GROUPS_KEY)
     groups.value = parseGroups(gResp?.remark)
+
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark ?? ''
+    auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
   }
 
   watch(
@@ -276,6 +283,23 @@ export function useD2BizModel(options: UseD2BaseOptions) {
     }
   }
 
+  function saveText(key: string, value: string): void {
+    if (isReadonly.value) return
+    const item = { item_id: key, conclusion: null, remark: value }
+    allResponses.value.set(key, item)
+    dispatchSaveEvent([item])
+  }
+
+  function saveAuditNote(value: string): void {
+    auditNote.value = value
+    saveText(NOTE_KEY, value)
+  }
+
+  function saveAuditConclusion(value: string): void {
+    auditConclusion.value = value
+    saveText(CONCLUSION_KEY, value)
+  }
+
   // ─── Lifecycle ─────────────────────────────────────────────────────────
 
   onBeforeUnmount(() => {
@@ -293,10 +317,14 @@ export function useD2BizModel(options: UseD2BaseOptions) {
     groups,
     allAnswered,
     recommendedModel,
+    auditNote,
+    auditConclusion,
     updateJudgment,
     updateGroup,
     addGroup,
     removeGroup,
+    saveAuditNote,
+    saveAuditConclusion,
   }
 }
 

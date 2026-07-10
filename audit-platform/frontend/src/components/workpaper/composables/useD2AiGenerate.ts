@@ -12,6 +12,14 @@ export type D2AiSection =
   | 'analysis-note'
   | 'detail-note'
   | 'writeoff-analysis'
+  | 'pledge-note'
+  | 'pledge-conclusion'
+  | 'related-party-note'
+  | 'voucher-note'
+  | 'cutoff-note'
+  | 'bizmodel-note'
+  | 'ecl-note'
+  | 'baddebt-note'
 
 export interface D2AiGenerateParams {
   section: D2AiSection

@@ -4,14 +4,16 @@
  * 抽样参数区 + 凭证明细表(17列) + 进度条 + 底部汇总
  * 集成 GtVoucherSamplingEngine 自动抽凭（Task 11.1）
  */
-import { inject, toRef, computed, type Ref } from 'vue'
+import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
 import { useD2VoucherCheck } from '../composables/useD2VoucherCheck'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
+import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
 import type { VoucherSampleRow } from '../composables/useD2VoucherCheck'
@@ -116,6 +118,50 @@ const year = computed(() => {
 
 const currentPhase = computed<Phase>(() => 'final')
 
+// ─── 核对结果点选选项 ───────────────────────────────────────────────────────
+const YN_OPTIONS = ['是', '否', 'N/A']
+const CONFIRM_OPTIONS = ['相符', '不符', '未回函', '未函证']
+
+// ─── 审计说明（inline 存储）─────────────────────────────────────────────────
+const NOTE_KEY = 'D2-voucher-note'
+const auditNote = ref('')
+
+onMounted(() => {
+  auditNote.value = props.allResponses.get(NOTE_KEY)?.remark || ''
+})
+
+function saveNote(v: string): void {
+  if (props.isReadonly) return
+  auditNote.value = v
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: v }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+}
+
+const { aiAvailable, generateAndConfirm } = useD2AiGenerate(toRef(props, 'wpId'))
+const aiLoadingNote = ref(false)
+
+async function generateNoteAI(): Promise<void> {
+  if (props.isReadonly) return
+  aiLoadingNote.value = true
+  try {
+    const text = await generateAndConfirm('voucher-note', auditNote.value, {
+      sheet: 'D2-7',
+      checked: samples.value.length,
+      abnormalCount: abnormalCount.value,
+      abnormalRate: `${(abnormalRate.value * 100).toFixed(1)}%`,
+    }, 'AI · 应收账款细节测试说明')
+    if (text) saveNote(text)
+  } finally { aiLoadingNote.value = false }
+}
+
+const GUIDANCE_TEXTS = [
+  '细节测试：对抽取的应收账款交易核对原始单据（销售合同、发货单、验收单、发票、回款记录），验证发生额的真实性、准确性与截止。',
+  '核对要点：金额一致（凭证↔单据）、日期一致（入账↔业务实质）、客户函证相符、账龄核实，任一异常应标记并追查。',
+  '异常处理：标记异常的样本应查明原因、评估错报性质与金额，必要时扩大样本或提出调整。',
+  '样本量与方法应与 B50 风险评估及重要性水平匹配，特定项目（大额/关联方/异常）应单独关注。',
+]
+
 // ─── 自动抽凭填充处理 (Task 11.1) ───────────────────────────────────────────
 
 function generateRowId(): string {
@@ -200,6 +246,17 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
 
 <template>
   <div class="d2-tab-voucher">
+    <div class="tab-header">
+      <h4>应收账款检查表（细节测试）D2-7</h4>
+      <GtReviewTrigger section-id="D2-voucher-header" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+      <template #default>
+        <p>通过抽样核对原始单据，验证应收账款发生额的真实性、准确性、截止与计价，识别异常交易。</p>
+      </template>
+    </el-alert>
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
@@ -273,60 +330,136 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
       class="virtual-table"
     />
 
-    <!-- 凭证明细表 -->
-    <el-table v-if="!useVirtualScroll || !browseMode" :data="samples" border size="small" :max-height="450" style="width: 100%">
-      <el-table-column label="序号" width="55">
-        <template #default="{ $index, row }">
-          {{ $index + 1 }}<GtReviewDot row-prefix="D2-voucher" :row-key="String(row.rowId || row.seq)" />
-        </template>
+    <!-- 凭证明细表（宽表：凭证基础信息固定左侧，核对结果横向滚动） -->
+    <el-table v-if="!useVirtualScroll || !browseMode" :data="samples" border size="small" :max-height="480" style="width: 100%">
+      <!-- 凭证基础信息 -->
+      <el-table-column label="凭证基础信息" header-align="center">
+        <el-table-column label="序号" width="55" fixed="left">
+          <template #default="{ $index, row }">
+            {{ $index + 1 }}<GtReviewDot row-prefix="D2-voucher" :row-key="String(row.rowId || row.seq)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="凭证号" width="110" fixed="left">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" placeholder="凭证号" @change="(v: string) => updateCell(row.rowId, 'voucherNo', v)" />
+            <span v-else>{{ row.voucherNo }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="凭证日期" width="130">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" :model-value="row.voucherDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'voucherDate', v)" />
+            <span v-else>{{ row.voucherDate }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
+            <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="交易对手" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" placeholder="交易对手" @change="(v: string) => updateCell(row.rowId, 'counterparty', v)" />
+            <span v-else>{{ row.counterparty || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="摘要" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.abstract" size="small" placeholder="摘要" @change="(v: string) => updateCell(row.rowId, 'abstract', v)" />
+            <span v-else>{{ row.abstract || '-' }}</span>
+          </template>
+        </el-table-column>
       </el-table-column>
-      <el-table-column label="凭证号" width="100">
+
+      <!-- 核对结果 -->
+      <el-table-column label="核对结果" header-align="center">
+        <el-table-column label="原始单据" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.hasOriginal" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'hasOriginal', v || '')">
+              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.hasOriginal || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额一致" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.amountConsistent" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'amountConsistent', v || '')">
+              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.amountConsistent || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="日期一致" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.dateConsistent" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'dateConsistent', v || '')">
+              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.dateConsistent || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="收入日期" width="130">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" :model-value="row.revenueDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'revenueDate', v)" />
+            <span v-else>{{ row.revenueDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="跨期" width="60" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.isCutoff" type="danger" size="small">是</el-tag>
+            <span v-else>否</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="客户函证" width="110" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.customerConfirm" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'customerConfirm', v || '')">
+              <el-option v-for="o in CONFIRM_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.customerConfirm || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账龄核实" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.agingVerify" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'agingVerify', v || '')">
+              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.agingVerify || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="异常" width="90" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.abnormalFlag" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'abnormalFlag', v || '')">
+              <el-option label="正常" value="" />
+              <el-option label="异常" value="Y" />
+            </el-select>
+            <el-tag v-else-if="row.abnormalFlag === 'Y'" type="danger" size="small">异常</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- 结论 -->
+      <el-table-column label="结论" min-width="140">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCell(row.rowId, 'voucherNo', v)" />
-          <span v-else>{{ row.voucherNo }}</span>
+          <el-input v-if="!isReadonly" :model-value="row.conclusion" size="small" placeholder="结论" @change="(v: string) => updateCell(row.rowId, 'conclusion', v)" />
+          <span v-else>{{ row.conclusion || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="凭证日期" width="120">
+      <el-table-column label="索引号" width="140">
         <template #default="{ row }">
-          <el-date-picker v-if="!isReadonly" :model-value="row.voucherDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'voucherDate', v)" />
-          <span v-else>{{ row.voucherDate }}</span>
+          <div class="index-cell">
+            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="索引号" @change="(v: string) => updateCell(row.rowId, 'indexRef', v)" />
+            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
+          </div>
         </template>
       </el-table-column>
-      <el-table-column label="金额" width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.amount) }}</template>
-      </el-table-column>
-      <el-table-column label="交易对手" width="120">
-        <template #default="{ row }">{{ row.counterparty || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="摘要" min-width="120">
-        <template #default="{ row }">{{ row.abstract || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="收入日期" width="120">
+      <el-table-column v-if="!isReadonly" label="" width="50" fixed="right">
         <template #default="{ row }">
-          <el-date-picker v-if="!isReadonly" :model-value="row.revenueDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'revenueDate', v)" />
-          <span v-else>{{ row.revenueDate }}</span>
+          <el-popconfirm title="确定删除该行？" confirm-button-text="删除" cancel-button-text="取消" @confirm="removeSample(row.rowId)">
+            <template #reference><el-button type="danger" link size="small">✕</el-button></template>
+          </el-popconfirm>
         </template>
       </el-table-column>
-      <el-table-column label="跨期" width="60" align="center">
-        <template #default="{ row }">
-          <el-tag v-if="row.isCutoff" type="danger" size="small">是</el-tag>
-          <span v-else>否</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="异常" width="60" align="center">
-        <template #default="{ row }">
-          <el-tag v-if="row.abnormalFlag === 'Y'" type="danger" size="small">Y</el-tag>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="结论" width="100">
-        <template #default="{ row }">{{ row.conclusion || '-' }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="60" v-if="!isReadonly">
-        <template #default="{ row }">
-          <el-button type="danger" link size="small" @click="removeSample(row.rowId)">删除</el-button>
-        </template>
-      </el-table-column>
+      <template #empty>暂无抽样凭证，点击"添加样本"或使用"自动抽凭"</template>
     </el-table>
 
     <!-- 底部汇总 -->
@@ -335,13 +468,38 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
       <span>异常笔数: <b style="color:#f56c6c">{{ abnormalCount }}</b></span>
       <span>异常率: {{ (abnormalRate * 100).toFixed(1) }}%</span>
     </div>
+
+    <!-- 审计说明 -->
+    <div class="section-subtitle">
+      审计说明
+      <GtReviewTrigger section-id="D2-voucher-note" />
+      <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+        <el-button size="small" text type="primary" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI 生成</el-button>
+      </el-tooltip>
+    </div>
+    <el-input type="textarea" autosize :model-value="auditNote" placeholder="记录细节测试的样本选取、核对结果、异常处理及总体结论..." :disabled="isReadonly" @change="saveNote" />
+
+    <details class="guidance-fold">
+      <summary>📋 编制提示</summary>
+      <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
+    </details>
   </div>
 </template>
 
 <style scoped>
 .d2-tab-voucher { padding: 12px; }
+.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.tab-header h4 { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
+.index-cell { display: flex; align-items: center; gap: 6px; }
+.index-cell .el-input { flex: 1; }
+.section-subtitle { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .params-card { margin-bottom: 12px; }
 .sampling-engine-collapse { margin-bottom: 12px; }
 .progress-bar { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; }

@@ -70,7 +70,9 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     saving.value = true
     try {
       await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: wpId.value,
+        // 传真实 projectId；未提供时省略，由服务端从 wp_id 推导（禁止把 wpId 当 project_id，
+        // 否则违反 checklist_responses.project_id 外键 → 500 保存失败）
+        project_id: projectId?.value || undefined,
         items: items.map((item) => ({
           item_id: item.item_id,
           conclusion: item.conclusion || null,

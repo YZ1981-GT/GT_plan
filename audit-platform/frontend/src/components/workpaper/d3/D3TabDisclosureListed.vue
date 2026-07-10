@@ -190,7 +190,7 @@
  * D3TabDisclosureListed.vue — 附注披露（上市公司）
  * 3子节卡片 + 跨sheet取数 + 动态行 + 合计 + 说明 + 编制提示
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, toRef, type Ref } from 'vue'
 import { useD3DisclosureListed } from '../composables/useD3DisclosureListed'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
@@ -199,15 +199,24 @@ import type { ChecklistResponse } from '../composables/useD3FormData'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   crossSheet: ReturnType<typeof useD3CrossSheet>
-  applicableStandards: Ref<string[]>
+  applicableStandards?: string[] | string
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// 父级经模板传入的是解包后的普通值（非 ref），此处重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
+const applicableStandardsRef = computed<string[]>(() => {
+  const v = props.applicableStandards
+  return Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : [])
+}) as unknown as Ref<string[]>
 
 const {
   isApplicable,
@@ -224,14 +233,14 @@ const {
   removeRow,
   updateCell,
 } = useD3DisclosureListed({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
-  applicableStandards: props.applicableStandards,
+  applicableStandards: applicableStandardsRef,
 })
 
 function fmtAmount(val: number | null | undefined): string {

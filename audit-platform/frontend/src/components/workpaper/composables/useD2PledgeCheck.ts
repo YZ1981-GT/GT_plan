@@ -48,6 +48,8 @@ export interface FactoringRow {
 
 const PLEDGE_KEY = 'D2-pledge-rows'
 const FACTORING_KEY = 'D2-factoring-rows'
+const NOTE_KEY = 'D2-pledge-note'
+const CONCLUSION_KEY = 'D2-pledge-conclusion'
 
 /** 质押比例警告阈值 */
 const PLEDGE_RATIO_WARNING = 0.5
@@ -155,6 +157,8 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
 
   const pledgeRows = ref<PledgeRow[]>([])
   const factoringRows = ref<FactoringRow[]>([])
+  const auditNote = ref('')
+  const auditConclusion = ref('')
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   // ─── Load from allResponses ────────────────────────────────────────────
@@ -165,6 +169,9 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
 
     const factResp = allResponses.value.get(FACTORING_KEY)
     factoringRows.value = parseFactoringRows(factResp?.remark)
+
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark ?? ''
+    auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
   }
 
   watch(
@@ -191,10 +198,23 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
    * 从 allResponses 读取 D2-adj-total 审定数
    */
   const pledgeRatio: ComputedRef<number> = computed(() => {
-    // 从审定表合计行读取审定总额
-    const adjRows = allResponses.value.get('D2-adj-total-audited')?.remark
-    const totalReceivable = parseNum(adjRows)
-    return calculatePledgeRatio(pledgeTotal.value, totalReceivable)
+    return calculatePledgeRatio(pledgeTotal.value, auditedTotal.value)
+  })
+
+  /** 审定表应收账款审定总额（跨 sheet 联动） */
+  const auditedTotal: ComputedRef<number> = computed(() => {
+    return parseNum(allResponses.value.get('D2-adj-total-audited')?.remark)
+  })
+
+  /** 审定表数据是否已加载（用于核对区 ⚠️ 提示） */
+  const adjDataLoaded: ComputedRef<boolean> = computed(() => {
+    return allResponses.value.get('D2-adj-total-audited')?.remark != null
+      && auditedTotal.value > 0
+  })
+
+  /** 保理终止确认合计（终止确认笔数） */
+  const factoringDerecognizedCount: ComputedRef<number> = computed(() => {
+    return factoringRows.value.filter(r => r.derecognition === '终止确认').length
   })
 
   /**
@@ -301,6 +321,23 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
     dispatchSaveEvent(items)
   }
 
+  function saveText(key: string, value: string): void {
+    if (isReadonly.value) return
+    const item = { item_id: key, conclusion: null, remark: value }
+    allResponses.value.set(key, item)
+    dispatchSaveEvent([item])
+  }
+
+  function saveAuditNote(value: string): void {
+    auditNote.value = value
+    saveText(NOTE_KEY, value)
+  }
+
+  function saveAuditConclusion(value: string): void {
+    auditConclusion.value = value
+    saveText(CONCLUSION_KEY, value)
+  }
+
   function dispatchSaveEvent(items: any[]): void {
     try {
       window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
@@ -327,10 +364,17 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
     pledgeTotal,
     pledgeRatio,
     pledgeRatioWarning,
+    auditedTotal,
+    adjDataLoaded,
+    factoringDerecognizedCount,
+    auditNote,
+    auditConclusion,
     addPledgeRow,
     addFactoringRow,
     removeRow,
     updateCell,
+    saveAuditNote,
+    saveAuditConclusion,
   }
 }
 
