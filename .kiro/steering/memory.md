@@ -95,7 +95,7 @@ inclusion: always
 | 循环 | 状态 | 备注 |
 |------|------|------|
 | A/B | ✅ | Dashboard/bundle/风险等已落地 |
-| C | ✅为主 | C1 向导+C2~C15+C22~C26 完成；Cx 新增弹窗增强(编制提示/附件OCR)仍待 |
+| C | ✅ | C1 向导+C2~C15+C22~C26 完成；**Cx 弹窗增强完成✅**(c-control-test-popup-enhance 33/33含optional：28 guidance JSON C2~C15+C2-2~C15-2/后端_load_guidance纯函数+render注入guidance/guidance_cx2/前端琥珀块L1+Cx-2/OcrAttachmentPicker+useOcrAttachmentCache/AI按钮OCR上下文;7属性全覆盖) |
 | D | ✅ | D1~D7全部完成✅；D2-refactor完成✅(49/49) |
 | E | ✅ | E1 货币资金完成 |
 | F | ✅ | F1/F2/F3/F4/F5/F0 全部完成✅ |
@@ -111,16 +111,18 @@ inclusion: always
 
 ### 活跃待办（排期优先）
 - **✅ 全部完成**：A~N全部循环底稿+函证+D2-refactor+G5 / S全部 / F循环全部 / L循环全部 / 基础设施(版本链/复核/抽凭/截止测试) — **无活跃待办**
-- **🟡 C2~C15 新增弹窗增强**：编制提示琥珀块 + 附件 OCR 作 AI context
+- **✅ C2~C15 弹窗增强已完成**：编制提示琥珀块 + 附件 OCR 作 AI context（c-control-test-popup-enhance 33/33）
 - **🟡 B40** 需重建 spec；**B60** 待 vLLM Phase3；AI 对话流 / 存货监盘 P2 / voucher-attachment P2
 - **基础设施**：version-trail/audit-review-dialog/全局一致性/voucher-sampling完成✅；cutoff-auto-sampling **未动工**
 - **🔴 科目方向铁律**：资产期末=期初+借-贷；负债/权益=期初+贷-借；**M3 库存股=权益备抵借方**；损益取发生额（H10/I6/K8~K13/L8/N4/N5）
 - **🔴 向导式隐藏子 sheet**：overrides 标 skip + 保留 WHOLE + skip 过滤须头部 `re.match` 提编码
 - **注册表维护**：`dedicated_component_types.py` → WHOLE；契约 `test_dedicated_component_registry_contract.py`（WHOLE⊆VALID∩FE；WHOLE−DISPATCH⊆WHITELIST∪CONFIRMATION）
 - **架构债**：拆 event_handlers / Top-5 巨型 Vue / services 按域分包；OCR=RapidOCR 单机；评估见 `docs/proposals/ai-infra-evaluation-2026-07.md`
-- **🟡 增强方向**：D2往来款账龄枚举可配置化 — **spec就绪(aging-config-enhancement, 15 tasks)**
-- **🟡 增强方向**：C2~C15弹窗增强(琥珀块+OCR AI context) — **spec就绪(c-control-test-popup-enhance, 14 tasks)**
+- **✅ 增强方向已完成**：D2往来款账龄枚举可配置化(aging-config-enhancement, 40/40 tasks全绿含optional)。后端AgingConfigService(wizard_state.aging_config)+3端点+校验；前端useAgingConfig(segments→bands,per-project缓存,window`aging-config:changed`刷新)/useAgingMigration(flat→nested,legacy值保留)；D2/D3/F1/K1/K3/G5明细表nested keyed动态列；AgingConfigDialog入口在ProjectSettingsCenter新增"底稿配置"tab(manager+)；导入导出动态列头统一走`_aging_export_headers.py`+`_cycle_import_export_common`(build_aging_headers/aging_export_values/match_import_aging,按label匹配,不匹配跳过报warn)；D6 ECL联动syncAgingGroupRows(共有段保留lossRate/bookBalance/新增零初始化/移除归档)；PUT后`event_bus.broadcast_raw("aging-config:changed")`(同tab window事件刷新已通,无SSE→window bridge)。测试115全绿(后端59+前端56),14条属性P1-P14全覆盖
+- **🟢 ACNR 地址坐标名称库**：架构提案升级 v1.10(codegraph实证补漏：§1.8索引命名空间11ns+Layer第4套语法 / §1.9附注库30+份重复 / §十七四大消费库关联统一+G9-G13)；**spec三件套完成**(feature/requirements-first：requirements 24条EARS可追溯G1-G13+MVD-1..8 / design 五层模型+resolver决策树+grammar_v1+15条正确性属性P1-P15+M0-M3映射 / tasks 23组按M0-M3+15波Task Dependency Graph)，**待实现**(M0 wave0 无依赖起点=grammar_v1.json+schema+D manifest+规则冻结)
+- **✅ 增强方向已完成**：C2~C15弹窗增强(琥珀块+OCR AI context) — c-control-test-popup-enhance 33/33全绿(含optional)。关键：guidance走render-config `html_data.guidance/guidance_cx2`(render策略`re.sub(r"-\d+$","",wp_code)`剥离Cx-2后缀);琥珀块`<details class="amber-context">`;OCR缓存父级GtCControlTest单例持有传ocrCache给picker,aiGenerateWithOcr Promise-resolver模式,OCR文本入context["参考资料（OCR识别）"]截断3000;EventBus新增`attachment:uploaded`事件刷列表;truncateOcrText/OCR_CONTEXT_KEY导出自useOcrAttachmentCache
 - **🟡 增强方向**：抽凭/版本链模式统一(collapse→dialog, useVersionTrail→Toolbar) — **spec就绪(ui-pattern-unification, 10 tasks)**
+- **🟡 ACNR 消费者接入**：`acnr-consumer-wiring` spec 经复盘扩至 P1–P8(未实现,待用户定优先级)。P1-P4=公式引擎/EventBus失效/LinkageGraph归一化/StaleEngine/stale_impact端点/BulkZIP manifest+topo/FieldPicker；复盘补 Req9-13+P5-P8=校验收敛(wp_formula_service/report_config/wp_user_formulas validate_formula_refs→full_resolve fail-open)/失效链统一/自定义cell入L3 runtime/前端索引收敛。🔴**关键发现**：`touch_wp_registry`直调`address_registry.invalidate_async`绕过`acnr.events.invalidate`→task1.3的reverse_index清理在该热路径是死代码,P6修复(两路径收敛canonical invalidate)。设计风险：CrossSheetResolver同步BFS调async full_resolve(运行loop抛错,首选改async)+WP()2参vs grammar3参(退化URI形态)。实证:full_resolve async/kw-only,manifest.list_import_export扁平字段,useAcnr.buildAddressTree/loadCellNodes均就绪。**第二轮复盘补 Req14-17+P9-P11**:公式picker(FormulaRefPicker/CellSelector走legacy useAddressRegistry Pinia store且无WP tab→接ACNR+加WP tab)/🔴**NoteFormulaDialog真bug**(formulas空ref从不加载+addFormula硬编码SUM占位+编辑不持久化+onApply从check_presets重生成丢编辑;后端仅apply/clear无list/save→需加GET/PUT formulas+NoteFormulaService)/addressRegistry store facade收敛ACNR/useNoteTree TreeNode无addr_id加note:section索引。高级查询树已P4覆盖,底稿索引已P8+GtIndexChip覆盖。**第三轮复盘补Req18+P12**(截图页WorkpaperList按wp_id直跳不需ACNR,wp_code列chip化可选;legacy navigateToWorkpaper的6调用点SourceRefChip/WorkpaperTraceView/MyTodoCard/ReviewOpinionList/DocAiChatPanel/WorkpaperHtmlTable由P8迁composable一并修复;🔴Bundle目录Tab D2TabIndex16行/D4TabIndex42行/每循环一个硬编码sheet_code→名称+假→span+jumpToSection→P12用useAcnrCatalogIndex从catalog取名+GtIndexChip跳转+契约测试防漂移+catalog空回退硬编码,routing/applicable/完成检测保留本地)。GtIndexChip已完全迁ACNR是标杆。**第四轮复盘补Req19+P13**(合并模块:🔴EliminationSheet.subjectTree硬编码五级科目名→useConsolSubjectSource从ACNR TB域/store tbAddresses取真源;useReportCrossCheck硬编码BS-*/IS-*+中文名模糊匹配→经ACNR REPORT域取canonical row_code精确取值,勾稽逻辑不变;open-formula/goto-sheet接Req14 picker+GtIndexChip;其余~15合并worksheet复用helper增量;契约测试防report code漂移;buildAutoEntries+Excel导入导出不动只换坐标名源;降级回退硬编码)。**第四轮补全Req20+P14**(合并模块三块不留死角:合并报表consolBreakdown(accountCode)/balance-check→ACNR REPORT/TB域+GtIndexChip;合并附注notes.reaggregate/consolBreakdown(sectionId)→ACNR NOTE域resolveIndex+溯源NOTE addr;合并工作底稿~15worksheet的open-formula/goto-sheet由ConsolWorksheetTabs父级统一接线到Req14 picker一处惠及全部+drill account_code作TB地址;契约防report code/note section漂移V1动态域豁免;计算恒等P25)。Req19=科目树+勾稽数据名源,Req20=报表/附注/worksheet formula-nav-drill地址。全景**P1-P14共14组**,综合优先级**P6>P10>P5>P9>P7>P8>P11>P12>P13>P14**(P13/P14合并模块依赖P9/P11收敛),未开发待用户定优先级
 
 ## 踩坑铁律（高频）
 
