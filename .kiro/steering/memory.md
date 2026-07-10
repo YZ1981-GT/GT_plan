@@ -88,6 +88,7 @@ inclusion: always
 
 ### git
 - 分支 `work/2026-05-30-wp-specs`；最高迁移 V099（以 `migration_status` 为准）
+- 最新已push：`8d54a1a2`(acnr-consumer-wiring spec P1-P15)→`8b282e02`(aging-config+c-control-test功能+D6 ECL+OCR composable, 73文件)；工作区 clean 与 origin 同步
 - `origin/HEAD→origin/master` 落后 main 隐患仍在
 
 ### 循环进度表（✅完成 / 🟡部分 / 🔵待开发）
