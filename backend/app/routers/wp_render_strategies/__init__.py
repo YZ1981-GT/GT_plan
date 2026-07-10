@@ -94,6 +94,7 @@ from ._e1_monetary_fund import render as render_e1_monetary_fund
 from ._g0_confirmation import render_g0_diff_securities, render_g0_alternative
 from ._h0_confirmation import render_h0_alternative
 from ._k0_confirmation import render_k0_alternative_k05, render_k0_alternative_k06
+from ._l0_confirmation import render_l0_alternative
 from ._c1_entity_level_control import render as render_c1_entity_level_control
 from ._c_control_test import render as render_c_control_test
 from ._c22_itgc import render as render_c22_itgc
@@ -245,6 +246,7 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "confirmation-alternative-h05": render_h0_alternative,
     "confirmation-alternative-k05": render_k0_alternative_k05,
     "confirmation-alternative-k06": render_k0_alternative_k06,
+    "confirmation-alternative-l05": render_l0_alternative,
     "c1-entity-level-control": render_c1_entity_level_control,
     "c-control-test": render_c_control_test,
     "c22-itgc-bundle": render_c22_itgc,

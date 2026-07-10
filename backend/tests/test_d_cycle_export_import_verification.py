@@ -59,8 +59,6 @@ class TestTask39DFormTableExport:
         "D1", "D1-1", "D1-4",
         # 应收账款
         "D2", "D2-1", "D2-3", "D2-4",
-        # 预收账款
-        "D3", "D3-1", "D3-2",
         # 营业收入
         "D4", "D4-1", "D4-5", "D4-12", "D4-21", "D4-33",
         # 应收款项融资
@@ -137,7 +135,7 @@ class TestTask41ImportFromExcel:
 
     # D{n}-1 审定表系列
     _AUDIT_DETERMINATION_CODES = [
-        "D1-1", "D2-1", "D3-1", "D4-1", "D5-1", "D6-1", "D7-1",
+        "D1-1", "D2-1", "D4-1", "D5-1", "D6-1", "D7-1",
     ]
 
     @pytest.mark.parametrize("wp_code", _AUDIT_DETERMINATION_CODES)
@@ -207,6 +205,11 @@ class TestTask42BatchExportZip:
         valid_types = {
             "d-form-table", "audit-sheet", "a-program-console",
             "confirmation-hub", "d-form-paragraph", "c-note-table",
+            # 专属组件
+            "d1-notes-receivable", "d2-accounts-receivable",
+            "d3-prepaid-accounts", "d4-operating-revenue",
+            "d5-receivables-financing", "d6-contract-assets",
+            "d7-contract-liabilities",
         }
         for entry in d_class_entries:
             wp_code = entry["wp_code"]

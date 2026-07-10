@@ -2,10 +2,10 @@
  * useF1Detail — F1-2 明细表核心逻辑 composable
  *
  * Spec: .kiro/specs/f1-prepayment/
- * Task: 7.1
+ * Task: 7.1, aging-config-enhancement Task 8.1
  *
  * 职责：
- * - 定义 DetailRow 类型（27列完整字段）
+ * - 定义 DetailRow 类型（动态账龄段，2-period: agingPrior/agingAudited）
  * - rows reactive（从F1-det-rows加载JSON数组）
  * - 行内公式自动计算（H=E+F+G, O=H+N-M, Q=O+P, T=Q+R+S）
  * - subtotalRow computed + verificationRow computed（合计-TB数）
@@ -14,8 +14,10 @@
  * - matchRelatedParty（从relatedParties列表包含匹配）
  * - importFromAuxBalance（调后端API批量导入）
  * - onConfirmationCompleted监听（标记isConfirmed='Y'）
+ * - 动态账龄配置集成（useAgingConfig + migrateD3F1Keys + remapRowAgingData）
  *
  * Requirements: 4.1-4.12, 5.1-5.7, 6.1-6.5, 18.4
+ * Aging Config Requirements: 5.1, 5.2, 5.3, 5.4
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -29,6 +31,8 @@ import {
 } from './useF1FormulaEngine'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
+import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
+import { migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -42,7 +46,7 @@ export interface DetailRow {
   priorAdjustment: number    // F: 期初账项调整
   priorReclass: number       // G: 期初重分类调整
   priorAudited: number       // H: =E+F+G（自动）
-  agingPrior: { within1: number; y1to2: number; y2to3: number; over3: number }  // I~L
+  agingPrior: AgingData      // I~L (动态账龄段，key 由项目配置决定)
   debit: number              // M: 借方发生
   credit: number             // N: 贷方发生
   endBalance: number         // O: =H+N-M（贷方科目，自动）
@@ -51,7 +55,7 @@ export interface DetailRow {
   endAje: number             // R: 期末账项调整
   endRje: number             // S: 期末重分类调整
   endAudited: number         // T: =Q+R+S（自动）
-  agingAudited: { within1: number; y1to2: number; y2to3: number; over3: number }  // U~X
+  agingAudited: AgingData    // U~X (动态账龄段，key 由项目配置决定)
   isConfirmed: string        // Y: 是否发函
   postPeriodSettlement: number // Z: 期后结转
   remark: string             // AA: 备注
@@ -78,19 +82,22 @@ function generateRowId(): string {
   return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
 }
 
-/** 安全解析 JSON 数组 */
-function safeParseRows(jsonStr: string | null | undefined): DetailRow[] {
+/** 安全解析 JSON 数组（使用动态 segments 进行迁移） */
+function safeParseRows(jsonStr: string | null | undefined, segments: AgingSegment[]): DetailRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed.map(normalizeRow) : []
+    return Array.isArray(parsed) ? parsed.map(raw => normalizeRow(raw, segments)) : []
   } catch {
     return []
   }
 }
 
-/** 规范化行数据，确保所有字段存在且类型正确 */
-function normalizeRow(raw: any): DetailRow {
+/** 规范化行数据，确保所有字段存在且类型正确（使用动态 segments） */
+function normalizeRow(raw: any, segments: AgingSegment[]): DetailRow {
+  // 使用 migrateD3F1Keys 对齐 aging key 到当前项目配置
+  const migrated = migrateD3F1Keys(raw, segments)
+
   return {
     rowId: raw.rowId || generateRowId(),
     customerName: raw.customerName || '',
@@ -101,12 +108,7 @@ function normalizeRow(raw: any): DetailRow {
     priorAdjustment: parseNum(raw.priorAdjustment),
     priorReclass: parseNum(raw.priorReclass),
     priorAudited: parseNum(raw.priorAudited),
-    agingPrior: {
-      within1: parseNum(raw.agingPrior?.within1),
-      y1to2: parseNum(raw.agingPrior?.y1to2),
-      y2to3: parseNum(raw.agingPrior?.y2to3),
-      over3: parseNum(raw.agingPrior?.over3),
-    },
+    agingPrior: migrated.agingPrior,
     debit: parseNum(raw.debit),
     credit: parseNum(raw.credit),
     endBalance: parseNum(raw.endBalance),
@@ -115,12 +117,7 @@ function normalizeRow(raw: any): DetailRow {
     endAje: parseNum(raw.endAje),
     endRje: parseNum(raw.endRje),
     endAudited: parseNum(raw.endAudited),
-    agingAudited: {
-      within1: parseNum(raw.agingAudited?.within1),
-      y1to2: parseNum(raw.agingAudited?.y1to2),
-      y2to3: parseNum(raw.agingAudited?.y2to3),
-      over3: parseNum(raw.agingAudited?.over3),
-    },
+    agingAudited: migrated.agingAudited,
     isConfirmed: raw.isConfirmed || '',
     postPeriodSettlement: parseNum(raw.postPeriodSettlement),
     remark: raw.remark || '',
@@ -149,8 +146,12 @@ export function recalcRowFormulas(row: DetailRow): DetailRow {
   }
 }
 
-/** 创建空行（所有数值为 0） */
-export function createEmptyRow(): DetailRow {
+/** 创建空行（账龄段基于当前项目配置动态初始化为 0） */
+export function createEmptyRow(segments: AgingSegment[] = []): DetailRow {
+  const emptyAging: AgingData = {}
+  for (const seg of segments) {
+    emptyAging[seg.key] = 0
+  }
   return {
     rowId: generateRowId(),
     customerName: '',
@@ -161,7 +162,7 @@ export function createEmptyRow(): DetailRow {
     priorAdjustment: 0,
     priorReclass: 0,
     priorAudited: 0,
-    agingPrior: { within1: 0, y1to2: 0, y2to3: 0, over3: 0 },
+    agingPrior: { ...emptyAging },
     debit: 0,
     credit: 0,
     endBalance: 0,
@@ -170,7 +171,7 @@ export function createEmptyRow(): DetailRow {
     endAje: 0,
     endRje: 0,
     endAudited: 0,
-    agingAudited: { within1: 0, y1to2: 0, y2to3: 0, over3: 0 },
+    agingAudited: { ...emptyAging },
     isConfirmed: '',
     postPeriodSettlement: 0,
     remark: '',
@@ -231,16 +232,21 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
+  // ─── Aging Config Integration (subject='F1', 2-period) ──────────────
+
+  const { segments, bands } = useAgingConfig(projectId, 'F1')
+
   // ─── Reactive rows ───────────────────────────────────────────────────
 
   const rows = ref<DetailRow[]>([])
   const searchQuery = ref<string>('')
 
-  // Load rows from allResponses
+  // Load rows from allResponses (with migration via migrateD3F1Keys)
   watch(
-    () => allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (jsonStr) => {
-      const parsed = safeParseRows(jsonStr)
+    [() => allResponses.value.get(ITEM_ID_ROWS)?.remark, segments],
+    ([jsonStr]) => {
+      if (!segments.value.length) return  // 等待 segments 加载完成
+      const parsed = safeParseRows(jsonStr as string | undefined, segments.value)
       // Recalculate formula chain for each row
       rows.value = parsed.map(recalcRowFormulas)
     },
@@ -268,6 +274,14 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
   const subtotalRow: ComputedRef<DetailRow> = computed(() => {
     const allRows = rows.value
+    // 动态合计 aging 数据
+    const agingPriorSub: AgingData = {}
+    const agingAuditedSub: AgingData = {}
+    for (const seg of segments.value) {
+      agingPriorSub[seg.key] = calcSubtotal(allRows.map(r => r.agingPrior?.[seg.key] ?? 0))
+      agingAuditedSub[seg.key] = calcSubtotal(allRows.map(r => r.agingAudited?.[seg.key] ?? 0))
+    }
+
     return {
       rowId: '__subtotal__',
       customerName: '合计',
@@ -278,12 +292,7 @@ export function useF1Detail(options: UseD3DetailOptions) {
       priorAdjustment: calcSubtotal(allRows.map(r => r.priorAdjustment)),
       priorReclass: calcSubtotal(allRows.map(r => r.priorReclass)),
       priorAudited: calcSubtotal(allRows.map(r => r.priorAudited)),
-      agingPrior: {
-        within1: calcSubtotal(allRows.map(r => r.agingPrior.within1)),
-        y1to2: calcSubtotal(allRows.map(r => r.agingPrior.y1to2)),
-        y2to3: calcSubtotal(allRows.map(r => r.agingPrior.y2to3)),
-        over3: calcSubtotal(allRows.map(r => r.agingPrior.over3)),
-      },
+      agingPrior: agingPriorSub,
       debit: calcSubtotal(allRows.map(r => r.debit)),
       credit: calcSubtotal(allRows.map(r => r.credit)),
       endBalance: calcSubtotal(allRows.map(r => r.endBalance)),
@@ -292,12 +301,7 @@ export function useF1Detail(options: UseD3DetailOptions) {
       endAje: calcSubtotal(allRows.map(r => r.endAje)),
       endRje: calcSubtotal(allRows.map(r => r.endRje)),
       endAudited: calcSubtotal(allRows.map(r => r.endAudited)),
-      agingAudited: {
-        within1: calcSubtotal(allRows.map(r => r.agingAudited.within1)),
-        y1to2: calcSubtotal(allRows.map(r => r.agingAudited.y1to2)),
-        y2to3: calcSubtotal(allRows.map(r => r.agingAudited.y2to3)),
-        over3: calcSubtotal(allRows.map(r => r.agingAudited.over3)),
-      },
+      agingAudited: agingAuditedSub,
       isConfirmed: '',
       postPeriodSettlement: calcSubtotal(allRows.map(r => r.postPeriodSettlement)),
       remark: '',
@@ -339,7 +343,7 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
   function addRow(): void {
     if (isReadonly.value) return
-    const newRow = createEmptyRow()
+    const newRow = createEmptyRow(segments.value)
     rows.value = [...rows.value, newRow]
     persistRows()
   }
@@ -362,12 +366,12 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
     const row = { ...rows.value[idx] }
 
-    // Handle nested aging fields
+    // Handle nested aging fields (dynamic keys)
     if (field.startsWith('agingPrior.')) {
-      const subField = field.replace('agingPrior.', '') as keyof DetailRow['agingPrior']
+      const subField = field.replace('agingPrior.', '')
       row.agingPrior = { ...row.agingPrior, [subField]: parseNum(value) }
     } else if (field.startsWith('agingAudited.')) {
-      const subField = field.replace('agingAudited.', '') as keyof DetailRow['agingAudited']
+      const subField = field.replace('agingAudited.', '')
       row.agingAudited = { ...row.agingAudited, [subField]: parseNum(value) }
     } else if (['priorUnadjusted', 'priorAdjustment', 'priorReclass', 'debit', 'credit', 'entityReclass', 'endAje', 'endRje', 'postPeriodSettlement'].includes(field)) {
       ;(row as any)[field] = parseNum(value)
@@ -434,7 +438,7 @@ export function useF1Detail(options: UseD3DetailOptions) {
             priorUnadjusted: imported.priorUnadjusted ?? imported.prior_unadjusted ?? 0,
             credit: imported.credit ?? 0,
             debit: imported.debit ?? 0,
-          })
+          }, segments.value)
           const recalculated = recalcRowFormulas(newRow)
           existingMap.set(name, recalculated)
           newCount++
@@ -469,6 +473,19 @@ export function useF1Detail(options: UseD3DetailOptions) {
   window.addEventListener('confirmation:completed', confirmationHandler)
   eventListeners.push({ event: 'confirmation:completed', handler: confirmationHandler })
 
+  // ─── Aging Config Changed EventBus ──────────────────────────────────
+
+  const agingConfigHandler = () => {
+    // 配置变更时：对每行调用 remapRowAgingData 保留已有段/零初始化新增段
+    if (!segments.value.length) return
+    rows.value = rows.value.map(row =>
+      remapRowAgingData(row, segments.value, false) as DetailRow,
+    )
+    persistRows()
+  }
+  window.addEventListener('aging-config:changed', agingConfigHandler)
+  eventListeners.push({ event: 'aging-config:changed', handler: agingConfigHandler })
+
   onBeforeUnmount(() => {
     for (const { event, handler } of eventListeners) {
       window.removeEventListener(event, handler)
@@ -483,6 +500,9 @@ export function useF1Detail(options: UseD3DetailOptions) {
     subtotalRow,
     verificationRow,
     searchQuery,
+    // 账龄配置
+    segments,
+    bands,
     // 操作
     addRow,
     removeRow,

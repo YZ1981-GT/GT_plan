@@ -9,6 +9,7 @@ import { useD2Detail, type DetailRow } from '../composables/useD2Detail'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
+import type { AgingBand } from '@/composables/useAgingConfig'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
@@ -51,6 +52,7 @@ const {
   updateCell,
   useVirtualScroll,
   importFromAuxBalance,
+  bands,
 } = useD2Detail({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -102,15 +104,6 @@ const { rowEventHandlers } = useVirtualTable({
 
 const RELATION_OPTIONS = ['非关联方', '控股股东', '实际控制人', '其他关联方']
 const CREDIT_RISK_OPTIONS = ['单项计提', '账龄组合', '客户类型组合']
-
-const AGING_BANDS = [
-  { label: '1年内', prior: 'priorAging1Year', current: 'currentAging1Year', audited: 'auditedAging1Year' },
-  { label: '1-2年', prior: 'priorAging1to2', current: 'currentAging1to2', audited: 'auditedAging1to2' },
-  { label: '2-3年', prior: 'priorAging2to3', current: 'currentAging2to3', audited: 'auditedAging2to3' },
-  { label: '3-4年', prior: 'priorAging3to4', current: 'currentAging3to4', audited: 'auditedAging3to4' },
-  { label: '4-5年', prior: 'priorAging4to5', current: 'currentAging4to5', audited: 'auditedAging4to5' },
-  { label: '5年以上', prior: 'priorAgingOver5', current: 'currentAgingOver5', audited: 'auditedAgingOver5' },
-] as const
 
 const { generateAndConfirm, aiAvailable } = useD2AiGenerate(toRef(props, 'wpId'))
 const importing = ref(false)
@@ -286,8 +279,8 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <!-- 期初审定账龄 -->
       <el-table-column label="期初审定账龄" align="center">
-        <el-table-column v-for="band in AGING_BANDS" :key="'p-' + band.prior" :label="band.label" width="95" align="right">
-          <template #default="{ row }">{{ displayPrefs.fmtAmount(row[band.prior]) }}</template>
+        <el-table-column v-for="band in bands" :key="'p-' + band.key" :label="band.label" width="95" align="right">
+          <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingPrior?.[band.key] ?? 0) }}</template>
         </el-table-column>
       </el-table-column>
 
@@ -312,8 +305,8 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <!-- 期末未审账龄 -->
       <el-table-column label="期末未审账龄" align="center">
-        <el-table-column v-for="band in AGING_BANDS" :key="'c-' + band.current" :label="band.label" width="95" align="right">
-          <template #default="{ row }">{{ displayPrefs.fmtAmount(row[band.current]) }}</template>
+        <el-table-column v-for="band in bands" :key="'c-' + band.key" :label="band.label" width="95" align="right">
+          <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingCurrent?.[band.key] ?? 0) }}</template>
         </el-table-column>
       </el-table-column>
 
@@ -331,17 +324,17 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 
       <!-- 期末审定账龄 -->
       <el-table-column label="期末审定账龄" align="center">
-        <el-table-column v-for="band in AGING_BANDS" :key="'a-' + band.audited" :label="band.label" width="95" align="right">
+        <el-table-column v-for="band in bands" :key="'a-' + band.key" :label="band.label" width="95" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
-              :model-value="row[band.audited]"
+              :model-value="row.agingAudited?.[band.key] ?? 0"
               :controls="false"
               size="small"
               class="aging-input"
-              @change="(v: number) => handleEdit(row, band.audited, v ?? 0)"
+              @change="(v: number) => handleEdit(row, `agingAudited.${band.key}`, v ?? 0)"
             />
-            <span v-else class="audited-aging">{{ displayPrefs.fmtAmount(row[band.audited]) }}</span>
+            <span v-else class="audited-aging">{{ displayPrefs.fmtAmount(row.agingAudited?.[band.key] ?? 0) }}</span>
           </template>
         </el-table-column>
       </el-table-column>

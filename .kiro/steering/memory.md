@@ -10,7 +10,7 @@ inclusion: always
 
 - 语言中文；启动 `start-dev.bat`（后端 9980 + 前端 3030）
 - **输出分步但连续做完**；**任务标记不能假绿**；**彻底解决不绕开**；**optional(*)任务也要做完**
-- **🔴 codegraph 优先于 grep**：79k 节点/160k 边/4449 文件；grep 仅用于非符号文本
+- **🔴 codegraph 优先于 grep**：146k 节点/312k 边/8673 文件；grep 仅用于非符号文本
 - **触类旁通**；**改动前先 spec 三件套**（>500行/3+组件/跨前后端）；**改动后必 Playwright 实测**
 - **UI 全中文化**；**报表金额默认"元"**；**中文场景全链路不能崩**
 - **底稿表格UI统一规范**：表格字体13px；AI+复核按钮右对齐在section标题同行；公式列虚线下划线+cursor:help+tooltip来源；列宽min-width自适应；审计说明/结论el-card包裹；编制提示details折叠底部
@@ -81,14 +81,13 @@ inclusion: always
 
 ## 任务状态
 
-### 完成度概览（2026-07 按代码实证刷新）
-- **222+ spec archived**；FE registry **195** componentType；WHOLE 整册专属 **65**（`DEDICATED_COMPONENT_TYPES` 单一来源）
-- **A/B/C**：专属+bundle 基本完成；C2~C15 弹窗层叠+Cx-2 增强已完成；C22/C23/C24/C25/C26 已完成
-- **D~N 专属组件**：绝大多数四件套齐全（Vue+composable+RENDERER_DISPATCH+registry）
-- **明细归档** → `#dev-history` / `.kiro/specs/INDEX.md`（本表只保留排期判断用摘要）
+### 完成度概览（2026-07-10 归档刷新）
+- **340+ spec archived**（含本次121个从active归入）；FE registry **195** componentType；WHOLE 整册专属 **65**（`DEDICATED_COMPONENT_TYPES` 单一来源）
+- **A~N + S 全部循环底稿100%完成**；基础设施100%完成
+- **Active spec = 0**（全部归档至 `_archive/05-business-features/`）
 
 ### git
-- 分支 `work/2026-05-30-wp-specs`；最高迁移约 V098 量级（以 `migration_status` 为准）
+- 分支 `work/2026-05-30-wp-specs`；最高迁移 V099（以 `migration_status` 为准）
 - `origin/HEAD→origin/master` 落后 main 隐患仍在
 
 ### 循环进度表（✅完成 / 🟡部分 / 🔵待开发）
@@ -97,30 +96,31 @@ inclusion: always
 |------|------|------|
 | A/B | ✅ | Dashboard/bundle/风险等已落地 |
 | C | ✅为主 | C1 向导+C2~C15+C22~C26 完成；Cx 新增弹窗增强(编制提示/附件OCR)仍待 |
-| D | ✅为主 | D1~D6 完成；**D7** 61%(19/31)；**D2 refactor** 24.5%(12/49)大型重构；D3 81.8%(27/33) |
+| D | ✅ | D1~D7全部完成✅；D2-refactor完成✅(49/49) |
 | E | ✅ | E1 货币资金完成 |
-| F | 🟡 | F5完成；F2-special/valuation完成；**F2-main** 73%(22/30)；**F1** 10%(3/29)；**F3** 10%(1/10)；**F4** 80%(8/10)；F0函证71%(5/7) |
-| G | ✅为主 | G1~G4/G6~G11完成；G12/G13/G14完成✅；**G0** 57%(4/7)；**G5** 76.5%(13/17) |
-| H | ✅为主 | H0/H1~H4/H6/H8~H10 完成；**H5完成✅**(40任务/24sheet/10PBT/行业守卫oil_gas+mining/折耗单位产量法/四区块审定表/EventBus 3事件/TB回写1631+1632)；**H7** 行业类待开发 |
+| F | ✅ | F1/F2/F3/F4/F5/F0 全部完成✅ |
+| G | ✅ | G1~G14全部完成✅；G0函证完成✅；G5完成✅(含Task11三阶段+ECL) |
+| H | ✅为主 | H0/H1~H4/H6/H8~H10 完成；**H5完成✅**(40任务/24sheet/10PBT/行业守卫oil_gas+mining/折耗单位产量法/四区块审定表/EventBus 3事件/TB回写1631+1632)；**H7完成✅**(44任务/26sheet/12PBT/行业守卫agriculture+forestry+livestock+fishery/双计量模式cost+fair_value/产量记录H7独有/互转三方向/直线法折旧/TB回写1621) |
 | I | ✅ | I1~I6 全部完成 |
 | J | ✅ | J1/J2/J3 + orchestration 全部完成 |
 | K | ✅为主 | K0~K9 完成；**K10 全部完成**(31任务/10sheet/6PBT/损益6117发生额贷-借/政府补助核对引擎联动K7/抽凭OCR/EventBus TB回写+A13)；**K11 全部完成**；**K12 全部完成**(29任务/9sheet/5PBT/损益6301发生额贷-借/抽凭OCR/EventBus TB回写+A13)；**K13 全部完成**(29任务/9sheet/5PBT/损益6711发生额借-贷/抽凭OCR/税前扣除性/EventBus TB回写+A13) |
-| L | ✅ | **L1/L2 已完成**（勿再写进行中）；L3~L8 完成；**L0** 函证待开发 |
+| L | ✅ | L1~L8完成；**L0函证完成✅** |
 | M | ✅ | **M1~M10 全部完成**（含 M6 未分配利润枢纽） |
 | N | ✅ | N1/N2/N3/N4/N5 全部完成；**N4**(29任务/9sheet/6PBT/损益6403发生额借-贷/多税种测算与N2同源/N2计提对应/EventBus TB回写+A利润表勾稽) |
 | S | ✅ | S3~S6/S12~S15/S20/S21/S32/S33/S34/S35全部完成✅ |
 
 ### 活跃待办（排期优先）
-- **🔵 未动工**：H7(0%/44任务) / L0(0%/8任务) / cutoff-auto-sampling(0%/18任务)
-- **🟡 进行中**：D2-refactor(24.5%) / D7(61%) / G0(57%) / G5(76.5%) / F1(10%) / F3(10%) / F2-main(73%) / F4(80%) / D3(82%)
-- **🟡 收尾**：voucher-sampling(89.5%/2任务) / f2-stocktake(87.5%/1任务) / F0函证(71%/1+1opt)
+- **✅ 全部完成**：A~N全部循环底稿+函证+D2-refactor+G5 / S全部 / F循环全部 / L循环全部 / 基础设施(版本链/复核/抽凭/截止测试) — **无活跃待办**
 - **🟡 C2~C15 新增弹窗增强**：编制提示琥珀块 + 附件 OCR 作 AI context
 - **🟡 B40** 需重建 spec；**B60** 待 vLLM Phase3；AI 对话流 / 存货监盘 P2 / voucher-attachment P2
-- **基础设施**：version-trail/audit-review-dialog/全局一致性完成✅；voucher-sampling 89.5%；cutoff-auto-sampling **未动工**
+- **基础设施**：version-trail/audit-review-dialog/全局一致性/voucher-sampling完成✅；cutoff-auto-sampling **未动工**
 - **🔴 科目方向铁律**：资产期末=期初+借-贷；负债/权益=期初+贷-借；**M3 库存股=权益备抵借方**；损益取发生额（H10/I6/K8~K13/L8/N4/N5）
 - **🔴 向导式隐藏子 sheet**：overrides 标 skip + 保留 WHOLE + skip 过滤须头部 `re.match` 提编码
 - **注册表维护**：`dedicated_component_types.py` → WHOLE；契约 `test_dedicated_component_registry_contract.py`（WHOLE⊆VALID∩FE；WHOLE−DISPATCH⊆WHITELIST∪CONFIRMATION）
 - **架构债**：拆 event_handlers / Top-5 巨型 Vue / services 按域分包；OCR=RapidOCR 单机；评估见 `docs/proposals/ai-infra-evaluation-2026-07.md`
+- **🟡 增强方向**：D2往来款账龄枚举可配置化 — **spec就绪(aging-config-enhancement, 15 tasks)**
+- **🟡 增强方向**：C2~C15弹窗增强(琥珀块+OCR AI context) — **spec就绪(c-control-test-popup-enhance, 14 tasks)**
+- **🟡 增强方向**：抽凭/版本链模式统一(collapse→dialog, useVersionTrail→Toolbar) — **spec就绪(ui-pattern-unification, 10 tasks)**
 
 ## 踩坑铁律（高频）
 

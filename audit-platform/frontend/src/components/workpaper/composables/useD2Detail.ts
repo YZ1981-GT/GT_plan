@@ -1,22 +1,25 @@
 /**
- * useD2Detail — 明细表D2-2核心逻辑 composable (39列宽表)
+ * useD2Detail — 明细表D2-2核心逻辑 composable (动态账龄版)
  *
- * Spec: .kiro/specs/d2-accounts-receivable-refactor/
- * Task: 4.1
+ * Spec: .kiro/specs/aging-config-enhancement/
+ * Task: 7.1
  *
  * 职责：
- * - DetailRow 类型定义（39列完整字段）
+ * - DetailRow 类型定义（核心字段 + nested keyed 账龄: agingPrior/agingCurrent/agingAudited）
  * - rows reactive（从 D2-detail-rows remark JSON加载）
- * - totalRow computed（SUM全部行各金额列）
+ * - 加载时自动检测旧 flat 格式，调用 migrateD2FlatToNested 迁移
+ * - 保存时调用 stripLegacyFlatKeys 确保仅 nested 格式
+ * - totalRow computed（SUM全部行各金额列 + 动态账龄段）
  * - searchQuery + filteredRows computed（模糊搜索客户名称）
  * - addRow / removeRow 动态行管理
  * - matchRelatedParty（关联方自动匹配）
  * - 行公式链自动计算（priorAudited/endBalance/currentUnadjusted/currentAudited）
  * - updateCell（编辑→公式重算→关联方匹配→debounce保存）
  * - useVirtualScroll computed（rows.length > 30 启用）
+ * - 监听 aging-config:changed 事件，保留已有段数据/零初始化新增段
  * - 序列化/反序列化（JSON.stringify rows → D2-detail-rows remark字段）
  *
- * Requirements: 2.1-2.11, 18.4
+ * Requirements: 4.1, 4.2, 4.3, 4.5, 10.2, 10.3, 10.4
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
@@ -24,6 +27,14 @@ import {
   getAuditedAmount,
 } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { useAgingConfig, createEmptyAgingData, type AgingSegment } from '@/composables/useAgingConfig'
+import {
+  isLegacyD2Format,
+  migrateD2FlatToNested,
+  stripLegacyFlatKeys,
+  remapRowAgingData,
+  type AgingData,
+} from '@/composables/useAgingMigration'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,37 +49,22 @@ export interface DetailRow {
   priorAje: number
   priorRje: number
   priorAudited: number           // 自动计算 = priorUnadjusted + priorAje + priorRje
-  // 期初审定账龄(6档)
-  priorAging1Year: number
-  priorAging1to2: number
-  priorAging2to3: number
-  priorAging3to4: number
-  priorAging4to5: number
-  priorAgingOver5: number
+  // 期初审定账龄 (nested keyed)
+  agingPrior: AgingData
   // 本期发生
   debitOccurrence: number        // 借方发生
   creditOccurrence: number       // 贷方发生
   endBalance: number             // 期末余额 = 期初审定 + 借方 - 贷方
   reclassification: number       // 被审计单位重分类
   currentUnadjusted: number      // 期末未审 = 期末余额 + 重分类
-  // 期末未审账龄(6档)
-  currentAging1Year: number
-  currentAging1to2: number
-  currentAging2to3: number
-  currentAging3to4: number
-  currentAging4to5: number
-  currentAgingOver5: number
+  // 期末未审账龄 (nested keyed)
+  agingCurrent: AgingData
   // 调整
   currentAje: number             // 账项调整(Z列)
   currentRje: number             // 重分类调整(AA列)
   currentAudited: number         // 期末审定 = 期末未审 + AJE + RJE
-  // 期末审定账龄(6档)
-  auditedAging1Year: number
-  auditedAging1to2: number
-  auditedAging2to3: number
-  auditedAging3to4: number
-  auditedAging4to5: number
-  auditedAgingOver5: number
+  // 期末审定账龄 (nested keyed)
+  agingAudited: AgingData
   // 分类与标记
   creditRiskClassification: string  // 信用风险组合方式(AI列): 单项计提/账龄组合/客户类型组合
   groupName: string              // 组合名称(AJ列)
@@ -77,18 +73,12 @@ export interface DetailRow {
   remark: string                 // 备注
 }
 
-/** 需要SUM求和的金额字段列表 */
-const NUMERIC_FIELDS: (keyof DetailRow)[] = [
+/** 需要SUM求和的固定金额字段列表（不含动态账龄段） */
+const FIXED_NUMERIC_FIELDS: (keyof DetailRow)[] = [
   'priorUnadjusted', 'priorAje', 'priorRje', 'priorAudited',
-  'priorAging1Year', 'priorAging1to2', 'priorAging2to3',
-  'priorAging3to4', 'priorAging4to5', 'priorAgingOver5',
   'debitOccurrence', 'creditOccurrence', 'endBalance',
   'reclassification', 'currentUnadjusted',
-  'currentAging1Year', 'currentAging1to2', 'currentAging2to3',
-  'currentAging3to4', 'currentAging4to5', 'currentAgingOver5',
   'currentAje', 'currentRje', 'currentAudited',
-  'auditedAging1Year', 'auditedAging1to2', 'auditedAging2to3',
-  'auditedAging3to4', 'auditedAging4to5', 'auditedAgingOver5',
   'postPayment',
 ]
 
@@ -99,8 +89,9 @@ function generateRowId(): string {
   return `dr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-/** 创建空行 */
-function createEmptyRow(seq: number): DetailRow {
+/** 创建空行（使用动态 segments 初始化账龄数据） */
+function createEmptyRow(seq: number, segments: AgingSegment[]): DetailRow {
+  const agingData = createEmptyAgingData(segments, 'D2')
   return {
     rowId: generateRowId(),
     seq,
@@ -111,32 +102,17 @@ function createEmptyRow(seq: number): DetailRow {
     priorAje: 0,
     priorRje: 0,
     priorAudited: 0,
-    priorAging1Year: 0,
-    priorAging1to2: 0,
-    priorAging2to3: 0,
-    priorAging3to4: 0,
-    priorAging4to5: 0,
-    priorAgingOver5: 0,
+    agingPrior: agingData.agingPrior,
     debitOccurrence: 0,
     creditOccurrence: 0,
     endBalance: 0,
     reclassification: 0,
     currentUnadjusted: 0,
-    currentAging1Year: 0,
-    currentAging1to2: 0,
-    currentAging2to3: 0,
-    currentAging3to4: 0,
-    currentAging4to5: 0,
-    currentAgingOver5: 0,
+    agingCurrent: agingData.agingCurrent!,
     currentAje: 0,
     currentRje: 0,
     currentAudited: 0,
-    auditedAging1Year: 0,
-    auditedAging1to2: 0,
-    auditedAging2to3: 0,
-    auditedAging3to4: 0,
-    auditedAging4to5: 0,
-    auditedAgingOver5: 0,
+    agingAudited: agingData.agingAudited,
     creditRiskClassification: '',
     groupName: '',
     isConfirmation: false,
@@ -168,10 +144,27 @@ function recalcRow(row: DetailRow): DetailRow {
   return row
 }
 
+/**
+ * 对 nested aging 对象的所有 key 求和
+ */
+function sumAgingData(dataList: AgingData[]): AgingData {
+  const result: AgingData = {}
+  for (const data of dataList) {
+    for (const [key, val] of Object.entries(data)) {
+      result[key] = (result[key] || 0) + (Number(val) || 0)
+    }
+  }
+  return result
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<string[]> }) {
-  const { allResponses, isReadonly, relatedParties } = options
+  const { allResponses, isReadonly, relatedParties, projectId } = options
+
+  // ─── 引入 useAgingConfig（subject='D2'） ───────────────────────────────
+
+  const { segments, bands } = useAgingConfig(projectId, 'D2')
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -192,47 +185,49 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       const parsed = JSON.parse(jsonStr)
       if (Array.isArray(parsed)) {
         rows.value = parsed.map((raw: any, idx: number) => {
+          // 旧 flat 格式检测与迁移 (Req 4.3, 10.2, 10.3)
+          let migrated: any = raw
+          if (isLegacyD2Format(raw)) {
+            migrated = migrateD2FlatToNested(raw)
+          }
+
+          // 确保 nested aging 字段存在（防御性）
+          const agingPrior: AgingData = (migrated.agingPrior && typeof migrated.agingPrior === 'object')
+            ? { ...migrated.agingPrior }
+            : {}
+          const agingCurrent: AgingData = (migrated.agingCurrent && typeof migrated.agingCurrent === 'object')
+            ? { ...migrated.agingCurrent }
+            : {}
+          const agingAudited: AgingData = (migrated.agingAudited && typeof migrated.agingAudited === 'object')
+            ? { ...migrated.agingAudited }
+            : {}
+
           const row: DetailRow = {
-            rowId: raw.rowId || generateRowId(),
-            seq: raw.seq ?? idx + 1,
-            customerName: raw.customerName || '',
-            companyCode: raw.companyCode || '',
-            relationType: raw.relationType || '非关联方',
-            priorUnadjusted: parseNum(raw.priorUnadjusted),
-            priorAje: parseNum(raw.priorAje),
-            priorRje: parseNum(raw.priorRje),
-            priorAudited: parseNum(raw.priorAudited),
-            priorAging1Year: parseNum(raw.priorAging1Year),
-            priorAging1to2: parseNum(raw.priorAging1to2),
-            priorAging2to3: parseNum(raw.priorAging2to3),
-            priorAging3to4: parseNum(raw.priorAging3to4),
-            priorAging4to5: parseNum(raw.priorAging4to5),
-            priorAgingOver5: parseNum(raw.priorAgingOver5),
-            debitOccurrence: parseNum(raw.debitOccurrence),
-            creditOccurrence: parseNum(raw.creditOccurrence),
-            endBalance: parseNum(raw.endBalance),
-            reclassification: parseNum(raw.reclassification),
-            currentUnadjusted: parseNum(raw.currentUnadjusted),
-            currentAging1Year: parseNum(raw.currentAging1Year),
-            currentAging1to2: parseNum(raw.currentAging1to2),
-            currentAging2to3: parseNum(raw.currentAging2to3),
-            currentAging3to4: parseNum(raw.currentAging3to4),
-            currentAging4to5: parseNum(raw.currentAging4to5),
-            currentAgingOver5: parseNum(raw.currentAgingOver5),
-            currentAje: parseNum(raw.currentAje),
-            currentRje: parseNum(raw.currentRje),
-            currentAudited: parseNum(raw.currentAudited),
-            auditedAging1Year: parseNum(raw.auditedAging1Year),
-            auditedAging1to2: parseNum(raw.auditedAging1to2),
-            auditedAging2to3: parseNum(raw.auditedAging2to3),
-            auditedAging3to4: parseNum(raw.auditedAging3to4),
-            auditedAging4to5: parseNum(raw.auditedAging4to5),
-            auditedAgingOver5: parseNum(raw.auditedAgingOver5),
-            creditRiskClassification: raw.creditRiskClassification || '',
-            groupName: raw.groupName || '',
-            isConfirmation: raw.isConfirmation === true || raw.isConfirmation === 'true',
-            postPayment: parseNum(raw.postPayment),
-            remark: raw.remark || '',
+            rowId: migrated.rowId || generateRowId(),
+            seq: migrated.seq ?? idx + 1,
+            customerName: migrated.customerName || '',
+            companyCode: migrated.companyCode || '',
+            relationType: migrated.relationType || '非关联方',
+            priorUnadjusted: parseNum(migrated.priorUnadjusted),
+            priorAje: parseNum(migrated.priorAje),
+            priorRje: parseNum(migrated.priorRje),
+            priorAudited: parseNum(migrated.priorAudited),
+            agingPrior,
+            debitOccurrence: parseNum(migrated.debitOccurrence),
+            creditOccurrence: parseNum(migrated.creditOccurrence),
+            endBalance: parseNum(migrated.endBalance),
+            reclassification: parseNum(migrated.reclassification),
+            currentUnadjusted: parseNum(migrated.currentUnadjusted),
+            agingCurrent,
+            currentAje: parseNum(migrated.currentAje),
+            currentRje: parseNum(migrated.currentRje),
+            currentAudited: parseNum(migrated.currentAudited),
+            agingAudited,
+            creditRiskClassification: migrated.creditRiskClassification || '',
+            groupName: migrated.groupName || '',
+            isConfirmation: migrated.isConfirmation === true || migrated.isConfirmation === 'true',
+            postPayment: parseNum(migrated.postPayment),
+            remark: migrated.remark || '',
           }
           // Recalc formula fields to ensure consistency
           return recalcRow(row)
@@ -258,7 +253,7 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
   // ─── Total Row ─────────────────────────────────────────────────────────
 
   /**
-   * 合计行：SUM所有行各金额列，不可编辑
+   * 合计行：SUM所有行各金额列 + 动态账龄段，不可编辑
    */
   const totalRow: ComputedRef<Partial<DetailRow>> = computed(() => {
     const result: Partial<DetailRow> = {
@@ -272,12 +267,18 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       isConfirmation: false,
       remark: '',
     }
-    for (const field of NUMERIC_FIELDS) {
+    // 固定金额字段求和
+    for (const field of FIXED_NUMERIC_FIELDS) {
       (result as any)[field] = rows.value.reduce(
         (sum, row) => sum + parseNum((row as any)[field]),
         0
       )
     }
+    // 动态账龄段求和
+    result.agingPrior = sumAgingData(rows.value.map(r => r.agingPrior))
+    result.agingCurrent = sumAgingData(rows.value.map(r => r.agingCurrent))
+    result.agingAudited = sumAgingData(rows.value.map(r => r.agingAudited))
+
     return result
   })
 
@@ -297,12 +298,12 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
   // ─── Row Management ────────────────────────────────────────────────────
 
   /**
-   * 在合计行上方新增空行，所有金额=0
+   * 在合计行上方新增空行，使用当前 segments 初始化账龄数据
    */
   function addRow(): void {
     if (isReadonly.value) return
     const newSeq = rows.value.length + 1
-    const newRow = createEmptyRow(newSeq)
+    const newRow = createEmptyRow(newSeq, segments.value)
     rows.value.push(newRow)
     debounceSave()
   }
@@ -344,8 +345,10 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
   /**
    * 编辑单元格 → 公式重算 → 触发关联方匹配(如编辑customerName) → debounce保存
    *
+   * 支持 nested aging 字段更新：field 格式 "agingPrior.within1" / "agingCurrent.y1to2" 等
+   *
    * @param rowId - 行唯一标识
-   * @param field - 字段名
+   * @param field - 字段名（支持 dot notation for aging fields）
    * @param value - 新值
    */
   function updateCell(rowId: string, field: string, value: any): void {
@@ -354,14 +357,23 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
     const row = rows.value.find(r => r.rowId === rowId)
     if (!row) return
 
-    // Update value
-    const key = field as keyof DetailRow
-    if (key === 'isConfirmation') {
-      row.isConfirmation = value === true || value === 'true'
-    } else if (NUMERIC_FIELDS.includes(key)) {
-      ;(row as any)[key] = parseNum(value)
+    // Handle nested aging field (e.g. "agingPrior.within1")
+    if (field.startsWith('agingPrior.') || field.startsWith('agingCurrent.') || field.startsWith('agingAudited.')) {
+      const [period, segKey] = field.split('.')
+      const agingObj = (row as any)[period] as AgingData
+      if (agingObj && segKey) {
+        agingObj[segKey] = parseNum(value)
+      }
     } else {
-      ;(row as any)[key] = value
+      // Update flat value
+      const key = field as keyof DetailRow
+      if (key === 'isConfirmation') {
+        row.isConfirmation = value === true || value === 'true'
+      } else if (FIXED_NUMERIC_FIELDS.includes(key)) {
+        ;(row as any)[key] = parseNum(value)
+      } else {
+        ;(row as any)[key] = value
+      }
     }
 
     // Recalculate formula chain
@@ -394,9 +406,11 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
 
   /**
    * 序列化行数据为 JSON，存储到 D2-detail-rows remark 字段
+   * 保存时调用 stripLegacyFlatKeys 确保不含 flat 字段 (Req 4.2, 10.4)
    */
   function serializeRows(): string {
-    return JSON.stringify(rows.value)
+    const cleanedRows = rows.value.map(row => stripLegacyFlatKeys(row))
+    return JSON.stringify(cleanedRows)
   }
 
   function debounceSave(): void {
@@ -442,6 +456,34 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       // silent
     }
   }
+
+  // ─── Aging Config Change Handling (Req 4.5) ────────────────────────────
+
+  /**
+   * 监听 aging-config:changed 事件，保留已有段数据/零初始化新增段
+   */
+  function onAgingConfigChanged(): void {
+    if (rows.value.length === 0) return
+
+    const newSegments = segments.value
+    if (!newSegments || newSegments.length === 0) return
+
+    // 重新映射每一行的 aging 数据
+    rows.value = rows.value.map(row => {
+      const remapped = remapRowAgingData(row, newSegments, true /* isThreePeriod */)
+      return {
+        ...row,
+        agingPrior: remapped.agingPrior,
+        agingCurrent: remapped.agingCurrent,
+        agingAudited: remapped.agingAudited,
+      }
+    })
+
+    // 配置变更后触发保存
+    debounceSave()
+  }
+
+  window.addEventListener('aging-config:changed', onAgingConfigChanged)
 
   // ─── Import from Aux Balance (Task 45.1) ────────────────────────────
 
@@ -497,7 +539,7 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
           updated++
         } else {
           // 新增行
-          const newRow = createEmptyRow(rows.value.length + 1)
+          const newRow = createEmptyRow(rows.value.length + 1, segments.value)
           newRow.customerName = customerName
           if (item.prior_balance !== undefined) {
             newRow.priorUnadjusted = item.prior_balance
@@ -559,6 +601,7 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       flushSave()
     }
     window.removeEventListener('confirmation:completed', onConfirmationCompleted)
+    window.removeEventListener('aging-config:changed', onAgingConfigChanged)
   })
 
   // ─── Return ────────────────────────────────────────────────────────────
@@ -585,6 +628,10 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
 
     // 导入
     importFromAuxBalance,
+
+    // 账龄配置（供模板/视图渲染使用）
+    segments,
+    bands,
 
     // 工具方法（供外部/测试使用）
     loadRows,

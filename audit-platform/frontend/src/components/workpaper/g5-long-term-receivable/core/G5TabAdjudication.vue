@@ -1,5 +1,12 @@
 <template>
   <div class="g5-adjudication">
+    <div class="section-head">
+      <h3 class="sheet-title">G5-1 审定表</h3>
+      <div class="head-actions">
+        <GtReviewTrigger section-id="g5-1-adjudication" />
+      </div>
+    </div>
+
     <!-- TB差异提示 -->
     <div v-if="Math.abs(adjudication.variance.value) > 0.01" class="variance-alert">
       <el-alert type="error" :closable="false">
@@ -72,6 +79,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useG5Adjudication } from '../../composables/useG5Adjudication'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -102,6 +110,9 @@ function rowClassName({ row }: any) {
 
 <style scoped>
 .g5-adjudication { font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
 .variance-alert { margin-bottom: 8px; }
 .formula-cell {
   border-bottom: 1px dashed #999;

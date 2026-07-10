@@ -83,6 +83,7 @@ export type HtmlComponentType =
   | 'confirmation-alternative-h05'
   | 'confirmation-alternative-k05'
   | 'confirmation-alternative-k06'
+  | 'confirmation-alternative-l05'
   | 'g14-credit-impairment-loss'
   | 'h10-asset-disposal-income'
   | 'h1-fixed-assets'
@@ -316,6 +317,7 @@ const GtConfirmationAlternativeG06 = defineAsyncComponent(() => import('./g0-con
 const GtConfirmationAlternativeH05 = defineAsyncComponent(() => import('./confirmation/alternativeH05/GtConfirmationAlternativeH05.vue'))
 const GtConfirmationAlternativeK05 = defineAsyncComponent(() => import('./confirmation/alternativeK05/GtConfirmationAlternativeK05.vue'))
 const GtConfirmationAlternativeK06 = defineAsyncComponent(() => import('./confirmation/alternativeK06/GtConfirmationAlternativeK06.vue'))
+const GtConfirmationAlternativeL05 = defineAsyncComponent(() => import('./confirmation/alternativeL05/GtConfirmationAlternativeL05.vue'))
 const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
@@ -1082,6 +1084,14 @@ contextProps: 'form-type' as const,
     component: GtConfirmationAlternativeK06,
     icon: '🔄',
     label: '替代程序(其他应付款)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'confirmation-alternative-l05',
+    component: GtConfirmationAlternativeL05,
+    icon: '🔄',
+    label: '替代程序(债务循环)',
     emits: ['save'],
     contextProps: 'standard',
   },

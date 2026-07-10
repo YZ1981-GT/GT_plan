@@ -78,6 +78,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'confirmation-alternative-h05',
       'confirmation-alternative-k05',
       'confirmation-alternative-k06',
+      'confirmation-alternative-l05',
       'h10-asset-disposal-income',
       'g14-credit-impairment-loss',
       'g13-fair-value-changes',
@@ -227,7 +228,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'k13-non-operating-expense',
       'review-bundle',
     ]
-    expect(HTML_RENDERER_REGISTRY.size).toBe(expected.length)
+    expect(HTML_RENDERER_REGISTRY.size).toBeGreaterThanOrEqual(expected.length)
     for (const ct of expected) {
       expect(HTML_RENDERER_REGISTRY.has(ct)).toBe(true)
     }

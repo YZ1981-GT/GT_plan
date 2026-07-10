@@ -112,59 +112,30 @@
         </el-table-column>
       </template>
 
-      <!-- ═══ 账龄区段列 ═══ -->
+      <!-- ═══ 账龄区段列（动态，基于 bands from useAgingConfig） ═══ -->
       <template v-if="activeSegment === 'aging'">
-        <el-table-column label="1年内" min-width="110" align="right">
+        <el-table-column
+          v-for="band in bands"
+          :key="band.key"
+          :label="band.label"
+          min-width="110"
+          align="right"
+        >
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aging1y" size="small"
-              :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'aging1y', v ?? 0)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging1y) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="1-2年" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aging1to2" size="small"
-              :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'aging1to2', v ?? 0)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging1to2) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="2-3年" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aging2to3" size="small"
-              :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'aging2to3', v ?? 0)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging2to3) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="3-4年" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aging3to4" size="small"
-              :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'aging3to4', v ?? 0)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging3to4) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="4-5年" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aging4to5" size="small"
-              :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'aging4to5', v ?? 0)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging4to5) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="5年以上" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.aging5plus" size="small"
-              :controls="false" class="amount-input"
-              @change="(v: number) => updateField(row.id, 'aging5plus', v ?? 0)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging5plus) }}</span>
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.agingAudited[band.key] ?? 0"
+              size="small"
+              :controls="false"
+              class="amount-input"
+              @change="(v: number) => updateField(row.id, `agingAudited.${band.key}`, v ?? 0)"
+            />
+            <span v-else class="amount-cell">{{ fmtAmt(row.agingAudited[band.key]) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="账龄合计" min-width="120" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="账龄合计=1年内+1-2年+2-3年+3-4年+4-5年+5年以上">
+            <span class="formula-cell" title="账龄合计=各账龄段之和">
               {{ fmtAmt(row.agingTotal) }}
             </span>
           </template>
@@ -271,9 +242,9 @@
       <summary>编制提示</summary>
       <ul>
         <li>36列拆为3区段Tab切换，行数据同步</li>
-        <li>6个账龄区间：1年内/1-2年/2-3年/3-4年/4-5年/5年以上</li>
+        <li>账龄区间基于项目级配置动态生成（支持3年段/5年段/自定义）</li>
         <li>账龄合计=各区间之和，须与期末余额一致（勾稽列显示✓或✗）</li>
-        <li>3年以上(3-4年+4-5年+5年以上>0)行显示橙色背景</li>
+        <li>3年以上(含3-4年/4-5年/5年以上/3年以上)行显示橙色背景</li>
         <li>减值阶段：Stage1正常/Stage2显著增加/Stage3已减值</li>
         <li>净值=期末余额-坏账准备（公式自动计算）</li>
         <li>"新增"按钮弹出对话框输入往来对象名称后创建行</li>
@@ -321,6 +292,7 @@ const {
   rows,
   stats,
   agingMismatches,
+  bands,
   loadRows,
   addRow,
   removeRow,

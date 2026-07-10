@@ -152,68 +152,35 @@
         </el-table-column>
       </template>
 
-      <!-- ═══ 区段1 账龄 ═══ -->
+      <!-- ═══ 区段1 账龄（动态，基于 bands from useAgingConfig） ═══ -->
       <template v-if="activeSegmentIdx === 1">
         <el-table-column label="往来对象" min-width="160">
           <template #default="{ row }">
             <span>{{ row.counterparty }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="1年以内" min-width="120" align="right">
+        <el-table-column
+          v-for="band in bands"
+          :key="band.key"
+          :label="band.label"
+          min-width="120"
+          align="right"
+        >
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
-              :model-value="row.agingWithin1Y"
+              :model-value="row.agingAudited[band.key] ?? 0"
               size="small"
               :controls="false"
               class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'agingWithin1Y', v ?? 0)"
+              @change="(v: number) => detail.updateCell(row.rowId, `agingAudited.${band.key}`, v ?? 0)"
             />
-            <span v-else class="amount-cell">{{ fmtAmt(row.agingWithin1Y) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="1-2年" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.aging1To2Y"
-              size="small"
-              :controls="false"
-              class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'aging1To2Y', v ?? 0)"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging1To2Y) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="2-3年" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.aging2To3Y"
-              size="small"
-              :controls="false"
-              class="amount-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'aging2To3Y', v ?? 0)"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aging2To3Y) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="3年以上" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.agingOver3Y"
-              size="small"
-              :controls="false"
-              class="amount-input aging-over3y-input"
-              @change="(v: number) => detail.updateCell(row.rowId, 'agingOver3Y', v ?? 0)"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.agingOver3Y) }}</span>
+            <span v-else class="amount-cell">{{ fmtAmt(row.agingAudited[band.key]) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="账龄合计" min-width="120" align="right">
           <template #default="{ row }">
-            <el-tooltip content="=1年内+1-2年+2-3年+3年以上" placement="top">
+            <el-tooltip content="=各账龄段之和" placement="top">
               <span class="formula-cell">{{ fmtAmt(row.agingTotal) }}</span>
             </el-tooltip>
           </template>
@@ -334,7 +301,7 @@
       <ul>
         <li>27列拆为3区段Tab切换（基础/账龄/检查），行数据同步</li>
         <li><strong>负债类科目</strong>：期末余额=期初余额+本期增加(贷方)-本期减少(借方)</li>
-        <li>账龄合计=1年以内+1-2年+2-3年+3年以上，应与期末余额一致（不一致红色提示）</li>
+        <li>账龄区间基于项目级配置动态生成，账龄合计应与期末余额一致（不一致红色提示）</li>
         <li>3年以上账龄>0的行标记橙色背景（长期挂账风险），需关注是否转营业外收入</li>
         <li>"疑似未入账"复选框标记完整性认定风险项（反向截止测试发现的漏记负债）</li>
         <li>新增行需弹窗输入往来对象名称后创建</li>
@@ -399,7 +366,10 @@ const detail = useK3Detail({
   saveResponse: (itemId: string, value: any) => {
     emit('save', itemId, value)
   },
+  projectId: toRef(props, 'projectId'),
 })
+
+const { bands } = detail
 
 const {
   exportTemplate,
@@ -420,14 +390,26 @@ const activeSegmentIdx = ref(0)
 const agingOver3YPercent = computed(() => {
   const endTotal = detail.subtotals.value.endBalance
   if (!endTotal || endTotal === 0) return 0
-  const over3y = detail.subtotals.value.agingOver3Y
+  // 动态计算3年以上：从 agingAudited 中找 over3/y3to4/y4to5/over5 key
+  const over3Keys = ['y3to4', 'y4to5', 'over5', 'over3']
+  const over3y = detail.detailRows.value.reduce((sum, r) => {
+    let rowSum = 0
+    for (const k of over3Keys) {
+      if (k in r.agingAudited) rowSum += (r.agingAudited[k] || 0)
+    }
+    return sum + rowSum
+  }, 0)
   return Math.round((over3y / endTotal) * 10000) / 100
 })
 
 // ─── 行样式：3年以上>0橙色背景（Req 3.5） ────────────────────────────────────
 
 function rowClassName({ row }: { row: K3DetailRow }): string {
-  if (row.agingOver3Y > 0) return 'aging-over3y-row'
+  // 3年以上>0的行橙色背景（动态 key 检测）
+  const over3Keys = ['y3to4', 'y4to5', 'over5', 'over3']
+  for (const k of over3Keys) {
+    if (k in row.agingAudited && (row.agingAudited[k] || 0) > 0) return 'aging-over3y-row'
+  }
   return ''
 }
 
@@ -446,9 +428,9 @@ function summaryMethod({ columns }: { columns: any[] }): string[] {
         return fmtAmt(total)
       }
     }
-    // 账龄区段合计
+    // 账龄区段合计（动态列无 property，skip）
     if (activeSegmentIdx.value === 1) {
-      if (['agingWithin1Y', 'aging1To2Y', 'aging2To3Y', 'agingOver3Y', 'agingTotal', 'endBalance'].includes(key)) {
+      if (key === 'agingTotal' || key === 'endBalance') {
         const total = detail.detailRows.value.reduce((sum, r) => sum + ((r as any)[key] || 0), 0)
         return fmtAmt(total)
       }

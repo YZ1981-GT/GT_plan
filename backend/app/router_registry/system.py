@@ -199,6 +199,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.project_config import router as project_config_router
     app.include_router(project_config_router, tags=["project-config"])
 
+    # ═══ §53b. 项目级账龄配置（AgingConfigService 增强版） ═══
+    from app.routers.aging_config import router as aging_config_router
+    app.include_router(aging_config_router, tags=["aging-config"])
+
     # ═══ §54. template-library-coordination：模板库管理 ═══
     from app.routers.template_library_mgmt import router as template_library_mgmt_router
     app.include_router(template_library_mgmt_router, tags=["template-library-mgmt"])

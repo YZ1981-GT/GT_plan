@@ -3,6 +3,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G5-12 凭证检查表</h3>
       <div class="head-actions">
+        <GtReviewTrigger section-id="g5-12-voucher-check" />
         <GtVoucherSamplingEngine :project-id="props.projectId" :account-codes="[G5_ACCOUNT_CODE]" dialog-mode @filled="onSampleFilled" />
         <G5ImportExportDropdown :wp-id="props.wpId" sheet="G5-12" @imported="onImported" />
         <el-button size="small" type="primary" plain @click="vc.addRow()" :disabled="props.readonly">+ 新增</el-button>
@@ -86,6 +87,9 @@ import { G5_ACCOUNT_CODE } from '../../composables/g5Constants'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const vc = useG5VoucherCheck()
@@ -112,7 +116,43 @@ function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: n
     vc.mergeSample({ summary: s.summary, amount: s.amount, voucherDate: s.voucherDate, voucherNo: s.voucherNo, source: '抽凭' })
   }
 }
-function uploadOcr(_row: VoucherCheckRow) { /* OCR 集成占位 */ }
+function uploadOcr(row: VoucherCheckRow) {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*,.pdf'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData)
+      const data = res.data?.data ?? res.data ?? {}
+      const summary = data.summary ?? data.extracted_fields?.summary ?? data.extracted_fields?.businessContent ?? ''
+      const voucherNo = data.extracted_fields?.voucherNo ?? data.voucher_no ?? ''
+      const voucherDate = data.extracted_fields?.voucherDate ?? data.voucher_date ?? ''
+      const amount = data.extracted_fields?.amount ?? data.amount ?? null
+      if (!summary && !voucherNo) { ElMessage.warning('OCR 未识别到有效内容'); return }
+      const display = [
+        summary ? `摘要：${summary}` : '',
+        voucherNo ? `凭证号：${voucherNo}` : '',
+        voucherDate ? `日期：${voucherDate}` : '',
+        amount ? `金额：${amount}` : '',
+      ].filter(Boolean).join('\n')
+      await ElMessageBox.confirm(display, 'OCR 识别结果确认', { type: 'info', confirmButtonText: '填入当前行', cancelButtonText: '取消' })
+      // merge OCR result into row
+      if (summary) row.summary = summary
+      if (voucherNo) row.voucherNo = voucherNo
+      if (voucherDate) row.voucherDate = voucherDate
+      if (amount && !isNaN(Number(amount))) row.amount = Number(amount)
+      row.attachment = file.name
+      vc.recalcRow(row)
+    } catch (e: any) {
+      if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('OCR 识别失败')
+    }
+  }
+  input.click()
+}
 function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>
 

@@ -1,5 +1,12 @@
 <template>
   <div class="g5-balance-detail">
+    <div class="section-head">
+      <h3 class="sheet-title">G5-2 余额明细表</h3>
+      <div class="head-actions">
+        <GtReviewTrigger section-id="g5-2-balance-detail" />
+      </div>
+    </div>
+
     <!-- 区段Tab切换 -->
     <div class="segment-tabs">
       <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" />
@@ -49,7 +56,7 @@
       </el-table-column>
     </el-table>
 
-    <!-- Tab2: 余额分析+账龄 -->
+    <!-- Tab2: 余额分析+账龄（动态列，基于 bands from useAgingConfig） -->
     <el-table
       v-show="detail.activeTab.value === 'aging'"
       :data="detail.rows.value"
@@ -67,12 +74,17 @@
           <span class="formula-cell" title="期末余额-未实现融资收益">{{ fmt(row.netAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="aging1Year" label="1年以内" min-width="80" align="right" />
-      <el-table-column prop="aging1to2" label="1-2年" min-width="70" align="right" />
-      <el-table-column prop="aging2to3" label="2-3年" min-width="70" align="right" />
-      <el-table-column prop="aging3to4" label="3-4年" min-width="70" align="right" />
-      <el-table-column prop="aging4to5" label="4-5年" min-width="70" align="right" />
-      <el-table-column prop="aging5Plus" label="5年以上" min-width="80" align="right" />
+      <el-table-column
+        v-for="band in bands"
+        :key="band.key"
+        :label="band.label"
+        min-width="80"
+        align="right"
+      >
+        <template #default="{ row }">
+          {{ fmt(row.agingAudited[band.key] ?? 0) }}
+        </template>
+      </el-table-column>
       <el-table-column label="账龄合计" min-width="90" align="right">
         <template #default="{ row }">
           <span
@@ -96,7 +108,9 @@
 </template>
 
 <script setup lang="ts">
+import { toRef } from 'vue'
 import { useG5BalanceDetail } from '../../composables/useG5BalanceDetail'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -105,7 +119,8 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-const detail = useG5BalanceDetail()
+const detail = useG5BalanceDetail(toRef(props, 'projectId'))
+const { bands } = detail
 
 const tabOptions = [
   { label: '债务人基础信息', value: 'basic' },
@@ -126,6 +141,9 @@ function fmt(v: number): string {
 
 <style scoped>
 .g5-balance-detail { font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
 .segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .tab-actions { margin-left: auto; }
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }

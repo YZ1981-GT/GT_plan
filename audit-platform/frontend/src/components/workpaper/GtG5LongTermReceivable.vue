@@ -187,9 +187,11 @@ function showVersionHistory() {
 }
 
 // ═══ 复核对话 provide ═══
-provide('openReviewDialog', () => {
-  // 将在 Task 15.6 完整实现
-})
+function openReviewDialog(sectionId: string): void {
+  console.log('[G5] openReviewDialog:', sectionId)
+}
+provide('openReviewDialog', openReviewDialog)
+provide('reloadWorkpaperData', () => formData.load())
 
 onMounted(async () => {
   await formData.load()

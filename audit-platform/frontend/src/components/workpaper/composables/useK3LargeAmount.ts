@@ -48,6 +48,16 @@ const ITEM_ID_THRESHOLD = 'K3-4-threshold'
 /** 默认大额阈值（元），可由用户调整 */
 const DEFAULT_THRESHOLD = 100000
 
+/** 检测行是否有3年以上账龄 (适配 nested aging 结构) */
+function _hasOver3YAging(row: K3DetailRow): boolean {
+  const over3Keys = ['y3to4', 'y4to5', 'over5', 'over3']
+  if (!row.agingAudited || typeof row.agingAudited !== 'object') return false
+  for (const k of over3Keys) {
+    if (k in row.agingAudited && Number(row.agingAudited[k]) > 0) return true
+  }
+  return false
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK3LargeAmount(params: UseK3LargeAmountParams) {
@@ -120,7 +130,7 @@ export function useK3LargeAmount(params: UseK3LargeAmountParams) {
         nature: d.nature,
         formationReason: d.formationReason,
         repaymentDate: d.repaymentDate,
-        isLongOutstanding: d.agingOver3Y > 0,
+        isLongOutstanding: _hasOver3YAging(d),
         followUpAction: '',
         sourceRowId: d.rowId,
       }))

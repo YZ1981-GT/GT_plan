@@ -135,41 +135,14 @@
     <el-table-column label="期初审定(H)" width="110" align="right">
       <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.priorAudited) }}</span></template>
     </el-table-column>
-    <!-- I~L: 期初账龄 -->
-    <el-table-column label="期初1年内(I)" width="100" align="right">
+    <!-- 期初账龄（动态） -->
+    <el-table-column v-for="band in bands" :key="'prior-' + band.key" :label="`${band.label}(期初)`" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingPrior.within1" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingPrior.within1', val)" />
+          <el-input v-model.number="row.agingPrior[band.key]" size="small" :disabled="isReadonly"
+            @change="(val: any) => onCellChange(row.rowId, `agingPrior.${band.key}`, val)" />
         </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingPrior?.within1) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="1-2年(J)" width="90" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingPrior.y1to2" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingPrior.y1to2', val)" />
-        </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingPrior?.y1to2) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="2-3年(K)" width="90" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingPrior.y2to3" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingPrior.y2to3', val)" />
-        </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingPrior?.y2to3) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="3年以上(L)" width="90" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingPrior.over3" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingPrior.over3', val)" />
-        </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingPrior?.over3) }}</span>
+        <span v-else class="amt">{{ fmtAmount(row.agingPrior?.[band.key]) }}</span>
       </template>
     </el-table-column>
     <!-- M: 借方发生 -->
@@ -234,41 +207,14 @@
     <el-table-column label="期末审定(T)" width="110" align="right">
       <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endAudited) }}</span></template>
     </el-table-column>
-    <!-- U~X: 审定账龄 -->
-    <el-table-column label="审定1年内(U)" width="100" align="right">
+    <!-- 审定账龄（动态） -->
+    <el-table-column v-for="band in bands" :key="'audited-' + band.key" :label="`${band.label}(期末审定)`" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingAudited.within1" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingAudited.within1', val)" />
+          <el-input v-model.number="row.agingAudited[band.key]" size="small" :disabled="isReadonly"
+            @change="(val: any) => onCellChange(row.rowId, `agingAudited.${band.key}`, val)" />
         </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingAudited?.within1) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="1-2年(V)" width="90" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingAudited.y1to2" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingAudited.y1to2', val)" />
-        </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingAudited?.y1to2) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="2-3年(W)" width="90" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingAudited.y2to3" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingAudited.y2to3', val)" />
-        </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingAudited?.y2to3) }}</span>
-      </template>
-    </el-table-column>
-    <el-table-column label="3年以上(X)" width="90" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingAudited.over3" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, 'agingAudited.over3', val)" />
-        </template>
-        <span v-else class="amt">{{ fmtAmount(row.agingAudited?.over3) }}</span>
+        <span v-else class="amt">{{ fmtAmount(row.agingAudited?.[band.key]) }}</span>
       </template>
     </el-table-column>
     <!-- Y: 是否发函 -->
@@ -410,6 +356,7 @@ const {
   subtotalRow,
   verificationRow,
   searchQuery,
+  bands,
   addRow,
   removeRow,
   updateCell,
@@ -423,7 +370,7 @@ const {
   relatedParties,
 })
 
-const columnCount = ref(27)
+const columnCount = computed(() => 19 + bands.value.length * 2) // 19 non-aging cols + 2 groups × N bands
 const rowCount = computed(() => filteredRows.value.length)
 const browseRows = filteredRows
 const browseRowCount = computed(() => filteredRows.value.length)

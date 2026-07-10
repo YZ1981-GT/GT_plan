@@ -12,11 +12,12 @@
 
     <!-- 新格式：alternative-f06-v1 -->
     <template v-else>
-      <!-- 顶部说明 -->
-      <div class="gt-confirmation-alternative-f06__header-tip">
-        <el-alert type="info" :closable="true" show-icon>
+      <!-- 工具栏 -->
+      <div class="gt-confirmation-alternative-f06__toolbar">
+        <el-alert type="info" :closable="true" show-icon style="flex:1">
           提示③：对回函可能性不高的、余额重大的，发函同时执行替代程序。
         </el-alert>
+        <el-button size="small" :icon="Clock" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
       </div>
 
       <!-- 看板 -->
@@ -309,14 +310,19 @@
 
     <!-- 隐藏文件选择器 -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
+
+    <!-- 版本历史 Drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId || ''" :project-id="props.projectId || ''" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Clock } from '@element-plus/icons-vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeF06Data } from './composables/useAlternativeF06Data'
+import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_F06 } from './blockColumnConfigsF06'
 
@@ -327,6 +333,7 @@ import AlternativeD05Master from '../alternativeD05/AlternativeD05Master.vue'
 import CheckBlock from '../alternativeD05/CheckBlock.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   htmlData: any
@@ -353,6 +360,13 @@ const data = useAlternativeF06Data({
   htmlData: () => props.htmlData,
   readonly: props.readonly,
 })
+
+// ─── 版本链集成 ──────────────────────────────────────────────────────────────
+
+const wpIdRef = computed(() => props.wpId || '')
+const projectIdRef = computed(() => props.projectId || '')
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef } = versionToolbar
 
 // ─── 区块配置（D06 专属列定义） ──────────────────────────────────────────────
 
@@ -650,6 +664,7 @@ function handleAiFill() {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
+  versionToolbar.scheduleAutoSnapshot()
 }
 
 function markDirty() {
@@ -689,6 +704,13 @@ defineExpose({
 }
 
 .gt-confirmation-alternative-f06__legacy-notice {
+  margin-bottom: 12px;
+}
+
+.gt-confirmation-alternative-f06__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 12px;
 }
 

@@ -24,6 +24,16 @@ import {
   type DetailRow,
 } from '../composables/useD3Detail'
 
+// ─── Constants for testing ───────────────────────────────────────────────────
+
+/** Default THREE_YEAR segments for D3 (used in tests) */
+const DEFAULT_D3_SEGMENTS = [
+  { key: 'within1', label: '1年以内', dayFrom: 0, dayTo: 365 },
+  { key: 'y1to2', label: '1-2年', dayFrom: 366, dayTo: 730 },
+  { key: 'y2to3', label: '2-3年', dayFrom: 731, dayTo: 1095 },
+  { key: 'over3', label: '3年以上', dayFrom: 1096, dayTo: null },
+]
+
 // ─── Generators ──────────────────────────────────────────────────────────────
 
 /** 金额生成器：[-1e9, 1e9] 有限浮点数 */
@@ -105,7 +115,7 @@ describe('useD3Detail - Property-Based Tests', () => {
           (E, F, G, M, N, P, R, S) => {
             // Create a row with these input values
             const row: DetailRow = {
-              ...createEmptyRow(),
+              ...createEmptyRow(DEFAULT_D3_SEGMENTS),
               priorUnadjusted: E,
               priorAdjustment: F,
               priorReclass: G,
@@ -164,7 +174,7 @@ describe('useD3Detail - Property-Based Tests', () => {
             const N = existingRows.length
 
             // Simulate addRow: append createEmptyRow
-            const newRow = createEmptyRow()
+            const newRow = createEmptyRow(DEFAULT_D3_SEGMENTS)
             const updatedRows = [...existingRows, newRow]
 
             // Length invariant

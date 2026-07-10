@@ -3,17 +3,22 @@
  *
  * 结构：
  *   (一) 单项计提（EclSingleRow[]）
- *   (二) 账龄组合（EclAgingGroup[]，每组合含6账龄段+小计）
+ *   (二) 账龄组合（EclAgingGroup[]，每组合含N账龄段+小计，N由项目账龄配置决定）
  *
  * 公式：
  *   - 应计提③ = 审定余额① × 损失率②
  *   - 差异⑤ = 应计提③ - 账面余额④
  *
- * Spec: .kiro/specs/d6-contract-assets/
- * Task: 11.1
- * Requirements: 13.1-13.12, 27.1, 27.4
+ * 联动 aging-config:changed：
+ *   - 已有段保留 lossRate/bookBalance
+ *   - 新增段零初始化
+ *   - 移除段标记归档（archived: true）
+ *
+ * Spec: .kiro/specs/d6-contract-assets/ + .kiro/specs/aging-config-enhancement/
+ * Task: 11.1, 13.1
+ * Requirements: 9.1, 9.2, 9.3, 13.1-13.12, 27.1, 27.4
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcExpectedProvision,
@@ -21,6 +26,7 @@ import {
   calcSubtotal,
 } from './useD6FormulaEngine'
 import type { ChecklistResponse } from './useD6FormData'
+import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -38,18 +44,20 @@ export interface EclSingleRow {
 
 export interface EclAgingRow {
   rowId: string
-  agingBand: string          // 账龄段
-  auditedBalance: number     // 审定账面余额①
-  lossRate: number           // 预期信用损失率②
-  expectedProvision: number  // 期末应计提③ = ①×②（自动）
-  bookBalance: number        // 期末坏账准备账面余额④
-  difference: number         // 差异⑤ = ③-④（自动）
+  segmentKey: string           // 账龄段 key (与 AgingSegment.key 对应)
+  agingBand: string            // 账龄段显示名
+  auditedBalance: number       // 审定账面余额①
+  lossRate: number             // 预期信用损失率②
+  expectedProvision: number    // 期末应计提③ = ①×②（自动）
+  bookBalance: number          // 期末坏账准备账面余额④
+  difference: number           // 差异⑤ = ③-④（自动）
+  archived?: boolean           // 配置变更移除段时标记归档（保留历史数据）
 }
 
 export interface EclAgingGroup {
   groupId: string
   groupName: string          // 组合名称
-  rows: EclAgingRow[]        // 固定6账龄段 + 小计
+  rows: EclAgingRow[]        // N账龄段（由项目配置决定）+ 可能的归档行
 }
 
 export interface UseD6EclCalculationOptions {
@@ -159,12 +167,14 @@ function normalizeGroup(raw: any): EclAgingGroup {
 function normalizeAgingRow(raw: any): EclAgingRow {
   return {
     rowId: raw.rowId || generateRowId(),
+    segmentKey: raw.segmentKey || '',
     agingBand: raw.agingBand || '',
     auditedBalance: parseNum(raw.auditedBalance),
     lossRate: parseNum(raw.lossRate),
     expectedProvision: parseNum(raw.expectedProvision),
     bookBalance: parseNum(raw.bookBalance),
     difference: parseNum(raw.difference),
+    ...(raw.archived ? { archived: true } : {}),
   }
 }
 
@@ -179,9 +189,29 @@ export function recalcAgingRow(row: EclAgingRow): EclAgingRow {
   return { ...row, expectedProvision, difference }
 }
 
+/**
+ * 基于项目账龄段配置创建初始行（Req 9.1: 按 segments 初始化，替代硬编码6行）
+ */
+function createAgingRowsFromSegments(segments: AgingSegment[]): EclAgingRow[] {
+  return segments.map(seg => ({
+    rowId: generateRowId(),
+    segmentKey: seg.key,
+    agingBand: seg.label,
+    auditedBalance: 0,
+    lossRate: 0,
+    expectedProvision: 0,
+    bookBalance: 0,
+    difference: 0,
+  }))
+}
+
+/**
+ * 兜底：无配置时用默认6段
+ */
 function createDefaultAgingRows(): EclAgingRow[] {
   return DEFAULT_AGING_BANDS.map(band => ({
     rowId: generateRowId(),
+    segmentKey: '',
     agingBand: band,
     auditedBalance: 0,
     lossRate: 0,
@@ -191,18 +221,92 @@ function createDefaultAgingRows(): EclAgingRow[] {
   }))
 }
 
-function createEmptyGroup(): EclAgingGroup {
+/**
+ * 配置变更时同步组合行（Req 9.2, 9.3）：
+ * - 已有段保留 lossRate/bookBalance
+ * - 新增段零初始化
+ * - 移除段标记 archived
+ */
+export function syncAgingGroupRows(
+  existingRows: EclAgingRow[],
+  newSegments: AgingSegment[],
+): EclAgingRow[] {
+  const newKeys = new Set(newSegments.map(s => s.key))
+
+  // 构建现有行的 segmentKey→row 索引（兼容旧数据用 agingBand 匹配）
+  const existingByKey = new Map<string, EclAgingRow>()
+  const existingByLabel = new Map<string, EclAgingRow>()
+  for (const row of existingRows) {
+    if (row.segmentKey) {
+      existingByKey.set(row.segmentKey, row)
+    }
+    if (row.agingBand) {
+      existingByLabel.set(row.agingBand, row)
+    }
+  }
+
+  // 为新配置的每个段创建/保留行
+  const result: EclAgingRow[] = newSegments.map(seg => {
+    // 优先按 key 匹配，再按 label 匹配（兼容旧数据无 segmentKey 的情况）
+    const existing = existingByKey.get(seg.key) || existingByLabel.get(seg.label)
+    if (existing) {
+      // 已有段：保留 lossRate/bookBalance，更新 label/segmentKey
+      return recalcAgingRow({
+        ...existing,
+        segmentKey: seg.key,
+        agingBand: seg.label,
+        archived: undefined,  // 如果之前被归档，恢复
+      } as EclAgingRow)
+    }
+    // 新增段：零初始化
+    return {
+      rowId: generateRowId(),
+      segmentKey: seg.key,
+      agingBand: seg.label,
+      auditedBalance: 0,
+      lossRate: 0,
+      expectedProvision: 0,
+      bookBalance: 0,
+      difference: 0,
+    }
+  })
+
+  // 标记移除段为归档（保留历史数据，不删除）
+  for (const row of existingRows) {
+    const rowKey = row.segmentKey || ''
+    if (rowKey && !newKeys.has(rowKey) && !row.archived) {
+      // 只有当行有实际数据时才归档，全零行直接丢弃
+      const hasData = row.lossRate !== 0 || row.bookBalance !== 0 || row.auditedBalance !== 0
+      if (hasData) {
+        result.push({
+          ...row,
+          archived: true,
+        })
+      }
+    }
+  }
+
+  return result
+}
+
+function createEmptyGroup(segments?: AgingSegment[]): EclAgingGroup {
   return {
     groupId: generateGroupId(),
     groupName: '',
-    rows: createDefaultAgingRows(),
+    rows: segments && segments.length > 0
+      ? createAgingRowsFromSegments(segments)
+      : createDefaultAgingRows(),
   }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD6EclCalculation(options: UseD6EclCalculationOptions) {
-  const { allResponses, debouncedSave } = options
+  const { allResponses, debouncedSave, projectId } = options
+
+  // ─── Aging Config (Req 9.1) ──────────────────────────────────────────
+
+  const { segments } = useAgingConfig(projectId, 'D2')
 
   // ─── Reactive data ───────────────────────────────────────────────────
 
@@ -311,7 +415,7 @@ export function useD6EclCalculation(options: UseD6EclCalculationOptions) {
   // ─── Aging Group Actions ─────────────────────────────────────────────
 
   function addAgingGroup(): void {
-    agingGroups.value = [...agingGroups.value, createEmptyGroup()]
+    agingGroups.value = [...agingGroups.value, createEmptyGroup(segments.value)]
     persistGroups()
   }
 
@@ -347,6 +451,34 @@ export function useD6EclCalculation(options: UseD6EclCalculationOptions) {
     })
     persistGroups()
   }
+
+  // ─── Aging Config Change Sync (Req 9.2, 9.3) ─────────────────────────
+
+  /**
+   * 监听 aging-config:changed 事件：
+   * - 已有段保留 lossRate/bookBalance
+   * - 新增段零初始化
+   * - 移除段标记归档
+   */
+  function onAgingConfigChanged(): void {
+    if (agingGroups.value.length === 0) return
+
+    const newSegments = segments.value
+    if (!newSegments || newSegments.length === 0) return
+
+    agingGroups.value = agingGroups.value.map(g => ({
+      ...g,
+      rows: syncAgingGroupRows(g.rows, newSegments),
+    }))
+
+    persistGroups()
+  }
+
+  window.addEventListener('aging-config:changed', onAgingConfigChanged)
+
+  onUnmounted(() => {
+    window.removeEventListener('aging-config:changed', onAgingConfigChanged)
+  })
 
   // ─── Audit Notes ─────────────────────────────────────────────────────
 
