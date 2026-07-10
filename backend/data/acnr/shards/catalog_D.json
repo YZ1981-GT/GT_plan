@@ -1,0 +1,1869 @@
+{
+  "cells": [
+    {
+      "addr_id": "D1/D1-2/F50",
+      "cell_address": "F50",
+      "domain": "wp",
+      "formula_ref": "WP('D1','原值明细（按类）D1-2','F50')",
+      "parent_addr_id": "D1/D1-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-票面金额合计",
+      "semantic_only": false,
+      "uri": "wp://D1/原值明细（按类）D1-2#F50"
+    },
+    {
+      "addr_id": "D1/D1-2/G50",
+      "cell_address": "G50",
+      "domain": "wp",
+      "formula_ref": "WP('D1','原值明细（按类）D1-2','G50')",
+      "parent_addr_id": "D1/D1-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-期末余额合计",
+      "semantic_only": false,
+      "uri": "wp://D1/原值明细（按类）D1-2#G50"
+    },
+    {
+      "addr_id": "D1/D1-3/E50",
+      "cell_address": "E50",
+      "domain": "wp",
+      "formula_ref": "WP('D1','原值明细（按客户）D1-3','E50')",
+      "parent_addr_id": "D1/D1-3",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-期末余额合计",
+      "semantic_only": false,
+      "uri": "wp://D1/原值明细（按客户）D1-3#E50"
+    },
+    {
+      "addr_id": "D1/D1-3/F50",
+      "cell_address": "F50",
+      "domain": "wp",
+      "formula_ref": "WP('D1','原值明细（按客户）D1-3','F50')",
+      "parent_addr_id": "D1/D1-3",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-期初余额合计",
+      "semantic_only": false,
+      "uri": "wp://D1/原值明细（按客户）D1-3#F50"
+    },
+    {
+      "addr_id": "D2/D2-2/E100",
+      "cell_address": "E100",
+      "domain": "wp",
+      "formula_ref": "WP('D2','明细表D2-2','E100')",
+      "parent_addr_id": "D2/D2-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-期末余额",
+      "semantic_only": false,
+      "uri": "wp://D2/明细表D2-2#E100"
+    },
+    {
+      "addr_id": "D2/D2-2/F100",
+      "cell_address": "F100",
+      "domain": "wp",
+      "formula_ref": "WP('D2','明细表D2-2','F100')",
+      "parent_addr_id": "D2/D2-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-期初余额",
+      "semantic_only": false,
+      "uri": "wp://D2/明细表D2-2#F100"
+    },
+    {
+      "addr_id": "D2/D2-2/G100",
+      "cell_address": "G100",
+      "domain": "wp",
+      "formula_ref": "WP('D2','明细表D2-2','G100')",
+      "parent_addr_id": "D2/D2-2",
+      "purpose": "aging_analysis",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-账龄1年内",
+      "semantic_only": false,
+      "uri": "wp://D2/明细表D2-2#G100"
+    },
+    {
+      "addr_id": "D2/D2-5/B30",
+      "cell_address": "B30",
+      "domain": "wp",
+      "formula_ref": "WP('D2','分析程序D2-5','B30')",
+      "parent_addr_id": "D2/D2-5",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "分析程序结论",
+      "semantic_only": false,
+      "uri": "wp://D2/分析程序D2-5#B30"
+    },
+    {
+      "addr_id": "D2/D2-5/C15",
+      "cell_address": "C15",
+      "domain": "wp",
+      "formula_ref": "WP('D2','分析程序D2-5','C15')",
+      "parent_addr_id": "D2/D2-5",
+      "purpose": "ratio_analysis",
+      "registry_version": "20260710102744",
+      "semantic_label": "应收账款周转率",
+      "semantic_only": false,
+      "uri": "wp://D2/分析程序D2-5#C15"
+    },
+    {
+      "addr_id": "D2/D2-6/B20",
+      "cell_address": "B20",
+      "domain": "wp",
+      "formula_ref": "WP('D2','检查D2-6','B20')",
+      "parent_addr_id": "D2/D2-6",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "检查结论-发票核实",
+      "semantic_only": false,
+      "uri": "wp://D2/检查D2-6#B20"
+    },
+    {
+      "addr_id": "D2/D2-6/B40",
+      "cell_address": "B40",
+      "domain": "wp",
+      "formula_ref": "WP('D2','检查D2-6','B40')",
+      "parent_addr_id": "D2/D2-6",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "检查结论-合同核实",
+      "semantic_only": false,
+      "uri": "wp://D2/检查D2-6#B40"
+    },
+    {
+      "addr_id": "D2/D2-6/B60",
+      "cell_address": "B60",
+      "domain": "wp",
+      "formula_ref": "WP('D2','检查D2-6','B60')",
+      "parent_addr_id": "D2/D2-6",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "检查结论-签收核实",
+      "semantic_only": false,
+      "uri": "wp://D2/检查D2-6#B60"
+    },
+    {
+      "addr_id": "D4/D4-13/B20",
+      "cell_address": "B20",
+      "domain": "wp",
+      "formula_ref": "WP('D4','检查D4-13','B20')",
+      "parent_addr_id": "D4/D4-13",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "收入截止测试结论",
+      "semantic_only": false,
+      "uri": "wp://D4/检查D4-13#B20"
+    },
+    {
+      "addr_id": "D4/D4-13/B40",
+      "cell_address": "B40",
+      "domain": "wp",
+      "formula_ref": "WP('D4','检查D4-13','B40')",
+      "parent_addr_id": "D4/D4-13",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "收入确认检查结论",
+      "semantic_only": false,
+      "uri": "wp://D4/检查D4-13#B40"
+    },
+    {
+      "addr_id": "D4/D4-2/E50",
+      "cell_address": "E50",
+      "domain": "wp",
+      "formula_ref": "WP('D4','收入明细（按类别）D4-2','E50')",
+      "parent_addr_id": "D4/D4-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-本期收入合计",
+      "semantic_only": false,
+      "uri": "wp://D4/收入明细（按类别）D4-2#E50"
+    },
+    {
+      "addr_id": "D4/D4-2/F50",
+      "cell_address": "F50",
+      "domain": "wp",
+      "formula_ref": "WP('D4','收入明细（按类别）D4-2','F50')",
+      "parent_addr_id": "D4/D4-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-上期收入合计",
+      "semantic_only": false,
+      "uri": "wp://D4/收入明细（按类别）D4-2#F50"
+    },
+    {
+      "addr_id": "D4/D4-22/B15",
+      "cell_address": "B15",
+      "domain": "wp",
+      "formula_ref": "WP('D4','IPO舞弊应对D4-22','B15')",
+      "parent_addr_id": "D4/D4-22",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "IPO收入真实性检查结论",
+      "semantic_only": false,
+      "uri": "wp://D4/IPO舞弊应对D4-22#B15"
+    },
+    {
+      "addr_id": "D4/D4-22/B30",
+      "cell_address": "B30",
+      "domain": "wp",
+      "formula_ref": "WP('D4','IPO舞弊应对D4-22','B30')",
+      "parent_addr_id": "D4/D4-22",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "舞弊风险应对结论",
+      "semantic_only": false,
+      "uri": "wp://D4/IPO舞弊应对D4-22#B30"
+    },
+    {
+      "addr_id": "D4/D4-3/D100",
+      "cell_address": "D100",
+      "domain": "wp",
+      "formula_ref": "WP('D4','收入明细（按客户）D4-3','D100')",
+      "parent_addr_id": "D4/D4-3",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-客户收入合计",
+      "semantic_only": false,
+      "uri": "wp://D4/收入明细（按客户）D4-3#D100"
+    },
+    {
+      "addr_id": "D4/D4-4/N20",
+      "cell_address": "N20",
+      "domain": "wp",
+      "formula_ref": "WP('D4','收入明细（按月份）D4-4','N20')",
+      "parent_addr_id": "D4/D4-4",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-各月收入合计",
+      "semantic_only": false,
+      "uri": "wp://D4/收入明细（按月份）D4-4#N20"
+    },
+    {
+      "addr_id": "D4/D4-6/B25",
+      "cell_address": "B25",
+      "domain": "wp",
+      "formula_ref": "WP('D4','分析程序D4-6','B25')",
+      "parent_addr_id": "D4/D4-6",
+      "purpose": "conclusion",
+      "registry_version": "20260710102744",
+      "semantic_label": "收入分析结论",
+      "semantic_only": false,
+      "uri": "wp://D4/分析程序D4-6#B25"
+    },
+    {
+      "addr_id": "D4/D4-6/C10",
+      "cell_address": "C10",
+      "domain": "wp",
+      "formula_ref": "WP('D4','分析程序D4-6','C10')",
+      "parent_addr_id": "D4/D4-6",
+      "purpose": "ratio_analysis",
+      "registry_version": "20260710102744",
+      "semantic_label": "毛利率变动分析",
+      "semantic_only": false,
+      "uri": "wp://D4/分析程序D4-6#C10"
+    },
+    {
+      "addr_id": "D5/D5-2/E30",
+      "cell_address": "E30",
+      "domain": "wp",
+      "formula_ref": "WP('D5','明细D5-2','E30')",
+      "parent_addr_id": "D5/D5-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-应收款项融资余额",
+      "semantic_only": false,
+      "uri": "wp://D5/明细D5-2#E30"
+    },
+    {
+      "addr_id": "D6/D6-2/F50",
+      "cell_address": "F50",
+      "domain": "wp",
+      "formula_ref": "WP('D6','明细表D6-2','F50')",
+      "parent_addr_id": "D6/D6-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-合同资产期末余额",
+      "semantic_only": false,
+      "uri": "wp://D6/明细表D6-2#F50"
+    },
+    {
+      "addr_id": "D6/D6-2/G50",
+      "cell_address": "G50",
+      "domain": "wp",
+      "formula_ref": "WP('D6','明细表D6-2','G50')",
+      "parent_addr_id": "D6/D6-2",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-合同资产期初余额",
+      "semantic_only": false,
+      "uri": "wp://D6/明细表D6-2#G50"
+    },
+    {
+      "addr_id": "D6/D6-3/E30",
+      "cell_address": "E30",
+      "domain": "wp",
+      "formula_ref": "WP('D6','减值准备明细D6-3','E30')",
+      "parent_addr_id": "D6/D6-3",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-减值准备余额",
+      "semantic_only": false,
+      "uri": "wp://D6/减值准备明细D6-3#E30"
+    },
+    {
+      "addr_id": "D6/D6-3/F30",
+      "cell_address": "F30",
+      "domain": "wp",
+      "formula_ref": "WP('D6','减值准备明细D6-3','F30')",
+      "parent_addr_id": "D6/D6-3",
+      "purpose": "balance_verification",
+      "registry_version": "20260710102744",
+      "semantic_label": "合计行-本期计提",
+      "semantic_only": false,
+      "uri": "wp://D6/减值准备明细D6-3#F30"
+    },
+    {
+      "addr_id": "D6/D6-8/C5",
+      "cell_address": "C5",
+      "domain": "wp",
+      "formula_ref": "WP('D6','减值测算D6-8','C5')",
+      "parent_addr_id": "D6/D6-8",
+      "purpose": "assumption",
+      "registry_version": "20260710102744",
+      "semantic_label": "折现率WACC",
+      "semantic_only": false,
+      "uri": "wp://D6/减值测算D6-8#C5"
+    },
+    {
+      "addr_id": "D6/D6-8/E20",
+      "cell_address": "E20",
+      "domain": "wp",
+      "formula_ref": "WP('D6','减值测算D6-8','E20')",
+      "parent_addr_id": "D6/D6-8",
+      "purpose": "impairment_calc",
+      "registry_version": "20260710102744",
+      "semantic_label": "DCF测算结果-可收回金额",
+      "semantic_only": false,
+      "uri": "wp://D6/减值测算D6-8#E20"
+    },
+    {
+      "addr_id": "D6/D6-8/E22",
+      "cell_address": "E22",
+      "domain": "wp",
+      "formula_ref": "WP('D6','减值测算D6-8','E22')",
+      "parent_addr_id": "D6/D6-8",
+      "purpose": "impairment_calc",
+      "registry_version": "20260710102744",
+      "semantic_label": "DCF测算结果-减值金额",
+      "semantic_only": false,
+      "uri": "wp://D6/减值测算D6-8#E22"
+    }
+  ],
+  "cycle": "D",
+  "registry_version": "20260710102744",
+  "sheets": [
+    {
+      "addr_id": "D0/D0",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D0 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "confirmation",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D0",
+      "origin": "standard",
+      "parent_wp_code": "D0",
+      "registry_version": "20260710102744",
+      "sheet_code": "D0",
+      "sheet_name": "底稿目录",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D1/D1",
+      "class_code": "F-审定表",
+      "cycle": "D",
+      "display_label": "底稿 > D1 > 审定表D1-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D1",
+      "origin": "standard",
+      "parent_wp_code": "D1",
+      "registry_version": "20260710102744",
+      "sheet_code": "D1",
+      "sheet_name": "审定表D1-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-1",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 应收账款实质性程序表D2A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 10,
+        "item_id": "D2-1-*",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-1",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-1",
+      "sheet_name": "应收账款实质性程序表D2A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-10",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "sampling",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 90,
+        "item_id": "D2-ecl-migration-matrix",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-10",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-10",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-11",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "confirmation",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 100,
+        "item_id": [
+          "D2-writeoff-reversal-rows",
+          "D2-writeoff-writeoff-rows"
+        ],
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-11",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-11",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-12",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "confirmation",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 110,
+        "item_id": [
+          "D2-pledge-rows",
+          "D2-factoring-rows"
+        ],
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-12",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-12",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-13",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "aging",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 120,
+        "item_id": [
+          "D2-bizmodel-judgments",
+          "D2-bizmodel-groups"
+        ],
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-13",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-13",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-2",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 应收账款实质性程序表D2A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "D2-detail-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-2",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-2",
+      "sheet_name": "应收账款实质性程序表D2A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-3",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 应收账款实质性程序表D2A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "monthly_analysis",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 30,
+        "item_id": [
+          "D2-bd-individual-rows",
+          "D2-bd-aging-rows",
+          "D2-bd-customer-rows"
+        ],
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-3",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-3",
+      "sheet_name": "应收账款实质性程序表D2A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-4",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 应收账款实质性程序表D2A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 40,
+        "item_id": "D2-entry-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-4",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-4",
+      "sheet_name": "应收账款实质性程序表D2A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-5",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 应收账款分析表D2-5",
+      "domain": "wp",
+      "editor_engine": "html",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-5",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-5",
+      "sheet_name": "应收账款分析表D2-5",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-6",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "impairment",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 50,
+        "item_id": "D2-related-party-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-6",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-6",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-7",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "impairment",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 60,
+        "item_id": "D2-voucher-samples",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-7",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-7",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-8",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 70,
+        "item_id": [
+          "D2-policy-paragraphs",
+          "D2-policy-historical-matrix",
+          "D2-policy-migration-matrix"
+        ],
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-8",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-8",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D2/D2-9",
+      "class_code": "C-附注披露",
+      "cycle": "D",
+      "display_label": "底稿 > D2 > 附注披露信息(上市公司）D2-1",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "sampling",
+      "import_export": {
+        "api_prefix": "d2",
+        "depends_on_sheets": [
+          "D2-1"
+        ],
+        "enabled": true,
+        "import_order": 80,
+        "item_id": "D2-ecl-single-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D2-9",
+      "origin": "standard",
+      "parent_wp_code": "D2",
+      "registry_version": "20260710102744",
+      "sheet_code": "D2-9",
+      "sheet_name": "附注披露信息(上市公司）D2-1",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D3/D3",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D3 > 预收账款实质性程序表D3A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "aging",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D3",
+      "origin": "standard",
+      "parent_wp_code": "D3",
+      "registry_version": "20260710102744",
+      "sheet_code": "D3",
+      "sheet_name": "预收账款实质性程序表D3A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-1",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 主营业务收入审计程序表D4A（修订前）",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 10,
+        "item_id": "D4-1-adj-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-1",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-1",
+      "sheet_name": "主营业务收入审计程序表D4A（修订前）",
+      "sheet_name_aliases": [
+        "营业收入审定表D4-1"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-10",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 产品销售价格分析D4-11",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "sampling",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 90,
+        "item_id": "D4-10-data",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-10",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-10",
+      "sheet_name": "产品销售价格分析D4-11",
+      "sheet_name_aliases": [
+        "重要客户销售价格分析D4-10"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-11",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 产品销售价格分析D4-11",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "confirmation",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 100,
+        "item_id": "D4-11-data",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-11",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-11",
+      "sheet_name": "产品销售价格分析D4-11",
+      "sheet_name_aliases": [
+        "产品销售价格分析D4-11"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-12",
+      "class_code": "D-检查表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 合同检查表D4-12",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "confirmation",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 110,
+        "item_id": "D4-12-contracts-v2",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-12",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-12",
+      "sheet_name": "合同检查表D4-12",
+      "sheet_name_aliases": [
+        "合同检查表D4-12"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-13",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "aging",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-13",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-13",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "营业收入账面金额与ERP系统核对记录D4-13"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-14",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 120,
+        "item_id": "D4-14-transactions",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-14",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-14",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "营业收入发生检查表D4-14"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-15",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 130,
+        "item_id": "D4-15-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-15",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-15",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "营业收入完整性检查表D4-15"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-16",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 140,
+        "item_id": "D4-16-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-16",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-16",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "出口收入电子口岸系统核对D4-16"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-17",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 150,
+        "item_id": "D4-17-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-17",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-17",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "营业收入截止测试（账到单据）D4-17"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-18",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 160,
+        "item_id": "D4-18-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-18",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-18",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "营业收入截止测试（单据到账）D4-18"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-19",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 170,
+        "item_id": "D4-19-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-19",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-19",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "销售折扣与折让检查D4-19"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-2",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 主营业务收入审计程序表D4A（修订前）",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "D4-2-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-2",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-2",
+      "sheet_name": "主营业务收入审计程序表D4A（修订前）",
+      "sheet_name_aliases": [
+        "主营业务收入明细表D4-2"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-20",
+      "class_code": "B-底稿目录",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 底稿目录",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 180,
+        "item_id": "D4-20-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-20",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-20",
+      "sheet_name": "底稿目录",
+      "sheet_name_aliases": [
+        "销售退货检查表 D4-20"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-21",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 关联方销售情况及价格分析D4-21",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 190,
+        "item_id": "D4-21-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-21",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-21",
+      "sheet_name": "关联方销售情况及价格分析D4-21",
+      "sheet_name_aliases": [
+        "关联方销售情况及价格分析D4-21"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-22",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 200,
+        "item_id": "D4-22-data",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-22",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-22",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "重要指标分析表D4-22"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-23",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 210,
+        "item_id": "D4-23-data",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-23",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-23",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "收入与开具发票金额比较分析D4-23"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-24",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 220,
+        "item_id": "D4-24-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-24",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-24",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "第三方回款检查D4-24"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-25",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 230,
+        "item_id": "D4-25-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-25",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-25",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "经销商检查D4-25"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-26",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 240,
+        "item_id": "D4-26-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-26",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-26",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "境外销售收入检查D4-26"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-27",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 250,
+        "item_id": "D4-27-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-27",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-27",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "识别未披露的关联方D4-27"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-28",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 260,
+        "item_id": "D4-28-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-28",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-28",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "客户信息核查清单D4-28"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-29",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 270,
+        "item_id": "D4-29-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-29",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-29",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "客户信息检查表D4-29"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-3",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 主营业务收入审计程序表D4A（修订前）",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "monthly_analysis",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 30,
+        "item_id": "D4-3-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-3",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-3",
+      "sheet_name": "主营业务收入审计程序表D4A（修订前）",
+      "sheet_name_aliases": [
+        "其他业务收入明细表D4-3"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-30",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 280,
+        "item_id": "D4-30-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-30",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-30",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "客户访谈记录汇总表D4-30"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-31",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 290,
+        "item_id": "D4-31-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-31",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-31",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "客户访谈记录 D4-31"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-32",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 程序表D4-22A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 300,
+        "item_id": "D4-32-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-32",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-32",
+      "sheet_name": "程序表D4-22A",
+      "sheet_name_aliases": [
+        "客户、供应商等资金流水检查D4-32"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-33",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 其他业务毛利率分析表D4-33",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 310,
+        "item_id": "D4-33-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-33",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-33",
+      "sheet_name": "其他业务毛利率分析表D4-33",
+      "sheet_name_aliases": [
+        "其他业务毛利率分析表D4-33"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-34",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 其他业务毛利率分析表D4-33",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 320,
+        "item_id": "D4-34-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-34",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-34",
+      "sheet_name": "其他业务毛利率分析表D4-33",
+      "sheet_name_aliases": [
+        "其他业务收入合同测算表D4-34"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-35",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 其他业务毛利率分析表D4-33",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 330,
+        "item_id": "D4-35-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-35",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-35",
+      "sheet_name": "其他业务毛利率分析表D4-33",
+      "sheet_name_aliases": [
+        "其他业务收入检查表D4-35"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-36",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 其他业务毛利率分析表D4-33",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 340,
+        "item_id": "D4-36-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-36",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-36",
+      "sheet_name": "其他业务毛利率分析表D4-33",
+      "sheet_name_aliases": [
+        "其他业务收入截止性测试D4-36"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-4",
+      "class_code": "A-一般程序表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 主营业务收入审计程序表D4A（修订前）",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 40,
+        "item_id": "D4-4-rows",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-4",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-4",
+      "sheet_name": "主营业务收入审计程序表D4A（修订前）",
+      "sheet_name_aliases": [
+        "营业收入调整分录汇总D4-4"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-5",
+      "class_code": "D-政策检查",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 营业收入会计政策检查D4-5",
+      "domain": "wp",
+      "editor_engine": "html",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-5",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-5",
+      "sheet_name": "营业收入会计政策检查D4-5",
+      "sheet_name_aliases": [
+        "营业收入会计政策检查D4-5"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-6",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 产品销售价格分析D4-11",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 50,
+        "item_id": "D4-6-indicators-v2",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-6",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-6",
+      "sheet_name": "产品销售价格分析D4-11",
+      "sheet_name_aliases": [
+        "重要指标分析D4-6"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-7",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 产品销售价格分析D4-11",
+      "domain": "wp",
+      "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 60,
+        "item_id": "D4-7-products",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-7",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-7",
+      "sheet_name": "产品销售价格分析D4-11",
+      "sheet_name_aliases": [
+        "毛利率分析表D4-7"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-8",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 产品销售价格分析D4-11",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "cutoff",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 70,
+        "item_id": "D4-8-products",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-8",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-8",
+      "sheet_name": "产品销售价格分析D4-11",
+      "sheet_name_aliases": [
+        "重要产品毛利分析D4-8"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D4/D4-9",
+      "class_code": "F-分析表",
+      "cycle": "D",
+      "display_label": "底稿 > D4 > 产品销售价格分析D4-11",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "sampling",
+      "import_export": {
+        "api_prefix": "d4",
+        "depends_on_sheets": [
+          "D4-1"
+        ],
+        "enabled": true,
+        "import_order": 80,
+        "item_id": "D4-9-data",
+        "storage_field": "remark"
+      },
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D4-9",
+      "origin": "standard",
+      "parent_wp_code": "D4",
+      "registry_version": "20260710102744",
+      "sheet_code": "D4-9",
+      "sheet_name": "产品销售价格分析D4-11",
+      "sheet_name_aliases": [
+        "重要客户结构分析D4-9"
+      ],
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D5/D5",
+      "class_code": "F-审定表",
+      "cycle": "D",
+      "display_label": "底稿 > D5 > 审定表D5",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D5",
+      "origin": "standard",
+      "parent_wp_code": "D5",
+      "registry_version": "20260710102744",
+      "sheet_code": "D5",
+      "sheet_name": "审定表D5",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D6/D6",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D6 > 合同资产实质性程序表 D6A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "impairment",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D6",
+      "origin": "standard",
+      "parent_wp_code": "D6",
+      "registry_version": "20260710102744",
+      "sheet_code": "D6",
+      "sheet_name": "合同资产实质性程序表 D6A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    },
+    {
+      "addr_id": "D7/D7",
+      "class_code": "A-实质性程序",
+      "cycle": "D",
+      "display_label": "底稿 > D7 > 合同负债实质性程序表 D7A",
+      "domain": "wp",
+      "editor_engine": "html",
+      "functional_type": "detail_table",
+      "jump_route_template": "/workpapers/{wp_id}?sheet=D7",
+      "origin": "standard",
+      "parent_wp_code": "D7",
+      "registry_version": "20260710102744",
+      "sheet_code": "D7",
+      "sheet_name": "合同负债实质性程序表 D7A",
+      "source_of_truth": "classification_db",
+      "template_version_id": "bbc0190d-1a02-4d1a-9294-134f7f5fd547"
+    }
+  ],
+  "version": "1"
+}

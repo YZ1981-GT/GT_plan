@@ -1,0 +1,258 @@
+{
+  "version": "1",
+  "description": "表驱动金样例：覆盖 lookup 正向/别名反查、resolve 多语法同 addr_id、resolve_instance、custom_flat、tb 域委托、miss+candidates、索引 cell:/TB: 殊途同归。可增不可删，删须 DRI 审批。",
+  "cases": [
+    {
+      "id": "RC-01",
+      "description": "lookup 正向命中：sheet_code → sheet_name/parent/api_prefix/item_id",
+      "api": "GET /api/acnr/lookup",
+      "input": {
+        "sheet_code": "D2-2"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2",
+        "entry_type": "sheet",
+        "sheet_name": "明细表D2-2",
+        "parent_wp_code": "D2",
+        "sheet_code": "D2-2",
+        "import_export": {
+          "enabled": true,
+          "api_prefix": "d2",
+          "item_id": "D2-detail-rows"
+        }
+      },
+      "validates": ["R2.1", "R2.2"]
+    },
+    {
+      "id": "RC-02",
+      "description": "别名反查命中：alias → 唯一 sheet_code",
+      "api": "GET /api/acnr/lookup",
+      "input": {
+        "alias": "应收账款明细表"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2",
+        "entry_type": "sheet",
+        "sheet_name": "明细表D2-2",
+        "parent_wp_code": "D2",
+        "sheet_code": "D2-2"
+      },
+      "validates": ["R3.1"],
+      "notes": "alias '应收账款明细表' 是 sheet_name_aliases 中的一条，来源于 *SheetLabels.ts ingest。"
+    },
+    {
+      "id": "RC-03",
+      "description": "resolve by formula_ref：WP 3 参 → canonical addr_id + cell_address",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "formula_ref": "WP('D2','明细表D2-2','E100')"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2/E100",
+        "entry_type": "cell",
+        "cell_address": "E100",
+        "semantic_label": "合计行-期末余额",
+        "formula_ref": "WP('D2','明细表D2-2','E100')",
+        "uri": "wp://D2/明细表D2-2#E100",
+        "jump_route": "/workpapers/{wp_id}?sheet=D2-2"
+      },
+      "validates": ["R5.1", "R5.3"],
+      "convergence_group": "D2-2-E100"
+    },
+    {
+      "id": "RC-04",
+      "description": "resolve by uri：standard profile URI → same addr_id as RC-03",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "uri": "wp://D2/明细表D2-2#E100"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2/E100",
+        "entry_type": "cell",
+        "cell_address": "E100",
+        "semantic_label": "合计行-期末余额",
+        "formula_ref": "WP('D2','明细表D2-2','E100')",
+        "uri": "wp://D2/明细表D2-2#E100",
+        "jump_route": "/workpapers/{wp_id}?sheet=D2-2"
+      },
+      "validates": ["R5.1", "R5.3"],
+      "convergence_group": "D2-2-E100",
+      "notes": "与 RC-03 的 addr_id 必须一致（殊途同归 Property 4）。"
+    },
+    {
+      "id": "RC-05",
+      "description": "resolve by addr_id directly：裸 addr_id → same result",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "addr_id": "D2/D2-2/E100"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2/E100",
+        "entry_type": "cell",
+        "cell_address": "E100",
+        "semantic_label": "合计行-期末余额",
+        "formula_ref": "WP('D2','明细表D2-2','E100')",
+        "uri": "wp://D2/明细表D2-2#E100",
+        "jump_route": "/workpapers/{wp_id}?sheet=D2-2"
+      },
+      "validates": ["R5.1", "R5.3"],
+      "convergence_group": "D2-2-E100",
+      "notes": "与 RC-03/04 的 addr_id 必须一致（殊途同归 Property 4）。"
+    },
+    {
+      "id": "RC-06",
+      "description": "resolve_instance：project_id + parent + sheet_code → wp_id",
+      "api": "GET /api/acnr/resolve-instance",
+      "input": {
+        "project_id": "proj-001-uuid",
+        "parent_wp_code": "D2",
+        "sheet_code": "D2-2"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2",
+        "entry_type": "sheet",
+        "wp_id": "wp-instance-uuid-001",
+        "jump_route": "/workpapers/wp-instance-uuid-001?sheet=D2-2"
+      },
+      "validates": ["R6.1", "R6.2"],
+      "notes": "resolve_instance 是唯一的 wp_id 解析出口；ProjectBinding 经 (project_id, parent, sheet_code) 三元组定位。"
+    },
+    {
+      "id": "RC-07",
+      "description": "custom_flat resolve：WP(wp_code, cell) 2 参 → addr_id",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "formula_ref": "WP('CUST-01','B7')"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "runtime/proj-001-uuid/wp-cust-uuid/CUST-01/B7",
+        "entry_type": "runtime_cell",
+        "cell_address": "B7",
+        "uri": "wp://CUST-01/B7",
+        "formula_ref": "WP('CUST-01','B7')",
+        "uri_profile": "custom_flat"
+      },
+      "validates": ["R9.2", "R9.4"],
+      "notes": "自定义底稿 2 参 WP，采用 custom_flat profile。RuntimeCellEntry 仅存在于 L2/L3，需带 project_id 调用。"
+    },
+    {
+      "id": "RC-08",
+      "description": "tb 域委托：TB:1001 → 委托 V1 动态 build，统一契约返回",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "index_ref": "TB:1001"
+      },
+      "expected_output": {
+        "found": true,
+        "domain": "tb",
+        "delegated_to": "v1",
+        "target_code": "1001",
+        "target_column": "审定数",
+        "uri": "tb://1001#审定数",
+        "entry_type": "tb_cell"
+      },
+      "validates": ["R5.7", "R11.2"],
+      "convergence_group": "TB-1001",
+      "notes": "非 wp 域经 V1 动态 build 完成解析；响应契约与 wp 域统一结构。"
+    },
+    {
+      "id": "RC-09",
+      "description": "miss + candidates：未知 ref → found:false + 最多 5 条 candidates",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "formula_ref": "WP('D2','不存在的表','X999')"
+      },
+      "expected_output": {
+        "found": false,
+        "error": null,
+        "candidates": [
+          { "addr_id": "D2/D2-2", "display_label": "底稿 > D2 > 明细表D2-2", "score": 0.72 },
+          { "addr_id": "D2/D2-1", "display_label": "底稿 > D2 > 审定表D2-1", "score": 0.65 },
+          { "addr_id": "D2/D2-3", "display_label": "底稿 > D2 > 检查表D2-3", "score": 0.58 }
+        ]
+      },
+      "validates": ["R2.3", "R5.6"],
+      "notes": "candidates 最多 5 条，含 addr_id/display_label/score；score 为相似度评分。示例只列 3 条，实现时动态计算。"
+    },
+    {
+      "id": "RC-10",
+      "description": "ambiguous：多命中 → found:false + error:ambiguous + candidates",
+      "api": "GET /api/acnr/lookup",
+      "input": {
+        "sheet_code": "AMB-1"
+      },
+      "expected_output": {
+        "found": false,
+        "error": "ambiguous",
+        "candidates": [
+          { "addr_id": "D3/AMB-1", "display_label": "底稿 > D3 > 测试表AMB-1", "sheet_code": "AMB-1" },
+          { "addr_id": "F2/AMB-1", "display_label": "底稿 > F2 > 分析表AMB-1", "sheet_code": "AMB-1" }
+        ]
+      },
+      "validates": ["R2.4", "R5.5"],
+      "notes": "同一 sheet_code 在 catalog 中命中多个条目时返回 ambiguous 及全部命中项。AMB-1 为测试用歧义数据。"
+    },
+    {
+      "id": "RC-11",
+      "description": "索引 cell: 殊途同归：cell:D2-2!E100 → same addr_id as RC-03/04/05",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "index_ref": "cell:D2-2!E100"
+      },
+      "expected_output": {
+        "found": true,
+        "addr_id": "D2/D2-2/E100",
+        "entry_type": "cell",
+        "cell_address": "E100",
+        "semantic_label": "合计行-期末余额",
+        "formula_ref": "WP('D2','明细表D2-2','E100')",
+        "uri": "wp://D2/明细表D2-2#E100",
+        "jump_route": "/workpapers/{wp_id}?sheet=D2-2"
+      },
+      "validates": ["R11.3", "R5.3"],
+      "convergence_group": "D2-2-E100",
+      "notes": "索引 cell: 命名空间 `!` 分隔 → 与 RC-03/04/05 解析到同一 addr_id（Property 4 多语法殊途同归）。"
+    },
+    {
+      "id": "RC-12",
+      "description": "索引 TB: 殊途同归：TB:1001 + TB('1001','审定数') → same target",
+      "api": "GET /api/acnr/resolve",
+      "input": {
+        "formula_ref": "TB('1001','审定数')"
+      },
+      "expected_output": {
+        "found": true,
+        "domain": "tb",
+        "delegated_to": "v1",
+        "target_code": "1001",
+        "target_column": "审定数",
+        "uri": "tb://1001#审定数",
+        "entry_type": "tb_cell"
+      },
+      "validates": ["R11.2", "R5.7"],
+      "convergence_group": "TB-1001",
+      "notes": "索引 TB:1001（RC-08）与公式 TB('1001','审定数')（本用例）经 resolve() 解析到同一目标。两者 convergence_group 相同证明殊途同归。"
+    }
+  ],
+  "convergence_assertions": [
+    {
+      "group": "D2-2-E100",
+      "cases": ["RC-03", "RC-04", "RC-05", "RC-11"],
+      "assert": "All cases resolve to the same canonical addr_id 'D2/D2-2/E100'",
+      "property": "Property 4: 多语法一致性解析（同格殊途同归）"
+    },
+    {
+      "group": "TB-1001",
+      "cases": ["RC-08", "RC-12"],
+      "assert": "Index syntax TB:1001 and formula syntax TB('1001','审定数') resolve to the same target",
+      "property": "Property 4: 多语法一致性解析（同格殊途同归）"
+    }
+  ]
+}

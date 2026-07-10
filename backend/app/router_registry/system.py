@@ -288,6 +288,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.linkage_trace import router as linkage_trace_router
     app.include_router(linkage_trace_router, tags=["linkage"])
 
+    # ═══ §133. ACNR 地址坐标名称注册中心（M0 只读 lookup/resolve） ═══
+    from app.routers.acnr import router as acnr_router
+    app.include_router(acnr_router, tags=["ACNR"])
+
     # ═══ §133. zero-downtime-deployment: DB-backed Feature Flags V2 (灰度) ═══
     from app.api.feature_flags import router as feature_flags_v2_router
     app.include_router(feature_flags_v2_router, tags=["Feature Flags V2"])
