@@ -1,14 +1,14 @@
 <!--
   GtIndexChip.vue — 跨底稿索引跳转 Chip 组件
 
-  按 design §3.8 实现：
-  - 解析 value → parseIndexRef()
-  - validate=true 时调 GET /api/wp-index-resolve 校验存在性
+  按 ACNR design §四大消费库关联统一 — 索引库 GtIndexChip 实现：
+  - 解析 value → parseIndexRef()（本地语法解析，仅用于显示）
+  - validate=true 时调 ACNR resolve(ns:target) 获取 addr_id + jump_route（R13.3）
   - 4 种显示状态：valid+exists(蓝) / valid+not_exists(灰) / valid+trimmed(灰) / invalid(纯文本)
-  - 11 命名空间路由 + 4 层级跳转 + 9 种边缘 case
+  - 跳转使用 ACNR 返回的 jump_route，不自行 parse 路由（R7.3 铁律）
 
-  锚定 spec workpaper-html-renderer Task 3.7
-  Validates: Requirements 3.11.8（4 层级跳转）+ 3.11.10（9 边缘 case）
+  锚定 spec acnr Task 17.2
+  Validates: Requirements 11.2, 11.3, 13.3
 -->
 <template>
   <!-- Invalid ref: render as plain text, no chip styling -->
@@ -71,9 +71,9 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
 import { parseIndexRef, type ResolvedIndexRef } from '@/utils/parseIndexRef'
 import { useWpNavigationHistory } from '@/composables/useWpNavigationHistory'
+import { useAcnr, type AcnrResolveResult } from '@/services/acnr'
 import { BUNDLE_SHEET_ALIASES } from './bundleSheetAliases'
 
 // ─── Props / Emits ───
@@ -114,11 +114,16 @@ const route = useRoute()
 const router = useRouter()
 const { push: pushNavHistory } = useWpNavigationHistory()
 
+// ─── ACNR SDK (R13.3: 不自行 parse，委托 ACNR resolve) ───
+const { resolve: acnrResolve, resolveInstance: acnrResolveInstance } = useAcnr()
+
 // ─── State ───
 const parsed = ref<ResolvedIndexRef | null>(null)
 const resolveStatus = ref<'pending' | 'exists' | 'not_exists' | 'trimmed' | 'error'>('pending')
 const trimReason = ref('')
 const resolving = ref(false)
+/** ACNR resolve 结果缓存，用于跳转时直接取 jump_route */
+const acnrResult = ref<AcnrResolveResult | null>(null)
 
 // ─── Computed ───
 const projectId = computed(() => {
@@ -224,6 +229,11 @@ const tooltipContent = computed(() => {
 })
 
 // ─── Methods ───
+
+/**
+ * 调用 ACNR resolve(ns:target) 校验存在性并获取 addr_id + jump_route (R13.3)
+ * 不自行 parse 路由，委托 ACNR 统一解析。
+ */
 async function resolveRef() {
   if (!parsed.value || !props.validate) {
     if (parsed.value) resolveStatus.value = 'exists'  // skip validation, assume exists
@@ -232,46 +242,55 @@ async function resolveRef() {
 
   resolving.value = true
   try {
-    const result = await api.get<{
-      exists: boolean
-      trimmed?: boolean
-      reason?: string
-      empty?: boolean
-    }>('/api/wp-index-resolve', {
-      params: {
-        ref: refValue.value,
-        project_id: projectId.value || undefined,
-      },
+    // R13.3: 调 resolve(ns:target) 获取 addr_id + jump_route，不自行 parse
+    const indexRef = buildIndexRef(parsed.value)
+    const result = await acnrResolve({
+      index_ref: indexRef,
+      project_id: projectId.value || undefined,
     })
 
-    if (result.trimmed) {
-      resolveStatus.value = 'trimmed'
-      trimReason.value = result.reason || ''
-    } else if (result.exists) {
-      resolveStatus.value = 'exists'
-      if (result.empty && parsed.value) {
-        parsed.value.empty = true
+    acnrResult.value = result
+
+    if (!result.found) {
+      // ACNR miss — 可能是 trimmed 或 not_exists
+      if (result.trimmed) {
+        resolveStatus.value = 'trimmed'
+        trimReason.value = result.reason || ''
+      } else {
+        resolveStatus.value = 'not_exists'
       }
     } else {
-      resolveStatus.value = 'not_exists'
+      // ACNR 命中
+      resolveStatus.value = 'exists'
     }
   } catch {
-    // On error, default to exists to avoid blocking user
-    resolveStatus.value = 'exists'
+    // ACNR 不可用时返回错误（R13.5: 不回退旧逻辑）
+    resolveStatus.value = 'error'
+    acnrResult.value = null
   } finally {
     resolving.value = false
   }
 }
 
-/** 解析 wp_code → wp_id 再跳转到底稿编辑页 */
+/**
+ * 从 parsed ResolvedIndexRef 构建 index_ref 字符串给 ACNR
+ * 格式: `ns:target`
+ */
+function buildIndexRef(resolved: ResolvedIndexRef): string {
+  return `${resolved.ns}:${resolved.target}`
+}
+
+/** 解析 wp_code → wp_id 再跳转到底稿编辑页 (经 ACNR resolve_instance，R13.1) */
 async function resolveAndNavigateToWp(wpCode: string, pid: string) {
   // ─── 虚拟子码重定向：A16-1~7 → A16 + ?version= ───
   if (/^A16-[1-7]$/.test(wpCode)) {
     try {
-      const res = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
-        params: { ref: 'A16', project_id: pid },
+      const res = await acnrResolveInstance({
+        project_id: pid,
+        parent: 'A16',
+        sheet_code: 'A16',
       })
-      if (res?.wp_id) {
+      if (res?.found && res.wp_id) {
         router.push({
           path: `/projects/${pid}/workpapers/${res.wp_id}/edit`,
           query: { version: wpCode },
@@ -286,23 +305,31 @@ async function resolveAndNavigateToWp(wpCode: string, pid: string) {
   }
 
   // ─── Bundle sheet alias（design §Sheet/Tab 路由契约）───
-  // 某些 wp_code 实际是 bundle 内的 sub-sheet，不是独立底稿。
-  // 底稿目录 F 列点击时用此映射路由到父 bundle + sheet query。
-  // 配置提取为共享文件，新增 alias 只需改一处。
   const alias = BUNDLE_SHEET_ALIASES[wpCode]
 
   try {
-    const res = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
-      params: { ref: wpCode, project_id: pid },
+    // R13.1: resolve_instance 是唯一 wp_id 出口
+    const res = await acnrResolveInstance({
+      project_id: pid,
+      parent: wpCode,
+      sheet_code: wpCode,
     })
-    if (res?.wp_id) {
-      router.push({ path: `/projects/${pid}/workpapers/${res.wp_id}/edit` })
+
+    if (res?.found && res.wp_id) {
+      // 使用 ACNR 返回的 jump_route（R7.3 铁律：不自行拼路由）
+      if (res.jump_route) {
+        router.push(res.jump_route)
+      } else {
+        router.push({ path: `/projects/${pid}/workpapers/${res.wp_id}/edit` })
+      }
     } else if (alias) {
       // 独立底稿不存在但有 bundle alias → 路由到父 bundle 的指定 sheet
-      const parentRes = await api.get<{ exists: boolean; wp_id?: string }>('/api/wp-index-resolve', {
-        params: { ref: alias.parent, project_id: pid },
+      const parentRes = await acnrResolveInstance({
+        project_id: pid,
+        parent: alias.parent,
+        sheet_code: alias.parent,
       })
-      if (parentRes?.wp_id) {
+      if (parentRes?.found && parentRes.wp_id) {
         router.push({
           path: `/projects/${pid}/workpapers/${parentRes.wp_id}/edit`,
           query: { sheet: alias.sheet },
@@ -310,13 +337,14 @@ async function resolveAndNavigateToWp(wpCode: string, pid: string) {
       } else {
         ElMessage.warning(`底稿 ${wpCode} 尚未生成`)
       }
-    } else if (res?.exists === false) {
+    } else if (res?.error === 'not_found') {
       ElMessage.warning(`底稿 ${wpCode} 尚未生成`)
     } else {
-      // wp_id 未返回但 exists=true，降级用 wp_code 作为 query 跳转到工作台筛选
+      // 降级：用 wp_code 作为 query 跳转到工作台筛选
       router.push({ path: `/projects/${pid}/workpapers`, query: { search: wpCode } })
     }
   } catch {
+    // R13.5: 转发失败返回错误，不回退旧逻辑
     ElMessage.warning(`跳转 ${wpCode} 失败，请手动查找`)
   }
 }
@@ -361,9 +389,21 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
     })
   }
 
+  // R13.3 / R7.3: 优先使用 ACNR 返回的 jump_route（不自行拼路由）
+  if (acnrResult.value?.found && acnrResult.value.jump_route) {
+    const jumpRoute = acnrResult.value.jump_route
+    // jump_route 模板中的 {wp_id} 已由后端 resolve_instance 填充
+    // 如果包含 {project_id} 占位符则替换
+    const finalRoute = jumpRoute.replace('{project_id}', pid)
+    router.push(finalRoute)
+    return
+  }
+
+  // Fallback: ACNR 未返回 jump_route 时（如 validate=false 或 ACNR 不可用），
+  // 使用 ACNR resolveInstance 获取 wp_id 跳转（仍经 ACNR 统一出口）
   switch (ns) {
     case 'wp':
-      // Layer 3: cross-workpaper jump → 通过 wp-index-resolve 解析 wp_code → wp_id 再跳转
+      // Layer 3: cross-workpaper jump → ACNR resolve_instance
       resolveAndNavigateToWp(target, pid)
       break
 
@@ -427,7 +467,6 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
 
     case 'Calc':
       // Layer 4: calculation dialog (emit event, handled by parent)
-      // No route navigation, parent handles dialog trigger
       break
 
     case 'Sample':
@@ -468,6 +507,7 @@ onMounted(init)
 watch(refValue, () => {
   resolveStatus.value = 'pending'
   trimReason.value = ''
+  acnrResult.value = null
   init()
 })
 </script>

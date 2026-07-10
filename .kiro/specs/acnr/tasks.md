@@ -188,17 +188,17 @@
     - 回写解析携带 project context
     - _Requirements: 15.1, 15.2, 15.4_
 
-- [ ] 17. 消费者切换（公式库 / 索引库）
-  - [ ] 17.1 实现前端 SDK `useAcnr.ts` + 公式选址器（`list_sheets`/`list_cells` 构建下拉树）+ 保存前 `resolve()` 校验
+- [x] 17. 消费者切换（公式库 / 索引库）
+  - [x] 17.1 实现前端 SDK `useAcnr.ts` + 公式选址器（`list_sheets`/`list_cells` 构建下拉树）+ 保存前 `resolve()` 校验
     - 非法引用编译期返回失败
     - _Requirements: 14.1, 14.2, 15.3_
-  - [ ] 17.2 改造 `GtIndexChip` 调 `resolve(ns:target)` 获取 addr_id + jump_route（不自行 parse）
+  - [x] 17.2 改造 `GtIndexChip` 调 `resolve(ns:target)` 获取 addr_id + jump_route（不自行 parse）
     - _Requirements: 11.2, 11.3, 13.3_
   - [x] 17.3 改造 `FormulaReverseIndex` 边端点使用 addr_id（重命名 sheet 边不断裂）
     - _Requirements: 14.3_
 
-- [ ] 18. 附注披露工厂
-  - [ ] 18.1 实现 `useDisclosureSection(cycle, options)` 工厂替换 ≥3 份 `useXDisclosureSoe`
+- [x] 18. 附注披露工厂
+  - [x] 18.1 实现 `useDisclosureSection(cycle, options)` 工厂替换 ≥3 份 `useXDisclosureSoe`
     - 登记 note 子域坐标 `note/{note_code}/{row_key}`；`disclosure:note-text-updated` payload 携带 addr_id；审定表/明细表取数经 `resolve()`
     - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
 
@@ -206,7 +206,7 @@
   - [x] 19.1 生成 `audit-platform/frontend/src/generated/dSheetLabels.ts` + 实现 `check-sheet-labels-generated` CI（禁手改）
     - _Requirements: 3.2, 18.1_
 
-- [ ] 20. Checkpoint（M2）
+- [x] 20. Checkpoint（M2）
   - Ensure all tests pass, ask the user if questions arise.
 
 ---

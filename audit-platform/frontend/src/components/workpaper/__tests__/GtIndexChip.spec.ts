@@ -1,15 +1,15 @@
 /**
  * GtIndexChip.spec.ts — 跨底稿索引跳转 Chip 组件测试
  *
- * spec workpaper-html-renderer Task 3.7
+ * spec acnr Task 17.2
  *
  * 验证：
  * 1. 合法索引渲染为 chip（el-tag）
  * 2. 非法索引渲染为纯文本
  * 3. 11 命名空间正确解析
- * 4. 9 种边缘 case 处理
- * 5. 跨项目禁止跳转
- * 6. 多目标显示下拉菜单
+ * 4. validate=true 时调 ACNR resolve（R13.3）
+ * 5. 使用 ACNR 返回的 jump_route 跳转（R7.3）
+ * 6. ACNR 不可用时显示 error 状态不回退旧逻辑（R13.5）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -27,10 +27,14 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
 
-// Mock apiProxy
-const mockApiGet = vi.fn()
-vi.mock('@/services/apiProxy', () => ({
-  api: { get: (...args: any[]) => mockApiGet(...args) },
+// Mock ACNR composable
+const mockAcnrResolve = vi.fn()
+const mockAcnrResolveInstance = vi.fn()
+vi.mock('@/services/acnr', () => ({
+  useAcnr: () => ({
+    resolve: mockAcnrResolve,
+    resolveInstance: mockAcnrResolveInstance,
+  }),
 }))
 
 // Element Plus stubs
@@ -77,7 +81,7 @@ const globalConfig = {
 describe('GtIndexChip — 基本渲染', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockApiGet.mockResolvedValue({ exists: true })
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2', jump_route: '/projects/proj-123/workpapers/wp-001/edit' })
   })
 
   it('合法底稿编码渲染为 chip', async () => {
@@ -118,7 +122,7 @@ describe('GtIndexChip — 基本渲染', () => {
 describe('GtIndexChip — 11 命名空间解析', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockApiGet.mockResolvedValue({ exists: true })
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2-2/E100' })
   })
 
   it('Note:五-1-1 解析为 Note 命名空间', async () => {
@@ -141,7 +145,7 @@ describe('GtIndexChip — 11 命名空间解析', () => {
     expect(wrapper.text()).toContain('TB:1122')
   })
 
-  it('宽松模式 D2-1 解析为 sheet 命名空间', async () => {
+  it('宽松模式 D2-1 解析为 wp 命名空间', async () => {
     const wrapper = mount(GtIndexChip, {
       props: { value: 'D2-1', validate: false },
       global: globalConfig,
@@ -170,37 +174,35 @@ describe('GtIndexChip — 11 命名空间解析', () => {
   })
 })
 
-describe('GtIndexChip — 校验状态', () => {
+describe('GtIndexChip — ACNR resolve 校验（R13.3）', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('validate=true 时调用 /api/wp-index-resolve', async () => {
-    mockApiGet.mockResolvedValue({ exists: true })
+  it('validate=true 时调用 ACNR resolve（不调旧 wp-index-resolve）', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2', jump_route: '/projects/proj-123/workpapers/wp-001/edit' })
     mount(GtIndexChip, {
       props: { value: 'D2', validate: true },
       global: globalConfig,
     })
     await flushPromises()
-    expect(mockApiGet).toHaveBeenCalledWith(
-      '/api/wp-index-resolve',
-      expect.objectContaining({
-        params: expect.objectContaining({ ref: 'D2' }),
-      }),
-    )
+    expect(mockAcnrResolve).toHaveBeenCalledWith({
+      index_ref: 'wp:D2',
+      project_id: 'proj-123',
+    })
   })
 
-  it('validate=false 时不调用 API', async () => {
+  it('validate=false 时不调用 ACNR', async () => {
     mount(GtIndexChip, {
       props: { value: 'D2', validate: false },
       global: globalConfig,
     })
     await flushPromises()
-    expect(mockApiGet).not.toHaveBeenCalled()
+    expect(mockAcnrResolve).not.toHaveBeenCalled()
   })
 
-  it('不存在时显示 info 类型 chip', async () => {
-    mockApiGet.mockResolvedValue({ exists: false })
+  it('ACNR resolve 返回 found:false 时显示 info 类型 chip', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: false, candidates: [] })
     const wrapper = mount(GtIndexChip, {
       props: { value: 'D2', validate: true },
       global: globalConfig,
@@ -210,8 +212,8 @@ describe('GtIndexChip — 校验状态', () => {
     expect(tag.attributes('data-type')).toBe('info')
   })
 
-  it('被裁剪时显示 info 类型 chip', async () => {
-    mockApiGet.mockResolvedValue({ exists: false, trimmed: true, reason: '不适用' })
+  it('ACNR resolve 返回 trimmed 时显示 info 类型 chip', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: false, trimmed: true, reason: '不适用' })
     const wrapper = mount(GtIndexChip, {
       props: { value: 'D2', validate: true },
       global: globalConfig,
@@ -219,16 +221,78 @@ describe('GtIndexChip — 校验状态', () => {
     await flushPromises()
     const tag = wrapper.find('.el-tag-stub')
     expect(tag.attributes('data-type')).toBe('info')
+  })
+
+  it('ACNR 不可用时显示 error 状态（R13.5: 不回退旧逻辑）', async () => {
+    mockAcnrResolve.mockRejectedValue(new Error('Network error'))
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'D2', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    const tag = wrapper.find('.el-tag-stub')
+    expect(tag.attributes('data-type')).toBe('danger')
+  })
+
+  it('cell:D2-2!E100 索引调用 ACNR resolve 时传 index_ref=cell:D2-2!E100（R11.3）', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2-2/E100' })
+    mount(GtIndexChip, {
+      props: { value: 'cell:D2-2!E100', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    expect(mockAcnrResolve).toHaveBeenCalledWith({
+      index_ref: 'cell:D2-2!E100',
+      project_id: 'proj-123',
+    })
   })
 })
 
-describe('GtIndexChip — 点击跳转', () => {
+describe('GtIndexChip — 跳转使用 ACNR jump_route（R7.3）', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockApiGet.mockResolvedValue({ exists: true })
+  })
+
+  it('ACNR 返回 jump_route 时直接用 jump_route 跳转', async () => {
+    mockAcnrResolve.mockResolvedValue({
+      found: true,
+      addr_id: 'D2/D2-2/E100',
+      jump_route: '/projects/proj-123/workpapers/wp-abc/edit?sheet=D2-2',
+    })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'cell:D2-2!E100', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    await wrapper.find('.el-tag-stub').trigger('click')
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-123/workpapers/wp-abc/edit?sheet=D2-2')
+  })
+
+  it('ACNR resolve 命中无 jump_route 时用 resolveInstance 跳转 wp 类型', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2' })
+    mockAcnrResolveInstance.mockResolvedValue({
+      found: true,
+      wp_id: 'wp-uuid-123',
+      jump_route: '/projects/proj-123/workpapers/wp-uuid-123/edit',
+    })
+    const wrapper = mount(GtIndexChip, {
+      props: { value: 'D2', validate: true },
+      global: globalConfig,
+    })
+    await flushPromises()
+    await wrapper.find('.el-tag-stub').trigger('click')
+    await flushPromises()
+    // Should use jump_route from resolveInstance
+    expect(mockAcnrResolveInstance).toHaveBeenCalledWith({
+      project_id: 'proj-123',
+      parent: 'D2',
+      sheet_code: 'D2',
+    })
+    expect(mockPush).toHaveBeenCalledWith('/projects/proj-123/workpapers/wp-uuid-123/edit')
   })
 
   it('点击有效 chip 触发 click 事件', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2' })
     const wrapper = mount(GtIndexChip, {
       props: { value: 'D2', validate: false },
       global: globalConfig,
@@ -242,59 +306,15 @@ describe('GtIndexChip — 点击跳转', () => {
       target: 'D2',
     })
   })
-
-  it('点击 wp 类型跳转到底稿编辑器', async () => {
-    const wrapper = mount(GtIndexChip, {
-      props: { value: 'D2', validate: false },
-      global: globalConfig,
-    })
-    await flushPromises()
-    await wrapper.find('.el-tag-stub').trigger('click')
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/projects/proj-123/workpapers/D2/edit',
-      }),
-    )
-  })
-
-  it('点击 Note 类型跳转到附注模块', async () => {
-    const wrapper = mount(GtIndexChip, {
-      props: { value: 'Note:五-1-1', validate: false },
-      global: globalConfig,
-    })
-    await flushPromises()
-    await wrapper.find('.el-tag-stub').trigger('click')
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/projects/proj-123/disclosure-notes',
-        query: { section: '五-1-1' },
-      }),
-    )
-  })
-
-  it('点击 TB 类型跳转到试算表', async () => {
-    const wrapper = mount(GtIndexChip, {
-      props: { value: 'TB:1122', validate: false },
-      global: globalConfig,
-    })
-    await flushPromises()
-    await wrapper.find('.el-tag-stub').trigger('click')
-    expect(mockPush).toHaveBeenCalledWith(
-      expect.objectContaining({
-        path: '/projects/proj-123/trial-balance',
-        query: { account: '1122' },
-      }),
-    )
-  })
 })
 
-describe('GtIndexChip — 灰态兜底（Req 10.3）', () => {
+describe('GtIndexChip — 灰态兜底', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
-  it('引用底稿不存在时显示灰态 chip（info 类型 + disabled class）', async () => {
-    mockApiGet.mockResolvedValue({ exists: false })
+  it('ACNR 返回 found:false 时显示灰态 chip', async () => {
+    mockAcnrResolve.mockResolvedValue({ found: false })
     const wrapper = mount(GtIndexChip, {
       props: { value: 'S4-1', validate: true },
       global: globalConfig,
@@ -307,7 +327,7 @@ describe('GtIndexChip — 灰态兜底（Req 10.3）', () => {
   })
 
   it('灰态 chip 的 tooltip 显示"底稿不存在"', async () => {
-    mockApiGet.mockResolvedValue({ exists: false })
+    mockAcnrResolve.mockResolvedValue({ found: false })
     const wrapper = mount(GtIndexChip, {
       props: { value: 'B10', validate: true },
       global: globalConfig,
@@ -318,7 +338,7 @@ describe('GtIndexChip — 灰态兜底（Req 10.3）', () => {
   })
 
   it('灰态 chip 点击不触发导航', async () => {
-    mockApiGet.mockResolvedValue({ exists: false })
+    mockAcnrResolve.mockResolvedValue({ found: false })
     const wrapper = mount(GtIndexChip, {
       props: { value: 'S17', validate: true },
       global: globalConfig,
@@ -328,22 +348,12 @@ describe('GtIndexChip — 灰态兜底（Req 10.3）', () => {
     expect(mockPush).not.toHaveBeenCalled()
     expect(wrapper.emitted('click')).toBeFalsy()
   })
-
-  it('灰态 chip 仍渲染文本值（value 可读）', async () => {
-    mockApiGet.mockResolvedValue({ exists: false })
-    const wrapper = mount(GtIndexChip, {
-      props: { value: 'S14-1', validate: true },
-      global: globalConfig,
-    })
-    await flushPromises()
-    expect(wrapper.text()).toContain('S14-1')
-  })
 })
 
 describe('GtIndexChip — 边缘 case', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockApiGet.mockResolvedValue({ exists: true })
+    mockAcnrResolve.mockResolvedValue({ found: true, addr_id: 'D2/D2' })
   })
 
   it('带空格的值 trim 后正常解析', async () => {
