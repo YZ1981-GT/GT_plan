@@ -128,10 +128,10 @@
     - **Validates: Requirements 24.1**
 
 - [ ] 10. resolve_instance + ProjectOverlay + Resolver 决策树
-  - [ ] 10.1 实现 `resolve_instance(project_id, parent_wp_code, sheet_code)` + ProjectBinding（运行时查 `WpIndex`）
+  - [x] 10.1 实现 `resolve_instance(project_id, parent_wp_code, sheet_code)` + ProjectBinding（运行时查 `WpIndex`）
     - 唯一 wp_id 出口；返回 jump_route 模板 + 已填充 wp_id；多实例返回 disambiguation，除非显式传 wp_id
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
-  - [ ] 10.2 实现 `overlay.py` L2 补丁应用 + 归属校验
+  - [x] 10.2 实现 `overlay.py` L2 补丁应用 + 归属校验
     - 带 project_id 时在 L1 命中前先应用 overlay；即使最终 ambiguous 仍先应用 overlay
     - _Requirements: 5.2, 5.8, 24.1_
   - [ ] 10.3 实现 `resolver.py` 完整决策树（L2 overlay → L1 Cell 精确 → L1 Sheet+aliases → semantic_label 包含 → L3 Runtime → 非 wp 域委托 V1 → miss 推荐）

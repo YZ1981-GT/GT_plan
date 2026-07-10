@@ -1,14 +1,19 @@
-"""ACNR 只读 API — lookup / resolve / entries / anchors
+"""ACNR API — lookup / resolve / entries / anchors / resolve-instance
 
-首期 M0 只读端点，读取 global_catalog.json 提供统一解析服务。
+M0: 只读端点（lookup/resolve/entries/anchors），读取 global_catalog.json。
+M1: resolve-instance（运行时查 WpIndex → ProjectBinding → wp_id）。
+
 响应经 ResponseWrapperMiddleware 包为 {code, message, data} 信封。
-
 注册到 router_registry/system.py §133。
 
-Requirements: 2.1, 2.2, 2.3, 2.4, 5.1, 5.3, 5.6
+Requirements: 2.1, 2.2, 2.3, 2.4, 5.1, 5.3, 5.6, 6.1, 6.2, 6.3, 6.4, 13.1
 """
-from fastapi import APIRouter, Depends, Query
+from uuid import UUID
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
 from app.deps import get_current_user
 from app.services.acnr.catalog import (
     list_cells,
@@ -16,6 +21,7 @@ from app.services.acnr.catalog import (
     lookup,
     resolve,
 )
+from app.services.acnr.resolver import resolve_instance
 
 router = APIRouter(prefix="/api/acnr", tags=["ACNR-地址坐标名称注册中心"])
 
@@ -90,3 +96,53 @@ async def acnr_anchors(
         if cells:
             return cells
     return []
+
+
+@router.get("/resolve-instance")
+async def acnr_resolve_instance(
+    project_id: UUID = Query(..., description="项目 UUID"),
+    parent: str = Query(..., description="父底稿码（WP 第一参），如 D2"),
+    sheet_code: str = Query(..., description="Tab 编码，如 D2-2"),
+    wp_id: UUID | None = Query(None, description="显式 wp_id（多实例消歧时传入）"),
+    _user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """项目实例解析 — 唯一 wp_id 出口 (R13.1)。
+
+    经 ProjectBinding 返回 wp_id + jump_route。
+
+    正常: {found:true, wp_id, wp_index_id, jump_route}
+    多实例: {found:false, error:"disambiguation", candidates:[...]}
+    未找到: {found:false, error:"not_found"}
+
+    Requirements: R6.1, R6.2, R6.3, R6.4, R13.1
+    """
+    result = await resolve_instance(
+        db=db,
+        project_id=project_id,
+        parent_wp_code=parent,
+        sheet_code=sheet_code,
+        explicit_wp_id=wp_id,
+    )
+
+    if result.found:
+        return {
+            "found": True,
+            "wp_id": str(result.wp_id),
+            "wp_index_id": str(result.wp_index_id),
+            "jump_route": result.jump_route,
+            "parent_wp_code": parent,
+            "sheet_code": sheet_code,
+        }
+
+    # Error responses
+    response: dict = {
+        "found": False,
+        "error": result.error,
+    }
+    if result.candidates:
+        response["candidates"] = result.candidates
+    if result.wp_index_id:
+        response["wp_index_id"] = str(result.wp_index_id)
+
+    return response
