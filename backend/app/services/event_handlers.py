@@ -637,11 +637,8 @@ def register_event_handlers() -> None:
         if pid:
             await address_registry.invalidate_async(pid, domain='note')
 
-    async def _invalidate_addr_wp(payload):
-        """底稿保存 → 失效底稿域缓存（WP(...) 单元格/交叉引用地址坐标随保存刷新）"""
-        pid = getattr(payload, 'project_id', '')
-        if pid:
-            await address_registry.invalidate_async(pid, domain='wp')
+    # NOTE: _invalidate_addr_wp 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
+    # ACNR handler 同时负责 L3 runtime + L2 overlay + 旧 address_registry WP 域失效
 
     async def _invalidate_addr_all(payload):
         """数据导入/回滚 → 失效该项目全部缓存"""
@@ -656,8 +653,7 @@ def register_event_handlers() -> None:
     event_bus.subscribe(EventType.REPORTS_UPDATED, _invalidate_addr_report)
     # 附注域：章节保存后 NOTE(...) 地址坐标失效（此前仅全量导入才刷新→地址坐标陈旧）
     event_bus.subscribe(EventType.NOTE_SECTION_SAVED, _invalidate_addr_note)
-    # 底稿域：底稿保存后 WP(...) 地址坐标失效（此前仅全量导入才刷新→地址坐标陈旧）
-    event_bus.subscribe(EventType.WORKPAPER_SAVED, _invalidate_addr_wp)
+    # 底稿域：由 ACNR events.register_acnr_invalidation_handler 统一订阅（R23.1）
     event_bus.subscribe(EventType.DATA_IMPORTED, _invalidate_addr_all)
     event_bus.subscribe(EventType.LEDGER_DATASET_ACTIVATED, _invalidate_addr_all)
     # 回滚同样需失效全部域（与下游 stale 标记保持一致；此前漏订阅）
@@ -1923,6 +1919,12 @@ def register_event_handlers() -> None:
     # ------------------------------------------------------------------
     from app.services.event_handlers_cycle_linkage import register_cycle_linkage_handlers
     register_cycle_linkage_handlers()
+
+    # ------------------------------------------------------------------
+    # ACNR 统一失效 handler（R23.1 — 替代各 router 级分散 touch_wp_registry）
+    # ------------------------------------------------------------------
+    from app.services.acnr.events import register_acnr_invalidation_handler
+    register_acnr_invalidation_handler()
 
     # 启动汇总（只打这一行 INFO）
     total_handlers = sum(len(h) for h in event_bus._handlers.values())

@@ -3,7 +3,7 @@
 读取 `global_catalog.json`（懒加载 + 缓存），构建索引，
 提供 list_sheets / list_cells / lookup / resolve（首期 L1 only）。
 
-Requirements: 2.1, 2.2, 2.3, 2.4, 5.1, 5.3, 5.6
+Requirements: 2.1, 2.2, 2.3, 2.4, 5.1, 5.3, 5.6, 23.4, 23.5
 """
 from __future__ import annotations
 
@@ -16,8 +16,38 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+
+# ─── 异常定义 ──────────────────────────────────────────────────────────────────
+
+
+class CatalogLoadError(Exception):
+    """Catalog 加载失败且无可用的上一版缓存时抛出。
+
+    触发此异常意味着操作整体失败，需人工介入。
+    Requirements: R23.5
+    """
+    pass
+
 # ─── Catalog 数据路径 ───────────────────────────────────────────────────────
 _CATALOG_PATH = Path(__file__).resolve().parents[3] / "data" / "acnr" / "global_catalog.json"
+
+
+# ─── 降级缓存（上一版成功加载的 catalog） ──────────────────────────────────────
+_last_good_catalog: CatalogIndex | None = None
+
+
+def _alert_admin(event_type: str, details: str) -> None:
+    """向管理端发出告警（当前实现：日志 + 指标占位）。
+
+    后续可接入运维告警系统（邮件/Slack/PagerDuty 等）。
+    Requirements: R23.4, R23.5
+    """
+    logger.warning(
+        "ACNR 管理告警 [%s]: %s",
+        event_type,
+        details,
+    )
+    # TODO: 接入实际运维告警系统（metrics / webhook）
 
 
 class CatalogIndex:
@@ -70,28 +100,49 @@ _catalog: CatalogIndex | None = None
 
 
 def _load_catalog() -> CatalogIndex:
-    """懒加载 catalog JSON 并构建索引。"""
-    global _catalog
+    """懒加载 catalog JSON 并构建索引，含降级处理。
+
+    Branch 1: 加载失败但有旧缓存 → 只读上一版 + 管理端告警
+              禁止静默退回分散 JSON（R23.4）
+    Branch 2: 加载失败且无旧缓存 → 操作整体失败（R23.5）
+
+    Requirements: R23.4, R23.5
+    """
+    global _catalog, _last_good_catalog
     if _catalog is not None:
         return _catalog
 
     catalog_path = Path(os.environ.get("ACNR_CATALOG_PATH", str(_CATALOG_PATH)))
-    if not catalog_path.exists():
-        logger.warning("ACNR catalog 文件不存在: %s，使用空 catalog", catalog_path)
-        _catalog = CatalogIndex({"version": "1", "registry_version": "unknown", "sheets": [], "cells": []})
+
+    try:
+        data = json.loads(catalog_path.read_text(encoding="utf-8"))
+        _catalog = CatalogIndex(data)
+        _last_good_catalog = _catalog  # 保存为下次降级缓存
+        logger.info(
+            "ACNR catalog 加载完成: version=%s, sheets=%d, cells=%d",
+            _catalog.registry_version,
+            len(_catalog.sheets_by_addr_id),
+            len(_catalog.cells_by_addr_id),
+        )
         return _catalog
+    except (FileNotFoundError, json.JSONDecodeError, OSError) as e:
+        # Branch 1: 有旧缓存 → 只读上一版 + 告警
+        if _last_good_catalog is not None:
+            logger.error(
+                "ACNR catalog 加载失败，降级为只读上一版: %s", e
+            )
+            _alert_admin("catalog_load_failed", str(e))
+            _catalog = _last_good_catalog
+            return _catalog
 
-    with open(catalog_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-
-    _catalog = CatalogIndex(data)
-    logger.info(
-        "ACNR catalog 加载完成: version=%s, sheets=%d, cells=%d",
-        _catalog.registry_version,
-        len(_catalog.sheets_by_addr_id),
-        len(_catalog.cells_by_addr_id),
-    )
-    return _catalog
+        # Branch 2: 无旧缓存 → 操作整体失败，需人工介入
+        logger.critical(
+            "ACNR catalog 加载失败且无可用缓存，需人工介入: %s", e
+        )
+        _alert_admin("catalog_load_failed_no_cache", str(e))
+        raise CatalogLoadError(
+            "Catalog 加载失败且不存在可用的上一版缓存，操作整体失败"
+        ) from e
 
 
 def get_catalog() -> CatalogIndex:

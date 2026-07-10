@@ -42,10 +42,10 @@ def test_note_section_saved_invalidates_note_domain():
 
 
 def test_workpaper_saved_invalidates_wp_domain():
-    """WORKPAPER_SAVED 必须挂接 _invalidate_addr_wp。"""
+    """WORKPAPER_SAVED 必须挂接 ACNR on_workpaper_saved（统一失效 R23.1）。"""
     names = _handler_names(EventType.WORKPAPER_SAVED)
-    assert any("_invalidate_addr_wp" in n for n in names), (
-        f"WORKPAPER_SAVED 缺少地址库 wp 域失效 handler，实际: {names}"
+    assert any("on_workpaper_saved" in n for n in names), (
+        f"WORKPAPER_SAVED 缺少 ACNR 统一失效 handler，实际: {names}"
     )
 
 

@@ -838,16 +838,7 @@ async def parse_workpaper(
     result = await parse_workpaper_real(db=db, project_id=project_id, wp_id=wp_id, dry_run=dry_run)
     if not dry_run and result.get("status") == "ok":
         await db.commit()
-        try:
-            from app.services.wp_parsed_data_service import touch_wp_registry
-
-            await touch_wp_registry(project_id)
-        except Exception as exc:
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "touch_wp_registry after parse: %s", exc
-            )
+        # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
     elif not dry_run:
         await db.commit()
     return result

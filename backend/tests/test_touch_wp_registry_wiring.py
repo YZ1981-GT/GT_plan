@@ -1,5 +1,8 @@
-# Feature: custom-workpaper-formula-binding — touch_wp_registry 接线守护
-"""静态检查：写 parsed_data 并 commit 的路由须在 commit 后调用 touch。"""
+# Feature: ACNR — touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理
+"""
+历史遗留静态检查（R23.2 收口后简化）：
+确认各 router 不再自行调用 touch_wp_registry（统一由 EventBus handler 驱动）。
+"""
 
 from __future__ import annotations
 
@@ -8,25 +11,18 @@ from pathlib import Path
 
 ROUTERS = Path(__file__).resolve().parents[1] / "app" / "routers"
 
-# 仅检查「wp.parsed_data =」后存在 commit 的文件
-PARSED_ASSIGN = re.compile(r"wp\.parsed_data\s*=")
-COMMIT = re.compile(r"await\s+db\.commit\(\)")
-TOUCH = re.compile(
-    r"touch_after_parsed_data_commit|touch_wp_registry"
-)
+# touch_wp_registry 直接调用（非注释）
+TOUCH_CALL = re.compile(r"^\s*(?:await\s+)?touch_wp_registry\(")
 
 
-def test_routers_with_parsed_data_assign_touch_after_commit():
-    missing: list[str] = []
+def test_no_router_directly_calls_touch_wp_registry():
+    """R23.2: 各 router 不应直接调用 touch_wp_registry（已统一由 ACNR EventBus handler 处理）。"""
+    violators: list[str] = []
     for path in sorted(ROUTERS.glob("*.py")):
-        text = path.read_text(encoding="utf-8")
-        if not PARSED_ASSIGN.search(text):
-            continue
-        if not COMMIT.search(text):
-            continue
-        if not TOUCH.search(text):
-            missing.append(path.name)
-    assert not missing, (
-        "以下路由写 parsed_data 且 commit，但未调用 touch："
-        + ", ".join(missing)
+        for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if TOUCH_CALL.search(line):
+                violators.append(f"{path.name}:{i}")
+    assert not violators, (
+        "以下路由仍直接调用 touch_wp_registry（应由 ACNR 统一失效）："
+        + ", ".join(violators)
     )

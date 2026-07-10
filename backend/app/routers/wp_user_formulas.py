@@ -325,12 +325,7 @@ async def update_user_formulas(
 
     await db.commit()
 
-    try:
-        from app.services.wp_parsed_data_service import touch_wp_registry
-
-        await touch_wp_registry(wp.project_id)
-    except Exception as e:
-        logger.warning("touch_wp_registry after user-formulas: %s", e)
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     return {
         "wp_id": str(wp_id),
@@ -388,12 +383,7 @@ async def restore_preset_formula(
 
     await db.commit()
 
-    try:
-        from app.services.wp_parsed_data_service import touch_wp_registry
-
-        await touch_wp_registry(wp.project_id)
-    except Exception as e:
-        logger.warning("touch_wp_registry after user-formulas delete: %s", e)
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     return {
         "wp_id": str(wp_id),

@@ -147,27 +147,27 @@
     - **Property 15: 非法引用编译期失败（resolve 校验总返回失败且不入库）**
     - **Validates: Requirements 14.2**
 
-- [ ] 11. 端点统一与转发 + addr_id 不可变
-  - [ ] 11.1 实现 v1/v2 转发 + 三个 legacy index-resolve 端点转发至统一 resolve 出口
+- [x] 11. 端点统一与转发 + addr_id 不可变
+  - [x] 11.1 实现 v1/v2 转发 + 三个 legacy index-resolve 端点转发至统一 resolve 出口
     - `/api/wp-index-resolve`、`/api/workpapers/render-registry/{wp_code}`、`/api/workpapers/index-resolve/{wpCode}` 转发；一次查询返回 exists/trimmed/reason；转发失败返回错误**不回退**旧逻辑
     - _Requirements: 13.1, 13.2, 13.4, 13.5_
-  - [ ] 11.2 实现 addr_id 不可变政策 + `registry_version` 处理
+  - [x] 11.2 实现 addr_id 不可变政策 + `registry_version` 处理
     - 禁改已有 addr_id（改名走 aliases）；弃用标 `deprecated:true` 保留 ≥1 版；归档项目记录 registry_version
     - _Requirements: 19.1, 19.2, 19.3, 19.4_
   - [ ]* 11.3 编写 addr_id 不可变与版本确定性属性测试
     - **Property 14: addr_id 不可变与版本确定性（重命名不断边、版本锁定确定）**
     - **Validates: Requirements 14.3, 19.1, 19.2, 19.5**
 
-- [ ] 12. 缓存失效收口 + catalog 降级
-  - [ ] 12.1 在 `WorkpaperSaveOrchestrator.after_save` 统一调用 ACNR `invalidate`（按 trigger/extra.sheets 增量），并删除各 router 级重复 `touch_wp_registry`
+- [x] 12. 缓存失效收口 + catalog 降级
+  - [x] 12.1 在 `WorkpaperSaveOrchestrator.after_save` 统一调用 ACNR `invalidate`（按 trigger/extra.sheets 增量），并删除各 router 级重复 `touch_wp_registry`
     - `invalidate` 由 `WORKPAPER_SAVED` 触发，`publish` 只传 `EventPayload`
     - _Requirements: 23.1, 23.2_
-  - [ ] 12.2 实现 catalog 加载失败降级（两分支）
+  - [x] 12.2 实现 catalog 加载失败降级（两分支）
     - 有旧缓存：只读上一版 + 管理端告警，禁止静默退回分散 JSON；无旧缓存：操作整体失败要求人工介入
     - _Requirements: 23.4, 23.5_
 
-- [ ] 13. CCR 自检（报告模式）
-  - [ ] 13.1 实现 `check-ccr-resolve`（M1 报告模式）
+- [x] 13. CCR 自检（报告模式）
+  - [x] 13.1 实现 `check-ccr-resolve`（M1 报告模式）
     - 校验每条 CCR source 可 resolve 或已标 `semantic_only`，产出缺口清单不阻断 PR；L4 边端点 normalize 为 addr_id
     - _Requirements: 17.1, 17.2_
 

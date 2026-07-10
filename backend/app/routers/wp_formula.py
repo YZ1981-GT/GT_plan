@@ -23,7 +23,6 @@ from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
 from app.services.wp_formula_service import wp_formula_service
 from app.services.wp_parsed_data_service import (
     format_cell_display_value,
-    touch_wp_registry,
     write_cell_to_parsed_data,
 )
 
@@ -177,7 +176,7 @@ async def save_formula(
             )
 
     await db.commit()
-    await touch_wp_registry(wp.project_id)
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     payload: dict = {"saved": _formula_to_dict(saved)}
     payload["evaluated_value"] = str(evaluated_value)
@@ -209,5 +208,5 @@ async def delete_formula(
         raise HTTPException(status_code=404, detail="公式不存在")
     await wp_formula_service.delete(db, formula_id)
     await db.commit()
-    await touch_wp_registry(wp.project_id)
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
     return {"deleted": str(formula_id)}

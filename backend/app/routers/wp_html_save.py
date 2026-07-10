@@ -223,12 +223,7 @@ async def save_html_data(
 
     await db.commit()
 
-    try:
-        from app.services.wp_parsed_data_service import touch_wp_registry
-
-        await touch_wp_registry(working_paper.project_id)
-    except Exception as e:
-        logger.warning("touch_wp_registry after html save: %s", e)
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     # ─── Step 8: 跨底稿引用变更检测 ──────────────────────────────────────
     stale_impact: list[StaleImpactItem] = []

@@ -3,9 +3,12 @@
 GET /api/wp-index-resolve
 按 design §5.1.6 实现：<GtIndexChip> 解析校验。
 
-解析 ref → 查 wp_index 校验存在性 → 返回 resolved 结构。
+M1: 转发至 ACNR 统一 resolve 出口（R13.2, R13.4, R13.5）。
+- 内部命名空间 (wp/sheet/cell): 调 ACNR full_resolve → 返回 exists/trimmed/reason
+- 外部命名空间 (Note/TB/Adj/Att/EQCR/Calc/Sample/Confirm): exists=true（不校验）
+- 转发失败: 返回错误，不回退旧解析逻辑（R13.5）
 
-Requirements: 3.11.9（11 命名空间）
+Requirements: 3.11.9（11 命名空间）, 13.1, 13.2, 13.4, 13.5
 """
 
 from __future__ import annotations
@@ -24,6 +27,7 @@ from app.deps import get_current_user
 from app.models.core import User
 from app.models.procedure_models import ProcedureInstance
 from app.services.acnr.grammar import STANDARD_WP_CODE_RE, STANDARD_WP_CODE_RE_STR
+from app.services.acnr.resolver import full_resolve, resolve_instance
 
 from app.models.workpaper_models import WpIndex
 
@@ -144,78 +148,6 @@ def _parse_ref(ref: str) -> tuple[str, int, str] | None:
     return None
 
 
-async def _check_wp_exists(
-    db: AsyncSession,
-    ns: str,
-    target: str,
-    project_id: UUID | None,
-) -> tuple[bool, bool, str | None, str | None]:
-    """Check if a wp/sheet/cell target exists in wp_index.
-
-    Returns (exists, trimmed, reason, wp_id).
-    """
-    if not project_id:
-        return (True, False, None, None)
-
-    # Determine the wp_code to look up
-    if ns == "wp":
-        wp_code = target.upper()
-    elif ns == "sheet":
-        match = _PARENT_WP_CODE_RE.match(target)
-        if match:
-            wp_code = match.group(1).upper()
-        else:
-            wp_code = target.upper()
-    elif ns == "cell":
-        sheet_part = target.split("!")[0] if "!" in target else target
-        match = _PARENT_WP_CODE_RE.match(sheet_part)
-        if match:
-            wp_code = match.group(1).upper()
-        else:
-            wp_code = sheet_part.upper()
-    else:
-        return (True, False, None, None)
-
-    # Query wp_index for existence
-    stmt = select(WpIndex).where(
-        WpIndex.project_id == project_id,
-        WpIndex.wp_code == wp_code,
-        WpIndex.is_deleted == False,  # noqa: E712
-    )
-    result = await db.execute(stmt)
-    wp_index = result.scalar_one_or_none()
-
-    if not wp_index:
-        return (False, False, None, None)
-
-    # Resolve wp_id: get working_paper.id for this wp_index entry
-    from app.models.workpaper_models import WorkingPaper
-    wp_stmt = select(WorkingPaper.id).where(
-        WorkingPaper.wp_index_id == wp_index.id,
-        WorkingPaper.project_id == project_id,
-        WorkingPaper.is_deleted == False,  # noqa: E712
-    ).limit(1)
-    wp_result = await db.execute(wp_stmt)
-    wp_row = wp_result.scalar_one_or_none()
-    wp_id = str(wp_row) if wp_row else None
-
-    # Check if the workpaper has been trimmed
-    trim_stmt = select(ProcedureInstance).where(
-        ProcedureInstance.project_id == project_id,
-        ProcedureInstance.wp_code == wp_code,
-        ProcedureInstance.status == "not_applicable",
-        ProcedureInstance.is_deleted == False,  # noqa: E712
-    )
-    trim_result = await db.execute(trim_stmt)
-    trim_instance = trim_result.scalar_one_or_none()
-
-    if trim_instance:
-        reason = trim_instance.skip_reason
-        return (True, True, reason, wp_id)
-
-    return (True, False, None, wp_id)
-
-
 # ─── Endpoint ────────────────────────────────────────────────────────────────
 
 
@@ -226,16 +158,14 @@ async def resolve_wp_index(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """解析底稿索引引用并校验存在性。
+    """解析底稿索引引用并校验存在性 — 转发至 ACNR 统一 resolve 出口。
 
-    解析 ref 字符串 → 确定命名空间和目标 → 查 wp_index 校验存在性 → 返回 resolved 结构。
-
-    EARS:
-    - WHEN ref 为合法格式 THEN 返回 resolved 结构（ns/layer/target/exists/trimmed）
-    - IF ref 格式非法 THEN 返回 422
-    - IF ns ∈ {Note/TB/Adj/Att/EQCR/Calc/Sample/Confirm} THEN exists=true（外部模块不校验）
-    - IF ns ∈ {wp/sheet/cell} AND project_id 提供 THEN 查 wp_index 校验存在性
-    - IF 底稿已裁剪（ProcedureInstance.status='not_applicable'）THEN trimmed=true + reason
+    M1 转发逻辑（R13.2, R13.4, R13.5）：
+    - 解析 ref → 确定命名空间和目标
+    - 外部命名空间 → exists=true（不校验物理格）
+    - 内部命名空间 (wp/sheet/cell) → 转发至 ACNR full_resolve + resolve_instance
+    - 转发失败 → 返回错误，**不回退旧解析逻辑**（R13.5）
+    - 一次查询返回 exists / trimmed / reason（R13.4）
     """
     parsed = _parse_ref(ref)
     if parsed is None:
@@ -258,16 +188,128 @@ async def resolve_wp_index(
             target=target,
         )
 
-    # wp/sheet/cell namespaces — validate against wp_index
-    exists, trimmed, reason, wp_id = await _check_wp_exists(db, ns, target, project_id)
+    # ─── 内部命名空间 (wp/sheet/cell) → 转发至 ACNR（R13.2）──────────────
+    try:
+        # 构造 index_ref 格式传入 ACNR full_resolve
+        index_ref = f"{ns}:{target}"
+        resolve_result = await full_resolve(
+            index_ref=index_ref,
+            project_id=str(project_id) if project_id else None,
+            db=db if project_id else None,
+        )
 
-    return ResolveResponse(
-        exists=exists,
-        trimmed=trimmed,
-        ns=ns,
-        layer=layer,
-        target=target,
-        reason=reason,
-        empty=False,
-        wp_id=wp_id,
-    )
+        # 从 ACNR resolve 结果判定 exists
+        exists = resolve_result.found
+
+        # 获取 wp_id（R13.1: resolve_instance 是唯一 wp_id 出口）
+        wp_id: str | None = None
+        trimmed = False
+        reason: str | None = None
+
+        if exists and project_id:
+            # 确定 parent_wp_code 和 sheet_code 用于 resolve_instance
+            parent_wp_code, sheet_code = _extract_parent_and_sheet(ns, target)
+            if parent_wp_code and sheet_code:
+                instance_result = await resolve_instance(
+                    db=db,
+                    project_id=project_id,
+                    parent_wp_code=parent_wp_code,
+                    sheet_code=sheet_code,
+                )
+                if instance_result.found:
+                    wp_id = str(instance_result.wp_id) if instance_result.wp_id else None
+                else:
+                    # resolve_instance 失败不影响 exists 状态
+                    pass
+
+            # 检查裁剪状态（trimmed / reason）
+            trimmed, reason = await _check_trimmed(db, project_id, ns, target)
+        elif not project_id:
+            # 无 project_id 时无法校验实例存在性，视为 exists=True（兼容旧行为）
+            exists = True
+        elif exists:
+            wp_id = resolve_result.wp_id
+
+        return ResolveResponse(
+            exists=exists,
+            trimmed=trimmed,
+            reason=reason,
+            empty=False,
+            ns=ns,
+            layer=layer,
+            target=target,
+            wp_id=wp_id,
+        )
+
+    except Exception as e:
+        # R13.5: 转发失败返回错误，**不回退旧逻辑**
+        logger.error("ACNR 转发失败 ref=%s: %s", ref, e, exc_info=True)
+        raise HTTPException(
+            status_code=502,
+            detail=f"ACNR 解析服务转发失败: {e!s}",
+        ) from e
+
+
+# ─── ACNR Forwarding Helpers (R13.2) ─────────────────────────────────────────
+
+
+def _extract_parent_and_sheet(ns: str, target: str) -> tuple[str | None, str | None]:
+    """从命名空间和 target 提取 parent_wp_code 和 sheet_code。
+
+    wp:D2 → (D2, D2)  # wp_code 即 sheet_code
+    wp:D2-2 → (D2, D2-2)
+    sheet:D2-2 → (D2, D2-2)
+    cell:D2-2!E100 → (D2, D2-2)
+    """
+    if ns == "cell" and "!" in target:
+        sheet_code = target.split("!")[0].strip().upper()
+    else:
+        sheet_code = target.strip().upper()
+
+    # 提取 parent_wp_code（如 D2-2 → D2）
+    match = _PARENT_WP_CODE_RE.match(sheet_code)
+    if match:
+        parent_wp_code = match.group(1).upper()
+    else:
+        parent_wp_code = sheet_code
+
+    return (parent_wp_code, sheet_code)
+
+
+async def _check_trimmed(
+    db: AsyncSession,
+    project_id: UUID,
+    ns: str,
+    target: str,
+) -> tuple[bool, str | None]:
+    """检查底稿裁剪状态（ProcedureInstance.status='not_applicable'）。
+
+    返回 (trimmed, reason)。
+    """
+    # 确定 wp_code
+    if ns == "wp":
+        wp_code = target.upper()
+    elif ns == "sheet":
+        wp_code = target.upper()
+    elif ns == "cell":
+        sheet_part = target.split("!")[0] if "!" in target else target
+        wp_code = sheet_part.upper()
+    else:
+        return (False, None)
+
+    try:
+        trim_stmt = select(ProcedureInstance).where(
+            ProcedureInstance.project_id == project_id,
+            ProcedureInstance.wp_code == wp_code,
+            ProcedureInstance.status == "not_applicable",
+            ProcedureInstance.is_deleted == False,  # noqa: E712
+        )
+        trim_result = await db.execute(trim_stmt)
+        trim_instance = trim_result.scalar_one_or_none()
+
+        if trim_instance:
+            return (True, trim_instance.skip_reason)
+    except Exception as e:
+        logger.warning("检查裁剪状态失败 wp_code=%s: %s", wp_code, e)
+
+    return (False, None)

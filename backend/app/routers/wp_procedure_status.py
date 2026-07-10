@@ -103,16 +103,7 @@ async def update_procedure_status(
     from sqlalchemy.orm.attributes import flag_modified
     flag_modified(wp, "parsed_data")
     await db.commit()
-    try:
-        from app.services.wp_parsed_data_service import touch_wp_registry
-
-        await touch_wp_registry(wp.project_id)
-    except Exception as touch_err:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "touch_wp_registry after procedure_status: %s", touch_err
-        )
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     return {
         "ok": True,
@@ -161,16 +152,7 @@ async def update_procedure_categories(
     from sqlalchemy.orm.attributes import flag_modified
     flag_modified(wp, "parsed_data")
     await db.commit()
-    try:
-        from app.services.wp_parsed_data_service import touch_wp_registry
-
-        await touch_wp_registry(wp.project_id)
-    except Exception as touch_err:
-        import logging
-
-        logging.getLogger(__name__).warning(
-            "touch_wp_registry after procedure_categories: %s", touch_err
-        )
+    # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     return {
         "ok": True,
