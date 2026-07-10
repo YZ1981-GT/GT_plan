@@ -68,9 +68,9 @@
     }
   ],
   "gaps": [],
-  "generated_at": "2026-07-10T10:27:44.629103+00:00",
+  "generated_at": "2026-07-10T12:24:34.456058+00:00",
   "manifest_blocked": false,
-  "registry_version": "20260710102744",
+  "registry_version": "20260710000000",
   "summary": {
     "alias_conflict_count": 5,
     "gap_count": 0,

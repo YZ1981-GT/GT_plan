@@ -1,0 +1,626 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACNR F 循环 Import/Export 手维清单（f_cycle_ie_manifest.yaml）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 用途：ACNR 生成器（generate_catalog.py）的 F 循环 import_export 输入源
+#       （design.md「Generator pipeline」/ R1.2 / R18.6 / R-ROUTE）。
+#
+# 铁律：本文件为「手工整理」，**禁止 AST 自动扫描** f*_import_export.py。
+#
+# 数据来源（逐 sheet 手工阅读）：
+#   _f0_import_export.py                (F0 函证 parsed_data 存储)
+#   _f1_import_export.py                (_SHEET_ITEM_ID + api_prefix=f1)
+#   _f2_import_export.py                (F2-3..F2-13/F2-14/F2-19..F2-32 api_prefix=f2)
+#   _f2_special_import_export.py        (F2-55..F2-72 api_prefix=f2-spe)
+#   _f2_stocktake_import_export.py      (F2-24..F2-26 api_prefix=f2-st)
+#   _f2_valuation_import_export.py      (F2-33..F2-52 api_prefix=f2-val)
+#   _f3_import_export.py                (F3 api_prefix=f3)
+#   _f4_import_export.py                (F4 api_prefix=f4)
+#   _f5_import_export.py                (F5 api_prefix=f5)
+#
+# 字段说明：同 d_cycle_ie_manifest.yaml。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1"
+cycle: F
+
+entries:
+  # ───────────────────────── F0 函证（api_prefix: f0） ─────────────────────────
+  # F0 函证使用 parsed_data 存储，非 checklist_responses
+  - sheet_code: F0-3S
+    api_prefix: f0
+    item_id: F0-3S-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: F0-6
+    api_prefix: f0
+    item_id: F0-6-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: []
+
+  # ───────────────────────── F1 预付账款（api_prefix: f1） ─────────────────────────
+  - sheet_code: F1-2
+    api_prefix: f1
+    item_id: F1-det-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: F1-5
+    api_prefix: f1
+    item_id: F1-lt-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [F1-2]
+  - sheet_code: F1-6
+    api_prefix: f1
+    item_id: F1-rp-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [F1-2]
+  - sheet_code: F1-7
+    api_prefix: f1
+    item_id: F1-vc-current-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [F1-2]
+  - sheet_code: F1-7-post
+    api_prefix: f1
+    item_id: F1-vc-post-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [F1-2]
+
+  # ───────────────────────── F2 存货主表（api_prefix: f2） ─────────────────────────
+  - sheet_code: F2-3
+    api_prefix: f2
+    item_id: F2-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: F2-4
+    api_prefix: f2
+    item_id: F2-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: []
+  - sheet_code: F2-5
+    api_prefix: f2
+    item_id: F2-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: []
+  - sheet_code: F2-6
+    api_prefix: f2
+    item_id: F2-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: []
+  - sheet_code: F2-7
+    api_prefix: f2
+    item_id: F2-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: []
+  - sheet_code: F2-8
+    api_prefix: f2
+    item_id: F2-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: []
+  - sheet_code: F2-9
+    api_prefix: f2
+    item_id: F2-9-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: []
+  - sheet_code: F2-10
+    api_prefix: f2
+    item_id: F2-10-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: []
+  - sheet_code: F2-11
+    api_prefix: f2
+    item_id: F2-11-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: []
+  - sheet_code: F2-12
+    api_prefix: f2
+    item_id: F2-12-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: []
+  - sheet_code: F2-13
+    api_prefix: f2
+    item_id: F2-13-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 110
+    depends_on_sheets: []
+  - sheet_code: F2-14
+    api_prefix: f2
+    item_id: F2-14-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 120
+    depends_on_sheets: []
+  - sheet_code: F2-19
+    api_prefix: f2
+    item_id: F2-19-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 130
+    depends_on_sheets: []
+  - sheet_code: F2-20
+    api_prefix: f2
+    item_id: F2-20-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 140
+    depends_on_sheets: []
+  - sheet_code: F2-29
+    api_prefix: f2
+    item_id: F2-29-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 150
+    depends_on_sheets: []
+  - sheet_code: F2-30
+    api_prefix: f2
+    item_id: F2-30-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 160
+    depends_on_sheets: []
+  - sheet_code: F2-31
+    api_prefix: f2
+    item_id: F2-31-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 170
+    depends_on_sheets: []
+  - sheet_code: F2-32
+    api_prefix: f2
+    item_id: F2-32-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 180
+    depends_on_sheets: []
+
+  # ───────────────────────── F2 监盘（api_prefix: f2-st） ─────────────────────────
+  - sheet_code: F2-24
+    api_prefix: f2-st
+    item_id: F2-24-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 190
+    depends_on_sheets: []
+  - sheet_code: F2-25
+    api_prefix: f2-st
+    item_id: F2-25-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 200
+    depends_on_sheets: []
+  - sheet_code: F2-26
+    api_prefix: f2-st
+    item_id: F2-26-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 210
+    depends_on_sheets: []
+
+  # ───────────────────────── F2 计价测试（api_prefix: f2-val） ─────────────────────────
+  - sheet_code: F2-33
+    api_prefix: f2-val
+    item_id: F2-33-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 220
+    depends_on_sheets: []
+  - sheet_code: F2-34
+    api_prefix: f2-val
+    item_id: F2-34-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 230
+    depends_on_sheets: []
+  - sheet_code: F2-35
+    api_prefix: f2-val
+    item_id: F2-35-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 240
+    depends_on_sheets: []
+  - sheet_code: F2-38
+    api_prefix: f2-val
+    item_id: F2-38-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 250
+    depends_on_sheets: []
+  - sheet_code: F2-39
+    api_prefix: f2-val
+    item_id: F2-39-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 260
+    depends_on_sheets: []
+  - sheet_code: F2-40
+    api_prefix: f2-val
+    item_id: F2-40-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 270
+    depends_on_sheets: []
+  - sheet_code: F2-41
+    api_prefix: f2-val
+    item_id: F2-41-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 280
+    depends_on_sheets: []
+  - sheet_code: F2-42
+    api_prefix: f2-val
+    item_id: F2-42-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 290
+    depends_on_sheets: []
+  - sheet_code: F2-43
+    api_prefix: f2-val
+    item_id: F2-43-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 300
+    depends_on_sheets: []
+  - sheet_code: F2-44
+    api_prefix: f2-val
+    item_id: F2-44-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 310
+    depends_on_sheets: []
+  - sheet_code: F2-47
+    api_prefix: f2-val
+    item_id: F2-47-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 320
+    depends_on_sheets: []
+  - sheet_code: F2-48
+    api_prefix: f2-val
+    item_id: F2-48-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 330
+    depends_on_sheets: []
+  - sheet_code: F2-49
+    api_prefix: f2-val
+    item_id: F2-49-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 340
+    depends_on_sheets: []
+  - sheet_code: F2-52
+    api_prefix: f2-val
+    item_id: F2-52-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 350
+    depends_on_sheets: []
+
+  # ───────────────────────── F2 专项（api_prefix: f2-spe） ─────────────────────────
+  - sheet_code: F2-55
+    api_prefix: f2-spe
+    item_id: F2-55-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 360
+    depends_on_sheets: []
+  - sheet_code: F2-56
+    api_prefix: f2-spe
+    item_id: F2-56-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 370
+    depends_on_sheets: []
+  - sheet_code: F2-57
+    api_prefix: f2-spe
+    item_id: F2-57-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 380
+    depends_on_sheets: []
+  - sheet_code: F2-58
+    api_prefix: f2-spe
+    item_id: F2-58-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 390
+    depends_on_sheets: []
+  - sheet_code: F2-61
+    api_prefix: f2-spe
+    item_id: F2-61-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 400
+    depends_on_sheets: []
+  - sheet_code: F2-62
+    api_prefix: f2-spe
+    item_id: F2-62-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 410
+    depends_on_sheets: []
+  - sheet_code: F2-63
+    api_prefix: f2-spe
+    item_id: F2-63-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 420
+    depends_on_sheets: []
+  - sheet_code: F2-64
+    api_prefix: f2-spe
+    item_id: F2-64-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 430
+    depends_on_sheets: []
+  - sheet_code: F2-65
+    api_prefix: f2-spe
+    item_id: F2-65-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 440
+    depends_on_sheets: []
+  - sheet_code: F2-66
+    api_prefix: f2-spe
+    item_id: F2-66-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 450
+    depends_on_sheets: []
+  - sheet_code: F2-67
+    api_prefix: f2-spe
+    item_id: F2-67-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 460
+    depends_on_sheets: []
+  - sheet_code: F2-68
+    api_prefix: f2-spe
+    item_id: F2-68-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 470
+    depends_on_sheets: []
+  - sheet_code: F2-69
+    api_prefix: f2-spe
+    item_id: F2-69-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 480
+    depends_on_sheets: []
+  - sheet_code: F2-70
+    api_prefix: f2-spe
+    item_id: F2-70-entities
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 490
+    depends_on_sheets: []
+  - sheet_code: F2-71
+    api_prefix: f2-spe
+    item_id: F2-71-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 500
+    depends_on_sheets: []
+  - sheet_code: F2-72
+    api_prefix: f2-spe
+    item_id: F2-72-entities
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 510
+    depends_on_sheets: []
+
+  # ───────────────────────── F3 应付票据（api_prefix: f3） ─────────────────────────
+  - sheet_code: F3-2
+    api_prefix: f3
+    item_id: F3-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: F3-3
+    api_prefix: f3
+    item_id: F3-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [F3-2]
+  - sheet_code: F3-4
+    api_prefix: f3
+    item_id: F3-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [F3-2]
+  - sheet_code: F3-5
+    api_prefix: f3
+    item_id: F3-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [F3-2]
+  - sheet_code: F3-6
+    api_prefix: f3
+    item_id: F3-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [F3-2]
+  - sheet_code: F3-7-credit
+    api_prefix: f3
+    item_id: F3-7-credit-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [F3-2]
+  - sheet_code: F3-7-debit
+    api_prefix: f3
+    item_id: F3-7-debit-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [F3-2]
+
+  # ───────────────────────── F4 应付账款（api_prefix: f4） ─────────────────────────
+  - sheet_code: F4-2
+    api_prefix: f4
+    item_id: F4-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: F4-3
+    api_prefix: f4
+    item_id: F4-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-5
+    api_prefix: f4
+    item_id: F4-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-6
+    api_prefix: f4
+    item_id: F4-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-7-purchase
+    api_prefix: f4
+    item_id: F4-7-purchase-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-7-inbound
+    api_prefix: f4
+    item_id: F4-7-inbound-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-7-invoice
+    api_prefix: f4
+    item_id: F4-7-invoice-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-8-debit
+    api_prefix: f4
+    item_id: F4-8-debit-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-8-credit
+    api_prefix: f4
+    item_id: F4-8-credit-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-9-factoring
+    api_prefix: f4
+    item_id: F4-9-factoring-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-9-note
+    api_prefix: f4
+    item_id: F4-9-note-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 110
+    depends_on_sheets: [F4-2]
+  - sheet_code: F4-9-supply
+    api_prefix: f4
+    item_id: F4-9-supply-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 120
+    depends_on_sheets: [F4-2]
+
+  # ───────────────────────── F5 主营业务成本（api_prefix: f5） ─────────────────────────
+  - sheet_code: F5-2
+    api_prefix: f5
+    item_id: F5-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: F5-3
+    api_prefix: f5
+    item_id: F5-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [F5-2]
+  - sheet_code: F5-4
+    api_prefix: f5
+    item_id: F5-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [F5-2]
+  - sheet_code: F5-5
+    api_prefix: f5
+    item_id: F5-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [F5-2]
+  - sheet_code: F5-6
+    api_prefix: f5
+    item_id: F5-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [F5-2]
+  - sheet_code: F5-8
+    api_prefix: f5
+    item_id: F5-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [F5-2]

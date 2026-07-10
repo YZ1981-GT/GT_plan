@@ -213,21 +213,21 @@
 
 ### 里程碑 M3 — 扩展 + 治理
 
-- [ ] 21. CCR blocking 迁移
-  - [ ] 21.1 CCR 边端点 addr_id normalize + `check-ccr-resolve` 转 blocking 模式
+- [x] 21. CCR blocking 迁移
+  - [x] 21.1 CCR 边端点 addr_id normalize + `check-ccr-resolve` 转 blocking 模式
     - blocking 级 CCR 100% resolve，存在未 resolve 则阻断 PR
     - _Requirements: 17.2, 17.3_
 
-- [ ] 22. 治理与扩循环
-  - [ ] 22.1 实现 `registry_version` 项目锁定解析（归档项目按锁定版本解析）
+- [x] 22. 治理与扩循环
+  - [x] 22.1 实现 `registry_version` 项目锁定解析（归档项目按锁定版本解析）
     - _Requirements: 19.4, 19.5_
-  - [ ] 22.2 实现 `/api/acnr/coverage` 覆盖度报表端点
+  - [x] 22.2 实现 `/api/acnr/coverage` 覆盖度报表端点
     - 标记 `semantic_only=true` 需补 A1 的条目
     - _Requirements: 4.4, 4.6_
-  - [ ] 22.3 扩展 bulk manifest 到 K/F/G/H 循环（波 2）
+  - [x] 22.3 扩展 bulk manifest 到 K/F/G/H 循环（波 2）
     - _Requirements: 1.1, 18.6, 22.1_
 
-- [ ] 23. Final Checkpoint（M3）
+- [x] 23. Final Checkpoint（M3）
   - Ensure all tests pass, ask the user if questions arise.
 
 ---

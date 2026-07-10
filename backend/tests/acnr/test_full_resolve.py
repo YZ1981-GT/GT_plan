@@ -519,3 +519,114 @@ class TestMultiSyntaxConvergence:
         assert all(r.found is True for r in results)
         assert all(r.addr_id == "D2/D2-2/E100" for r in results)
         assert all(r.entry_type == "cell" for r in results)
+
+
+# ─── Test: Version-locked resolution (R19.4, R19.5) ─────────────────────────
+
+
+class TestVersionLockedResolution:
+    """R19.5: 归档项目按锁定 registry_version 解析。"""
+
+    @pytest.mark.asyncio
+    async def test_archived_project_same_version_resolves_normally(self):
+        """归档项目 locked_version == 当前 catalog 版本 → 正常解析。"""
+        from app.services.acnr.immutability import (
+            record_project_registry_version,
+            clear_all_project_versions,
+        )
+
+        project_id = str(uuid4())
+        # 锁定版本与当前 catalog 版本一致
+        record_project_registry_version(project_id, "2026.1.0-test")
+
+        try:
+            result = await full_resolve(
+                addr_id="D2/D2-2/E100",
+                project_id=project_id,
+            )
+
+            assert result.found is True
+            assert result.addr_id == "D2/D2-2/E100"
+            assert result.entry_type == "cell"
+        finally:
+            clear_all_project_versions()
+
+    @pytest.mark.asyncio
+    async def test_archived_project_different_version_logs_warning_and_resolves(self):
+        """归档项目 locked_version != 当前版本 → 记录警告，仍使用当前 catalog。
+
+        M3 简化实现：版本不匹配时 log warning + 继续解析（不中断）。
+        """
+        from app.services.acnr.immutability import (
+            record_project_registry_version,
+            clear_all_project_versions,
+        )
+
+        project_id = str(uuid4())
+        # 锁定版本与当前不同（模拟 catalog 升级后的旧归档项目）
+        record_project_registry_version(project_id, "2025.3.0-archived")
+
+        try:
+            with patch(
+                "app.services.acnr.resolver.logger"
+            ) as mock_logger:
+                result = await full_resolve(
+                    addr_id="D2/D2-2/E100",
+                    project_id=project_id,
+                )
+
+                # 仍然解析成功（使用当前 catalog）
+                assert result.found is True
+                assert result.addr_id == "D2/D2-2/E100"
+
+                # 验证记录了版本不匹配警告
+                mock_logger.warning.assert_called_once()
+                warning_msg = mock_logger.warning.call_args[0][0]
+                assert "version-locked" in warning_msg
+
+        finally:
+            clear_all_project_versions()
+
+    @pytest.mark.asyncio
+    async def test_non_archived_project_no_version_check(self):
+        """非归档项目（无锁定版本）→ 不触发版本检查逻辑。"""
+        from app.services.acnr.immutability import clear_all_project_versions
+
+        project_id = str(uuid4())
+        # 不记录任何 registry_version
+
+        clear_all_project_versions()
+
+        with patch(
+            "app.services.acnr.resolver.logger"
+        ) as mock_logger:
+            result = await full_resolve(
+                addr_id="D2/D2-2/E100",
+                project_id=project_id,
+            )
+
+            assert result.found is True
+            # 无版本锁定 → 无 warning
+            mock_logger.warning.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_project_id_no_version_check(self):
+        """无 project_id → 不触发版本检查。"""
+        from app.services.acnr.immutability import (
+            record_project_registry_version,
+            clear_all_project_versions,
+        )
+
+        # 即使全局有归档记录，无 project_id 时不检查
+        record_project_registry_version("some-other-project", "2025.1.0")
+
+        try:
+            with patch(
+                "app.services.acnr.resolver.logger"
+            ) as mock_logger:
+                result = await full_resolve(addr_id="D2/D2-2/E100")
+
+                assert result.found is True
+                mock_logger.warning.assert_not_called()
+        finally:
+            clear_all_project_versions()

@@ -208,6 +208,18 @@ jobs:
       - name: Check CCR resolve (report mode)
         run: python backend/scripts/acnr/check_ccr_resolve.py
 
+  acnr-ccr-resolve-blocking:
+    # ACNR R17.3: CCR resolve blocking 模式（M3）
+    # 所有非 semantic_only 的 CCR source 必须 100% resolve，否则阻断 PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check CCR resolve (blocking mode)
+        run: python backend/scripts/acnr/check_ccr_resolve.py --blocking
+
   check-sheet-labels-generated:
     # ACNR R3.2/R18.1: dSheetLabels.ts 生成一致性守卫（禁手改）
     # 验证前端 D-cycle sheet labels 文件与生成器输出一致

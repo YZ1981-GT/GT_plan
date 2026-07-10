@@ -28,8 +28,8 @@ _ACNR_DATA_DIR = _BACKEND_ROOT / "data" / "acnr"
 _CATALOG_PATH = _ACNR_DATA_DIR / "global_catalog.json"
 _MANIFEST_DIR = _ACNR_DATA_DIR / "sources"
 
-# 首期仅 D 循环
-_SUPPORTED_CYCLES = ["D"]
+# 支持的循环（波 1: D, 波 2: K/F/G/H）
+_SUPPORTED_CYCLES = ["D", "K", "F", "G", "H"]
 
 # 需要精确比对的字段（manifest 与 catalog.import_export 共有）
 _COMPARE_FIELDS = [
@@ -97,8 +97,9 @@ def main() -> int:
         )
         return 1
 
-    # 构建 sheet_code → import_export 映射（仅 D 循环）
+    # 构建 sheet_code → import_export 映射（支持的循环）
     catalog_sheets: dict[str, dict] = {}
+    catalog_sheets_by_cycle: dict[str, dict[str, dict]] = {c: {} for c in _SUPPORTED_CYCLES}
     for sheet in catalog_data.get("sheets", []):
         cycle = sheet.get("cycle", "")
         if cycle not in _SUPPORTED_CYCLES:
@@ -107,6 +108,7 @@ def main() -> int:
         ie = sheet.get("import_export")
         if ie and ie.get("enabled"):
             catalog_sheets[sheet_code] = ie
+            catalog_sheets_by_cycle[cycle][sheet_code] = ie
 
     # --- Step 2: 遍历每个支持的 cycle manifest ---
     warnings: list[str] = []
@@ -134,11 +136,12 @@ def main() -> int:
         manifest_sheet_codes: set[str] = set()
 
         # --- Step 3: 逐条比对 manifest → catalog ---
+        cycle_catalog_sheets = catalog_sheets_by_cycle.get(cycle, {})
         for entry in manifest_entries:
             sheet_code = entry.get("sheet_code", "")
             manifest_sheet_codes.add(sheet_code)
 
-            if sheet_code not in catalog_sheets:
+            if sheet_code not in cycle_catalog_sheets:
                 # M0 阶段 classification 可能未按子 sheet 粒度注册
                 # （如 D1-1 在 classification 中只有 D1），
                 # 此类条目报 warning 不报 error。
@@ -149,7 +152,7 @@ def main() -> int:
                 )
                 continue
 
-            catalog_ie = catalog_sheets[sheet_code]
+            catalog_ie = cycle_catalog_sheets[sheet_code]
 
             # 逐字段比对
             for field in _COMPARE_FIELDS:
@@ -163,7 +166,8 @@ def main() -> int:
                     )
 
         # --- Step 4: 检查 catalog 有 import_export 但 manifest 未登记的 sheet ---
-        for sheet_code in catalog_sheets:
+        cycle_catalog_sheets = catalog_sheets_by_cycle.get(cycle, {})
+        for sheet_code in cycle_catalog_sheets:
             if sheet_code not in manifest_sheet_codes:
                 errors.append(
                     f"[{cycle}] Catalog 中 '{sheet_code}' 有 import_export"
@@ -172,11 +176,12 @@ def main() -> int:
 
     # --- Step 5: 输出结果 ---
     if not errors:
+        total_ie_sheets = sum(len(v) for v in catalog_sheets_by_cycle.values())
         msg = (
             f"[ACNR ie-sync] OK — "
             f"manifest 与 catalog import_export 段一致"
             f"（{len(_SUPPORTED_CYCLES)} 循环, "
-            f"{sum(1 for _ in catalog_sheets)} 条 I/E sheet）。"
+            f"{total_ie_sheets} 条 I/E sheet）。"
         )
         if warnings:
             msg += (

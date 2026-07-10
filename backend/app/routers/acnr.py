@@ -1,12 +1,13 @@
-"""ACNR API — lookup / resolve / entries / anchors / resolve-instance
+"""ACNR API — lookup / resolve / entries / anchors / resolve-instance / coverage
 
 M0: 只读端点（lookup/resolve/entries/anchors），读取 global_catalog.json。
 M1: resolve-instance（运行时查 WpIndex → ProjectBinding → wp_id）。
+M3: coverage 覆盖度报表端点。
 
 响应经 ResponseWrapperMiddleware 包为 {code, message, data} 信封。
 注册到 router_registry/system.py §133。
 
-Requirements: 2.1, 2.2, 2.3, 2.4, 5.1, 5.3, 5.6, 6.1, 6.2, 6.3, 6.4, 13.1
+Requirements: 2.1, 2.2, 2.3, 2.4, 4.4, 4.6, 5.1, 5.3, 5.6, 6.1, 6.2, 6.3, 6.4, 13.1
 """
 from uuid import UUID
 
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.services.acnr.catalog import (
+    get_catalog,
     list_cells,
     list_sheets,
     lookup,
@@ -146,3 +148,99 @@ async def acnr_resolve_instance(
         response["wp_index_id"] = str(result.wp_index_id)
 
     return response
+
+
+@router.get("/coverage")
+async def acnr_coverage(
+    cycle: str | None = Query(None, description="循环码过滤，如 D"),
+    _user=Depends(get_current_user),
+):
+    """覆盖度报表 — 标记 semantic_only=true 需补 A1 的条目。
+
+    统计 cell 坐标覆盖情况，列出所有 semantic_only 条目以便后续补充 A1 地址。
+
+    Returns (data 部分):
+    {
+        "total_cells": int,          # 总 cell 条目数
+        "with_cell_address": int,    # 有 A1 坐标的条目数
+        "semantic_only": int,        # semantic_only=true 的条目数
+        "coverage_pct": float,       # 覆盖率百分比 (0~100)
+        "needs_a1": [{addr_id, semantic_label, parent_addr_id}],  # 需补 A1 的条目
+        "by_cycle": {"D": {total, covered, pct}, ...}  # 按循环分组统计
+    }
+
+    Requirements: R4.4, R4.6
+    """
+    cat = get_catalog()
+
+    # 收集所有 cell 条目（可选按 cycle 过滤）
+    all_cells: list[dict] = []
+    if cycle:
+        # 先找属于该循环的 sheet addr_id 集合
+        cycle_sheet_ids: set[str] = set()
+        for s in cat.sheets_by_addr_id.values():
+            if s.get("cycle", "").upper() == cycle.upper():
+                cycle_sheet_ids.add(s.get("addr_id", ""))
+        # 仅收集属于该循环的 cell
+        for sheet_id in cycle_sheet_ids:
+            all_cells.extend(cat.cells_by_parent.get(sheet_id, []))
+    else:
+        all_cells = list(cat.cells_by_addr_id.values())
+
+    total_cells = len(all_cells)
+    with_cell_address = 0
+    semantic_only_count = 0
+    needs_a1: list[dict] = []
+
+    # 按 cycle 分组统计的临时结构
+    cycle_stats: dict[str, dict[str, int]] = {}
+
+    for cell in all_cells:
+        has_a1 = bool(cell.get("cell_address"))
+        is_semantic_only = cell.get("semantic_only", False)
+
+        if has_a1:
+            with_cell_address += 1
+
+        # R4.6: semantic_only=true 的条目一律标记需补 A1（无论 A1 是否已存在）
+        if is_semantic_only:
+            semantic_only_count += 1
+            needs_a1.append({
+                "addr_id": cell.get("addr_id"),
+                "semantic_label": cell.get("semantic_label"),
+                "parent_addr_id": cell.get("parent_addr_id"),
+            })
+
+        # 按 cycle 分组 — 从 parent_addr_id 关联 sheet 拿 cycle
+        parent_id = cell.get("parent_addr_id", "")
+        parent_sheet = cat.sheets_by_addr_id.get(parent_id)
+        cell_cycle = (parent_sheet.get("cycle", "?") if parent_sheet else "?").upper()
+
+        if cell_cycle not in cycle_stats:
+            cycle_stats[cell_cycle] = {"total": 0, "covered": 0}
+        cycle_stats[cell_cycle]["total"] += 1
+        if has_a1:
+            cycle_stats[cell_cycle]["covered"] += 1
+
+    # 计算覆盖率
+    coverage_pct = round((with_cell_address / total_cells * 100) if total_cells > 0 else 0.0, 2)
+
+    # 构建 by_cycle 响应
+    by_cycle: dict[str, dict] = {}
+    for c, stats in sorted(cycle_stats.items()):
+        c_total = stats["total"]
+        c_covered = stats["covered"]
+        by_cycle[c] = {
+            "total": c_total,
+            "covered": c_covered,
+            "pct": round((c_covered / c_total * 100) if c_total > 0 else 0.0, 2),
+        }
+
+    return {
+        "total_cells": total_cells,
+        "with_cell_address": with_cell_address,
+        "semantic_only": semantic_only_count,
+        "coverage_pct": coverage_pct,
+        "needs_a1": needs_a1,
+        "by_cycle": by_cycle,
+    }

@@ -1,0 +1,340 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACNR K 循环 Import/Export 手维清单（k_cycle_ie_manifest.yaml）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 用途：ACNR 生成器（generate_catalog.py）的 K 循环 import_export 输入源
+#       （design.md「Generator pipeline」/ R1.2 / R18.6 / R-ROUTE）。
+#
+# 铁律：本文件为「手工整理」，**禁止 AST 自动扫描** k*_import_export.py。
+#
+# 数据来源（逐 sheet 手工阅读）：
+#   _k0_confirmation_import_export.py  (K0-5/K0-6 parsed_data 存储)
+#   _k1_import_export.py   (create_cycle_import_export_router api_prefix=k1)
+#   _k2_import_export.py   (create_cycle_import_export_router api_prefix=k2)
+#   _k3_import_export.py   (create_cycle_import_export_router api_prefix=k3)
+#   _k4_import_export.py   (create_cycle_import_export_router api_prefix=k4)
+#   _k5_import_export.py   (create_cycle_import_export_router api_prefix=k5)
+#   _k6_import_export.py   (create_cycle_import_export_router api_prefix=k6)
+#   _k7_import_export.py   (create_cycle_import_export_router api_prefix=k7)
+#   _k8_import_export.py   (create_cycle_import_export_router api_prefix=k8)
+#   _k9_import_export.py   (create_cycle_import_export_router api_prefix=k9)
+#   _k10_import_export.py  (create_cycle_import_export_router api_prefix=k10)
+#   _k11_import_export.py  (create_cycle_import_export_router api_prefix=k11)
+#   _k12_import_export.py  (create_cycle_import_export_router api_prefix=k12)
+#   _k13_import_export.py  (create_cycle_import_export_router api_prefix=k13)
+#
+# 字段说明：同 d_cycle_ie_manifest.yaml。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1"
+cycle: K
+
+entries:
+  # ───────────────────────── K0 函证（api_prefix: k0） ─────────────────────────
+  # K0 函证使用 parsed_data 存储，非 checklist_responses
+  - sheet_code: K0-5
+    api_prefix: k0
+    item_id: K0-5-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K0-6
+    api_prefix: k0
+    item_id: K0-6-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: []
+
+  # ───────────────────────── K1 其他应收款（api_prefix: k1） ─────────────────────────
+  - sheet_code: K1-2
+    api_prefix: k1
+    item_id: K1-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K1-5
+    api_prefix: k1
+    item_id: K1-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K1-2]
+  - sheet_code: K1-7
+    api_prefix: k1
+    item_id: K1-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [K1-2]
+  - sheet_code: K1-8
+    api_prefix: k1
+    item_id: K1-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [K1-2]
+
+  # ───────────────────────── K2 其他流动资产（api_prefix: k2） ─────────────────────────
+  - sheet_code: K2-2
+    api_prefix: k2
+    item_id: K2-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K2-4
+    api_prefix: k2
+    item_id: K2-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K2-2]
+  - sheet_code: K2-5
+    api_prefix: k2
+    item_id: K2-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [K2-2]
+
+  # ───────────────────────── K3 其他应付款（api_prefix: k3） ─────────────────────────
+  - sheet_code: K3-2
+    api_prefix: k3
+    item_id: K3-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K3-3
+    api_prefix: k3
+    item_id: K3-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K3-2]
+
+  # ───────────────────────── K4 其他流动负债（api_prefix: k4） ─────────────────────────
+  - sheet_code: K4-2
+    api_prefix: k4
+    item_id: K4-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K4-3
+    api_prefix: k4
+    item_id: K4-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K4-2]
+
+  # ───────────────────────── K5 预计负债（api_prefix: k5） ─────────────────────────
+  - sheet_code: K5-2
+    api_prefix: k5
+    item_id: K5-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K5-3
+    api_prefix: k5
+    item_id: K5-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K5-2]
+
+  # ───────────────────────── K6 持有待售资产（api_prefix: k6） ─────────────────────────
+  - sheet_code: K6-2
+    api_prefix: k6
+    item_id: K6-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K6-3
+    api_prefix: k6
+    item_id: K6-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K6-2]
+  - sheet_code: K6-6
+    api_prefix: k6
+    item_id: K6-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [K6-2]
+
+  # ───────────────────────── K7 递延收益（api_prefix: k7） ─────────────────────────
+  - sheet_code: K7-2
+    api_prefix: k7
+    item_id: K7-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K7-3
+    api_prefix: k7
+    item_id: K7-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K7-2]
+
+  # ───────────────────────── K8 销售费用（api_prefix: k8） ─────────────────────────
+  - sheet_code: K8-2
+    api_prefix: k8
+    item_id: K8-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K8-3
+    api_prefix: k8
+    item_id: K8-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K8-2]
+  - sheet_code: K8-5
+    api_prefix: k8
+    item_id: K8-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [K8-2]
+  - sheet_code: K8-6
+    api_prefix: k8
+    item_id: K8-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [K8-2]
+  - sheet_code: K8-7
+    api_prefix: k8
+    item_id: K8-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [K8-2]
+  - sheet_code: K8-8
+    api_prefix: k8
+    item_id: K8-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [K8-2]
+
+  # ───────────────────────── K9 管理费用（api_prefix: k9） ─────────────────────────
+  - sheet_code: K9-2
+    api_prefix: k9
+    item_id: K9-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K9-3
+    api_prefix: k9
+    item_id: K9-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K9-2]
+  - sheet_code: K9-5
+    api_prefix: k9
+    item_id: K9-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [K9-2]
+  - sheet_code: K9-6
+    api_prefix: k9
+    item_id: K9-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [K9-2]
+  - sheet_code: K9-7
+    api_prefix: k9
+    item_id: K9-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [K9-2]
+  - sheet_code: K9-8
+    api_prefix: k9
+    item_id: K9-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [K9-2]
+
+  # ───────────────────────── K10 其他收益（api_prefix: k10） ─────────────────────────
+  - sheet_code: K10-2
+    api_prefix: k10
+    item_id: K10-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K10-4
+    api_prefix: k10
+    item_id: K10-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K10-2]
+
+  # ───────────────────────── K11 资产减值损失（api_prefix: k11） ─────────────────────────
+  - sheet_code: K11-2
+    api_prefix: k11
+    item_id: K11-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K11-3
+    api_prefix: k11
+    item_id: K11-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K11-2]
+
+  # ───────────────────────── K12 营业外收入（api_prefix: k12） ─────────────────────────
+  - sheet_code: K12-2
+    api_prefix: k12
+    item_id: K12-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K12-3
+    api_prefix: k12
+    item_id: K12-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K12-2]
+
+  # ───────────────────────── K13 营业外支出（api_prefix: k13） ─────────────────────────
+  - sheet_code: K13-2
+    api_prefix: k13
+    item_id: K13-2-detail-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: K13-3
+    api_prefix: k13
+    item_id: K13-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [K13-2]

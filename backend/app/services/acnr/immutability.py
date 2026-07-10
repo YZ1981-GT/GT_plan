@@ -314,7 +314,15 @@ def record_project_registry_version(
 
     规则（R19.4）：
     - 项目归档时记录 registry_version
-    - 后续解析该项目引用时按锁定版本解析（R19.5，M3 实现）
+    - 后续解析该项目引用时按锁定版本解析（R19.5，resolver.py full_resolve 已实现）
+
+    接线位置（应在项目归档流程中调用）：
+    - 当前 M3 实现：由 project archival handler 在归档时调用本函数
+    - 推荐接入点：ProjectService.archive_project() 或对应的 EventBus handler
+      处理 PROJECT_ARCHIVED 事件时调用：
+        from app.services.acnr.immutability import record_project_registry_version
+        from app.services.acnr.catalog import get_catalog
+        record_project_registry_version(project_id, get_catalog().registry_version)
 
     Args:
         project_id: 项目 ID

@@ -1,21 +1,23 @@
-"""ACNR CCR Resolve Check — M1 报告模式 CI 守卫。
+"""ACNR CCR Resolve Check — CI 守卫（report / blocking 双模式）。
 
 校验每条 CCR（cross_wp_references）source 可被 ACNR catalog resolve，
-或已标 `semantic_only`。产出缺口清单但**不阻断 PR**（report mode）。
+或已标 `semantic_only`。
 
-M1 报告模式 vs M3 blocking 模式:
-- M1（本脚本）: 产出缺口报告，exit code 始终 0（report mode）
-- M3（task 21.1）: 要求 100% resolve，缺口时阻断 PR
+双模式:
+- report（默认）: 产出缺口报告，exit code 始终 0
+- blocking（--blocking）: 所有非 semantic_only 的 CCR source 必须 100% resolve，
+  存在未 resolve 则 exit 1 阻断 PR（R17.3）
 
 L4 边端点 normalize:
-- 对每个已 resolve 的 CCR source，记录其 canonical addr_id
+- 对每个已 resolve 的 CCR source，记录其 canonical addr_id（R17.2）
 - 输出 addr_id 映射摘要
 
-Requirements: 17.1, 17.2
+Requirements: 17.1, 17.2, 17.3
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -253,6 +255,52 @@ def _build_ccr_source_formula(ref: dict) -> str | None:
         return f"WP('{source_wp}','{source_sheet}')"
 
 
+def _normalize_target_endpoints(
+    ref: dict, catalog: OfflineCatalog
+) -> list[dict[str, Any]]:
+    """Normalize CCR target endpoints to addr_id (R17.2).
+
+    Each target has: wp_code, sheet, cell, formula, cell_label, address.
+    Returns list of {target_key, addr_id, resolved} dicts.
+    """
+    targets = ref.get("targets", [])
+    normalized: list[dict[str, Any]] = []
+
+    for target in targets:
+        wp_code = target.get("wp_code", "")
+        sheet = target.get("sheet", "")
+        cell = target.get("cell", "")
+        formula = target.get("formula", "")
+
+        # Try resolve via formula if available
+        if formula:
+            resolve_out = catalog.resolve_formula_ref(formula)
+            if resolve_out["found"]:
+                normalized.append({
+                    "target_key": f"{wp_code}:{sheet}:{cell}",
+                    "addr_id": resolve_out["addr_id"],
+                    "resolved": True,
+                })
+                continue
+
+        # Fallback: resolve via wp_code + sheet + cell
+        resolve_out2 = catalog.resolve_source_address(wp_code, sheet, cell or None)
+        if resolve_out2["found"]:
+            normalized.append({
+                "target_key": f"{wp_code}:{sheet}:{cell}",
+                "addr_id": resolve_out2["addr_id"],
+                "resolved": True,
+            })
+        else:
+            normalized.append({
+                "target_key": f"{wp_code}:{sheet}:{cell}",
+                "addr_id": None,
+                "resolved": False,
+            })
+
+    return normalized
+
+
 # ---------------------------------------------------------------------------
 # Report data structures
 # ---------------------------------------------------------------------------
@@ -286,17 +334,32 @@ class ResolveResult:
 
 
 def main() -> int:
-    """Execute CCR resolve check (M1 report mode).
+    """Execute CCR resolve check.
 
-    Always exits 0 — this is report mode, not blocking.
+    Modes:
+    - report (default): always exits 0, produces gap report
+    - blocking (--blocking): exits 1 if ANY non-semantic_only CCR source fails to resolve (R17.3)
     """
+    parser = argparse.ArgumentParser(
+        description="ACNR CCR Resolve Check — 校验 CCR source 可被 catalog resolve"
+    )
+    parser.add_argument(
+        "--blocking",
+        action="store_true",
+        help="Blocking 模式：非 semantic_only 的 CCR source 必须 100%% resolve，否则 exit 1 阻断 PR（R17.3）",
+    )
+    args = parser.parse_args()
+    blocking_mode: bool = args.blocking
+
+    mode_label = "Blocking Mode" if blocking_mode else "Report Mode"
+
     # --- Load catalog ---
     if not _CATALOG_PATH.exists():
         print(
             f"[ACNR ccr-resolve] WARNING: {_CATALOG_PATH} 不存在，跳过检查。",
             file=sys.stderr,
         )
-        return 0  # report mode, never block
+        return 0  # catalog missing — cannot enforce, skip gracefully
 
     try:
         catalog_data = json.loads(_CATALOG_PATH.read_text(encoding="utf-8"))
@@ -406,10 +469,27 @@ def main() -> int:
     gap_results = [r for r in results if not r.resolved and not r.semantic_only]
 
     # --- Build L4 edge endpoint addr_id mapping (R17.2) ---
+    # Source endpoints
     addr_id_mapping: dict[str, str] = {}
     for r in resolved_results:
         if r.addr_id:
             addr_id_mapping[r.ref_id] = r.addr_id
+
+    # Target endpoints — normalize all targets to addr_id (R17.2)
+    target_total = 0
+    target_resolved = 0
+    target_addr_id_mapping: dict[str, list[str]] = {}
+    for ref in references:
+        ref_id = ref.get("ref_id", "?")
+        normalized_targets = _normalize_target_endpoints(ref, catalog)
+        target_total += len(normalized_targets)
+        resolved_targets: list[str] = []
+        for nt in normalized_targets:
+            if nt["resolved"] and nt["addr_id"]:
+                target_resolved += 1
+                resolved_targets.append(nt["addr_id"])
+        if resolved_targets:
+            target_addr_id_mapping[ref_id] = resolved_targets
 
     # --- Print summary ---
     total = len(results)
@@ -418,14 +498,17 @@ def main() -> int:
     gap_count = len(gap_results)
 
     print("=" * 70)
-    print("  ACNR CCR Resolve Check — M1 Report Mode")
+    print(f"  ACNR CCR Resolve Check — {mode_label}")
     print("=" * 70)
     print(f"  Total CCR sources:       {total}")
     print(f"  ✓ Resolved:              {resolved_count}")
     print(f"  ○ Semantic-only skipped: {semantic_count}")
     print(f"  ✗ Gaps (unresolved):     {gap_count}")
     print(
-        f"  L4 addr_id endpoints:    {len(addr_id_mapping)} mapped"
+        f"  L4 source addr_id:       {len(addr_id_mapping)} mapped"
+    )
+    print(
+        f"  L4 target addr_id:       {target_resolved}/{target_total} mapped"
     )
     print("=" * 70)
 
@@ -450,26 +533,46 @@ def main() -> int:
 
     # --- Detail: sample addr_id mappings ---
     if addr_id_mapping:
-        print(f"\n--- L4 Endpoint addr_id Mapping (sample, first 10) ---\n")
+        print(f"\n--- L4 Source Endpoint addr_id Mapping (sample, first 10) ---\n")
         for ref_id, addr_id in list(addr_id_mapping.items())[:10]:
-            print(f"  {ref_id} → {addr_id}")
+            print(f"  {ref_id} (source) → {addr_id}")
         if len(addr_id_mapping) > 10:
             print(f"  ... and {len(addr_id_mapping) - 10} more")
 
-    # --- Final status ---
+    if target_addr_id_mapping:
+        print(f"\n--- L4 Target Endpoint addr_id Mapping (sample, first 10) ---\n")
+        for ref_id, targets in list(target_addr_id_mapping.items())[:10]:
+            for t_addr in targets[:3]:
+                print(f"  {ref_id} (target) → {t_addr}")
+            if len(targets) > 3:
+                print(f"         ... and {len(targets) - 3} more targets")
+        if len(target_addr_id_mapping) > 10:
+            print(f"  ... and {len(target_addr_id_mapping) - 10} more refs")
+
+    # --- Final status & exit code ---
     print()
     if gap_count == 0:
         print("[ACNR ccr-resolve] ✓ All CCR sources resolve or are semantic_only.")
+        return 0
+
+    resolve_pct = (resolved_count / total * 100) if total else 0
+
+    if blocking_mode:
+        # R17.3: blocking 级 CCR 100% resolve, 存在未 resolve → exit 1 → 阻断 PR
+        print(
+            f"[ACNR ccr-resolve] ✗ BLOCKING: {gap_count} CCR source(s) cannot resolve "
+            f"(resolve rate: {resolve_pct:.1f}%). "
+            f"Blocking mode — PR blocked."
+        )
+        return 1
     else:
-        resolve_pct = (resolved_count / total * 100) if total else 0
+        # Report mode: always exit 0
         print(
             f"[ACNR ccr-resolve] ⚠ {gap_count} CCR source(s) cannot resolve "
             f"(resolve rate: {resolve_pct:.1f}%). "
             f"Report mode — PR not blocked."
         )
-
-    # M1 report mode: always exit 0
-    return 0
+        return 0
 
 
 if __name__ == "__main__":

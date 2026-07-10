@@ -168,7 +168,7 @@ def _detect_alias_conflicts(
 def generate_catalog(
     *,
     classification_records: list[Any] | None = None,
-    cycle: str = "d",
+    cycle: str = "all",
     offline: bool = False,
     registry_version: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
@@ -179,7 +179,8 @@ def generate_catalog(
     classification_records
         classification 记录（ORM/dict），None 时走离线缓存。
     cycle
-        循环码（小写），默认 'd'。
+        循环码（小写），默认 'all'。'all' 加载所有可用 manifest。
+        单循环如 'd' 仅加载该循环。
     offline
         是否使用离线缓存。
     registry_version
@@ -220,14 +221,23 @@ def generate_catalog(
     sheet_by_code: dict[str, SheetCatalogEntry] = {s.sheet_code: s for s in sheets}
 
     # --- Step 2: 合并 import_export（IE manifest） ---
-    try:
-        ie_data = load_ie_manifest(cycle)
-    except FileNotFoundError:
-        ie_data = {}
+    # 支持 cycle='all' 加载所有可用 manifest，或单循环加载
+    _ALL_CYCLES = ["d", "k", "f", "g", "h"]
 
-    for sheet_code, ie_segment in ie_data.items():
-        if sheet_code in sheet_by_code:
-            sheet_by_code[sheet_code].import_export = ie_segment
+    if cycle.lower() == "all":
+        cycles_to_load = _ALL_CYCLES
+    else:
+        cycles_to_load = [cycle.lower()]
+
+    for c in cycles_to_load:
+        try:
+            ie_data = load_ie_manifest(c)
+        except FileNotFoundError:
+            ie_data = {}
+
+        for sheet_code, ie_segment in ie_data.items():
+            if sheet_code in sheet_by_code:
+                sheet_by_code[sheet_code].import_export = ie_segment
 
     # --- Step 3: 合并 component_type（render_registry） ---
     for wp_code, comp_type in render_data.component_types.items():
@@ -503,8 +513,8 @@ def main() -> int:
     )
     parser.add_argument(
         "--cycle",
-        default="d",
-        help="循环码（默认 d）",
+        default="all",
+        help="循环码（默认 all，加载所有可用 manifest；或指定如 d/k/f/g/h）",
     )
     parser.add_argument(
         "--registry-version",

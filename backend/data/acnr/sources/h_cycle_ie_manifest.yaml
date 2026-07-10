@@ -1,0 +1,270 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACNR H 循环 Import/Export 手维清单（h_cycle_ie_manifest.yaml）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 用途：ACNR 生成器（generate_catalog.py）的 H 循环 import_export 输入源
+#       （design.md「Generator pipeline」/ R1.2 / R18.6 / R-ROUTE）。
+#
+# 铁律：本文件为「手工整理」，**禁止 AST 自动扫描** h*_import_export.py。
+#
+# 数据来源（逐 sheet 手工阅读）：
+#   _h0_confirmation_import_export.py   (H0 函证 parsed_data 存储)
+#   _h1_import_export.py    (create_cycle_import_export_router api_prefix=h1)
+#   _h2_import_export.py    (create_cycle_import_export_router api_prefix=h2)
+#   _h3_import_export.py    (create_cycle_import_export_router api_prefix=h3)
+#   _h4_import_export.py    (create_cycle_import_export_router api_prefix=h4)
+#   _h6_import_export.py    (create_cycle_import_export_router api_prefix=h6)
+#   _h8_import_export.py    (create_cycle_import_export_router api_prefix=h8)
+#   _h10_asset_disposal_income_import_export.py (api_prefix=h10)
+#
+# 字段说明：同 d_cycle_ie_manifest.yaml。
+#
+# 备注：
+#   - H1/H2/H3 使用虚拟 sheet_code 分区段（如 H1-2-base/H1-2-cost/H1-2-dep/H1-2-impair）
+#     但 item_id 共享同一 key（H1-2-rows）。manifest 中只登记逻辑 sheet_code（如 H1-2）。
+#   - H5（生产性生物资产）/H7（林木类生物资产）为行业特殊底稿，
+#     目前无独立 import_export 文件，首期不登记。
+#   - H9 为租赁/使用权资产，目前无独立 import_export 文件，首期不登记。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1"
+cycle: H
+
+entries:
+  # ───────────────────────── H0 函证（api_prefix: h0） ─────────────────────────
+  # H0 函证使用 parsed_data 存储
+  - sheet_code: H0-3S
+    api_prefix: h0
+    item_id: H0-3S-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H0-6
+    api_prefix: h0
+    item_id: H0-6-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: []
+
+  # ───────────────────────── H1 固定资产（api_prefix: h1） ─────────────────────────
+  # H1-2 有 4 个区段（base/cost/dep/impair），共享 item_id=H1-2-rows
+  - sheet_code: H1-2
+    api_prefix: h1
+    item_id: H1-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H1-3
+    api_prefix: h1
+    item_id: H1-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H1-2]
+  - sheet_code: H1-7
+    api_prefix: h1
+    item_id: H1-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [H1-2]
+  - sheet_code: H1-8
+    api_prefix: h1
+    item_id: H1-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [H1-2]
+  - sheet_code: H1-10
+    api_prefix: h1
+    item_id: H1-10-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [H1-2]
+  - sheet_code: H1-16
+    api_prefix: h1
+    item_id: H1-16-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [H1-2]
+  - sheet_code: H1-19
+    api_prefix: h1
+    item_id: H1-19-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [H1-2]
+
+  # ───────────────────────── H2 在建工程（api_prefix: h2） ─────────────────────────
+  # H2-2 有 4 个区段（base/cost/transfer/impair），共享 item_id=H2-2-rows
+  - sheet_code: H2-2
+    api_prefix: h2
+    item_id: H2-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H2-3
+    api_prefix: h2
+    item_id: H2-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H2-2]
+  - sheet_code: H2-7
+    api_prefix: h2
+    item_id: H2-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [H2-2]
+  - sheet_code: H2-8
+    api_prefix: h2
+    item_id: H2-8-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [H2-2]
+  - sheet_code: H2-10
+    api_prefix: h2
+    item_id: H2-10-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [H2-2]
+
+  # ───────────────────────── H3 投资性房地产（api_prefix: h3） ─────────────────────────
+  # H3-2 有多个区段（cost-base/cost-fv/cost-change/fv-base/fv-change），共享 item_id=H3-2-rows
+  - sheet_code: H3-2
+    api_prefix: h3
+    item_id: H3-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H3-3
+    api_prefix: h3
+    item_id: H3-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H3-2]
+  - sheet_code: H3-6
+    api_prefix: h3
+    item_id: H3-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [H3-2]
+  - sheet_code: H3-7
+    api_prefix: h3
+    item_id: H3-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [H3-2]
+  - sheet_code: H3-9
+    api_prefix: h3
+    item_id: H3-9-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [H3-2]
+
+  # ───────────────────────── H4 工程物资（api_prefix: h4） ─────────────────────────
+  - sheet_code: H4-2
+    api_prefix: h4
+    item_id: H4-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H4-3
+    api_prefix: h4
+    item_id: H4-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H4-2]
+  - sheet_code: H4-5
+    api_prefix: h4
+    item_id: H4-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [H4-2]
+  - sheet_code: H4-6
+    api_prefix: h4
+    item_id: H4-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [H4-2]
+
+  # ───────────────────────── H6 固定资产清理（api_prefix: h6） ─────────────────────────
+  - sheet_code: H6-2
+    api_prefix: h6
+    item_id: H6-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H6-3
+    api_prefix: h6
+    item_id: H6-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H6-2]
+
+  # ───────────────────────── H8 累计折旧（api_prefix: h8） ─────────────────────────
+  # H8-2 有 4 个区段（基础/初始/折旧/变更），共享 item_id=H8-2-rows
+  - sheet_code: H8-2
+    api_prefix: h8
+    item_id: H8-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H8-3
+    api_prefix: h8
+    item_id: H8-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H8-2]
+  - sheet_code: H8-5
+    api_prefix: h8
+    item_id: H8-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [H8-2]
+  - sheet_code: H8-6
+    api_prefix: h8
+    item_id: H8-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [H8-2]
+
+  # ───────────────────────── H10 资产处置收益（api_prefix: h10） ─────────────────────────
+  - sheet_code: H10-2
+    api_prefix: h10
+    item_id: H10-detail-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: H10-3
+    api_prefix: h10
+    item_id: H10-aje-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [H10-2]

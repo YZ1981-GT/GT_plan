@@ -1,0 +1,514 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ACNR G 循环 Import/Export 手维清单（g_cycle_ie_manifest.yaml）
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 用途：ACNR 生成器（generate_catalog.py）的 G 循环 import_export 输入源
+#       （design.md「Generator pipeline」/ R1.2 / R18.6 / R-ROUTE）。
+#
+# 铁律：本文件为「手工整理」，**禁止 AST 自动扫描** g*_import_export.py。
+#
+# 数据来源（逐 sheet 手工阅读）：
+#   _g0_confirmation_import_export.py           (G0-3S/G0-6 parsed_data)
+#   _g1_trading_financial_assets_import_export.py  (api_prefix=g1)
+#   _g2_interest_receivable_import_export.py       (api_prefix=g2)
+#   _g3_dividend_receivable_import_export.py       (api_prefix=g3)
+#   _g4_bond_investment_main_import_export.py      (api_prefix=g4)
+#   _g4_bond_investment_sppi_import_export.py      (api_prefix=g4-sppi)
+#   _g4_bond_investment_ecl_import_export.py       (api_prefix=g4-ecl)
+#   _g5_long_term_receivable_import_export.py      (api_prefix=g5)
+#   _g6_other_bond_investment_main_import_export.py  (api_prefix=g6)
+#   _g6_other_bond_investment_sppi_import_export.py  (api_prefix=g6-sppi)
+#   _g6_other_bond_investment_ecl_import_export.py   (api_prefix=g6-ecl)
+#   _g7_long_term_equity_main_import_export.py       (api_prefix=g7)
+#   _g7_long_term_equity_method_import_export.py     (api_prefix=g7-method)
+#   _g7_long_term_equity_subsidiary_import_export.py (api_prefix=g7-sub)
+#   _g8_other_equity_instruments_import_export.py    (api_prefix=g8)
+#   _g9_other_noncurrent_financial_import_export.py  (api_prefix=g9)
+#   _g10_trading_financial_liabilities_import_export.py (api_prefix=g10)
+#   _g11_investment_income_import_export.py          (api_prefix=g11)
+#   _g12_net_hedge_gains_import_export.py            (api_prefix=g12)
+#   _g13_fair_value_changes_import_export.py         (api_prefix=g13)
+#   _g14_credit_impairment_loss_import_export.py     (api_prefix=g14)
+#
+# 字段说明：同 d_cycle_ie_manifest.yaml。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+version: "1"
+cycle: G
+
+entries:
+  # ───────────────────────── G0 函证（api_prefix: g0） ─────────────────────────
+  - sheet_code: G0-3S
+    api_prefix: g0
+    item_id: G0-3S-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G0-6
+    api_prefix: g0
+    item_id: G0-6-alt-procedures
+    storage_field: parsed_data
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: []
+
+  # ───────────────────────── G1 交易性金融资产（api_prefix: g1） ─────────────────────────
+  - sheet_code: G1-2
+    api_prefix: g1
+    item_id: G1-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G1-3
+    api_prefix: g1
+    item_id: G1-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-4
+    api_prefix: g1
+    item_id: G1-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-5
+    api_prefix: g1
+    item_id: G1-5-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-6
+    api_prefix: g1
+    item_id: G1-6-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-7
+    api_prefix: g1
+    item_id: G1-7-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-11
+    api_prefix: g1
+    item_id: G1-11-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-12
+    api_prefix: g1
+    item_id: G1-12-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-13
+    api_prefix: g1
+    item_id: G1-13-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: [G1-2]
+  - sheet_code: G1-14
+    api_prefix: g1
+    item_id: G1-14-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: [G1-2]
+
+  # ───────────────────────── G2 应收利息（api_prefix: g2） ─────────────────────────
+  - sheet_code: G2-2
+    api_prefix: g2
+    item_id: G2-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G2-3
+    api_prefix: g2
+    item_id: G2-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G2-2]
+
+  # ───────────────────────── G3 应收股利（api_prefix: g3） ─────────────────────────
+  - sheet_code: G3-1
+    api_prefix: g3
+    item_id: G3-1-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G3-2
+    api_prefix: g3
+    item_id: G3-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G3-1]
+
+  # ───────────────────────── G4 债权投资-主表（api_prefix: g4） ─────────────────────────
+  - sheet_code: G4-2
+    api_prefix: g4
+    item_id: G4-2-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G4-3
+    api_prefix: g4
+    item_id: G4-3-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G4-2]
+
+  # ───────────────────────── G4 债权投资-SPPI（api_prefix: g4-sppi） ─────────────────────────
+  - sheet_code: G4-6
+    api_prefix: g4-sppi
+    item_id: G4-6-bond-items
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G4-2]
+  - sheet_code: G4-7
+    api_prefix: g4-sppi
+    item_id: G4-7-items
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G4-2]
+
+  # ───────────────────────── G4 债权投资-ECL（api_prefix: g4-ecl） ─────────────────────────
+  - sheet_code: G4-9
+    api_prefix: g4-ecl
+    item_id: G4-9-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [G4-2]
+  - sheet_code: G4-10
+    api_prefix: g4-ecl
+    item_id: G4-10-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [G4-2]
+  - sheet_code: G4-12
+    api_prefix: g4-ecl
+    item_id: G4-12-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [G4-2]
+  - sheet_code: G4-13
+    api_prefix: g4-ecl
+    item_id: G4-13-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [G4-2]
+
+  # ───────────────────────── G5 长期应收款（api_prefix: g5） ─────────────────────────
+  - sheet_code: G5-2
+    api_prefix: g5
+    item_id: G5-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G5-3
+    api_prefix: g5
+    item_id: G5-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G5-2]
+  - sheet_code: G5-4
+    api_prefix: g5
+    item_id: G5-4-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G5-2]
+
+  # ───────────────────────── G6 其他债权投资-主表（api_prefix: g6） ─────────────────────────
+  - sheet_code: G6-2
+    api_prefix: g6
+    item_id: G6-2-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G6-3
+    api_prefix: g6
+    item_id: G6-3-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G6-2]
+
+  # ───────────────────────── G6 其他债权投资-SPPI（api_prefix: g6-sppi） ─────────────────────────
+  - sheet_code: G6-5
+    api_prefix: g6-sppi
+    item_id: G6-5-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G6-2]
+  - sheet_code: G6-6
+    api_prefix: g6-sppi
+    item_id: G6-6-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G6-2]
+
+  # ───────────────────────── G6 其他债权投资-ECL（api_prefix: g6-ecl） ─────────────────────────
+  - sheet_code: G6-12
+    api_prefix: g6-ecl
+    item_id: G6-12-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [G6-2]
+  - sheet_code: G6-14
+    api_prefix: g6-ecl
+    item_id: G6-14-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [G6-2]
+
+  # ───────────────────────── G7 长期股权投资-主表（api_prefix: g7） ─────────────────────────
+  - sheet_code: G7-2
+    api_prefix: g7
+    item_id: G7-2-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G7-3
+    api_prefix: g7
+    item_id: G7-3-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G7-2]
+
+  # ───────────────────────── G7 长期股权投资-权益法（api_prefix: g7-method） ─────────────────────────
+  - sheet_code: G7-4
+    api_prefix: g7-method
+    item_id: G7-4-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-5
+    api_prefix: g7-method
+    item_id: G7-5-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-13
+    api_prefix: g7-method
+    item_id: G7-13-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-14
+    api_prefix: g7-method
+    item_id: G7-14-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 60
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-15
+    api_prefix: g7-method
+    item_id: G7-15-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 70
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-16
+    api_prefix: g7-method
+    item_id: G7-16-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 80
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-17
+    api_prefix: g7-method
+    item_id: G7-17-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 90
+    depends_on_sheets: [G7-2]
+
+  # ───────────────────────── G7 长期股权投资-子公司（api_prefix: g7-sub） ─────────────────────────
+  - sheet_code: G7-8
+    api_prefix: g7-sub
+    item_id: G7-8-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 100
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-9
+    api_prefix: g7-sub
+    item_id: G7-9-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 110
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-10
+    api_prefix: g7-sub
+    item_id: G7-10-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 120
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-11
+    api_prefix: g7-sub
+    item_id: G7-11-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 130
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-12
+    api_prefix: g7-sub
+    item_id: G7-12-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 140
+    depends_on_sheets: [G7-2]
+  - sheet_code: G7-18
+    api_prefix: g7-sub
+    item_id: G7-18-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 150
+    depends_on_sheets: [G7-2]
+
+  # ───────────────────────── G8 其他权益工具投资（api_prefix: g8） ─────────────────────────
+  - sheet_code: G8-2
+    api_prefix: g8
+    item_id: G8-detail-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G8-3
+    api_prefix: g8
+    item_id: G8-adjustment-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G8-2]
+  - sheet_code: G8-4
+    api_prefix: g8
+    item_id: G8-fv-test-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G8-2]
+  - sheet_code: G8-6
+    api_prefix: g8
+    item_id: G8-voucher-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G8-2]
+
+  # ───────────────────────── G9 其他非流动金融资产（api_prefix: g9） ─────────────────────────
+  - sheet_code: G9-2
+    api_prefix: g9
+    item_id: G9-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G9-3
+    api_prefix: g9
+    item_id: G9-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G9-2]
+
+  # ───────────────────────── G10 交易性金融负债（api_prefix: g10） ─────────────────────────
+  - sheet_code: G10-2
+    api_prefix: g10
+    item_id: G10-detail-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+
+  # ───────────────────────── G11 投资收益（api_prefix: g11） ─────────────────────────
+  - sheet_code: G11-2
+    api_prefix: g11
+    item_id: G11-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G11-3
+    api_prefix: g11
+    item_id: G11-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G11-2]
+
+  # ───────────────────────── G12 净敞口套期收益（api_prefix: g12） ─────────────────────────
+  - sheet_code: G12-2
+    api_prefix: g12
+    item_id: G12-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G12-3
+    api_prefix: g12
+    item_id: G12-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G12-2]
+
+  # ───────────────────────── G13 公允价值变动损益（api_prefix: g13） ─────────────────────────
+  - sheet_code: G13-2
+    api_prefix: g13
+    item_id: G13-detail-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+
+  # ───────────────────────── G14 信用减值损失（api_prefix: g14） ─────────────────────────
+  - sheet_code: G14-2
+    api_prefix: g14
+    item_id: G14-2-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 10
+    depends_on_sheets: []
+  - sheet_code: G14-3
+    api_prefix: g14
+    item_id: G14-3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G14-2]

@@ -42,6 +42,7 @@ from app.services.acnr.catalog import (
     _ambiguous_response,
     _build_jump_route,
 )
+from app.services.acnr.immutability import get_project_registry_version
 from app.services.acnr.overlay import get_project_overlay, ProjectOverlay
 from app.services.acnr.runtime import get_runtime_entries, RuntimeCellEntry
 
@@ -278,6 +279,27 @@ async def full_resolve(
     """
     cat = get_catalog()
     overlay = get_project_overlay()
+
+    # ─── R19.5: 版本锁定解析（归档项目按锁定 registry_version 解析）──────
+    # M3 简化实现：
+    #   - locked_version == current catalog version → 使用当前 catalog（最常见）
+    #   - locked_version != current → 记录警告，仍使用当前 catalog
+    #     （完整版本化 catalog 存储是 M3+ 后续工作，此处只确保基础设施就位）
+    if project_id:
+        locked_version = get_project_registry_version(project_id)
+        if locked_version:
+            current_version = cat.registry_version
+            if locked_version != current_version:
+                logger.warning(
+                    "ACNR version-locked resolution: project=%s locked_version=%s "
+                    "current_version=%s — using current catalog (versioned catalog "
+                    "storage not yet implemented)",
+                    project_id,
+                    locked_version,
+                    current_version,
+                )
+                # TODO M3+: load_versioned_catalog(locked_version) 加载历史版本 catalog
+                # 当前仍使用 cat（当前版本），保证解析不中断
 
     # ─── Step 7 (前置判断): 非 wp 域检测 → 委托 V1（R5.7）──────────────
     non_wp_domain = _detect_non_wp_domain(uri, formula_ref, index_ref)
