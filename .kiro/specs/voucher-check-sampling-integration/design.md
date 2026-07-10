@@ -2,10 +2,11 @@
 
 ## Overview
 
-本设计在**不重写既有抽凭引擎**的前提下，交付两大能力：
+本设计在**不重写既有抽凭引擎**的前提下，交付三大能力：
 
 - **A. D3-7 预收账款检查表全闭环**：行级附件上传 + OCR 识别 + AI 辅助 + 用户确认 + 回写，并以弹窗方式接入既有抽凭引擎（`GtVoucherSamplingEngine`），抽样结果回填检查表并标注来源。
 - **B. 抽凭引擎方法学增强**：在既有 `useSamplingAlgorithms` 纯函数模块与 `useVoucherSampling` 编排 composable 及后端 sampling 路由上做**扩展**，补齐科学样本量推导、MUS 完整方法学（高值必选 + 抽样间隔）、错报推断与总体结论、总体完整性校验、与重要性水平联动、抽样备忘导出、重抽治理与属性抽样（可选）。
+- **C. 四表库凭证库联动 · 截止性测试 · 回写后 AI 复核**：抽凭按当前底稿绑定科目从四表库凭证库检索并单/多回写；截止性测试按基准日 ±N 天一键取数回写并标注跨期；两类回写完成后统一提供 AI 复核弹窗（识别异常/跨期）→ 人工确认填入审计说明。
 
 核心设计原则：
 - **复用优先**：新增能力以纯函数 + 配置字段 + 端点字段扩展形式加入，既有五种抽样方法、覆盖率、CAS 1314 校验、版本 diff/历史/撤销、回填三模式、字段留痕、随机种子全部保留。
@@ -26,8 +27,10 @@
 | 抽样算法 | `composables/useSamplingAlgorithms.ts`（纯函数） | `computeSampleSize`/`computeMusInterval`/`projectMisstatement`/`computeUpperMisstatementLimit`/`deriveSamplingConclusion`/`reconcilePopulation`/`computeAttributeSampleSize`/`evaluateDeviationRate` |
 | 抽样编排 | `composables/useVoucherSampling.ts` | 承接新参数与错报推断状态、重抽原因、备忘导出 |
 | 重要性联动 | 重要性/B15 底稿取数 | `loadTolerableMisstatement()` |
-| 后端 | `/sampling/voucher-extract`·`/cutoff-fill`·`/voucher-history`·`/voucher-undo`·`/voucher-compare` | 扩展返回 high_value 标记、population_reconcile、resample_reason、seed 展示 |
-| OCR/AI/版本链 | `/d4/contract-ocr`、`/ai/generate-text`、`useVersionTrail` | 无需新端点（复用） |
+| 截止性测试 | `composables/useCutoffAutoSampling.ts`（±N 天，未动工） | `filterByCutoffWindow`/`markCutoffCrossPeriod` + 截止底稿"一键取数"工具栏 |
+| 回写后 AI 复核 | `/ai/generate-text` | `voucher-sampling/PostFillAiReviewDialog.vue`（检查表 + 截止共用） |
+| 后端 | `/sampling/voucher-extract`·`/cutoff-fill`·`/voucher-history`·`/voucher-undo`·`/voucher-compare` | 扩展返回 high_value 标记、population_reconcile、resample_reason、seed 展示、日期窗口过滤 |
+| OCR/AI/版本链 | `/d4/contract-ocr`、`/ai/generate-text`、`useVersionTrail` | 无需新端点（复用；AI section 白名单加 voucher-review/cutoff-review） |
 
 ### 数据流（D3-7 抽凭 + 错报评价闭环）
 
@@ -169,6 +172,38 @@ async function loadTolerableMisstatement(projectId: string): Promise<string | nu
 ```
 取数来源：优先复用既有重要性模块端点（如 `/api/projects/{pid}/materiality`）；无则手工录入。
 
+### C. 凭证库（四表库）联动 · 截止性测试 · 回写后 AI 复核
+
+#### C.1 凭证库联动与按科目单/多回写（Req 24）
+- 抽凭引擎既有 `triggerSampling` 已调用后端 `/sampling/voucher-extract`，其数据源即四表库凭证库（序时账 `tb_ledger`）。本设计明确：`account-code` prop = 当前底稿绑定科目（D3-7=2203），作为 `filters.account_codes` 默认值；抽样结果经 `@filled` 一次性回填（单/多条），行 `source='抽凭'` 并携带 `accountCode`。
+- 无新增端点；复用 `SamplingPreviewDialog` 的勾选（单/多）+ `confirmFill`。
+
+#### C.2 截止性测试凭证联动（Req 25）
+- 复用/扩展既有 `composables/useCutoffAutoSampling.ts`（memory：序时账 ±N 天，"cutoff-auto-sampling 未动工"）。
+- 新增/完善纯函数与流程：
+```ts
+// 基准日 ±N 天窗口过滤（纯函数，可测）
+export function filterByCutoffWindow(
+  vouchers: LedgerVoucher[], cutoffDate: string, daysBefore: number, daysAfter: number,
+): LedgerVoucher[]
+// 跨期判定：记账日期与业务发生日期(单据日期)跨越基准日 → 跨期疑点（复用 shouldMarkCrossPeriod 语义）
+export function markCutoffCrossPeriod(v: LedgerVoucher, cutoffDate: string): boolean
+```
+- 截止底稿工具栏"一键取数"：设定 `cutoffDate` + `daysBefore`/`daysAfter` + 科目/方向/金额 → 调 `/sampling/voucher-extract`（复用，`filters` 增日期窗口 `date_from`/`date_to`）→ 回写截止底稿，跨期行标注跨期疑点。只读禁用。
+- **单日期降级**：跨期判定理想需"记账日期 + 业务发生日期(单据日期)"两个日期分居基准日两侧。若凭证库仅提供单一日期（记账日期），则 `markCutoffCrossPeriod` 退化为"落在基准日后侧窗口内的凭证一律标注为需人工判断的跨期疑点"，由审计师结合原始单据人工确认；此降级不改变 Property 12 的位置判定语义（仍仅依赖日期相对基准日的位置）。
+- **截止底稿载体**：本联动作用于绑定 `useCutoffAutoSampling` 的截止测试区/底稿（如 D3-7「期后结转检查」区块即其一实例），为通用范式而非单一底稿专属。
+
+#### C.3 回写后 AI 复核弹窗（Req 26，检查表 + 截止共用）
+- 新增共享组件 `voucher-sampling/PostFillAiReviewDialog.vue`：
+```vue
+<PostFillAiReviewDialog
+  v-model="showReview" :wp-id="wpId" :rows="filledRows"
+  section="cutoff-review | voucher-review" :ai-available="aiAvailable"
+  @applied="(text) => writeToAuditNote(text)" />
+```
+- 流程：抽凭/截止回写 `完成` → 触发 `showReview=true`（提示"是否发起 AI 复核"）→ Auditor 发起 → `POST /api/workpapers/{wpId}/ai/generate-text`（section=voucher-review/cutoff-review，context=回写凭证摘要，prompt=识别异常/跨期）→ 展示意见 → 确认填入审计说明 / 取消不写入；AI 不可用提示且不影响已回写数据；确认前不定稿。
+- 复用既有 `/ai/generate-text` 端点，仅新增 section 白名单 `voucher-review`/`cutoff-review`。
+
 ## Data Models
 
 见 B.1。既有 `SamplingConfig`/`SampledVoucher`/`CoverageStats`/`ComplianceWarning`/`ExtractionLogEntry` 全部保留，新增字段均为可选（`?`），保证既有五方法与回填/历史向后兼容。
@@ -178,6 +213,7 @@ async function loadTolerableMisstatement(projectId: string): Promise<string | nu
 - `POST /sampling/voucher-extract`（扩展响应）：`items[].high_value: boolean`、`stats.population_amount/population_count`、`stats.book_amount`（用于总体校验，若可得）。
 - `POST /sampling/cutoff-fill`（扩展请求）：`extraction_criteria` 增 `confidence_level`/`tolerable_misstatement`/`expected_misstatement`/`suggested_sample_size`/`resample_reason`/`sampling_interval`。
 - `GET /sampling/voucher-history`（扩展响应）：回显 `random_seed`、`resample_reason`、`sampling_interval`、`conclusion`。
+- `POST /sampling/voucher-extract`（截止取数复用）：`filters` 增日期窗口 `date_from`/`date_to`（= 基准日 ∓ 天数），供截止性测试一键取数复用同一检索端点。
 - 版本快照 `POST /workpapers/{wpId}/versions`：description 增方法学要素（方法/间隔/样本量/seed）。
 - 错报推断为**前端纯函数**计算（基于样本 `actualMisstatement`），无需新端点；结论与备忘随 checklist_responses / 版本链持久化。
 
@@ -234,14 +270,23 @@ added / removed / retained 三集合互斥且并集 = A ∪ B。
 `expectedMisstatement ≥ tolerableMisstatement` 时校验必失败；统计法缺 confidence/tolerable 时校验必失败。
 **Validates: Requirements 20.2, 20.3**
 
+### Property 11: 截止窗口过滤边界
+`filterByCutoffWindow` 结果中每张凭证日期 `d` 满足 `cutoffDate − daysBefore ≤ d ≤ cutoffDate + daysAfter`；窗口外凭证一律被排除。
+**Validates: Requirements 25.1, 25.3**
+
+### Property 12: 跨期判定单调
+`markCutoffCrossPeriod` 当记账日期与业务发生期间分居基准日两侧时恒为 true，同侧恒为 false；判定仅依赖日期相对基准日的位置。
+**Validates: Requirements 25.5**
+
 ## Testing Strategy
 
 - **纯函数 PBT**（hypothesis/fast-check，max_examples≈5）：`computeMusInterval`/`computeSampleSize`（样本量随可容忍↓而↑、随置信度↑而↑）、`projectMisstatement`（污染率∈[0,1]、非负单调）、`computeUpperMisstatementLimit`（UML≥projected）、`deriveSamplingConclusion`（边界 UML=tolerable）、`markHighValueItems`（≥间隔全选）、`reconcilePopulation`（差异符号/阈值）、`computeAttributeSampleSize`/`evaluateDeviationRate`、既有 `applyFillMode`/`computeVersionDiff` 回归。
-- **组件单测**：D3-7 OCR 映射 merge 保留已填值、抽样回填三模式、来源标注、只读禁用。
-- **Playwright 实测**（铁律，diagnostics/单测查不出的交互）：D3-7 打开抽凭弹窗→配置方法学参数→抽样→勾选→回填→行级📎OCR确认→录入错报→查看结论→保存落库；0 console error；postgres 校验落库。
+- **截止窗口纯函数 PBT**：`filterByCutoffWindow`（Property 11 窗口边界）、`markCutoffCrossPeriod`（Property 12 位置判定与单日期降级）。
+- **组件单测**：D3-7 OCR 映射 merge 保留已填值、抽样回填三模式、来源标注、只读禁用；PostFillAiReviewDialog 确认写入/取消不写入/AI 不可用不阻断。
+- **Playwright 实测**（铁律，diagnostics/单测查不出的交互）：①D3-7 打开抽凭弹窗→配置方法学参数→抽样→勾选→回填(来源=抽凭)→行级📎OCR确认→录入错报→查看结论→回写后 AI 复核弹窗确认填入审计说明→保存落库；②截止性测试设基准日 ±N 天→一键取数→回写(跨期标注)→AI 复核弹窗；均 0 console error + postgres 校验落库。
 
 ## 实现边界
 
-- **必做**：A（Req 1~12，D3-7 样板全闭环）+ B 核心（R15 样本量、R16 重要性联动、R17 MUS 完整、R18 错报推断与结论、R19 总体校验、R20 参数、R22 重抽治理/可复现）。
+- **必做**：A（Req 1~12，D3-7 样板全闭环）+ B 核心（R15 样本量、R16 重要性联动、R17 MUS 完整、R18 错报推断与结论、R19 总体校验、R20 参数、R22 重抽治理/可复现）+ C（R24 凭证库按科目单/多回写、R25 截止性测试一键取数联动、R26 回写后 AI 复核弹窗）。
 - **可选/后续**：R21 备忘导出（次优先）、R23 属性抽样、Req 13~14 横向推广其他循环检查表（D2-7/G4-13/G5-12/G6/G7-18/G8-6/G9-6/G10-7/G12-6/G2/G3/F2）。
 - 明确排除 `ui-pattern-unification` 负责的通用工具栏迁移与全局 collapse→dialog。

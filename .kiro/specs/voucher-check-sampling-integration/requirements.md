@@ -4,7 +4,7 @@
 
 本特性为 D3-7 预收账款凭证检查表补齐"行级附件上传 + OCR 识别 + AI 辅助 + 用户确认 + 回写字段"的完整证据闭环，并将检查表与既有抽凭引擎（`GtVoucherSamplingEngine`）以弹窗方式深度联动，使审计师能够在检查表内自定义抽凭方法、勾选凭证、查看与使用凭证版本链。当前 D3-7 仅有异常点选，缺失上述全部能力，本特性以 D3-7 为**样板与本次主目标**，交付一套可被其他循环凭证检查表复用的标准范式。
 
-本特性同时融入审计抽凭专家视角的改进项（抽样代表性反馈、特定选取原因、重抽批次可追溯等），并以**可选/后续需求项**形式界定其他循环同类凭证检查表（D2-7/G4-13/G5-12/G6/G7-18/G8-6/G9-6/G10-7/G12-6/G2/G3/F2 等）的横向统一改造范围。
+本特性同时融入审计抽凭专家视角的方法学改进项（科学样本量推导、MUS 完整方法学、错报推断与总体结论、总体完整性校验、重抽治理等，见分组三），并明确抽凭与四表库凭证库的联动口径、将同一联动扩展至截止性测试底稿、在两类回写后统一提供 AI 复核弹窗闭环（见分组四）；以**可选/后续需求项**形式界定其他循环同类凭证检查表（D2-7/G4-13/G5-12/G6/G7-18/G8-6/G9-6/G10-7/G12-6/G2/G3/F2 等）的横向统一改造范围（见分组二）。
 
 **能力边界声明**：本特性以"凭证检查表全闭环"为中心，复用既有抽凭引擎、OCR 端点、AI 端点、版本链服务，不重复实现 `ui-pattern-unification` spec 负责的通用工具栏迁移与 collapse→dialog 的全局模式统一；两者重叠处以本特性对凭证检查表的具体验收标准为准。
 
@@ -38,6 +38,10 @@
 - **Materiality_Workpaper（重要性水平底稿）**：既有重要性模块/B15 底稿，提供整体重要性与实际执行重要性。
 - **Attribute_Sampling（属性抽样）**：用于控制测试的抽样，基于预计偏差率、可容忍偏差率与置信度确定样本量并评估偏差率上限。
 - **Sampling_Memo（抽样计划与结论备忘）**：记录抽样方法、参数、样本量依据、覆盖率、错报推断与结论的归档文档。
+- **Voucher_Library（四表库凭证库）**：项目四表库中存储凭证级分录数据的凭证库（序时账/凭证明细），是抽凭与截止测试检索的总体来源，可按会计科目、方向、金额、日期检索。
+- **Cutoff_Test（截止性测试底稿）**：检验交易是否记录于正确会计期间的底稿，围绕基准日前后天数检查凭证是否跨期。
+- **Cutoff_Date（基准日）**：资产负债表日/期末日，截止性测试以其前后天数界定检索窗口。
+- **Post_Fill_AI_Review（回写后 AI 复核）**：抽凭或截止凭证回写到底稿后触发的 AI 复核，识别异常与跨期问题并给出意见，经审计师确认后填入审计说明。
 
 ---
 
@@ -318,3 +322,49 @@
 1. WHERE Sampling_Engine 用于控制测试，THE Sampling_Engine SHALL 支持 Attribute_Sampling，依据预计偏差率、可容忍偏差率与 Confidence_Level 推导样本量。
 2. WHEN Auditor 录入样本中的偏差数量，THE Attribute_Sampling SHALL 计算偏差率上限并与可容忍偏差率比较给出控制是否有效的结论建议。
 3. THE Attribute_Sampling SHALL 作为可选/后续能力，不影响实质性抽样（金额法）的既有流程。
+
+---
+
+**分组四 · 四表库凭证库联动 + 截止性测试 + 回写后 AI 复核**
+
+> 本组明确抽凭与四表库凭证库的联动口径，并将同一联动范式扩展至截止性测试底稿；两类回写完成后统一提供回写后 AI 复核弹窗闭环。
+
+### Requirement 24: 凭证库（四表库）联动与按科目单/多回写
+
+**User Story:** 作为审计师，我希望抽凭直接调用四表库凭证库并按当前底稿对应的会计科目检索凭证，选定单条或多条后一次性回写到底稿，以便高效获取与本底稿相关的凭证。
+
+#### Acceptance Criteria
+
+1. WHEN Auditor 在 Sampling_Dialog 执行抽样，THE Sampling_Engine SHALL 从 Voucher_Library 按所选抽样方法与总体范围（含会计科目、方向、金额、日期）检索候选凭证。
+2. WHERE 当前底稿绑定特定会计科目，THE Sampling_Engine SHALL 默认以该科目作为 Voucher_Library 检索的科目范围。
+3. WHEN Auditor 选定单条或多条凭证并确认回写，THE Voucher_Check_Sheet SHALL 一次性将选定凭证的凭证号与对应会计科目回写到当前底稿。
+4. THE Sampling_Engine SHALL 支持随机、分层、特定项目、系统、货币单元多种方法从 Voucher_Library 检索。
+5. WHEN 回写完成，THE Voucher_Check_Sheet SHALL 将回写行来源标注为抽凭。
+
+### Requirement 25: 截止性测试凭证联动
+
+**User Story:** 作为审计师，我希望在截止性测试底稿按基准日前后天数一键从四表库获取符合条件的凭证并回写，以便快速完成期末截止测试的取数。
+
+#### Acceptance Criteria
+
+1. THE Cutoff_Test SHALL 允许 Auditor 设定 Cutoff_Date 与其前后天数窗口。
+2. THE Cutoff_Test SHALL 允许 Auditor 设定检索条件，包含会计科目范围、借贷方向与金额条件。
+3. WHEN Auditor 触发一键取数，THE Cutoff_Test SHALL 从 Voucher_Library 检索 Cutoff_Date 前后指定天数内符合条件的凭证。
+4. WHEN 检索完成，THE Cutoff_Test SHALL 将符合条件的凭证回写到截止性测试底稿。
+5. WHERE 凭证的记账日期与业务发生期间跨越 Cutoff_Date，THE Cutoff_Test SHALL 将该凭证标注为跨期疑点。
+6. WHILE Readonly_State 为真，THE Cutoff_Test SHALL 禁用一键取数与回写。
+
+### Requirement 26: 回写后 AI 复核弹窗闭环
+
+**User Story:** 作为审计师，我希望抽凭或截止凭证回写完成后系统提示我发起 AI 复核以识别异常与跨期问题，AI 给出意见并经我确认后填入审计说明，以便快速形成有依据的审计说明且以人工确认为准。
+
+#### Acceptance Criteria
+
+1. WHEN 抽凭结果回写到 Voucher_Check_Sheet 完成，THE Voucher_Check_Sheet SHALL 弹出提示询问 Auditor 是否发起 Post_Fill_AI_Review。
+2. WHEN 截止凭证回写到 Cutoff_Test 完成，THE Cutoff_Test SHALL 弹出提示询问 Auditor 是否发起 Post_Fill_AI_Review。
+3. WHEN Auditor 发起 Post_Fill_AI_Review，THE AI_Assist_Service SHALL 基于回写凭证识别潜在异常与跨期问题并返回复核意见。
+4. WHEN AI_Assist_Service 返回复核意见，THE Post_Fill_AI_Review 弹窗 SHALL 向 Auditor 展示该意见供确认。
+5. WHEN Auditor 确认采用复核意见，THE 系统 SHALL 将该意见填入对应底稿的审计说明。
+6. WHEN Auditor 取消，THE 系统 SHALL 不将复核意见写入审计说明。
+7. IF AI_Assist_Service 不可用，THEN THE Post_Fill_AI_Review 弹窗 SHALL 提示不可用且不影响已回写的凭证数据。
+8. THE 系统 SHALL 在 Auditor 确认前不将 AI 复核意见作为最终结论写入底稿。
