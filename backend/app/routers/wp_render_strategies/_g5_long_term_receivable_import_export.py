@@ -82,6 +82,18 @@ _G5_SPECS: dict[str, dict[str, Any]] = {
         "title": "G5-2 长期应收款余额明细表",
         "headers": _G5_2_HEADERS,
         "field_keys": _G5_2_KEYS,
+        # 动态账龄列头（Task 12.1）：导出时基础列 + 项目账龄配置派生的 3N 账龄列（期初/期末未审/期末审定）
+        "aging": {
+            "subject": "G5",
+            "base_headers": [
+                "序号", "债务人", "业务类型", "合同编号", "开始日", "到期日",
+                "合同总额", "已收回", "期末余额", "关联方", "未实现收益", "净额", "备注",
+            ],
+            "base_field_keys": [
+                "seq", "debtorName", "businessType", "contractNo", "startDate", "maturityDate",
+                "contractAmount", "recoveredAmount", "closingBalance", "isRelatedParty", "unrealizedIncome", "netAmount", "remark",
+            ],
+        },
         "guidance": ["G5-2 余额明细", "", "期末余额=合同总额-已收回；净额=余额-未实现；账龄合计应等于净额。"],
     },
     "G5-3": {

@@ -26,9 +26,53 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 
+from ._cycle_import_export_common import (
+    aging_export_values,
+    build_aging_headers,
+    match_import_aging,
+    resolve_aging_segments,
+    subject_aging_periods,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["d3-import-export"])
+
+# D3-2 明细表非账龄基础列（账龄列由项目配置动态派生，Task 12.1）
+_D3_2_BASE_HEADERS: list[str] = [
+    "对方单位名称", "公司代码", "款项性质", "关联方类型",
+    "期初未审余额", "期初账项调整", "期初重分类调整",
+    "借方发生", "贷方发生", "被审计单位重分类调整",
+    "期末账项调整", "期末重分类调整",
+    "是否发函", "期后结转", "备注",
+]
+
+
+def _d3_2_dynamic_headers(segments: list[Any]) -> list[str]:
+    """D3-2 动态列头：基础列 + 2N 账龄列（期初/期末审定）。Task 12.1。"""
+    return _D3_2_BASE_HEADERS + build_aging_headers(segments, subject_aging_periods("D3"))
+
+
+def _export_d3_2_row_dynamic(data: dict, segments: list[Any]) -> list:
+    """D3-2 动态导出行：基础值 + 嵌套账龄值（按 segments 顺序）。Task 12.1。"""
+    base = [
+        _safe_str(data.get("customerName")),
+        _safe_str(data.get("companyCode")),
+        _safe_str(data.get("nature")),
+        _safe_str(data.get("relationType")),
+        _safe_float(data.get("priorUnadjusted")),
+        _safe_float(data.get("priorAdjustment")),
+        _safe_float(data.get("priorReclass")),
+        _safe_float(data.get("debit")),
+        _safe_float(data.get("credit")),
+        _safe_float(data.get("entityReclass")),
+        _safe_float(data.get("endAje")),
+        _safe_float(data.get("endRje")),
+        _safe_str(data.get("isConfirmed")),
+        _safe_float(data.get("postPeriodSettlement")),
+        _safe_str(data.get("remark")),
+    ]
+    return base + aging_export_values(data, segments, subject_aging_periods("D3"))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Sheet 配置
@@ -138,11 +182,17 @@ def _validate_sheet(sheet_code: str) -> None:
 async def d3_export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D3-2"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白模板xlsx（含表头+格式，无数据行）"""
     _validate_sheet(sheet)
-    headers = _get_headers(sheet)
+    # D3-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
+    if sheet == "D3-2":
+        segments = await resolve_aging_segments(db, wp_id, "D3")
+        headers = _d3_2_dynamic_headers(segments)
+    else:
+        headers = _get_headers(sheet)
 
     wb = Workbook()
     ws = wb.active
@@ -184,9 +234,16 @@ async def d3_export_data(
 ) -> StreamingResponse:
     """导出当前数据xlsx"""
     _validate_sheet(sheet)
-    headers = _get_headers(sheet)
 
     import sqlalchemy as sa
+
+    # D3-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
+    d3_2_segments: list[Any] = []
+    if sheet == "D3-2":
+        d3_2_segments = await resolve_aging_segments(db, wp_id, "D3")
+        headers = _d3_2_dynamic_headers(d3_2_segments)
+    else:
+        headers = _get_headers(sheet)
 
     if sheet == "D3-1":
         return await _stream_d3_1_export(wp_id, db, headers, sheet)
@@ -215,7 +272,7 @@ async def d3_export_data(
 
     for data_row in rows_data:
         if sheet == "D3-2":
-            row_values = _export_d3_2_row(data_row)
+            row_values = _export_d3_2_row_dynamic(data_row, d3_2_segments)
         elif sheet == "D3-3":
             row_values = _export_d3_3_row(data_row)
         elif sheet == "D3-4-debit":
@@ -271,9 +328,19 @@ async def d3_import_data(
     if ws is None:
         raise HTTPException(400, "xlsx文件中无活动工作表")
 
-    # 验证列头
-    expected_headers = _get_headers(sheet)
     actual_headers = [str(cell.value).strip() if cell.value else "" for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+
+    # D3-2：账龄列按 label 动态匹配当前项目配置，验证仅校验基础列（Task 12.2）
+    d3_2_segments: list[Any] = []
+    skipped_columns: list[str] = []
+    if sheet == "D3-2":
+        expected_headers = _D3_2_BASE_HEADERS
+        d3_2_segments = await resolve_aging_segments(db, wp_id, "D3")
+        _, skipped_columns = match_import_aging(
+            lambda _h: None, actual_headers, d3_2_segments, subject_aging_periods("D3"),
+        )
+    else:
+        expected_headers = _get_headers(sheet)
 
     errors: list[str] = []
     missing_cols = [h for h in expected_headers if h not in actual_headers]
@@ -302,7 +369,7 @@ async def d3_import_data(
                 rows_data.append(row_dict)
             continue
         if sheet == "D3-2":
-            row_dict = _parse_d3_2_row(row, actual_headers)
+            row_dict = _parse_d3_2_row(row, actual_headers, d3_2_segments)
         elif sheet == "D3-3":
             row_dict = _parse_d3_3_row(row, actual_headers)
         elif sheet == "D3-4-debit":
@@ -357,6 +424,11 @@ async def d3_import_data(
     if truncated:
         result_data["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
         result_data["truncated"] = True
+    if skipped_columns:
+        result_data["skipped_columns"] = skipped_columns
+        result_data["warnings"] = [
+            f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped_columns)}"
+        ]
 
     return result_data
 
@@ -573,8 +645,17 @@ def _col_val(row: tuple, actual_headers: list[str], col_name: str) -> Any:
         return None
 
 
-def _parse_d3_2_row(row: tuple, actual_headers: list[str]) -> dict:
-    return {
+def _parse_d3_2_row(
+    row: tuple, actual_headers: list[str], segments: list[Any] | None = None
+) -> dict:
+    """解析 D3-2/F1-2 明细行。
+
+    - segments 提供时（导入端点，Task 12.2）：账龄列按 label 动态匹配当前项目账龄配置，
+      格式 `{label}(期初)` / `{label}(期末审定)`，写入 nested keyed agingPrior/agingAudited。
+    - segments 为 None（legacy 纯函数/round-trip 测试）：读取旧固定列头 `期初审定账龄(1年以下)` 等，
+      映射到固定 within1/y1to2/y2to3/over3 键。
+    """
+    base = {
         "rowId": str(uuid4()),
         "customerName": _safe_str(_col_val(row, actual_headers, "对方单位名称")),
         "companyCode": _safe_str(_col_val(row, actual_headers, "公司代码")),
@@ -583,27 +664,38 @@ def _parse_d3_2_row(row: tuple, actual_headers: list[str]) -> dict:
         "priorUnadjusted": _safe_float(_col_val(row, actual_headers, "期初未审余额")),
         "priorAdjustment": _safe_float(_col_val(row, actual_headers, "期初账项调整")),
         "priorReclass": _safe_float(_col_val(row, actual_headers, "期初重分类调整")),
-        "agingPrior": {
-            "within1": _safe_float(_col_val(row, actual_headers, "期初审定账龄(1年以下)")),
-            "y1to2": _safe_float(_col_val(row, actual_headers, "期初审定账龄(1~2年)")),
-            "y2to3": _safe_float(_col_val(row, actual_headers, "期初审定账龄(2~3年)")),
-            "over3": _safe_float(_col_val(row, actual_headers, "期初审定账龄(3年以上)")),
-        },
         "debit": _safe_float(_col_val(row, actual_headers, "借方发生")),
         "credit": _safe_float(_col_val(row, actual_headers, "贷方发生")),
         "entityReclass": _safe_float(_col_val(row, actual_headers, "被审计单位重分类调整")),
         "endAje": _safe_float(_col_val(row, actual_headers, "期末账项调整")),
         "endRje": _safe_float(_col_val(row, actual_headers, "期末重分类调整")),
-        "agingAudited": {
-            "within1": _safe_float(_col_val(row, actual_headers, "审定账龄(1年以下)")),
-            "y1to2": _safe_float(_col_val(row, actual_headers, "审定账龄(1~2年)")),
-            "y2to3": _safe_float(_col_val(row, actual_headers, "审定账龄(2~3年)")),
-            "over3": _safe_float(_col_val(row, actual_headers, "审定账龄(3年以上)")),
-        },
         "isConfirmed": _safe_str(_col_val(row, actual_headers, "是否发函")),
         "postPeriodSettlement": _safe_float(_col_val(row, actual_headers, "期后结转")),
         "remark": _safe_str(_col_val(row, actual_headers, "备注")),
     }
+
+    if segments:
+        aging_nested, _unmatched = match_import_aging(
+            lambda h: _col_val(row, actual_headers, h),
+            actual_headers,
+            segments,
+            subject_aging_periods("D3"),
+        )
+        base.update(aging_nested)
+    else:
+        base["agingPrior"] = {
+            "within1": _safe_float(_col_val(row, actual_headers, "期初审定账龄(1年以下)")),
+            "y1to2": _safe_float(_col_val(row, actual_headers, "期初审定账龄(1~2年)")),
+            "y2to3": _safe_float(_col_val(row, actual_headers, "期初审定账龄(2~3年)")),
+            "over3": _safe_float(_col_val(row, actual_headers, "期初审定账龄(3年以上)")),
+        }
+        base["agingAudited"] = {
+            "within1": _safe_float(_col_val(row, actual_headers, "审定账龄(1年以下)")),
+            "y1to2": _safe_float(_col_val(row, actual_headers, "审定账龄(1~2年)")),
+            "y2to3": _safe_float(_col_val(row, actual_headers, "审定账龄(2~3年)")),
+            "over3": _safe_float(_col_val(row, actual_headers, "审定账龄(3年以上)")),
+        }
+    return base
 
 
 def _parse_d3_5_row(row: tuple, actual_headers: list[str]) -> dict:

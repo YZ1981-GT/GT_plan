@@ -153,3 +153,173 @@ async def get_project_segments_from_wp(
 def get_segment_keys(segments: "list[AgingSegment]") -> list[str]:
     """提取段 key 列表，用于从行数据的 agingPrior/agingCurrent/agingAudited 中取值。"""
     return [seg.key for seg in segments]
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 动态列计划引擎（headers + export + import label 匹配）
+#
+# 供 D2/D3/F1/K1/K3/G5 明细表导入导出复用。核心思想：用一份"列计划"(column plan)
+# 同时驱动 ①导出列头 ②导出取值 ③导入按列头匹配。账龄列由当前项目 segments 动态生成，
+# 存储读写走 nested keyed 结构 (agingPrior/agingCurrent/agingAudited[seg_key])。
+#
+# Requirements: 8.1 (动态列头) / 8.2 8.3 8.4 (label 匹配 + unmatched warning)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+import re as _re
+
+# 列计划条目：
+#   ("F", header, key, kind)          固定列，kind ∈ {"num","str","bool"}
+#   ("A", header, period, seg_key)    账龄列，取值 row[period][seg_key]
+FixedCol = tuple  # ("F", str, str, str)
+AgingCol = tuple  # ("A", str, str, str)
+
+# 账龄期间在 row 上的 nested 字段名
+PERIOD_PRIOR = "agingPrior"
+PERIOD_CURRENT = "agingCurrent"
+PERIOD_AUDITED = "agingAudited"
+
+# 账龄列头识别正则（用于 unmatched warning 检测）：形如 "1年以内(期初)" / "期初审定账龄(1-2年)" / "3年以上"
+_AGING_SUFFIX_RE = _re.compile(r".*[（(](?:期初|期末|期末未审|期末审定|审定)[)）]\s*$")
+_AGING_PREFIX_RE = _re.compile(r"^(?:期初审定账龄|审定账龄|期初账龄|期末账龄)[（(].*[)）]\s*$")
+_YEAR_LABEL_RE = _re.compile(r"^\s*\d+\s*年")  # "1年以内" / "5年以上" 等纯段名
+
+
+def _to_float(val: object) -> float:
+    if val is None:
+        return 0.0
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _to_str(val: object) -> str:
+    return "" if val is None else str(val).strip()
+
+
+def _to_bool_cn(val: object) -> bool:
+    s = _to_str(val).lower()
+    return s in ("是", "yes", "true", "1", "y")
+
+
+def build_aging_cols(
+    segments: "list[AgingSegment]",
+    period: str,
+    header_fn,
+) -> list:
+    """为单个 period 构建账龄列计划片段。
+
+    header_fn(seg) -> str 决定列头文本（支持 suffix / prefix_paren 等风格）。
+    """
+    return [("A", header_fn(seg), period, seg.key) for seg in segments]
+
+
+def plan_headers(plan: list) -> list[str]:
+    """从列计划提取列头列表。"""
+    return [entry[1] for entry in plan]
+
+
+def plan_export_row(row: dict, plan: list) -> list:
+    """按列计划从 row 提取一行导出值（账龄读 nested keyed）。"""
+    out: list = []
+    for entry in plan:
+        if entry[0] == "F":
+            _, _header, key, kind = entry
+            val = row.get(key)
+            if kind == "bool":
+                out.append("是" if val else "")
+            elif kind == "num":
+                out.append(_to_float(val) if val not in (None, "") else "")
+            else:
+                out.append("" if val is None else val)
+        else:  # aging
+            _, _header, period, seg_key = entry
+            aging_obj = row.get(period) or {}
+            out.append(_to_float(aging_obj.get(seg_key)) if isinstance(aging_obj, dict) else 0.0)
+    return out
+
+
+def _looks_like_aging(header: str) -> bool:
+    """判断某列头是否"看起来像账龄列"（用于 unmatched warning 检测）。"""
+    h = (header or "").strip()
+    if not h:
+        return False
+    return bool(
+        _AGING_SUFFIX_RE.match(h)
+        or _AGING_PREFIX_RE.match(h)
+        or _YEAR_LABEL_RE.match(h)
+    )
+
+
+def plan_parse_row(
+    values: tuple,
+    actual_headers: list[str],
+    plan: list,
+    *,
+    extra: dict | None = None,
+) -> tuple[dict, list[str]]:
+    """按列计划解析一行导入数据（账龄按列头精确匹配 → nested keyed）。
+
+    返回 (row_dict, unmatched_aging_headers)。
+    - 固定列：按列头在 actual_headers 中的位置取值。
+    - 账龄列：在 actual_headers 中查找该列头；命中则写入 row[period][seg_key]，
+      缺失则该段初始化为 0（满足配置变更后旧模板缺列的情况）。
+    - unmatched：actual_headers 中"看起来像账龄"但不属于当前列计划的列 → 报 warning 并跳过。
+
+    Requirements: 8.2 (label 匹配) / 8.3 (unmatched warning+skip) / 8.4 (旧模板按 label 映射)
+    """
+    vals = list(values) + [None] * max(0, len(actual_headers) - len(values))
+
+    def _col(header: str) -> object:
+        try:
+            idx = actual_headers.index(header)
+        except ValueError:
+            return None
+        return vals[idx] if idx < len(vals) else None
+
+    row: dict = {}
+    if extra:
+        row.update(extra)
+
+    expected_headers: set[str] = set()
+    # 初始化 nested 账龄容器
+    for entry in plan:
+        if entry[0] == "A":
+            _, header, period, seg_key = entry
+            expected_headers.add(header)
+            row.setdefault(period, {})
+            row[period][seg_key] = _to_float(_col(header))
+        else:
+            _, header, key, kind = entry
+            expected_headers.add(header)
+            raw = _col(header)
+            if kind == "num":
+                row[key] = _to_float(raw)
+            elif kind == "bool":
+                row[key] = _to_bool_cn(raw)
+            else:
+                row[key] = _to_str(raw)
+
+    # unmatched 账龄列检测
+    unmatched = [
+        h for h in actual_headers
+        if h and h not in expected_headers and _looks_like_aging(h)
+    ]
+    return row, unmatched
+
+
+# ─── header_fn 工厂（不同风格） ──────────────────────────────────────────────
+
+def suffix_header_fn(suffix: str):
+    """列头 = {label}{suffix}，如 '1年以内(期初)'。"""
+    return lambda seg: f"{seg.label}{suffix}"
+
+
+def prefix_paren_header_fn(prefix: str):
+    """列头 = {prefix}({label})，如 '期初审定账龄(1年以内)'。"""
+    return lambda seg: f"{prefix}({seg.label})"
+
+
+def plain_label_header_fn():
+    """列头 = {label}（单 period 纯段名，如 K1-2/K3-2/G5-2）。"""
+    return lambda seg: seg.label

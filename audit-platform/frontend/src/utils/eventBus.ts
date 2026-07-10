@@ -331,6 +331,9 @@ export type Events = {
   // 复核标记变更（Foundation Task 2.9）
   'review-mark:changed': ReviewMarkChangedPayload
 
+  // 附件上传完成（c-control-test-popup-enhance Task 12.1：通知 OCR 附件缓存刷新列表）
+  'attachment:uploaded': { wpId?: string; projectId?: string } | void
+
   // 重要性水平
   'materiality:changed': MaterialityChangedPayload
 

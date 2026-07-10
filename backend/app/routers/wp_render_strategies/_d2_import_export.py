@@ -24,11 +24,16 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.routers.wp_render_strategies._cycle_import_export_common import (
+    AGING_PERIOD_LABELS,
     load_json_rows,
+    match_import_aging,
+    resolve_aging_segments,
     safe_float,
     safe_str,
+    subject_aging_periods,
     upsert_json_rows,
 )
+from app.routers.wp_render_strategies._aging_export_headers import _looks_like_aging
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -124,6 +129,57 @@ SHEET_COLUMNS: dict[str, list[str]] = {
     ],
 }
 
+# D2-2 明细表固定（非账龄）列 — 供导入校验使用（账龄列按 label 动态匹配）。Task 12.2
+_D2_2_BASE_COLUMNS: list[str] = [
+    '序号', '客户名称', '公司代码', '关联方类型',
+    '期初未审', '期初AJE', '期初RJE', '期初审定',
+    '借方发生', '贷方发生', '期末余额', '重分类', '期末未审',
+    '期末AJE', '期末RJE', '期末审定',
+    '信用风险组合方式', '组合名称', '是否函证', '期后回款', '备注',
+]
+
+
+def get_d2_2_columns(segments: list[Any]) -> list[str]:
+    """D2-2 明细表动态列头（Task 12.1）。
+
+    3 期账龄（期初/期末未审/期末审定），每期 N 段，账龄列头由项目账龄配置派生。
+    列头顺序遵循 segments 顺序，格式 `{label}({period_label})`。
+    """
+    prior = [f"{s.label}({AGING_PERIOD_LABELS['prior']})" for s in segments]
+    current = [f"{s.label}({AGING_PERIOD_LABELS['current']})" for s in segments]
+    audited = [f"{s.label}({AGING_PERIOD_LABELS['audited']})" for s in segments]
+    return [
+        '序号', '客户名称', '公司代码', '关联方类型',
+        '期初未审', '期初AJE', '期初RJE', '期初审定',
+        *prior,
+        '借方发生', '贷方发生', '期末余额', '重分类', '期末未审',
+        *current,
+        '期末AJE', '期末RJE', '期末审定',
+        *audited,
+        '信用风险组合方式', '组合名称', '是否函证', '期后回款', '备注',
+    ]
+
+
+def _d2_2_export_values(row: dict, segments: list[Any]) -> list[Any]:
+    """D2-2 动态导出行值（读取嵌套 agingPrior/agingCurrent/agingAudited，按 segments 顺序）。Task 12.1。"""
+    def _period_vals(field: str) -> list[Any]:
+        bucket = row.get(field) or {}
+        return [safe_float(bucket.get(s.key)) if isinstance(bucket, dict) else '' for s in segments]
+
+    return [
+        row.get('seq', ''), row.get('customerName', ''), row.get('companyCode', ''), row.get('relationType', ''),
+        row.get('priorUnadjusted', ''), row.get('priorAje', ''), row.get('priorRje', ''), row.get('priorAudited', ''),
+        *_period_vals('agingPrior'),
+        row.get('debitOccurrence', ''), row.get('creditOccurrence', ''), row.get('endBalance', ''),
+        row.get('reclassification', ''), row.get('currentUnadjusted', ''),
+        *_period_vals('agingCurrent'),
+        row.get('currentAje', ''), row.get('currentRje', ''), row.get('currentAudited', ''),
+        *_period_vals('agingAudited'),
+        row.get('creditRiskClassification', ''), row.get('groupName', ''),
+        '是' if row.get('isConfirmation') else '', row.get('postPayment', ''), row.get('remark', ''),
+    ]
+
+
 SHEET_ITEM_ID_MAP: dict[str, str] = {
     'D2-2': 'D2-detail-rows',
     'D2-4': 'D2-entry-rows',
@@ -193,12 +249,16 @@ def _validate_sheet(sheet: str) -> None:
         )
 
 
-def _create_template_workbook(sheet: str) -> "Workbook":
+def _create_template_workbook(sheet: str, segments: list[Any] | None = None) -> "Workbook":
     wb = Workbook()
     ws = wb.active
     ws.title = sheet
 
-    columns = SHEET_COLUMNS[sheet]
+    # D2-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
+    if sheet == 'D2-2':
+        columns = get_d2_2_columns(segments or [])
+    else:
+        columns = SHEET_COLUMNS[sheet]
     header_font = Font(bold=True, size=11)
     header_fill = PatternFill(
         start_color="D9E1F2", end_color="D9E1F2", fill_type="solid"
@@ -226,22 +286,35 @@ def _create_template_workbook(sheet: str) -> "Workbook":
 
 
 def _validate_columns(ws: Any, sheet: str) -> list[str]:
-    """校验列名，返回不匹配的列名列表"""
-    expected = set(SHEET_COLUMNS[sheet])
+    """校验列名，返回不匹配的列名列表。
+
+    D2-2：校验固定基础列（_D2_2_BASE_COLUMNS），账龄列（形如 `1年以内(期初)`）按 label
+    动态匹配，不作为非法列（Task 12.2）。
+    """
+    if sheet == 'D2-2':
+        expected = set(_D2_2_BASE_COLUMNS)
+    else:
+        expected = set(SHEET_COLUMNS[sheet])
     actual: list[str] = []
     for cell in ws[1]:
         if cell.value is not None:
             actual.append(str(cell.value).strip())
 
-    invalid = [col for col in actual if col not in expected]
+    invalid = [
+        col for col in actual
+        if col not in expected and not (sheet == 'D2-2' and _looks_like_aging(col))
+    ]
     if len(actual) < 3:
         invalid.append('列数不足(至少需要3列)')
     return invalid
 
 
 def _parse_rows(ws: Any, sheet: str) -> tuple[list[dict], str | None]:
-    """解析数据行为 dict 列表，超500行截断"""
-    columns = SHEET_COLUMNS[sheet]
+    """解析数据行为 dict 列表，超500行截断。
+
+    D2-2 保留全部实际列（含动态账龄列），供 _parse_d2_2_rows 按 label 匹配。
+    """
+    columns = None if sheet == 'D2-2' else SHEET_COLUMNS[sheet]
     actual_cols: list[str] = []
     for cell in ws[1]:
         if cell.value is not None:
@@ -265,7 +338,7 @@ def _parse_rows(ws: Any, sheet: str) -> tuple[list[dict], str | None]:
         for col_idx, val in enumerate(row):
             if col_idx < len(actual_cols):
                 col_name = actual_cols[col_idx]
-                if col_name in columns:
+                if col_name and (columns is None or col_name in columns):
                     row_dict[col_name] = val if val is not None else ''
         rows.append(row_dict)
 
@@ -277,7 +350,14 @@ def _yes_no(val: Any) -> bool:
     return s in ('是', 'yes', 'true', '1', 'y')
 
 
-def _parse_d2_2_rows(rows: list[dict]) -> list[dict]:
+def _parse_d2_2_rows(rows: list[dict], segments: list[Any] | None = None) -> list[dict]:
+    """解析 D2-2 明细行 → nested keyed 结构（agingPrior/agingCurrent/agingAudited）。Task 12.2。
+
+    账龄列按 label 匹配当前项目账龄配置（segments），格式 `{label}({period_label})`，
+    不再写入 legacy flat 字段（priorAging1Year 等）。segments 为空时账龄容器为空对象。
+    """
+    segs = segments or []
+    periods = subject_aging_periods('D2')  # [prior, current, audited]
     out: list[dict] = []
     for i, r in enumerate(rows, start=1):
         prior_u = safe_float(r.get('期初未审'))
@@ -286,6 +366,9 @@ def _parse_d2_2_rows(rows: list[dict]) -> list[dict]:
         cur_u = safe_float(r.get('期末未审'))
         cur_a = safe_float(r.get('账项调整(AJE)')) or safe_float(r.get('期末AJE'))
         cur_r = safe_float(r.get('重分类调整(RJE)')) or safe_float(r.get('期末RJE'))
+        aging_nested, _unmatched = match_import_aging(
+            lambda h: r.get(h), list(r.keys()), segs, periods,
+        )
         out.append({
             'rowId': str(uuid4()),
             'seq': int(safe_float(r.get('序号'))) or i,
@@ -295,40 +378,38 @@ def _parse_d2_2_rows(rows: list[dict]) -> list[dict]:
             'priorUnadjusted': prior_u,
             'priorAje': prior_a,
             'priorRje': prior_r,
-            'priorAudited': prior_u + prior_a + prior_r,
-            'priorAging1Year': safe_float(r.get('1年以内(期初)')),
-            'priorAging1to2': safe_float(r.get('1-2年(期初)')),
-            'priorAging2to3': safe_float(r.get('2-3年(期初)')),
-            'priorAging3to4': safe_float(r.get('3-4年(期初)')),
-            'priorAging4to5': safe_float(r.get('4-5年(期初)')),
-            'priorAgingOver5': safe_float(r.get('5年以上(期初)')),
+            'priorAudited': safe_float(r.get('期初审定')) or (prior_u + prior_a + prior_r),
             'debitOccurrence': safe_float(r.get('借方发生')),
             'creditOccurrence': safe_float(r.get('贷方发生')),
             'endBalance': safe_float(r.get('期末余额')),
             'reclassification': safe_float(r.get('重分类')),
             'currentUnadjusted': cur_u,
-            'currentAging1Year': safe_float(r.get('1年以内(期末)')),
-            'currentAging1to2': safe_float(r.get('1-2年(期末)')),
-            'currentAging2to3': safe_float(r.get('2-3年(期末)')),
-            'currentAging3to4': safe_float(r.get('3-4年(期末)')),
-            'currentAging4to5': safe_float(r.get('4-5年(期末)')),
-            'currentAgingOver5': safe_float(r.get('5年以上(期末)')),
             'currentAje': cur_a,
             'currentRje': cur_r,
             'currentAudited': safe_float(r.get('期末审定')) or (cur_u + cur_a + cur_r),
-            'auditedAging1Year': safe_float(r.get('1年以内(审定)')),
-            'auditedAging1to2': safe_float(r.get('1-2年(审定)')),
-            'auditedAging2to3': safe_float(r.get('2-3年(审定)')),
-            'auditedAging3to4': safe_float(r.get('3-4年(审定)')),
-            'auditedAging4to5': safe_float(r.get('4-5年(审定)')),
-            'auditedAgingOver5': safe_float(r.get('5年以上(审定)')),
             'creditRiskClassification': safe_str(r.get('信用风险组合方式')),
             'groupName': safe_str(r.get('组合名称')),
             'isConfirmation': _yes_no(r.get('是否函证')),
             'postPayment': safe_float(r.get('期后回款')),
             'remark': safe_str(r.get('备注')),
+            **aging_nested,
         })
     return out
+
+
+def _d2_2_skipped_aging_columns(rows: list[dict], segments: list[Any] | None) -> list[str]:
+    """检测 D2-2 导入行中不匹配当前账龄配置的账龄列（Task 12.2，Requirement 8.3）。"""
+    all_headers: list[str] = []
+    seen: set[str] = set()
+    for r in rows:
+        for k in r.keys():
+            if k and k not in seen:
+                seen.add(k)
+                all_headers.append(k)
+    _, unmatched = match_import_aging(
+        lambda _h: None, all_headers, segments or [], subject_aging_periods('D2'),
+    )
+    return unmatched
 
 
 def _create_fixed_d2_3_row(category: str) -> dict:
@@ -700,10 +781,12 @@ def _parse_d2_13_rows(rows: list[dict]) -> dict[str, list[dict]]:
     }
 
 
-def _rows_to_storage_map(sheet: str, rows: list[dict]) -> dict[str, list[dict]]:
+def _rows_to_storage_map(
+    sheet: str, rows: list[dict], segments: list[Any] | None = None
+) -> dict[str, list[dict]]:
     """解析导入行并映射为 item_id → rows（单 key sheet 亦返回单元素 dict）。"""
     if sheet == 'D2-2':
-        return {SHEET_ITEM_ID_MAP['D2-2']: _parse_d2_2_rows(rows)}
+        return {SHEET_ITEM_ID_MAP['D2-2']: _parse_d2_2_rows(rows, segments)}
     if sheet == 'D2-3':
         return _parse_d2_3_by_category(rows)
     if sheet == 'D2-4':
@@ -1116,11 +1199,14 @@ async def _import_d2_5_data(
 async def export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet名称"),
+    db: AsyncSession = Depends(get_db),
 ):
     """导出空白xlsx模板（含表头+格式）"""
     _validate_sheet(sheet)
 
-    wb = _create_template_workbook(sheet)
+    # D2-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
+    segments = await resolve_aging_segments(db, wp_id, 'D2') if sheet == 'D2-2' else None
+    wb = _create_template_workbook(sheet, segments)
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -1159,10 +1245,15 @@ async def export_data(
         stored_by_key[key] = await load_json_rows(db, wp_id, key, field='remark')
     stored = _load_stored_rows(sheet, stored_by_key)
 
-    wb = _create_template_workbook(sheet)
+    # D2-2 明细表：账龄列头/值按项目账龄配置动态生成（Task 12.1）
+    segments = await resolve_aging_segments(db, wp_id, 'D2') if sheet == 'D2-2' else None
+    wb = _create_template_workbook(sheet, segments)
     ws = wb.active
     for row in stored:
-        ws.append(_export_row_values(sheet, row))
+        if sheet == 'D2-2':
+            ws.append(_d2_2_export_values(row, segments or []))
+        else:
+            ws.append(_export_row_values(sheet, row))
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -1244,17 +1335,28 @@ async def import_data(
             }
         }
 
-    storage_map = _rows_to_storage_map(sheet, rows)
+    # D2-2：解析账龄列前解析项目账龄配置 segments（Task 12.2）
+    segments = await resolve_aging_segments(db, wp_id, 'D2') if sheet == 'D2-2' else None
+    skipped_columns = _d2_2_skipped_aging_columns(rows, segments) if sheet == 'D2-2' else []
+
+    storage_map = _rows_to_storage_map(sheet, rows, segments)
     for item_id, stored_rows in storage_map.items():
         await upsert_json_rows(db, wp_id, item_id, stored_rows, field='remark')
 
     total_rows = sum(len(v) for v in storage_map.values())
-    field_count = len(SHEET_COLUMNS[sheet])
+    field_count = (
+        len(get_d2_2_columns(segments or [])) if sheet == 'D2-2' else len(SHEET_COLUMNS[sheet])
+    )
     result: dict[str, Any] = {
         "rowCount": total_rows,
         "fieldCount": field_count,
     }
     if warning:
         result["warning"] = warning
+    if skipped_columns:
+        result["skipped_columns"] = skipped_columns
+        result["warnings"] = [
+            f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped_columns)}"
+        ]
 
     return {"data": result}

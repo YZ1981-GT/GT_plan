@@ -42,7 +42,7 @@ export {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, customQuery, systemDicts, adminLogs,
+  addressRegistry, acnr, customQuery, systemDicts, adminLogs,
   officePreview,
 } from './system'
 
@@ -83,7 +83,7 @@ import {
   governance, eqcr, signatures, rotation, archive, subsequentEvents,
   goingConcern, riskAssessments, auditPrograms, findings, managementLetter,
   linkage, linkageBus, conflictGuard, chainWorkflow, dataLock,
-  addressRegistry, customQuery, systemDicts, adminLogs,
+  addressRegistry, acnr, customQuery, systemDicts, adminLogs,
   officePreview,
 } from './system'
 
@@ -111,7 +111,7 @@ export const API = {
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
   customQuery, systemDicts, adminLogs,
-  officePreview,
+  officePreview, acnr,
 } as const
 
 export default API

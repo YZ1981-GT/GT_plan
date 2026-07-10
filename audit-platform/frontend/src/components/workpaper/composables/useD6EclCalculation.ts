@@ -192,7 +192,7 @@ export function recalcAgingRow(row: EclAgingRow): EclAgingRow {
 /**
  * 基于项目账龄段配置创建初始行（Req 9.1: 按 segments 初始化，替代硬编码6行）
  */
-function createAgingRowsFromSegments(segments: AgingSegment[]): EclAgingRow[] {
+export function createAgingRowsFromSegments(segments: AgingSegment[]): EclAgingRow[] {
   return segments.map(seg => ({
     rowId: generateRowId(),
     segmentKey: seg.key,

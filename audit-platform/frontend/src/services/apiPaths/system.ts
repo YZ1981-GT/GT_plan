@@ -589,6 +589,16 @@ export const addressRegistry = {
   },
 } as const
 
+// ─── ACNR 地址坐标名称注册中心（统一出口） ──────────────────────────────────
+
+export const acnr = {
+  entries: '/api/acnr/entries',
+  anchors: '/api/acnr/anchors',
+  resolve: '/api/acnr/resolve',
+  lookup: '/api/acnr/lookup',
+  resolveInstance: '/api/acnr/resolve-instance',
+} as const
+
 // ─── 自定义查询 ─────────────────────────────────────────────────────────────
 
 export const customQuery = {

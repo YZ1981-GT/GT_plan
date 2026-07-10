@@ -497,6 +497,17 @@ const props = defineProps<{
   exceptionDesc?: string
   /** 例外描述变更回调 */
   updateExceptionDesc?: (devIndex: number, desc: string) => void
+  /**
+   * 共享 AI 生成流程（父组件 GtCControlTest 提供）：先弹 OCR 附件选择器，
+   * 将选中附件 OCR 文本并入 context["参考资料（OCR识别）"] 后调用 /ai/generate-text。
+   * 缺省时回退为直接调用端点（不带附件 OCR 上下文）。
+   */
+  aiGenerateWithOcr?: (params: {
+    section: string
+    prompt: string
+    existingContent: string
+    context: Record<string, string>
+  }) => Promise<string>
 }>()
 
 const emit = defineEmits<{
@@ -529,6 +540,13 @@ const aiGeneratingException = ref(false)
 
 async function handleAiGenerateException(): Promise<void> {
   if (props.readonly || aiGeneratingException.value) return
+
+  const wpId = props.wpId
+  if (!wpId) {
+    ElMessage.warning('AI服务暂不可用（缺少底稿ID）')
+    return
+  }
+
   aiGeneratingException.value = true
   try {
     const context: Record<string, string> = {}
@@ -538,23 +556,30 @@ async function handleAiGenerateException(): Promise<void> {
 
     const systemHint = '请根据以下控制点信息，生成一段专业的控制例外情况描述（80~150字），需包含：例外具体表现、涉及的交易金额或笔数、发生时间区间、影响范围。使用审计专业用语。'
 
-    const wpId = props.wpId
-    if (!wpId) {
-      ElMessage.warning('AI服务暂不可用（缺少底稿ID）')
-      return
+    let generated = ''
+    if (props.aiGenerateWithOcr) {
+      // 走共享流程：先弹 OCR 附件选择器 → context["参考资料（OCR识别）"] → /ai/generate-text
+      generated = await props.aiGenerateWithOcr({
+        section: 'control-exception-description',
+        prompt: systemHint,
+        existingContent: exceptionDescription.value || '',
+        context,
+      })
+    } else {
+      // 回退：直接调用端点（不带附件 OCR 上下文）
+      const res = await http.post(
+        `/api/workpapers/${wpId}/ai/generate-text`,
+        {
+          prompt: systemHint,
+          context,
+          existingContent: exceptionDescription.value || '',
+          section: 'control-exception-description',
+        },
+        { _silent: true } as any,
+      )
+      generated = res?.data?.data?.content || res?.data?.content || res?.data?.text || ''
     }
 
-    const res = await http.post(
-      `/api/workpapers/${wpId}/ai/generate-text`,
-      {
-        prompt: systemHint,
-        context,
-        existingContent: exceptionDescription.value || '',
-        section: 'control-exception-description',
-      },
-      { _silent: true } as any,
-    )
-    const generated = res?.data?.data?.content || res?.data?.content || res?.data?.text || ''
     if (generated) {
       exceptionDescription.value = generated
       handleExceptionDescBlur() // 持久化

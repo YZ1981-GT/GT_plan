@@ -56,6 +56,17 @@
             </div>
           </div>
 
+          <!-- 编制提示琥珀块（偏差评价方法论上下文，readonly 也展示） -->
+          <details v-if="guidanceCx2?.sections?.length" class="amber-context">
+            <summary>编制提示</summary>
+            <div class="amber-context__body">
+              <div v-for="(sec, i) in guidanceCx2.sections" :key="i" class="amber-context__section">
+                <strong>{{ sec.heading }}</strong>
+                <p style="white-space: pre-wrap;">{{ sec.content }}</p>
+              </div>
+            </div>
+          </details>
+
           <!-- 决策树组件（直接渲染，非弹窗） -->
           <CControlTestDecisionTree
             ref="standaloneDecisionTreeRef"
@@ -72,6 +83,7 @@
             :build-defect-summary="buildDefectSummary"
             :exception-desc="activeExceptionDesc"
             :update-exception-desc="updateExceptionDesc"
+            :ai-generate-with-ocr="aiGenerateWithOcr"
             @navigate="handleDeviationNavigateStandalone"
             @change-dev-index="handleChangeDevIndex"
           />
@@ -354,6 +366,17 @@
       append-to-body
       class="cct-l1-dialog"
     >
+      <!-- 编制提示琥珀块（方法论上下文，readonly 也展示） -->
+      <details v-if="guidanceL1?.sections?.length" class="amber-context">
+        <summary>编制提示</summary>
+        <div class="amber-context__body">
+          <div v-for="(sec, i) in guidanceL1.sections" :key="i" class="amber-context__section">
+            <strong>{{ sec.heading }}</strong>
+            <p style="white-space: pre-wrap;">{{ sec.content }}</p>
+          </div>
+        </div>
+      </details>
+
       <CControlTestSubPage
         v-if="controlDialogVisible"
         :wp-id="wpId"
@@ -371,6 +394,7 @@
         :update-sample-description="updateSampleDescription"
         :update-sample-result="updateSampleResult"
         :update-summary-deviation="handleDeviationBackfill"
+        :ai-generate-with-ocr="aiGenerateWithOcr"
         @navigate="handleSubPageNavigate"
       />
       <template #footer>
@@ -400,6 +424,17 @@
       append-to-body
       class="cct-l2-dialog"
     >
+      <!-- 编制提示琥珀块（偏差评价方法论上下文，readonly 也展示） -->
+      <details v-if="guidanceCx2?.sections?.length" class="amber-context">
+        <summary>编制提示</summary>
+        <div class="amber-context__body">
+          <div v-for="(sec, i) in guidanceCx2.sections" :key="i" class="amber-context__section">
+            <strong>{{ sec.heading }}</strong>
+            <p style="white-space: pre-wrap;">{{ sec.content }}</p>
+          </div>
+        </div>
+      </details>
+
       <CControlTestDecisionTree
         v-if="deviationDialogVisible"
         :wp-code="wpCode"
@@ -415,6 +450,7 @@
         :build-defect-summary="buildDefectSummary"
         :exception-desc="activeExceptionDesc"
         :update-exception-desc="updateExceptionDesc"
+        :ai-generate-with-ocr="aiGenerateWithOcr"
         @navigate="handleDeviationNavigate"
         @change-dev-index="handleChangeDevIndex"
       />
@@ -424,6 +460,19 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         OCR 附件选择器（L1 子页 + Cx-2 偏差评价 AI 生成前共用）
+         由本组件唯一持有缓存，向 picker 传入共享 ocrCache
+         ═══════════════════════════════════════════════════════════════════ -->
+    <OcrAttachmentPicker
+      v-model:visible="ocrPickerVisible"
+      :wp-id="wpId"
+      :project-id="projectId"
+      :ocr-cache="ocrCache"
+      @confirm="handleOcrConfirm"
+      @cancel="handleOcrCancel"
+    />
   </div>
 </template>
 
@@ -440,6 +489,9 @@ import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
 import CControlTestSummaryTable from './cControlTest/CControlTestSummaryTable.vue'
 import CControlTestSubPage from './cControlTest/CControlTestSubPage.vue'
 import CControlTestDecisionTree from './cControlTest/CControlTestDecisionTree.vue'
+import OcrAttachmentPicker from './cControlTest/OcrAttachmentPicker.vue'
+import { useOcrAttachmentCache, OCR_CONTEXT_KEY } from '@/composables/useOcrAttachmentCache'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -525,6 +577,138 @@ const { state, loading, selfLoad, flushPendingSaves,
   addSample, removeSample, updateSampleDescription, updateSampleResult,
   updateDeviationStep, ensureDeviationSlots, writebackDefect, buildDefectSummary } =
   useCControlTestData(wpIdRef, projectIdRef, effectiveWpCodeRef, isReadonly)
+
+// ─── Guidance (编制提示琥珀块) ────────────────────────────────────────────────
+
+interface GuidanceSection {
+  heading: string
+  content: string
+}
+interface GuidanceData {
+  wp_code: string
+  title: string
+  sections: GuidanceSection[]
+  source: string
+}
+
+/** L1 Dialog 编制提示（来自 render-config html_data.guidance） */
+const guidanceL1 = ref<GuidanceData | null>(null)
+/** Cx-2 偏差评价编制提示（来自 render-config html_data.guidance_cx2） */
+const guidanceCx2 = ref<GuidanceData | null>(null)
+
+/** 从 render-config 加载 guidance / guidance_cx2（缺失静默降级为 null） */
+async function loadGuidance(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const res = await http.get(
+      `/api/workpapers/${props.wpId}/render-config`,
+      { params: { force_component_type: 'c-control-test' }, _silent: true } as any,
+    )
+    const sheets = res?.data?.data?.sheets || res?.data?.sheets || []
+    const htmlData = sheets[0]?.html_data || {}
+    guidanceL1.value = htmlData.guidance || null
+    guidanceCx2.value = htmlData.guidance_cx2 || null
+  } catch {
+    // 加载失败静默降级：琥珀块 v-if 隐藏
+    guidanceL1.value = null
+    guidanceCx2.value = null
+  }
+}
+
+// ─── OCR 附件选择缓存 + AI 生成集成（Task 10.1 / 11.1 / 12.1） ─────────────────
+
+/**
+ * dialog 级 OCR 附件缓存。
+ * - ocrCache：组件生命周期持久（重复 AI 生成不重复 OCR），resetListCache 不清除它
+ * - attachmentList：dialog session 内缓存，dialog 关闭时 resetListCache()
+ * 由本组件（父级）唯一持有，向 OcrAttachmentPicker 传入共享的 ocrCache。
+ */
+const {
+  ocrCache,
+  attachmentList,
+  attachmentListLoaded,
+  loadAttachments,
+  resetListCache,
+} = useOcrAttachmentCache()
+
+/** OcrAttachmentPicker 显隐 */
+const ocrPickerVisible = ref(false)
+/** 当前挂起的取件 Promise resolver（picker confirm/cancel 时兑现） */
+let ocrPickerResolve: ((payload: { ocrText: string; failedIds: string[] }) => void) | null = null
+
+/** 打开附件选择器并等待用户确认/取消，返回 OCR 文本与失败 ID */
+function pickOcrText(): Promise<{ ocrText: string; failedIds: string[] }> {
+  return new Promise((resolve) => {
+    ocrPickerResolve = resolve
+    ocrPickerVisible.value = true
+  })
+}
+
+/** picker 确认：兑现 Promise 并关闭 */
+function handleOcrConfirm(payload: { ocrText: string; failedIds: string[] }): void {
+  ocrPickerVisible.value = false
+  if (ocrPickerResolve) {
+    ocrPickerResolve(payload)
+    ocrPickerResolve = null
+  }
+}
+
+/** picker 取消：以空文本兑现 Promise（不阻塞 AI 生成） */
+function handleOcrCancel(): void {
+  ocrPickerVisible.value = false
+  if (ocrPickerResolve) {
+    ocrPickerResolve({ ocrText: '', failedIds: [] })
+    ocrPickerResolve = null
+  }
+}
+
+/**
+ * 共享 AI 生成流程（供 L1 子页与 Cx-2 偏差评价复用）。
+ *
+ * 流程：
+ * 1. 加载底稿附件列表（判断是否存在可选附件）
+ * 2. 若存在附件 → 弹出 OcrAttachmentPicker，等待用户勾选并 OCR 识别 → 得到 ocrText
+ *    若无附件（Req 5.4）→ 跳过选择器，直接生成
+ * 3. 有 ocrText 时并入 context["参考资料（OCR识别）"]
+ * 4. 调用通用端点 /ai/generate-text，返回生成文本（失败返回空串）
+ *
+ * @returns 生成的文本内容；失败或无返回时为空串
+ */
+async function aiGenerateWithOcr(params: {
+  section: string
+  prompt: string
+  existingContent: string
+  context: Record<string, string>
+}): Promise<string> {
+  if (!props.wpId) return ''
+
+  const context: Record<string, string> = { ...params.context }
+
+  // 加载附件列表以判断是否需要弹出选择器（Req 4.1 / 5.4）
+  await loadAttachments(props.wpId)
+  if (attachmentList.value.length > 0) {
+    const { ocrText } = await pickOcrText()
+    if (ocrText) {
+      context[OCR_CONTEXT_KEY] = ocrText
+    }
+  }
+
+  try {
+    const res = await http.post(
+      `/api/workpapers/${props.wpId}/ai/generate-text`,
+      {
+        prompt: params.prompt,
+        context,
+        existingContent: params.existingContent || '',
+        section: params.section,
+      },
+      { _silent: true } as any,
+    )
+    return res?.data?.data?.content || res?.data?.content || res?.data?.text || ''
+  } catch {
+    return ''
+  }
+}
 
 // ─── Dialog State ────────────────────────────────────────────────────────────
 
@@ -981,7 +1165,7 @@ async function handleAiGenerateDescription(): Promise<void> {
 
     // 附件OCR文本作为参考资料
     const ocrMaterial = editOcrTexts.value.filter(t => t.trim()).join('\n---\n')
-    if (ocrMaterial) context['参考资料（OCR识别）'] = ocrMaterial.slice(0, 3000)
+    if (ocrMaterial) context[OCR_CONTEXT_KEY] = ocrMaterial.slice(0, 3000)
 
     // 编制提示作为system指令的一部分
     const systemHint = '请根据以下信息，生成一段专业的内部控制活动描述（100~200字），需包含：谁执行、什么频率、做什么、产生什么证据、如何复核。'
@@ -1018,15 +1202,42 @@ function handleFabAdd() {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
+/**
+ * 附件上传事件：使附件列表缓存失效，下次加载时刷新（Req 6.4 / Task 12.1）。
+ * 仅重置列表加载标志，ocrCache 保留（组件生命周期持久）。
+ */
+function onAttachmentUploaded(): void {
+  attachmentListLoaded.value = false
+}
+
 onMounted(async () => {
   await selfLoad()
   syncDeviationViewState()
+  loadGuidance()
+  // 订阅附件上传事件 → 刷新附件列表缓存
+  eventBus.on('attachment:uploaded', onAttachmentUploaded)
 })
 
 watch(
   () => [isDeviationSheet.value, props.sheetName, loading.value] as const,
   () => {
     if (!loading.value) syncDeviationViewState()
+  },
+)
+
+/**
+ * L1 / Cx-2 弹窗生命周期缓存管理（Task 12.1）：
+ * - 打开时 loadAttachments 预热附件列表
+ * - 关闭时 resetListCache 清列表缓存（ocrCache 保留）
+ */
+watch(
+  () => controlDialogVisible.value || deviationDialogVisible.value,
+  (open) => {
+    if (open) {
+      if (props.wpId) loadAttachments(props.wpId)
+    } else {
+      resetListCache()
+    }
   },
 )
 
@@ -1038,6 +1249,7 @@ function syncDeviationViewState() {
 
 onBeforeUnmount(() => {
   flushPendingSaves()
+  eventBus.off('attachment:uploaded', onAttachmentUploaded)
 })
 </script>
 
@@ -1335,6 +1547,42 @@ onBeforeUnmount(() => {
 
 .cct-tips-content p {
   margin: 0 0 4px;
+}
+
+/* ─── 编制提示琥珀块 (.amber-context) ─── */
+.amber-context {
+  margin-bottom: 12px;
+  border-left: 4px solid #d97706; /* amber-600 */
+  background: #fffbeb; /* amber-50 */
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.amber-context > summary {
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #92400e; /* amber-800 */
+}
+
+.amber-context__body {
+  padding: 0 12px 10px;
+}
+
+.amber-context__section {
+  margin-bottom: 8px;
+}
+
+.amber-context__section strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #78350f; /* amber-900 */
+}
+
+.amber-context__section p {
+  margin: 0;
+  color: #451a03; /* amber-950 */
 }
 
 /* ─── L0.5 Edit Control Dialog ─── */

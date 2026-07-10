@@ -18,7 +18,7 @@
     - 实现 `validate_config(payload)` 方法 (段数2-10/非空label/label唯一)
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-  - [ ]* 1.2 编写 AgingConfigService 属性测试
+  - [x]* 1.2 编写 AgingConfigService 属性测试
     - **Property 1: Preset resolution returns correct segments**
     - **Property 2: Default preset inference by subject**
     - **Property 3: Configuration round-trip preservation**
@@ -32,7 +32,7 @@
     - 实现 `get_effective_segments(project_id, subject)` 含 subject_overrides 解析
     - _Requirements: 1.2, 1.3, 2.5, 10.1_
 
-  - [ ]* 1.4 编写 get_config/save_config 单元测试
+  - [x]* 1.4 编写 get_config/save_config 单元测试
     - 测试默认配置推断逻辑
     - 测试 subject_overrides 覆盖逻辑
     - 测试无 wizard_state 时的兜底行为
@@ -47,7 +47,7 @@
     - 在 router_registry 注册路由
     - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-  - [ ]* 2.2 编写 API 端点单元测试
+  - [x]* 2.2 编写 API 端点单元测试
     - 测试 GET 正常返回结构
     - 测试 PUT 校验失败返回 422 (空 label/重复 label/段数超限)
     - 测试 PUT 成功保存并返回配置
@@ -68,7 +68,7 @@
     - 实现 EventBus 监听 `aging-config:changed` 事件刷新配置
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-  - [ ]* 4.2 编写 useAgingConfig 属性测试
+  - [x]* 4.2 编写 useAgingConfig 属性测试
     - **Property 5: Config-to-bands transformation with subject override**
     - **Property 6: Three-period subject row generation (D2/K1/K3/G5)**
     - **Property 7: Two-period subject row generation (D3/F1)**
@@ -84,7 +84,7 @@
     - 实现配置变更时的数据保留逻辑 (已有段保留/新增段零初始化)
     - _Requirements: 4.3, 5.3, 5.4, 10.2, 10.3, 10.4_
 
-  - [ ]* 5.2 编写迁移工具属性测试
+  - [x]* 5.2 编写迁移工具属性测试
     - **Property 8: D2 legacy flat-to-nested migration preserves all values**
     - **Property 9: D3/F1 legacy key migration preserves values**
     - **Property 10: Config change preserves existing segment data**
@@ -109,7 +109,7 @@
     - 确保列标题从 band.label 读取
     - _Requirements: 4.4_
 
-- [ ] 8. D3/F1 明细表账龄动态化改造
+- [x] 8. D3/F1 明细表账龄动态化改造
   - [x] 8.1 改造 useD3Detail 和 useF1Detail composable
     - 引入 useAgingConfig composable (subject='D3'/'F1')
     - 将 DetailRow 数据结构改为 nested keyed (agingPrior/agingAudited, 无 agingCurrent)
@@ -134,7 +134,7 @@
     - 移除各自硬编码的列定义
     - _Requirements: 6.4_
 
-- [-] 10. Checkpoint - 明细表改造验证
+- [x] 10. Checkpoint - 明细表改造验证
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 11. 账龄配置 UI 管理界面
@@ -149,56 +149,56 @@
     - 已有数据变更时弹确认警告 (段被移除将丢失数据)
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
 
-  - [ ]* 11.2 编写 AgingConfigDialog 单元测试
+  - [x]* 11.2 编写 AgingConfigDialog 单元测试
     - 测试预设切换 UI 行为
     - 测试自定义段校验逻辑
     - 测试确认提交流程
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 12. 导入导出适配
-  - [-] 12.1 改造导出服务支持动态账龄列头
+- [x] 12. 导入导出适配
+  - [x] 12.1 改造导出服务支持动态账龄列头
     - 修改各明细表的导出模板生成逻辑
     - 基于 useAgingConfig.bands 动态生成列头 (3N for D2/K1/K3/G5, 2N for D3/F1)
     - 确保导出的列头与当前项目配置一致
     - _Requirements: 8.1_
 
-  - [-] 12.2 改造导入服务支持 label 匹配
+  - [x] 12.2 改造导入服务支持 label 匹配
     - 导入时按列头 label 匹配当前配置的 segment
     - 不匹配的列报 warning 并跳过
     - 配置变更后导入旧模板时尝试按 label 映射
     - _Requirements: 8.2, 8.3, 8.4_
 
-  - [ ]* 12.3 编写导入导出属性测试
+  - [x]* 12.3 编写导入导出属性测试
     - **Property 12: Export header generation from bands**
     - **Property 13: Import label matching maps correctly**
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.4**
 
-- [ ] 13. D6 坏账准备 ECL 联动
-  - [ ] 13.1 改造 D6 ECL 计算 composable 联动账龄配置
+- [x] 13. D6 坏账准备 ECL 联动
+  - [x] 13.1 改造 D6 ECL 计算 composable 联动账龄配置
     - 引入 useAgingConfig 获取当前段定义
     - ECL 分组创建时按 segments 初始化行 (替代硬编码6行)
     - 配置变更时：已有段保留 lossRate/bookBalance，新增段零初始化，移除段标记归档
     - _Requirements: 9.1, 9.2, 9.3_
 
-  - [ ]* 13.2 编写 ECL 联动属性测试
+  - [x]* 13.2 编写 ECL 联动属性测试
     - **Property 14: ECL group syncs with aging config**
     - **Validates: Requirements 9.1, 9.2, 9.3**
 
-- [ ] 14. 集成与串联
-  - [~] 14.1 EventBus 配置变更通知链路串联
+- [x] 14. 集成与串联
+  - [x] 14.1 EventBus 配置变更通知链路串联
     - 后端 save_config 成功后 publish `aging-config:changed` 事件
     - 前端 useAgingConfig 监听 window event 触发 refresh
     - 各 Detail composable 响应式更新列定义
     - AgingConfigDialog 入口集成到项目设置页面
     - _Requirements: 3.3, 3.5, 4.5_
 
-  - [ ]* 14.2 编写集成测试
+  - [x]* 14.2 编写集成测试
     - 测试完整 PUT→EventBus→前端刷新链路
     - 测试 D6 ECL 联动端到端
     - 测试导入导出 XLSX 往返
     - _Requirements: 3.3, 9.2, 8.1, 8.2_
 
-- [~] 15. Final checkpoint - 全链路验证
+- [x] 15. Final checkpoint - 全链路验证
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

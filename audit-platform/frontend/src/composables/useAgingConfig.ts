@@ -78,6 +78,38 @@ export function segmentsToBands(segments: AgingSegment[], subject?: string): Agi
   }))
 }
 
+/** 导出列头的账龄期间标签（与后端 AGING_PERIOD_LABELS 保持一致） */
+export const AGING_EXPORT_PERIOD_LABELS = {
+  prior: '期初',
+  current: '期末未审',
+  audited: '期末审定',
+} as const
+
+/**
+ * 从 bands 生成导出账龄列头（供导出服务动态列头使用）。
+ *
+ * - 3-period subjects（D2/K1/K3/G5）：每个 band 生成 3 列（期初/期末未审/期末审定）→ 3N 列
+ * - 2-period subjects（D3/F1）：每个 band 生成 2 列（期初/期末审定）→ 2N 列
+ *
+ * 列头顺序严格遵循 bands 数组顺序，并使用 band.label。
+ * 列头格式：`{label}({periodLabel})`，例如 `1年以内(期初)`。
+ *
+ * 是否含「期末未审」列由 band.currentField 是否非空决定（segmentsToBands 已按 subject 设置）。
+ *
+ * Requirements: 8.1
+ */
+export function buildAgingExportHeaders(bands: AgingBand[], _subject?: string): string[] {
+  const headers: string[] = []
+  for (const band of bands) {
+    headers.push(`${band.label}(${AGING_EXPORT_PERIOD_LABELS.prior})`)
+    if (band.currentField) {
+      headers.push(`${band.label}(${AGING_EXPORT_PERIOD_LABELS.current})`)
+    }
+    headers.push(`${band.label}(${AGING_EXPORT_PERIOD_LABELS.audited})`)
+  }
+  return headers
+}
+
 /**
  * 为指定 subject 创建空的 aging 数据对象（所有段初始化为 0）
  */

@@ -63,6 +63,18 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
         "title": "K1-2 其他应收款明细表",
         "headers": _K1_2_HEADERS,
         "field_keys": _K1_2_KEYS,
+        # 动态账龄列头（Task 12.1）：导出时基础列 + 项目账龄配置派生的 3N 账龄列（期初/期末未审/期末审定）
+        "aging": {
+            "subject": "K1",
+            "base_headers": [
+                "往来对象", "性质", "关联关系", "期初余额", "期末余额",
+                "阶段", "坏账准备", "净值", "凭证号", "结论", "备注",
+            ],
+            "base_field_keys": [
+                "counterparty", "nature", "relatedParty", "openingBalance", "closingBalance",
+                "stage", "badDebtProvision", "netValue", "voucherNo", "conclusion", "remark",
+            ],
+        },
         "guidance": [
             "K1-2 明细表 编制说明",
             "",

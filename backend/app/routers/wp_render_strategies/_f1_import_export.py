@@ -27,8 +27,16 @@ from ._cycle_import_export_common import (
     upsert_json_rows,
     workbook_to_response,
 )
+from ._cycle_import_export_common import (
+    match_import_aging,
+    resolve_aging_segments,
+    subject_aging_periods,
+)
 from ._d3_import_export import (
+    _D3_2_BASE_HEADERS,
+    _d3_2_dynamic_headers,
     _export_d3_2_row,
+    _export_d3_2_row_dynamic,
     _export_d3_5_row,
     _export_d3_6_row,
     _export_d3_7_row,
@@ -191,10 +199,16 @@ def _template_meta(sheet: str) -> tuple[str | None, str | None, list[str]]:
 async def f1_export_template(
     wp_id: str,
     sheet: str = Query(...),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     _validate_sheet(sheet)
-    headers = _headers(sheet)
+    # F1-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
+    if sheet == "F1-2":
+        segments = await resolve_aging_segments(db, wp_id, "F1")
+        headers = _d3_2_dynamic_headers(segments)
+    else:
+        headers = _headers(sheet)
     title, subtitle, guidance = _template_meta(sheet)
     wb = build_workbook_template(sheet, headers, title=title, subtitle=subtitle, guidance=guidance)
     return workbook_to_response(wb, f"{sheet}_模板.xlsx")
@@ -208,14 +222,23 @@ async def f1_export_data(
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     _validate_sheet(sheet)
-    headers = _headers(sheet)
     item_id = _SHEET_ITEM_ID[sheet]
     rows_data = await load_json_rows(db, wp_id, item_id, field="remark")
     title, subtitle, guidance = _template_meta(sheet)
+    # F1-2 明细表：账龄列头/值按项目账龄配置动态生成（Task 12.1）
+    f1_2_segments: list[Any] = []
+    if sheet == "F1-2":
+        f1_2_segments = await resolve_aging_segments(db, wp_id, "F1")
+        headers = _d3_2_dynamic_headers(f1_2_segments)
+    else:
+        headers = _headers(sheet)
     wb = build_workbook_template(sheet, headers, title=title, subtitle=subtitle, guidance=guidance)
     ws = wb[sheet]
     for d in rows_data:
-        ws.append(_export_row(sheet, d))
+        if sheet == "F1-2":
+            ws.append(_export_d3_2_row_dynamic(d, f1_2_segments))
+        else:
+            ws.append(_export_row(sheet, d))
     return workbook_to_response(wb, f"{sheet}_数据.xlsx")
 
 
@@ -233,19 +256,42 @@ async def f1_import_data(
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "文件大小不能超过10MB")
-    headers = _headers(sheet)
     header_row = 2 if _SHEET_META.get(sheet, {}).get("title") else 1
+
+    # F1-2 明细表：账龄列按 label 动态匹配当前项目配置，验证仅校验基础列（Task 12.2）
+    f1_2_segments: list[Any] = []
+    skipped_columns: list[str] = []
+    if sheet == "F1-2":
+        f1_2_segments = await resolve_aging_segments(db, wp_id, "F1")
+        headers = _D3_2_BASE_HEADERS
+    else:
+        headers = _headers(sheet)
+
     try:
         actual, raw_rows = parse_upload_xlsx(content, headers, header_row=header_row)
     except ValueError as e:
         return {"ok": False, "errors": [str(e)], "imported_count": 0}
     except Exception:
         raise HTTPException(400, "无法解析xlsx文件")
-    rows_data, truncated = import_rows_generic(
-        raw_rows, actual, [], parse_fn=lambda r, h: _parse_row(sheet, r, h),
-    )
+
+    if sheet == "F1-2":
+        _, skipped_columns = match_import_aging(
+            lambda _h: None, actual, f1_2_segments, subject_aging_periods("D3"),
+        )
+        rows_data, truncated = import_rows_generic(
+            raw_rows, actual, [], parse_fn=lambda r, h: _parse_d3_2_row(r, h, f1_2_segments),
+        )
+    else:
+        rows_data, truncated = import_rows_generic(
+            raw_rows, actual, [], parse_fn=lambda r, h: _parse_row(sheet, r, h),
+        )
     await upsert_json_rows(db, wp_id, _SHEET_ITEM_ID[sheet], rows_data, field="remark")
     out: dict[str, Any] = {"ok": True, "imported_count": len(rows_data), "errors": []}
     if truncated:
         out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+    if skipped_columns:
+        out["skipped_columns"] = skipped_columns
+        out["warnings"] = [
+            f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped_columns)}"
+        ]
     return out

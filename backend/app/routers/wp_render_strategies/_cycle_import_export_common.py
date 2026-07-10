@@ -236,6 +236,124 @@ def build_workbook_template(
     return wb
 
 
+# ─── 动态账龄列头支持（aging-config-enhancement Task 12.1） ───────────────────
+
+# 账龄期间标签（与前端 AGING_EXPORT_PERIOD_LABELS 保持一致）
+AGING_PERIOD_LABELS: dict[str, str] = {
+    "prior": "期初",
+    "current": "期末未审",
+    "audited": "期末审定",
+}
+
+# 三期科目（含期末未审 current）：D2/K1/K3/G5；两期科目（仅期初/期末审定）：D3/F1
+_THREE_PERIOD_SUBJECTS = frozenset({"D2", "K1", "K3", "G5"})
+
+# 期间 key → DetailRow 中嵌套 aging 数据字段名
+_AGING_PERIOD_FIELD: dict[str, str] = {
+    "prior": "agingPrior",
+    "current": "agingCurrent",
+    "audited": "agingAudited",
+}
+
+
+def subject_aging_periods(subject: str) -> list[str]:
+    """返回科目对应的账龄期间列表（有序）。
+
+    - 三期科目（D2/K1/K3/G5）：[prior, current, audited]
+    - 两期科目（D3/F1）：[prior, audited]
+    """
+    if subject in _THREE_PERIOD_SUBJECTS:
+        return ["prior", "current", "audited"]
+    return ["prior", "audited"]
+
+
+def build_aging_headers(segments: list[Any], periods: list[str]) -> list[str]:
+    """按 segments 顺序 + 期间生成动态账龄列头（period-major）。
+
+    格式：`{label}({period_label})`（期初/期末未审/期末审定），委托 _aging_export_headers 的
+    header_fn 工厂，保证与导入端（12.2）列头匹配逻辑使用同一套格式。
+    """
+    from ._aging_export_headers import suffix_header_fn
+
+    headers: list[str] = []
+    for period in periods:
+        header_fn = suffix_header_fn(f"({AGING_PERIOD_LABELS.get(period, period)})")
+        headers.extend(header_fn(seg) for seg in segments)
+    return headers
+
+
+def aging_export_values(data: dict, segments: list[Any], periods: list[str]) -> list[Any]:
+    """按 build_aging_headers 相同顺序，从嵌套 aging 结构提取导出值。
+
+    读取 data['agingPrior'/'agingCurrent'/'agingAudited'][seg.key]（缺失取 0）。
+    """
+    from ._aging_export_headers import get_segment_keys
+
+    keys = get_segment_keys(segments)
+    values: list[Any] = []
+    for period in periods:
+        bucket = data.get(_AGING_PERIOD_FIELD.get(period, "")) or {}
+        for key in keys:
+            values.append(safe_float(bucket.get(key)) if isinstance(bucket, dict) else 0.0)
+    return values
+
+
+def match_import_aging(
+    get_value: Callable[[str], Any],
+    actual_headers: list[str],
+    segments: list[Any],
+    periods: list[str],
+) -> tuple[dict[str, dict[str, float]], list[str]]:
+    """按 build_aging_headers 相同格式，从导入行匹配账龄列 → nested keyed 结构。
+
+    - 列头格式 `{label}({period_label})`（期初/期末未审/期末审定），与导出端（build_aging_headers）
+      使用同一套格式，保证 export→import 往返一致。
+    - 每段 label 命中列头 → 值写入 row[period_field][seg.key]；缺列（配置变更后旧模板缺该段）→ 初始化 0。
+    - unmatched：actual_headers 中"看起来像账龄"但不属于当前 segments×periods 的列 → 返回供上层报 warning + 跳过。
+
+    返回 (aging_nested, unmatched_headers)：
+      aging_nested = {"agingPrior": {seg_key: float}, "agingCurrent": {...}, "agingAudited": {...}}
+
+    Requirements: 8.2 (label 匹配) / 8.3 (unmatched warning+skip) / 8.4 (旧模板按 label 映射)
+    """
+    from ._aging_export_headers import _looks_like_aging
+
+    expected: set[str] = set()
+    aging: dict[str, dict[str, float]] = {}
+    for period in periods:
+        field = _AGING_PERIOD_FIELD.get(period, period)
+        plabel = AGING_PERIOD_LABELS.get(period, period)
+        bucket: dict[str, float] = {}
+        for seg in segments:
+            header = f"{seg.label}({plabel})"
+            expected.add(header)
+            bucket[seg.key] = safe_float(get_value(header))
+        aging[field] = bucket
+
+    unmatched = [
+        h for h in actual_headers
+        if h and h not in expected and _looks_like_aging(h)
+    ]
+    return aging, unmatched
+
+
+async def resolve_aging_segments(db: AsyncSession, wp_id: str, subject: str) -> list[Any]:
+    """解析某底稿对应项目 + 科目的有效账龄段列表。
+
+    委托 _aging_export_headers.get_project_segments_from_wp（单一 DB 解析入口）。
+    异常时回退到该科目默认预设段，保证导出不崩。
+    """
+    from ._aging_export_headers import get_project_segments_from_wp
+
+    try:
+        return await get_project_segments_from_wp(db, wp_id, subject)
+    except Exception:  # noqa: BLE001 — 兜底：任何异常回退默认预设
+        from app.services import aging_config_service as _acs
+
+        default_preset = _acs.DEFAULT_SUBJECT_PRESETS.get(subject, _acs.AgingPreset.FIVE_YEAR)
+        return _acs.resolve_segments(default_preset, None)
+
+
 def workbook_to_response(wb: Workbook, filename: str) -> StreamingResponse:
     buf = io.BytesIO()
     wb.save(buf)
@@ -308,16 +426,42 @@ def create_cycle_import_export_router(
     def _spec(sheet: str) -> dict[str, Any]:
         return specs[sheet]
 
+    async def _export_headers(sp: dict[str, Any], wp_id: str, db: AsyncSession) -> list[str]:
+        """构建导出列头。含 aging 描述符时拼接动态账龄列头（Task 12.1）。"""
+        aging = sp.get("aging")
+        if not aging:
+            return sp["headers"]
+        subject = aging["subject"]
+        periods = aging.get("periods") or subject_aging_periods(subject)
+        segments = await resolve_aging_segments(db, wp_id, subject)
+        return list(aging["base_headers"]) + build_aging_headers(segments, periods)
+
+    async def _export_row(sp: dict[str, Any], d: dict, wp_id: str, db: AsyncSession, _seg_cache: dict) -> list[Any]:
+        """构建单行导出值。含 aging 描述符时拼接动态账龄值（Task 12.1）。"""
+        aging = sp.get("aging")
+        if not aging:
+            return export_row_by_keys(d, sp["field_keys"])
+        subject = aging["subject"]
+        periods = aging.get("periods") or subject_aging_periods(subject)
+        segments = _seg_cache.get(subject)
+        if segments is None:
+            segments = await resolve_aging_segments(db, wp_id, subject)
+            _seg_cache[subject] = segments
+        base = export_row_by_keys(d, aging["base_field_keys"])
+        return base + aging_export_values(d, segments, periods)
+
     @router.post(f"/api/workpapers/{{wp_id}}/{api_prefix}/export-template")
     async def export_template(
         wp_id: str,
         sheet: str = Query(...),
+        db: AsyncSession = Depends(get_db),
         current_user: User = Depends(get_current_user),
     ) -> StreamingResponse:
         _validate(sheet)
         sp = _spec(sheet)
+        headers = await _export_headers(sp, wp_id, db)
         wb = build_workbook_template(
-            sheet, sp["headers"], title=sp.get("title"), subtitle=sp.get("subtitle"), guidance=sp.get("guidance"),
+            sheet, headers, title=sp.get("title"), subtitle=sp.get("subtitle"), guidance=sp.get("guidance"),
         )
         return workbook_to_response(wb, f"{sheet}_模板.xlsx")
 
@@ -332,13 +476,14 @@ def create_cycle_import_export_router(
         sp = _spec(sheet)
         item_id = sp.get("item_id", f"{sheet}-rows")
         rows = await load_json_rows(db, wp_id, item_id, field=storage_field)
+        headers = await _export_headers(sp, wp_id, db)
         wb = build_workbook_template(
-            sheet, sp["headers"], title=sp.get("title"), subtitle=sp.get("subtitle"), guidance=sp.get("guidance"),
+            sheet, headers, title=sp.get("title"), subtitle=sp.get("subtitle"), guidance=sp.get("guidance"),
         )
         ws = wb[sheet]
-        keys = sp["field_keys"]
+        _seg_cache: dict = {}
         for d in rows:
-            ws.append(export_row_by_keys(d, keys))
+            ws.append(await _export_row(sp, d, wp_id, db, _seg_cache))
         return workbook_to_response(wb, f"{sheet}_数据.xlsx")
 
     @router.post(f"/api/workpapers/{{wp_id}}/{api_prefix}/import-data")
@@ -357,6 +502,47 @@ def create_cycle_import_export_router(
             raise HTTPException(400, "文件大小不能超过10MB")
         sp = _spec(sheet)
         hr = sp.get("header_row", header_row)
+        aging = sp.get("aging")
+
+        # 含 aging 描述符（K1-2/K3-2/G5-2）：按项目账龄配置动态 label 匹配（Task 12.2）
+        if aging:
+            subject = aging["subject"]
+            periods = aging.get("periods") or subject_aging_periods(subject)
+            segments = await resolve_aging_segments(db, wp_id, subject)
+            base_headers = list(aging["base_headers"])
+            base_field_keys = list(aging["base_field_keys"])
+            try:
+                actual, raw = parse_upload_xlsx(content, base_headers, header_row=hr)
+            except ValueError as e:
+                return {"ok": False, "errors": [str(e)], "imported_count": 0}
+            except Exception:
+                raise HTTPException(400, "无法解析xlsx文件")
+
+            # unmatched 账龄列检测（一次性，基于实际列头）
+            _, skipped = match_import_aging(lambda _h: None, actual, segments, periods)
+
+            def _parse_aging(r: tuple, h: list[str]) -> dict:
+                out_row: dict[str, Any] = {"id": str(uuid4())}
+                for header, key in zip(base_headers, base_field_keys):
+                    raw_v = col_val(r, h, header)
+                    out_row[key] = safe_float(raw_v) if is_numeric_field_key(key) else safe_str(raw_v)
+                aging_nested, _u = match_import_aging(
+                    lambda x: col_val(r, h, x), h, segments, periods,
+                )
+                out_row.update(aging_nested)
+                return out_row
+
+            rows, truncated = import_rows_generic(raw, actual, base_field_keys, parse_fn=_parse_aging)
+            item_id = sp.get("item_id", f"{sheet}-rows")
+            await upsert_json_rows(db, wp_id, item_id, rows, field=storage_field)
+            out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
+            if truncated:
+                out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+            if skipped:
+                out["skipped_columns"] = skipped
+                out["warnings"] = [f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped)}"]
+            return out
+
         try:
             actual, raw = parse_upload_xlsx(content, sp["headers"], header_row=hr)
         except ValueError as e:
@@ -369,10 +555,10 @@ def create_cycle_import_export_router(
         )
         item_id = sp.get("item_id", f"{sheet}-rows")
         await upsert_json_rows(db, wp_id, item_id, rows, field=storage_field)
-        out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
+        out2: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
         if truncated:
-            out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
-        return out
+            out2["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+        return out2
 
     return router
 

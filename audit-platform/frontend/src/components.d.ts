@@ -1741,6 +1741,7 @@ declare module 'vue' {
     NoteVersionTreePanel: typeof import('./components/notes/NoteVersionTreePanel.vue')['default']
     NotificationCenter: typeof import('./components/collaboration/NotificationCenter.vue')['default']
     NotificationList: typeof import('./components/collaboration/NotificationList.vue')['default']
+    OcrAttachmentPicker: typeof import('./components/workpaper/cControlTest/OcrAttachmentPicker.vue')['default']
     OcrConfirmDialog: typeof import('./components/attachment/OcrConfirmDialog.vue')['default']
     OcrFieldsDrawer: typeof import('./components/workpaper/OcrFieldsDrawer.vue')['default']
     OCRResultPanel: typeof import('./components/workpaper/OCRResultPanel.vue')['default']

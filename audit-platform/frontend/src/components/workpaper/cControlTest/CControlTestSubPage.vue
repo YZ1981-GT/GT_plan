@@ -87,7 +87,14 @@
       <template #header>
         <div class="cct-section-header-row">
           <span class="cct-section-title">控制测试程序</span>
-          <el-button v-if="!readonly" size="small" type="primary" link>
+          <el-button
+            v-if="!readonly"
+            size="small"
+            type="primary"
+            link
+            :loading="aiGeneratingField === 'testProcedure'"
+            @click="handleAiGenerate('testProcedure')"
+          >
             <el-icon><MagicStick /></el-icon>
             AI辅助
           </el-button>
@@ -108,7 +115,14 @@
       <template #header>
         <div class="cct-section-header-row">
           <span class="cct-section-title">总体定义</span>
-          <el-button v-if="!readonly" size="small" type="primary" link>
+          <el-button
+            v-if="!readonly"
+            size="small"
+            type="primary"
+            link
+            :loading="aiGeneratingField === 'populationDef'"
+            @click="handleAiGenerate('populationDef')"
+          >
             <el-icon><MagicStick /></el-icon>
             AI辅助
           </el-button>
@@ -129,7 +143,14 @@
       <template #header>
         <div class="cct-section-header-row">
           <span class="cct-section-title">总体来源</span>
-          <el-button v-if="!readonly" size="small" type="primary" link>
+          <el-button
+            v-if="!readonly"
+            size="small"
+            type="primary"
+            link
+            :loading="aiGeneratingField === 'populationSource'"
+            @click="handleAiGenerate('populationSource')"
+          >
             <el-icon><MagicStick /></el-icon>
             AI辅助
           </el-button>
@@ -190,7 +211,14 @@
         <div class="cct-section-header-row">
           <span class="cct-section-title">抽样过程</span>
           <div class="cct-tool-chips">
-            <el-button v-if="!readonly" size="small" type="primary" link>
+            <el-button
+              v-if="!readonly"
+              size="small"
+              type="primary"
+              link
+              :loading="aiGeneratingField === 'samplingProcess'"
+              @click="handleAiGenerate('samplingProcess')"
+            >
               <el-icon><MagicStick /></el-icon>
               AI辅助
             </el-button>
@@ -228,7 +256,14 @@
       <template #header>
         <div class="cct-section-header-row">
           <span class="cct-section-title">偏差定义</span>
-          <el-button v-if="!readonly" size="small" type="primary" link>
+          <el-button
+            v-if="!readonly"
+            size="small"
+            type="primary"
+            link
+            :loading="aiGeneratingField === 'deviationDef'"
+            @click="handleAiGenerate('deviationDef')"
+          >
             <el-icon><MagicStick /></el-icon>
             AI辅助
           </el-button>
@@ -393,7 +428,14 @@
       <template #header>
         <div class="cct-section-header-row">
           <span class="cct-section-title">考虑扩大测试范围</span>
-          <el-button v-if="!readonly" size="small" type="primary" link>
+          <el-button
+            v-if="!readonly"
+            size="small"
+            type="primary"
+            link
+            :loading="aiGeneratingField === 'expandScope'"
+            @click="handleAiGenerate('expandScope')"
+          >
             <el-icon><MagicStick /></el-icon>
             AI辅助
           </el-button>
@@ -415,7 +457,14 @@
         <div class="cct-section-header-row">
           <span class="cct-section-title">控制缺陷结论</span>
           <div class="cct-section-actions">
-            <el-button v-if="!readonly" size="small" type="primary" link>
+            <el-button
+              v-if="!readonly"
+              size="small"
+              type="primary"
+              link
+              :loading="aiGeneratingField === 'defectConclusion'"
+              @click="handleAiGenerate('defectConclusion')"
+            >
               <el-icon><MagicStick /></el-icon>
               AI辅助
             </el-button>
@@ -468,6 +517,7 @@ import { suggestSampleSize } from '@/composables/useSampleSizeEngine'
 import { api } from '@/services/apiProxy'
 import { uploadAttachment } from '@/services/commonApi'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import type { ControlPage, SampleResult } from '@/composables/useCControlTestData'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
@@ -490,6 +540,17 @@ const props = defineProps<{
   updateSampleResult: (pageIndex: number, sampleIndex: number, value: SampleResult['result']) => void
   // Deviation backfill
   updateSummaryDeviation: (pageIndex: number, hasDeviation: '是' | '否') => void
+  /**
+   * 共享 AI 生成流程（父组件 GtCControlTest 提供）：先弹 OCR 附件选择器，
+   * 将选中附件 OCR 文本并入 context["参考资料（OCR识别）"] 后调用 /ai/generate-text。
+   * 返回生成文本（失败/无内容为空串）。缺省时按钮提示 AI 不可用。
+   */
+  aiGenerateWithOcr?: (params: {
+    section: string
+    prompt: string
+    existingContent: string
+    context: Record<string, string>
+  }) => Promise<string>
 }>()
 
 const emit = defineEmits<{
@@ -627,6 +688,9 @@ async function onUploadSampleAttachment(index: number, file: File) {
     await persistAttachment(index, attachment)
 
     ElMessage.success(`样本附件 "${file.name}" 已上传`)
+
+    // 通知父组件刷新 OCR 附件列表缓存（Task 12.1 / Req 6.4）
+    eventBus.emit('attachment:uploaded', { wpId: props.wpId, projectId: props.projectId })
 
     // 2) OCR 识别（仅图片/PDF 可识别）— Req 10.2
     if (isOcrEligible(file.name)) {
@@ -855,6 +919,84 @@ function onSampleFieldChange(sampleIndex: number, field: string, value: string) 
     row[field] = value
     // 触发持久化
     props.updateCtrlPageText(props.pageIndex, `sample-${sampleIndex}-${field}`, value)
+  }
+}
+
+// ─── AI 生成（集成 OCR 附件选择，Task 10.1） ──────────────────────────────────
+
+/** 当前正在 AI 生成的字段（控制按钮 loading 与并发） */
+const aiGeneratingField = ref<string | null>(null)
+
+/** 各文本区的 AI 生成提示语 */
+const AI_FIELD_META: Record<string, { label: string; prompt: string }> = {
+  testProcedure: { label: '控制测试程序', prompt: '请生成一段专业的控制测试程序描述，说明如何验证该控制点在审计期间的运行有效性（测试方法、样本选取、验证要点）。' },
+  populationDef: { label: '总体定义', prompt: '请定义本次控制测试的总体范围（时间区间、数据来源、记录完整性边界）。' },
+  populationSource: { label: '总体来源', prompt: '请说明本次控制测试总体数据的来源与获取方式。' },
+  samplingProcess: { label: '抽样过程', prompt: '请描述本次控制测试的抽样过程（抽样方法、样本选取依据，可引用 IDEA 等审计工具）。' },
+  deviationDef: { label: '偏差定义', prompt: '请定义在本控制点测试中，何种情况构成控制偏差。' },
+  expandScope: { label: '考虑扩大测试范围', prompt: '请就是否需要扩大控制测试范围给出专业判断与理由。' },
+  defectConclusion: { label: '控制缺陷结论', prompt: '请生成控制缺陷结论，说明是否存在控制缺陷及其性质与影响。' },
+}
+
+/** 读取字段现有内容 */
+function getAiFieldValue(field: string): string {
+  if (field === 'expandScope') return expandScope.value
+  if (field === 'defectConclusion') return defectConclusion.value
+  return String((props.page as any)[field] || '')
+}
+
+/** 将 AI 生成结果写回字段并持久化 */
+function applyAiFieldValue(field: string, value: string) {
+  if (field === 'expandScope') {
+    expandScope.value = value
+    props.updateCtrlPageText(props.pageIndex, 'expandScope', value)
+  } else if (field === 'defectConclusion') {
+    defectConclusion.value = value
+    props.updateCtrlPageText(props.pageIndex, 'defectConclusion', value)
+  } else {
+    ;(props.page as any)[field] = value
+    props.updateCtrlPageText(props.pageIndex, field, value)
+  }
+}
+
+/**
+ * 触发某文本区的 AI 生成：委托父组件的 aiGenerateWithOcr（内部会弹出 OCR 附件选择器，
+ * 将选中附件 OCR 文本并入 context["参考资料（OCR识别）"]），返回后写回字段。
+ */
+async function handleAiGenerate(field: string): Promise<void> {
+  if (props.readonly || aiGeneratingField.value) return
+  const meta = AI_FIELD_META[field]
+  if (!meta) return
+  if (!props.aiGenerateWithOcr) {
+    ElMessage.info('AI 服务暂不可用')
+    return
+  }
+  aiGeneratingField.value = field
+  try {
+    const context: Record<string, string> = {}
+    if (props.controlName) context['控制点名称'] = props.controlName
+    if (props.wpCode) context['循环编码'] = props.wpCode
+    if (props.page.attribute) context['控制属性'] = props.page.attribute
+    if (props.page.frequency) context['控制频率'] = props.page.frequency
+    if (props.page.relatedRisk) context['相关风险'] = props.page.relatedRisk
+    if (props.page.testMethod) context['测试方法'] = props.page.testMethod
+
+    const generated = await props.aiGenerateWithOcr({
+      section: field,
+      prompt: meta.prompt,
+      existingContent: getAiFieldValue(field),
+      context,
+    })
+    if (generated) {
+      applyAiFieldValue(field, generated)
+      ElMessage.success(`AI 已生成「${meta.label}」`)
+    } else {
+      ElMessage.info('AI 未返回内容，请手动填写')
+    }
+  } catch {
+    ElMessage.warning('AI 服务暂不可用，请手动填写')
+  } finally {
+    aiGeneratingField.value = null
   }
 }
 </script>

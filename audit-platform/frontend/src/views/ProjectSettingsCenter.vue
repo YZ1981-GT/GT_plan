@@ -147,6 +147,36 @@
           </div>
         </el-tab-pane>
 
+        <!-- Tab 7: 底稿配置 -->
+        <el-tab-pane label="底稿配置" name="worksheet">
+          <div class="settings-panel">
+            <h3 class="settings-panel__title">底稿配置</h3>
+            <p class="settings-panel__desc">
+              项目级底稿参数配置。变更后所有已打开的往来款明细表会自动刷新。
+            </p>
+            <div class="settings-config-card">
+              <div class="settings-config-card__info">
+                <div class="settings-config-card__name">账龄段配置</div>
+                <div class="settings-config-card__desc">
+                  统一 D2 应收 / D3 预收 / F1 预付 / K1 其他应收 / K3 其他应付 / G5 长期应收
+                  的账龄区间划分（3年段 / 5年段 / 自定义），并联动 D6 坏账准备 ECL 分组。
+                </div>
+              </div>
+              <el-button
+                type="primary"
+                size="small"
+                :disabled="!canManageMembers || isReadonly"
+                @click="agingDialogVisible = true"
+              >
+                配置账龄段
+              </el-button>
+            </div>
+            <p v-if="!canManageMembers" class="settings-panel__desc" style="margin-top: 8px;">
+              仅项目经理及以上角色可修改账龄段配置。
+            </p>
+          </div>
+        </el-tab-pane>
+
         <!-- Tab 6: 锁定策略 -->
         <el-tab-pane label="锁定策略" name="locking">
           <div class="settings-panel">
@@ -173,6 +203,13 @@
           </div>
         </el-tab-pane>
       </el-tabs>
+
+      <!-- 账龄段配置弹窗 -->
+      <AgingConfigDialog
+        v-model:visible="agingDialogVisible"
+        :project-id="projectId"
+        @config-saved="onAgingConfigSaved"
+      />
     </div>
   </GtPageShell>
 </template>
@@ -182,6 +219,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import GtPageShell from '@/components/common/GtPageShell.vue'
 import ProjectContextBar from '@/components/common/ProjectContextBar.vue'
+import AgingConfigDialog from '@/components/workpaper/AgingConfigDialog.vue'
+import { ElMessage } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { api } from '@/services/apiProxy'
@@ -197,6 +236,13 @@ const ctx = computed(() => projectStore.currentProjectContext)
 const yearOptions = computed(() => projectStore.yearOptions)
 
 const activeTab = ref('basic')
+
+// ─── 账龄段配置弹窗 ───
+const agingDialogVisible = ref(false)
+
+function onAgingConfigSaved() {
+  ElMessage.success('账龄段配置已更新，相关明细表将自动刷新')
+}
 
 // ─── 权限判断 ───
 const canViewPermissions = computed(() => {
@@ -399,5 +445,29 @@ async function loadMembers() {
 
 .settings-panel__table {
   width: 100%;
+}
+
+.settings-config-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--gt-color-border, #e4e7ed);
+  border-radius: var(--gt-radius-md, 6px);
+  background: var(--gt-color-fill-light, #fafafa);
+}
+
+.settings-config-card__name {
+  font-size: var(--gt-font-size-base, 14px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+  margin-bottom: 6px;
+}
+
+.settings-config-card__desc {
+  color: var(--gt-color-text-secondary, #606266);
+  font-size: var(--gt-font-size-sm, 13px);
+  line-height: 1.6;
 }
 </style>

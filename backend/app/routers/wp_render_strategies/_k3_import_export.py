@@ -57,6 +57,26 @@ _K3_SPECS: dict[str, dict[str, Any]] = {
         "title": "K3-2 其他应付款明细表",
         "headers": _K3_2_HEADERS,
         "field_keys": _K3_2_KEYS,
+        # 动态账龄列头（Task 12.1）：导出时基础列 + 项目账龄配置派生的 3N 账龄列（期初/期末未审/期末审定）
+        "aging": {
+            "subject": "K3",
+            "base_headers": [
+                "序号", "往来对象", "性质", "关联关系",
+                "期初余额", "本期增加(贷方)", "本期减少(借方)", "期末余额",
+                "形成原因", "预计偿付时间", "是否长期挂账", "疑似未入账",
+                "凭证号", "结论", "备注",
+                "大额标记", "关联方标记", "期后偿付金额", "期后偿付日期",
+                "核查状态", "审计师评价", "备注2",
+            ],
+            "base_field_keys": [
+                "seq", "counterparty", "nature", "relatedParty",
+                "openingBalance", "increase", "decrease", "closingBalance",
+                "formationReason", "expectedPaymentTime", "isLongOutstanding", "suspectedUnrecorded",
+                "voucherNo", "conclusion", "remark",
+                "isLargeAmount", "isRelatedParty", "postPaymentAmt", "postPaymentDate",
+                "checkStatus", "auditorEval", "remark2",
+            ],
+        },
         "guidance": [
             "K3-2 明细表 编制说明",
             "",

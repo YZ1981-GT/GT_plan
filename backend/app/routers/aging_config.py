@@ -76,6 +76,24 @@ async def put_aging_config(
 
     result = await save_config(project_id, payload, db)
     await db.commit()
+
+    # 配置变更后广播轻量 SSE 通知，让在线客户端刷新账龄列定义。
+    # 走 broadcast_raw（纯 SSE，不触发 _handlers / 不入 debounce），
+    # 与 annotations/attachments/consol 等通知链路保持一致。
+    # 无 event_bus / 无 event loop 时静默回退，不阻断保存。
+    try:
+        from app.services.event_bus import event_bus
+
+        event_bus.broadcast_raw(
+            "aging-config:changed",
+            {
+                "project_id": str(project_id),
+                "preset": result.preset.value,
+            },
+        )
+    except Exception:
+        pass
+
     return result
 
 

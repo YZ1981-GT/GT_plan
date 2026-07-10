@@ -35,7 +35,10 @@ inclusion: always
 | EventBus | 进程内事件总线（publish=EventPayload 走 handlers+SSE / broadcast_raw=纯 SSE） |
 | WORKPAPER_SAVED | 底稿保存事件（触发一致性检查+C/F/D~N 循环联动） |
 | CCR / cross-ref | 跨底稿交叉引用（cross_wp_references，ref_index chip 可跳转） |
-| address_registry | 地址坐标注册表（5 域：tb/report/note/wp/aux） |
+| address_registry | 地址坐标注册表 V1（5 域：tb/report/note/wp/aux；运行时动态目录，公式选址用） |
+| address_registry_v2 | 地址坐标静态依赖图（l2 语义 / l3 依赖 / stale 影响分析） |
+| ACNR | 地址坐标名称注册中心（Address Coordinate & Naming Registry）；平台级目录真源，收敛 classification/种子/I/E/labels/CCR；见 `docs/proposals/address-coordinate-name-registry-architecture.md` |
+| addr_id | ACNR 稳定主键 `{wp_code}/{sheet_code}/{coordinate_key}`，不因 sheet 改名而变 |
 | ledger_datasets | 数据集版本治理（staged→active→superseded，可见性靠 status 非 is_deleted） |
 | get_active_filter | 四表查询统一入口（禁止裸写 `TbX.is_deleted==False`） |
 | B15 | 重要性水平底稿（redirect 到 Materiality 模块） |
