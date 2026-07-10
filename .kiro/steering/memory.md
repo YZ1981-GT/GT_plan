@@ -90,7 +90,7 @@ inclusion: always
 
 ### git
 - 分支 `work/2026-05-30-wp-specs`；最高迁移 V099（以 `migration_status` 为准）
-- 最新已push：`0593e95e`(voucher-check-sampling spec三件套 req26/design12属性/tasks14 + D2-12向导/卡片矩阵 + D3 ref解包修复打磨)；已rebase吸收origin 12提交(ACNR/aging/c-control 148文件)；工作区 clean 与 origin 同步
+- 最新已push：`5bce941f`(voucher-check-sampling spec三件套 req26/design12属性/tasks14含分组四+可追溯性修复R5/6/9→任务 + D2-12向导/卡片矩阵 + D3 ref解包修复打磨)；已rebase吸收origin 12提交(ACNR/aging/c-control 148文件)；工作区 clean 与 origin 同步
 - `origin/HEAD→origin/master` 落后 main 隐患仍在
 
 ### 循环进度表（✅完成 / 🟡部分 / 🔵待开发）
