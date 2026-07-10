@@ -488,13 +488,18 @@ def _uri_to_addr_id(uri: str) -> str | None:
             parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == parent]
             if len(parent_filtered) == 1:
                 return f"{parent_filtered[0]['addr_id']}/{cell_part}"
-            # fallback: 尝试 sheet_name 包含 sheet_code 的模式匹配
+            # fallback: 尝试 sheet_name 包含 sheet_code 的模式匹配（取最长匹配避免歧义）
             # 例如 "明细表D2-2" 对应 sheet_code="D2-2"
+            best_uri_match: dict | None = None
+            best_uri_code_len = 0
             for s in cat.sheets_by_addr_id.values():
                 if s.get("parent_wp_code") == parent:
                     code = s.get("sheet_code", "")
-                    if code and code in sheet_name:
-                        return f"{s['addr_id']}/{cell_part}"
+                    if code and code in sheet_name and len(code) > best_uri_code_len:
+                        best_uri_match = s
+                        best_uri_code_len = len(code)
+            if best_uri_match:
+                return f"{best_uri_match['addr_id']}/{cell_part}"
         elif len(parts) == 1:
             # custom_flat: wp://{wp_code}#{cell}
             wp_code = parts[0]
@@ -516,12 +521,17 @@ def _uri_to_addr_id(uri: str) -> str | None:
             parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == parent]
             if len(parent_filtered) == 1:
                 return parent_filtered[0]["addr_id"]
-            # sheet_name 包含 sheet_code
+            # sheet_name 包含 sheet_code（取最长匹配避免歧义）
+            best_uri_s: dict | None = None
+            best_uri_s_len = 0
             for s in cat.sheets_by_addr_id.values():
                 if s.get("parent_wp_code") == parent:
                     code = s.get("sheet_code", "")
-                    if code and code in sheet_name:
-                        return s["addr_id"]
+                    if code and code in sheet_name and len(code) > best_uri_s_len:
+                        best_uri_s = s
+                        best_uri_s_len = len(code)
+            if best_uri_s:
+                return best_uri_s["addr_id"]
         elif len(parts) == 1:
             # 可能是裸 wp_code
             return parts[0]
@@ -574,12 +584,17 @@ def _formula_ref_to_addr_id(formula_ref: str) -> str | None:
         parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == parent]
         if len(parent_filtered) == 1:
             return f"{parent_filtered[0]['addr_id']}/{cell_or_semantic}"
-        # sheet_name 包含 sheet_code 的模式匹配
+        # sheet_name 包含 sheet_code 的模式匹配（取最长匹配避免 D4-1 vs D4-13 歧义）
+        best_match: dict | None = None
+        best_code_len = 0
         for s in cat.sheets_by_addr_id.values():
             if s.get("parent_wp_code") == parent:
                 code = s.get("sheet_code", "")
-                if code and code in sheet_name:
-                    return f"{s['addr_id']}/{cell_or_semantic}"
+                if code and code in sheet_name and len(code) > best_code_len:
+                    best_match = s
+                    best_code_len = len(code)
+        if best_match:
+            return f"{best_match['addr_id']}/{cell_or_semantic}"
         # fallback: 直接拼
         return f"{parent}/{sheet_name}/{cell_or_semantic}"
 
@@ -597,12 +612,17 @@ def _formula_ref_to_addr_id(formula_ref: str) -> str | None:
         parent_filtered = [s for s in alias_hits if s.get("parent_wp_code") == first]
         if len(parent_filtered) == 1:
             return parent_filtered[0]["addr_id"]
-        # sheet_name 包含 sheet_code
+        # sheet_name 包含 sheet_code（取最长匹配避免歧义）
+        best_match_2: dict | None = None
+        best_code_len_2 = 0
         for s in cat.sheets_by_addr_id.values():
             if s.get("parent_wp_code") == first:
                 code = s.get("sheet_code", "")
-                if code and code in second:
-                    return s["addr_id"]
+                if code and code in second and len(code) > best_code_len_2:
+                    best_match_2 = s
+                    best_code_len_2 = len(code)
+        if best_match_2:
+            return best_match_2["addr_id"]
         # 尝试 custom_flat: wp_code + cell
         matches = cat.sheets_by_code.get(first, [])
         if len(matches) == 1:

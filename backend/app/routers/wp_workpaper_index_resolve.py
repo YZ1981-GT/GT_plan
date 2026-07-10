@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.acnr.grammar import STANDARD_WP_CODE_RE
+from app.services.acnr.grammar import STANDARD_WP_CODE_RE, STANDARD_WP_CODE_RE_STR
 from app.services.acnr.resolver import resolve_instance
 
 logger = logging.getLogger(__name__)
@@ -108,8 +108,10 @@ async def resolve_workpaper_index(
 
 import re
 
-# 从 grammar_v1 导入的标准底稿码正则
-_PARENT_RE = re.compile(r"^([A-S]\d+)", re.IGNORECASE)
+# 基于 STANDARD_WP_CODE_RE (^[A-S]\d) 构建 parent 提取正则 (R12.2)
+_PARENT_RE = re.compile(
+    r"(" + STANDARD_WP_CODE_RE_STR.lstrip("^") + r"+)", re.IGNORECASE
+)
 
 
 def _extract_parent(wp_code: str) -> str:

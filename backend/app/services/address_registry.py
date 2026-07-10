@@ -47,7 +47,7 @@ class AddressEntry:
 
 _URI_PATTERN = re.compile(
     r'^(?P<domain>report|note|wp|tb|aux)://'
-    r'(?P<source>[^/]+)'
+    r'(?P<source>[^/#]+)'
     r'(?:/(?P<path>[^#]*))?'
     r'(?:#(?P<cell>.+))?$'
 )

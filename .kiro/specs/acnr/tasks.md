@@ -97,22 +97,22 @@
 
 ### 里程碑 M1 — 运行时接线 + 语法实现 + resolve_instance + 失效收口 + 端点统一
 
-- [ ] 7. `formula_grammar.py` WP/PREV 2+3 参与无损往返
+- [x] 7. `formula_grammar.py` WP/PREV 2+3 参与无损往返
   - [x] 7.1 在 `formula_grammar.py` 实现 `WP()`/`PREV()` 的 2 参与 3 参解析（具备实际解析能力方可标完成）
     - _Requirements: 10.2, 10.5_
   - [x] 7.2 修复 `formula_ref_to_uri()` 保留第三参（语义名不丢弃），并接入 `grammar.py` 互转
     - _Requirements: 10.3_
-  - [ ]* 7.3 编写 formula_ref ↔ uri 无损往返属性测试
+  - [x]* 7.3 编写 formula_ref ↔ uri 无损往返属性测试
     - **Property 5: formula_ref ↔ uri 无损往返（含 2/3 参 WP/PREV 及五域）**
     - **Validates: Requirements 10.2, 10.3**
-  - [ ]* 7.4 编写 URI profile 往返属性测试
+  - [x]* 7.4 编写 URI profile 往返属性测试
     - **Property 3: URI profile 往返保持（standard/custom_flat）**
     - **Validates: Requirements 9.1, 9.2, 9.4, 9.5**
 
 - [x] 8. STANDARD_WP_CODE_RE 单一常量共享
   - [x] 8.1 让 `wp_render_config.py` 与 `wp_index_resolve.py` 从 grammar_v1 import `STANDARD_WP_CODE_RE`，删除各自 `[A-I]\d`/`[A-S]\d` 副本
     - _Requirements: 12.2_
-  - [ ]* 8.2 编写标准码判定收敛属性测试
+  - [x]* 8.2 编写标准码判定收敛属性测试
     - **Property 9: 标准码判定收敛（J1/S3 判为标准，[A-I]\d 误判消除）**
     - **Validates: Requirements 12.4, 12.5**
 
@@ -123,7 +123,7 @@
   - [x] 9.2 实现 `runtime.py` 的 `register_custom()` 登记 RuntimeCellEntry（保存后 parsed_data 提交调用）
     - 校验 `project_id` + wp 归属；自定义 addr_id 仅存 L2/L3 不落全局 L1
     - _Requirements: 23.3, 24.1, 24.2_
-  - [ ]* 9.3 编写自定义写入项目归属校验属性测试
+  - [x]* 9.3 编写自定义写入项目归属校验属性测试
     - **Property 13: 自定义写入项目归属校验（防 IDOR）**
     - **Validates: Requirements 24.1**
 
@@ -137,13 +137,13 @@
   - [x] 10.3 实现 `resolver.py` 完整决策树（L2 overlay → L1 Cell 精确 → L1 Sheet+aliases → semantic_label 包含 → L3 Runtime → 非 wp 域委托 V1 → miss 推荐）
     - 命中带 project context 附 wp_id；非 wp 域经同一出口委托 V1 返回统一契约；miss 记指标
     - _Requirements: 5.1, 5.3, 5.4, 5.5, 5.6, 5.7_
-  - [ ]* 10.4 编写多语法一致性解析属性测试
+  - [x]* 10.4 编写多语法一致性解析属性测试
     - **Property 4: 多语法一致性解析（同格殊途同归，含索引/公式/uri/tb 域委托）**
     - **Validates: Requirements 5.1, 5.3, 5.7, 11.2, 11.3, 14.4, 16.4, 22.3, 22.5**
-  - [ ]* 10.5 编写未命中/ambiguous 响应契约属性测试
+  - [x]* 10.5 编写未命中/ambiguous 响应契约属性测试
     - **Property 8: 未命中响应契约与 ambiguous（含 resolve_instance 多实例）**
     - **Validates: Requirements 2.3, 2.4, 5.5, 5.6**
-  - [ ]* 10.6 编写非法引用编译期失败属性测试
+  - [x]* 10.6 编写非法引用编译期失败属性测试
     - **Property 15: 非法引用编译期失败（resolve 校验总返回失败且不入库）**
     - **Validates: Requirements 14.2**
 
@@ -154,7 +154,7 @@
   - [x] 11.2 实现 addr_id 不可变政策 + `registry_version` 处理
     - 禁改已有 addr_id（改名走 aliases）；弃用标 `deprecated:true` 保留 ≥1 版；归档项目记录 registry_version
     - _Requirements: 19.1, 19.2, 19.3, 19.4_
-  - [ ]* 11.3 编写 addr_id 不可变与版本确定性属性测试
+  - [x]* 11.3 编写 addr_id 不可变与版本确定性属性测试
     - **Property 14: addr_id 不可变与版本确定性（重命名不断边、版本锁定确定）**
     - **Validates: Requirements 14.3, 19.1, 19.2, 19.5**
 
@@ -171,7 +171,7 @@
     - 校验每条 CCR source 可 resolve 或已标 `semantic_only`，产出缺口清单不阻断 PR；L4 边端点 normalize 为 addr_id
     - _Requirements: 17.1, 17.2_
 
-- [ ] 14. Checkpoint（M1）
+- [x] 14. Checkpoint（M1）
   - Ensure all tests pass, ask the user if questions arise.
 
 ---
