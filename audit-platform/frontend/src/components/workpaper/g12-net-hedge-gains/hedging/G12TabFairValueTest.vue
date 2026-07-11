@@ -5,6 +5,7 @@
       <h3>G12-4 公允价值测试</h3>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="fv.addRow()">+ 新增</el-button>
       <CycleImportExportDropdown :wp-id="wpId" api-prefix="g12" sheet="G12-4" :disabled="isReadonly" @imported="emit('imported')" />
+      <el-tag size="small" type="info">共 {{ fv.rows.value.length }} 行</el-tag>
       <GtReviewTrigger section-id="G12-4-fv-test" />
     </div>
 
@@ -78,7 +79,7 @@
           </template>
         </el-table-column>
         <el-table-column label="FV变动" width="100" align="right">
-          <template #default="{ row }"><span class="formula">{{ row.instrumentFVChange.toFixed(2) }}</span></template>
+          <template #default="{ row }"><span class="formula" title="工具FV变动 = 工具期末FV − 工具期初FV">{{ row.instrumentFVChange.toFixed(2) }}</span></template>
         </el-table-column>
         <el-table-column label="估值方法" width="100">
           <template #default="{ row }">
@@ -130,7 +131,7 @@
           </template>
         </el-table-column>
         <el-table-column label="FV变动" width="100" align="right">
-          <template #default="{ row }"><span class="formula">{{ row.itemFVChange.toFixed(2) }}</span></template>
+          <template #default="{ row }"><span class="formula" title="项目FV变动 = 项目期末FV − 项目期初FV">{{ row.itemFVChange.toFixed(2) }}</span></template>
         </el-table-column>
         <el-table-column label="风险因素" width="100">
           <template #default="{ row }">
@@ -174,6 +175,11 @@
       <el-input :model-value="fv.conclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" @update:model-value="fv.updateConclusion" />
     </el-card>
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+      <p>公允价值测试分「套期工具侧」与「被套期项目侧」两区段，按套期关系编号关联。FV 变动 = 期末 FV − 期初 FV，须与 G12-2 套期关系明细一致。有效性测试方法含前瞻性（比率分析/回归分析）与回顾性；公允价值层次（Level 1/2/3）影响估值可靠性判断。</p>
+    </details>
   </div>
 </template>
 
@@ -235,7 +241,9 @@ const tabOptions = [
 .cross-alert { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .warn-chip, .ok-chip { margin-left: 8px; }
-.formula { border-bottom: 1px dashed #909399; }
+.formula { border-bottom: 1px dashed #909399; background: #fafafa; cursor: help; display: inline-block; width: 100%; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .conclusion { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 </style>

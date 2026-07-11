@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认针对债权投资的审计调整(AJE)与重分类(RJE)分录依据充分、借贷平衡，并正确汇总回写至 G4-1 审定表。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section标题栏 + 复核按钮右对齐 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-3 调整分录汇总</h3>

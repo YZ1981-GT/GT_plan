@@ -1,5 +1,10 @@
 <template>
   <div class="g7-disclosure-soe">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：按国企附注格式披露长期股权投资信息，在上市公司披露基础上增加国有资本保值增值率、对外投资决策程序合规性及境外投资信息，确认披露完整、准确并符合国资监管要求。
+    </el-alert>
+
     <!-- 附注披露信息（国企）：355行×17列，全平台最长附注 -->
     <el-skeleton v-if="!htmlData" :rows="8" animated />
     <template v-else>
@@ -456,6 +461,10 @@ function loadFromHtmlData(data: any): void {
 .g7-disclosure-soe {
   padding: 12px;
   font-size: 13px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
 }
 
 .virtual-scroll-container {

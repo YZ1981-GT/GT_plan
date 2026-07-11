@@ -150,6 +150,15 @@
       <el-input :model-value="vc.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="汇总凭证抽查结论、异常事项及后续程序" :disabled="isReadonly" @update:model-value="vc.updateConclusion" />
     </div>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>可用抽凭引擎按科目 2101 抽取样本自动填入；「核对内容」区段逐笔核对原始凭证完整性、授权、账务处理及公允价值计量是否正确。</p>
+        <p>借贷合计不平衡或存在异常凭证时汇总栏标红；异常凭证须填写异常说明并评定风险等级。</p>
+        <p>抽查结论应覆盖样本范围、发现的异常事项及拟采取的后续审计程序。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -276,4 +285,6 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 :deep(.abnormal-row) { background-color: #fdf6ec !important; }
 .conclusion-panel { margin-top: 12px; padding: 12px; background: #fafafa; border-radius: 4px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

@@ -126,6 +126,14 @@ function fmtAmount(v: number): string {
       </div>
     </details>
 
+    <el-alert
+      class="audit-objective"
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：核对应付账款(2202)明细的完整性与准确性，验证期末余额=期初审定+本期贷方-本期借方，账龄划分合理，关注长期挂账与关联方款项。"
+    />
+
     <div class="section-toolbar">
       <div class="toolbar-left">
         <el-input
@@ -136,6 +144,8 @@ function fmtAmount(v: number): string {
           style="width: 240px"
         />
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
+      </div>
+      <div class="toolbar-right">
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -146,8 +156,8 @@ function fmtAmount(v: number): string {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-      </div>
-      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F4-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         <el-button
           v-if="openReviewDialog"
           size="small"
@@ -221,7 +231,7 @@ function fmtAmount(v: number): string {
           <span v-else>{{ fmtAmount(row.currentCredit) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期末余额" min-width="110" align="right">
+      <el-table-column label="期末余额" min-width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <el-tooltip content="期末 = 期初 + 贷方 - 借方" placement="top">
             <span class="formula-cell">{{ fmtAmount(row.closingBalance) }}</span>
@@ -271,7 +281,7 @@ function fmtAmount(v: number): string {
           <span v-else>{{ fmtAmount(row.aging3YearPlus) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="账龄合计" min-width="100" align="right">
+      <el-table-column label="账龄合计" min-width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <el-tooltip content="合计 = 各账龄段SUM" placement="top">
             <span class="formula-cell" :class="{ 'mismatch-cell': row.agingMismatch }">{{ fmtAmount(row.agingTotal) }}</span>
@@ -334,7 +344,7 @@ function fmtAmount(v: number): string {
           <span v-else>{{ fmtAmount(row.rjeReclassification) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="审定余额" min-width="110" align="right">
+      <el-table-column label="审定余额" min-width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <el-tooltip content="审定 = 期末 + AJE + RJE" placement="top">
             <span class="formula-cell audited-cell">{{ fmtAmount(row.adjustedBalance) }}</span>
@@ -386,15 +396,28 @@ function fmtAmount(v: number): string {
 }
 .guidance-details {
   margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
   font-size: 13px;
 }
 .guidance-details .guidance-content {
-  padding: 8px 12px;
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.8;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-details .guidance-content p {
+  margin: 2px 0;
+}
+.audit-objective {
+  margin-bottom: 12px;
 }
 .section-toolbar {
   display: flex;
@@ -410,6 +433,14 @@ function fmtAmount(v: number): string {
 .toolbar-right {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 .segment-tabs {
   margin-bottom: 8px;

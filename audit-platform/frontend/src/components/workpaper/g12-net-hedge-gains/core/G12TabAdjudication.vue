@@ -11,6 +11,15 @@
     <GCycleGuideStrip :steps="['G12A 程序', 'G12-1 审定', 'G12-2↔G12-4', 'G12-3 调整', 'G12-5/6', '附注披露']" />
 
     <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="核对净敞口套期收益（6103）审定数与试算平衡表一致，验证 G12-1↔G12-2 汇总、G12-2↔G12-4 公允价值测试的勾稽关系，对本期与上期变动率超阈值项目取得合理性解释。"
+    />
+
+    <el-alert
       v-if="hedgeCrossMessage"
       type="warning"
       :closable="false"
@@ -186,6 +195,11 @@
       <el-input :model-value="adj.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }"
         :disabled="isReadonly" @update:model-value="adj.updateAuditConclusion" />
     </el-card>
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+      <p>审定数 = 未审数 + 调整数；未审数取自 G12-2 套期关系明细汇总，调整数取自 G12-3 调整分录。发布审定数后经 EventBus 同步至附注披露与试算平衡表（6103）。|变动率| > 20% 的项目须在「原因分析」列填写说明。</p>
+    </details>
   </div>
 </template>
 
@@ -262,13 +276,16 @@ function fmtRate(rate: number | null): string {
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .title { margin: 0; font-size: 15px; font-weight: 600; }
 .actions { display: flex; gap: 8px; align-items: center; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #fafafa; }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 .reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 .tb-row { display: flex; align-items: center; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
 .variance { font-weight: 600; }
 .variance.is-error { color: #f56c6c; }
 .note-card { margin-top: 12px; }
+.audit-objective { margin-bottom: 12px; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .cross-alert { margin-bottom: 12px; }
 .warn-chip { margin-left: 8px; }
 .ok-chip { margin-left: 8px; }

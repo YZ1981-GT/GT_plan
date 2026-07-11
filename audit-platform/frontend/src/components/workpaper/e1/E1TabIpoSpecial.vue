@@ -21,6 +21,7 @@ import {
   COLUMN_CONFIG,
 } from '../composables/useE1IpoSpecial'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -104,15 +105,41 @@ function formatCellValue(row: any, col: ColumnDef): string {
 
 <template>
   <div class="e1-tab-ipo-special">
-    <!-- Applicability Switch -->
-    <div class="applicability-bar">
-      <el-switch
-        :model-value="isApplicable"
-        :disabled="isReadonly"
-        active-text="已启用IPO/舞弊应对程序"
-        inactive-text="未启用"
-        @change="toggleApplicability"
-      />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 针对 IPO 及舞弊风险执行更严格的货币资金核查程序（E1-26~32），先确认本程序是否适用。</p>
+        <p>2. 全额函证银行账户，核查资金流水的完整性，穿行测试大额资金往来的业务实质。</p>
+        <p>3. 重点关注资金体外循环、大额异常资金往来、关联方资金占用与资金归集迹象。</p>
+        <p>4. 执行未预先告知的现场监盘与银行流水穿行测试，评估管理层凌驾于控制之上的风险。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：针对 IPO 及舞弊风险执行专项核查，确认货币资金真实、完整且不存在体外循环。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-switch
+          :model-value="isApplicable"
+          :disabled="isReadonly"
+          active-text="已启用IPO/舞弊应对程序"
+          inactive-text="未启用"
+          @change="toggleApplicability"
+        />
+        <el-button v-if="isApplicable" size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <el-tag v-if="isApplicable" size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- Not applicable state -->
@@ -130,10 +157,11 @@ function formatCellValue(row: any, col: ColumnDef): string {
             :label="col.label"
             :width="getColWidth(col)"
             :align="col.type === 'number' || col.type === 'computed' ? 'right' : 'left'"
+            :class-name="col.type === 'computed' ? 'auto-calc-col' : ''"
           >
             <template #default="{ row }">
               <!-- Computed: readonly -->
-              <span v-if="col.type === 'computed'" class="computed-cell">
+              <span v-if="col.type === 'computed'" class="auto-calc-value">
                 {{ formatCellValue(row, col) }}
               </span>
               <!-- Number -->
@@ -181,8 +209,6 @@ function formatCellValue(row: any, col: ColumnDef): string {
             </template>
           </el-table-column>
         </el-table>
-
-        <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRow">+ 添加行</el-button>
       </template>
     </el-skeleton>
   </div>
@@ -192,20 +218,71 @@ function formatCellValue(row: any, col: ColumnDef): string {
 .e1-tab-ipo-special {
   padding: 12px 0;
 }
-.applicability-bar {
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
+.e1-tab-ipo-special :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
 }
+.e1-tab-ipo-special :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .not-applicable {
   padding: 40px 0;
 }
-.computed-cell {
-  color: #606266;
-  font-style: italic;
+
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
-.add-btn {
-  margin-top: 8px;
+.auto-calc-value {
+  color: #606266;
 }
 </style>

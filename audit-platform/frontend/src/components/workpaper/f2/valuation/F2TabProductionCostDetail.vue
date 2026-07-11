@@ -10,20 +10,45 @@
       </div>
     </header>
 
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="pc.addRow()">+ 新增产品</el-button>
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-val"
-        sheet="F2-41"
-        :disabled="isReadonly"
-        ai-section="cost-analysis"
-        :existing-content="pc.auditNote.value"
-        ai-title="AI 生成 · 生产成本分析结论"
-        review-section="F2-41-conclusion"
-        @ai-filled="(t: string) => { pc.auditNote.value = t }"
-      />
-      <el-segmented v-model="pc.activeSegment.value" :options="segments" size="small" />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 生产成本按产品分直接材料/直接人工/制造费用三要素反映期初、投入、转出与期末结存，验证成本归集与结转的完整性（CAS 1 号存货）。</p>
+        <p>2. 灰色底纹列为自动计算列（各要素期末、三费合计期末），据"期初+投入−转出"自动计算，不可手工编辑。</p>
+        <p>3. 切换上方要素分段可分别查看材料/人工/费用的期初、投入、转出、期末明细，期末结存应与在产品明细账勾稽一致。</p>
+        <p>4. 关注生产成本转出（结转完工产品）与在产品估价的合理性，防止成本跨期结转调节利润。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证生产成本三要素归集与结转的完整性、准确性，确认在产品期末结存计价合理，为存货成本真实性提供基础证据。"
+      class="objective-alert"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="pc.addRow()">+ 新增产品</el-button>
+        <el-segmented v-model="pc.activeSegment.value" :options="segments" size="small" />
+      </div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-val"
+          sheet="F2-41"
+          :disabled="isReadonly"
+          ai-section="cost-analysis"
+          :existing-content="pc.auditNote.value"
+          ai-title="AI 生成 · 生产成本分析结论"
+          review-section="F2-41-conclusion"
+          @ai-filled="(t: string) => { pc.auditNote.value = t }"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
+        <el-tag size="small" type="info">共 {{ pc.enrichedRows.value.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-table :data="pc.enrichedRows.value" border size="small" max-height="460">
@@ -52,13 +77,13 @@
             class="compact-num" @change="(v: number) => pc.updateRow(row.rowId, { [segKeys.transfer]: v ?? 0 })" />
         </template>
       </el-table-column>
-      <el-table-column :label="`${segLabel}-期末`" width="100" align="right">
+      <el-table-column :label="`${segLabel}-期末`" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
-          <span class="formula">{{ row[segKeys.closing].toLocaleString() }}</span>
+          <span class="formula" title="期初 + 投入 − 转出">{{ row[segKeys.closing].toLocaleString() }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="三费合计-期末" width="115" align="right">
-        <template #default="{ row }"><span class="formula">{{ row.totalClosing.toLocaleString() }}</span></template>
+      <el-table-column label="三费合计-期末" width="115" align="right" class-name="auto-calc-col">
+        <template #default="{ row }"><span class="formula" title="材料期末 + 人工期末 + 费用期末">{{ row.totalClosing.toLocaleString() }}</span></template>
       </el-table-column>
       <el-table-column label="" width="48">
         <template #default="{ row }">
@@ -67,10 +92,13 @@
       </el-table-column>
     </el-table>
 
-    <footer class="footer">
-      <h4>审计说明</h4>
-      <el-input v-model="pc.auditNote.value" type="textarea" :rows="3" :disabled="isReadonly" />
-    </footer>
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input v-model="pc.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="生产成本明细审计说明..." />
+    </el-card>
   </div>
 </template>
 
@@ -78,6 +106,7 @@
 import { computed, toRef } from 'vue'
 import { useF2ProductionCostDetail, type ProductionSegment } from '../../composables/useF2ProductionCostDetail'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 const props = defineProps<{

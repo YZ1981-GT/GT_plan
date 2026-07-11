@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-stage-classification">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资信用风险自初始确认以来的变化评估恰当，三阶段（Stage1/2/3）划分合理，作为预期信用损失计提的基础。"
+      style="margin-bottom: 12px"
+    />
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p><strong>ECL三阶段划分标准：</strong></p>

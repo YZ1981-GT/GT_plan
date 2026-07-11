@@ -1,36 +1,45 @@
 <template>
 <div class="d5-adjustment">
-    <!-- 编制提示折叠 -->
-    <details class="guidance-hint">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
       <summary>📋 编制提示</summary>
-      <div class="hint-content">
-        调整分录编制要求：<br/>
-        1. 审计调整分录（AJE）：用于更正被审计单位错误的会计处理或确认未入账交易。<br/>
-        2. 重分类调整分录（RJE）：用于调整报表列报分类，不影响利润。<br/>
-        3. 应收款项融资相关调整科目：1124应收款项融资/6101公允价值变动损益/其他综合收益。<br/>
-        4. 借贷必须平衡，每笔分录需注明调整事由和索引号。
+      <div class="guidance-content">
+        <p>1. 审计调整分录（AJE）：用于更正被审计单位错误的会计处理或确认未入账交易。</p>
+        <p>2. 重分类调整分录（RJE）：用于调整报表列报分类，不影响利润。</p>
+        <p>3. 应收款项融资相关调整科目：1124应收款项融资 / 6101公允价值变动损益 / 其他综合收益。</p>
+        <p>4. 借贷必须平衡，每笔分录需注明调整事由和索引号；可选中分录推送至 A13 错报汇总表。</p>
       </div>
     </details>
 
     <!-- 工具栏 -->
-    <div class="adj-toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
-        新增调整分录
-      </el-button>
-      <el-button
-        size="small"
-        :disabled="isReadonly || selectedRowIds.length === 0"
-        @click="handlePushToA13"
-      >
-        推送至A13
-      </el-button>
-      <el-button-group size="small" style="margin-left: auto">
-        <el-button @click="onExportTemplate">导出模板</el-button>
-        <el-button @click="onExportData">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-          <el-button :disabled="isReadonly">导入数据</el-button>
-        </el-upload>
-      </el-button-group>
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增调整分录</el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || selectedRowIds.length === 0"
+          @click="handlePushToA13"
+        >推送至A13</el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="onExportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="onExportData">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile" :disabled="isReadonly">
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:D5-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- 调整分录表 -->
@@ -189,12 +198,10 @@
 
     <!-- 底部借贷合计行 + 平衡指示 -->
     <div class="balance-row">
-      <span>借方合计：{{ fmtAmount(debitTotal) }}</span>
-      <span>贷方合计：{{ fmtAmount(creditTotal) }}</span>
-      <span :class="isBalanced ? 'balance-ok' : 'balance-err'">
-        <template v-if="isBalanced">✓ 平衡</template>
-        <template v-else>✗ 不平衡：差额 {{ fmtAmount(balanceDiff) }}</template>
-      </span>
+      <span class="balance-item">借方合计：<strong>{{ fmtAmount(debitTotal) }}</strong></span>
+      <span class="balance-item">贷方合计：<strong>{{ fmtAmount(creditTotal) }}</strong></span>
+      <el-tag v-if="isBalanced" type="success" size="small">借贷平衡</el-tag>
+      <el-tag v-else type="danger" size="small">不平衡 差额 {{ fmtAmount(balanceDiff) }}</el-tag>
     </div>
 </div>
 </template>
@@ -211,10 +218,13 @@
  * Task: 16.1
  * Requirements: 7.1-7.7
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, toRef, type Ref } from 'vue'
 import { useD5Adjustment } from '../composables/useD5Adjustment'
 import { useD5TabImportExport } from '../composables/useD5TabImportExport'
 import type { ChecklistResponse } from '../composables/useD5FormData'
+
+// @ts-ignore
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -222,10 +232,12 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -240,7 +252,7 @@ const {
   updateCell,
   pushToA13,
 } = useD5Adjustment({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
@@ -274,57 +286,73 @@ function fmtAmount(val: number | null | undefined): string {
 
 <style scoped>
 .d5-adjustment {
-  padding: 16px;
+  padding: 12px;
+}
+.d5-adjustment :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d5-adjustment :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 
-.mode-toolbar {
-  margin-bottom: 12px;
-}
-
-.guidance-hint {
+/* 编制提示 */
+.guidance-details {
   margin-bottom: 12px;
   border-left: 3px solid #409eff;
   background: #ecf5ff;
   border-radius: 4px;
-}
-
-.guidance-hint summary {
   padding: 8px 12px;
+}
+.guidance-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-weight: 500;
   color: #409eff;
 }
-
-.guidance-hint .hint-content {
-  padding: 8px 12px 12px;
-  font-size: 12px;
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
   color: #606266;
-  line-height: 1.8;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
 }
 
-.adj-toolbar {
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.toolbar-left {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  align-items: center;
 }
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 
+/* 借贷平衡指示 */
 .balance-row {
   display: flex;
-  gap: 24px;
+  align-items: center;
+  gap: 16px;
   padding: 10px 12px;
-  background: #fafafa;
+  background: #f5f7fa;
   border-radius: 4px;
   margin-top: 12px;
   font-size: 13px;
-  font-weight: 600;
 }
-
-.balance-ok {
-  color: #67c23a;
+.balance-item {
+  color: #606266;
 }
-
-.balance-err {
-  color: #f56c6c;
+.balance-item strong {
+  color: #303133;
 }
-
 </style>

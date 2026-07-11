@@ -10,6 +10,7 @@ import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { parseNum, calcSubtotal } from '../composables/useF4AccPayFormulaEngine'
 import type { ChecklistResponse } from '../composables/useF4FormData'
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -182,6 +183,8 @@ function fmtAmount(v: number): string {
     <div class="section-toolbar">
       <div class="toolbar-left">
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
+      </div>
+      <div class="toolbar-right">
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -192,8 +195,8 @@ function fmtAmount(v: number): string {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-      </div>
-      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F4-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-3-adjustment')">复核</el-button>
       </div>
     </div>
@@ -253,11 +256,14 @@ function fmtAmount(v: number): string {
 
 <style scoped>
 .f4-tab-adjustment { font-size: 13px; }
-.guidance-details { margin-bottom: 12px; font-size: 13px; }
-.guidance-details .guidance-content { padding: 8px 12px; background: #fffbeb; border-left: 3px solid #f59e0b; margin-top: 6px; font-size: 12px; line-height: 1.8; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: 13px; }
+.guidance-details .guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-details .guidance-content p { margin: 2px 0; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 8px; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-weight: 600; font-size: 13px; }
 .subtotal-bar.balance-fail { background: #fef0f0; }
 .balance-ok { color: #67c23a; margin-left: 12px; }

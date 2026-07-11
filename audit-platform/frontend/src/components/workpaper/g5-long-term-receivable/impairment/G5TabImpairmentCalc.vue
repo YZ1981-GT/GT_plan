@@ -20,6 +20,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G5-10 长期应收款坏账准备测算表</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G5-10" />
         <el-segmented v-model="activeTab" :options="segmentOptions" size="small" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 新增债务人
@@ -27,6 +28,10 @@
         <el-button size="small" @click="openReviewDialog('G5-10-impairment-calc')">💬复核</el-button>
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      测算长期应收款坏账准备（ECL）：按 Stage 分组验证信用损失率、坏账准备、账面价值及本年计提/转回的计算准确性。
+    </el-alert>
 
     <!-- Stage分组表格 -->
     <el-table
@@ -318,6 +323,7 @@ import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG5ImpairmentCalc } from '../../composables/useG5ImpairmentCalc'
 import type { G5ImpairmentCalcRow } from '../../composables/useG5ImpairmentCalc'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -507,6 +513,10 @@ defineExpose({
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
 }
 
 /* 表格 */

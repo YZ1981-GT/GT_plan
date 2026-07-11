@@ -1,8 +1,20 @@
 <template>
 <div class="d7-disclosure">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 合同负债（科目2205）附注依据 CAS14 收入准则披露，按上市公司版 / 国企版分别列报。</p>
+        <p>2. 分类表期末/期初数取自 D7-1 审定表（浅蓝背景为跨sheet自动取数），请与审定数核对一致。</p>
+        <p>3. 上市公司版需披露性质分类、账龄超1年重要合同负债及本期重大变动事项；国企版按财务决算报告附注要求披露分类信息。</p>
+        <p>4. 披露文本将双向回写至附注模块，请与审定表、明细表保持一致。</p>
+      </div>
+    </details>
+
     <!-- 上市/国企版切换 -->
     <div class="variant-toolbar">
       <el-segmented v-model="activeVariant" :options="variantOptions" size="small" />
+      <span class="chip-wrap"><GtIndexChip value="wp:D7-1" :context-project-id="projectId" /></span>
     </div>
 
     <!-- 上市公司版 -->
@@ -33,7 +45,7 @@
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.current) }}</span>
             </template>
           </el-table-column>
-          <el-table-column v-if="section.isDynamic && !isReadonly" label="" width="60" align="center">
+          <el-table-column v-if="section.isDynamic && !isReadonly" label="操作" width="60" align="center">
             <template #default="{ row }">
               <el-button v-if="!row.rowId.startsWith('__')" type="danger" text size="small" @click="removeDynamicRow(section.sectionKey, row.rowId)">删除</el-button>
             </template>
@@ -45,8 +57,8 @@
         </div>
 
         <!-- 说明textarea -->
-        <div class="note-textarea">
-          <label>说明：</label>
+        <div class="note-block">
+          <div class="note-label">说明：</div>
           <el-input
             :model-value="noteTexts[getNoteKey(section.sectionKey)]"
             type="textarea"
@@ -58,12 +70,12 @@
         </div>
 
         <!-- 编制提示 -->
-        <details class="editing-hints">
+        <details class="guidance-hint">
           <summary>📋 编制提示</summary>
-          <div class="hints-content">
-            <p v-if="section.sectionKey === 'listed-1'">从D7-1审定表自动取数，确认性质分类合计与审定数一致。<GtIndexChip wp-code="D7-1" label="→D7-1" /></p>
-            <p v-else-if="section.sectionKey === 'listed-2'">列示账龄超过1年的重要合同负债，说明未转收原因。</p>
-            <p v-else>列示本期账面价值发生重大变动的合同负债事项。</p>
+          <div class="hint-content">
+            <template v-if="section.sectionKey === 'listed-1'">从 D7-1 审定表自动取数，确认性质分类合计与审定数一致。<GtIndexChip value="wp:D7-1" :context-project-id="projectId" /></template>
+            <template v-else-if="section.sectionKey === 'listed-2'">列示账龄超过1年的重要合同负债，说明未转收原因。</template>
+            <template v-else>列示本期账面价值发生重大变动的合同负债事项。</template>
           </div>
         </details>
       </div>
@@ -92,7 +104,7 @@
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.current) }}</span>
             </template>
           </el-table-column>
-          <el-table-column v-if="section.isDynamic && !isReadonly" label="" width="60" align="center">
+          <el-table-column v-if="section.isDynamic && !isReadonly" label="操作" width="60" align="center">
             <template #default="{ row }">
               <el-button v-if="!row.rowId.startsWith('__')" type="danger" text size="small" @click="removeDynamicRow(section.sectionKey, row.rowId)">删除</el-button>
             </template>
@@ -103,8 +115,8 @@
           <el-button size="small" @click="addDynamicRow(section.sectionKey)">添加行</el-button>
         </div>
 
-        <div class="note-textarea">
-          <label>说明：</label>
+        <div class="note-block">
+          <div class="note-label">说明：</div>
           <el-input
             :model-value="noteTexts[getNoteKey(section.sectionKey)]"
             type="textarea"
@@ -114,6 +126,14 @@
             @change="(v: string) => updateNoteText(getNoteKey(section.sectionKey), v)"
           />
         </div>
+
+        <!-- 编制提示 -->
+        <details class="guidance-hint">
+          <summary>📋 编制提示</summary>
+          <div class="hint-content">
+            国企版按《国有企业财务决算报告附注》要求披露合同负债的分类构成及期初期末余额变动情况。
+          </div>
+        </details>
       </div>
     </template>
 </div>
@@ -126,7 +146,7 @@
  * Task: 23.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6, 19.5, 20.1
  */
-import { computed, type Ref } from 'vue'
+import { computed, toRef, type Ref } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { useD7Disclosure, type DisclosureSection, type DisclosureRow } from '../composables/useD7Disclosure'
 import type { ChecklistResponse } from '../composables/useD7FormData'
@@ -139,11 +159,13 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD7CrossSheet>
   variant?: 'listed' | 'soe'
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const variantOptions = [
   { label: '上市公司版', value: 'listed' },
@@ -154,7 +176,7 @@ const {
   listedSections, soeSections,
   activeVariant, addDynamicRow, removeDynamicRow, noteTexts,
 } = useD7Disclosure({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   crossSheet: props.crossSheet,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
@@ -210,8 +232,43 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.d7-disclosure { padding: 16px; }
-.variant-toolbar { margin-bottom: 16px; }
+.d7-disclosure { padding: 12px; }
+.d7-disclosure :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d7-disclosure :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+
+.variant-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .disclosure-card {
   margin-bottom: 20px;
@@ -221,18 +278,17 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .card-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #303133; }
 .label-bold { font-weight: 700; }
-.cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
+.cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; cursor: help; }
 
-.note-textarea { margin-top: 12px; }
-.note-textarea label { font-size: 13px; color: #606266; display: block; margin-bottom: 4px; }
+.note-block { margin-top: 12px; }
+.note-label { font-size: 13px; color: #606266; margin-bottom: 6px; }
 
-.editing-hints {
+.guidance-hint {
   margin-top: 12px;
   border-left: 3px solid #409eff;
   background: #ecf5ff;
   border-radius: 4px;
 }
-.editing-hints summary { padding: 8px 12px; cursor: pointer; font-size: 12px; color: #409eff; }
-.hints-content { padding: 0 12px 10px; font-size: 12px; color: #606266; line-height: 1.6; }
-.hints-content p { margin: 0; }
+.guidance-hint summary { padding: 8px 12px; cursor: pointer; font-size: 12px; color: #409eff; }
+.guidance-hint .hint-content { padding: 8px 12px 12px; font-size: 12px; color: #606266; line-height: 1.6; }
 </style>

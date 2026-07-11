@@ -1,30 +1,62 @@
 <template>
 <div class="d6-tab-detail">
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 本表列示合同资产（科目1402）明细，按合同类型归集，依 CAS14 收入准则确认——已履约但收款权取决于时间以外因素的部分列示为合同资产。</p>
+      <p>2. 灰色底纹列为自动计算列（期初审定/期末未审/期末审定），不可手工编辑；数字列右对齐。</p>
+      <p>3. 支持从余额表一键导入，并可切换"含账龄"列组查看期初/期末账龄分布，为 D6-8 ECL 组合计提提供依据。</p>
+      <p>4. 各合同类型自动生成小计行、全表生成合计行，请与 D6-1 审定表按类型聚合核对一致。</p>
+    </div>
+  </details>
+
+  <!-- 审计目标 -->
+  <el-alert
+    type="info"
+    :closable="false"
+    title="审计目标：核实合同资产各明细项目期末余额的存在与准确，确认合同类型分类与账龄划分的恰当性，为审定表聚合及减值测算提供依据。"
+    class="objective-alert"
+  />
+
   <!-- 工具栏 -->
-  <div class="detail-toolbar">
-    <el-input
-      v-model="searchFilter"
-      placeholder="搜索合同名称/客户名称..."
-      size="small"
-      style="width:240px"
-      clearable
-    />
-    <div class="toolbar-actions">
+  <div class="tab-toolbar">
+    <div class="toolbar-left">
+      <el-input
+        v-model="searchFilter"
+        placeholder="搜索合同名称/客户名称..."
+        size="small"
+        style="width:220px"
+        clearable
+      />
       <el-segmented v-model="columnGroup" :options="columnGroupOptions" size="small" />
-      <GtReviewTrigger section-id="D6-2-header" />
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">添加明细行</el-button>
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加明细行</el-button>
       <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="exportTemplate">导出空模板</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="exportData">导出数据</el-button>
-      <el-upload
-        :show-file-list="false"
-        accept=".xlsx"
-        :auto-upload="false"
-        :disabled="isReadonly || importing"
-        @change="(f: any) => onImportFile(f.raw || f)"
-      >
-        <el-button size="small" :disabled="isReadonly || importing">导入数据</el-button>
-      </el-upload>
+      <GtReviewTrigger section-id="D6-2-header" />
+    </div>
+    <div class="toolbar-right">
+      <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData">导出数据</el-dropdown-item>
+            <el-dropdown-item>
+              <el-upload
+                :show-file-list="false"
+                accept=".xlsx"
+                :auto-upload="false"
+                :disabled="isReadonly || importing"
+                @change="(f: any) => onImportFile(f.raw || f)"
+              >
+                <span>导入数据</span>
+              </el-upload>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-1" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ filteredRows.length }} 行</el-tag>
     </div>
   </div>
 
@@ -187,7 +219,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期初审定" width="110" align="right">
+      <el-table-column label="期初审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span>
         </template>
@@ -294,7 +326,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期末未审" width="110" align="right">
+      <el-table-column label="期末未审" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endUnadjusted) }}</span>
         </template>
@@ -334,7 +366,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期末审定" width="110" align="right">
+      <el-table-column label="期末审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endAudited) }}</span>
         </template>
@@ -514,21 +546,37 @@
     </el-table>
   </div>
 
-  <!-- 审计说明 -->
-  <div class="audit-notes-section">
-    <h4>审计说明</h4>
-    <el-input
-      v-model="auditExplanation"
-      type="textarea"
-      :rows="3"
-      :disabled="isReadonly"
-      placeholder="对合同资产明细本期变动的分析说明..."
-    />
-    <div class="note-actions">
-      <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genDetailChange">🤖AI</el-button>
-      <GtReviewTrigger section-id="D6-2-note-explanation" label="💬 复核" />
+  <!-- 审计意见区（卡片式） -->
+  <el-card class="opinion-card" shadow="never">
+    <template #header>
+      <div class="opinion-header">
+        <span class="opinion-title">审计说明与结论</span>
+        <div class="opinion-chips">
+          <GtIndexChip value="wp:D6-1" :context-project-id="projectId" />
+        </div>
+      </div>
+    </template>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">审计说明</span>
+        <div class="opinion-actions">
+          <el-tooltip :content="aiTip" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoading"
+              :disabled="isReadonly || !aiAvailable" @click="genDetailChange">🤖 AI辅助</el-button>
+          </el-tooltip>
+          <GtReviewTrigger section-id="D6-2-note-explanation" label="💬 复核" />
+        </div>
+      </div>
+      <el-input
+        v-model="auditExplanation"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 7 }"
+        :disabled="isReadonly"
+        placeholder="对合同资产明细本期变动的分析说明..."
+      />
     </div>
-  </div>
+  </el-card>
 </div>
 </template>
 
@@ -554,14 +602,19 @@ import { calcSubtotal } from '../composables/useD6FormulaEngine'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
+// @ts-ignore
+import GtIndexChip from '../GtIndexChip.vue'
+
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
@@ -592,7 +645,7 @@ const {
   searchFilter,
   filteredRows,
 } = useD6Detail({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
@@ -691,7 +744,7 @@ const {
 const auditExplanation = ref('')
 
 watch(
-  () => props.allResponses.value.get('D6-2-note-explanation')?.remark,
+  () => allResponsesRef.value.get('D6-2-note-explanation')?.remark,
   (val) => { auditExplanation.value = val || '' },
   { immediate: true },
 )
@@ -701,6 +754,8 @@ watch(auditExplanation, (val) => {
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD6AiGenerate(toRef(props, 'wpId'))
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 
 async function genDetailChange() {
   if (props.isReadonly) return
@@ -721,29 +776,113 @@ function fmtAmount(val: number | null | undefined): string {
 
 <style scoped>
 .d6-tab-detail { padding: 16px; }
+.d6-tab-detail :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d6-tab-detail :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
 
-.detail-toolbar {
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 8px;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-radius: 6px;
 }
-
-.toolbar-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .virtual-hint { flex: 1; margin: 0; }
 
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
+}
 .auto-calc { background: #f5f7fa; padding: 2px 6px; border-radius: 2px; color: #909399; }
 .subtotal-label { font-weight: 700; }
 .subtotal-amount { font-weight: 700; }
 
-.audit-notes-section { margin-top: 20px; }
-.audit-notes-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
-.note-actions { display: flex; gap: 8px; margin-top: 8px; }
+/* 审计意见卡片 */
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 </style>

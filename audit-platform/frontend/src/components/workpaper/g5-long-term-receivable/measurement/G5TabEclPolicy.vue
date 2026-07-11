@@ -1,6 +1,13 @@
 <template>
   <div class="g5-ecl-policy">
-    <h3 class="sheet-title">G5-8 会计政策检查</h3>
+    <div class="section-head">
+      <h3 class="sheet-title">G5-8 会计政策检查</h3>
+      <GtIndexChip value="wp:G5-8" />
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      检查长期应收款预期信用损失（ECL）会计政策及关键参数是否符合准则要求，评价政策一致性与合规性。
+    </el-alert>
 
     <el-card shadow="never" class="section-card">
       <template #header><div class="section-header"><span>（一）基本政策</span><el-button size="small" type="primary" text>AI</el-button></div></template>
@@ -58,18 +65,34 @@
       <template #header><div class="section-header"><span>综合结论</span><el-button size="small" type="primary" text>AI</el-button></div></template>
       <el-input v-model="policy.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="props.readonly" />
     </el-card>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>核对企业是否采用三阶段 ECL 模型，判断标准与准则一致（CAS 22）</li>
+        <li>关注 ECL 关键参数：违约概率 PD、违约损失率 LGD、违约风险敞口 EAD 的确定依据</li>
+        <li>关注前瞻性信息与宏观经济情景权重的合理性</li>
+        <li>合规性逐项判断（合规 / 不合规 / 待核实），不合规项须在说明中记录并跟进</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useG5EclPolicy } from '../../composables/useG5EclPolicy'
+import GtIndexChip from '../../GtIndexChip.vue'
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const policy = useG5EclPolicy()
 </script>
 
 <style scoped>
 .g5-ecl-policy { font-size: 13px; padding: 4px; }
-.sheet-title { margin: 0 0 12px; font-size: 15px; }
+.section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.audit-objective { margin-bottom: 12px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .section-card { margin-bottom: 12px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; }
 </style>

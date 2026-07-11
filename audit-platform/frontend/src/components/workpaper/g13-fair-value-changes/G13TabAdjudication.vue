@@ -156,6 +156,13 @@
       <el-input :model-value="adj.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }"
         :disabled="isReadonly" @update:model-value="adj.updateAuditConclusion" />
     </el-card>
+
+    <details class="compile-hint">
+      <summary>📋 编制提示</summary>
+      <p>1. 本期各行未审/调整/审定数自 G13-2 明细按所属科目自动汇总，仅上期数及原因分析需手工录入。</p>
+      <p>2. |变动率|>20% 的行须填写原因分析；审定合计应与试算平衡表 6101 发生额一致，差异需查明。</p>
+      <p>3. 「发布审定数」将审定合计广播至附注披露与 TB 回写（CAS 39 公允价值计量，损益取发生额口径）。</p>
+    </details>
   </div>
 </template>
 
@@ -209,7 +216,7 @@ function fmtRate(rate: number | null): string {
 .g13-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .g13-actions { display: flex; gap: 8px; align-items: center; }
 .g13-title { margin: 0; font-size: 15px; font-weight: 600; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #fafafa; display: inline-block; width: 100%; }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 .reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 .g13-tb-row { display: flex; align-items: center; gap: 16px; margin: 12px 0; flex-wrap: wrap; }
@@ -217,6 +224,8 @@ function fmtRate(rate: number | null): string {
 .variance.is-error { color: #f56c6c; }
 .g13-note-card { margin-top: 12px; }
 .cross-alert { margin-bottom: 12px; }
+.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
+.compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 .warn-chip, .ok-chip { margin-left: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 :deep(.g13-row-total) { font-weight: 700; background: #f5f7fa; }

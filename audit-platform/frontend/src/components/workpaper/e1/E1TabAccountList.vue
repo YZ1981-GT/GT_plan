@@ -10,9 +10,12 @@
  *
  * Requirements: 8.1-8.2
  */
-import { inject, toRef, type Ref } from 'vue'
+import { inject, toRef, computed, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useE1AccountList, type AccountListRow } from '../composables/useE1AccountList'
+import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,8 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
   fmtAmount: (v: number) =>
     v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 })
+
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -54,6 +59,25 @@ const {
   updateCell,
 } = useE1AccountList(options)
 
+// ─── 导入导出（E1-10） ────────────────────────────────────────────────────────
+
+const sheetCode = computed(() => 'E1-10')
+const { exportTemplate, exportData, importData, isImporting } = useE1ImportExport({
+  wpId: toRef(props, 'wpId') as unknown as Ref<string>,
+  sheet: sheetCode as unknown as Ref<string>,
+})
+
+async function handleImport(file: File): Promise<boolean> {
+  const res = await importData(file)
+  if (res.success) {
+    ElMessage.success(res.message || '导入成功')
+    await reloadWorkpaperData?.()
+  } else {
+    ElMessage.warning(res.message || '导入失败')
+  }
+  return false
+}
+
 // ─── Row Class ───────────────────────────────────────────────────────────────
 
 function getRowClass({ row }: { row: AccountListRow }): string {
@@ -64,6 +88,55 @@ function getRowClass({ row }: { row: AccountListRow }): string {
 
 <template>
   <div class="e1-tab-account-list">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 取得被审计单位全部银行账户清单，与开户许可证、征信报告（E1-18）核对账户完整性。</p>
+        <p>2. 关注是否存在账外账户、久悬未用账户及未纳入审定表的账户。</p>
+        <p>3. 核对结果为"不一致"时，须在原因栏说明差异内容（红色高亮提示）。</p>
+        <p>4. 每个银行账户均应取得银行询证函回函予以支持，并与审定表勾稽一致。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实被审计单位银行账户的完整性，确认不存在账外账户及未入账资金往来。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate()">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData()">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx,.xls"
+                  :before-upload="handleImport"
+                  :disabled="isImporting"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
         <el-table
@@ -184,8 +257,6 @@ function getRowClass({ row }: { row: AccountListRow }): string {
             </template>
           </el-table-column>
         </el-table>
-
-        <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRow">+ 添加行</el-button>
       </template>
     </el-skeleton>
   </div>
@@ -195,9 +266,62 @@ function getRowClass({ row }: { row: AccountListRow }): string {
 .e1-tab-account-list {
   padding: 12px 0;
 }
-.add-btn {
-  margin-top: 8px;
+.e1-tab-account-list :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
 }
+.e1-tab-account-list :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .required-field :deep(.el-input__wrapper) {
   box-shadow: 0 0 0 1px #f56c6c inset;
 }

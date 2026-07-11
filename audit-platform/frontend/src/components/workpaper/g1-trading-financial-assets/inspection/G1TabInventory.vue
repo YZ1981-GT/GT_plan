@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-4 证券结存表</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="inv.addRow()">新增证券</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
+        <el-tag size="small" type="info">共 {{ inv.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-4-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实交易性金融资产各证券期末数量、成本与公允价值结存的准确与完整，确认未实现损益计算恰当，为明细表及审定表提供支撑。"
+      class="objective-alert"
+    />
 
     <el-segmented v-model="segment" :options="segmentOptions" size="small" class="segment-bar" />
 
@@ -17,6 +27,7 @@
         :label="col.label"
         :width="col.width"
         :align="col.type === 'number' ? 'right' : 'left'"
+        :class-name="col.formula ? 'auto-calc-col' : ''"
         :fixed="col.prop === 'securityName' ? 'left' : undefined"
       >
         <template #default="{ row, $index }">
@@ -70,7 +81,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>期末数量 = 期初数量 + 增加数量 - 减少数量；期末成本 = 期初成本 + 增加成本 - 减少成本。</li>
         <li>未实现损益 = 期末公允 - 期末成本，系统自动计算。</li>
@@ -84,6 +95,7 @@
 import { ref, toRef, computed, inject } from 'vue'
 import { useG1Inventory, type G1InventoryRow } from '../../composables/useG1Inventory'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -126,11 +138,16 @@ function fmtNum(v: unknown): string {
 
 <style scoped>
 .g1-inventory { padding: 12px; font-size: 13px; }
+.g1-inventory :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-inventory :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .segment-bar { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-line { padding: 2px 0; }
 .subtotal-label { font-weight: 600; margin-right: 8px; }

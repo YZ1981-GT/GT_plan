@@ -1,7 +1,7 @@
 <template>
   <div class="cycle-adjudication">
     <h3 class="sheet-title">{{ config.sheetCode }} {{ config.accountLabel }}审定表</h3>
-    <el-table :data="adj.rows" border size="small">
+    <el-table :data="rows" border size="small">
       <el-table-column prop="label" label="项目" width="160" fixed />
       <el-table-column label="期初审定" width="110">
         <template #default="{ row }">
@@ -9,27 +9,27 @@
             v-if="row.rowKey !== 'subtotal'"
             :model-value="row.priorAudited"
             size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => adj.updateField(row.rowKey, 'prior-audited', v ?? 0)"
+            @update:model-value="(v: number) => updateField(row.rowKey, 'prior-audited', v ?? 0)"
           />
         </template>
       </el-table-column>
-      <el-table-column :label="adj.debitLabel" width="110">
+      <el-table-column :label="debitLabel" width="110">
         <template #default="{ row }">
           <el-input-number
             v-if="row.rowKey !== 'subtotal'"
             :model-value="row.periodDebit"
             size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => adj.updateField(row.rowKey, 'debit', v ?? 0)"
+            @update:model-value="(v: number) => updateField(row.rowKey, 'debit', v ?? 0)"
           />
         </template>
       </el-table-column>
-      <el-table-column :label="adj.creditLabel" width="110">
+      <el-table-column :label="creditLabel" width="110">
         <template #default="{ row }">
           <el-input-number
             v-if="row.rowKey !== 'subtotal'"
             :model-value="row.periodCredit"
             size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => adj.updateField(row.rowKey, 'credit', v ?? 0)"
+            @update:model-value="(v: number) => updateField(row.rowKey, 'credit', v ?? 0)"
           />
         </template>
       </el-table-column>
@@ -42,7 +42,7 @@
             v-if="row.rowKey !== 'subtotal'"
             :model-value="row.closingAje"
             size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => adj.updateField(row.rowKey, 'aje', v ?? 0)"
+            @update:model-value="(v: number) => updateField(row.rowKey, 'aje', v ?? 0)"
           />
         </template>
       </el-table-column>
@@ -52,7 +52,7 @@
             v-if="row.rowKey !== 'subtotal'"
             :model-value="row.closingRje"
             size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => adj.updateField(row.rowKey, 'rje', v ?? 0)"
+            @update:model-value="(v: number) => updateField(row.rowKey, 'rje', v ?? 0)"
           />
         </template>
       </el-table-column>
@@ -61,7 +61,7 @@
       </el-table-column>
     </el-table>
 
-    <el-table :data="[adj.totalRow]" border size="small" class="subtotal-table" :show-header="false">
+    <el-table :data="[totalRow]" border size="small" class="subtotal-table" :show-header="false">
       <el-table-column width="160"><template #default="{ row }"><b>{{ row.label }}</b></template></el-table-column>
       <el-table-column width="110"><template #default="{ row }">{{ row.priorAudited.toLocaleString() }}</template></el-table-column>
       <el-table-column width="110"><template #default="{ row }">{{ row.periodDebit.toLocaleString() }}</template></el-table-column>
@@ -74,20 +74,20 @@
 
     <div class="tb-diff-row">
       <span>试算平衡表数（{{ config.accountCode }}）：
-        <el-input-number v-model="adj.trialBalanceAmount" size="small" :controls="false" :disabled="isReadonly" />
+        <el-input-number v-model="trialBalanceAmount" size="small" :controls="false" :disabled="isReadonly" />
       </span>
-      <span :class="{ 'diff-red': adj.trialBalanceDiff !== 0 }">
-        差异：{{ adj.trialBalanceDiff.toLocaleString() }}
-        <template v-if="adj.trialBalanceDiff === 0"> ✓</template>
+      <span :class="{ 'diff-red': trialBalanceDiff !== 0 }">
+        差异：{{ trialBalanceDiff.toLocaleString() }}
+        <template v-if="trialBalanceDiff === 0"> ✓</template>
         <template v-else> ✗</template>
       </span>
     </div>
 
     <div class="audit-notes">
       <h4>审计说明</h4>
-      <el-input v-model="adj.auditNote" type="textarea" :rows="2" :disabled="isReadonly" />
+      <el-input v-model="auditNote" type="textarea" :rows="2" :disabled="isReadonly" />
       <h4>审计结论</h4>
-      <el-input v-model="adj.conclusion" type="textarea" :rows="2" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :rows="2" :disabled="isReadonly" />
     </div>
   </div>
 </template>
@@ -107,7 +107,17 @@ const props = defineProps<{
 
 const configRef = computed(() => props.config)
 
-const adj = usePeriodAdjudication({
+const {
+  rows,
+  totalRow,
+  trialBalanceAmount,
+  trialBalanceDiff,
+  auditNote,
+  conclusion,
+  debitLabel,
+  creditLabel,
+  updateField,
+} = usePeriodAdjudication({
   config: configRef,
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,

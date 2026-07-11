@@ -14,7 +14,11 @@
     <template v-else>
       <!-- 工具栏 -->
       <div class="gt-confirmation-alternative-g06__toolbar">
-        <span class="gt-confirmation-alternative-g06__title">G0-6 投资循环替代程序</span>
+        <div class="gt-confirmation-alternative-g06__toolbar-left">
+          <span class="gt-confirmation-alternative-g06__title">G0-6 投资循环替代程序</span>
+          <GtIndexChip value="wp:G0-6" />
+          <el-tag size="small" type="info" effect="plain">共 {{ data.companies.value.length }} 家</el-tag>
+        </div>
         <div class="gt-confirmation-alternative-g06__toolbar-right">
           <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
           <GtReviewTrigger section-id="G0-6-alternative" label="复核" />
@@ -27,6 +31,16 @@
           提示③：对回函可能性不高的、余额重大的，发函同时执行替代程序。
         </el-alert>
       </div>
+
+      <!-- 编制提示 -->
+      <details class="gt-confirmation-alternative-g06__tips">
+        <summary>编制提示</summary>
+        <p>
+          依据 CAS 1312《函证》：对回函可能性不高或余额重大的证券投资，发函同时执行替代程序。投资循环替代程序按四类证据检查：
+          ①持仓证明（托管对账单／中登查询）②投资收益/股利（分红公告＋银行回单）③处置收益（交易确认单＋成本＋手续费）④公允价值佐证（报价来源／估值模型／Level 层级）。
+          逐笔核对凭证与检查证据，系统自动计算股利差异、处置损益与检查比例，标记异常项，并在审计结论中说明检查情况与结论类型（A/B/C）。
+        </p>
+      </details>
 
       <!-- 看板 -->
       <AlternativeD05Dashboard :metrics="data.metrics.value" />
@@ -360,6 +374,7 @@ import { BLOCK_COLUMN_CONFIGS_G06 } from './blockColumnConfigsG06'
 import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
 import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件
 import AlternativeD05Dashboard from '../../confirmation/alternativeD05/AlternativeD05Dashboard.vue'
@@ -897,6 +912,32 @@ defineExpose({
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 12px;
+}
+
+.gt-confirmation-alternative-g06__toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gt-confirmation-alternative-g06__tips {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+.gt-confirmation-alternative-g06__tips summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+}
+
+.gt-confirmation-alternative-g06__tips p {
+  margin: 8px 0 0;
+  line-height: 1.6;
 }
 
 .gt-confirmation-alternative-g06__title {

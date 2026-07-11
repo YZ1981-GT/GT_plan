@@ -19,6 +19,14 @@
 -->
 <template>
   <div class="g4-voucher-check">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：通过检查债权投资相关记账凭证及支持性文件，确认业务真实发生、账务处理正确、借贷平衡，异常凭证已识别说明。"
+      style="margin-bottom: 12px"
+    />
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-13 凭证检查表</h3>

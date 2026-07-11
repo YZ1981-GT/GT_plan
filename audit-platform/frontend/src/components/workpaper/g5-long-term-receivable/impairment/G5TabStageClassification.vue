@@ -37,6 +37,10 @@
       </div>
     </div>
 
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      对各长期应收款债务人执行 ECL 三阶段划分，比对企业划分与审计判断的一致性，识别信用风险显著增加及已减值情形。
+    </el-alert>
+
     <!-- 无数据占位 -->
     <el-empty v-if="stageLogic.rows.value.length === 0" description="暂无债务人，点击"新增债务人"开始" />
 
@@ -485,6 +489,10 @@ defineExpose({
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
 }
 
 /* ─── 主表格 ─── */

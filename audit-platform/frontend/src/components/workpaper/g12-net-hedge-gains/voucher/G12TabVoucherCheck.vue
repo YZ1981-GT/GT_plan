@@ -5,8 +5,18 @@
       <el-button size="small" type="primary" :disabled="isReadonly" @click="vc.addRow()">+ 新增</el-button>
       <GtVoucherSamplingEngine v-if="wpId && projectId" :project-id="projectId" :account-codes="['6103']" dialog-mode />
       <CycleImportExportDropdown :wp-id="wpId" api-prefix="g12" sheet="G12-6" :disabled="isReadonly" @imported="emit('imported')" />
+      <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
       <GtReviewTrigger section-id="G12-6-voucher" />
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="抽取净敞口套期收益（6103）相关凭证，核对原始凭证完整性、授权批准、账务处理、套期指定文档与公允价值估值依据，识别异常凭证并评估风险等级。支持抽凭引擎选样与 📎 附件 OCR 自动填充。"
+    />
 
     <div class="stats">
       借贷：{{ vc.debitTotal.value.toFixed(2) }} / {{ vc.creditTotal.value.toFixed(2) }} ·
@@ -184,6 +194,11 @@
       </el-table-column>
     </el-table>
     </template>
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+      <p>凭证检查分「凭证基础 / 核对内容 / 结论」三区段。核对 5 要素：原始凭证完整、授权批准、账务处理正确、套期指定文档齐备、公允价值估值依据充分；任一未通过标记为异常。可通过抽凭引擎按科目 6103 选样，或截止测试一键取数（基准日 ±N 天）回写并跨期标注。</p>
+    </details>
   </div>
 </template>
 
@@ -299,6 +314,9 @@ function rowClassName({ row }: { row: { isAbnormal: boolean } }): string {
 <style scoped>
 .g12-vc { padding: 12px; font-size: 13px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.audit-objective { margin-bottom: 8px; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .stats { font-size: 12px; margin-bottom: 8px; color: #606266; }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .virtual-hint { flex: 1; margin: 0; }

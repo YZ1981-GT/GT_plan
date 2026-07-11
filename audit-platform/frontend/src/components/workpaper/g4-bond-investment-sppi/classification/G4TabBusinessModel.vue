@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-business-model">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认管理债权投资的业务模式判断恰当（以收取合同现金流量为目标），作为金融资产分类计量的基础。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section标题 + 复核按钮 -->
     <div class="section-header">
       <h3 class="section-title">G4-5 业务模式分析</h3>

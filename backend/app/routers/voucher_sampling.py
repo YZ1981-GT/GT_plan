@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 from uuid import UUID
 
@@ -94,7 +94,7 @@ async def voucher_extract(
             workpaper_id=req.workpaper_id,
             user_id=current_user.id,
             snapshot_type="auto_sampling",
-            description=f"抽凭执行: {req.sampling_method.value}, phase={req.phase}",
+            description=f"抽凭执行: {req.sampling_method}, phase={req.phase}",
         )
 
         # 1. 解析过滤条件
@@ -126,6 +126,15 @@ async def voucher_extract(
             )
             from datetime import timedelta
             date_end = date(req.year, max_month + 1, 1) - timedelta(days=1)
+
+        # 截止性测试复用：filters 显式日期窗口 date_from/date_to（= 基准日 ∓ 天数）
+        # 覆盖由 period_range 推导的日期范围（可选，向后兼容：缺省时沿用月份推导）
+        date_from_override = _parse_iso_date(filters.get("date_from"))
+        date_to_override = _parse_iso_date(filters.get("date_to"))
+        if date_from_override is not None:
+            date_start = date_from_override
+        if date_to_override is not None:
+            date_end = date_to_override
 
         # 金额阈值：使用 amount_min 作为 threshold（LedgerQueryFilters 设计）
         amount_threshold = Decimal(str(amount_min)) if amount_min else Decimal("0")
@@ -183,18 +192,44 @@ async def voucher_extract(
             seed=req.random_seed,
         )
 
-        # 9. 构建返回值（金额序列化为字符串）
+        # 9. 总体金额（账面来源=序时账总体，按 GREATEST 汇总）与 MUS 抽样间隔推导
+        #    population_amount / book_amount 用于总体完整性校验（R19）
+        population_amount = sum(
+            (_greatest_amount(it) for it in items), Decimal("0")
+        )
+        sampling_interval = _derive_sampling_interval(
+            req.sampling_method, sp, population_amount
+        )
+
+        # 10. 高值必选项标识（R17）：单笔金额 ≥ 抽样间隔者标记 high_value
+        #     无可推导间隔时 high_value 一律 False（向后兼容默认值）
+        marked_items: list[dict] = []
+        for it in result.items:
+            marked = dict(it)
+            if sampling_interval is not None and sampling_interval > 0:
+                marked["high_value"] = _greatest_amount(it) >= sampling_interval
+            else:
+                marked["high_value"] = False
+            marked_items.append(marked)
+
+        # 11. 构建返回值（金额序列化为字符串，新增字段均向后兼容）
         return {
-            "items": result.items,
+            "items": marked_items,
             "stats": {
                 "population_count": result.population_count,
                 "population_debit_total": str(result.population_debit_total),
                 "population_credit_total": str(result.population_credit_total),
+                "population_amount": str(population_amount),
+                # 账面来源合计（序时账总体 GREATEST 汇总）；无法获取时降级为 null
+                "book_amount": str(population_amount) if items else None,
                 "sample_count": result.sample_count,
                 "sample_debit_total": str(result.sample_debit_total),
                 "sample_credit_total": str(result.sample_credit_total),
                 "count_coverage_rate": str(result.count_coverage_rate),
                 "amount_coverage_rate": str(result.amount_coverage_rate),
+                "sampling_interval": (
+                    str(sampling_interval) if sampling_interval is not None else None
+                ),
             },
             "seed_used": result.seed_used,
             "truncated": result.truncated,
@@ -243,6 +278,11 @@ async def voucher_history(
             "filled_count": row.filled_count,
             "fill_mode": row.fill_mode,
             "is_undone": row.is_undone,
+            # 方法学留痕回显：优先读 extraction_criteria JSON，回退到顶层列，缺省返回 null
+            "random_seed": _echo_criteria_field(row, "random_seed"),
+            "resample_reason": _echo_criteria_field(row, "resample_reason"),
+            "sampling_interval": _echo_criteria_field(row, "sampling_interval"),
+            "conclusion": _echo_criteria_field(row, "conclusion"),
         }
         for row in rows
     ]
@@ -362,6 +402,76 @@ async def voucher_compare(
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+def _parse_iso_date(value: Any) -> Optional[date]:
+    """将 filters 中的 date_from/date_to 解析为 date（接受 date 或 'YYYY-MM-DD' 字符串）。
+
+    无法解析或为空时返回 None（调用方保留原有日期范围，保证向后兼容）。
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (ValueError, TypeError):
+        return None
+
+
+def _greatest_amount(item: dict) -> Decimal:
+    """GREATEST(|debit_amount|, |credit_amount|) — 单条凭证的代表金额。"""
+    debit = item.get("debit_amount")
+    credit = item.get("credit_amount")
+    try:
+        debit_val = abs(Decimal(str(debit))) if debit is not None else Decimal("0")
+    except (InvalidOperation, ValueError):
+        debit_val = Decimal("0")
+    try:
+        credit_val = abs(Decimal(str(credit))) if credit is not None else Decimal("0")
+    except (InvalidOperation, ValueError):
+        credit_val = Decimal("0")
+    return max(debit_val, credit_val)
+
+
+def _derive_sampling_interval(
+    method: SamplingMethod, sp: dict, population_amount: Decimal
+) -> Optional[Decimal]:
+    """推导 MUS 抽样间隔用于高值必选标识（R17）。
+
+    优先使用前端显式传入的 sampling_interval；
+    否则在 MUS 方法下按 总体金额 / mus_sample_size 推导；
+    其他方法无间隔概念，返回 None（high_value 一律 False）。
+    """
+    explicit = sp.get("sampling_interval")
+    if explicit is not None and explicit != "":
+        try:
+            val = Decimal(str(explicit))
+            if val > 0:
+                return val
+        except (InvalidOperation, ValueError):
+            pass
+
+    if method == "mus":
+        try:
+            mus_size = int(sp.get("mus_sample_size", 10) or 0)
+        except (ValueError, TypeError):
+            mus_size = 0
+        if mus_size > 0 and population_amount > 0:
+            return population_amount / Decimal(mus_size)
+
+    return None
+
+
+def _echo_criteria_field(record: Any, key: str) -> Any:
+    """从抽凭历史记录回显方法学字段。
+
+    优先从 extraction_criteria JSON 读取；回退到记录顶层同名属性；均无则返回 None。
+    """
+    criteria = getattr(record, "extraction_criteria", None)
+    if isinstance(criteria, dict) and key in criteria:
+        return criteria.get(key)
+    return getattr(record, key, None)
 
 
 def _build_sampling_params(method: SamplingMethod, sp: dict) -> SamplingParams:

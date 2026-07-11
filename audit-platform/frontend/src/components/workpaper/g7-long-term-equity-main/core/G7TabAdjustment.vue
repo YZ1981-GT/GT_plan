@@ -22,6 +22,11 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：汇总长期股权投资相关的审计调整分录(AJE)与重分类分录(RJE)，验证借贷平衡，确认调整依据充分、金额准确，并将净调整额回写 G7-1 审定表对应列。
+    </el-alert>
+
     <!-- 借贷差额实时显示 -->
     <div class="balance-indicator" :class="{ balanced: isBalanced, unbalanced: !isBalanced }">
       <span v-if="isBalanced">借贷差额: ¥0.00 ✅</span>
@@ -458,6 +463,10 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
 .g7-tab-adjustment {
   padding: 12px;
   font-size: 13px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
 }
 
 .section-head {

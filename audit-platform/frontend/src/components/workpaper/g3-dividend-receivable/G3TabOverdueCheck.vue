@@ -27,8 +27,19 @@
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G3-5-overdue')">💬复核</el-button>
+        <GtIndexChip value="wp:G3-5" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ overdue.rows.value.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：评估长期未收回应收股利的可收回性与减值风险，关注被投资方经营状况及偿付能力，识别高风险逾期事项。"
+    />
 
     <el-table
       :data="overdue.rows.value"
@@ -184,16 +195,15 @@
     </el-card>
 
     <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>逾期天数 = MAX(0, 当前日期 - 约定付款日)</li>
-        <li>逾期 &gt; 180天：红色高亮（极高风险）</li>
-        <li>逾期 &gt; 90天且≤180天：橙色高亮（高风险）</li>
-        <li>预计可收回性：全额可收回 / 部分可收回 / 很可能无法收回 / 无法收回</li>
-        <li>风险等级：低 / 中 / 高 / 极高</li>
-        <li>需关注被投资方经营状况及历史分红记录，综合评估收回可能性</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示（CAS 依据）</summary>
+      <div class="guidance-content">
+        <p>1. 逾期天数 = MAX(0, 当前日期 - 约定付款日)。</p>
+        <p>2. 逾期 &gt; 180 天：红色高亮（极高风险）；逾期 &gt; 90 天且 ≤180 天：橙色高亮（高风险）。</p>
+        <p>3. 预计可收回性：全额可收回 / 部分可收回 / 很可能无法收回 / 无法收回。</p>
+        <p>4. 风险等级：低 / 中 / 高 / 极高；需关注被投资方经营状况及历史分红记录，综合评估收回可能性。</p>
+        <p class="cas-basis">CAS 依据：应对应收款项的可收回性进行评估并考虑减值（《企业会计准则第 22 号——金融工具确认和计量》预期信用损失）。</p>
+      </div>
     </details>
   </div>
 </template>
@@ -202,6 +212,7 @@
 import { ref, toRef, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GtIndexChip from '../GtIndexChip.vue'
 import {
   useG3OverdueCheck,
   getOverdueRiskClass,
@@ -301,13 +312,16 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
   align-items: center;
 }
 
-/* 公式列：虚线下划线 + cursor:help */
+/* 公式列：灰底 + 虚线下划线 + cursor:help */
 .formula-cell {
   border-bottom: 1px dashed #909399;
   cursor: help;
   display: inline-block;
   min-width: 40px;
+  padding: 0 4px;
   text-align: right;
+  background: #f5f7fa;
+  border-radius: 2px;
 }
 
 /* 删除图标 */
@@ -350,18 +364,37 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
   align-items: center;
 }
 
-/* 编制提示 */
-.prep-hint {
+/* 审计目标 */
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+/* 编制提示（guidance-details gold 样式） */
+.guidance-details {
   margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
 }
-.prep-hint summary {
+.guidance-details summary {
   cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
 }
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.guidance-content .cas-basis {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>
 

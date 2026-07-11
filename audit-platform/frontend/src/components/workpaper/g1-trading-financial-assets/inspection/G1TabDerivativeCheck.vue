@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-14 衍生金融工具核查表</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="dc.addRow()">新增衍生工具</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+        <el-tag size="small" type="info">共 {{ dc.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-14-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核查衍生金融工具（期权/期货/互换/远期）的存在、名义金额、对手方及保证金安排，评价会计处理适当性，确认非套期衍生工具计入交易性金融资产恰当。"
+      class="objective-alert"
+    />
 
     <div class="stats-bar">
       衍生工具：<b>{{ dc.rows.value.length }}</b> 项 ·
@@ -76,7 +86,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>衍生工具类型：期权/期货/互换/远期，需关注名义金额、对手方及保证金安排。</li>
         <li>会计处理适当性下拉判定，标记为「不适当」的项目应在合规结论中说明并提出调整建议。</li>
@@ -90,6 +100,7 @@
 import { toRef, inject } from 'vue'
 import { useG1DerivativeCheck } from '../../composables/useG1DerivativeCheck'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -108,9 +119,13 @@ const dc = useG1DerivativeCheck({
 
 <style scoped>
 .g1-derivative-check { padding: 12px; font-size: 13px; }
+.g1-derivative-check :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-derivative-check :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #f56c6c; }
 .conclusion-card { margin-top: 12px; }

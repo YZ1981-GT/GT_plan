@@ -61,21 +61,21 @@
               class="compact-num" @change="(v: number) => vt.updateRow(row.rowId, { bookIssueAmt: v ?? 0 })" />
           </template>
         </el-table-column>
-        <el-table-column label="审计金额" width="95" min-width="85" align="right">
+        <el-table-column label="审计金额" width="95" min-width="85" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="加权平均单价 × 发出数量" placement="top">
               <span class="formula">{{ fmt(row.auditIssueAmt) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="差异额" width="90" min-width="80" align="right">
+        <el-table-column label="差异额" width="90" min-width="80" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="审计金额 - 账面金额" placement="top">
               <span class="formula">{{ fmt(row.varianceAmt) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="差异率" width="80" min-width="70" align="right">
+        <el-table-column label="差异率" width="80" min-width="70" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="差异额 / 账面金额 × 100%" placement="top">
               <span :class="{ 'spread-warn': isExceed(row) }" class="formula">{{ fmtRate(row.varianceRate) }}</span>

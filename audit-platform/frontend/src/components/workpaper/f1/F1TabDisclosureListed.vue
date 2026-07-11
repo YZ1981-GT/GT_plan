@@ -4,6 +4,17 @@
     <el-alert type="info" title="当前项目不适用上市公司附注披露格式" :closable="false" show-icon />
   </template>
   <template v-else>
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 上市公司应按CAS30财务报表列报要求，分别披露预付账款（科目1123）按性质分类和按账龄分类情况。</p>
+        <p>2. 账龄超过1年的重要预付账款应逐户披露，说明未结转原因。</p>
+        <p>3. 重大变动应说明变动原因，包括新签大额合同、大额结转等情形。</p>
+        <p>4. 跨sheet取数单元格（浅蓝色背景）自动从 F1-1 审定表同步，无需手动维护。</p>
+      </div>
+    </details>
+
     <!-- 子节一：按性质分类 -->
     <div class="disclosure-card">
       <h4 class="card-title">
@@ -13,7 +24,7 @@
             <el-tag size="small" type="info">跨sheet取数</el-tag>
           </el-tooltip>
         </span>
-        <GtIndexChip target="F1-1" label="→F1-1" />
+        <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
       </h4>
       <el-table :data="[...section1Rows, section1Subtotal]" size="small" border stripe>
         <el-table-column prop="label" label="项目" width="200">
@@ -38,7 +49,7 @@
       </el-table>
       <div class="note-area">
         <span class="note-prefix">说明：</span>
-        <el-input v-model="note1" type="textarea" :rows="2" :disabled="isReadonly"
+        <el-input v-model="note1" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
           placeholder="按性质分类的附注披露说明..." />
       </div>
     </div>
@@ -105,7 +116,7 @@
       </el-table>
       <div class="note-area">
         <span class="note-prefix">说明：</span>
-        <el-input v-model="note2" type="textarea" :rows="2" :disabled="isReadonly"
+        <el-input v-model="note2" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
           placeholder="超1年预收的附注披露说明..." />
       </div>
     </div>
@@ -166,21 +177,10 @@
       </el-table>
       <div class="note-area">
         <span class="note-prefix">说明：</span>
-        <el-input v-model="note3" type="textarea" :rows="2" :disabled="isReadonly"
+        <el-input v-model="note3" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
           placeholder="重大变动的附注披露说明..." />
       </div>
     </div>
-
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>📋 编制提示</summary>
-      <div class="hint-content">
-        1. 上市公司应按CAS30财务报表列报要求，分别披露预付账款按性质分类和按账龄分类情况。<br/>
-        2. 账龄超过1年的重要预付账款应逐户披露，说明未结转原因。<br/>
-        3. 重大变动应说明变动原因，包括新签大额合同、大额结转等情形。<br/>
-        4. 跨sheet取数单元格（浅蓝色背景）自动从F1-1审定表同步，无需手动维护。
-      </div>
-    </details>
   </template>
 </div>
 </template>
@@ -190,7 +190,7 @@
  * F1TabDisclosureListed.vue — 附注披露（上市公司）
  * 3子节卡片 + 跨sheet取数 + 动态行 + 合计 + 说明 + 编制提示
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, toRef, type Ref } from 'vue'
 import { useF1DisclosureListed } from '../composables/useF1DisclosureListed'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -199,15 +199,17 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   crossSheet: ReturnType<typeof useF1CrossSheet>
-  applicableStandards: Ref<string[]>
+  applicableStandards: string[]
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const {
   isApplicable,
@@ -224,14 +226,14 @@ const {
   removeRow,
   updateCell,
 } = useF1DisclosureListed({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
-  applicableStandards: props.applicableStandards,
+  applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,
 })
 
 function fmtAmount(val: number | null | undefined): string {
@@ -243,6 +245,15 @@ function fmtAmount(val: number | null | undefined): string {
 
 <style scoped>
 .d3-disclosure-listed { padding: 16px; }
+.d3-disclosure-listed :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.d3-disclosure-listed :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+
 .disclosure-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .cross-sheet-badge { font-weight: normal; }
@@ -251,7 +262,4 @@ function fmtAmount(val: number | null | undefined): string {
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
 .note-area { margin-top: 12px; display: flex; align-items: flex-start; gap: 8px; }
 .note-prefix { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
-.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
-.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
-.compile-hint .hint-content { padding: 8px 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 </style>

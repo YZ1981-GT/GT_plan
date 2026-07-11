@@ -17,6 +17,7 @@ import {
   type MonthlyInterestRow,
 } from '../composables/useE1InterestCalc'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -69,8 +70,36 @@ function isMaterial(): boolean {
 
 <template>
   <div class="e1-tab-interest-analysis">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表按月测算存款利息，验证账面利息收入的合理性：测算利息 = 月均余额 × 月利率。</p>
+        <p>2. 灰色底纹列（测算利息）为自动计算，不可手工录入；月均余额与月利率可手工录入。</p>
+        <p>3. 测算合计与账面利息的差异橙色高亮时，须核对利率与计息基础，查明差异原因。</p>
+        <p>4. 关注利息收入与银行存款规模、协定存款利率是否匹配，识别账外资金或体外循环迹象。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过利息测算复核存款利息收入的完整与准确，评价利率合理性，识别未入账利息及资金异常占用。"
+      class="objective-alert"
+    />
+
     <el-skeleton :loading="isLoading" :rows="14" animated>
       <template #default>
+        <!-- 工具栏 -->
+        <div class="tab-toolbar">
+          <div class="toolbar-left"></div>
+          <div class="toolbar-right">
+            <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+            <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          </div>
+        </div>
+
         <el-table :data="rows" border stripe size="small" style="width: 100%">
           <el-table-column label="月份" width="80" align="center">
             <template #default="{ row }">
@@ -103,7 +132,7 @@ function isMaterial(): boolean {
             </template>
           </el-table-column>
 
-          <el-table-column label="测算利息" width="180" align="right">
+          <el-table-column label="测算利息" width="180" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="computed-cell">{{ displayPrefs.fmtAmount(asMonthly(row).calculatedInterest) }}</span>
             </template>
@@ -140,6 +169,59 @@ function isMaterial(): boolean {
 <style scoped>
 .e1-tab-interest-analysis {
   padding: 12px 0;
+}
+.e1-tab-interest-analysis :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-interest-analysis :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 .computed-cell {
   color: #606266;

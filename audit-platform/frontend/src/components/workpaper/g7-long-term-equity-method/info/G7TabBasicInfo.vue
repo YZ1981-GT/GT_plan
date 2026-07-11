@@ -35,6 +35,11 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：核实合营/联营被投资单位的工商登记、股权结构及管理层信息，验证持股比例、投票权及重大影响判断依据充分，确认权益法核算前提成立。
+    </el-alert>
+
     <!-- 2区段Tab切换 -->
     <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
 
@@ -503,6 +508,7 @@ onMounted(() => {
 
 <style scoped>
 .g7-tab-basic-info { padding: 12px; font-size: 13px; }
+.audit-objective { margin-bottom: 12px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

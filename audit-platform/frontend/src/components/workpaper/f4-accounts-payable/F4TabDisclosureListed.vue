@@ -9,6 +9,7 @@
 import { inject, toRef, ref, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ChecklistResponse } from '../composables/useF4FormData'
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -78,11 +79,20 @@ onBeforeUnmount(() => {
         <span class="section-label">附注披露（上市公司）</span>
       </div>
       <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F4-1" :context-project-id="projectId" /></span>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-listed')">复核</el-button>
       </div>
     </div>
 
-    <el-card shadow="never">
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">附注披露内容</span>
+          <div class="opinion-actions">
+            <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-listed')">💬</el-button>
+          </div>
+        </div>
+      </template>
       <el-input
         v-model="noteText"
         type="textarea"
@@ -96,10 +106,18 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .f4-tab-disclosure-listed { font-size: 13px; }
-.guidance-details { margin-bottom: 12px; font-size: 13px; }
-.guidance-details .guidance-content { padding: 8px 12px; background: #fffbeb; border-left: 3px solid #f59e0b; margin-top: 6px; font-size: 12px; line-height: 1.8; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: 13px; }
+.guidance-details .guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-details .guidance-content p { margin: 2px 0; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 8px; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .section-label { font-weight: 600; font-size: 14px; color: #303133; }
+.opinion-card { border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; }
 </style>

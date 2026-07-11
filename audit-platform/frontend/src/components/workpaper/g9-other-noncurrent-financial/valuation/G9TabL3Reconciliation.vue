@@ -2,7 +2,11 @@
   <div class="g9-l3" data-testid="g9-l3-reconciliation">
     <div class="toolbar">
       <div class="methodology">L3 变动分析：期初 + 购入 − 处置 + 转入 − 转出 + FV(损益) + FV(OCI) + 利息 − 减值 + 其他 = 期末</div>
-      <G9ImportExportDropdown :wp-id="wpId" sheet="G9-5" @imported="onImported" />
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:G9-5" />
+        <el-tag size="small" type="info">共 {{ l3.rows.value.length }} 行</el-tag>
+        <G9ImportExportDropdown :wp-id="wpId" sheet="G9-5" @imported="onImported" />
+      </div>
     </div>
     <el-button v-if="!isReadonly" size="small" @click="l3.addRow()">+ 新增</el-button>
     <el-table :data="l3.rows.value" border size="small" style="font-size:13px;margin-top:8px" max-height="480">
@@ -84,7 +88,7 @@
         </template>
       </el-table-column>
       <el-table-column label="期末(公式)" width="100" align="right">
-        <template #default="{ row }"><span class="formula-cell">{{ row.closingFairValue }}</span></template>
+        <template #default="{ row }"><span class="formula-cell" title="期末 = 期初 + 购入 − 处置 + 转入 − 转出 + FV损益 + FV(OCI) + 利息 − 减值 + 其他">{{ row.closingFairValue }}</span></template>
       </el-table-column>
       <el-table-column label="企业报告" width="96" align="right">
         <template #default="{ row }">
@@ -118,11 +122,20 @@
       <el-input v-model="l3.conclusion.value" type="textarea" :rows="3" placeholder="审计结论"
         :disabled="isReadonly" @change="l3.updateConclusion(l3.conclusion.value)" />
     </el-card>
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>第三层次（Level3）公允价值调节表按 CAS 39 公允价值计量：逐项列示期初至期末的十因子变动，公式期末应与企业报告期末勾稽，差异须查明原因。</p>
+        <p>FV(损益) 计入当期损益，FV(OCI) 计入其他综合收益，两者需分别列示不得混淆。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, toRef } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9L3Reconciliation } from '../../composables/useG9L3Reconciliation'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -150,7 +163,10 @@ function onImported() { emit('imported') }
 .g9-l3 { font-size: 13px; }
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .methodology { flex: 1; border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; }
-.formula-cell { border-bottom: 1px dashed #909399; }
+.toolbar-right { display: flex; align-items: center; gap: 8px; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #f5f7fa; display: inline-block; width: 100%; }
+.methodology-hint { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 .var-warn { color: #f56c6c; font-weight: 600; }
 .totals-row { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; padding: 8px; background: #f5f7fa; font-size: 12px; }
 .conclusion-card { margin-top: 12px; }

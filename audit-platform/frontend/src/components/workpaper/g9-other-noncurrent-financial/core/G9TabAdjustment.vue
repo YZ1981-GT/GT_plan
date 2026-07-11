@@ -3,10 +3,20 @@
     <div class="toolbar">
       <h3>G9-3 调整分录</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G9-3" />
+        <el-tag size="small" type="info">共 {{ adj.rows.value.length }} 行</el-tag>
         <G9ImportExportDropdown :wp-id="wpId" sheet="G9-3" @imported="onImported" />
         <el-button v-if="!isReadonly" size="small" @click="adj.addRow()">+ 新增</el-button>
       </div>
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：检查审计调整分录（AJE）与重分类分录（RJE）的依据充分、借贷平衡，并正确回写 G9-1 审定表。"
+    />
 
     <el-alert v-if="!adj.balanceOk.value" type="error" :closable="false" class="balance-alert">
       借贷不平衡，差额 {{ adj.balanceDiff.value.toFixed(2) }}
@@ -93,11 +103,20 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>AJE 为审计调整分录（影响审定数），RJE 为重分类分录（影响列报）。每笔分录须借贷平衡，合计差额应为 0。</p>
+        <p>涉及科目 1504 的调整将自动回写至 G9-1 审定表「{{ G9_ADJ_WRITEBACK_ROW_KEY }}」行的期末 AJE/RJE。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { G9_ADJ_WRITEBACK_ROW_KEY } from '../../composables/g9Constants'
 import { useG9Adjustment } from '../../composables/useG9Adjustment'
@@ -143,6 +162,9 @@ onBeforeUnmount(() => {
 <style scoped>
 .g9-adj { font-size: 13px; }
 .toolbar { display: flex; justify-content: space-between; margin-bottom: 8px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
 .balance-alert { margin-bottom: 8px; }
+.audit-objective { margin-bottom: 10px; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

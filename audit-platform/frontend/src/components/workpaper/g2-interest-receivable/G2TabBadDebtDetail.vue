@@ -1,9 +1,34 @@
 <template>
   <div class="g2-bad-debt">
-    <div class="section-head">
-      <h3 class="sheet-title">G2-3 坏账准备明细表</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表列示应收利息减值准备（预期信用损失 ECL）明细，验证计提充分性与阶段划分恰当性。</p>
+        <p>2. ECL = EAD × 适用PD × LGD（Stage1 用 12个月PD，Stage2/3 用整个存续期PD）。</p>
+        <p>3. 差异 = 测算ECL - 企业计提；本期变动 = 本期ECL - 上期ECL。</p>
+        <p>4. 灰色底纹列为自动计算列；转移方向标记阶段间迁移（如 1→2 表示由正常转为关注）。</p>
+        <p>5. 依据：CAS 22《金融工具确认和计量》预期信用损失（ECL）三阶段模型。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证应收利息减值准备（ECL）计提的充分性、阶段划分的恰当性，以及减值变动的准确性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">G2-3 坏账准备明细表</span>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="bd.addRow()">新增行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-3" /></span>
+        <el-tag size="small" type="info">共 {{ bd.dataRows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G2-3-bad-debt')">💬复核</el-button>
       </div>
     </div>
@@ -67,7 +92,7 @@
             @update:model-value="(v: number) => bd.updateCell(row.id, 'ead', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="ECL金额" width="120" align="right">
+      <el-table-column label="ECL金额" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="ECL = EAD × 适用PD × LGD">{{ fmtNum(row.eclAmount) }}</span>
         </template>
@@ -79,7 +104,7 @@
             @update:model-value="(v: number) => bd.updateCell(row.id, 'companyProvision', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="差异" width="110" align="right">
+      <el-table-column label="差异" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="差异 = ECL金额 - 企业计提">{{ fmtNum(row.variance) }}</span>
         </template>
@@ -91,7 +116,7 @@
             @update:model-value="(v: number) => bd.updateCell(row.id, 'previousECL', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="本期变动" width="110" align="right">
+      <el-table-column label="本期变动" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="本期变动 = 本期ECL - 上期ECL">{{ fmtNum(row.periodChange) }}</span>
         </template>
@@ -148,15 +173,6 @@
       </div>
     </div>
 
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>ECL = EAD × 适用PD × LGD（Stage1用12个月PD，Stage2/3用整个存续期PD）</li>
-        <li>差异 = 测算ECL - 企业计提</li>
-        <li>本期变动 = 本期ECL - 上期ECL</li>
-        <li>转移方向标记阶段间的迁移方向（如1→2表示从正常转为关注）</li>
-      </ul>
-    </details>
   </div>
 </template>
 
@@ -167,6 +183,7 @@ import {
   STAGE_OPTIONS,
   TRANSFER_DIRECTION_OPTIONS,
 } from '../../composables/useG2BadDebtDetail'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -194,14 +211,21 @@ function fmtNum(v: unknown): string {
 
 <style scoped>
 .g2-bad-debt { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.g2-bad-debt :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g2-bad-debt :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-label { font-weight: 600; margin-right: 8px; }
 .grand-total { margin-top: 6px; padding-top: 6px; border-top: 1px solid #dcdfe6; font-weight: 600; color: #303133; }
-.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; }
-.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
 </style>

@@ -293,10 +293,13 @@ import { useK9ImportExport } from '../../composables/useK9ImportExport'
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   tbData?: { unadjusted6602?: number; audited6602?: number }
   isReadonly: boolean
 }>()
+
+// 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -319,7 +322,7 @@ const {
   addRow,
   removeRow,
 } = useK9Detail({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
   wpId: toRef(props, 'wpId') as Ref<string>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,

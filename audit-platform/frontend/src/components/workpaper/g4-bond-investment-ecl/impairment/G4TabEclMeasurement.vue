@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-ecl-measurement">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认企业预期信用损失(ECL)计量方法、组合划分依据及信用损失率(PD/LGD/EAD)参数的选取与计算合理、可靠。"
+      style="margin-bottom: 12px"
+    />
     <!-- 方法论上下文（琥珀色左边线+浅黄背景）: ECL三种方法简介 -->
     <div class="methodology-context">
       <p><strong>预期信用损失(ECL)计量的三种方法：</strong></p>

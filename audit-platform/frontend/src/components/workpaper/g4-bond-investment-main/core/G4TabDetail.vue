@@ -1,5 +1,13 @@
 <template>
   <div class="g4-detail">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资明细的存在与权利归属，摊余成本、账面价值等计价属性计算准确，一年内到期部分分类与列报恰当。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section 标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-2 债权投资明细表</h3>

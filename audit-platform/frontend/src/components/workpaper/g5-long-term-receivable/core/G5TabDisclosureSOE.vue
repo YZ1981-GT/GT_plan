@@ -11,6 +11,13 @@
       <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 8, maxRows: 30 }"
         :disabled="props.readonly" placeholder="长期应收款附注披露（国企格式）..." />
     </el-card>
+    <details class="prep-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>监听 substantive:adjudicated(1531) 自动同步审定数</li>
+        <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -46,4 +53,5 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', hand
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
 </style>

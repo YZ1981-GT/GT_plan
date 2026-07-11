@@ -21,6 +21,7 @@ import {
   type CashDetailRow,
 } from '../composables/useE1CashDetail'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -70,13 +71,38 @@ onMounted(() => {
 
 <template>
   <div class="e1-tab-cash-detail">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表按币种列示库存现金（科目1001）明细，外币现金须折算为人民币列报。</p>
+        <p>2. 灰色底纹列（期末原币/折算人民币/审定人民币）为自动计算：期末原币=期初+增加-减少，折算人民币=期末原币×汇率。</p>
+        <p>3. 外币汇率采用资产负债表日中间价，人民币行汇率固定为1，不可编辑。</p>
+        <p>4. 期末现金应与库存现金监盘表（现金盘点）核对一致，大额现金留存关注资金真实性。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实库存现金期末余额的存在与准确，验证外币折算的恰当性，为 E1-1 审定表提供现金审定依据。"
+      class="objective-alert"
+    />
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
-        <!-- Toolbar -->
-        <div class="toolbar" v-if="!isReadonly">
-          <el-button type="primary" size="small" @click="addRow">
-            + 新增行
-          </el-button>
+        <!-- 工具栏 -->
+        <div class="tab-toolbar">
+          <div class="toolbar-left">
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="addRow">
+              + 新增行
+            </el-button>
+          </div>
+          <div class="toolbar-right">
+            <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+            <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          </div>
         </div>
 
         <el-table
@@ -139,7 +165,7 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 期末原币 (readonly) -->
-          <el-table-column label="期末原币" width="130" align="right">
+          <el-table-column label="期末原币" width="130" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="readonly-val">{{ displayPrefs.fmtAmount(row.endingFc) }}</span>
             </template>
@@ -160,7 +186,7 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 折算人民币 (readonly) -->
-          <el-table-column label="折算人民币" width="140" align="right">
+          <el-table-column label="折算人民币" width="140" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="readonly-val">{{ displayPrefs.fmtAmount(row.endingRmb) }}</span>
             </template>
@@ -180,7 +206,7 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 审定人民币 (readonly) -->
-          <el-table-column label="审定人民币" width="140" align="right">
+          <el-table-column label="审定人民币" width="140" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="readonly-val">{{ displayPrefs.fmtAmount(row.auditedRmb) }}</span>
             </template>
@@ -233,8 +259,58 @@ onMounted(() => {
 .e1-tab-cash-detail {
   padding: 12px 0;
 }
-.toolbar {
+.e1-tab-cash-detail :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-cash-detail :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
   margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 .readonly-val {
   color: #909399;

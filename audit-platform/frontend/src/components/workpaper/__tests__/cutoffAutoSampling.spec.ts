@@ -32,6 +32,9 @@ import {
   type ExtractedVoucher,
   type CutoffAutoSamplingOptions,
 } from '../composables/useCutoffAutoSampling'
+import http from '@/utils/http'
+
+const mockPost = vi.mocked(http.post)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -304,5 +307,111 @@ describe('applyFillMode - 填充策略', () => {
       const result = applyFillMode(existing, same, 'merge')
       expect(result.length).toBe(2)
     })
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. triggerCutoffFetch — 一键取数（四表库凭证库联动，Req 25）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('useCutoffAutoSampling - triggerCutoffFetch 一键取数', () => {
+  beforeEach(() => {
+    mockPost.mockReset()
+  })
+
+  it('只读态禁用一键取数，不调用后端（R25.6）', async () => {
+    const { triggerCutoffFetch } = useCutoffAutoSampling(
+      makeOptions({ readonly: ref(true) }),
+    )
+    await triggerCutoffFetch()
+    expect(mockPost).not.toHaveBeenCalled()
+  })
+
+  it('调用 voucher-extract 并携带 filters.date_from/date_to 窗口边界（R25.1/R25.3）', async () => {
+    mockPost.mockResolvedValueOnce({ data: { items: [], stats: {} } })
+    const { triggerCutoffFetch } = useCutoffAutoSampling(
+      makeOptions({ year: ref(2025), accountCode: '1122' }),
+    )
+    await triggerCutoffFetch()
+
+    expect(mockPost).toHaveBeenCalledTimes(1)
+    const [url, body] = mockPost.mock.calls[0]
+    expect(url).toContain('/sampling/voucher-extract')
+    // 基准日 2025-12-31，前5后10 → 2025-12-26 至 2026-01-10
+    expect(body.filters.date_from).toBe('2025-12-26')
+    expect(body.filters.date_to).toBe('2026-01-10')
+    expect(body.filters.account_codes).toEqual(['1122'])
+  })
+
+  it('映射返回项为 ExtractedVoucher，并标注跨期疑点（R25.4/R25.5）', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        items: [
+          // 窗口内、基准日之前 → 不跨期
+          {
+            voucher_no: 'V-100',
+            voucher_date: '2025-12-28',
+            summary: '期前入账',
+            debit_amount: '1000.00',
+            credit_amount: null,
+            account_code: '112201',
+            account_name: '应收账款',
+            voucher_type: '记',
+          },
+          // 窗口内、基准日之后、无业务发生日期 → 单日期降级为跨期疑点
+          {
+            voucher_no: 'V-200',
+            voucher_date: '2026-01-05',
+            summary: '期后结转',
+            debit_amount: null,
+            credit_amount: '2000.00',
+            account_code: '112201',
+            account_name: '应收账款',
+            voucher_type: '转',
+          },
+        ],
+        stats: { population_count: 2 },
+      },
+    })
+
+    const { triggerCutoffFetch, extractedVouchers, previewVisible } = useCutoffAutoSampling(
+      makeOptions({ year: ref(2025) }),
+    )
+    await triggerCutoffFetch()
+
+    expect(extractedVouchers.value.length).toBe(2)
+    const before = extractedVouchers.value.find(v => v.voucherNo === 'V-100')!
+    const after = extractedVouchers.value.find(v => v.voucherNo === 'V-200')!
+
+    expect(before.cutoffStatus).toBe('正常')
+    expect(before.remark).toBe('')
+    expect(before.debitAmount).toBe('1000.00')
+
+    expect(after.cutoffStatus).toBe('可能跨期')
+    expect(after.remark).toBe('跨期疑点')
+    expect(after.creditAmount).toBe('2000.00')
+
+    expect(previewVisible.value).toBe(true)
+  })
+
+  it('窗口外凭证被 filterByCutoffWindow 兜底裁剪（R25.3）', async () => {
+    mockPost.mockResolvedValueOnce({
+      data: {
+        items: [
+          { voucher_no: 'IN', voucher_date: '2026-01-05', debit_amount: '1', account_code: '112201' },
+          { voucher_no: 'OUT', voucher_date: '2026-03-01', debit_amount: '1', account_code: '112201' },
+        ],
+        stats: {},
+      },
+    })
+
+    const { triggerCutoffFetch, extractedVouchers } = useCutoffAutoSampling(
+      makeOptions({ year: ref(2025) }),
+    )
+    await triggerCutoffFetch()
+
+    const nos = extractedVouchers.value.map(v => v.voucherNo)
+    expect(nos).toContain('IN')
+    expect(nos).not.toContain('OUT')
   })
 })

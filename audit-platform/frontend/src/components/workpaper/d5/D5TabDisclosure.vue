@@ -1,5 +1,16 @@
 <template>
 <div class="d5-disclosure">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 应收款项融资（科目1124）为以公允价值计量且其变动计入其他综合收益（FVOCI）的金融资产，附注按上市公司版/国企版分别披露。</p>
+        <p>2. 分类表期末/期初数取自 D5-1 审定表（浅蓝背景为跨sheet自动取数），减值准备变动按公式：期末余额 = 上年末 + 本期计提 − 转回 − 核销。</p>
+        <p>3. 上市公司版需披露分类构成、减值准备变动明细及金融资产风险敞口；国企版仅需披露分类信息。</p>
+        <p>4. 披露文本将双向回写至附注模块，请与审定表、减值测算保持一致。</p>
+      </div>
+    </details>
+
     <!-- 版本切换（上市公司版 / 国企版） -->
     <div class="variant-toolbar" v-if="showListed && showSoe">
       <el-segmented
@@ -45,7 +56,7 @@
             <el-input
               v-model="noteTexts['listed-1']"
               type="textarea"
-              :rows="2"
+              :autosize="{ minRows: 2, maxRows: 6 }"
               :disabled="isReadonly"
               placeholder="对应收款项融资分类的补充说明..."
             />
@@ -127,7 +138,7 @@
                 <span v-else>{{ fmtAmount(row.writeOff) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="期末" width="110" align="right">
+            <el-table-column label="期末" width="110" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
                 <span class="auto-calc">{{ fmtAmount(row.endBalance) }}</span>
               </template>
@@ -160,7 +171,7 @@
             <el-input
               v-model="noteTexts['listed-2']"
               type="textarea"
-              :rows="2"
+              :autosize="{ minRows: 2, maxRows: 6 }"
               :disabled="isReadonly"
               placeholder="对减值准备变动的补充说明..."
             />
@@ -182,7 +193,7 @@
             <el-input
               v-model="noteTexts['listed-3']"
               type="textarea"
-              :rows="3"
+              :autosize="{ minRows: 3, maxRows: 7 }"
               :disabled="isReadonly"
               placeholder="其他需要披露的说明事项..."
             />
@@ -231,7 +242,7 @@
           <el-input
             v-model="noteTexts['soe-1']"
             type="textarea"
-            :rows="2"
+            :autosize="{ minRows: 2, maxRows: 6 }"
             :disabled="isReadonly"
             placeholder="国企版分类披露补充说明..."
           />
@@ -263,7 +274,7 @@
  * Task: 17.1
  * Requirements: 8.1-8.8
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed, toRef, type Ref } from 'vue'
 import { useD5Disclosure } from '../composables/useD5Disclosure'
 import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
@@ -274,10 +285,12 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD5CrossSheet>
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -292,7 +305,7 @@ const {
   impairmentRemoveRow,
   noteTexts,
 } = useD5Disclosure({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   debouncedSave: props.debouncedSave,
@@ -332,11 +345,42 @@ function fmtAmount(val: number | null | undefined): string {
 
 <style scoped>
 .d5-disclosure {
-  padding: 16px;
+  padding: 12px;
+}
+.d5-disclosure :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d5-disclosure :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 
-.mode-toolbar {
+/* 顶部编制提示 */
+.guidance-details {
   margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 
 .variant-toolbar {

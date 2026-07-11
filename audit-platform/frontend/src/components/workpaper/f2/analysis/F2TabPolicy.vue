@@ -34,8 +34,36 @@ async function generatePolicyConclusion() {
 
 <template>
   <div class="f2-tab-policy">
-    <details class="guidance-details"><summary>📋 编制提示</summary><p>核查存货五类会计政策，变更项需说明原因并评价。</p></details>
-    <el-tag v-if="changedCount > 0" type="warning" size="small">{{ changedCount }} 项政策有变更</el-tag>
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 逐项核查存货相关会计政策（发出计价方法、跌价准备、成本核算等），变更项须说明原因并评价。</p>
+        <p>2. 依《企业会计准则第 1 号——存货》，发出存货计价方法（先进先出/加权平均/个别计价）一经确定不得随意变更。</p>
+        <p>3. 期末按成本与可变现净值孰低计量，跌价准备计提方法及依据应保持前后一贯。</p>
+        <p>4. 政策变更须评价是否符合准则、是否影响可比性，并在结论中说明。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：评价存货计价与跌价准备会计政策的适当性及前后期一贯性。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-tag v-if="changedCount > 0" type="warning" size="small">{{ changedCount }} 项政策有变更</el-tag>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ sections.length }} 项</el-tag>
+      </div>
+    </div>
 
     <el-card v-for="sec in sections" :key="sec.key" class="policy-card" shadow="never">
       <template #header>
@@ -69,25 +97,45 @@ async function generatePolicyConclusion() {
       </el-form>
     </el-card>
 
-    <el-card shadow="never">
+    <el-card class="opinion-card" shadow="never">
       <template #header>
-        <div class="card-header">
-          <span class="card-title">政策评价结论</span>
-          <div class="header-actions">
+        <div class="opinion-header">
+          <span class="opinion-title">政策评价结论</span>
+          <div class="opinion-actions">
+            <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="generatePolicyConclusion">🤖 AI辅助</el-button>
             <F2ReviewChip section-id="F2-16-conclusion" />
-            <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="generatePolicyConclusion">AI 生成</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="policyConclusion" type="textarea" :rows="4" :disabled="isReadonly" placeholder="总体政策评价结论..." />
+      <el-input v-model="policyConclusion" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly" placeholder="总体政策评价结论..." />
     </el-card>
   </div>
 </template>
 
 <style scoped>
 .f2-tab-policy { padding: 12px; font-size: 13px; }
+.f2-tab-policy :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-tab-policy :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .policy-card { margin: 12px 0; }
 .card-title { font-weight: 600; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
 </style>

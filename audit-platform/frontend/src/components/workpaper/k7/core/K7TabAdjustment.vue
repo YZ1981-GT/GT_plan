@@ -176,7 +176,7 @@ const ITEM_PREFIX = 'K7-3-adj'
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -184,6 +184,9 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+// 父组件模板绑定会自动解包顶层 ref → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
@@ -226,7 +229,7 @@ onMounted(() => {
 })
 
 function loadFromResponses(): void {
-  const saved = props.allResponses.value.get(`${ITEM_PREFIX}-entries`)
+  const saved = allResponsesRef.value.get(`${ITEM_PREFIX}-entries`)
   const raw = saved?.remark ?? saved?.value ?? null
   if (!raw) { entries.value = []; return }
   try {
@@ -324,8 +327,8 @@ function handleSaveWriteback(): void {
     .reduce((sum, e) => sum + (e.creditAmount - e.debitAmount), 0)
 
   // 双向同步到allResponses供K7-1审定表读取
-  props.allResponses.value.set('K7-1-aje-total', { item_id: 'K7-1-aje-total', remark: String(ajeTotal) })
-  props.allResponses.value.set('K7-1-rje-total', { item_id: 'K7-1-rje-total', remark: String(rjeTotal) })
+  allResponsesRef.value.set('K7-1-aje-total', { item_id: 'K7-1-aje-total', remark: String(ajeTotal) })
+  allResponsesRef.value.set('K7-1-rje-total', { item_id: 'K7-1-rje-total', remark: String(rjeTotal) })
 
   // 持久化
   emit('save', 'K7-1-aje-total', { remark: String(ajeTotal) })

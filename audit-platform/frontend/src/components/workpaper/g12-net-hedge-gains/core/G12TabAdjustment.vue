@@ -7,8 +7,18 @@
         同步至审定表
       </el-button>
       <CycleImportExportDropdown :wp-id="wpId" api-prefix="g12" sheet="G12-3" :disabled="isReadonly" @imported="emit('imported')" />
+      <el-tag size="small" type="info">共 {{ adj.rows.value.length }} 行</el-tag>
       <GtReviewTrigger section-id="G12-3-adjustment" />
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="录入净敞口套期收益相关 AJE/RJE 调整分录，验证借贷平衡后同步至 G12-1 审定表调整数，确保审定数口径一致、可追溯。"
+    />
 
     <el-table :data="adj.rows.value" border size="small" stripe style="font-size:13px">
       <el-table-column label="类型" width="80">
@@ -84,6 +94,11 @@
         {{ adj.isBalanced.value ? '✓ 借贷平衡' : `✗ 差额：${fmt(Math.abs(adj.balanceDiff.value))}` }}
       </span>
     </div>
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+      <p>AJE=审计调整分录，RJE=重分类调整分录。科目 6103 净敞口套期收益为损益类（贷方）。借贷合计须平衡后方可「同步至审定表」，同步后 G12-1 调整数 overlay 自动更新。</p>
+    </details>
   </div>
 </template>
 
@@ -118,6 +133,9 @@ function fmt(val: number): string {
 <style scoped>
 .g12-adj-sheet { padding: 12px; font-size: 13px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.audit-objective { margin-bottom: 12px; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; font-weight: 600; }

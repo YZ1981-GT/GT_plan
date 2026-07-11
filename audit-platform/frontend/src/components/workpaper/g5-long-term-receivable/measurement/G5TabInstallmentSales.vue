@@ -5,9 +5,14 @@
       <p>未实现融资收益 = 应收总额 - 公允价值；摊余成本 = 应收 - 未实现</p>
     </div>
 
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      对分期收款销售形成的长期应收款按实际利率法测算未实现融资收益的摊销，验证各期融资收益与账面确认金额的一致性。
+    </el-alert>
+
     <div class="segment-tabs">
       <el-segmented v-model="sales.activeTab.value" :options="tabOptions" size="small" />
       <div class="tab-actions">
+        <GtIndexChip value="wp:G5-6" />
         <G5ImportExportDropdown :wp-id="props.wpId" sheet="G5-6" @imported="onImported" />
         <el-button size="small" type="primary" plain @click="sales.addGroup()" :disabled="props.readonly">+ 新增项目</el-button>
       </div>
@@ -94,6 +99,17 @@
       <template #header><div class="section-header"><span>审计结论</span><el-button size="small" type="primary" text>AI 辅助</el-button></div></template>
       <el-input v-model="sales.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="props.readonly" />
     </el-card>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>初始交易要素：未实现收益 = 应收总额 − 公允价值；实际利率按现值等式反推</li>
+        <li>分期摊销：本期收益 = 期初摊余成本 × 实际利率</li>
+        <li>期末应收 = 期初应收 − 本期收款；期末摊余 = 期初摊余 + 本期收益 − 本期收款</li>
+        <li>期间连续性：第 N 期期初 = 第 N−1 期期末，校验未通过会橙色告警</li>
+        <li>融资收益合计与账面确认的利息收入比较，差异需分析</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -101,6 +117,7 @@
 import { useG5InstallmentSales } from '../../composables/useG5InstallmentSales'
 import type { InstallmentSalesGroup, InstallmentPeriod } from '../../composables/useG5InstallmentSales'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const sales = useG5InstallmentSales()
@@ -120,6 +137,10 @@ function fmt(v: number | null | undefined): string {
 <style scoped>
 .g5-installment-sales { font-size: 13px; }
 .method-context { margin-bottom: 12px; padding: 8px 12px; border-left: 3px solid #e6a23c; background: #fdf6ec; border-radius: 0 4px 4px 0; font-size: 12px; color: #865c0a; }
+.audit-objective { margin-bottom: 12px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .tab-actions { margin-left: auto; display: flex; gap: 8px; }
 .group-header { display: flex; align-items: center; gap: 8px; margin: 12px 0 4px; padding: 6px 12px; background: #f0f9eb; border-left: 3px solid #67c23a; border-radius: 0 4px 4px 0; }

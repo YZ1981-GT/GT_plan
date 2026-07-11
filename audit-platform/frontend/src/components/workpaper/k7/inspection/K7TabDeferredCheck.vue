@@ -123,14 +123,14 @@
  * Spec: .kiro/specs/k7-deferred-income/ | Task: 4.5
  * Requirements: 5.1-5.3
  */
-import { inject, type Ref } from 'vue'
+import { inject, toRef, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK7Check } from '../../composables/useK7Check'
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -141,10 +141,13 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string, label?: string) => void>('openReviewDialog', undefined)
 
+// 父组件模板绑定会自动解包顶层 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 const check = useK7Check({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   saveResponse: (field: string, value: any) => { emit('save', field, value) },
 })
 

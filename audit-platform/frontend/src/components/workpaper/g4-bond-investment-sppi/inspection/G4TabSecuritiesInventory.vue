@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-securities-inventory">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：通过监盘确认有价证券的存在性与数量准确性，为债权投资账面记录提供实物证据。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section标题 + 复核按钮 -->
     <div class="section-header">
       <h3 class="section-title">G4-7 有价证券盘点表</h3>
@@ -208,17 +216,16 @@
  * - 合计行 + 审计说明/审计结论（el-card + textarea + AI按钮）
  * - 动态行增删 + 导入导出 slot + 复核对话
  */
-import { inject, toRef } from 'vue'
+import { inject, toRef, computed } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
 import { useG4SppiInventory } from '@/composables/useG4SppiInventory'
+import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: any
-  debouncedSave: (itemId: string, data: any) => void
 }>()
 
 const emit = defineEmits<{
@@ -234,10 +241,17 @@ function emitAi(section: string): void {
   emit('aiGenerate', section)
 }
 
+// ─── 数据层（自包含：父级不传 allResponses/debouncedSave，对齐 G4TabBusinessModel） ───
+const formData = useG4SppiFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+formData.loadAll()
+
 // ─── composable ──────────────────────────────────────────────────────────────
 const inventoryLogic = useG4SppiInventory({
-  allResponses: toRef(props, 'allResponses'),
-  debouncedSave: props.debouncedSave,
+  allResponses: formData.allResponses,
+  debouncedSave: formData.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
 })
 

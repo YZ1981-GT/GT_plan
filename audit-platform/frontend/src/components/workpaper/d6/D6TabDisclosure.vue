@@ -1,7 +1,25 @@
 <template>
 <div class="d6-disclosure">
-  <div v-if="showListed && showSoe" class="variant-toolbar">
-    <el-segmented v-model="activeVariant" :options="variantOptions" size="small" />
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 合同资产（科目1402）附注依 CAS14 收入准则及 CAS22 减值准则披露，按上市公司版（5子节）/ 国企版（3子节）分别列报。</p>
+      <p>2. 表内浅蓝背景单元格为跨sheet自动取数（来源 D6-1 审定表 / D6-3 减值明细 / D6-8 测算），不可手工编辑。</p>
+      <p>3. 上市公司版需披露分类构成、减值计提情况、单项与组合明细及计提转回核销变动；国企版仅需披露分类及减值变动。</p>
+      <p>4. 各子节说明文本将双向回写至附注模块，请与审定表、减值明细及测算保持勾稽一致。</p>
+    </div>
+  </details>
+
+  <!-- 工具栏 -->
+  <div class="tab-toolbar">
+    <div class="toolbar-left">
+      <el-segmented v-if="showListed && showSoe" v-model="activeVariant" :options="variantOptions" size="small" />
+    </div>
+    <div class="toolbar-right">
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-1" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-3" :context-project-id="projectId" /></span>
+    </div>
   </div>
 
   <!-- 上市公司版 -->
@@ -142,7 +160,7 @@
         <el-input
           :model-value="noteTexts[getListedNoteKey(section.sectionKey)]"
           type="textarea"
-          :rows="2"
+          :autosize="{ minRows: 2, maxRows: 6 }"
           :disabled="isReadonly"
           placeholder="补充披露说明..."
           @change="(v: string) => updateNoteText(getListedNoteKey(section.sectionKey), v)"
@@ -201,7 +219,7 @@
         <el-input
           :model-value="noteTexts[getSoeNoteKey(section.sectionKey)]"
           type="textarea"
-          :rows="2"
+          :autosize="{ minRows: 2, maxRows: 6 }"
           :disabled="isReadonly"
           placeholder="补充披露说明..."
           @change="(v: string) => updateNoteText(getSoeNoteKey(section.sectionKey), v)"
@@ -216,27 +234,32 @@
 /**
  * D6TabDisclosure.vue — 附注披露（上市5子节 / 国企3子节）
  */
-import { computed, type Ref } from 'vue'
+import { computed, toRef, type Ref } from 'vue'
 import { useD6Disclosure } from '../composables/useD6Disclosure'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
+
+// @ts-ignore
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD6CrossSheet>
   variant: 'listed' | 'soe'
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const {
   listedSections, soeSections, showListed, showSoe, activeVariant,
   groupedDetails, addGroup, addGroupedDetailRow, updateGroupName, updateGroupedCell, removeGroupedRow,
   noteTexts,
 } = useD6Disclosure({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   crossSheet: props.crossSheet,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
@@ -308,7 +331,54 @@ function fmtPct100(rate: number): string {
 
 <style scoped>
 .d6-disclosure { padding: 16px; }
-.variant-toolbar { margin-bottom: 16px; }
+.d6-disclosure :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d6-disclosure :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .disclosure-card {
   margin-bottom: 24px;
   padding: 16px;

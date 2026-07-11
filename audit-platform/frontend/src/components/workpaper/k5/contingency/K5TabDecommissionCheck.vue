@@ -124,6 +124,7 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.4
  * Requirements: 7.1-7.4
  */
+import { toRef } from 'vue'
 import { Plus, Delete, MagicStick, WarningFilled } from '@element-plus/icons-vue'
 import { useK5Decommission } from '../../composables/useK5Decommission'
 import type { Ref } from 'vue'
@@ -131,7 +132,7 @@ import type { Ref } from 'vue'
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -139,6 +140,9 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+// 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const {
   decommissionRows,
@@ -148,7 +152,7 @@ const {
   addRow,
   removeRow,
 } = useK5Decommission({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   saveResponse: async (field: string, value: any) => {
     emit('save', `K5-${field}`, value)
   },

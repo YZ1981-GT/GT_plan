@@ -19,6 +19,7 @@
  * Requirements: 1.2, 1.3, 1.5, 3.3, 3.5, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 5.3, 5.6, 5.8, 7.5, 8.4, 9.1, 9.5
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
+// 说明：readonly 支持 Ref 或 ComputedRef（组件侧多以 computed 传入）
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { determineCutoffStatus, computeDateRange, type CutoffDirection, type CutoffStatus } from './cutoffJudgment'
@@ -84,6 +85,8 @@ export interface CutoffAutoSamplingOptions {
   existingSamples?: Ref<ExtractedVoucher[]>
   /** 填充回调（父组件决定如何集成到自身数据结构） */
   onFilled?: (payload: { samples: ExtractedVoucher[]; fillMode: FillMode }) => void
+  /** 只读态：为真时禁用一键取数与回写（R25.6） */
+  readonly?: Ref<boolean> | ComputedRef<boolean>
 }
 
 // ─── Pure Function: applyFillMode（独立导出供 PBT 测试） ─────────────────────
@@ -115,6 +118,73 @@ export function applyFillMode(
   }
 }
 
+// ─── 截止窗口纯函数（供一键取数与 PBT 复用；design C.2 / Property 11·12）────
+//
+// spec: voucher-check-sampling-integration, Task 10 基座（Task 3 先行落地以供属性测试）
+// 纯函数、无 Vue 依赖，泛型保持调用方凭证结构不变。
+
+/** 解析 YYYY-MM-DD 为毫秒时间戳（本地 0 点，避免时区偏移）；非法返回 NaN。 */
+function parseDateMs(dateStr: string | null | undefined): number {
+  if (!dateStr) return NaN
+  return new Date(dateStr + 'T00:00:00').getTime()
+}
+
+/**
+ * 基准日 ±N 天窗口过滤（纯函数）。
+ *
+ * 仅保留记账日期 d 满足 `cutoffDate − daysBefore ≤ d ≤ cutoffDate + daysAfter` 的凭证；
+ * 窗口外或日期非法者一律排除。
+ *
+ * Requirements: 25.1, 25.3（design C.2 / Property 11）
+ */
+export function filterByCutoffWindow<T extends { voucherDate: string }>(
+  vouchers: T[],
+  cutoffDate: string,
+  daysBefore: number,
+  daysAfter: number,
+): T[] {
+  const list = Array.isArray(vouchers) ? vouchers : []
+  const { start, end } = computeDateRange(cutoffDate, daysBefore, daysAfter)
+  const startMs = parseDateMs(start)
+  const endMs = parseDateMs(end)
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return []
+  return list.filter((v) => {
+    const d = parseDateMs(v?.voucherDate)
+    return Number.isFinite(d) && d >= startMs && d <= endMs
+  })
+}
+
+/**
+ * 跨期判定（纯函数）。
+ *
+ * 当记账日期(voucherDate)与业务发生日期(businessDate)分居基准日两侧时为 true，
+ * 同侧为 false；判定仅依赖各日期相对基准日的位置（> 基准日为"期后"，≤ 基准日为"期内/当日"）。
+ * 单日期降级：缺业务发生日期时，退化为"记账日期落在基准日之后即需人工判断的跨期疑点"，
+ * 位置判定语义不变。
+ *
+ * Requirements: 25.5（design C.2 / Property 12）
+ */
+export function markCutoffCrossPeriod(
+  v: { voucherDate: string; businessDate?: string | null },
+  cutoffDate: string,
+): boolean {
+  const cutoffMs = parseDateMs(cutoffDate)
+  const bookMs = parseDateMs(v?.voucherDate)
+  if (!Number.isFinite(cutoffMs) || !Number.isFinite(bookMs)) return false
+
+  const bookAfter = bookMs > cutoffMs
+  const bizStr = v?.businessDate
+  if (!bizStr) {
+    // 单日期降级：记账日期落在基准日之后 → 跨期疑点
+    return bookAfter
+  }
+  const bizMs = parseDateMs(bizStr)
+  if (!Number.isFinite(bizMs)) return bookAfter
+  const bizAfter = bizMs > cutoffMs
+  // 分居两侧 → 跨期
+  return bookAfter !== bizAfter
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
@@ -127,6 +197,7 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
     defaultConditions,
     existingSamples,
     onFilled,
+    readonly,
   } = options
 
   // ─── Config 初始化 ──────────────────────────────────────────────────────
@@ -304,9 +375,146 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
     }
   }
 
+  // ─── triggerCutoffFetch（一键取数：四表库凭证库联动，Req 25）───────────────
+  //
+  // 与 triggerExtraction（走 /cutoff-extract）不同，本函数复用抽凭引擎的
+  // /sampling/voucher-extract 端点，以基准日 ±N 天窗口（filters.date_from/date_to）
+  // 从四表库凭证库（tb_ledger）按科目/方向/金额检索，映射为 ExtractedVoucher，
+  // 经纯函数 filterByCutoffWindow 兜底裁剪窗口、markCutoffCrossPeriod 标注跨期疑点，
+  // 再打开预览由既有 confirmFill 回写。只读禁用（R25.6）。
+  //
+  // Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6
+
+  async function triggerCutoffFetch(): Promise<void> {
+    // 只读禁用一键取数（R25.6）
+    if (readonly?.value) {
+      ElMessage.warning('只读状态下禁用一键取数')
+      return
+    }
+    // 校验：基准日 + 科目范围（R25.1/R25.2）
+    if (!validateConfig()) return
+
+    loading.value = true
+    try {
+      // 基准日 ±N 天窗口（R25.1/R25.3）
+      const { start, end } = computeDateRange(
+        config.value.cutoffDate,
+        config.value.daysBefore,
+        config.value.daysAfter,
+      )
+
+      // 检索条件：科目范围 + 借贷方向 + 金额（R25.2），日期窗口经 filters.date_from/date_to
+      const filters: Record<string, any> = {
+        account_codes: config.value.accountCodes,
+        direction_filter: config.value.directionFilter,
+        voucher_type_filter: config.value.voucherTypeFilter,
+        summary_keyword: config.value.summaryKeyword,
+        // 一键取数为"检索总体"，不排除已提取（保证窗口内凭证完整可见）
+        exclude_extracted: false,
+        date_from: start,
+        date_to: end,
+      }
+      if (config.value.amountThreshold && config.value.amountThreshold > 0) {
+        // 金额条件：GREATEST(借,贷) ≥ 阈值（元），下沉到序时账查询
+        filters.amount_min = config.value.amountThreshold
+      }
+
+      // 复用抽凭端点，specific_item + 阈值0 = 返回窗口内全部符合条件凭证（检索模式，R25.3）
+      const res = await http.post(
+        `/api/projects/${projectId.value}/sampling/voucher-extract`,
+        {
+          sampling_method: 'specific_item',
+          sampling_params: { materiality_threshold: 0 },
+          filters,
+          workpaper_id: workpaperId.value,
+          year: year.value,
+        },
+      )
+
+      const data = res.data as any
+      const items: any[] = data?.items ?? []
+      const statsData = data?.stats ?? {}
+
+      if (items.length === 0) {
+        ElMessage.info('未找到符合条件的凭证')
+        return
+      }
+
+      // 映射为 ExtractedVoucher，并用 markCutoffCrossPeriod 标注跨期疑点（R25.5）
+      const mapped: ExtractedVoucher[] = items.map((item: any) => {
+        const debitAmt = item.debit_amount ?? item.debitAmount ?? null
+        const creditAmt = item.credit_amount ?? item.creditAmount ?? null
+        const voucherDate = item.voucher_date ?? item.voucherDate ?? ''
+        // 业务发生日期（单据日期）用于跨期判定；缺省时 markCutoffCrossPeriod 走单日期降级
+        const businessDate =
+          item.business_date ?? item.businessDate ?? item.bill_date ?? null
+
+        const crossPeriod = markCutoffCrossPeriod(
+          { voucherDate, businessDate },
+          config.value.cutoffDate,
+        )
+
+        return {
+          voucherNo: item.voucher_no ?? item.voucherNo ?? '',
+          voucherDate,
+          summary: item.summary ?? null,
+          debitAmount: debitAmt != null ? String(debitAmt) : null,
+          creditAmount: creditAmt != null ? String(creditAmt) : null,
+          accountCode: item.account_code ?? item.accountCode ?? '',
+          accountName: item.account_name ?? item.accountName ?? null,
+          counterpartAccount:
+            item.counterpart_account ?? item.counterpartAccount ?? null,
+          voucherType: item.voucher_type ?? item.voucherType ?? null,
+          cutoffStatus: crossPeriod ? ('可能跨期' as CutoffStatus) : ('正常' as CutoffStatus),
+          remark: crossPeriod ? '跨期疑点' : '',
+          selected: true, // 默认全部勾选
+        } as ExtractedVoucher
+      })
+
+      // 纯函数兜底裁剪窗口（后端已按 date_from/date_to 过滤，此处保证客户端窗口不变量，R25.3）
+      extractedVouchers.value = filterByCutoffWindow(
+        mapped,
+        config.value.cutoffDate,
+        config.value.daysBefore,
+        config.value.daysAfter,
+      )
+
+      if (extractedVouchers.value.length === 0) {
+        ElMessage.info('未找到符合条件的凭证')
+        return
+      }
+
+      // 填充统计（复用抽凭端点的总体统计口径）
+      stats.value = {
+        totalCount:
+          statsData.population_count ?? statsData.totalCount ?? extractedVouchers.value.length,
+        debitTotal: String(
+          statsData.population_debit_total ?? statsData.debit_total ?? '0',
+        ),
+        creditTotal: String(
+          statsData.population_credit_total ?? statsData.credit_total ?? '0',
+        ),
+        byVoucherType: {},
+        truncated: data?.truncated ?? statsData.truncated ?? false,
+      }
+
+      // 打开预览弹窗，由既有 confirmFill 回写截止底稿（R25.4）
+      previewVisible.value = true
+    } catch (err: any) {
+      ElMessage.error(err?.message || '一键取数失败，请稍后重试')
+    } finally {
+      loading.value = false
+    }
+  }
+
   // ─── confirmFill ────────────────────────────────────────────────────────
 
   async function confirmFill(): Promise<ExtractedVoucher[]> {
+    // 只读禁用回写（R25.6）
+    if (readonly?.value) {
+      ElMessage.warning('只读状态下禁用回写')
+      return []
+    }
     const selected = selectedVouchers.value
     if (selected.length === 0) {
       ElMessage.warning('请至少勾选一条凭证')
@@ -449,6 +657,7 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
 
     // 操作
     triggerExtraction,
+    triggerCutoffFetch,
     confirmFill,
     loadHistory,
     undoLastExtraction,

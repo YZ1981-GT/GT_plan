@@ -15,6 +15,7 @@
 import { ref, inject, toRef, type Ref } from 'vue'
 import { useE1Analysis, type AnalysisRow } from '../composables/useE1Analysis'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -68,8 +69,36 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
 
 <template>
   <div class="e1-tab-analysis">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表对货币资金各项目进行期末与期初的变动分析，期末金额取自 E1-1 审定表（跨sheet自动取数）。</p>
+        <p>2. 灰色底纹列（期末金额/变动额）为自动计算，不可手工录入；期初金额可手工录入。</p>
+        <p>3. 变动率 = 变动额 / 期初金额，绝对值超过30%时红色高亮，须在"变动原因"列分析说明。</p>
+        <p>4. 关注货币资金异常大幅波动是否与经营规模、筹资投资活动相匹配，识别资金占用与舞弊风险。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过分析性程序评价货币资金各项目变动的合理性，识别异常波动，为进一步实质性程序提供方向。"
+      class="objective-alert"
+    />
+
     <el-skeleton :loading="isLoading" :rows="6" animated>
       <template #default>
+        <!-- 工具栏 -->
+        <div class="tab-toolbar">
+          <div class="toolbar-left"></div>
+          <div class="toolbar-right">
+            <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+            <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          </div>
+        </div>
+
         <el-table
           :data="rows"
           border
@@ -84,7 +113,7 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
             </template>
           </el-table-column>
 
-          <el-table-column label="期末金额" width="150" align="right">
+          <el-table-column label="期末金额" width="150" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
             </template>
@@ -102,7 +131,7 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
             </template>
           </el-table-column>
 
-          <el-table-column label="变动额" width="150" align="right">
+          <el-table-column label="变动额" width="150" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="computed-cell">{{ displayPrefs.fmtAmount(row.changeAmount) }}</span>
             </template>
@@ -147,6 +176,59 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
 <style scoped>
 .e1-tab-analysis {
   padding: 12px 0;
+}
+.e1-tab-analysis :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-analysis :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 .computed-cell {
   color: #606266;

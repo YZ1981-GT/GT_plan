@@ -216,6 +216,23 @@ function isCoverageSufficient(entry: ExtractionLogEntry): boolean {
                 金额 {{ entry.coverageStats?.amountCoverageRate || '—' }}%
               </span>
             </div>
+            <!-- ── 方法学增强回显（R22 seed/重抽原因；R17 间隔；R18 结论）── -->
+            <div v-if="entry.randomSeed != null" class="entry-row">
+              <span class="entry-field">随机种子：</span>
+              <span class="entry-value entry-seed">{{ entry.randomSeed }}</span>
+            </div>
+            <div v-if="entry.samplingInterval" class="entry-row">
+              <span class="entry-field">抽样间隔：</span>
+              <span class="entry-value">{{ entry.samplingInterval }} 元</span>
+            </div>
+            <div v-if="entry.resampleReason" class="entry-row">
+              <span class="entry-field">重抽原因：</span>
+              <span class="entry-value entry-resample">{{ entry.resampleReason }}</span>
+            </div>
+            <div v-if="entry.conclusion" class="entry-row">
+              <span class="entry-field">抽样结论：</span>
+              <span class="entry-value">{{ entry.conclusion }}</span>
+            </div>
           </div>
 
           <!-- QC 合规标记（Requirement 8.5） -->
@@ -348,6 +365,15 @@ function isCoverageSufficient(entry: ExtractionLogEntry): boolean {
 
 .entry-value {
   color: var(--el-text-color-regular, #606266);
+}
+
+.entry-seed {
+  font-family: 'Menlo', 'Monaco', 'Consolas', monospace;
+  color: var(--el-color-primary, #409eff);
+}
+
+.entry-resample {
+  color: var(--el-color-warning, #e6a23c);
 }
 
 /* ── QC 合规标记 ── */

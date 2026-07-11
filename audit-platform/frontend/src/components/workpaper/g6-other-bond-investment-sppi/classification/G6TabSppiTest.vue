@@ -270,10 +270,11 @@ import { inject, computed, watch, onMounted } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
 import { useG6SppiTest } from '../../composables/useG6SppiTest'
 import type { SppiTestData, SppiItem } from '../../composables/useG6SppiTest'
+import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 
 const props = defineProps<{
-  data: SppiTestData | null
-  readonly: boolean
+  htmlData: Record<string, any> | null
+  isReadonly: boolean
   wpId: string
   projectId: string
 }>()
@@ -282,6 +283,9 @@ const emit = defineEmits<{
   (e: 'update', data: SppiTestData): void
   (e: 'aiGenerate', section: string): void
 }>()
+
+// 模板中以 `readonly` 绑定 :disabled，映射到父级传入的 is-readonly
+const readonly = computed(() => props.isReadonly)
 
 // ─── 复核对话 inject ────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog')
@@ -307,14 +311,51 @@ const {
   getSectionMethodology,
 } = useG6SppiTest()
 
-// ─── 加载数据 ──────────────────────────────────────────────────────────────
-onMounted(() => {
-  loadData(props.data)
+// ─── 数据层（自加载/保存，对齐同组其他 tab） ──────────────────────────────
+const formData = useG6SppiFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
 })
 
-watch(() => props.data, (newData) => {
-  loadData(newData)
+const SPPI_ITEM_ID = 'G6-8-sppi-test-data'
+
+// ─── 加载数据 ──────────────────────────────────────────────────────────────
+onMounted(async () => {
+  await formData.loadAll()
+  initFromData()
 })
+
+watch(() => props.htmlData, () => {
+  initFromData()
+})
+
+function initFromData(): void {
+  // 优先从已保存的 checklist-response 读取
+  const saved = formData.allResponses.value.get(SPPI_ITEM_ID)
+  if (saved?.conclusion) {
+    try {
+      const parsed = JSON.parse(saved.conclusion) as SppiTestData
+      if (parsed?.sections?.length) {
+        loadData(parsed)
+        return
+      }
+    } catch { /* ignore parse error */ }
+  }
+  // 其次从 render-config 解析内容
+  const content = formData.parseContent()
+  if (content.sppiTest && (content.sppiTest as any).sections) {
+    loadData(content.sppiTest as SppiTestData)
+  } else {
+    loadData(null)
+  }
+}
+
+// ─── 持久化（debounce 保存到 checklist-responses） ──────────────────────────
+function persist(): void {
+  formData.debouncedSave(SPPI_ITEM_ID, {
+    conclusion: JSON.stringify(toJSON()),
+  })
+}
 
 // ─── 完成度统计 ─────────────────────────────────────────────────────────────
 const completedCount = computed(() => {
@@ -332,14 +373,16 @@ const pendingCount = computed(() => totalRows.value - completedCount.value)
 // ─── Item更新处理 ───────────────────────────────────────────────────────────
 function handleItemUpdate(sectionId: string, itemId: string, field: keyof SppiItem, value: any): void {
   updateItem(sectionId, itemId, field, value)
-  // 触发父组件保存
+  persist()
+  // 兼容：向上通知父组件
   emit('update', toJSON())
 }
 
-// ─── 监听数据变化向上通知 ───────────────────────────────────────────────────
+// ─── 监听结论变化：持久化 + 向上通知 ────────────────────────────────────────
 watch(
   () => sections.value.map(s => s.sectionConclusion),
   () => {
+    persist()
     emit('update', toJSON())
   },
 )

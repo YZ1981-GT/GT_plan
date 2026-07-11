@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-interest-calc">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资利息收入按实际利率法计算准确，实际利率与票面利率差异合理，测算合计与 G4-1 审定利息收入一致。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section标题栏 + 新增投资项目 + 复核按钮 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-4 利息测算表（实际利率法）</h3>

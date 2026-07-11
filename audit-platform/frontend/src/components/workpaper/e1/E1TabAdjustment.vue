@@ -22,6 +22,7 @@ import {
   type AdjustmentCategory,
 } from '../composables/useE1Adjustment'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -73,16 +74,34 @@ const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '
 
 <template>
   <div class="e1-tab-adjustment">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表汇总货币资金相关的调整分录（账项调整AJE/报表调整RJE）。</p>
+        <p>2. 借方合计必须等于贷方合计，平衡时显示"✓ 平衡"，不平衡时显示差额并须查明原因。</p>
+        <p>3. 类别选择"账项调整"影响科目余额并回写审定数；"报表调整"仅影响报表列报。</p>
+        <p>4. 确认后可点击"推送至A2"将调整分录汇总至未审计报表调整底稿。</p>
+      </div>
+    </details>
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
-        <!-- Toolbar -->
-        <div class="toolbar">
-          <el-button v-if="!isReadonly" type="primary" size="small" @click="addRow">
-            + 新增行
-          </el-button>
-          <el-button v-if="!isReadonly" type="warning" size="small" @click="pushToA2">
-            推送至A2
-          </el-button>
+        <!-- 工具栏 -->
+        <div class="tab-toolbar">
+          <div class="toolbar-left">
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="addRow">
+              + 新增行
+            </el-button>
+            <el-button v-if="!isReadonly" type="warning" size="small" @click="pushToA2">
+              推送至A2
+            </el-button>
+          </div>
+          <div class="toolbar-right">
+            <span class="chip-wrap"><GtIndexChip value="wp:A2" :context-project-id="projectId" /></span>
+            <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+            <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          </div>
         </div>
 
         <el-table :data="rows" border stripe size="small" style="width: 100%" max-height="500">
@@ -241,11 +260,53 @@ const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '
 .e1-tab-adjustment {
   padding: 12px 0;
 }
-.toolbar {
+.e1-tab-adjustment :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-adjustment :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
   margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.tab-toolbar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
   gap: 8px;
 }
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 .balance-summary {
   display: flex;
   gap: 24px;

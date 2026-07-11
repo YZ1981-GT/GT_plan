@@ -1,29 +1,49 @@
 <template>
   <div class="f2-purchase-price">
-    <h3 class="title">原材料采购价格分析 F2-61</h3>
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表按月分析原材料采购单价，识别 IPO 期间采购价格异常波动及可能的成本操纵。</p>
+        <p>2. 灰底列为自动计算列（月度单价、年度总额/总量/均价、变动率），不可手动编辑。</p>
+        <p>3. 单价异常（标黄）或年度均价变动率超阈值（标黄行）须结合市场行情与供应商访谈说明原因。</p>
+        <p>4. 分"材料基础 / 上半年 / 下半年 / 年度汇总"四段查看，减少横向滚动。</p>
+      </div>
+    </details>
 
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="pp.addRow()">+ 新增材料</el-button>
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-spe"
-        sheet="F2-61"
-        :disabled="isReadonly"
-        ai-section="price-analysis"
-        :existing-content="pp.auditNote.value"
-        review-section="F2-61-price"
-        @ai-filled="(t: string) => { pp.auditNote.value = t }"
-      />
-      <el-input v-model="pp.searchQuery.value" size="small" placeholder="搜索材料名称/规格" clearable class="search" />
-      <el-tag v-if="pp.abnormalCount.value > 0" type="warning" size="small">
-        {{ pp.abnormalCount.value }} 行价格异常
-      </el-tag>
-      <span class="hint">共 {{ pp.filteredRows.value.length }} 行</span>
-      <template v-if="useVirtualScroll">
-        <el-button size="small" link @click="browseMode = !browseMode">
-          {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
-        </el-button>
-      </template>
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>审计目标：分析原材料采购价格的合理性与波动趋势，识别异常定价，验证采购成本的真实性。</template>
+    </el-alert>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="pp.addRow()">+ 新增材料</el-button>
+        <el-input v-model="pp.searchQuery.value" size="small" placeholder="搜索材料名称/规格" clearable class="search" />
+        <el-tag v-if="pp.abnormalCount.value > 0" type="warning" size="small">
+          {{ pp.abnormalCount.value }} 行价格异常
+        </el-tag>
+        <template v-if="useVirtualScroll">
+          <el-button size="small" link @click="browseMode = !browseMode">
+            {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
+          </el-button>
+        </template>
+      </div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-spe"
+          sheet="F2-61"
+          :disabled="isReadonly"
+          ai-section="price-analysis"
+          :existing-content="pp.auditNote.value"
+          review-section="F2-61-price"
+          @ai-filled="(t: string) => { pp.auditNote.value = t }"
+        />
+        <GtIndexChip value="wp:F2-61" />
+        <el-tag size="small" type="info">共 {{ pp.filteredRows.value.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-segmented v-model="pp.activeSegment.value" :options="segments" size="small" class="segment-bar" />
@@ -96,30 +116,44 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="单价" width="80" align="right">
+          <el-table-column label="单价" width="80" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
-              <span
-                :class="{
-                  formula: true,
-                  'price-warn': row.enrichedMonths[mi].priceAbnormal,
-                }"
-              >
-                {{ fmtPrice(row.enrichedMonths[mi].unitPrice) }}
-              </span>
+              <el-tooltip content="月度单价 = 当月金额 / 当月数量" placement="top">
+                <span
+                  :class="{
+                    formula: true,
+                    'price-warn': row.enrichedMonths[mi].priceAbnormal,
+                  }"
+                >
+                  {{ fmtPrice(row.enrichedMonths[mi].unitPrice) }}
+                </span>
+              </el-tooltip>
             </template>
           </el-table-column>
         </el-table-column>
       </template>
 
       <template v-else>
-        <el-table-column label="年度总金额" width="110" align="right">
-          <template #default="{ row }">{{ row.annualTotalAmount.toLocaleString() }}</template>
+        <el-table-column label="年度总金额" width="110" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <el-tooltip content="年度总金额 = 各月采购金额合计" placement="top">
+              <span class="formula">{{ row.annualTotalAmount.toLocaleString() }}</span>
+            </el-tooltip>
+          </template>
         </el-table-column>
-        <el-table-column label="年度总数量" width="110" align="right">
-          <template #default="{ row }">{{ row.annualTotalQty.toLocaleString() }}</template>
+        <el-table-column label="年度总数量" width="110" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <el-tooltip content="年度总数量 = 各月采购数量合计" placement="top">
+              <span class="formula">{{ row.annualTotalQty.toLocaleString() }}</span>
+            </el-tooltip>
+          </template>
         </el-table-column>
-        <el-table-column label="年度均价" width="100" align="right">
-          <template #default="{ row }"><span class="formula">{{ row.annualAvgPrice.toFixed(4) }}</span></template>
+        <el-table-column label="年度均价" width="100" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <el-tooltip content="年度均价 = 年度总金额 / 年度总数量" placement="top">
+              <span class="formula">{{ row.annualAvgPrice.toFixed(4) }}</span>
+            </el-tooltip>
+          </template>
         </el-table-column>
         <el-table-column label="上年均价" width="100">
           <template #default="{ row }">
@@ -127,9 +161,11 @@
               @change="(v: number) => pp.updateRow(row.id, { priorAvgPrice: v ?? 0 })" />
           </template>
         </el-table-column>
-        <el-table-column label="变动率%" width="90" align="right">
+        <el-table-column label="变动率%" width="90" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            <span :class="{ 'price-warn': row.isAbnormal }">{{ row.changeRate.toFixed(1) }}%</span>
+            <el-tooltip content="变动率 =（年度均价 − 上年均价）/ 上年均价" placement="top">
+              <span class="formula" :class="{ 'price-warn': row.isAbnormal }">{{ row.changeRate.toFixed(1) }}%</span>
+            </el-tooltip>
           </template>
         </el-table-column>
       </template>
@@ -141,8 +177,16 @@
       </el-table-column>
     </el-table>
 
-    <h4>审计说明</h4>
-    <el-input v-model="pp.auditNote.value" type="textarea" :rows="3" :disabled="isReadonly" />
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+        </div>
+      </template>
+      <el-input v-model="pp.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="请说明采购价格波动分析结果、异常定价原因及与市场行情/供应商访谈的印证情况……" :disabled="isReadonly" />
+    </el-card>
   </div>
 </template>
 
@@ -153,6 +197,7 @@ import type { Column } from 'element-plus'
 import { useF2PurchasePrice, MONTH_LABELS } from '../../composables/useF2PurchasePrice'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -208,14 +253,25 @@ function fmtPrice(v: number | ''): string {
 
 <style scoped>
 .f2-purchase-price { padding: 12px; font-size: 13px; }
-.title { margin: 0 0 8px; }
-.toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.f2-purchase-price :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-purchase-price :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .search { width: 180px; }
-.hint { font-size: 12px; color: #909399; }
 .segment-bar { margin-bottom: 8px; }
-.formula { text-decoration: underline dotted #909399; }
+.formula { text-decoration: underline dotted #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .price-warn { color: #e6a23c; font-weight: 600; background: #fdf6ec; padding: 0 4px; border-radius: 2px; }
 :deep(.warn-row) { background: #fdf6ec; }
 .virtual-table { margin-bottom: 8px; }
-h4 { margin: 16px 0 8px; font-size: 13px; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

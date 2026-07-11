@@ -21,6 +21,7 @@ import {
   type UseE1BaseOptions,
   type AdjRow,
 } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -55,6 +56,7 @@ const options: UseE1BaseOptions = {
 
 const {
   rows,
+  diffRow,
   isLoading,
   isRateExceeding,
   hasDifference,
@@ -109,6 +111,36 @@ onMounted(() => {
 
 <template>
   <div class="e1-tab-adjudication">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表汇总货币资金各项目（库存现金1001、银行存款1002、其他货币资金1012、数字货币）的期初、期末审定过程。</p>
+        <p>2. 审定数 = 未审数 + 账项调整；灰色底纹列（期初/期末审定数）为自动计算，不可手工录入。</p>
+        <p>3. 未审数取自 E1-2 现金明细、E1-3 银行存款明细、E1-4 数字货币明细（跨sheet自动取数）；账项调整取自 E1-5 调整分录。</p>
+        <p>4. 变动率超过30%的项目请在"原因分析"列说明；审定合计应与试算平衡表核对一致，差异≠0时须查明原因。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：确认货币资金期初、期末余额的存在、完整与准确，评价账项调整的恰当性，并与试算平衡表（科目1001/1002/1012）核对一致。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-3" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-4" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-skeleton :loading="isLoading" :rows="12" animated>
       <template #default>
         <el-table
@@ -149,7 +181,7 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 期初审定数 -->
-          <el-table-column label="期初审定数" width="130" align="right">
+          <el-table-column label="期初审定数" width="130" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="computed-cell">
                 {{ displayPrefs.fmtAmount(row.openingAudited) }}
@@ -172,7 +204,7 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 期末审定数 -->
-          <el-table-column label="期末审定数" width="130" align="right">
+          <el-table-column label="期末审定数" width="130" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="computed-cell">
                 {{ displayPrefs.fmtAmount(row.endingAudited) }}
@@ -226,6 +258,13 @@ onMounted(() => {
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 核对行 -->
+        <div class="tb-check-row">
+          <span class="tb-label">审定合计与试算平衡表核对（科目1001/1002/1012）：</span>
+          <el-tag v-if="hasDifference()" type="danger" size="small">差异 {{ displayPrefs.fmtAmount(diffRow.endingAudited) }}</el-tag>
+          <el-tag v-else type="success" size="small">核对一致</el-tag>
+        </div>
       </template>
     </el-skeleton>
   </div>
@@ -234,6 +273,72 @@ onMounted(() => {
 <style scoped>
 .e1-tab-adjudication {
   padding: 12px 0;
+}
+.e1-tab-adjudication :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-adjudication :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
+}
+.tb-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.tb-label {
+  color: #909399;
 }
 .computed-cell {
   color: #606266;

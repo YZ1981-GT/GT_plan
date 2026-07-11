@@ -3,11 +3,20 @@
     <div class="g14-toolbar">
       <h3 class="g14-title">G14-2 信用减值损失明细表</h3>
       <div class="g14-actions">
+        <GtIndexChip value="wp:G14-2" />
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
         <CycleImportExportDropdown :wp-id="wpId" api-prefix="g14" sheet="G14-2"
           :disabled="isReadonly" @imported="emit('imported')" />
         <GtReviewTrigger section-id="G14-2-detail" />
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：核对 9 类减值来源本期计提/转回/转销与减值准备滚动勾稽（期末=期初+计提+转回−转销），
+        验证审定数=计入损益，并与各源科目（D1/D2/D5/G4/G5）ECL 交叉一致（CAS 22 预期信用损失 ECL）。
+      </template>
+    </el-alert>
 
     <el-alert v-if="detail.detailTotalMismatch.value" type="error" :closable="false" show-icon
       title="明细表合计审定数与计入损益合计不一致，请核查各行核对列" style="margin-bottom:8px" />
@@ -144,6 +153,8 @@
       <summary>📋 编制提示</summary>
       <p>1. 13 列拆为「本期数 / 减值准备滚动」两 Tab；固定 9 类行 + 合计，与 G14-1 一一对应。</p>
       <p>2. 期末 = 期初 + 计提 + 转回(带符号) - 转销；核对列验证审定数 = 计入损益。</p>
+      <p>3. CAS 22 预期信用损失（ECL）：坏账/减值准备按三阶段（12 个月 / 整个存续期 ECL）计量，本期计提计入信用减值损失（6702，借方），转回冲减（贷方）。</p>
+      <p>4. 各行「ECL 来源」chip 指向 D1/D2/D5/G4/G5 等源科目底稿，用于交叉验证减值基数一致性。</p>
     </details>
   </div>
 </template>
@@ -206,6 +217,7 @@ function eclRef(rowKey: string): string {
 
 <style scoped>
 .cross-alert { margin-bottom: 8px; }
+.audit-objective { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .g14-detail { padding: 12px; font-size: 13px; }
 .g14-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }

@@ -21,6 +21,7 @@ import {
   type ReconciliationRow,
 } from '../composables/useE1Reconciliation'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -65,13 +66,38 @@ const {
 
 <template>
   <div class="e1-tab-reconciliation">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表对每个银行账户编制余额调节表，验证企业账面余额与银行对账单余额的一致性。</p>
+        <p>2. 企业侧：账面余额 + 企收银未收 − 企付银未付 = 调节后企业余额；银行侧：对账单余额 + 银收企未收 − 银付企未付 = 调节后银行余额。</p>
+        <p>3. 调节后双方余额应相等，差异≠0时红色高亮并须填写差异原因（必填），关注未达账项与舞弊迹象。</p>
+        <p>4. 调节表数据应与 E1-3 银行存款明细及银行函证回函核对一致。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过银行存款余额调节表验证账面余额的准确与完整，识别未达账项及异常调节事项，评价截止认定的恰当性。"
+      class="objective-alert"
+    />
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
-        <!-- Toolbar -->
-        <div class="toolbar" v-if="!isReadonly">
-          <el-button type="primary" size="small" @click="addRow">
-            + 新增银行账户
-          </el-button>
+        <!-- 工具栏 -->
+        <div class="tab-toolbar">
+          <div class="toolbar-left">
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="addRow">
+              + 新增银行账户
+            </el-button>
+          </div>
+          <div class="toolbar-right">
+            <span class="chip-wrap"><GtIndexChip value="wp:E1-3" :context-project-id="projectId" /></span>
+            <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          </div>
         </div>
 
         <!-- Reconciliation Cards -->
@@ -229,9 +255,49 @@ const {
 .e1-tab-reconciliation {
   padding: 12px 0;
 }
-.toolbar {
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
   margin-bottom: 12px;
 }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 .recon-list {
   display: flex;
   flex-direction: column;

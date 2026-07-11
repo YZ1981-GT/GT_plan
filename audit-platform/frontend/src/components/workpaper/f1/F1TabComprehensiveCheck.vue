@@ -1,5 +1,24 @@
 <template>
 <div class="d3-comprehensive-check">
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 本表对预付账款（科目1123）本期增减变动与期后结转进行抽样检查，验证真实性与截止恰当性。</p>
+      <p>2. 抽样应结合重要性与风险确定样本量，大额、长账龄、关联方预付款应作为特定样本必选。</p>
+      <p>3. 逐笔核对凭证、合同、原始单据，异常项在"异常"列标注并回写审计说明。</p>
+      <p>4. 期后结转贷方合计应与 F1-2 期后结转（Z列）勾稽一致，差异须查明原因。</p>
+    </div>
+  </details>
+
+  <!-- 审计目标 -->
+  <el-alert
+    type="info"
+    :closable="false"
+    title="审计目标：验证预付账款本期增减变动的真实性与准确性，检查期后结转情况，评估长期挂账款项的可收回性与截止恰当性。"
+    class="objective-alert"
+  />
+
   <!-- 抽样参数区 -->
   <div class="sampling-params-card">
     <h4 class="card-title">抽样参数</h4>
@@ -38,18 +57,30 @@
   </div>
 
   <!-- 汇总 + 导入导出 -->
-  <div class="summary-bar">
-    <el-tag type="info">已检查：{{ totalChecked }}</el-tag>
-    <el-tag :type="anomalyCount > 0 ? 'danger' : 'success'">异常：{{ anomalyCount }}</el-tag>
-    <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'">异常率：{{ anomalyRate.toFixed(1) }}%</el-tag>
-    <GtIndexChip target="voucher-sampling-engine" label="抽凭引擎" />
-    <el-button-group size="small" style="margin-left: auto">
-      <el-button @click="exportTemplate('F1-7')">导出模板</el-button>
-      <el-button @click="exportData('F1-7')">导出数据</el-button>
-      <el-upload :show-file-list="false" accept=".xlsx" :disabled="isReadonly || importing" :before-upload="(file: any) => handleImport(file, 'F1-7')">
-        <el-button>导入数据</el-button>
-      </el-upload>
-    </el-button-group>
+  <div class="tab-toolbar">
+    <div class="toolbar-left">
+      <el-tag type="info">已检查：{{ totalChecked }}</el-tag>
+      <el-tag :type="anomalyCount > 0 ? 'danger' : 'success'">异常：{{ anomalyCount }}</el-tag>
+      <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'">异常率：{{ anomalyRate.toFixed(1) }}%</el-tag>
+      <el-tag size="small" type="warning" effect="plain">抽凭引擎</el-tag>
+    </div>
+    <div class="toolbar-right">
+      <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate('F1-7')">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData('F1-7')">导出数据</el-dropdown-item>
+            <el-dropdown-item>
+              <el-upload :show-file-list="false" accept=".xlsx" :disabled="isReadonly || importing"
+                :before-upload="(file: any) => handleImport(file, 'F1-7')">
+                <span>导入数据</span>
+              </el-upload>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
   </div>
 
   <!-- (1) 本期增减变动 -->
@@ -171,14 +202,24 @@
   <div class="vc-section">
     <div class="section-header">
       <h4>(2) 期后结转检查</h4>
-      <el-button-group size="small">
-        <el-button @click="exportTemplate('F1-7-post')">导出模板</el-button>
-        <el-button @click="exportData('F1-7-post')">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :disabled="isReadonly || importing" :before-upload="(file: any) => handleImport(file, 'F1-7-post')">
-          <el-button>导入数据</el-button>
-        </el-upload>
-      </el-button-group>
-      <el-button size="small" :disabled="isReadonly" @click="addSample('postPeriod')">+ 添加样本</el-button>
+      <div class="section-header-actions">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('F1-7-post')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('F1-7-post')">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload :show-file-list="false" accept=".xlsx" :disabled="isReadonly || importing"
+                  :before-upload="(file: any) => handleImport(file, 'F1-7-post')">
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button size="small" :disabled="isReadonly" @click="addSample('postPeriod')">+ 添加样本</el-button>
+      </div>
     </div>
     <el-table :data="postPeriodRows" size="small" border stripe :height="postPeriodRows.length > 15 ? '400px' : undefined">
       <el-table-column type="index" label="#" width="40" />
@@ -305,22 +346,21 @@
  * F1TabComprehensiveCheck.vue — F1-7 综合检查表
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useF1VoucherCheck } from '../composables/useF1VoucherCheck'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
-// @ts-ignore
-import GtIndexChip from '../GtIndexChip.vue'
-
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -336,9 +376,9 @@ const {
   updateCell,
   updateSamplingParams,
 } = useF1VoucherCheck({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
@@ -353,7 +393,7 @@ const progressPct = computed(() => {
 import { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import { parseNum } from '../composables/useF1FormulaEngine'
 
-const crossSheet = useF1CrossSheet({ allResponses: props.allResponses })
+const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
 /** F1-2 Z列（期后结转）合计 vs F1-7 (2)期后结转贷方合计 交叉验证 */
 const postPeriodCrossValidation = computed(() => {
@@ -361,7 +401,7 @@ const postPeriodCrossValidation = computed(() => {
   if (d37Total === 0) return ''
 
   // 从 F1-2 明细行聚合 Z列合计
-  const detResp = props.allResponses.value.get('F1-det-rows')
+  const detResp = allResponsesRef.value.get('F1-det-rows')
   let d32ZTotal = 0
   if (detResp?.remark) {
     try {
@@ -380,7 +420,7 @@ function openReview() {
 }
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: props.wpId })
+const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: toRef(props, 'wpId') as Ref<string> })
 
 async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> {
   const result = await importData(sheet, file)
@@ -391,16 +431,31 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 
 <style scoped>
 .d3-comprehensive-check { padding: 16px; }
+.d3-comprehensive-check :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.d3-comprehensive-check :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+
 .sampling-params-card { padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
 .params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
 .param-item { display: flex; align-items: center; gap: 8px; }
 .param-label { font-size: 12px; color: #909399; white-space: nowrap; min-width: 60px; }
 .sampling-progress { display: flex; align-items: center; font-size: 12px; color: #606266; }
-.summary-bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
 .vc-section { margin-bottom: 20px; }
-.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
 .section-header h4 { font-size: 14px; font-weight: 600; }
+.section-header-actions { display: flex; gap: 8px; align-items: center; }
 .abnormal-cell :deep(.el-input__inner) { color: #f56c6c; font-weight: 600; }
 .review-actions { margin-top: 12px; }
 </style>

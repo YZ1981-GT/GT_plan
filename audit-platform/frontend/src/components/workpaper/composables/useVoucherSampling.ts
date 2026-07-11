@@ -28,6 +28,11 @@ import {
   validateSamplingConfig,
   checkCAS1314Compliance,
   computeCoverage,
+  computeMusInterval,
+  computeSampleSize,
+  markHighValueItems,
+  projectMisstatement,
+  deriveSamplingConclusion,
   type SamplingMethod,
   type Phase,
   type FillMode,
@@ -36,7 +41,10 @@ import {
   type EditTrailEntry,
   type CoverageStats,
   type ComplianceWarning,
+  type MisstatementResult,
+  type SamplingConclusion,
 } from './useSamplingAlgorithms'
+import { useVersionTrail } from './useVersionTrail'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -60,6 +68,15 @@ export interface ExtractionLogEntry {
   fillMode: FillMode
   isUndone: boolean
   extractionCriteria: Record<string, unknown>
+  // ─── 方法学增强回显（R22 重抽治理/可复现；后端未就绪时兜底为 null）─────────
+  /** 本次抽样使用的随机种子（R22.2 可复现，在历史与版本链展示） */
+  randomSeed?: number | null
+  /** MUS 抽样间隔（Decimal 字符串，R17） */
+  samplingInterval?: string | null
+  /** 重抽原因（R22.1） */
+  resampleReason?: string | null
+  /** 抽样结论文案（R18.5/18.6） */
+  conclusion?: string | null
 }
 
 export interface CompareResult {
@@ -142,6 +159,12 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       summaryKeyword: '',
       excludeExtracted: true,
       randomSeed: null,
+      // ─── 方法学增强参数（可选，向后兼容）────────────────────────────
+      confidenceLevel: undefined,
+      tolerableMisstatement: undefined,
+      expectedMisstatement: undefined,
+      suggestedSampleSize: undefined,
+      resampleReason: undefined,
     }
   }
 
@@ -160,6 +183,29 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   const seedUsed = ref<number | null>(null)
   const configErrors = ref<Record<string, string>>({})
 
+  // ─── 方法学增强状态（向后兼容，纯附加）───────────────────────────────────
+  /** 系统建议样本量（R15.4 留痕；手工覆盖 config.sampleSize 后仍保留此建议值） */
+  const suggestedSampleSize = ref<number | null>(null)
+  /** 本次 MUS 抽样间隔（Decimal 字符串，R17.1 展示） */
+  const samplingInterval = ref<string | null>(null)
+  /** 错报推断结果（R18.2/18.4） */
+  const misstatementResult = ref<MisstatementResult | null>(null)
+  /** 抽样结论（R18.5/18.6；人工确认前不定稿） */
+  const samplingConclusion = ref<SamplingConclusion | null>(null)
+  /** 可容忍错报是否由重要性/B15 自动带入（R16；用于 UI 提示可覆盖） */
+  const tolerableFromMateriality = ref(false)
+
+  // ─── Version Trail（延迟实例化）───────────────────────────────────────────
+  // useVersionTrail 内部依赖 Pinia store（useAuthStore/useRoleContextStore），
+  // 延迟到首次使用时实例化，避免无 Pinia 的纯逻辑测试环境实例化即报错。
+  let _versionTrail: ReturnType<typeof useVersionTrail> | null = null
+  function getVersionTrail(): ReturnType<typeof useVersionTrail> {
+    if (!_versionTrail) {
+      _versionTrail = useVersionTrail({ projectId, workpaperId })
+    }
+    return _versionTrail
+  }
+
   // ─── Validation ─────────────────────────────────────────────────────────
 
   /**
@@ -170,6 +216,168 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     const errors = validateSamplingConfig(config.value)
     configErrors.value = errors
     return Object.keys(errors).length === 0
+  }
+
+  // ─── 方法学增强：重要性联动 / 样本量推导 / 错报推断 / 重抽治理 ───────────────
+
+  /**
+   * R16 从重要性/B15 底稿带入可容忍错报（实际执行重要性）作为初始值。
+   *
+   * - 成功：写入 config.tolerableMisstatement 并标记 tolerableFromMateriality=true，返回该值。
+   * - 失败/未取到：不改动已有值，返回 null，允许审计师手工录入（R16.3）。
+   *
+   * @param pid 项目 ID，默认取当前 options.projectId
+   * @returns 可容忍错报（Decimal 字符串）或 null
+   */
+  async function loadTolerableMisstatement(pid?: string): Promise<string | null> {
+    const targetPid = pid ?? projectId.value
+    if (!targetPid) return null
+    try {
+      const res = await http.get(`/api/projects/${targetPid}/materiality`, {
+        params: { year: year.value },
+        // 未编制重要性时后端可能 404，静默兜底允许手填
+        _silent: true,
+      } as any)
+      const data = res.data as any
+      const pm =
+        data?.performance_materiality ??
+        data?.performanceMateriality ??
+        data?.overall_materiality ??
+        data?.overallMateriality ??
+        null
+      if (pm == null || pm === '' || Number(pm) <= 0) return null
+      const value = String(pm)
+      config.value.tolerableMisstatement = value
+      tolerableFromMateriality.value = true
+      return value
+    } catch {
+      // 取数失败：允许手工录入（R16.3），不打断流程
+      return null
+    }
+  }
+
+  /**
+   * R15 科学样本量推导（MUS）：依据置信度/可容忍错报/预期错报与总体金额推导建议样本量。
+   *
+   * 同步计算并留痕本次 MUS 抽样间隔（samplingInterval）。缺少置信度或可容忍错报时
+   * 返回 0 并不改动配置（R15.5 由 validateConfig/UI 负责提示）。
+   *
+   * @param populationAmount 总体金额（Decimal 字符串），默认取当前覆盖率统计
+   * @returns 建议样本量（非负整数，0 表示参数不足无法推导）
+   */
+  function computeSuggestedSampleSize(populationAmount?: string): number {
+    const cfg = config.value
+    const tol = cfg.tolerableMisstatement
+    const cl = cfg.confidenceLevel
+    if (!tol || tol === '' || cl == null || !(cl > 0 && cl < 1)) {
+      return 0
+    }
+    const expected = cfg.expectedMisstatement && cfg.expectedMisstatement !== '' ? cfg.expectedMisstatement : '0'
+    const popAmount = populationAmount ?? coverageStats.value?.populationAmount ?? '0'
+
+    // 抽样间隔留痕
+    samplingInterval.value = computeMusInterval(tol, cl, expected)
+
+    const suggested = computeSampleSize(popAmount, tol, expected, cl)
+    // R15.4 留痕：保留系统建议值（config.suggestedSampleSize 与 suggestedSampleSize ref）
+    cfg.suggestedSampleSize = suggested
+    suggestedSampleSize.value = suggested
+    return suggested
+  }
+
+  /**
+   * R15.3 采用系统建议样本量：将建议值写入当前方法的样本量参数（保留 suggestedSampleSize 留痕）。
+   */
+  function applySuggestedSampleSize(): void {
+    const suggested = suggestedSampleSize.value
+    if (suggested == null || suggested <= 0) return
+    if (config.value.samplingMethod === 'mus') {
+      config.value.musSampleSize = suggested
+    } else {
+      config.value.sampleSize = suggested
+    }
+  }
+
+  /**
+   * R18 错报推断与总体结论
+   *
+   * 基于样本已录入的实际错报（actualMisstatement）按当前抽样方法推断总体错报，
+   * 计算错报上限（UML），并与可容忍错报比较得出结论建议。人工确认前不写入底稿（R18.7）。
+   *
+   * @returns { result, conclusion } 推断结果与结论（可容忍错报缺失时 conclusion 为 null）
+   */
+  function inferMisstatement(): {
+    result: MisstatementResult
+    conclusion: SamplingConclusion | null
+  } {
+    const cl = config.value.confidenceLevel ?? 0.95
+    const interval = samplingInterval.value ?? '0'
+    const popAmount = coverageStats.value?.populationAmount ?? '0'
+    // 仅纳入已检查（含实际错报录入）的样本
+    const samples = sampledVouchers.value
+
+    const result = projectMisstatement(
+      samples,
+      config.value.samplingMethod,
+      interval,
+      popAmount,
+      cl,
+    )
+    misstatementResult.value = result
+
+    const tol = config.value.tolerableMisstatement
+    let conclusion: SamplingConclusion | null = null
+    if (tol && tol !== '') {
+      conclusion = deriveSamplingConclusion(result.upperLimit, tol)
+    }
+    samplingConclusion.value = conclusion
+    return { result, conclusion }
+  }
+
+  /**
+   * R18.1 录入某样本的实际错报金额（Decimal 字符串）+ edit_trail 留痕，并即时重算推断。
+   *
+   * @param index sampledVouchers 数组索引
+   * @param value 实际错报金额
+   */
+  function recordActualMisstatement(index: number, value: string): void {
+    const voucher = sampledVouchers.value[index]
+    if (!voucher) return
+    const oldValue = String(voucher.actualMisstatement ?? '')
+    const newValue = String(value ?? '')
+    voucher.actualMisstatement = newValue
+
+    voucher.editTrail.push({
+      userId: 'current_user',
+      timestamp: new Date().toISOString(),
+      field: 'actualMisstatement',
+      oldValue,
+      newValue,
+    })
+
+    // 即时重算推断错报与结论
+    inferMisstatement()
+  }
+
+  /**
+   * R22 重抽治理：重抽必须录入原因（R22.1），不静默覆盖历史批次（R22.3，历史由后端逐条留存）。
+   *
+   * 重置随机种子以便本次重抽由后端生成新的可复现种子（R22.2）。
+   *
+   * @param reason 重抽原因（必填）
+   * @returns 是否已发起重抽
+   */
+  async function resample(reason: string): Promise<boolean> {
+    const trimmed = (reason ?? '').trim()
+    if (!trimmed) {
+      ElMessage.warning('重抽必须填写重抽原因')
+      return false
+    }
+    config.value.resampleReason = trimmed
+    // 重置种子 → 后端生成并回传新种子（seedUsed），保证可复现且不复用旧批次
+    config.value.randomSeed = null
+    await triggerSampling()
+    return true
   }
 
   // ─── Computed: 选中统计 ─────────────────────────────────────────────────
@@ -272,6 +480,25 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         amountCoverageRate: String(statsData.amount_coverage_rate ?? statsData.amountCoverageRate ?? '0.00'),
       }
 
+      // ─── 方法学增强：MUS 抽样间隔 + 高值必选 + 建议样本量留痕 ───────────
+      // 仅当 MUS 且已提供置信度/可容忍错报时生效；其他方法保持原行为不变。
+      samplingInterval.value = null
+      if (
+        config.value.samplingMethod === 'mus' &&
+        config.value.tolerableMisstatement &&
+        config.value.confidenceLevel != null
+      ) {
+        // 推导间隔与建议样本量（留痕），并标注高值必选项（金额 ≥ 间隔 → 100% 必选）
+        computeSuggestedSampleSize(coverageStats.value.populationAmount)
+        if (samplingInterval.value) {
+          sampledVouchers.value = markHighValueItems(sampledVouchers.value, samplingInterval.value)
+        }
+      }
+
+      // 每次新抽样重置上一批次的错报推断状态（历史批次由后端留存，不受影响）
+      misstatementResult.value = null
+      samplingConclusion.value = null
+
       // 截断提示
       if (truncated) {
         ElMessage.warning('抽样结果超过500条，已截断显示')
@@ -339,16 +566,25 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     // 应用填充策略
     const result = applyFillMode(existing, selected, effectiveMode, phase.value)
 
-    // 创建版本链快照（fire-and-forget，失败不阻塞主流程）
-    http.post(
-      `/api/projects/${projectId.value}/workpapers/${workpaperId.value}/versions`,
-      {
-        snapshot_type: 'auto_sampling',
-        description: `抽凭填充：${config.value.samplingMethod} ${config.value.accountCodes.join(',')} phase=${phase.value}`,
-      },
-    ).catch(() => {
-      // fire-and-forget: 版本链快照失败仅静默忽略
-    })
+    // R9.1 创建版本链快照（经 useVersionTrail；含方法/间隔/样本量/seed，
+    // 执行人与时间由后端补全）。fire-and-forget，失败不阻塞主流程。
+    const snapshotDesc =
+      `抽凭填充：方法=${config.value.samplingMethod}` +
+      ` 科目=${config.value.accountCodes.join(',')}` +
+      ` 间隔=${samplingInterval.value ?? '-'}` +
+      ` 样本量=${selected.length}` +
+      ` seed=${seedUsed.value ?? '-'}` +
+      ` phase=${phase.value}` +
+      (config.value.resampleReason ? ` 重抽原因=${config.value.resampleReason}` : '')
+    try {
+      void getVersionTrail()
+        .createSnapshot(snapshotDesc, { snapshotType: 'auto_sampling', silent: true })
+        .catch(() => {
+          // fire-and-forget: 版本链快照失败仅静默忽略
+        })
+    } catch {
+      // 版本链实例化失败（如无 Pinia 环境）不影响回填主流程
+    }
 
     // 记录填充日志（含 before_data 快照 — 向后兼容）
     try {
@@ -363,6 +599,14 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             sampling_params: buildSamplingParams(),
             random_seed: seedUsed.value,
             phase: phase.value,
+            // ─── 方法学增强字段（后端未就绪时作为冗余 JSON 留存，向后兼容）───
+            confidence_level: config.value.confidenceLevel ?? null,
+            tolerable_misstatement: config.value.tolerableMisstatement ?? null,
+            expected_misstatement: config.value.expectedMisstatement ?? null,
+            suggested_sample_size: config.value.suggestedSampleSize ?? null,
+            sampling_interval: samplingInterval.value ?? null,
+            resample_reason: config.value.resampleReason ?? null,
+            conclusion: samplingConclusion.value?.message ?? null,
             coverage_stats: coverageStats.value
               ? {
                   count_rate: coverageStats.value.countCoverageRate,
@@ -419,18 +663,26 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       const data = res.data as any
       const list: any[] = Array.isArray(data) ? data : (data?.items ?? [])
 
-      historyList.value = list.map((item: any) => ({
-        id: item.id ?? '',
-        createdAt: item.created_at ?? item.createdAt ?? '',
-        userId: item.user_id ?? item.userId ?? '',
-        samplingMethod: item.sampling_method ?? item.samplingMethod ?? item.extraction_criteria?.sampling_method ?? 'random',
-        sampleCount: item.filled_count ?? item.filledCount ?? item.sampleCount ?? 0,
-        coverageStats: parseCoverageStats(item),
-        phase: item.extraction_criteria?.phase ?? item.phase ?? 'preliminary',
-        fillMode: item.fill_mode ?? item.fillMode ?? 'append',
-        isUndone: item.is_undone ?? item.isUndone ?? false,
-        extractionCriteria: item.extraction_criteria ?? item.extractionCriteria ?? {},
-      }))
+      historyList.value = list.map((item: any) => {
+        const criteria = item.extraction_criteria ?? item.extractionCriteria ?? {}
+        return {
+          id: item.id ?? '',
+          createdAt: item.created_at ?? item.createdAt ?? '',
+          userId: item.user_id ?? item.userId ?? '',
+          samplingMethod: item.sampling_method ?? item.samplingMethod ?? criteria.sampling_method ?? 'random',
+          sampleCount: item.filled_count ?? item.filledCount ?? item.sampleCount ?? 0,
+          coverageStats: parseCoverageStats(item),
+          phase: criteria.phase ?? item.phase ?? 'preliminary',
+          fillMode: item.fill_mode ?? item.fillMode ?? 'append',
+          isUndone: item.is_undone ?? item.isUndone ?? false,
+          extractionCriteria: criteria,
+          // ─── 方法学增强回显（R22 seed/重抽原因；R17 间隔；R18 结论）兜底 null ──
+          randomSeed: item.random_seed ?? item.randomSeed ?? criteria.random_seed ?? null,
+          samplingInterval: item.sampling_interval ?? item.samplingInterval ?? criteria.sampling_interval ?? null,
+          resampleReason: item.resample_reason ?? item.resampleReason ?? criteria.resample_reason ?? null,
+          conclusion: item.conclusion ?? criteria.conclusion ?? null,
+        }
+      })
 
       historyVisible.value = true
     } catch {
@@ -606,6 +858,13 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     fillMode,
     seedUsed,
 
+    // 方法学增强状态
+    suggestedSampleSize,
+    samplingInterval,
+    misstatementResult,
+    samplingConclusion,
+    tolerableFromMateriality,
+
     // 计算属性
     selectedVouchers,
     selectedCount,
@@ -621,6 +880,14 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     toggleSelectAll,
     updateField,
     batchMarkChecked,
+
+    // 方法学增强操作（R15/R16/R18/R22）
+    loadTolerableMisstatement,
+    computeSuggestedSampleSize,
+    applySuggestedSampleSize,
+    inferMisstatement,
+    recordActualMisstatement,
+    resample,
 
     // 校验
     validateConfig,

@@ -183,7 +183,7 @@ import type { Ref } from 'vue'
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   tbData: K5TbData
   isReadonly: boolean
 }>()
@@ -197,6 +197,9 @@ const emit = defineEmits<{
 
 const tbDataRef = computed(() => props.tbData)
 
+// 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
+
 const {
   rows,
   subtotalRow,
@@ -205,7 +208,7 @@ const {
   tbReconciliation,
   saveAll,
 } = useK5Adjudication({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   tbData: tbDataRef as Ref<K5TbData>,
   saveResponse: async (field: string, value: any) => {
     emit('save', `K5-${field}`, value)

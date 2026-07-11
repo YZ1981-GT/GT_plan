@@ -1,5 +1,24 @@
 <template>
   <div class="f2-unit-consumption">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表分析主要产品的单位材料消耗（单耗）及投入产出比，验证生产成本结转的合理性与营业成本的准确性（CAS 1231 / CAS 1141）。</p>
+        <p>2. 灰色底纹列为自动计算列（差异率%/金额影响/投入产出比/单耗变动率），由标准/实际单耗、单价及投入产出量自动测算，不可手工编辑。</p>
+        <p>3. 单耗差异率超阈值标橙、投入产出失衡标红，请填写合理性说明与审计关注；单耗异常可能提示成本核算错误或存货舞弊。</p>
+        <p>4. 可通过工具栏"AI 生成"辅助撰写单耗分析结论，"💬"发起复核对话，"导入导出"批量维护产品单耗数据。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证主要产品单位材料消耗与投入产出的合理性，评价生产成本结转的准确性，识别多结转/少结转导致的营业成本错报。"
+      class="objective-alert"
+    />
+
     <header class="sheet-header">
       <div class="header-text">
         <h3>主要产品生产成本及单耗分析</h3>
@@ -25,32 +44,38 @@
       </div>
     </header>
 
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="uc.addProduct()">+ 产品</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="uc.addMaterial()">+ 材料</el-button>
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-spe"
-        sheet="F2-64"
-        :disabled="isReadonly"
-        ai-section="consumption-analysis"
-        :existing-content="uc.auditNote.value"
-        review-section="F2-64-consumption"
-        @ai-filled="(t: string) => { uc.auditNote.value = t }"
-      />
-      <el-input
-        v-model="uc.searchQuery.value"
-        size="small"
-        placeholder="搜索产品 / 材料 / 规格"
-        clearable
-        prefix-icon="Search"
-        class="search"
-      />
-      <el-segmented v-model="uc.viewMode.value" :options="viewModes" size="small" />
-      <template v-if="uc.viewMode.value === 'group'">
-        <el-button size="small" link @click="expandAllGroups">全部展开</el-button>
-        <el-button size="small" link @click="collapseAllGroups">全部折叠</el-button>
-      </template>
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="uc.addProduct()">+ 产品</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="uc.addMaterial()">+ 材料</el-button>
+        <el-input
+          v-model="uc.searchQuery.value"
+          size="small"
+          placeholder="搜索产品 / 材料 / 规格"
+          clearable
+          prefix-icon="Search"
+          class="search"
+        />
+        <el-segmented v-model="uc.viewMode.value" :options="viewModes" size="small" />
+        <template v-if="uc.viewMode.value === 'group'">
+          <el-button size="small" link @click="expandAllGroups">全部展开</el-button>
+          <el-button size="small" link @click="collapseAllGroups">全部折叠</el-button>
+        </template>
+      </div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-spe"
+          sheet="F2-64"
+          :disabled="isReadonly"
+          ai-section="consumption-analysis"
+          :existing-content="uc.auditNote.value"
+          review-section="F2-64-consumption"
+          @ai-filled="(t: string) => { uc.auditNote.value = t }"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-64" /></span>
+        <el-tag size="small" type="info">共 {{ uc.flatRows.value.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- 聚焦录入：左产品导航 + 右区段表格 -->
@@ -138,9 +163,9 @@
                   @change="(v: number) => uc.updateRow(row.id, { actualConsumption: v ?? 0 })" />
               </template>
             </el-table-column>
-            <el-table-column label="差异率%" width="88" align="right">
+            <el-table-column label="差异率%" width="88" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
-                <span :class="devClass(row)">{{ row.deviationPct.toFixed(1) }}</span>
+                <span :class="devClass(row)" title="(实际单耗-标准单耗)/标准单耗×100">{{ row.deviationPct.toFixed(1) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="材料单价" width="95">
@@ -150,9 +175,9 @@
                   @change="(v: number) => uc.updateRow(row.id, { materialUnitPrice: v ?? 0 })" />
               </template>
             </el-table-column>
-            <el-table-column label="金额影响" width="105" align="right">
+            <el-table-column label="金额影响" width="105" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
-                <span class="formula">{{ fmtMoney(row.amountImpact) }}</span>
+                <span class="formula" title="(实际单耗-标准单耗)×材料单价×产量">{{ fmtMoney(row.amountImpact) }}</span>
               </template>
             </el-table-column>
           </template>
@@ -172,9 +197,9 @@
                   @change="(v: number) => uc.updateRow(row.id, { outputQty: v ?? 0 })" />
               </template>
             </el-table-column>
-            <el-table-column label="投入产出比" width="100" align="right">
+            <el-table-column label="投入产出比" width="100" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
-                <span :class="ioClass(row)">{{ row.outputQty ? row.ioRatio.toFixed(3) : '—' }}</span>
+                <span :class="ioClass(row)" title="本期投入量/本期产出量">{{ row.outputQty ? row.ioRatio.toFixed(3) : '—' }}</span>
               </template>
             </el-table-column>
           </template>
@@ -187,9 +212,9 @@
                   @change="(v: number) => uc.updateRow(row.id, { priorConsumption: v ?? 0 })" />
               </template>
             </el-table-column>
-            <el-table-column label="单耗变动率" width="100" align="right">
+            <el-table-column label="单耗变动率" width="100" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
-                <span class="formula">{{ uc.fmtRate(row.consumptionChangeRate) }}</span>
+                <span class="formula" title="(本期单耗-上期单耗)/上期单耗×100">{{ uc.fmtRate(row.consumptionChangeRate) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="T-1期单耗" width="95">
@@ -297,11 +322,16 @@
       />
     </div>
 
-    <footer class="sheet-footer">
-      <h4>分析结论</h4>
-      <el-input v-model="uc.auditNote.value" type="textarea" :rows="3" :disabled="isReadonly"
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">分析结论</span>
+        </div>
+      </template>
+      <el-input v-model="uc.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="汇总单耗异常原因、投入产出失衡说明及审计结论…" />
-    </footer>
+    </el-card>
   </div>
 </template>
 
@@ -310,6 +340,7 @@ import { ref, computed, onMounted, onBeforeUnmount, toRef, h } from 'vue'
 import { useF2UnitConsumption, type EnrichedUnitConsumptionRow } from '../../composables/useF2UnitConsumption'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -459,12 +490,27 @@ onBeforeUnmount(() => {
 .stat-val { font-size: 18px; font-weight: 700; color: #303133; line-height: 1.2; }
 .stat-label { font-size: 11px; color: #909399; margin-top: 2px; }
 
-.toolbar {
-  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-  margin-bottom: 12px; padding: 8px 10px;
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 8px 10px; gap: 8px;
   background: #fff; border-radius: 8px; border: 1px solid #ebeef5;
 }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .search { width: 200px; }
+
+.f2-unit-consumption :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-unit-consumption :deep(.el-table .cell) { font-size: 13px !important; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 
 .focus-layout {
   display: grid;
@@ -524,7 +570,7 @@ onBeforeUnmount(() => {
 .flat-view { background: #fff; border: 1px solid #ebeef5; border-radius: 8px; padding: 8px; }
 .flat-hint { font-size: 12px; color: #909399; margin-bottom: 6px; padding: 0 4px; }
 
-.formula { text-decoration: underline dotted #909399; }
+.formula { border-bottom: 1px dashed #909399; cursor: help; }
 .dev-warn { color: #e6a23c; font-weight: 600; background: #fdf6ec; padding: 0 4px; border-radius: 2px; }
 .io-warn { color: #f56c6c; font-weight: 600; background: #fef0f0; padding: 0 4px; border-radius: 2px; }
 
@@ -535,8 +581,11 @@ onBeforeUnmount(() => {
 :deep(.compact-num) { width: 100%; }
 :deep(.compact-num .el-input__inner) { text-align: right; padding: 0 6px; }
 
-.sheet-footer { margin-top: 16px; }
-.sheet-footer h4 { margin: 0 0 8px; font-size: 13px; color: #606266; }
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 
 @media (max-width: 960px) {
   .focus-layout { grid-template-columns: 1fr; }

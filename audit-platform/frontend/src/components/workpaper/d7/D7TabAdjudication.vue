@@ -1,33 +1,58 @@
 <template>
 <div class="d7-adjudication">
-    <div class="toolbar">
-      <el-button size="small" @click="exportTemplate">导出模板</el-button>
-      <el-button size="small" @click="exportData">导出数据</el-button>
-      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-        <el-button size="small" :loading="importing">导入数据</el-button>
-      </el-upload>
-    </div>
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表反映合同负债（科目2205）的审定过程，依据 CAS14 收入准则，指企业已收或应收客户对价而应向客户转让商品的义务。</p>
+        <p>2. "期末未审"及跨sheet浅蓝背景单元格取自 D7-2 明细表按性质/账龄聚合，不可手工编辑；灰色底纹列为自动计算的审定数。</p>
+        <p>3. 合同负债（2205）与不适用 CAS14 的预收账款（2203）需严格区分，判断路径：是否存在合同→是否已收对价→是否有履约义务。</p>
+        <p>4. 变动率超过30%的项目请在审计说明中解释原因；账龄超1年的合同负债应关注未结转合理性；审定完成后须与试算平衡表核对一致。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：确认合同负债期末余额的存在、完整与准确，评价其与预收账款分类的恰当性及与履约义务的对应关系，并与试算平衡表核对一致。"
+      class="objective-alert"
+    />
+
     <!-- 交叉验证警告 -->
     <el-alert
       v-if="crossValidationWarning"
       type="warning"
       :closable="false"
       show-icon
-      style="margin-bottom:12px"
+      class="cross-warning"
     >
       {{ crossValidationWarning }}
     </el-alert>
 
-    <!-- CAS14准则提示 -->
-    <details class="editing-hints">
-      <summary>📖 CAS14 合同负债vs预收账款区分决策</summary>
-      <div class="hints-content">
-        <p><strong>合同负债</strong>（科目2205）：已收/应收对价，应向客户转让商品的义务（CAS14适用）。</p>
-        <p><strong>预收账款</strong>（科目2203）：不适用CAS14的预收款项。</p>
-        <p>决策树：是否存在合同→是否已收对价→是否有履约义务→合同负债 / 预收账款。</p>
-        <p>相关底稿：<GtIndexChip wp-code="D3" label="→D3 预收账款" /></p>
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile" :disabled="isReadonly">
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:D7-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:D3" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ natureRows.length + agingRows.length }} 行</el-tag>
       </div>
-    </details>
+    </div>
 
     <!-- 一、按性质分类区块 -->
     <div class="adjudication-block">
@@ -69,7 +94,7 @@
             <span v-else>{{ fmtAmount(row.priorRje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定" width="120" align="right">
+        <el-table-column label="审定" width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span>
           </template>
@@ -94,7 +119,7 @@
             <span v-else>{{ fmtAmount(row.currentRje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定" width="120" align="right">
+        <el-table-column label="审定" width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="auto-calc">{{ fmtAmount(row.currentAudited) }}</span>
           </template>
@@ -151,7 +176,7 @@
         <el-table-column label="RJE" width="100" align="right">
           <template #default="{ row }"><span>{{ fmtAmount(row.priorRje) }}</span></template>
         </el-table-column>
-        <el-table-column label="审定" width="120" align="right">
+        <el-table-column label="审定" width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }"><span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span></template>
         </el-table-column>
         <el-table-column label="期末未审" width="115" align="right">
@@ -163,7 +188,7 @@
         <el-table-column label="RJE" width="100" align="right">
           <template #default="{ row }"><span>{{ fmtAmount(row.currentRje) }}</span></template>
         </el-table-column>
-        <el-table-column label="审定" width="120" align="right">
+        <el-table-column label="审定" width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }"><span class="auto-calc">{{ fmtAmount(row.currentAudited) }}</span></template>
         </el-table-column>
         <el-table-column label="变动额" width="115" align="right">
@@ -182,48 +207,87 @@
       </el-table>
     </div>
 
-    <!-- TB差异 -->
-    <div class="tb-diff-section">
-      <div class="tb-row">
-        <span>试算平衡表数（科目2205）：</span>
-        <span class="tb-amount">{{ fmtAmount(trialBalanceAmount) }}</span>
-      </div>
-      <div class="tb-row" :class="{ 'diff-red': trialBalanceDiff !== 0 }">
-        <span>差异：</span>
-        <span>{{ fmtAmount(trialBalanceDiff) }}</span>
-        <span v-if="trialBalanceDiff === 0" class="check-mark"> ✓</span>
-        <span v-else class="cross-mark"> ✗</span>
-      </div>
+    <!-- 核对行 -->
+    <div class="tb-check-row">
+      <span class="tb-label">与试算平衡表核对（科目2205）：</span>
+      <span>{{ fmtAmount(trialBalanceAmount) }}</span>
+      <el-tag v-if="trialBalanceDiff !== 0" type="danger" size="small" class="diff-tag">差异 {{ fmtAmount(trialBalanceDiff) }}</el-tag>
+      <el-tag v-else type="success" size="small" class="diff-tag">核对一致</el-tag>
     </div>
 
-    <!-- 审计说明 -->
-    <div class="audit-notes-section">
-      <h4>审计说明</h4>
-      <div class="note-item">
-        <label>变动分析：<GtIndexChip wp-code="D7-2" label="→D7-2" /></label>
-        <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="分析合同负债本期变动原因..." />
-        <div class="note-actions">
-          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genExplanation">🤖AI</el-button>
-          <el-button size="small" @click="openReview('D7-1-note-explanation')">💬复核</el-button>
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:D7-2" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D7-5" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D3" :context-project-id="projectId" />
+          </div>
         </div>
-      </div>
-      <div class="note-item">
-        <label>账龄分析：<GtIndexChip wp-code="D7-5" label="→D7-5" /></label>
-        <el-input v-model="auditNotes.agingExplanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="分析账龄超过1年合同负债的原因及合理性..." />
-        <div class="note-actions">
-          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genAgingExplanation">🤖AI</el-button>
-          <el-button size="small" @click="openReview('D7-1-note-aging-explanation')">💬复核</el-button>
+      </template>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">1. 变动分析</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoading"
+                :disabled="isReadonly || !aiAvailable" @click="genExplanation">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReview('D7-1-note-explanation')">💬</el-button>
+          </div>
         </div>
+        <el-input
+          v-model="auditNotes.explanation"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          :disabled="isReadonly"
+          placeholder="分析合同负债本期变动原因..."
+        />
       </div>
-      <div class="note-item">
-        <label>CAS14区分说明：<GtIndexChip wp-code="D3" label="→D3 预收账款" /></label>
-        <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="对合同负债与预收账款的区分结论..." />
-        <div class="note-actions">
-          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genConclusion">🤖AI</el-button>
-          <el-button size="small" @click="openReview('D7-1-note-conclusion')">💬复核</el-button>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">2. 账龄分析</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoading"
+                :disabled="isReadonly || !aiAvailable" @click="genAgingExplanation">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReview('D7-1-note-aging-explanation')">💬</el-button>
+          </div>
         </div>
+        <el-input
+          v-model="auditNotes.agingExplanation"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          :disabled="isReadonly"
+          placeholder="分析账龄超过1年合同负债的原因及合理性..."
+        />
       </div>
-    </div>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">3. CAS14区分结论</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoading"
+                :disabled="isReadonly || !aiAvailable" @click="genConclusion">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReview('D7-1-note-conclusion')">💬</el-button>
+          </div>
+        </div>
+        <el-input
+          v-model="auditNotes.conclusion"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          :disabled="isReadonly"
+          placeholder="对合同负债与预收账款的区分结论..."
+        />
+      </div>
+    </el-card>
 </div>
 </template>
 
@@ -250,11 +314,13 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD7CrossSheet>
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
@@ -279,7 +345,7 @@ const {
   auditNotes,
   updateCell,
 } = useD7Adjudication({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
@@ -288,6 +354,8 @@ const {
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 
 async function genExplanation() {
   if (props.isReadonly) return
@@ -362,34 +430,55 @@ function openReview(sectionId: string) {
 </script>
 
 <style scoped>
-.d7-adjudication { padding: 16px; }
-.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.d7-adjudication { padding: 12px; }
+.d7-adjudication :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d7-adjudication :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
 
-.editing-hints {
-  margin-bottom: 16px;
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
   border-left: 3px solid #409eff;
   background: #ecf5ff;
   border-radius: 4px;
+  padding: 8px 12px;
 }
-.editing-hints summary {
-  padding: 10px 14px;
+.guidance-details summary {
   cursor: pointer;
-  font-size: 13px;
   font-weight: 500;
   color: #409eff;
 }
-.hints-content {
-  padding: 0 14px 12px;
+.guidance-content {
+  margin-top: 8px;
   font-size: 13px;
   color: #606266;
-  line-height: 1.8;
+  line-height: 1.6;
 }
-.hints-content p { margin: 0 0 4px; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.cross-warning { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .adjudication-block { margin-bottom: 8px; }
 .block-separator { height: 2px; background: #303133; margin: 16px 0; }
 .block-title { font-size: 14px; font-weight: 700; margin: 0 0 8px; color: #303133; }
 
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .auto-calc { background: #f5f7fa; padding: 2px 6px; border-radius: 2px; color: #909399; }
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
 .label-bold { font-weight: 700; }
@@ -401,23 +490,38 @@ function openReview(sectionId: string) {
 :deep(.total-row) { background-color: #fafafa !important; font-weight: 600; }
 :deep(.diff-highlight-row) { background-color: #fef0f0 !important; }
 
-.tb-diff-section {
-  margin: 16px 0;
-  padding: 12px;
-  background: #fafafa;
-  border-radius: 6px;
+/* 核对行 */
+.tb-check-row {
   display: flex;
-  gap: 32px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  margin: 16px 0;
   font-size: 13px;
 }
-.tb-row { display: flex; align-items: center; gap: 4px; }
-.tb-amount { font-weight: 600; }
-.check-mark { color: #67c23a; }
-.cross-mark { color: #f56c6c; }
+.tb-label { color: #909399; }
+.diff-tag { margin-left: 8px; }
 
-.audit-notes-section { margin-top: 20px; }
-.audit-notes-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-.note-item { margin-bottom: 16px; }
-.note-item label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #606266; margin-bottom: 6px; }
-.note-actions { display: flex; gap: 8px; margin-top: 6px; }
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-chips { display: flex; gap: 6px; }
+.opinion-section { margin-bottom: 16px; }
+.opinion-section:last-child { margin-bottom: 0; }
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; }
 </style>

@@ -16,6 +16,7 @@
  * Requirements: 15.1-15.6
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount } from 'vue'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -234,12 +235,28 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="e1-tab-disclosure">
-    <!-- Dual Mode Toggle -->
-    <div class="mode-bar">
-      <el-segmented v-model="activeMode" :options="[
-        { label: '结构化视图', value: 'structured' },
-        { label: '在线编辑', value: 'online-edit' },
-      ]" size="small" />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 期末数取自 E1-1 审定表各科目审定数（跨sheet自动取数，灰色底纹列不可手工录入）。</p>
+        <p>2. 上市公司版：列示库存现金/银行存款/存放财务公司/其他货币资金/应计利息/数字货币。</p>
+        <p>3. 国企版：额外列示受限制货币资金明细（保证金/担保存款/境外受限）。</p>
+        <p>4. 境外存款需说明汇率中间价参考来源；数字货币列报参照准则解释15号资金集中管理。</p>
+      </div>
+    </details>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-segmented v-model="activeMode" :options="[
+          { label: '结构化视图', value: 'structured' },
+          { label: '在线编辑', value: 'online-edit' },
+        ]" size="small" />
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+      </div>
     </div>
 
     <!-- Online Edit placeholder -->
@@ -256,7 +273,7 @@ onBeforeUnmount(() => {
             <span :class="{ 'font-bold': row.key === 'total' }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末数" width="180" align="right">
+        <el-table-column label="期末数" width="180" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
           </template>
@@ -307,30 +324,25 @@ onBeforeUnmount(() => {
         <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRestrictedRow">+ 添加行</el-button>
       </template>
 
-      <!-- Tips (collapsible) -->
-      <details class="tips-section">
-        <summary>📋 编制提示</summary>
-        <div class="tips-content">
-          <p>1. 期末数取自E1-1审定表各科目审定数（跨sheet自动取数）</p>
-          <p>2. 上市公司版：列示库存现金/银行存款/存放财务公司/其他货币资金/应计利息/数字货币</p>
-          <p>3. 国企版：额外列示受限制货币资金明细（保证金/担保存款/境外受限）</p>
-          <p>4. 境外存款需说明汇率中间价参考来源</p>
-          <p>5. 数字货币列报参照准则解释15号资金集中管理</p>
-        </div>
-      </details>
-
-      <!-- Note textarea -->
-      <div class="note-section">
-        <h4 class="section-title">说明</h4>
+      <!-- 附注说明（卡片式） -->
+      <el-card class="opinion-card" shadow="never">
+        <template #header>
+          <div class="opinion-header">
+            <span class="opinion-title">附注说明</span>
+            <div class="opinion-chips">
+              <GtIndexChip value="wp:E1-1" :context-project-id="projectId" />
+            </div>
+          </div>
+        </template>
         <el-input
           :model-value="noteText"
           :disabled="isReadonly"
           type="textarea"
-          :autosize="{ minRows: 3, maxRows: 10 }"
+          :autosize="{ minRows: 3, maxRows: 14 }"
           placeholder="填写货币资金附注说明（受限/境外/回收风险等）"
           @change="updateNote"
         />
-      </div>
+      </el-card>
     </template>
   </div>
 </template>
@@ -339,8 +351,55 @@ onBeforeUnmount(() => {
 .e1-tab-disclosure {
   padding: 12px 0;
 }
-.mode-bar {
+.e1-tab-disclosure :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-disclosure :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
   margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 .online-edit-placeholder {
   padding: 40px 0;
@@ -361,29 +420,28 @@ onBeforeUnmount(() => {
 .add-btn {
   margin-top: 8px;
 }
-.tips-section {
+.opinion-card {
   margin-top: 16px;
-  border-left: 3px solid #409eff;
-  background: #ecf5ff;
-  border-radius: 4px;
-  padding: 8px 12px;
-}
-.tips-section summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: #409eff;
-}
-.tips-content {
-  margin-top: 8px;
-  font-size: 13px;
-  color: #606266;
-  white-space: pre-wrap;
-}
-.tips-content p {
-  margin: 4px 0;
-}
-.note-section {
-  margin-top: 16px;
+  border-radius: 8px;
   max-width: 700px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
 }
 </style>

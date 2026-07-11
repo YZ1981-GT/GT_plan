@@ -2,7 +2,11 @@
   <div class="g9-fv" data-testid="g9-fv-test">
     <div class="toolbar">
       <div class="methodology">公允价值三层次：Level1 活跃市场报价 / Level2 可观察输入值 / Level3 不可观察输入值（估值技术）</div>
-      <G9ImportExportDropdown :wp-id="wpId" sheet="G9-4" @imported="onImported" />
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:G9-4" />
+        <el-tag size="small" type="info">共 {{ fv.rows.value.length }} 行</el-tag>
+        <G9ImportExportDropdown :wp-id="wpId" sheet="G9-4" @imported="onImported" />
+      </div>
     </div>
     <el-segmented v-model="fv.activeTab.value" :options="[{ label: '基础+审定', value: 'basic' }, { label: '估值详情', value: 'detail' }]" size="small" />
     <el-button v-if="!isReadonly" size="small" style="margin:8px 0" @click="fv.addRow()">+ 新增</el-button>
@@ -64,7 +68,7 @@
           </template>
         </el-table-column>
         <el-table-column label="差异" width="88" align="right">
-          <template #default="{ row }"><span class="formula-cell">{{ row.fairValueDiff }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="差异 = 审定FV − 未审FV">{{ row.fairValueDiff }}</span></template>
         </el-table-column>
         <el-table-column label="层次" width="96">
           <template #default="{ row }">
@@ -160,7 +164,7 @@
     </el-card>
 
     <details class="methodology-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       Level3 层次须填写估值技术与不可观察输入值；差异列 = 审定 FV − 未审 FV。
     </details>
   </div>
@@ -168,6 +172,7 @@
 
 <script setup lang="ts">
 import { computed, toRef } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9FairValueTest } from '../../composables/useG9FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -195,8 +200,9 @@ function onImported() { emit('imported') }
 .g9-fv { font-size: 13px; }
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .methodology { flex: 1; border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; }
+.toolbar-right { display: flex; align-items: center; gap: 8px; }
 .l3-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
-.formula-cell { border-bottom: 1px dashed #909399; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #f5f7fa; display: inline-block; width: 100%; }
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .methodology-hint { margin-top: 8px; font-size: 12px; color: #909399; }

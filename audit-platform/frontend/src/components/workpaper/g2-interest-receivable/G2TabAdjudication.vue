@@ -1,8 +1,33 @@
 <template>
   <div class="g2-adjudication">
-    <div class="section-head">
-      <h3 class="sheet-title">G2-1 应收利息审定表</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表审定应收利息（科目1132）期初/期末余额，验证审定数与试算平衡表的勾稽一致性。</p>
+        <p>2. 借方公式链：期初审定=期初未审+AJE+RJE；期末未审=期初审定+借方发生额-贷方发生额；期末审定=期末未审+AJE+RJE。</p>
+        <p>3. 灰色底纹列为自动计算列（期初审定/期末未审/期末审定），不可手工编辑。</p>
+        <p>4. 审定合计与试算平衡表（1132）差异应为0，否则红色标记须查明原因。</p>
+        <p>5. 依据：CAS 22《金融工具确认和计量》（实际利率法、应收利息确认）、CAS 37《金融工具列报》。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证应收利息（科目1132）期末余额的存在、完整与准确，确认审定数与试算平衡表勾稽一致，为报表列报提供审定依据。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">G2-1 应收利息审定表</span>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-1" /></span>
+        <el-tag size="small" type="info">共 {{ adj.dataRows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G2-1-adjudication')">💬复核</el-button>
       </div>
     </div>
@@ -51,7 +76,7 @@
           <span v-else class="row-bold">{{ fmtNum(row.openingRJE) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期初审定" width="120" align="right">
+      <el-table-column label="期初审定" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="{ 'row-bold': row.id === 'subtotal', 'formula-cell': row.id !== 'subtotal' }"
             :title="row.id !== 'subtotal' ? '期初审定 = 期初未审 + AJE + RJE' : ''">
@@ -61,7 +86,7 @@
       </el-table-column>
 
       <!-- 期末4列 -->
-      <el-table-column label="期末未审" width="120" align="right">
+      <el-table-column label="期末未审" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="{ 'row-bold': row.id === 'subtotal', 'formula-cell': row.id !== 'subtotal' }"
             :title="row.id !== 'subtotal' ? '期末未审 = 期初审定 + 借方 - 贷方' : ''">
@@ -93,7 +118,7 @@
           <span v-else class="row-bold">{{ fmtNum(row.closingRJE) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期末审定" width="120" align="right">
+      <el-table-column label="期末审定" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="{ 'row-bold': row.id === 'subtotal', 'formula-cell': row.id !== 'subtotal' }"
             :title="row.id !== 'subtotal' ? '期末审定 = 期末未审 + AJE + RJE' : ''">
@@ -152,6 +177,7 @@
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
 import { useG2Adjudication } from '../../composables/useG2Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -176,10 +202,20 @@ function fmtNum(v: unknown): string {
 
 <style scoped>
 .g2-adjudication { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.g2-adjudication :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g2-adjudication :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .row-bold { font-weight: 600; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-label { font-weight: 600; margin-right: 8px; }

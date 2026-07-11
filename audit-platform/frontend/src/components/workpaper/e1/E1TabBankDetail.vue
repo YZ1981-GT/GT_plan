@@ -84,6 +84,10 @@ const {
 
 const groups: BankDetailGroup[] = ['principal', 'finance', 'other']
 
+const totalRowCount = computed(() =>
+  groups.reduce((sum, g) => sum + ((groupedRows.value?.[g]?.length) ?? 0), 0),
+)
+
 function getRowClass({ row }: { row: BankDetailRow }): string {
   if (hasConfirmDiff(row)) return 'e1-bank-confirm-diff'
   return ''
@@ -92,9 +96,35 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
 
 <template>
   <div class="e1-tab-bank-detail">
-    <!-- Variant Segmented -->
-    <div class="variant-switch">
-      <el-segmented v-model="variant" :options="variantOptions" size="small" />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表列示银行存款（科目1002）及其他货币资金（科目1012）明细，按存款本金、存放财务公司款项、其他货币资金三组归集。</p>
+        <p>2. 灰色底纹列（期末余额/审定数/函证差异）为自动计算：期末余额=期初+增加-减少，函证差异=审定数-回函确认金额。</p>
+        <p>3. 银行存款应实施函证程序，回函确认金额与审定数不一致时橙色高亮，须查明差异原因并在备注中说明。</p>
+        <p>4. 询证函索引号点击可跳转 E0 函证底稿；外币账户须填列币种及资产负债表日汇率。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实银行存款及其他货币资金期末余额的存在、完整与准确，通过函证获取外部证据，评价受限资金披露的恰当性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-segmented v-model="variant" :options="variantOptions" size="small" />
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E0" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ totalRowCount }} 行</el-tag>
+      </div>
     </div>
 
     <el-skeleton :loading="isLoading" :rows="10" animated>
@@ -223,7 +253,7 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
             </el-table-column>
 
             <!-- 期末余额 (readonly) -->
-            <el-table-column label="期末余额" width="120" align="right">
+            <el-table-column label="期末余额" width="120" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
                 <span class="readonly-val">{{ displayPrefs.fmtAmount(row.ending) }}</span>
               </template>
@@ -243,7 +273,7 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
             </el-table-column>
 
             <!-- 审定数 (readonly) -->
-            <el-table-column label="审定数" width="120" align="right">
+            <el-table-column label="审定数" width="120" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
                 <span class="readonly-val">{{ displayPrefs.fmtAmount(row.audited) }}</span>
               </template>
@@ -263,7 +293,7 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
             </el-table-column>
 
             <!-- 函证差异 (readonly) -->
-            <el-table-column label="函证差异" width="110" align="right">
+            <el-table-column label="函证差异" width="110" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
                 <span :class="{ 'orange-text': hasConfirmDiff(row) }">
                   {{ displayPrefs.fmtAmount(row.confirmDiff) }}
@@ -276,8 +306,9 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
               <template #default="{ row }">
                 <GtIndexChip
                   v-if="row.confirmIndexNo"
-                  :index-no="row.confirmIndexNo"
-                  target-wp-code="E0"
+                  value="wp:E0"
+                  :context-project-id="projectId"
+                  :context="`询证函索引号：${row.confirmIndexNo}`"
                 />
                 <el-input
                   v-else
@@ -329,8 +360,58 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
 .e1-tab-bank-detail {
   padding: 12px 0;
 }
-.variant-switch {
+.e1-tab-bank-detail :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-bank-detail :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
 .group-section {
   margin-bottom: 20px;

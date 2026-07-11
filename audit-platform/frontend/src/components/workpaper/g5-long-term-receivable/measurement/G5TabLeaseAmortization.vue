@@ -6,10 +6,15 @@
       <p>净投资额 = 应收融资租赁款 - 未实现融资收益；期间连续性：第N期期初 = 第N-1期期末</p>
     </div>
 
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      对融资租赁形成的长期应收款按内含利率法测算未实现融资收益的分期摊销，验证各期融资收益与账面确认金额的一致性。
+    </el-alert>
+
     <!-- 区段Tab + 操作按钮 -->
     <div class="segment-tabs">
       <el-segmented v-model="lease.activeTab.value" :options="tabOptions" size="small" />
       <div class="tab-actions">
+        <GtIndexChip value="wp:G5-5" />
         <el-button size="small" type="primary" plain @click="lease.addGroup()" :disabled="props.readonly">
           + 新增租赁项目
         </el-button>
@@ -175,6 +180,7 @@
 <script setup lang="ts">
 import { useG5LeaseAmortization } from '../../composables/useG5LeaseAmortization'
 import type { LeaseAmortizationGroup, LeaseAmortizationPeriod } from '../../composables/useG5LeaseAmortization'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -223,8 +229,9 @@ function fmt(v: number | null | undefined): string {
 }
 .method-context p { margin: 0 0 4px; }
 .method-context p:last-child { margin-bottom: 0; }
+.audit-objective { margin-bottom: 12px; }
 .segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.tab-actions { margin-left: auto; }
+.tab-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .group-header {
   display: flex; align-items: center; gap: 8px;
   margin: 12px 0 4px; padding: 6px 12px;

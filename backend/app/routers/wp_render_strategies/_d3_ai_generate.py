@@ -65,6 +65,7 @@ _SUPPORTED_SECTIONS = {
     "analysis-note",
     "longterm-reason",
     "related-party-note",
+    "voucher-conclusion",
 }
 
 _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编制审计底稿 D3《预收账款》。
@@ -89,6 +90,7 @@ _SECTION_PROMPTS: dict[str, str] = {
     "analysis-note": "请基于D3-4分析程序结果（借贷发生额分析+Top5债务人），生成分析程序审计说明。",
     "longterm-reason": "请为该客户长期挂账的预收账款生成未结转原因建议文本，结合项目背景和行业惯例。",
     "related-party-note": "请生成关联方预收账款审计说明，评价关联方交易的合理性和定价公允性。",
+    "voucher-conclusion": "请生成D3-7凭证检查表的检查结论，综合本期增减变动与期后结转凭证的抽样检查结果、异常笔数与异常率，对预收账款发生的真实性、完整性与截止准确性给出结论；如存在跨期疑点应说明其对收入截止（D4）的影响。",
 }
 
 

@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-10 合同现金流量特征（SPPI 逐项分析）</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增投资项目</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-9" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-10-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：逐项测试金融资产合同现金流量特征（SPPI），确认现金流量是否仅为对本金和未偿付本金金额利息的支付，为分类适当性（G1-9）提供依据。"
+      class="objective-alert"
+    />
 
     <div class="methodology">
       合同现金流量特征测试（SPPI）：逐项检查合同条款，判断现金流量是否仅为对本金和未偿付本金金额的利息的支付。
@@ -85,7 +95,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>逐项检查是否含本金、利息构成、修改的货币时间价值、提前还款/展期条款、非追索权特征。</li>
         <li>任一条款导致现金流量不符合 SPPI，则结论为「不通过」，应分类为 FVTPL。</li>
@@ -98,6 +108,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, inject, h } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useWorkpaperBrowseMode } from '../../composables/useWorkpaperBrowseMode'
 import { virtualTextCol } from '../../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
@@ -228,9 +239,13 @@ watch(conclusion, (v) => {
 
 <style scoped>
 .g1-contract-cf { padding: 12px; font-size: 13px; }
+.g1-contract-cf :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-contract-cf :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .methodology { margin-bottom: 12px; padding: 8px 12px; background: #fdf6ec; border-left: 3px solid #e6a23c; font-size: 12px; color: #8a6d3b; border-radius: 2px; }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .virtual-hint { flex: 1; min-width: 200px; margin: 0; }

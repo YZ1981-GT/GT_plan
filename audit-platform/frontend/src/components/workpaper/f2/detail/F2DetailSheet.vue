@@ -1,24 +1,49 @@
 <template>
   <div class="f2-detail-sheet">
     <h3 class="sheet-title">{{ config.categoryLabel }}明细表 {{ config.sheetCode }}</h3>
-    <details class="guidance-details"><summary>📋 编制提示</summary><p>区段Tab切换查看期初/增减/期末/库龄；期末=期初+增加-减少(自动计算)；库龄合计需=期末金额；3年以上有值行标记长期积压。</p></details>
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">新增品名</el-button>
-      <el-input
-        v-model="detail.searchText.value"
-        size="small"
-        placeholder="搜索品名..."
-        clearable
-        style="width: 180px"
-      />
-      <CycleImportExportDropdown
-        :wp-id="wpId"
-        api-prefix="f2"
-        :sheet="sheetCode"
-        :disabled="isReadonly"
-        @imported="onImported"
-      />
-      <span class="account-tag">科目 {{ config.accountCode }}</span>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表列示存货明细，按区段 Tab 切换查看期初 / 增减 / 期末 / 库龄（CAS 1301 存货 / CAS 1311 监盘）。</p>
+        <p>2. 灰色底纹列为自动计算列：期末数量 / 金额 = 期初 + 增加 − 减少；单价 = 金额 ÷ 数量；库龄合计 = Σ 各库龄段。</p>
+        <p>3. 库龄合计 ≠ 期末金额的行标橙提示，须核实库龄分布数据的完整性。</p>
+        <p>4. 3 年以上有值的行标记为长期积压，应关注存货跌价与呆滞风险。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实存货明细期末余额的存在与准确，验证期初+增减勾稽及库龄分布合理性，识别长期积压与跌价风险。"
+      class="objective-alert"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">新增品名</el-button>
+        <el-input
+          v-model="detail.searchText.value"
+          size="small"
+          placeholder="搜索品名..."
+          clearable
+          style="width: 180px"
+        />
+        <span class="account-tag">科目 {{ config.accountCode }}</span>
+      </div>
+      <div class="toolbar-right">
+        <CycleImportExportDropdown
+          :wp-id="wpId"
+          api-prefix="f2"
+          :sheet="sheetCode"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
+        <span class="chip-wrap"><GtIndexChip :value="'wp:' + config.sheetCode" /></span>
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-segmented v-model="detail.activeSegment" :options="segmentOptions" size="small" class="segment-bar" />
@@ -103,21 +128,21 @@
       </template>
 
       <template v-else-if="detail.activeSegment === 'closing'">
-        <el-table-column v-if="config.hasQuantity" label="期末数量" min-width="110">
+        <el-table-column v-if="config.hasQuantity" label="期末数量" min-width="110" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="公式：期初数量 + 增加 - 减少" placement="top">
               <span class="formula-cell">{{ row.closingQty.toLocaleString() }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="期末金额" min-width="120">
+        <el-table-column label="期末金额" min-width="120" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="公式：期初金额 + 增加 - 减少" placement="top">
               <span class="formula-cell">{{ row.closingAmt.toLocaleString() }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="单价" min-width="100">
+        <el-table-column label="单价" min-width="100" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="公式：金额 ÷ 数量" placement="top">
               <span v-if="row.unitPrice === ''" class="formula-cell">—</span>
@@ -152,7 +177,7 @@
               @change="detail.updateRow(row.id, { agingGt3: row.agingGt3 })" />
           </template>
         </el-table-column>
-        <el-table-column label="库龄合计" min-width="110">
+        <el-table-column label="库龄合计" min-width="110" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="公式：Σ(1年以内 + 1-2年 + 2-3年 + 3年以上)" placement="top">
               <span :class="['formula-cell', { 'aging-warn': Math.abs(row.agingTotal - row.closingAmt) > 0.01 }]">
@@ -161,7 +186,7 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="期末金额" min-width="110">
+        <el-table-column label="期末金额" min-width="110" class-name="auto-calc-col">
           <template #default="{ row }">{{ row.closingAmt.toLocaleString() }}</template>
         </el-table-column>
       </template>
@@ -190,6 +215,7 @@ import { computed, inject, toRef, ref, h, onMounted, onBeforeUnmount } from 'vue
 import { useF2DetailSheet } from '../../composables/useF2DetailSheet'
 import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { F2DetailSheetConfig } from './f2DetailSheetConfigs'
 import type { F2DetailRow } from '../../composables/useF2DetailSheet'
@@ -300,16 +326,30 @@ const { rowEventHandlers } = useVirtualTable({
 
 <style scoped>
 .f2-detail-sheet { padding: 12px; font-size: 13px; }
+.f2-detail-sheet :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-detail-sheet :deep(.el-table .cell) { font-size: 13px !important; }
 .sheet-title { margin: 0 0 12px; font-size: 15px; }
-.toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .account-tag { font-size: 12px; color: #909399; }
 .segment-bar { margin-bottom: 12px; }
 .totals-row { display: flex; gap: 16px; margin-top: 12px; flex-wrap: wrap; font-size: 12px; }
 .aging-warn { color: #e6a23c; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .virtual-hint { margin-bottom: 8px; flex: 1; }
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .virtual-table { margin-bottom: 8px; }
-.guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
 :deep(.long-term-row) { background: #fdf6ec; }
 </style>

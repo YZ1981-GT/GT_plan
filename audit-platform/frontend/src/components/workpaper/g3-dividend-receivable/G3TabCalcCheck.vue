@@ -29,8 +29,19 @@
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G3-4-calc-check')">💬复核</el-button>
+        <GtIndexChip value="wp:G3-4" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ calcCheck.rows.value.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：独立测算应收股利金额并与企业入账数核对，通过抽凭检查验证入账凭证的真实性与准确性，关注测算差异较大项目。"
+    />
 
     <!-- 2区段Tab -->
     <el-tabs v-model="calcCheck.segment.value" type="border-card" class="segment-tabs">
@@ -167,16 +178,16 @@
     </el-card>
 
     <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>应收股利(测算) = 持股数量 × 每股股利</li>
-        <li>测算差异 = 应收股利(测算) - 企业入账金额</li>
-        <li>|测算差异| &gt; 100 元的行以橙色高亮，需重点关注</li>
-        <li>抽凭引擎按科目1131抽取样本，自动填入凭证检查区段</li>
-        <li>2区段共享同一行集合，切换Tab可查看同一被投资方的测算和凭证信息</li>
-        <li>已由抽凭引擎填入的行会显示📌标记</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示（CAS 依据）</summary>
+      <div class="guidance-content">
+        <p>1. 应收股利(测算) = 持股数量 × 每股股利；测算差异 = 应收股利(测算) - 企业入账金额。</p>
+        <p>2. |测算差异| &gt; 100 元的行以橙色高亮，需重点关注。</p>
+        <p>3. 抽凭引擎按科目 1131 抽取样本，自动填入凭证检查区段，已填入行显示 📌 标记。</p>
+        <p>4. 2 区段共享同一行集合，切换 Tab 可查看同一被投资方的测算和凭证信息。</p>
+        <p>5. 灰色底纹列为自动计算列，不可手动编辑。</p>
+        <p class="cas-basis">CAS 依据：通过重新计算与检查凭证获取充分适当的审计证据（《中国注册会计师审计准则第 1301 号——审计证据》）。</p>
+      </div>
     </details>
 
     <!-- 抽凭引擎Dialog -->
@@ -207,6 +218,7 @@
 import { ref, computed, toRef, inject, defineAsyncComponent } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GtIndexChip from '../GtIndexChip.vue'
 import {
   useG3CalcCheck,
   G3_CALCCHECK_SEGMENTS,
@@ -388,13 +400,16 @@ function handleImportData() {
   border-top: none;
 }
 
-/* 公式列：虚线下划线 + cursor:help */
+/* 公式列：灰底 + 虚线下划线 + cursor:help */
 .formula-cell {
   border-bottom: 1px dashed #909399;
   cursor: help;
   display: inline-block;
   min-width: 40px;
+  padding: 0 4px;
   text-align: right;
+  background: #f5f7fa;
+  border-radius: 2px;
 }
 
 /* 差异>100橙色 */
@@ -451,17 +466,36 @@ function handleImportData() {
   align-items: center;
 }
 
-/* 编制提示 */
-.prep-hint {
+/* 审计目标 */
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+/* 编制提示（guidance-details gold 样式） */
+.guidance-details {
   margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
 }
-.prep-hint summary {
+.guidance-details summary {
   cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
 }
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.guidance-content .cas-basis {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

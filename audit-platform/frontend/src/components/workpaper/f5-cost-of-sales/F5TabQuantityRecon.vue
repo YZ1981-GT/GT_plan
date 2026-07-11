@@ -1,11 +1,34 @@
 <template>
   <div class="f5-qty-recon">
-    <div class="f5-qty-toolbar">
-      <span class="f5-qty-title">F5-6 销售数量与结转成本数量核对</span>
-      <div class="f5-qty-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表核对各品种销售数量与结转成本数量的一致性，是营业成本量本核对的核心程序。</p>
+        <p>2. 灰色底纹列为自动计算列（数量差异/差异率/可供销售量/理论结转量/理论差异），不可手工编辑。</p>
+        <p>3. 差异率超过 5% 标橙、超过 10% 标红，请从下拉选择差异原因；理论结转量=期初+产量+采购-期末。</p>
+        <p>4. 可通过 📎 上传出库单由 OCR 识别数量自动填入；量差异常可能提示成本结转错误或存货舞弊。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实销售数量与结转成本数量匹配，验证成本结转的完整与准确，识别多结转/少结转导致的营业成本错报。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="promptAddRow">+ 品种</el-button>
+      </div>
+      <div class="toolbar-right">
         <CycleImportExportDropdown v-if="importExportCtx" :wp-id="wpId" :api-prefix="importExportCtx.apiPrefix"
           :sheet="importExportCtx.sheet" :disabled="isReadonly" @imported="$emit('imported')" />
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-2" /></span>
+        <el-tag size="small" type="info">共 {{ recon.rows.value.length }} 行</el-tag>
       </div>
     </div>
 
@@ -46,10 +69,10 @@
           <span v-else>{{ fmt(row.costQty) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="数量差异" width="100" align="right">
+      <el-table-column label="数量差异" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="f5-formula" title="销售-结转">{{ fmt(row.qtyVariance) }}</span></template>
       </el-table-column>
-      <el-table-column label="差异率%" width="100" align="right">
+      <el-table-column label="差异率%" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="f5-formula" :class="hlClass(row)" title="数量差异/销售数量×100">{{ pct(row.varianceRate) }}</span>
         </template>
@@ -84,7 +107,7 @@
           <span v-else>{{ fmt(row.currentPurchase) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="可供销售量" width="110" align="right">
+      <el-table-column label="可供销售量" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="f5-formula" title="期初+产量+采购">{{ fmt(row.availableForSale) }}</span></template>
       </el-table-column>
       <el-table-column label="期末库存" width="100" align="right">
@@ -94,10 +117,10 @@
           <span v-else>{{ fmt(row.closingInventory) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="理论结转量" width="110" align="right">
+      <el-table-column label="理论结转量" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="f5-formula" title="可供销售-期末">{{ fmt(row.theoreticalCostQty) }}</span></template>
       </el-table-column>
-      <el-table-column label="理论差异" width="100" align="right">
+      <el-table-column label="理论差异" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="f5-formula" title="理论结转-结转">{{ fmt(row.theoreticalVariance) }}</span></template>
       </el-table-column>
       <el-table-column label="📎OCR" width="70" v-if="!isReadonly">
@@ -126,15 +149,18 @@
       <span>红色警告品种数：<b class="danger">{{ recon.summary.value.redCount }}</b></span>
     </div>
 
-    <el-card class="f5-qty-note" shadow="never">
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
       <template #header>
-        <div class="f5-card-header">
-          <span>审计说明</span>
-          <el-button size="small" @click="openReview">💬 复核</el-button>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+          <div class="opinion-actions">
+            <el-button size="small" @click="openReview">💬</el-button>
+          </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" autosize :disabled="isReadonly"
-        placeholder="销售数量与结转成本数量核对说明..." @change="saveNote" />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="销售数量与结转成本数量核对说明（差异原因、理论结转验证结论等）..." @change="saveNote" />
     </el-card>
   </div>
 </template>
@@ -144,31 +170,35 @@
  * F5TabQuantityRecon.vue — F5-6 数量核对（16列，81行）
  * >5%橙色/>10%红色 + 差异原因下拉 + 理论结转验证 + 📎OCR出库单数量识别 + 底部汇总
  */
-import { ref, computed, inject, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/services/apiProxy'
 import { useF5QuantityRecon } from '../composables/useF5QuantityRecon'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 defineEmits<{ imported: [] }>()
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   wpId: string
   isReadonly: boolean
 }>()
+
+// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const NOTE_KEY = 'F5-6-audit-note'
 
 const recon = useF5QuantityRecon({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const auditNote = ref(props.allResponses.value.get(NOTE_KEY)?.remark ?? '')
+const auditNote = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
 const ocrLoadingId = ref<string | null>(null)
 
 const importExportCtx = computed(() =>
@@ -176,7 +206,7 @@ const importExportCtx = computed(() =>
 )
 
 function saveNote() {
-  props.allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value })
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value })
   window.dispatchEvent(new CustomEvent('f5:save-items', {
     detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: auditNote.value }] },
   }))
@@ -205,7 +235,7 @@ async function onOcr(rowId: string, uploadFile: any) {
     })
     recon.mergeOcrQuantity(rowId, qty)
     window.dispatchEvent(new CustomEvent('f5:save-items', {
-      detail: { items: [props.allResponses.value.get('F5-6-quantity-recon-rows')].filter(Boolean) },
+      detail: { items: [allResponsesRef.value.get('F5-6-quantity-recon-rows')].filter(Boolean) },
     }))
     ElMessage.success('已填入')
   } catch (e) {
@@ -245,18 +275,38 @@ function openReview() { openReviewDialog('F5-6-conclusion') }
 </script>
 
 <style scoped>
-.f5-qty-recon { padding: 12px; font-size: 13px; }
-.f5-qty-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.f5-qty-title { font-weight: 600; }
-.f5-qty-actions { display: flex; gap: 8px; align-items: center; }
+.f5-qty-recon { padding: 12px; }
+.f5-qty-recon :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f5-qty-recon :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 表格 */
 .f5-formula { border-bottom: 1px dashed #909399; cursor: help; }
 .f5-formula.is-warn { color: #e6a23c; font-weight: 600; }
 .f5-formula.is-danger { color: #f56c6c; font-weight: 700; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .f5-qty-summary { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; flex-wrap: wrap; }
 .f5-qty-summary .warn { color: #e6a23c; }
 .f5-qty-summary .danger { color: #f56c6c; }
-.f5-qty-note { margin-top: 12px; }
-.f5-card-header { display: flex; align-items: center; justify-content: space-between; }
 :deep(.f5-row-orange) { background: #fdf6ec; }
 :deep(.f5-row-red) { background: #fef0f0; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; }
 </style>

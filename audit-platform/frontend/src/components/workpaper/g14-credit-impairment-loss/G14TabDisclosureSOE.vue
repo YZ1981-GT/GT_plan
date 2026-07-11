@@ -8,6 +8,10 @@
 
       <div class="head-actions">
 
+        <GtIndexChip value="wp:G14" />
+
+        <el-tag size="small" type="info">共 {{ dis.rows.value.length }} 行</el-tag>
+
         <el-button size="small" :loading="dis.aiLoading.value" :disabled="isReadonly"
 
           @click="dis.generateAiConclusion()">🤖 AI辅助</el-button>
@@ -17,6 +21,16 @@
       </div>
 
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+
+      <template #title>
+
+        审计目标：国企版将坏账损失合并披露（Σ 应收票据/账款/款项融资/其他应收款/长期应收款/担保），与 G14-2 明细汇总一致，符合 CAS 22 预期信用损失（ECL）披露要求。
+
+      </template>
+
+    </el-alert>
 
 
 
@@ -129,6 +143,22 @@
 
     />
 
+    <details class="compile-hint">
+
+      <summary>📋 编制提示</summary>
+
+      <div class="hint-content">
+
+        1. 国企版按 4 行披露：坏账损失（合并 6 类应收源）、债权投资减值损失、其他债权投资减值损失、其他。<br>
+
+        2. CAS 22 预期信用损失（ECL）：信用减值损失为损益类（6702，借方计提、贷方转回），坏账损失行 = Σ 明细各坏账源行本期发生额。<br>
+
+        3. 点「刷新」拉取最新审定数与上期数；合计与 G14-1 审定表一致。
+
+      </div>
+
+    </details>
+
   </div>
 
 </template>
@@ -146,6 +176,8 @@ import { G14_ACCOUNT_CODE, G14_DISCLOSURE_FORMULA_MAP } from '../composables/g14
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 import GCycleDisclosureExtras from '../shared/GCycleDisclosureExtras.vue'
+
+import GtIndexChip from '../GtIndexChip.vue'
 
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
@@ -211,9 +243,17 @@ function fmt(v: number): string {
 
 .sync-hint { margin-bottom: 12px; }
 
+.audit-objective { margin-bottom: 12px; }
+
 .formula-cell { border-bottom: 1px dashed #909399; }
 
 .note-card { margin-top: 12px; }
+
+.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
+
+.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
+
+.hint-content { padding: 0 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 
 :deep(.g14-row-total) { font-weight: 700; background: #f5f7fa; }
 

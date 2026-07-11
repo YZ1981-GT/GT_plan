@@ -1,29 +1,53 @@
 <template>
 <div class="d3-detail">
-  <!-- 搜索 + 工具栏 -->
-  <div class="detail-toolbar">
-    <el-input
-      v-model="searchQuery"
-      size="small"
-      placeholder="搜索客户名称..."
-      clearable
-      style="width: 240px"
-    />
-    <div class="toolbar-actions">
-      <el-button-group size="small">
-        <el-button @click="exportTemplate('F1-2')">导出模板</el-button>
-        <el-button @click="exportData('F1-2')">导出数据</el-button>
-        <el-upload
-          :show-file-list="false"
-          accept=".xlsx"
-          :disabled="isReadonly || importing"
-          :before-upload="(file: any) => handleImport(file, 'F1-2')"
-        >
-          <el-button>导入数据</el-button>
-        </el-upload>
-      </el-button-group>
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 本表按对方单位逐户列示预付账款（科目1123）明细，填列期初/发生额/期末及账龄分布。</p>
+      <p>2. 灰色底纹列为自动计算列（期初审定H/期末余额O/期末未审Q/期末审定T），不可手工编辑。</p>
+      <p>3. 账龄超过1年的长期挂账应转入 F1-5 检查，关联方预付款需在 F1-6 单独列示并关注商业实质。</p>
+      <p>4. 关注预付款能否形成资产及可收回性，存在无法收回迹象的应评估减值并考虑重分类。</p>
+    </div>
+  </details>
+
+  <!-- 审计目标 -->
+  <el-alert
+    type="info"
+    :closable="false"
+    title="审计目标：核实预付账款期末余额的存在与准确，确认账龄划分与款项性质恰当，识别长期挂账、关联方预付及减值迹象。"
+    class="objective-alert"
+  />
+
+  <!-- 工具栏 -->
+  <div class="tab-toolbar">
+    <div class="toolbar-left">
+      <el-input v-model="searchQuery" size="small" placeholder="搜索客户名称..." clearable style="width: 220px" />
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加客户</el-button>
       <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
+    </div>
+    <div class="toolbar-right">
+      <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate('F1-2')">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData('F1-2')">导出数据</el-dropdown-item>
+            <el-dropdown-item>
+              <el-upload
+                :show-file-list="false"
+                accept=".xlsx"
+                :disabled="isReadonly || importing"
+                :before-upload="(file: any) => handleImport(file, 'F1-2')"
+              >
+                <span>导入数据</span>
+              </el-upload>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
     </div>
   </div>
 
@@ -112,7 +136,7 @@
       </template>
     </el-table-column>
     <!-- H: 期初审定(自动) -->
-    <el-table-column label="期初审定(H)" width="110" align="right">
+    <el-table-column label="期初审定(H)" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.priorAudited) }}</span></template>
     </el-table-column>
     <!-- 期初账龄（动态） -->
@@ -146,7 +170,7 @@
       </template>
     </el-table-column>
     <!-- O: 期末余额(自动) -->
-    <el-table-column label="期末余额(O)" width="110" align="right">
+    <el-table-column label="期末余额(O)" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endBalance) }}</span></template>
     </el-table-column>
     <!-- P: 重分类调整 -->
@@ -160,7 +184,7 @@
       </template>
     </el-table-column>
     <!-- Q: 期末未审(自动) -->
-    <el-table-column label="期末未审(Q)" width="110" align="right">
+    <el-table-column label="期末未审(Q)" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endUnadjusted) }}</span></template>
     </el-table-column>
     <!-- R: 期末AJE -->
@@ -184,7 +208,7 @@
       </template>
     </el-table-column>
     <!-- T: 期末审定(自动) -->
-    <el-table-column label="期末审定(T)" width="110" align="right">
+    <el-table-column label="期末审定(T)" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endAudited) }}</span></template>
     </el-table-column>
     <!-- 审定账龄（动态） -->
@@ -238,28 +262,49 @@
     style="margin: 12px 0"
   />
 
-  <!-- 审计说明 -->
-  <div class="audit-notes-section">
-    <h4>审计说明</h4>
-    <div class="note-block">
-      <div class="note-label">(1) 变动分析</div>
-      <el-input type="textarea" :rows="2" :disabled="isReadonly" placeholder="说明预付账款明细变动情况..."
+  <!-- 审计说明区（卡片式） -->
+  <el-card class="opinion-card" shadow="never">
+    <template #header>
+      <div class="opinion-header">
+        <span class="opinion-title">审计说明</span>
+        <div class="opinion-chips">
+          <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
+          <GtIndexChip value="wp:F1-5" :context-project-id="projectId" />
+          <GtIndexChip value="wp:F1-6" :context-project-id="projectId" />
+        </div>
+      </div>
+    </template>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">(1) 变动分析</span>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="说明预付账款明细变动情况..."
         :model-value="auditNote1" @update:model-value="auditNote1 = $event" />
     </div>
-    <div class="note-block">
-      <div class="note-label">(2) 合同履约分析 <el-button size="small" :disabled="true">🤖AI</el-button></div>
-      <el-input type="textarea" :rows="2" :disabled="isReadonly" placeholder="分析合同履约情况..."
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">(2) 合同履约分析</span>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="分析合同履约情况..."
         :model-value="auditNote2" @update:model-value="auditNote2 = $event" />
     </div>
-    <div class="note-block">
-      <div class="note-label">(3) 超期未结转说明</div>
-      <el-input type="textarea" :rows="2" :disabled="isReadonly" placeholder="超期未结转的原因和处理计划..."
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">(3) 超期未结转说明</span>
+        <div class="opinion-actions">
+          <el-button size="small" @click="openReview">💬</el-button>
+        </div>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="超期未结转的原因和处理计划..."
         :model-value="auditNote3" @update:model-value="auditNote3 = $event" />
     </div>
-    <div class="conclusion-actions">
-      <el-button size="small" @click="openReview">💬 复核</el-button>
-    </div>
-  </div>
+  </el-card>
 </div>
 </template>
 
@@ -268,19 +313,24 @@
  * F1TabDetail.vue — F1-2 明细表
  * 27列宽表 + 款项性质/关联方下拉 + 公式链自动计算 + 搜索 + 导入
  */
-import { computed, inject, ref, type Ref } from 'vue'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { useF1Detail } from '../composables/useF1Detail'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
+// @ts-ignore - GtIndexChip may not have type declarations
+import GtIndexChip from '../GtIndexChip.vue'
+
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -301,9 +351,9 @@ const {
   updateCell,
   importFromAuxBalance,
 } = useF1Detail({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
@@ -313,7 +363,7 @@ const {
 // ─── F1-7 期后结转联动 ──────────────────────────────────────────────────────
 import { useF1CrossSheet } from '../composables/useF1CrossSheet'
 
-const crossSheet = useF1CrossSheet({ allResponses: props.allResponses })
+const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
 /** 当 F1-7 有期后结转金额但 F1-2 Z列为空时，显示黄色提示 */
 const postPeriodLinkageWarning = computed(() => {
@@ -364,7 +414,7 @@ function openReview() {
 }
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: props.wpId })
+const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: toRef(props, 'wpId') as Ref<string> })
 
 async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> {
   const result = await importData(sheet, file)
@@ -375,17 +425,39 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 
 <style scoped>
 .d3-detail { padding: 16px; }
-.detail-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.toolbar-actions { display: flex; gap: 8px; }
+.d3-detail :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.d3-detail :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .subtotal-label { font-weight: 700; }
 .amt { text-align: right; display: inline-block; width: 100%; }
-.auto-calc { background: #f5f7fa; padding: 2px 4px; border-radius: 2px; }
-.audit-notes-section { margin-top: 20px; }
-.audit-notes-section h4 { font-size: 14px; margin-bottom: 12px; }
-.note-block { margin-bottom: 12px; }
-.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; color: #606266; }
-.conclusion-actions { margin-top: 8px; }
+.auto-calc { color: #909399; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 :deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
 :deep(.verification-row) { background-color: #fff8e1 !important; }
 :deep(.related-party-row) { background-color: #fdf6ec !important; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-chips { display: flex; gap: 6px; }
+.opinion-section { margin-bottom: 16px; }
+.opinion-section:last-child { margin-bottom: 0; }
+.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; }
 </style>

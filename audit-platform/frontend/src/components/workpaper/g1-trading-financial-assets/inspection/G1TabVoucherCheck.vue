@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-13 交易性金融资产检查表（凭证核对）</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="vc.addRow()">新增检查行</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 笔</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-13-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：抽取交易性金融资产（科目1501）凭证逐笔核对合同、结算单、报价/估值、授权审批与账务处理，确认交易真实、计量准确、记录完整。"
+      class="objective-alert"
+    />
 
     <div class="stats-bar">
       检查凭证：<b>{{ vc.rows.value.length }}</b> 笔 ·
@@ -91,7 +101,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>可使用自动抽凭引擎按科目 1501 抽取样本，样本自动填入检查表并标记来源。</li>
         <li>点击 📎 上传凭证扫描件，OCR 自动识别凭证信息后确认填入当前行。</li>
@@ -107,6 +117,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useG1VoucherCheck } from '../../composables/useG1VoucherCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import type { SampledVoucher, FillMode, Phase } from '../../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -192,9 +203,13 @@ async function handleRowOcr(rowId: string, file: File): Promise<boolean> {
 
 <style scoped>
 .g1-voucher-check { padding: 12px; font-size: 13px; }
+.g1-voucher-check :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-voucher-check :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #f56c6c; }
 .sampling-collapse { margin-bottom: 12px; }

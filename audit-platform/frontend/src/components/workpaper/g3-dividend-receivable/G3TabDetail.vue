@@ -25,8 +25,19 @@
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G3-2-detail')">💬复核</el-button>
+        <GtIndexChip value="wp:G3-2" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：确认应收股利的真实性、完整性与计价准确性，核查持股比例、分红方案与应收金额的勾稽一致性，识别逾期未收回项目。"
+    />
 
     <!-- 4区段Tab -->
     <el-tabs v-model="detail.segment.value" type="border-card" class="segment-tabs">
@@ -177,17 +188,16 @@
     </div>
 
     <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>权益份额 = 被投资方净资产 × 持股比例 / 100</li>
-        <li>分红总额 = 持股数量 × 每股股利</li>
-        <li>实际分红率 = 分红总额 / 被投资方净利润 × 100%（净利润≤0时显示N/A）</li>
-        <li>应收股利 = 持股数量 × 每股股利</li>
-        <li>期末应收 = 应收股利 - 已收金额</li>
-        <li>逾期天数 = MAX(0, 当前日期 - 股权登记日)</li>
-        <li>逾期行以橙色背景高亮</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示（CAS 依据）</summary>
+      <div class="guidance-content">
+        <p>1. 权益份额 = 被投资方净资产 × 持股比例 / 100。</p>
+        <p>2. 分红总额 = 持股数量 × 每股股利；应收股利 = 持股数量 × 每股股利。</p>
+        <p>3. 实际分红率 = 分红总额 / 被投资方净利润 × 100%（净利润≤0 时显示 N/A）。</p>
+        <p>4. 期末应收 = 应收股利 - 已收金额；逾期天数 = MAX(0, 当前日期 - 股权登记日)，逾期行橙色高亮。</p>
+        <p>5. 灰色底纹列为自动计算列，不可手动编辑。</p>
+        <p class="cas-basis">CAS 依据：成本法下于被投资单位宣告分派现金股利时确认应收股利及投资收益（《企业会计准则第 2 号——长期股权投资》、《企业会计准则第 22 号——金融工具确认和计量》）。</p>
+      </div>
     </details>
   </div>
 </template>
@@ -196,6 +206,7 @@
 import { computed, toRef, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GtIndexChip from '../GtIndexChip.vue'
 import {
   useG3Detail,
   G3_DETAIL_SEGMENTS,
@@ -323,13 +334,16 @@ function handleImportData() {
   border-top: none;
 }
 
-/* 公式列：虚线下划线 + cursor:help */
+/* 公式列：灰底 + 虚线下划线 + cursor:help */
 .formula-cell {
   border-bottom: 1px dashed #909399;
   cursor: help;
   display: inline-block;
   min-width: 40px;
+  padding: 0 4px;
   text-align: right;
+  background: #f5f7fa;
+  border-radius: 2px;
 }
 
 /* 逾期行橙色 */
@@ -370,17 +384,36 @@ function handleImportData() {
   color: #606266;
 }
 
-/* 编制提示 */
-.prep-hint {
+/* 审计目标 */
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+/* 编制提示（guidance-details gold 样式） */
+.guidance-details {
   margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
 }
-.prep-hint summary {
+.guidance-details summary {
   cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
 }
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.guidance-content .cas-basis {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

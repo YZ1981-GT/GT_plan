@@ -1,10 +1,36 @@
 <template>
   <div class="g2-interest-calc">
-    <div class="section-head">
-      <h3 class="sheet-title">G2-5 利息测算表</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表独立测算应收利息，验证企业利息计提金额的准确性与完整性。</p>
+        <p>2. 应收利息 = 面值 × 票面利率/100 × 计息天数/365（365天基准，非360天）。</p>
+        <p>3. 差异 = 测算应收利息 - 企业计提金额；灰色底纹列为自动计算列。</p>
+        <p>4. |差异| &gt; 100 元时橙色高亮，须查明原因并做说明。</p>
+        <p>5. 测算应与 G2-2 明细表中对应标的利息交叉核对。</p>
+        <p>6. 依据：CAS 22《金融工具确认和计量》（实际利率法、应收利息确认）。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过独立测算应收利息，验证企业利息计提金额的准确性与完整性，识别少计或多计风险。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">G2-5 利息测算表</span>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="calc.addRow()">新增测算行</el-button>
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-5" /></span>
+        <el-tag size="small" type="info">共 {{ calc.dataRows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G2-5-interest-calc')">💬复核</el-button>
       </div>
     </div>
@@ -45,12 +71,12 @@
             @update:model-value="(v: string) => calc.updateCell(row.id, 'accrualEnd', v ?? '')" />
         </template>
       </el-table-column>
-      <el-table-column label="计息天数" width="90" align="right">
+      <el-table-column label="计息天数" width="90" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="计息天数 = 截止日 - 起始日">{{ row.accruedDays }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="应收利息" width="120" align="right">
+      <el-table-column label="应收利息" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="应收利息 = 面值 × 利率/100 × 天数/365">{{ fmtNum(row.calculatedInterest) }}</span>
         </template>
@@ -62,7 +88,7 @@
             @update:model-value="(v: number) => calc.updateCell(row.id, 'companyAccrual', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="差异" width="110" align="right">
+      <el-table-column label="差异" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="['formula-cell', { 'variance-warn': calc.isVarianceWarning(row) }]"
             title="差异 = 应收利息 - 企业计提">
@@ -99,21 +125,13 @@
         :disabled="isReadonly" placeholder="对利息测算的复核结论..." />
     </el-card>
 
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>应收利息 = 面值 × 票面利率/100 × 计息天数/365（注意：365天基准，非360天）</li>
-        <li>差异 = 测算应收利息 - 企业计提金额</li>
-        <li>|差异| > 100 元时橙色高亮，需查明原因并做说明</li>
-        <li>测算应与G2-2明细表中对应标的利息交叉核对</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
 import { useG2InterestCalc } from '../../composables/useG2InterestCalc'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -152,16 +170,23 @@ function fillAiDraft() {
 
 <style scoped>
 .g2-interest-calc { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.g2-interest-calc :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g2-interest-calc :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .variance-warn { color: #e6a23c; font-weight: 600; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-label { font-weight: 600; margin-right: 8px; }
 .grand-total { margin-top: 6px; padding-top: 6px; border-top: 1px solid #dcdfe6; font-weight: 600; color: #303133; }
 .conclusion-card { margin-top: 12px; }
-.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; }
-.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
 </style>

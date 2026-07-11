@@ -1,10 +1,36 @@
 <template>
   <div class="g2-ecl-calc">
-    <div class="section-head">
-      <h3 class="sheet-title">G2-7 坏账准备测算</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表独立测算预期信用损失（ECL），验证企业坏账准备计提的合理性。两个区段Tab共享同一组行数据，切换时行保持同步。</p>
+        <p>2. 阶段判定优先级：已减值→Stage3 &gt; 显著增加→Stage2 &gt; 否则 Stage1。</p>
+        <p>3. 适用PD：Stage1 用 12个月PD，Stage2/3 用整个存续期PD。</p>
+        <p>4. ECL = EAD × 适用PD × LGD；差异 = 测算ECL - 企业计提；灰色底纹列为自动计算列。</p>
+        <p>5. 差异/企业计提 &gt; 10% 时橙色高亮，须重点关注。</p>
+        <p>6. 依据：CAS 22《金融工具确认和计量》预期信用损失（ECL）三阶段模型。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：独立测算应收利息预期信用损失，验证企业坏账准备计提金额与阶段划分的合理性与充分性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">G2-7 坏账准备测算</span>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="ecl.addRow()">新增行</el-button>
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-7" /></span>
+        <el-tag size="small" type="info">共 {{ ecl.dataRows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G2-7-ecl-calc')">💬复核</el-button>
       </div>
     </div>
@@ -45,7 +71,7 @@
             @update:model-value="(v: boolean) => ecl.updateCell(row.id, 'isImpaired', v)" />
         </template>
       </el-table-column>
-      <el-table-column label="划分阶段" width="100" align="center">
+      <el-table-column label="划分阶段" width="100" align="center" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="已减值→3, 显著增加→2, 否则→1">
             Stage{{ row.determinedStage }}
@@ -93,7 +119,7 @@
             @update:model-value="(v: number) => ecl.updateCell(row.id, 'pdLifetime', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="适用PD" width="100" align="right">
+      <el-table-column label="适用PD" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="Stage1→12个月PD / Stage2,3→存续期PD">
             {{ row.applicablePD.toFixed(6) }}
@@ -114,7 +140,7 @@
             @update:model-value="(v: number) => ecl.updateCell(row.id, 'ead', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="ECL金额" width="120" align="right">
+      <el-table-column label="ECL金额" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="formula-cell" title="ECL = EAD × 适用PD × LGD">{{ fmtNum(row.eclAmount) }}</span>
         </template>
@@ -126,7 +152,7 @@
             @update:model-value="(v: number) => ecl.updateCell(row.id, 'companyProvision', v ?? 0)" />
         </template>
       </el-table-column>
-      <el-table-column label="差异" width="110" align="right">
+      <el-table-column label="差异" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="['formula-cell', { 'variance-warn': ecl.isVarianceWarning(row) }]"
             title="差异 = ECL金额 - 企业计提">
@@ -164,22 +190,13 @@
         :disabled="isReadonly" placeholder="对ECL测算的复核结论..." />
     </el-card>
 
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>阶段判定优先级：已减值→Stage3 > 显著增加→Stage2 > 否则Stage1</li>
-        <li>适用PD：Stage1用12个月PD，Stage2/3用整个存续期PD</li>
-        <li>ECL = EAD × 适用PD × LGD</li>
-        <li>差异/企业计提 > 10% 时橙色高亮，需重点关注</li>
-        <li>两个区段Tab共享同一组行数据，切换时行保持同步</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
 import { useG2ECLCalc } from '../../composables/useG2ECLCalc'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -224,11 +241,21 @@ function fillAiDraft() {
 
 <style scoped>
 .g2-ecl-calc { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.g2-ecl-calc :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g2-ecl-calc :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .segment-bar { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .variance-warn { color: #e6a23c; font-weight: 600; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-label { font-weight: 600; margin-right: 8px; }

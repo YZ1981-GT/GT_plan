@@ -3,14 +3,19 @@
     <div class="g13-toolbar">
       <h3 class="g13-title">G13-2 公允价值变动明细表</h3>
       <div class="g13-actions">
-        <el-input v-model="detail.searchQuery" placeholder="搜索工具名/科目/类型…" size="small"
+        <el-input v-model="searchQuery" placeholder="搜索工具名/科目/类型…" size="small"
           clearable style="width:200px" data-testid="g13-detail-search" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">+ 新增行</el-button>
+        <el-tag size="small" type="info" effect="plain" data-testid="g13-detail-count">共 {{ detail.rows.value.length }} 行</el-tag>
+        <GtIndexChip value="wp:G13-2" :validate="false" />
         <CycleImportExportDropdown :wp-id="wpId" api-prefix="g13" sheet="G13-2"
           :disabled="isReadonly" @imported="emit('imported')" />
         <GtReviewTrigger section-id="G13-2-detail" />
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective"
+      title="审计目标：验证以公允价值计量的金融工具其公允价值变动收益（6101）计量准确、期末计价恰当，并与 G1/G8/G9/G10 源科目 FV 变动勾稽一致（CAS 39 公允价值计量）" />
 
     <el-alert v-if="detail.hasFvMismatch.value" type="error" :closable="false" show-icon
       title="存在 FV变动与审定数不一致的行，请核查" style="margin-bottom:8px" />
@@ -209,6 +214,8 @@ const detail = useG13Detail({
   isReadonly: toRef(props, 'isReadonly'),
   debouncedSave: props.debouncedSave,
 })
+// 解构到顶层：searchQuery 为 ref，模板 v-model 需顶层 ref 才能自动解包
+const searchQuery = detail.searchQuery
 
 const extCross = useG13ExternalCross({
   allResponses: toRef(props, 'allResponses'),
@@ -217,7 +224,7 @@ const extCross = useG13ExternalCross({
 })
 
 const displayRows = computed(() => {
-  const data = detail.searchQuery.value.trim() ? detail.filteredRows.value : detail.rows.value
+  const data = searchQuery.value.trim() ? detail.filteredRows.value : detail.rows.value
   return [...data, detail.totalRow.value]
 })
 
@@ -242,11 +249,12 @@ function fmt(v: number | null | undefined): string {
 <style scoped>
 .cross-alert { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.audit-objective { margin-bottom: 8px; }
 .g13-detail { padding: 12px; font-size: 13px; }
 .g13-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .g13-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .g13-title { margin: 0; font-size: 15px; font-weight: 600; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #fafafa; display: inline-block; width: 100%; }
 .cell-error { color: #f56c6c; font-weight: 600; }
 :deep(.g13-row-total) { font-weight: 700; background: #f5f7fa; }
 :deep(.g13-row-mismatch) { background: #fef0f0 !important; }

@@ -1,5 +1,18 @@
 <template>
   <div class="g5-bad-debt-detail">
+    <div class="section-head">
+      <h3 class="sheet-title">G5-3 坏账准备明细表</h3>
+      <div class="head-actions">
+        <GtIndexChip value="wp:G5-3" />
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
+        <GtReviewTrigger section-id="g5-3-bad-debt-detail" />
+      </div>
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      复核长期应收款坏账准备的计提方式、损失率与计提金额，验证审定余额、审定坏账及净值勾稽，核对本年计提与转回。
+    </el-alert>
+
     <!-- 区段Tab切换 -->
     <div class="segment-tabs">
       <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" />
@@ -96,11 +109,24 @@
       审定净值合计: {{ fmt(detail.totals.value.adjustedNetValue) }} |
       本年计提合计: {{ fmt(detail.totals.value.currentYearProvision) }}
     </div>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>未审坏账③ = 期末余额① × 损失率②</li>
+        <li>坏账调整⑥ = 余额调整⑤ × 调整后率②A + ①×(②A − ②)，可为负（冲回）</li>
+        <li>审定余额⑦ = ① + ⑤；审定坏账⑧ = ③ + ⑥；审定净值⑨ = ⑦ − ⑧</li>
+        <li>本年计提 = ⑧ − 上年坏账 + 本年转回</li>
+        <li>组合计提关注账龄损失率；单项计提关注现金流量现值（CAS 22 / ECL 模型）</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useG5BadDebtDetail } from '../../composables/useG5BadDebtDetail'
+import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -130,6 +156,13 @@ function fmt(v: number): string {
 
 <style scoped>
 .g5-bad-debt-detail { font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .tab-actions { margin-left: auto; }
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }

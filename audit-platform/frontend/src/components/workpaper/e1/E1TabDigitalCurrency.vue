@@ -17,6 +17,7 @@
 import { ref, inject, toRef, computed, onMounted, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem, ChecklistResponse } from '../composables/useE1Adjudication'
 import { parseNum, calcCashBalance, calcFxConvert, sumField } from '../composables/useE1FormulaEngine'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -219,11 +220,36 @@ function onConclusionChange(val: string): void {
 
 <template>
   <div class="e1-tab-digital-currency">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表列示数字货币（人民币数字货币/其他）明细，归入其他货币资金（科目1012）列报。</p>
+        <p>2. 灰色底纹列（期末原币/本位币/审定原币/审定人民币）为自动计算，不可手工录入。</p>
+        <p>3. 差异列=查询余额-审定原币，差异≠0时红色高亮，须核对钱包/平台查询余额并说明原因。</p>
+        <p>4. 数字货币列报参照企业会计准则解释第15号资金集中管理相关规定，关注可回收性与受限情况。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实数字货币期末余额的存在与准确，通过查询余额验证真实性，为 E1-1 审定表提供其他货币资金审定依据。"
+      class="objective-alert"
+    />
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
-        <!-- Toolbar -->
-        <div class="toolbar" v-if="!isReadonly">
-          <el-button type="primary" size="small" @click="addRow">+ 新增行</el-button>
+        <!-- 工具栏 -->
+        <div class="tab-toolbar">
+          <div class="toolbar-left">
+            <el-button v-if="!isReadonly" type="primary" size="small" @click="addRow">+ 新增行</el-button>
+          </div>
+          <div class="toolbar-right">
+            <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+            <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          </div>
         </div>
 
         <el-table :data="rows" border stripe size="small" style="width: 100%" max-height="500">
@@ -260,10 +286,10 @@ function onConclusionChange(val: string): void {
               <el-input-number :model-value="row.decrease" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'decrease', v ?? 0)" />
             </template>
           </el-table-column>
-          <el-table-column label="期末原币" width="110" align="right">
+          <el-table-column label="期末原币" width="110" align="right" class-name="auto-calc-col">
             <template #default="{ row }"><span class="readonly-val">{{ displayPrefs.fmtAmount(row.endingFc) }}</span></template>
           </el-table-column>
-          <el-table-column label="本位币" width="110" align="right">
+          <el-table-column label="本位币" width="110" align="right" class-name="auto-calc-col">
             <template #default="{ row }"><span class="readonly-val">{{ displayPrefs.fmtAmount(row.endingRmb) }}</span></template>
           </el-table-column>
           <el-table-column label="账项调整" width="110" align="right">
@@ -271,10 +297,10 @@ function onConclusionChange(val: string): void {
               <el-input-number :model-value="row.adjustment" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'adjustment', v ?? 0)" />
             </template>
           </el-table-column>
-          <el-table-column label="审定原币" width="110" align="right">
+          <el-table-column label="审定原币" width="110" align="right" class-name="auto-calc-col">
             <template #default="{ row }"><span class="readonly-val">{{ displayPrefs.fmtAmount(row.auditedFc) }}</span></template>
           </el-table-column>
-          <el-table-column label="审定人民币" width="120" align="right">
+          <el-table-column label="审定人民币" width="120" align="right" class-name="auto-calc-col">
             <template #default="{ row }"><span class="readonly-val">{{ displayPrefs.fmtAmount(row.auditedRmb) }}</span></template>
           </el-table-column>
           <el-table-column label="查询余额" width="110" align="right">
@@ -313,21 +339,35 @@ function onConclusionChange(val: string): void {
           <span>审定人民币: {{ displayPrefs.fmtAmount(totalRow.auditedRmb) }}</span>
         </div>
 
-        <!-- 审计说明 + 审计结论 -->
-        <div class="audit-notes-section">
-          <div class="note-block">
-            <label class="note-label">审计说明</label>
+        <!-- 审计意见区（卡片式） -->
+        <el-card class="opinion-card" shadow="never">
+          <template #header>
+            <div class="opinion-header">
+              <span class="opinion-title">审计说明与结论</span>
+              <div class="opinion-chips">
+                <GtIndexChip value="wp:E1-1" :context-project-id="projectId" />
+              </div>
+            </div>
+          </template>
+
+          <div class="opinion-section">
+            <div class="opinion-section-header">
+              <span class="opinion-section-label">1. 审计说明</span>
+            </div>
             <el-input
               type="textarea"
               :model-value="auditNote"
               :disabled="isReadonly"
               :autosize="{ minRows: 2, maxRows: 6 }"
-              placeholder="填写审计说明"
+              placeholder="填写审计说明（数字货币查询余额核对、可回收性、受限情况等）"
               @change="onNoteChange"
             />
           </div>
-          <div class="note-block">
-            <label class="note-label">审计结论</label>
+
+          <div class="opinion-section">
+            <div class="opinion-section-header">
+              <span class="opinion-section-label">2. 审计结论</span>
+            </div>
             <el-input
               type="textarea"
               :model-value="auditConclusion"
@@ -337,7 +377,7 @@ function onConclusionChange(val: string): void {
               @change="onConclusionChange"
             />
           </div>
-        </div>
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -345,7 +385,45 @@ function onConclusionChange(val: string): void {
 
 <style scoped>
 .e1-tab-digital-currency { padding: 12px 0; }
-.toolbar { margin-bottom: 12px; }
+.e1-tab-digital-currency :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.e1-tab-digital-currency :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .readonly-val { color: #909399; background: #f5f7fa; padding: 2px 6px; border-radius: 2px; }
 .red-text { color: #f56c6c; font-weight: 600; }
 .total-row {
@@ -354,7 +432,37 @@ function onConclusionChange(val: string): void {
   font-weight: 700; font-size: 13px; flex-wrap: wrap;
 }
 .total-label { color: #303133; min-width: 40px; }
-.audit-notes-section { margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
-.note-block { display: flex; flex-direction: column; gap: 4px; }
-.note-label { font-weight: 600; font-size: 13px; color: #303133; }
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips { display: flex; gap: 6px; }
+.opinion-section { margin-bottom: 16px; }
+.opinion-section:last-child { margin-bottom: 0; }
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
 </style>

@@ -188,6 +188,15 @@
       · 期初审定 {{ fmt(detail.totalRow.value.openingAdjusted) }}
       · FV变动合计 {{ fmt(detail.rows.value.reduce((s, r) => s + r.fairValueChange, 0)) }}
     </div>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>依据 CAS 22《金融工具确认和计量》，交易性金融负债（2101）以公允价值计量且其变动计入当期损益。</p>
+        <p>期末余额 = 期初余额 + 本期增加 − 本期减少；公允价值变动 = 期末FV − 期初FV，计入公允价值变动损益。</p>
+        <p>明细合计应与 G10-1 审定表期末审定数勾稽；含嵌入衍生的负债须在「公允价值+分类」区段说明主合同与拆分判断。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -241,4 +250,6 @@ function fmt(v: number) {
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .formula-cell { border-bottom: 1px dashed #999; }
 .total-bar { margin-top: 8px; padding: 8px; background: #f5f7fa; font-size: 12px; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

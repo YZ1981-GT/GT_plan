@@ -26,8 +26,19 @@
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G3-3-adjustment')">💬复核</el-button>
+        <GtIndexChip value="wp:G3-3" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：记录并复核应收股利相关的审计调整(AJE)与重分类调整(RJE)，确保每笔分录借贷平衡且调整依据充分。"
+    />
 
     <el-table :data="rows" border size="small" max-height="500" class="adjustment-table">
       <!-- 序号 -->
@@ -130,14 +141,15 @@
     </div>
 
     <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>AJE = 审计调整分录，RJE = 重分类调整分录</li>
-        <li>每笔分录的借方合计与贷方合计应相等（借贷平衡）</li>
-        <li>调整分录将自动反映到G3-1审定表的AJE/RJE列</li>
-        <li>科目代码1131为应收股利，其他科目按实际情况填列</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示（CAS 依据）</summary>
+      <div class="guidance-content">
+        <p>1. AJE = 审计调整分录，RJE = 重分类调整分录。</p>
+        <p>2. 每笔分录的借方合计与贷方合计应相等（借贷平衡），不平衡时底部红色告警并显示差额。</p>
+        <p>3. 调整分录将自动反映到 G3-1 审定表的 AJE/RJE 列。</p>
+        <p>4. 科目代码 1131 为应收股利，其他科目按实际情况填列。</p>
+        <p class="cas-basis">CAS 依据：调整分录应有充分、适当的审计证据支持（《中国注册会计师审计准则第 1301 号——审计证据》）。</p>
+      </div>
     </details>
   </div>
 </template>
@@ -146,6 +158,7 @@
 import { ref, computed, watch, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GtIndexChip from '../GtIndexChip.vue'
 import { isDebitCreditBalanced, parseNum } from '../composables/useG3DivRecFormulaEngine'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
@@ -339,17 +352,36 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
   font-weight: 700;
 }
 
-/* 编制提示 */
-.prep-hint {
+/* 审计目标 */
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+/* 编制提示（guidance-details gold 样式） */
+.guidance-details {
   margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
 }
-.prep-hint summary {
+.guidance-details summary {
   cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
 }
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.guidance-content .cas-basis {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

@@ -14,6 +14,24 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过成本倒轧（材料→成本构成→成本结转→营业成本）验证营业成本结转的完整与准确，将倒轧结果与 F5-1 审定营业成本核对，差异超重要性水平须查明。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="toolbar-hint">科目6401 · 4区结构化倒轧验证</span>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" /></span>
+      </div>
+    </div>
+
     <!-- ① 材料流转区 -->
     <el-card class="f5-zone" shadow="never">
       <template #header><span class="f5-zone-title">① 材料流转区</span></template>
@@ -77,25 +95,29 @@
       </div>
     </el-card>
 
-    <!-- 审计结论 + 编制提示 -->
-    <el-card class="f5-conclusion" shadow="never">
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
       <template #header>
-        <div class="f5-card-header">
-          <span>审计结论</span>
-          <el-button size="small" @click="openReview">💬 复核</el-button>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+          <div class="opinion-actions">
+            <el-button size="small" @click="openReview">💬</el-button>
+          </div>
         </div>
       </template>
-      <el-input v-model="roll.auditConclusion.value" type="textarea" autosize :disabled="isReadonly"
-        placeholder="成本倒轧审计结论..." @change="saveConclusion" />
+      <el-input v-model="roll.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly" placeholder="成本倒轧审计结论..." @change="saveConclusion" />
     </el-card>
 
-    <details class="f5-tips">
-      <summary>编制提示</summary>
-      <ul>
-        <li>期初/期末原材料(1401)、在产品(1404)、产成品(1405)由试算表自动取数，只读。</li>
-        <li>可编辑字段：本期购入、直接人工、制造费用、其他发出。</li>
-        <li>校验区从 F5-1 审定表获取审定营业成本，差异超重要性水平以红色标记。</li>
-      </ul>
+    <!-- 编制提示 -->
+    <details class="guidance-details guidance-bottom">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 期初/期末原材料(1401)、在产品(1404)、产成品(1405)由试算表自动取数（灰底只读），确保存货口径与 F2 存货底稿一致。</p>
+        <p>2. 可编辑字段：本期购入、直接人工、制造费用、其他发出；各区结果按公式自动倒轧（公式列虚线，悬停查看来源）。</p>
+        <p>3. 倒轧营业成本 = 期初产成品 + 完工产品成本 − 期末产成品 − 其他发出，逐区串联验证成本结转链条。</p>
+        <p>4. 校验区从 F5-1 审定表获取审定营业成本，与倒轧结果差异超重要性水平以红色标记，须查明原因。</p>
+      </div>
     </details>
   </div>
 </template>
@@ -105,13 +127,14 @@
  * F5TabCostRollforward.vue — F5-7 成本倒轧表（4区结构化验证）
  * 蓝色引导区 + 4区el-card(公式行虚线+tooltip) + TB取数只读/可编辑高亮 + 校验区(绿/红) + 审计结论(AI) + 编制提示折叠
  */
-import { computed, inject, watch, h, type Ref, type VNode } from 'vue'
+import { computed, inject, toRef, watch, h, type Ref, type VNode } from 'vue'
 import { ElInput } from 'element-plus'
 import { useF5CostRollforward } from '../composables/useF5CostRollforward'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   wpId: string
   isReadonly: boolean
   materiality?: number
@@ -120,12 +143,15 @@ const props = defineProps<{
   tbData?: Record<string, number>
 }>()
 
+// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const CONCLUSION_KEY = 'F5-7-conclusion'
 const ROLL_KEY = 'F5-7-cost-rollforward'
 
 const roll = useF5CostRollforward({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   materiality: computed(() => props.materiality ?? 0) as unknown as Ref<number>,
   adjudicatedCOGS: computed(() => props.adjudicatedCOGS ?? 0) as unknown as Ref<number>,
@@ -145,7 +171,7 @@ function seedTb(tb?: Record<string, number>): void {
   if (Object.keys(patch).length) {
     roll.setTbValues(patch as any)
     window.dispatchEvent(new CustomEvent('f5:save-items', {
-      detail: { items: [props.allResponses.value.get(ROLL_KEY)].filter(Boolean) },
+      detail: { items: [allResponsesRef.value.get(ROLL_KEY)].filter(Boolean) },
     }))
   }
 }
@@ -164,7 +190,7 @@ function editable(field: string): VNode {
     onChange: (v: any) => {
       roll.updateField(field, v)
       window.dispatchEvent(new CustomEvent('f5:save-items', {
-        detail: { items: [props.allResponses.value.get(ROLL_KEY)].filter(Boolean) },
+        detail: { items: [allResponsesRef.value.get(ROLL_KEY)].filter(Boolean) },
       }))
     },
   })
@@ -172,7 +198,7 @@ function editable(field: string): VNode {
 
 function saveConclusion() {
   window.dispatchEvent(new CustomEvent('f5:save-items', {
-    detail: { items: [props.allResponses.value.get(CONCLUSION_KEY)].filter(Boolean) },
+    detail: { items: [allResponsesRef.value.get(CONCLUSION_KEY)].filter(Boolean) },
   }))
 }
 
@@ -205,9 +231,28 @@ function openReview() { openReviewDialog('F5-7-conclusion') }
 .f5-verify-grid > div { display: flex; flex-direction: column; gap: 4px; }
 .f5-verify-grid .danger { color: #f56c6c; }
 .f5-verify-grid .ok { color: #67c23a; }
-.f5-conclusion { margin-top: 12px; }
 .f5-card-header { display: flex; align-items: center; justify-content: space-between; }
-.f5-tips { margin-top: 12px; padding: 8px 12px; background: #fdf6ec; border-left: 3px solid #e6a23c; border-radius: 4px; }
-.f5-tips summary { cursor: pointer; color: #b88230; font-weight: 600; }
-.f5-tips ul { margin: 8px 0 0; padding-left: 20px; color: #909399; }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.toolbar-hint { font-size: 13px; color: #909399; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 12px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; }
+
+/* 编制提示 */
+.guidance-details { margin-top: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
 </style>

@@ -1,18 +1,34 @@
 <template>
 <div class="f2-ipo-procedure">
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 本程序表针对 IPO 存货专项审计，逐条执行采购价格、产能能耗、关联方定价、供应商访谈等程序。</p>
+      <p>2. 关注原材料采购价格异常波动（F2-61）、产能与能耗匹配性（F2-63）及关联方采购公允性（F2-65）。</p>
+      <p>3. 供应商访谈（F2-71/F2-72）应核实交易真实性，关注是否存在体外循环或利益输送。</p>
+      <p>4. 程序执行结论应回填底稿目录（F2-1）并向报表层（A1-13）传递。</p>
+    </div>
+  </details>
+
+  <!-- 审计目标 -->
+  <el-alert type="info" :closable="false" show-icon class="objective-alert">
+    <template #title>审计目标：针对 IPO 审计要求，验证存货采购价格、产能能耗及关联方交易的真实性、公允性与完整性。</template>
+  </el-alert>
+
   <!-- 交叉索引 -->
   <div class="procedure-header">
     <div class="index-chips">
-      <GtIndexChip wp-code="F2-61" label="F2-61" />
-      <GtIndexChip wp-code="F2-62" label="F2-62" />
-      <GtIndexChip wp-code="F2-63" label="F2-63" />
-      <GtIndexChip wp-code="F2-64" label="F2-64" />
-      <GtIndexChip wp-code="F2-65" label="F2-65" />
-      <GtIndexChip wp-code="F2-68" label="F2-68" />
-      <GtIndexChip wp-code="F2-70" label="F2-70" />
-      <GtIndexChip wp-code="F2-72" label="F2-72" />
-      <GtIndexChip wp-code="F2-1" label="F2-1" />
-      <GtIndexChip wp-code="A1-13" label="A1-13" />
+      <GtIndexChip value="wp:F2-61" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-62" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-63" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-64" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-65" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-68" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-70" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-72" :context-project-id="projectId" />
+      <GtIndexChip value="wp:F2-1" :context-project-id="projectId" />
+      <GtIndexChip value="wp:A1-13" :context-project-id="projectId" />
     </div>
   </div>
 
@@ -46,10 +62,8 @@
 import { ref, onMounted } from 'vue'
 import http from '@/utils/http'
 
-// @ts-ignore
-import GtIndexChip from '../../../GtIndexChip.vue'
-// @ts-ignore
-import GtAProgramConsole from '../../../GtAProgramConsole.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
+import GtAProgramConsole from '../../GtAProgramConsole.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -95,6 +109,18 @@ onMounted(selfLoad)
 .f2-ipo-procedure {
   padding: 16px;
 }
+
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
 
 .procedure-header {
   margin-bottom: 12px;

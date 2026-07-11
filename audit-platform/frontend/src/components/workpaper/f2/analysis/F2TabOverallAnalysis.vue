@@ -11,6 +11,7 @@ import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 use([PieChart, BarChart, LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
 
@@ -107,7 +108,34 @@ const trendLineOption = computed(() => ({
 
 <template>
   <div class="f2-overall-analysis">
-    <details class="guidance-details"><summary>📋 编制提示</summary><p>结构/周转/趋势/异常四区块；结构数据自动从 F2-3~13 取数。</p></details>
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 从结构、周转、趋势、异常四个维度对存货整体进行分析，结构数据自动从 F2-3~F2-13 取数。</p>
+        <p>2. 存货周转率 = 营业成本 ÷ 平均存货；周转天数 = 365 ÷ 周转率，用于评价存货流动性。</p>
+        <p>3. 依《企业会计准则第 1 号——存货》，关注占比与周转异常，识别积压、滞销及减值迹象。</p>
+        <p>4. 各区块异常应结合产销率、成本变动综合判断，为跌价准备计提提供依据。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：从结构、周转、趋势维度分析存货整体的合理性，识别异常波动及减值迹象。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left" />
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-2" /></span>
+        <el-tag size="small" type="info">共 {{ structureRows.length }} 类</el-tag>
+      </div>
+    </div>
 
     <el-card shadow="never" class="block-card">
       <template #header><span class="block-title">一、结构分析</span></template>
@@ -117,8 +145,8 @@ const trendLineOption = computed(() => ({
         <el-table-column prop="label" label="存货类别" width="140" />
         <el-table-column label="本期金额" width="120" align="right"><template #default="{ row }">{{ fmt(row.currentAmt) }}</template></el-table-column>
         <el-table-column label="上期金额" width="120" align="right"><template #default="{ row }">{{ fmt(row.priorAmt) }}</template></el-table-column>
-        <el-table-column label="占比" width="80" align="right"><template #default="{ row }">{{ fmtPct(row.sharePct) }}</template></el-table-column>
-        <el-table-column label="占比变动" width="90" align="right">
+        <el-table-column label="占比" width="80" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ fmtPct(row.sharePct) }}</template></el-table-column>
+        <el-table-column label="占比变动" width="90" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span :class="{ highlight: row.isHighlight }">{{ fmtPct(row.shareChange) }}</span>
           </template>
@@ -159,31 +187,51 @@ const trendLineOption = computed(() => ({
       <el-alert v-for="a in anomalies" :key="a.id" :title="a.message" :type="a.severity === 'danger' ? 'error' : 'warning'" :closable="false" show-icon class="anomaly-item" />
     </el-card>
 
-    <el-card shadow="never">
+    <el-card class="opinion-card" shadow="never">
       <template #header>
-        <div class="card-header">
-          <span class="block-title">分析结论</span>
-          <div class="header-actions">
+        <div class="opinion-header">
+          <span class="opinion-title">分析结论</span>
+          <div class="opinion-actions">
+            <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="generateAnalysisConclusion">🤖 AI辅助</el-button>
             <F2ReviewChip section-id="F2-18-conclusion" />
-            <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="generateAnalysisConclusion">AI 生成</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="analysisConclusion" type="textarea" :rows="4" :disabled="isReadonly" placeholder="总体分析结论..." />
+      <el-input v-model="analysisConclusion" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly" placeholder="总体分析结论..." />
     </el-card>
   </div>
 </template>
 
 <style scoped>
 .f2-overall-analysis { padding: 12px; font-size: 13px; }
+.f2-overall-analysis :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-overall-analysis :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 12px; }
 .block-title { font-weight: 600; }
 .highlight { color: #e6a23c; font-weight: 600; }
 .turnover-inputs { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
 .anomaly-item { margin-bottom: 8px; }
-.guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
-.card-header { display: flex; justify-content: space-between; align-items: center; }
-.header-actions { display: flex; gap: 8px; align-items: center; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
 .chart-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
 .pie-chart { width: 280px; height: 220px; flex-shrink: 0; }
 .structure-table { flex: 1; min-width: 320px; }

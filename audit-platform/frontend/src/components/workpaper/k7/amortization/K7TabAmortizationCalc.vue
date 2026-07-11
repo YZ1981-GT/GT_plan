@@ -305,7 +305,7 @@
  * Spec: .kiro/specs/k7-deferred-income/ | Task: 4.4
  * Requirements: 4.1-4.7
  */
-import { ref, inject, watch, defineAsyncComponent, type Ref } from 'vue'
+import { ref, inject, watch, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -318,7 +318,7 @@ const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -332,10 +332,13 @@ const openReviewDialog = inject<(id: string, label?: string) => void>(
   undefined,
 )
 
+// 父组件模板绑定会自动解包顶层 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 const calc = useK7AmortizationCalc({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   saveResponse: (field: string, value: any) => { emit('save', field, value) },
 })
 
@@ -349,7 +352,7 @@ const CONCLUSION_ITEM_ID = 'K7-4-conclusion'
 
 // Load conclusion from allResponses
 watch(
-  () => props.allResponses.value,
+  () => allResponsesRef.value,
   (responses) => {
     const item = responses.get(CONCLUSION_ITEM_ID)
     const raw = item?.remark ?? item?.conclusion ?? (typeof item === 'string' ? item : '')

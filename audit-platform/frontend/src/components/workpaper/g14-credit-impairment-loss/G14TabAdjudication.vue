@@ -3,10 +3,19 @@
     <div class="g14-toolbar">
       <h3 class="g14-title">G14-1 信用减值损失审定表</h3>
       <div class="g14-actions">
+        <GtIndexChip value="wp:G14-1" />
+        <el-tag size="small" type="info">共 {{ adj.dataRows.value.length }} 行</el-tag>
         <GtReviewTrigger section-id="G14-1-adjudication" />
         <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：确认本期信用减值损失（6702，损益类，取本期发生额 借方计提−贷方转回）计提/转回充分、准确，
+        各减值来源与 D1/D2/D5/G4/G5 等源科目 ECL 勾稽一致，变动合理且披露完整（CAS 22 金融工具 — 预期信用损失 ECL）。
+      </template>
+    </el-alert>
 
     <GCycleGuideStrip :steps="['G14A 程序', 'G14-1 审定', 'G14-2 明细', 'G14-3 调整', '附注披露']" />
 
@@ -156,6 +165,16 @@
       <el-input :model-value="adj.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }"
         :disabled="isReadonly" @update:model-value="adj.updateAuditConclusion" />
     </el-card>
+
+    <details class="compile-hint">
+      <summary>📋 编制提示</summary>
+      <div class="hint-content">
+        1. 本期数（未审/调整/审定）自 G14-2 明细自动汇总；上期数独立录入，用于变动分析。<br>
+        2. 变动率 |&gt;30%| 时「原因分析」必填；审定合计须与试算平衡表 6702 发生额一致（差异高亮）。<br>
+        3. CAS 22 金融工具确认与计量：信用减值损失反映预期信用损失（ECL）模型下坏账/债权投资减值准备的本期计提与转回，损益方向为借方计提、贷方转回，取本期发生额。<br>
+        4. 「发布审定数」后经 EventBus 同步至附注披露；各减值来源与 D1/D2/D5/G4/G5 源科目 ECL 交叉核对。
+      </div>
+    </details>
   </div>
 </template>
 
@@ -216,6 +235,10 @@ function fmtRate(rate: number | null): string {
 .variance { font-weight: 600; }
 .variance.is-error { color: #f56c6c; }
 .g14-note-card { margin-top: 12px; }
+.audit-objective { margin-bottom: 12px; }
+.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
+.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
+.hint-content { padding: 0 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 .cross-alert { margin-bottom: 12px; }
 .warn-chip, .ok-chip { margin-left: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }

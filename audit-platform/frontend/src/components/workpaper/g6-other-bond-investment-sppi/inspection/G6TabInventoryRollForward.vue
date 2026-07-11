@@ -27,7 +27,7 @@
             <el-tag v-if="reconciliation.varianceCount.value > 0" type="danger" size="small">
               {{ reconciliation.varianceCount.value }}项差异
             </el-tag>
-            <el-button size="small" :disabled="props.readonly" @click="handleAi">✨ AI辅助</el-button>
+            <el-button size="small" :disabled="props.isReadonly" @click="handleAi">✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-10-roll-forward')">💬 复核</el-button>
           </div>
         </div>
@@ -49,7 +49,7 @@
             <div class="name-cell">
               <span>{{ row.securitiesName }}</span>
               <el-button
-                v-if="!props.readonly"
+                v-if="!props.isReadonly"
                 size="small" type="danger" link
                 @click.stop="reconciliation.removeItem(row.id)"
               >🗑️</el-button>
@@ -60,7 +60,7 @@
         <el-table-column label="盘点日数量" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.countDateQuantity"
               size="small" :controls="false" :precision="0"
               style="width: 85px"
@@ -72,7 +72,7 @@
         <el-table-column label="增减" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.changeQuantity"
               size="small" :controls="false"
               style="width: 85px"
@@ -93,7 +93,7 @@
         <el-table-column label="账面数量" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.bookQuantity"
               size="small" :controls="false" :precision="0"
               style="width: 85px"
@@ -115,7 +115,7 @@
         <el-table-column label="差异原因" min-width="150">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.varianceReason"
               type="textarea"
               :autosize="{ minRows: 1, maxRows: 3 }"
@@ -130,7 +130,7 @@
         <el-table-column label="差异结论" width="120">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.varianceConclusion"
               type="textarea"
               :autosize="{ minRows: 1, maxRows: 3 }"
@@ -144,7 +144,7 @@
         <el-table-column label="索引" width="80">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.indexRef"
               size="small"
               placeholder="索引"
@@ -156,7 +156,7 @@
         <el-table-column label="备注" min-width="150">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.remark"
               size="small"
               placeholder="备注..."
@@ -193,7 +193,7 @@
             <el-tag size="small" type="info">
               {{ reconciliation.changeDetailCount.value }}条明细
             </el-tag>
-            <el-button size="small" :disabled="props.readonly" @click="handleAi">✨ AI辅助</el-button>
+            <el-button size="small" :disabled="props.isReadonly" @click="handleAi">✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-10-change-detail')">💬 复核</el-button>
           </div>
         </div>
@@ -213,7 +213,7 @@
             <div class="name-cell">
               <span>{{ row.securitiesName }}</span>
               <el-button
-                v-if="!props.readonly"
+                v-if="!props.isReadonly"
                 size="small" type="danger" link
                 @click.stop="reconciliation.removeChangeDetail(row.id)"
               >🗑️</el-button>
@@ -224,7 +224,7 @@
         <el-table-column label="日期" width="120">
           <template #default="{ row }">
             <el-date-picker
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.date"
               type="date"
               size="small"
@@ -239,7 +239,7 @@
         <el-table-column label="交易类型" width="100">
           <template #default="{ row }">
             <el-select
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.transactionType"
               size="small"
               placeholder="选择"
@@ -259,7 +259,7 @@
         <el-table-column label="数量" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.quantity"
               size="small" :controls="false" :precision="0"
               style="width: 85px"
@@ -271,7 +271,7 @@
         <el-table-column label="金额" width="120" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.amount"
               size="small" :controls="false" :precision="2"
               style="width: 105px"
@@ -283,7 +283,7 @@
         <el-table-column label="凭证号" width="100">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.voucherNo"
               size="small"
               placeholder="凭证号"
@@ -295,7 +295,7 @@
         <el-table-column label="经办人" width="100">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.handler"
               size="small"
               placeholder="经办人"
@@ -307,7 +307,7 @@
         <el-table-column label="备注" min-width="150">
           <template #default="{ row }">
             <el-input
-              v-if="!props.readonly"
+              v-if="!props.isReadonly"
               v-model="row.remark"
               size="small"
               placeholder="备注..."
@@ -321,13 +321,13 @@
     <!-- ═══ 底部操作区 ═══ -->
     <div class="bottom-actions">
       <el-button
-        v-if="!props.readonly"
+        v-if="!props.isReadonly"
         type="primary" size="small"
         @click="activeTab === 'rollForward' ? reconciliation.addItem() : reconciliation.addChangeDetail()"
       >
         + 新增行
       </el-button>
-      <el-dropdown v-if="!props.readonly" size="small" class="import-export-dropdown">
+      <el-dropdown v-if="!props.isReadonly" size="small" class="import-export-dropdown">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown>
           <el-dropdown-menu>
@@ -345,7 +345,7 @@
         <div class="section-header">
           <span class="section-title">审计结论</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="props.readonly" @click="handleAi">✨ AI辅助</el-button>
+            <el-button size="small" :disabled="props.isReadonly" @click="handleAi">✨ AI辅助</el-button>
           </div>
         </div>
       </template>
@@ -353,7 +353,7 @@
         v-model="reconciliation.auditConclusion.value"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 10 }"
-        :disabled="props.readonly"
+        :disabled="props.isReadonly"
         placeholder="对盘点倒轧结果的审计结论..."
         @input="handleSave"
       />
@@ -387,6 +387,8 @@
  * - 差异红色高亮 + 差异原因必填
  * - 2区段Tab行同步（selectedRowIndex）
  * - 动态行增删 + 导入导出 + AI辅助 + 审计结论 + 编制提示
+ *
+ * Props 对齐父级 GtG6OtherBondSppi 传入的 html-data / is-readonly（自加载走 useG6SppiFormData）
  */
 import { computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -398,8 +400,8 @@ import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import type { ReconciliationItem, ReconciliationData } from '../../composables/useG6SppiReconciliation'
 
 const props = defineProps<{
-  data: ReconciliationData | null
-  readonly: boolean
+  htmlData: Record<string, any> | null
+  isReadonly: boolean
   wpId: string
   projectId: string
 }>()
@@ -441,16 +443,12 @@ function handleTab1RowChange(row: ReconciliationItem | null): void {
 
 // ─── 数据加载 ───
 onMounted(async () => {
-  if (props.data) {
-    reconciliation.loadData(props.data)
-  } else {
-    await formData.loadAll()
-    initFromData()
-  }
+  await formData.loadAll()
+  initFromData()
 })
 
-watch(() => props.data, (newData) => {
-  if (newData) reconciliation.loadData(newData)
+watch(() => props.htmlData, (newData) => {
+  if (newData) initFromData()
 })
 
 function initFromData(): void {

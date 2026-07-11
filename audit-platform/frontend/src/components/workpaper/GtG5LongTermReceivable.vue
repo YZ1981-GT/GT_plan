@@ -70,12 +70,12 @@
         <G5TabStageClassification
           v-else-if="currentSheet === 'G5-9'"
           :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
+          :project-id="props.projectId" :is-readonly="isReadonly"
         />
         <G5TabImpairmentCalc
           v-else-if="currentSheet === 'G5-10'"
           :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
+          :project-id="props.projectId" :is-readonly="isReadonly"
         />
         <G5TabReversalWriteoff
           v-else-if="currentSheet === 'G5-11'"

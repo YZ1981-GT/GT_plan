@@ -85,6 +85,15 @@
     <div class="balance-row">
       借方 {{ fmt(adj.debitTotal.value) }} · 贷方 {{ fmt(adj.creditTotal.value) }}
     </div>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>汇总本科目相关的账项调整（AJE）与重分类调整（RJE）；每笔分录借贷必须平衡，合计借方应等于合计贷方。</p>
+        <p>调整净额自动回写 G10-1 审定表「其他初始金额」行期末调整列，据以计算审定数（未审 + 账项调整）。</p>
+        <p>RJE 仅影响列报重分类不改变损益；AJE 涉及公允价值变动损益的须与 G10-2 明细「计入损益」勾稽。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -133,4 +142,6 @@ function fmt(v: number) {
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .balance-alert { margin-bottom: 8px; }
 .balance-row { margin-top: 8px; padding: 8px; background: #f5f7fa; font-size: 12px; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

@@ -151,14 +151,13 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import type { Ref } from 'vue'
 
 const K5_ACCOUNT_CODE = '2701'
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 

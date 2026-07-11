@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-9 分类适当性检查（SPPI + 业务模式）</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="cls.addRow()">新增投资项目</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+        <el-tag size="small" type="info">共 {{ cls.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-9-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：评价金融资产分类（AC/FVOCI/FVTPL）适当性，核实 SPPI 测试与业务模式判定的合理性，确认分类结论符合 CAS22 要求。"
+      class="objective-alert"
+    />
 
     <div class="stats-bar">
       SPPI通过：<b>{{ cls.stats.value.pass }}</b> ·
@@ -97,7 +107,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>SPPI 测试判断合同现金流量是否仅为本金和利息，未通过则强制分类为 FVTPL。</li>
         <li>最终分类需结合 SPPI 结果与业务模式共同判定：AC / FVOCI / FVTPL。</li>
@@ -111,6 +121,7 @@
 import { ref, toRef, inject } from 'vue'
 import { useG1Classification } from '../../composables/useG1Classification'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -135,9 +146,13 @@ const segmentOptions = [
 
 <style scoped>
 .g1-classification { padding: 12px; font-size: 13px; }
+.g1-classification :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-classification :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #f56c6c; }
 .segment-bar { margin-bottom: 12px; }

@@ -9,6 +9,15 @@
       </div>
     </div>
 
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="按国企披露口径列报净敞口套期收益的本期发生额及变动，核对合计与 G12-1 审定数（6103）一致，编制附注披露说明。"
+    />
+
     <el-table :data="dis.displayRows.value" border size="small" style="font-size:13px" max-height="400"
       data-testid="g12-disclosure-soe-table"
       :row-class-name="rowClassName">
@@ -27,7 +36,7 @@
         </template>
       </el-table-column>
       <el-table-column label="变动额" width="120" align="right">
-        <template #default="{ row }"><span class="formula-cell">{{ fmt(row.changeAmount) }}</span></template>
+        <template #default="{ row }"><span class="formula-cell" title="变动额 = 本期发生额 − 上期发生额">{{ fmt(row.changeAmount) }}</span></template>
       </el-table-column>
       <el-table-column label="备注" min-width="100">
         <template #default="{ row }">
@@ -52,6 +61,11 @@
       :is-readonly="isReadonly"
       @refresh="dis.pullLatestAdjudicated()"
     />
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+      <p>国企口径按套期类型分项披露净敞口套期收益（6103）本期发生额。合计须与 G12-1 审定数勾稽一致；发布审定数后经 EventBus 自动同步。附注说明须涵盖套期策略与有效性评价结论。</p>
+    </details>
   </div>
 </template>
 
@@ -92,7 +106,10 @@ function fmt(v: number): string {
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
-.formula-cell { border-bottom: 1px dashed #909399; }
+.audit-objective { margin-bottom: 12px; }
+.formula-cell { border-bottom: 1px dashed #909399; background: #fafafa; cursor: help; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .note-card { margin-top: 12px; }
 :deep(.g12-row-total) { font-weight: 700; background: #f5f7fa; }
 </style>

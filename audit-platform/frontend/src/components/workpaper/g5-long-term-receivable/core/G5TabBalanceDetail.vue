@@ -3,9 +3,15 @@
     <div class="section-head">
       <h3 class="sheet-title">G5-2 余额明细表</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G5-2" />
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
         <GtReviewTrigger section-id="g5-2-balance-detail" />
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      核实长期应收款各债务人期末余额、未实现融资收益及净额，按账龄分段验证合计勾稽，识别关联方及长账龄风险。
+    </el-alert>
 
     <!-- 区段Tab切换 -->
     <div class="segment-tabs">
@@ -104,12 +110,24 @@
       期末余额: {{ fmt(detail.totals.value.closingBalance) }} |
       净额: {{ fmt(detail.totals.value.netAmount) }}
     </div>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>期末余额 = 合同总额 − 已收回金额（自动计算列）</li>
+        <li>净额 = 期末余额 − 未实现融资收益</li>
+        <li>账龄合计应等于净额，若不一致（红色）需核对账龄分段录入</li>
+        <li>账龄分段随项目账龄配置动态生成，可在"底稿配置"中调整</li>
+        <li>关联方债务人须勾选，供关联方交易披露与减值单独评估</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { toRef } from 'vue'
 import { useG5BalanceDetail } from '../../composables/useG5BalanceDetail'
+import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
@@ -144,6 +162,10 @@ function fmt(v: number): string {
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .tab-actions { margin-left: auto; }
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }

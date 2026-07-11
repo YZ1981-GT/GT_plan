@@ -45,6 +45,15 @@
       <el-input :model-value="dis.noteText.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly" @update:model-value="dis.updateNoteText" />
     </el-card>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>依据 CAS 37《金融工具列报》编制附注；期末余额应与 G10-1 审定表审定数（2101）及试算平衡表勾稽。</p>
+        <p>披露交易性金融负债的构成、公允价值层次、期末与期初变动原因；含衍生工具的须说明性质与风险。</p>
+        <p>{{ variant === 'listed' ? '上市主体须按监管口径披露公允价值计量层次转移及重大不可观察输入值。' : '国有企业须结合国资监管要求披露相关金融负债管理情况。' }}</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -81,4 +90,6 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 .formula-cell { border-bottom: 1px dashed #999; }
 .note-card { margin-top: 8px; }
 :deep(.total-row) { font-weight: 600; background: #f5f7fa; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

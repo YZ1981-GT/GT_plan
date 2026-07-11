@@ -4,8 +4,18 @@
       <h3>G12-2 套期关系明细</h3>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="hd.addRow()">+ 新增</el-button>
       <CycleImportExportDropdown :wp-id="wpId" api-prefix="g12" sheet="G12-2" :disabled="isReadonly" @imported="emit('imported')" />
+      <el-tag size="small" type="info">共 {{ hd.rows.value.length }} 行</el-tag>
       <GtReviewTrigger section-id="G12-2-hedge-detail" />
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="核对套期关系的正式指定文档（套期类型、被套期项目、套期工具、套期比率），测算套期无效部分并与 G12-4 公允价值测试交叉验证，评价套期有效性结论。"
+    />
 
     <el-alert v-if="crossMismatches.length" type="warning" :closable="false" class="cross-alert" data-testid="g12-hedge-fv-cross-bar">
       <template #title>G12-4 交叉验证差异（{{ crossMismatches.length }} 处）</template>
@@ -126,7 +136,7 @@
           </template>
         </el-table-column>
         <el-table-column label="无效部分" width="100" align="right">
-          <template #default="{ row }"><span class="formula">{{ row.ineffectiveness.toFixed(2) }}</span></template>
+          <template #default="{ row }"><span class="formula" title="套期无效部分 = |套期工具FV变动 − 被套期项目FV变动|">{{ row.ineffectiveness.toFixed(2) }}</span></template>
         </el-table-column>
         <el-table-column label="计入损益" width="100" align="right">
           <template #default="{ row }">
@@ -166,6 +176,11 @@
       <span>无效部分合计：{{ hd.totals.value.ineffectiveness.toFixed(2) }}</span>
       <span>计入损益合计：{{ hd.totals.value.profitLossAmount.toFixed(2) }}</span>
     </div>
+
+    <details class="methodology-hint">
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+      <p>套期会计三要素：经济关系 + 信用风险主导 + 套期比率。「关系指定」区段录入正式指定信息，「FV与结论」区段录入公允价值变动并测算无效部分（计入损益）。工具/项目 FV 变动须与 G12-4 公允价值测试一致，否则触发交叉验证告警。</p>
+    </details>
   </div>
 </template>
 
@@ -218,11 +233,14 @@ function rowClassName({ row }: { row: { hedgeRelationId: string } }): string {
 <style scoped>
 .g12-hedge { padding: 12px; font-size: 13px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.audit-objective { margin-bottom: 8px; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .cross-alert { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .warn-chip, .ok-chip { margin-left: 8px; }
 .cross-line { font-size: 12px; }
-.formula { border-bottom: 1px dashed #909399; }
+.formula { border-bottom: 1px dashed #909399; background: #fafafa; cursor: help; display: inline-block; width: 100%; }
 .totals { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 10px; padding: 8px 12px; background: #fafafa; border-radius: 4px; font-size: 12px; font-weight: 500; }
 :deep(.g12-cross-warn) { background: #fdf6ec !important; }
 :deep(.fv-mismatch .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }

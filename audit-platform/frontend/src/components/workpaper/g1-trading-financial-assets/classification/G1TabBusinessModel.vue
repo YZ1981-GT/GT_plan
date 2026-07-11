@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-8 业务模式分析（CAS22）</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增投资项目</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-8-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：评价被审计单位金融资产业务模式（CAS22）判定的恰当性，确认业务模式与持有目的、交易频率、管理层意图一致，为金融资产分类适当性提供依据。"
+      class="objective-alert"
+    />
 
     <div class="methodology">
       业务模式判定依据 CAS22：以收取合同现金流量为目标（持有至收取）/ 既收取又出售 / 其他（出售）。
@@ -62,7 +72,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>业务模式在主体层面（而非单项工具层面）判定，交易性金融资产通常为「出售」模式。</li>
         <li>需关注历史交易频率与管理层意图的一致性，出售频繁支持 FVTPL 分类。</li>
@@ -75,6 +85,7 @@
 import { ref, watch, inject } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -181,9 +192,13 @@ watch(conclusion, (v) => {
 
 <style scoped>
 .g1-biz-model { padding: 12px; font-size: 13px; }
+.g1-biz-model :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-biz-model :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .methodology { margin-bottom: 12px; padding: 8px 12px; background: #fdf6ec; border-left: 3px solid #e6a23c; font-size: 12px; color: #8a6d3b; border-radius: 2px; }
 .conclusion-card { margin-top: 12px; }
 .prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }

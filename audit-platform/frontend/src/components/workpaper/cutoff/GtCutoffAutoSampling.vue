@@ -8,11 +8,13 @@
  * 通用组件：通过 props 配置适配 D2/D4-17/D4-18/F2/E2 等所有截止性测试
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 7.1, 7.3
  */
-import { ref, toRef } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import { useCutoffAutoSampling, type CutoffConfig, type ExtractedVoucher, type FillMode } from '../composables/useCutoffAutoSampling'
 import type { CutoffDirection } from '../composables/cutoffJudgment'
+import http from '@/utils/http'
 import CutoffPreviewDialog from './CutoffPreviewDialog.vue'
 import CutoffHistoryDrawer from './CutoffHistoryDrawer.vue'
+import PostFillAiReviewDialog, { type PostFillReviewRow } from '../voucher-sampling/PostFillAiReviewDialog.vue'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -23,14 +25,23 @@ interface Props {
   workpaperId: string
   projectId: string
   year: number
+  /** 只读态：为真时禁用一键取数与回写（R25.6） */
+  readonly?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  readonly: false,
+})
+
+// 只读态（R25.6）：以 computed 传入 composable，供一键取数/回写守卫使用
+const readonlyRef = computed(() => props.readonly)
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
 const emit = defineEmits<{
   (e: 'filled', payload: { samples: ExtractedVoucher[]; fillMode: FillMode }): void
+  /** AI 复核意见经用户确认后回传，供父级写入截止底稿审计说明（Req 26.5） */
+  (e: 'applied', text: string): void
 }>()
 
 // ─── Composable ───────────────────────────────────────────────────────────────
@@ -51,6 +62,7 @@ const {
   selectedCreditTotal,
   dateRangeText,
   triggerExtraction,
+  triggerCutoffFetch,
   confirmFill,
   loadHistory,
   undoLastExtraction,
@@ -64,10 +76,50 @@ const {
   accountCode: props.accountCode,
   cutoffDirection: props.cutoffDirection as CutoffDirection,
   defaultConditions: props.defaultConditions,
+  readonly: readonlyRef,
   onFilled: (payload) => {
     emit('filled', payload)
+    // 截止凭证回写完成 → 触发回写后 AI 复核弹窗（Req 26.2）
+    triggerPostFillReview(payload.samples)
   },
 })
+
+// ─── 回写后 AI 复核（Req 26：截止一键取数回写后触发，section=cutoff-review） ───
+
+const aiAvailable = ref(false)
+const showReview = ref(false)
+const reviewRows = ref<PostFillReviewRow[]>([])
+
+async function checkAiHealth() {
+  try {
+    const r = await http.get('/api/ai/health', { _silent: true } as any)
+    const status = r.data?.data?.status ?? r.data?.status
+    aiAvailable.value = status === 'healthy' || status === 'degraded'
+  } catch {
+    aiAvailable.value = false
+  }
+}
+
+/** 截止凭证回写完成后弹出 AI 复核（R26.2） */
+function triggerPostFillReview(samples: ExtractedVoucher[]) {
+  reviewRows.value = samples.map((s) => ({
+    voucherNo: s.voucherNo,
+    voucherDate: s.voucherDate,
+    summary: s.summary,
+    debitAmount: s.debitAmount,
+    creditAmount: s.creditAmount,
+    counterpartAccount: s.counterpartAccount,
+    cutoffStatus: s.cutoffStatus,
+  }))
+  showReview.value = true
+}
+
+/** 确认采用 AI 复核意见 → 上抛父级写入截止底稿审计说明（R26.5/26.8） */
+function onReviewApplied(text: string) {
+  emit('applied', text)
+}
+
+onMounted(() => { void checkAiHealth() })
 
 // ─── 凭证类型选项 ─────────────────────────────────────────────────────────────
 
@@ -83,6 +135,13 @@ const voucherTypeOptions = [
 async function handleExtract() {
   if (!validateConfig()) return
   await triggerExtraction()
+}
+
+// 一键取数（R25）：从四表库凭证库按基准日 ±N 天窗口检索并回写，跨期行标注跨期疑点
+async function handleCutoffFetch() {
+  if (props.readonly) return
+  if (!validateConfig()) return
+  await triggerCutoffFetch()
 }
 
 function handleShowHistory() {
@@ -228,12 +287,17 @@ function handleShowHistory() {
 
     <!-- 操作按钮 -->
     <div class="action-bar">
-      <el-button type="primary" :loading="loading" @click="handleExtract">
+      <el-button type="primary" :loading="loading" :disabled="readonly" @click="handleExtract">
         开始提取
+      </el-button>
+      <!-- 一键取数：四表库凭证库联动（R25），只读禁用 -->
+      <el-button type="success" plain :loading="loading" :disabled="readonly" @click="handleCutoffFetch">
+        一键取数
       </el-button>
       <el-button text @click="handleShowHistory">
         提取历史
       </el-button>
+      <span v-if="readonly" class="readonly-hint">只读状态下已禁用取数与回写</span>
     </div>
 
     <!-- 预览弹窗 -->
@@ -256,6 +320,16 @@ function handleShowHistory() {
       v-model:visible="historyVisible"
       :history-list="historyList"
       @undo="undoLastExtraction"
+    />
+
+    <!-- 回写后 AI 复核弹窗（Req 26，section=cutoff-review） -->
+    <PostFillAiReviewDialog
+      v-model="showReview"
+      :wp-id="workpaperId"
+      :rows="reviewRows"
+      section="cutoff-review"
+      :ai-available="aiAvailable"
+      @applied="onReviewApplied"
     />
   </div>
 </template>
@@ -296,7 +370,13 @@ export default { components: { InfoFilled } }
 
 .action-bar {
   display: flex;
+  align-items: center;
   gap: 12px;
   padding: 8px 0 0 100px;
+}
+
+.readonly-hint {
+  font-size: 12px;
+  color: #909399;
 }
 </style>

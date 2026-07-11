@@ -1,18 +1,43 @@
 <template>
   <div class="f2-supplier-info">
-    <h3 class="title">供应商信息核查 F2-70</h3>
-    <div class="top-toolbar">
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-spe"
-        sheet="F2-70"
-        :disabled="isReadonly"
-        ai-section="supplier-analysis"
-        :existing-content="md.auditNote.value"
-        review-section="F2-70-check"
-        @ai-filled="(t: string) => { md.auditNote.value = t }"
-      />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表核查主要供应商的工商登记信息（信用代码、法定代表人、注册资本、成立日期、经营范围等），验证供应商真实存在且具备履约能力（CAS 1141 / CAS 1231）。</p>
+        <p>2. 左侧选择供应商后在右侧录入基础工商信息与审计核查结论；建议与企查查/国家企业信用信息公示系统交叉比对。</p>
+        <p>3. 关注成立时间短、注册资本与交易规模不匹配、经营范围与采购内容不符的供应商，警惕空壳公司与虚构采购。</p>
+        <p>4. 可通过工具栏"AI 生成"辅助撰写核查结论，"💬"发起复核对话，"导入导出"批量维护供应商信息。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实主要供应商工商登记信息真实有效，评价其履约能力与商业实质，识别空壳公司及未披露关联方风险。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-spe"
+          sheet="F2-70"
+          :disabled="isReadonly"
+          ai-section="supplier-analysis"
+          :existing-content="md.auditNote.value"
+          review-section="F2-70-check"
+          @ai-filled="(t: string) => { md.auditNote.value = t }"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-70" /></span>
+        <el-tag size="small" type="info">共 {{ md.entityList.value.length }} 家</el-tag>
+      </div>
     </div>
+
     <div class="layout">
       <aside class="list-panel">
         <el-input v-model="md.searchQuery.value" size="small" placeholder="搜索供应商..." clearable />
@@ -52,8 +77,17 @@
         <el-button v-if="!isReadonly" type="danger" link size="small" @click="md.removeEntity(cur.id)">删除</el-button>
       </main>
     </div>
-    <h4>核查结论</h4>
-    <el-input v-model="md.auditNote.value" type="textarea" :rows="3" :disabled="isReadonly" />
+
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">核查结论</span>
+        </div>
+      </template>
+      <el-input v-model="md.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="汇总供应商工商信息核查结果与审计结论…" />
+    </el-card>
   </div>
 </template>
 
@@ -62,6 +96,7 @@ import { computed, toRef } from 'vue'
 import { useF2MasterDetail } from '../../composables/useF2MasterDetail'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -104,8 +139,22 @@ function patch(key: string, val: string | number): void {
 </script>
 
 <style scoped>
-.f2-supplier-info { padding: 12px; font-size: 13px; }
-.title { margin: 0 0 8px; }
+.f2-supplier-info { padding: 12px 16px; font-size: 13px; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 主从布局 */
 .layout { display: flex; gap: 12px; min-height: 360px; }
 .list-panel { width: 260px; flex-shrink: 0; border: 1px solid #ebeef5; padding: 8px; border-radius: 4px; }
 .add-btn { margin: 8px 0; width: 100%; }
@@ -115,5 +164,10 @@ function patch(key: string, val: string | number): void {
 .detail-panel { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-h4 { margin: 16px 0 8px; font-size: 13px; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

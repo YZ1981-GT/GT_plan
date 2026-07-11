@@ -31,15 +31,28 @@ interface Props {
   config: SamplingConfig
   configErrors: Record<string, string>
   loading: boolean
+  /** 系统建议样本量（R15 留痕；null 表示尚未推导或参数不足） */
+  suggestedSampleSize?: number | null
+  /** 可容忍错报是否由重要性/B15 自动带入（R16 提示可覆盖） */
+  tolerableFromMateriality?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  suggestedSampleSize: null,
+  tolerableFromMateriality: false,
+})
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
 const emit = defineEmits<{
   (e: 'update:visible', v: boolean): void
   (e: 'execute'): void
+  /** 请求依据置信度/可容忍/预期错报推导建议样本量（R15） */
+  (e: 'compute-suggested'): void
+  /** 请求采用系统建议样本量（R15.3） */
+  (e: 'apply-suggested'): void
+  /** 请求从重要性/B15 底稿带入可容忍错报（R16） */
+  (e: 'load-tolerable'): void
 }>()
 
 // ─── Dialog visibility ────────────────────────────────────────────────────────
@@ -91,6 +104,37 @@ const directionOptions: { value: 'debit' | 'credit' | 'all'; label: string }[] =
   { value: 'debit', label: '借方' },
   { value: 'credit', label: '贷方' },
 ]
+
+// ─── 置信度选项（点选优先，R20）──────────────────────────────────────────────
+
+const confidenceOptions: { value: number; label: string }[] = [
+  { value: 0.80, label: '80%' },
+  { value: 0.85, label: '85%' },
+  { value: 0.90, label: '90%' },
+  { value: 0.95, label: '95%' },
+  { value: 0.99, label: '99%' },
+]
+
+// ─── 是否为统计抽样方法（MUS 必填方法学参数，R20）────────────────────────────
+
+const isStatisticalMethod = computed(() => props.config.samplingMethod === 'mus')
+
+// 建议样本量展示：>0 才有意义
+const hasSuggested = computed(
+  () => props.suggestedSampleSize != null && props.suggestedSampleSize > 0,
+)
+
+function handleComputeSuggested() {
+  emit('compute-suggested')
+}
+
+function handleApplySuggested() {
+  emit('apply-suggested')
+}
+
+function handleLoadTolerable() {
+  emit('load-tolerable')
+}
 
 // ─── Collapse 默认展开 ───────────────────────────────────────────────────────
 
@@ -278,6 +322,82 @@ function hasError(key: string): boolean {
               disabled
               style="width: 200px"
             />
+          </el-form-item>
+        </div>
+      </div>
+
+      <!-- ═══ 2.5 统计抽样参数（方法学：置信度/可容忍错报/预期错报）═══ -->
+      <div class="config-section">
+        <div class="section-title">
+          统计抽样参数
+          <span class="section-title-hint">
+            {{ isStatisticalMethod ? '（货币单元抽样必填）' : '（选填，用于科学样本量推导）' }}
+          </span>
+        </div>
+        <div class="param-block methodology-block">
+          <!-- 置信度：点选优先 -->
+          <el-form-item label="置信度" :error="getError('confidenceLevel')">
+            <el-select
+              v-model="config.confidenceLevel"
+              placeholder="请选择置信度"
+              clearable
+              style="width: 200px"
+            >
+              <el-option
+                v-for="opt in confidenceOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+
+          <!-- 可容忍错报（默认取重要性/B15） -->
+          <el-form-item label="可容忍错报" :error="getError('tolerableMisstatement')">
+            <el-input
+              v-model="config.tolerableMisstatement"
+              placeholder="可容忍错报"
+              clearable
+              style="width: 200px"
+            >
+              <template #suffix>元</template>
+            </el-input>
+            <el-button size="small" text type="primary" class="ml-8" @click="handleLoadTolerable">
+              从重要性带入
+            </el-button>
+            <el-tag v-if="tolerableFromMateriality" size="small" type="success" effect="plain">
+              已带入 B15 实际执行重要性
+            </el-tag>
+          </el-form-item>
+
+          <!-- 预期错报 -->
+          <el-form-item label="预期错报" :error="getError('expectedMisstatement')">
+            <el-input
+              v-model="config.expectedMisstatement"
+              placeholder="预期错报（须小于可容忍错报）"
+              clearable
+              style="width: 200px"
+            >
+              <template #suffix>元</template>
+            </el-input>
+          </el-form-item>
+
+          <!-- 建议样本量推导与覆盖 -->
+          <el-form-item label="建议样本量">
+            <el-button size="small" plain type="primary" @click="handleComputeSuggested">
+              计算建议样本量
+            </el-button>
+            <template v-if="hasSuggested">
+              <el-tag size="small" type="warning" effect="plain" class="suggested-tag">
+                建议 {{ suggestedSampleSize }} 笔
+              </el-tag>
+              <el-button size="small" text type="primary" @click="handleApplySuggested">
+                采用建议值
+              </el-button>
+            </template>
+            <span v-else class="hint-text">
+              填写置信度与可容忍错报后可推导科学样本量
+            </span>
           </el-form-item>
         </div>
       </div>
@@ -546,6 +666,26 @@ function hasError(key: string): boolean {
 .hint-text {
   font-size: 12px;
   color: var(--el-text-color-placeholder);
+  margin-left: 8px;
+}
+
+/* ── 方法学参数区 ── */
+.section-title-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--el-text-color-placeholder);
+  margin-left: 4px;
+}
+
+.methodology-block .el-form-item {
+  margin-bottom: 14px;
+}
+
+.ml-8 {
+  margin-left: 8px;
+}
+
+.suggested-tag {
   margin-left: 8px;
 }
 

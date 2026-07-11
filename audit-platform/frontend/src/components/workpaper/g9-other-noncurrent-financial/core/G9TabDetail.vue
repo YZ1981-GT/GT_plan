@@ -3,10 +3,21 @@
     <div class="toolbar">
       <h3>G9-2 明细表</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G9-2" />
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
         <G9ImportExportDropdown :wp-id="wpId" sheet="G9-2" @imported="onImported" />
         <el-button v-if="!isReadonly" size="small" @click="detail.addRow()">+ 新增行</el-button>
       </div>
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：核对其他非流动金融资产明细的存在、计价与分类，期末审定合计应与 G9-1 审定表勾稽一致。"
+    />
+
     <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" />
     <el-table :data="detail.rows.value" border size="small" style="font-size:13px;margin-top:8px" max-height="520"
       highlight-current-row @current-change="onRowChange">
@@ -86,7 +97,7 @@
           </template>
         </el-table-column>
         <el-table-column label="期初审定" width="96" align="right">
-          <template #default="{ row }"><span class="formula-cell">{{ fmt(row.openingAdjusted) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="期初审定 = 期初余额 + 期初调整">{{ fmt(row.openingAdjusted) }}</span></template>
         </el-table-column>
         <el-table-column label="本期增加" width="96" align="right">
           <template #default="{ row }">
@@ -134,7 +145,7 @@
       <template v-else>
         <el-table-column label="资产名称" prop="assetName" min-width="100" fixed />
         <el-table-column label="期末余额" width="100" align="right">
-          <template #default="{ row }"><span class="formula-cell">{{ fmt(row.closingBalance) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="期末余额 = 期初审定 + 增加 − 减少 + FV变动 + 利息 − 减值 + OCI">{{ fmt(row.closingBalance) }}</span></template>
         </el-table-column>
         <el-table-column label="调整数" width="96" align="right">
           <template #default="{ row }">
@@ -144,7 +155,7 @@
           </template>
         </el-table-column>
         <el-table-column label="审定数" width="100" align="right">
-          <template #default="{ row }"><span class="formula-cell">{{ fmt(row.closingAdjusted) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="审定数 = 期末余额 + 调整数">{{ fmt(row.closingAdjusted) }}</span></template>
         </el-table-column>
         <el-table-column label="层次" width="96">
           <template #default="{ row }">
@@ -195,11 +206,21 @@
       <span v-for="(amt, cls) in detail.classificationSubtotals.value" :key="cls"
         :class="{ 'total-line': cls === '总计' }">{{ cls }}: {{ fmt(amt) }}</span>
     </div>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>按 CAS 22 金融工具确认与计量：FVTPL / FVOCI / 摊余成本分类需与合同现金流量特征及业务模式一致。</p>
+        <p>期初审定 = 期初余额 + 期初调整；期末余额 = 期初审定 + 增加 − 减少 + FV变动 + 利息 − 减值 + OCI；审定数 = 期末余额 + 调整数。</p>
+        <p>Level3 层次资产须在 G9-4 补充估值技术与不可观察输入值。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9Detail } from '../../composables/useG9Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -239,8 +260,11 @@ function fmt(n: number) {
 <style scoped>
 .g9-detail { font-size: 13px; }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
 .subtotals { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; color: #606266; }
 .total-line { font-weight: 600; color: #303133; }
-.formula-cell { border-bottom: 1px dashed #909399; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #f5f7fa; display: inline-block; width: 100%; }
+.audit-objective { margin: 8px 0; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

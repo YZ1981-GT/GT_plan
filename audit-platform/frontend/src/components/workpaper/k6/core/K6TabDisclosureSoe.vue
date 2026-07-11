@@ -189,14 +189,13 @@
 import { ref, onMounted, onBeforeUnmount, inject } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import type { Ref } from 'vue'
 
 const K6_ACCOUNT_CODE = '1481'
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 

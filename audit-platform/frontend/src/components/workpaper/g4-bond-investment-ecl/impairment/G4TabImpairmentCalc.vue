@@ -14,6 +14,14 @@
 -->
 <template>
   <div class="g4-impairment-calc">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资减值准备的计量准确，审定减值、审定账面价值及本年计提/转回金额计算正确，按 Stage 分组恰当。"
+      style="margin-bottom: 12px"
+    />
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-10 减值准备测算表</h3>

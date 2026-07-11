@@ -137,7 +137,7 @@
  * - Auto data fetch from K7-1 审定表 (subscribe substantive:adjudicated EventBus)
  * - AI assisted (section: overall-opinion)
  */
-import { ref, onMounted, onUnmounted, inject, type Ref } from 'vue'
+import { ref, onMounted, onUnmounted, inject, toRef, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 
@@ -146,7 +146,7 @@ const K7_ACCOUNT_CODE = '2401'
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -154,6 +154,9 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+// 父组件模板绑定会自动解包顶层 ref → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const openReview = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -200,7 +203,7 @@ function initDefaultRows(): void {
 // ─── 加载已保存数据 ──────────────────────────────────────────────────────────
 
 function loadSavedData(): void {
-  const savedAsset = props.allResponses.value.get('K7-disclosure-soe-asset-rows')
+  const savedAsset = allResponsesRef.value.get('K7-disclosure-soe-asset-rows')
   if (savedAsset?.remark) {
     try {
       assetRelatedRows.value = JSON.parse(savedAsset.remark)
@@ -209,14 +212,14 @@ function loadSavedData(): void {
     initDefaultRows()
   }
 
-  const savedIncome = props.allResponses.value.get('K7-disclosure-soe-income-rows')
+  const savedIncome = allResponsesRef.value.get('K7-disclosure-soe-income-rows')
   if (savedIncome?.remark) {
     try {
       incomeRelatedRows.value = JSON.parse(savedIncome.remark)
     } catch { /* keep default */ }
   }
 
-  const savedNarrative = props.allResponses.value.get('K7-disclosure-soe-narrative')
+  const savedNarrative = allResponsesRef.value.get('K7-disclosure-soe-narrative')
   if (savedNarrative?.remark) {
     narrativeText.value = savedNarrative.remark
   }
@@ -225,7 +228,7 @@ function loadSavedData(): void {
 // ─── 自动取数（从K7-1审定表） ────────────────────────────────────────────────
 
 function applyAutoFill(): void {
-  const adjData = props.allResponses.value.get('K7-1-audited-by-type')
+  const adjData = allResponsesRef.value.get('K7-1-audited-by-type')
   if (adjData?.remark) {
     hasAutoData.value = true
     try {

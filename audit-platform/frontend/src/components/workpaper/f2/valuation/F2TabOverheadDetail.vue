@@ -10,18 +10,43 @@
       </div>
     </header>
 
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="oh.addRow()">+ 新增费用项</el-button>
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-val"
-        sheet="F2-43"
-        :disabled="isReadonly"
-        ai-section="cost-analysis"
-        :existing-content="oh.auditNote.value"
-        review-section="F2-43-conclusion"
-        @ai-filled="(t: string) => { oh.auditNote.value = t }"
-      />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 制造费用按费用项目归集预算、实际与分配额，验证费用归集完整性与分配方法的合理性、一贯性（CAS 1 号存货加工成本）。</p>
+        <p>2. 灰色底纹列为自动计算列（变动率），据实际与预算自动测算，不可手工编辑。</p>
+        <p>3. 分配额与预算/实际不符的行自动标红，须核查分配基准是否恰当、是否存在费用跨期或错误归集。</p>
+        <p>4. 关注将期间费用错误计入制造费用、或制造费用未按受益对象合理分配导致存货成本失真的情形。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证制造费用归集的完整性与分配方法的合理性、一贯性，通过预算与实际对比识别异常波动，确认制造费用计入存货成本的准确性。"
+      class="objective-alert"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="oh.addRow()">+ 新增费用项</el-button>
+      </div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-val"
+          sheet="F2-43"
+          :disabled="isReadonly"
+          ai-section="cost-analysis"
+          :existing-content="oh.auditNote.value"
+          review-section="F2-43-conclusion"
+          @ai-filled="(t: string) => { oh.auditNote.value = t }"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
+        <el-tag size="small" type="info">共 {{ oh.enrichedRows.value.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-table
@@ -53,9 +78,9 @@
             class="compact-num" @change="(v: number) => oh.updateRow(row.rowId, { allocatedAmt: v ?? 0 })" />
         </template>
       </el-table-column>
-      <el-table-column label="变动率" width="85" align="right">
+      <el-table-column label="变动率" width="85" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
-          <span v-if="row.varianceRate !== '' && row.varianceRate !== 'N/A'" class="formula">
+          <span v-if="row.varianceRate !== '' && row.varianceRate !== 'N/A'" class="formula" title="(实际 − 预算) ÷ 预算 × 100%">
             {{ (Number(row.varianceRate) * 100).toFixed(1) }}%
           </span>
           <span v-else>—</span>
@@ -68,10 +93,13 @@
       </el-table-column>
     </el-table>
 
-    <footer class="footer">
-      <h4>审计说明</h4>
-      <el-input v-model="oh.auditNote.value" type="textarea" :rows="3" :disabled="isReadonly" />
-    </footer>
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input v-model="oh.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="制造费用明细审计说明..." />
+    </el-card>
   </div>
 </template>
 
@@ -79,6 +107,7 @@
 import { toRef } from 'vue'
 import { useF2OverheadDetail } from '../../composables/useF2OverheadDetail'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 const props = defineProps<{

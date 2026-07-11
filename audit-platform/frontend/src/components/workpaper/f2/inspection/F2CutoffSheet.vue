@@ -1,23 +1,47 @@
 <template>
   <div class="f2-cutoff-sheet">
     <h3 class="sheet-title">{{ config.title }} {{ config.sheetCode }}</h3>
-    <details class="guidance-details"><summary>📋 编制提示</summary><p>正向测试：期末后N天单据→检查是否已入账；反向测试：期末前N天入账→检查是否有单据。截止不正确行红色高亮。</p></details>
-    <div class="meta">
-      <el-tag size="small">{{ config.direction === 'inbound' ? '入库' : '出库' }}</el-tag>
-      <el-tag size="small" type="info">{{ config.testType === 'forward' ? '正向测试' : '反向测试' }}</el-tag>
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="cutoff.addRow()">新增行</el-button>
-      <CycleImportExportDropdown
-        v-if="wpId"
-        :wp-id="wpId"
-        api-prefix="f2"
-        :sheet="config.sheetCode"
-        :disabled="isReadonly"
-        @imported="onImported"
-      />
-      <el-tag size="small">共 {{ cutoff.cutoffSummary.total }} 笔</el-tag>
-      <el-tag v-if="cutoff.cutoffSummary.errorCount > 0" size="small" type="danger">
-        错误 {{ cutoff.cutoffSummary.errorCount }} 笔 / {{ cutoff.cutoffSummary.errorAmount.toLocaleString() }} 元
-      </el-tag>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表执行存货收发货截止测试，验证期末前后出入库是否计入正确会计期间（CAS 1301 存货 / CAS 1211 舞弊风险）。</p>
+        <p>2. 正向测试：期末后 N 天单据 → 检查是否已入账；反向测试：期末前 N 天入账 → 检查是否有对应单据。</p>
+        <p>3. 截止判定基于单据日期 / 记账日期与期末日的比较，可手动覆盖；截止不正确的行红色高亮。</p>
+        <p>4. 可点击"⚡ 自动提取凭证"从序时账按基准日 ±N 天一键提取，回填后核对是否跨期。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证存货收发在资产负债表日前后计入正确会计期间，确认存货与营业成本截止的准确性，识别跨期错报。"
+      class="objective-alert"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-tag size="small">{{ config.direction === 'inbound' ? '入库' : '出库' }}</el-tag>
+        <el-tag size="small" type="info">{{ config.testType === 'forward' ? '正向测试' : '反向测试' }}</el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="cutoff.addRow()">新增行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-tag v-if="cutoff.cutoffSummary.errorCount > 0" size="small" type="danger">
+          错误 {{ cutoff.cutoffSummary.errorCount }} 笔 / {{ cutoff.cutoffSummary.errorAmount.toLocaleString() }} 元
+        </el-tag>
+        <CycleImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          api-prefix="f2"
+          :sheet="config.sheetCode"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
+        <span class="chip-wrap"><GtIndexChip :value="'wp:' + config.sheetCode" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ cutoff.cutoffSummary.total }} 笔</el-tag>
+      </div>
     </div>
 
     <div v-if="!isReadonly && wpId && projectId" class="auto-extract">
@@ -125,17 +149,19 @@
       涉及金额 {{ cutoff.cutoffSummary.errorAmount.toLocaleString() }} 元
     </div>
 
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="opinion-card conclusion-card">
       <template #header>
         <div class="conclusion-header">
           <span class="conclusion-title">截止测试结论</span>
           <div class="header-actions">
+            <GtIndexChip :value="'wp:' + config.sheetCode" :context-project-id="projectId" />
             <F2ReviewChip :section-id="`${config.sheetCode}-conclusion`" />
             <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="generateCutoffConclusion">AI 生成</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="cutoff.cutoffConclusion" type="textarea" :rows="3" :disabled="isReadonly" />
+      <el-input v-model="cutoff.cutoffConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="截止测试结论（跨期错报笔数与金额、是否需调整、对存货与营业成本截止的评价等）..." />
     </el-card>
   </div>
 </template>
@@ -153,6 +179,7 @@ import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
 import GtCutoffAutoSampling from '../../cutoff/GtCutoffAutoSampling.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 
 const props = defineProps<{
@@ -209,14 +236,31 @@ async function generateCutoffConclusion() {
 
 <style scoped>
 .f2-cutoff-sheet { padding: 12px; font-size: 13px; }
+.f2-cutoff-sheet :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-cutoff-sheet :deep(.el-table .cell) { font-size: 13px !important; }
 .sheet-title { margin: 0 0 8px; }
-.meta { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .auto-extract { margin-bottom: 12px; }
 .summary-footer { margin-top: 12px; font-size: 12px; color: #606266; }
-.conclusion-card { margin-top: 16px; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .conclusion-header { display: flex; justify-content: space-between; align-items: center; }
-.conclusion-title { font-weight: 600; font-size: 13px; }
+.conclusion-title { font-weight: 600; font-size: 14px; color: #303133; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
-.guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
 :deep(.error-row) { background: #fef0f0; }
 </style>

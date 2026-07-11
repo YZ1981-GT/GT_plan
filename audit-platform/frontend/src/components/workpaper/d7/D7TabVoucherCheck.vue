@@ -1,5 +1,55 @@
 <template>
 <div class="d7-voucher-check">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表对合同负债（科目2205）本期增减变动及期后结转进行凭证抽查，依据 CAS14 收入准则验证发生额的真实性与截止准确性。</p>
+        <p>2. 抽样应结合特定项目（大额/异常）与随机抽样，样本量需覆盖目标；核对凭证与合同、收款记录、履约证据一致。</p>
+        <p>3. 期后结转检查关注资产负债表日后合同负债结转至收入的凭证，验证收入确认时点的恰当性（截止测试）。</p>
+        <p>4. 异常项目应勾选"异常"并在审计说明中记录，异常率偏高时应扩大样本或追加实质性程序。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过凭证抽查验证合同负债本期发生额及期后结转的真实性、准确性与截止恰当性，识别异常交易及收入确认时点风险。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <el-dropdown v-if="!isReadonly" size="small" trigger="click">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="periodImport.exportTemplate">导出本期模板</el-dropdown-item>
+              <el-dropdown-item @click="periodImport.exportData">导出本期数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="periodImport.importing" @change="(f: any) => onPeriodImport(f.raw || f)">
+                  <span>导入本期数据</span>
+                </el-upload>
+              </el-dropdown-item>
+              <el-dropdown-item divided @click="postImport.exportTemplate">导出期后模板</el-dropdown-item>
+              <el-dropdown-item @click="postImport.exportData">导出期后数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="postImport.importing" @change="(f: any) => onPostImport(f.raw || f)">
+                  <span>导入期后数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:D7-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:D4" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ periodChangeRows.length + postTransferRows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 抽样参数区 -->
     <div class="sampling-params-card">
       <h4 class="card-title">抽样参数</h4>
@@ -152,7 +202,7 @@
         <el-table-column label="对方科目" width="130">
           <template #default="{ row }">
             <span>{{ row.counterAccount }}</span>
-            <GtIndexChip v-if="row.counterAccount && row.counterAccount.includes('主营业务收入')" wp-code="D4" label="→D4" style="margin-left:4px" />
+            <GtIndexChip v-if="row.counterAccount && row.counterAccount.includes('主营业务收入')" value="wp:D4" :context-project-id="projectId" style="margin-left:4px" />
           </template>
         </el-table-column>
         <el-table-column label="贷方金额" width="120" align="right">
@@ -184,36 +234,55 @@
     <div class="summary-section">
       <span>已检查：<strong>{{ checkedCount }}</strong> 笔</span>
       <span>异常：<strong class="abnormal-count">{{ abnormalCount }}</strong> 笔</span>
-      <span>异常率：<strong :class="{ 'abnormal-count': abnormalRate > 0 }">{{ (abnormalRate * 100).toFixed(1) }}%</strong></span>
-      <el-button-group v-if="!isReadonly" size="small" style="margin-left: auto">
-        <el-button @click="periodImport.exportTemplate">导出本期模板</el-button>
-        <el-button @click="periodImport.exportData">导出本期数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="periodImport.importing" @change="(f: any) => onPeriodImport(f.raw || f)">
-          <el-button :disabled="periodImport.importing">导入本期</el-button>
-        </el-upload>
-        <el-button @click="postImport.exportTemplate">导出期后模板</el-button>
-        <el-button @click="postImport.exportData">导出期后数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="postImport.importing" @change="(f: any) => onPostImport(f.raw || f)">
-          <el-button :disabled="postImport.importing">导入期后</el-button>
-        </el-upload>
-      </el-button-group>
+      <span>异常率：</span>
+      <el-tag v-if="abnormalRate > 0" type="danger" size="small">{{ (abnormalRate * 100).toFixed(1) }}%</el-tag>
+      <el-tag v-else type="success" size="small">{{ (abnormalRate * 100).toFixed(1) }}% 无异常</el-tag>
     </div>
 
-    <!-- 审计说明/结论 -->
-    <div class="audit-notes-section">
-      <h4>审计说明</h4>
-      <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="凭证检查发现..." />
-      <div class="note-actions">
-        <el-button size="small" @click="openReview('D7-7-note-explanation')">💬复核</el-button>
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:D7-2" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D4" :context-project-id="projectId" />
+          </div>
+        </div>
+      </template>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">1. 审计说明</span>
+          <div class="opinion-actions">
+            <el-button size="small" @click="openReview('D7-7-note-explanation')">💬</el-button>
+          </div>
+        </div>
+        <el-input
+          v-model="auditNotes.explanation"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          :disabled="isReadonly"
+          placeholder="凭证检查发现..."
+        />
       </div>
-    </div>
-    <div class="audit-notes-section">
-      <h4>审计结论</h4>
-      <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="凭证检查结论..." />
-      <div class="note-actions">
-        <el-button size="small" @click="openReview('D7-7-note-conclusion')">💬复核</el-button>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">2. 审计结论</span>
+          <div class="opinion-actions">
+            <el-button size="small" @click="openReview('D7-7-note-conclusion')">💬</el-button>
+          </div>
+        </div>
+        <el-input
+          v-model="auditNotes.conclusion"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="凭证检查结论..."
+        />
       </div>
-    </div>
+    </el-card>
 </div>
 </template>
 
@@ -239,11 +308,13 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: any
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
@@ -266,7 +337,7 @@ const {
   checkedCount, abnormalCount, abnormalRate,
   addSample, removeSample, updateCell, auditNotes,
 } = useD7VoucherCheck({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
@@ -329,7 +400,47 @@ const {
 </script>
 
 <style scoped>
-.d7-voucher-check { padding: 16px; }
+.d7-voucher-check { padding: 12px; }
+.d7-voucher-check :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d7-voucher-check :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .sampling-params-card {
   padding: 16px;
@@ -355,11 +466,29 @@ const {
   background: #fafafa;
   border-radius: 6px;
   display: flex;
-  gap: 24px;
+  align-items: center;
+  gap: 16px;
   font-size: 13px;
 }
 
-.audit-notes-section { margin-top: 16px; }
-.audit-notes-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.note-actions { display: flex; gap: 8px; margin-top: 6px; }
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-chips { display: flex; gap: 6px; }
+.opinion-section { margin-bottom: 16px; }
+.opinion-section:last-child { margin-bottom: 0; }
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
 </style>

@@ -2,11 +2,11 @@
   <div class="g1-detail">
     <h3 class="sheet-title">G1-2 交易性金融资产明细表</h3>
     <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">新增证券</el-button>
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow()">新增证券</el-button>
     </div>
-    <el-segmented v-model="detail.segment" :options="segmentOptions" size="small" class="segment-bar" />
+    <el-segmented v-model="segment" :options="segmentOptions" size="small" class="segment-bar" />
 
-    <el-table :data="detail.rows" border size="small" max-height="500">
+    <el-table :data="rows" border size="small" max-height="500">
       <el-table-column prop="securityName" label="证券名称" width="140" fixed />
 
       <el-table-column
@@ -26,7 +26,7 @@
             v-model="row.investType"
             size="small"
             :disabled="isReadonly"
-            @change="detail.updateRow(row.id, { investType: row.investType })"
+            @change="updateRow(row.id, { investType: row.investType })"
           >
             <el-option v-for="o in investOptions" :key="o.value" :value="o.value" :label="o.label" />
           </el-select>
@@ -36,7 +36,7 @@
             v-model="row.fairValueSource"
             size="small"
             :disabled="isReadonly"
-            @change="detail.updateRow(row.id, { fairValueSource: row.fairValueSource })"
+            @change="updateRow(row.id, { fairValueSource: row.fairValueSource })"
           >
             <el-option value="1" label="Level 1" />
             <el-option value="2" label="Level 2" />
@@ -49,7 +49,7 @@
             size="small"
             :controls="false"
             :disabled="isReadonly"
-            @change="detail.updateRow(row.id, { [col.prop]: row[col.prop] })"
+            @change="updateRow(row.id, { [col.prop]: row[col.prop] })"
           />
           <!-- 日期 -->
           <el-input
@@ -58,7 +58,7 @@
             size="small"
             :disabled="isReadonly"
             placeholder="YYYY-MM-DD"
-            @change="detail.updateRow(row.id, { [col.prop]: row[col.prop] })"
+            @change="updateRow(row.id, { [col.prop]: row[col.prop] })"
           />
           <!-- 文本 -->
           <el-input
@@ -66,27 +66,27 @@
             v-model="row[col.prop]"
             size="small"
             :disabled="isReadonly"
-            @change="detail.updateRow(row.id, { [col.prop]: row[col.prop] })"
+            @change="updateRow(row.id, { [col.prop]: row[col.prop] })"
           />
         </template>
       </el-table-column>
 
       <el-table-column label="操作" width="60" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="!isReadonly" size="small" type="danger" link @click="detail.removeRow(row.id)">删</el-button>
+          <el-button v-if="!isReadonly" size="small" type="danger" link @click="removeRow(row.id)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <!-- 分类小计 + 总计 -->
     <div class="totals">
-      <div v-for="st in detail.subtotalsByType" :key="st.investType" class="subtotal-line">
+      <div v-for="st in subtotalsByType" :key="st.investType" class="subtotal-line">
         <span class="subtotal-label">{{ st.investLabel }}小计({{ st.count }})</span>
         期末成本 {{ fmtCell(st.totals.closingCost) }} · 公允价值 {{ fmtCell(st.totals.closingFairValue) }} · 审定 {{ fmtCell(st.totals.adjusted) }}
       </div>
       <div class="grand-total">
         <span class="subtotal-label">总计</span>
-        期末成本 {{ fmtCell(detail.grandTotal.closingCost) }} · 公允价值 {{ fmtCell(detail.grandTotal.closingFairValue) }} · 投资收益合计 {{ fmtCell(detail.grandTotal.totalIncome) }} · 审定 {{ fmtCell(detail.grandTotal.adjusted) }}
+        期末成本 {{ fmtCell(grandTotal.closingCost) }} · 公允价值 {{ fmtCell(grandTotal.closingFairValue) }} · 投资收益合计 {{ fmtCell(grandTotal.totalIncome) }} · 审定 {{ fmtCell(grandTotal.adjusted) }}
       </div>
     </div>
   </div>
@@ -107,7 +107,18 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
-const detail = useG1Detail({
+// 解构到顶层：composable 返回的 ref 只有作为顶层绑定时才会在模板中自动解包
+// （嵌套访问 detail.rows / detail.grandTotal.x 不解包 → el-table 收到 ref、computed.x 为 undefined）
+const {
+  segments,
+  segment,
+  rows,
+  subtotalsByType,
+  grandTotal,
+  addRow,
+  updateRow,
+  removeRow,
+} = useG1Detail({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
@@ -115,10 +126,10 @@ const detail = useG1Detail({
 
 const investOptions = G1_INVEST_TYPE_OPTIONS
 
-const segmentOptions = detail.segments.map((s) => ({ label: s.label, value: s.key }))
+const segmentOptions = segments.map((s) => ({ label: s.label, value: s.key }))
 
 const currentColumns = computed(() => {
-  const seg = detail.segments.find((s) => s.key === detail.segment.value)
+  const seg = segments.find((s) => s.key === segment.value)
   // 基础信息区段的证券名称已作为 fixed 列展示，避免重复
   return (seg?.columns ?? []).filter((c) => c.prop !== 'securityName')
 })

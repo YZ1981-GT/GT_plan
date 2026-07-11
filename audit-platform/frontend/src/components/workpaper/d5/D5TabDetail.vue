@@ -1,30 +1,57 @@
 <template>
 <div class="d5-detail">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表列示应收款项融资（科目1124）明细，按"应收票据"与"应收账款"两类归集，采用出售（背书/贴现）模式管理的票据/账款以公允价值计量（FVOCI）。</p>
+        <p>2. 灰色底纹列为自动计算列（期初审定/期末余额/期末未审/期末审定），不可手工编辑。</p>
+        <p>3. 支持从 D1-6（出售模式票据）、D2-13（出售模式账款）及余额表一键导入明细。</p>
+        <p>4. 各类别自动生成小计行，全表生成合计行，请与 D5-1 审定表按类别聚合核对一致。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实应收款项融资各明细项目期末余额的存在与准确，确认按出售模式分类计量的恰当性，为审定表按类别聚合提供依据。"
+      class="objective-alert"
+    />
+
     <!-- 工具栏 -->
-    <div class="detail-toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
-        添加明细行
-      </el-button>
-      <el-button size="small" :disabled="isReadonly" @click="importFromD1">
-        从D1导入(出售模式票据)
-      </el-button>
-      <el-button size="small" :disabled="isReadonly" @click="importFromD2">
-        从D2导入(出售模式账款)
-      </el-button>
-      <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">
-        从余额表导入
-      </el-button>
-      <el-button size="small" :disabled="isReadonly" @click="exportTemplate">导出空模板</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="exportData">导出数据</el-button>
-      <el-upload
-        :show-file-list="false"
-        accept=".xlsx"
-        :auto-upload="false"
-        :disabled="isReadonly || importing"
-        @change="(f: any) => onImportFile(f.raw || f)"
-      >
-        <el-button size="small" :disabled="isReadonly || importing">导入数据</el-button>
-      </el-upload>
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加明细行</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="importFromD1">从D1导入(出售模式票据)</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="importFromD2">从D2导入(出售模式账款)</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx"
+                  :auto-upload="false"
+                  :disabled="isReadonly || importing"
+                  @change="(f: any) => onImportFile(f.raw || f)"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:D1-6" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:D2-13" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <div v-if="useVirtualScroll" class="virtual-toolbar">
@@ -76,8 +103,8 @@
           </el-select>
           <span v-else>
             {{ row.category }}
-            <GtIndexChip v-if="row.category === '应收票据'" wp-code="D1-6" label="D1-6" />
-            <GtIndexChip v-if="row.category === '应收账款'" wp-code="D2-13" label="D2-13" />
+            <GtIndexChip v-if="row.category === '应收票据'" value="wp:D1-6" :context-project-id="projectId" />
+            <GtIndexChip v-if="row.category === '应收账款'" value="wp:D2-13" :context-project-id="projectId" />
           </span>
         </template>
       </el-table-column>
@@ -153,7 +180,7 @@
       </el-table-column>
 
       <!-- F: 期初审定 (自动) -->
-      <el-table-column label="期初审定" width="110" align="right">
+      <el-table-column label="期初审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span>
         </template>
@@ -214,7 +241,7 @@
       </el-table-column>
 
       <!-- J: 期末余额 (自动) -->
-      <el-table-column label="期末余额" width="110" align="right">
+      <el-table-column label="期末余额" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endBalance) }}</span>
         </template>
@@ -239,7 +266,7 @@
       </el-table-column>
 
       <!-- L: 期末未审余额 (自动) -->
-      <el-table-column label="期末未审" width="110" align="right">
+      <el-table-column label="期末未审" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endUnadjusted) }}</span>
         </template>
@@ -282,7 +309,7 @@
       </el-table-column>
 
       <!-- O: 期末审定余额 (自动) -->
-      <el-table-column label="期末审定" width="110" align="right">
+      <el-table-column label="期末审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endAudited) }}</span>
         </template>
@@ -336,26 +363,39 @@
     </el-table>
     </div>
 
-    <!-- 审计说明区域 -->
-    <div class="audit-notes-section">
-      <h4>审计说明</h4>
-      <el-input
-        v-model="auditExplanation"
-        type="textarea"
-        :rows="3"
-        :disabled="isReadonly"
-        placeholder="对明细表本期变动的分析说明..."
-      />
-      <div class="note-actions">
-        <el-button
-          size="small"
-          :disabled="isReadonly || !aiAvailable || aiLoading"
-          :loading="aiLoading"
-          @click="genDetailNote"
-        >🤖AI</el-button>
-        <el-button size="small" @click="openReview('D5-detail-note')">💬 复核</el-button>
+    <!-- 审计意见区（卡片式） -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:D5-1" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D1-6" :context-project-id="projectId" />
+            <GtIndexChip value="wp:D2-13" :context-project-id="projectId" />
+          </div>
+        </div>
+      </template>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">审计说明</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoading"
+                :disabled="isReadonly || !aiAvailable" @click="genDetailNote">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReview('D5-detail-note')">💬</el-button>
+          </div>
+        </div>
+        <el-input
+          v-model="auditExplanation"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 7 }"
+          :disabled="isReadonly"
+          placeholder="对明细表本期变动的分析说明..."
+        />
       </div>
-    </div>
+    </el-card>
 </div>
 </template>
 
@@ -389,10 +429,12 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
@@ -423,7 +465,7 @@ const {
   importFromD2,
   importFromAuxBalance,
 } = useD5Detail({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
@@ -467,7 +509,7 @@ const {
 const auditExplanation = ref('')
 
 watch(
-  () => props.allResponses.value.get('D5-2-note-explanation')?.remark,
+  () => allResponsesRef.value.get('D5-2-note-explanation')?.remark,
   (val) => { auditExplanation.value = val || '' },
   { immediate: true },
 )
@@ -477,6 +519,8 @@ watch(auditExplanation, (val) => {
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 
 async function genDetailNote() {
   if (props.isReadonly) return
@@ -560,12 +604,63 @@ function openReview(sectionId: string) {
 
 <style scoped>
 .d5-detail {
-  padding: 16px;
+  padding: 12px;
+}
+.d5-detail :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d5-detail :deep(.el-table .cell) {
+  font-size: 13px !important;
 }
 
-.mode-toolbar {
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
   margin-bottom: 12px;
 }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .virtual-toolbar {
   display: flex;
@@ -573,49 +668,70 @@ function openReview(sectionId: string) {
   gap: 12px;
   margin-bottom: 8px;
 }
-
 .virtual-hint {
   flex: 1;
 }
 
-.detail-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-radius: 6px;
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
 }
-
 .auto-calc {
   background: #f5f7fa;
   padding: 2px 6px;
   border-radius: 2px;
   color: #909399;
 }
-
 .subtotal-label {
   font-weight: 700;
 }
-
 .subtotal-amount {
   font-weight: 700;
 }
 
-.audit-notes-section {
-  margin-top: 20px;
+/* 审计意见卡片 */
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
 }
-
-.audit-notes-section h4 {
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 10px;
+  color: #303133;
 }
-
-.note-actions {
+.opinion-chips {
   display: flex;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
 }
 </style>

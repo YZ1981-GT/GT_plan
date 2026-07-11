@@ -323,7 +323,7 @@
  * 科目：2401 递延收益（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+收到(贷方增加)-分摊(借方减少)
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useK7Adjudication, type K7AdjRow } from '../../composables/useK7Adjudication'
@@ -331,10 +331,13 @@ import { useK7Adjudication, type K7AdjRow } from '../../composables/useK7Adjudic
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   tbData: { unadjusted2401: number; audited2401: number }
   isReadonly: boolean
 }>()
+
+// 父组件模板绑定会自动解包顶层 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -346,7 +349,7 @@ const openReviewDialog = inject<(id: string, label?: string) => void>('openRevie
 // ─── Composable wiring ───────────────────────────────────────────────────────
 
 const adj = useK7Adjudication({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   saveResponse: async (field: string, value: any) => {
     emit('save', field, value)
   },

@@ -11,6 +11,11 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：确认非一揽子交易下处置子公司股权的处置损益计算准确（个别报表=对价−账面−应收股利+可转损益OCI；合并层面另加合并调整与净资产份额影响），会计处理符合 CAS2/CAS33，处置时点及对价确认恰当。
+    </el-alert>
+
     <el-skeleton v-if="!props.htmlData" :rows="6" animated />
     <div v-else class="disposal-single-content">
       <!-- 47行×14列单表（横向可滚动，固定前2列，max-height虚拟滚动） -->
@@ -64,6 +69,19 @@
         placeholder="对非一揽子处置的审计结论..."
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>个别处置损益 = 处置对价 − 处置日账面价值 − 应收股利 + 结转的可转损益OCI（CAS2）</li>
+        <li>合并处置损益 = 处置对价 − 享有子公司自购买日持续计算的净资产份额 ± 合并层面商誉/调整</li>
+        <li>处置部分股权但未丧失控制权：不确认损益，差额调整资本公积（合并层面）</li>
+        <li>丧失控制权：剩余股权按丧失控制权日公允价值重新计量，差额计入投资收益</li>
+        <li>与被投资方相关的其他综合收益，按处置比例结转（可结转部分转投资收益/留存收益）</li>
+        <li>公式列显示虚线下划线，鼠标悬停可查看公式来源</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -132,6 +150,10 @@ async function handleAi(section: string): Promise<void> {
 
 <style scoped>
 .g7-tab-disposal-single { padding: 12px; font-size: 13px; }
+.audit-objective { margin-bottom: 12px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.prep-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.prep-hint ul { margin: 4px 0 0 16px; line-height: 1.8; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

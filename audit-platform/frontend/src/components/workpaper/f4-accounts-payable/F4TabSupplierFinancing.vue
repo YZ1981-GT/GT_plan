@@ -12,6 +12,7 @@ import { inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { useF4SupplierFinancing } from '../composables/useF4SupplierFinancing'
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -118,8 +119,17 @@ function fmtAmount(v: number): string {
       </div>
     </details>
 
+    <el-alert
+      class="audit-objective"
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：检查保理、票据融资及供应链融资是否满足终止确认条件(IFRS 9/CAS 23)，评估是否应重分类为金融负债，防止负债表外化。"
+    />
+
     <div class="section-toolbar">
-      <div class="toolbar-left">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -130,8 +140,8 @@ function fmtAmount(v: number): string {
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-      </div>
-      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F4-2" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ factoringRows.length + noteRows.length + supplyChainRows.length }} 行</el-tag>
         <el-button
           v-if="openReviewDialog"
           size="small"
@@ -408,29 +418,35 @@ function fmtAmount(v: number): string {
       </div>
     </div>
 
-    <el-card class="audit-card" shadow="never">
+    <el-card class="opinion-card" shadow="never">
       <template #header>
-        <div class="card-header">
-          <span>审计结论</span>
-          <div class="header-actions">
-            <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="generateAiConclusion">
-              ✨ AI生成
-            </el-button>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+          <div class="opinion-chips">
+            <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
+          </div>
+        </div>
+      </template>
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">审计结论</span>
+          <div class="opinion-actions">
+            <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="generateAiConclusion">🤖 AI辅助</el-button>
             <el-button
               v-if="openReviewDialog"
               size="small"
               @click="openReviewDialog('f4-9-conclusion')"
-            >复核</el-button>
+            >💬</el-button>
           </div>
         </div>
-      </template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 10 }"
-        :disabled="isReadonly"
-        placeholder="请输入供应商融资检查审计结论，或点击AI生成..."
-      />
+        <el-input
+          v-model="auditConclusion"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 10 }"
+          :disabled="isReadonly"
+          placeholder="请输入供应商融资检查审计结论，或点击AI辅助生成..."
+        />
+      </div>
     </el-card>
   </div>
 </template>
@@ -441,15 +457,28 @@ function fmtAmount(v: number): string {
 }
 .guidance-details {
   margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
   font-size: 13px;
 }
 .guidance-details .guidance-content {
-  padding: 8px 12px;
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.8;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-details .guidance-content p {
+  margin: 2px 0;
+}
+.audit-objective {
+  margin-bottom: 12px;
 }
 .section-toolbar {
   display: flex;
@@ -465,6 +494,11 @@ function fmtAmount(v: number): string {
 .toolbar-right {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 .region-section {
   margin-bottom: 20px;
@@ -508,16 +542,45 @@ function fmtAmount(v: number): string {
   flex-wrap: wrap;
   font-size: 13px;
 }
-.audit-card {
-  margin-top: 12px;
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
 }
-.card-header {
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
 }
-.header-actions {
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
 }
 </style>

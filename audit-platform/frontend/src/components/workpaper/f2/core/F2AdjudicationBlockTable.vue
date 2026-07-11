@@ -108,5 +108,7 @@ function onUpdate(rowKey: string, field: string, value: number) {
 </script>
 
 <style scoped>
+:deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+:deep(.el-table .cell) { font-size: 13px !important; }
 .formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }
 </style>

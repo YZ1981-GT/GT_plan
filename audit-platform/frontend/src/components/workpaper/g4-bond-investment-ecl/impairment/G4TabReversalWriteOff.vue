@@ -15,6 +15,14 @@
 -->
 <template>
   <div class="g4-reversal-writeoff">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资减值准备转回（收回）与核销的依据充分、程序合规，转回不超过累计计提，关注核销中的关联交易。"
+      style="margin-bottom: 12px"
+    />
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-12 减值准备转回（收回）、核销检查表</h3>

@@ -158,6 +158,15 @@
       <el-input :model-value="fv.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly" @update:model-value="fv.updateConclusion" />
     </el-card>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>依据 CAS 39《公允价值计量》，按输入值可观察程度划分三层次；Level3 使用不可观察输入值时须记录估值技术、关键参数及敏感性分析。</p>
+        <p>审定FV = 审定数量 × 审定单价；关注估值方法与上期是否一致，不一致须说明变更理由及影响。</p>
+        <p>Level3 负债的期末公允价值变动应与 G10-6 第三层次调节表勾稽。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -204,4 +213,6 @@ function fmt(v: number) {
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 :deep(.l3-required .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

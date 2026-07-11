@@ -1,11 +1,28 @@
 <template>
 <div class="d3-adjustment">
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 预付账款（科目1123）调整分录应按实际调整事项逐笔编制，确保借贷平衡。</p>
+      <p>2. 账项调整（AJE）影响审定数；重分类调整（RJE）仅改变列报位置，不影响损益。</p>
+      <p>3. 常见调整：长期挂账转其他应收款/坏账、关联方预付重分类、错误计提冲回等。</p>
+      <p>4. 勾选后可推送至 A13 错报汇总表，由业务合伙人最终评估影响。</p>
+    </div>
+  </details>
+
   <!-- 工具栏 -->
-  <div class="adj-toolbar">
-    <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增调整分录</el-button>
-    <el-button size="small" :disabled="isReadonly || selectedRowIds.length === 0" @click="pushToA13">
-      推送至A13（{{ selectedRowIds.length }}条）
-    </el-button>
+  <div class="tab-toolbar">
+    <div class="toolbar-left">
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增调整分录</el-button>
+      <el-button size="small" :disabled="isReadonly || selectedRowIds.length === 0" @click="pushToA13">
+        推送至A13（{{ selectedRowIds.length }}条）
+      </el-button>
+    </div>
+    <div class="toolbar-right">
+      <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
   </div>
 
   <!-- 调整分录表 -->
@@ -86,24 +103,11 @@
   </el-table>
 
   <!-- 借贷合计 + 平衡指示 -->
-  <div class="balance-row">
-    <span>借方合计：{{ fmtAmount(debitTotal) }}</span>
-    <span>贷方合计：{{ fmtAmount(creditTotal) }}</span>
-    <span :class="isBalanced ? 'balanced' : 'unbalanced'">
-      {{ isBalanced ? '✓ 借贷平衡' : `✗ 差额：${fmtAmount(balanceDiff)}` }}
-    </span>
+  <div class="tb-check-row">
+    <span class="tb-label">借方合计 {{ fmtAmount(debitTotal) }} · 贷方合计 {{ fmtAmount(creditTotal) }}</span>
+    <el-tag v-if="isBalanced" type="success" size="small">借贷平衡</el-tag>
+    <el-tag v-else type="danger" size="small">差额 {{ fmtAmount(balanceDiff) }}</el-tag>
   </div>
-
-  <!-- 编制提示 -->
-  <details class="compile-hint">
-    <summary>📋 编制提示</summary>
-    <div class="hint-content">
-      1. 调整分录应按实际调整事项逐笔编制，确保借贷平衡。<br/>
-      2. 账项调整（AJE）影响审定数，重分类调整（RJE）不影响损益。<br/>
-      3. 完成后可将分录推送至A13错报汇总表，由业务合伙人最终评估。<br/>
-      4. 分录类别选择：账项调整=已确认错报；重分类调整=仅改变列报位置。
-    </div>
-  </details>
 </div>
 </template>
 
@@ -112,18 +116,23 @@
  * F1TabAdjustment.vue — F1-3 调整分录汇总表
  * 10列表 + 借贷平衡 + 推送A13
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, toRef, type Ref } from 'vue'
 import { useF1Adjustment } from '../composables/useF1Adjustment'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
+// @ts-ignore - GtIndexChip may not have type declarations
+import GtIndexChip from '../GtIndexChip.vue'
+
 const props = defineProps<{
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  wpId: Ref<string>
-  projectId: Ref<string>
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId: string
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const selectedRowIds = ref<string[]>([])
 
@@ -138,9 +147,9 @@ const {
   updateCell,
   pushToA13,
 } = useF1Adjustment({
-  allResponses: props.allResponses,
-  wpId: props.wpId,
-  projectId: props.projectId,
+  allResponses: allResponsesRef,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
@@ -159,11 +168,22 @@ function fmtAmount(val: number | null | undefined): string {
 
 <style scoped>
 .d3-adjustment { padding: 16px; }
-.adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
-.balanced { color: #67c23a; }
-.unbalanced { color: #f56c6c; font-weight: 600; }
-.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
-.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
-.compile-hint .hint-content { padding: 8px 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
+.d3-adjustment :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.d3-adjustment :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 平衡核对行 */
+.tb-check-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #f5f7fa; border-radius: 4px; margin-top: 12px; font-size: 13px; }
+.tb-label { color: #909399; }
 </style>

@@ -63,6 +63,13 @@
       :is-readonly="isReadonly"
       @refresh="onReconcileRefresh"
     />
+
+    <details class="compile-hint">
+      <summary>📋 编制提示</summary>
+      <p>1. 上市公司口径披露 9 类公允价值变动收益来源+合计；本期发生额可「从明细同步」按 G13-2 所属科目汇总。</p>
+      <p>2. 上期发生额自 G13-1 审定表上期审定数带入；变动额=本期-上期，用于附注文字说明佐证。</p>
+      <p>3. 「发布审定数」后本组件自动同步审定合计（6101）（CAS 39 公允价值计量 / CAS 30 财务报表列报）。</p>
+    </details>
   </div>
 </template>
 
@@ -109,7 +116,9 @@ function onReconcileRefresh(): void {
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .sync-hint { margin-bottom: 12px; }
-.formula-cell { border-bottom: 1px dashed #909399; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #fafafa; display: inline-block; width: 100%; }
 .note-card { margin-top: 12px; }
+.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
+.compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 :deep(.g13-row-total) { font-weight: 700; background: #f5f7fa; }
 </style>

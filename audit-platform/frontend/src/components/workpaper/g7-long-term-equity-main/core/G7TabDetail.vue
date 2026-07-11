@@ -39,6 +39,11 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：核实各被投资单位长期股权投资明细的期初、本期变动及期末余额的完整性与准确性，验证成本法/权益法核算方法适当，账面价值、减值准备及权益法调整计算正确，并与 G7-1 审定表勾稽一致。
+    </el-alert>
+
     <!-- 5区段Tab切换 -->
     <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
 
@@ -1050,6 +1055,7 @@ onMounted(() => {
 
 <style scoped>
 .g7-detail { padding: 12px; font-size: 13px; }
+.audit-objective { margin-bottom: 12px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

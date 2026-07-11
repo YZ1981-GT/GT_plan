@@ -18,6 +18,7 @@ import {
   type ColumnDef,
 } from '../composables/useE1IpoSpecial'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -79,6 +80,37 @@ function formatCellValue(row: any, col: ColumnDef): string {
 
 <template>
   <div class="e1-tab-large-check">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 检查大额及异常现金/银行收支的真实性、合规性与业务实质。</p>
+        <p>2. 关注大额现金交易、频繁整数收支、无正常商业理由的资金往来及资金体外循环迹象。</p>
+        <p>3. 核对收支凭证、合同、审批手续是否齐全，金额、对方账户是否与业务匹配。</p>
+        <p>4. 重点关注与关联方、疑似虚构交易对手的大额资金往来，识别舞弊风险。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：检查大额及异常收支的真实性与合规性，识别资金舞弊及体外循环迹象。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-tag size="small" type="success">收支检查 (E1-23)</el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
         <el-table :data="rows" border stripe size="small" max-height="500" style="width: 100%">
@@ -88,10 +120,11 @@ function formatCellValue(row: any, col: ColumnDef): string {
             :label="col.label"
             :width="getColWidth(col)"
             :align="col.type === 'number' || col.type === 'computed' ? 'right' : 'left'"
+            :class-name="col.type === 'computed' ? 'auto-calc-col' : ''"
           >
             <template #default="{ row }">
               <!-- Computed: readonly -->
-              <span v-if="col.type === 'computed'" class="computed-cell">
+              <span v-if="col.type === 'computed'" class="auto-calc-value">
                 {{ formatCellValue(row, col) }}
               </span>
               <!-- Number -->
@@ -139,8 +172,6 @@ function formatCellValue(row: any, col: ColumnDef): string {
             </template>
           </el-table-column>
         </el-table>
-
-        <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRow">+ 添加行</el-button>
       </template>
     </el-skeleton>
   </div>
@@ -150,11 +181,67 @@ function formatCellValue(row: any, col: ColumnDef): string {
 .e1-tab-large-check {
   padding: 12px 0;
 }
-.computed-cell {
-  color: #606266;
-  font-style: italic;
+.e1-tab-large-check :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
 }
-.add-btn {
+.e1-tab-large-check :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
   margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
+}
+.auto-calc-value {
+  color: #606266;
 }
 </style>

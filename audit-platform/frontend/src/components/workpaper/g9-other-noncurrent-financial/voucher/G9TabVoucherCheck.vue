@@ -3,11 +3,21 @@
     <div class="section-head">
       <h3 class="sheet-title">G9-6 凭证检查表</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G9-6" />
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
         <G9ImportExportDropdown :wp-id="wpId" sheet="G9-6" @imported="onImported" />
         <GtVoucherSamplingEngine :project-id="projectId" :account-codes="['1504']" dialog-mode @filled="onSampleFilled" />
         <el-button v-if="!isReadonly" size="small" type="primary" plain @click="vc.addRow()">+ 新增</el-button>
       </div>
     </div>
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：抽取其他非流动金融资产相关凭证，核对原始单据、授权、账务处理、分类、公允价值与减值，识别异常并评估风险。"
+    />
+
     <div class="summary-bar" :class="{ 'summary-error': !vc.balanceOk.value }">
       借方合计 {{ fmt(debitTotal) }} | 贷方合计 {{ fmt(creditTotal) }} | 差额 {{ fmt(vc.balanceDiff.value) }}
     </div>
@@ -197,6 +207,14 @@
       <el-input :model-value="vc.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly" @update:model-value="vc.updateConclusion" />
     </el-card>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>按 CAS 1301 审计抽样：通过抽凭引擎按科目 1504 选取样本，或按截止基准日窗口一键取数（跨期自动标注）。</p>
+        <p>核对内容任一项为「否」则该凭证自动标记为异常；借贷合计差额应为 0。异常凭证须填写风险等级、异常说明与处理建议。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -352,7 +370,10 @@ onBeforeUnmount(() => {
 .g9-voucher { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 .summary-bar { padding: 8px 12px; background: #f5f7fa; font-size: 12px; margin-bottom: 8px; border-radius: 4px; }
 .summary-error { background: #fef0f0; color: #f56c6c; }
 .segment-tabs { margin-bottom: 8px; }

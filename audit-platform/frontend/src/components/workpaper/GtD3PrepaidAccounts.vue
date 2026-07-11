@@ -105,6 +105,7 @@
           :is-readonly="isReadonly"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
+          :year="props.year"
         />
         <D3TabDisclosureListed
           v-else-if="currentSheet === '附注上市'"

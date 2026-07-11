@@ -13,6 +13,7 @@
  * Requirements: 8.3
  */
 import { ref, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -124,6 +125,36 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="e1-tab-account-commitment">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 取得管理层关于银行账户完整性的书面承诺，作为账户完整性认定的支持证据。</p>
+        <p>2. 承诺书应由法定代表人或经授权的负责人签字并加盖公章确认。</p>
+        <p>3. 管理层承诺不能替代实质性审计程序，仍须执行账户核对（E1-10）与征信查询（E1-18）。</p>
+        <p>4. 承诺内容应与银行账户清单、征信报告相互印证，关注是否存在账外账户。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：取得管理层对银行账户完整性的书面承诺，支持货币资金完整性认定。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-tag size="small" type="success">银行账户情况承诺书 (E1-11)</el-tag>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-10" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <el-card shadow="never" class="commit-card">
       <template #header>
         <span class="card-title">银行账户情况承诺书</span>
@@ -182,6 +213,55 @@ onBeforeUnmount(() => {
 .e1-tab-account-commitment {
   padding: 12px 0;
 }
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .commit-card {
   max-width: 800px;
 }

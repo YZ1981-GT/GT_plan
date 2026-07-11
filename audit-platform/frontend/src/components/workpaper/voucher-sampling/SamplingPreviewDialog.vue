@@ -19,8 +19,9 @@
  * Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 7.5
  */
 import { computed, ref } from 'vue'
-import { Search } from '@element-plus/icons-vue'
-import type { SampledVoucher, CoverageStats, FillMode, CheckResult } from '../composables/useSamplingAlgorithms'
+import { Search, Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import type { SampledVoucher, CoverageStats, FillMode, CheckResult, Phase } from '../composables/useSamplingAlgorithms'
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -33,9 +34,13 @@ interface Props {
   selectedCount: number
   selectedDebitTotal: number
   selectedCreditTotal: number
+  /** 当前审计阶段，用于手工新增行标注 phase */
+  phase?: Phase
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  phase: 'preliminary',
+})
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
@@ -72,19 +77,64 @@ const checkResultOptions: { value: CheckResult; label: string }[] = [
   { value: '异常', label: '异常' },
 ]
 
-// ─── 追加按钮：搜索弹窗（placeholder UI） ────────────────────────────────────
+// ─── 追加按钮：人工增补凭证（凭证号去重）─────────────────────────────────────
 
 const appendSearchVisible = ref(false)
-const appendSearchKeyword = ref('')
+const appendForm = ref<{ voucherNo: string; voucherDate: string; debitAmount: string; creditAmount: string; summary: string }>(
+  { voucherNo: '', voucherDate: '', debitAmount: '', creditAmount: '', summary: '' },
+)
 
 function handleOpenAppendSearch() {
+  appendForm.value = { voucherNo: '', voucherDate: '', debitAmount: '', creditAmount: '', summary: '' }
   appendSearchVisible.value = true
-  appendSearchKeyword.value = ''
 }
 
+/**
+ * 人工新增勾选一条系统抽样未选中的凭证（R6.2）；按凭证号去重（R6.4）。
+ * 若凭证号已存在则改为勾选该已有行而不重复添加。
+ */
 function handleAppendSearch() {
-  // placeholder：后续实现从序时账搜索追加
+  const no = appendForm.value.voucherNo.trim()
+  if (!no) {
+    ElMessage.warning('请填写凭证号')
+    return
+  }
+  // 凭证号去重：已存在则仅勾选
+  const existing = props.vouchers.find(v => v.voucherNo === no)
+  if (existing) {
+    existing.selected = true
+    ElMessage.info(`凭证号 ${no} 已存在，已为其勾选`)
+    appendSearchVisible.value = false
+    return
+  }
+  props.vouchers.push({
+    voucherNo: no,
+    voucherDate: appendForm.value.voucherDate || '',
+    summary: appendForm.value.summary || null,
+    debitAmount: appendForm.value.debitAmount ? String(appendForm.value.debitAmount) : null,
+    creditAmount: appendForm.value.creditAmount ? String(appendForm.value.creditAmount) : null,
+    accountCode: '',
+    accountName: null,
+    counterpartAccount: null,
+    voucherType: null,
+    accountingPeriod: null,
+    checkResult: '',
+    abnormal: false,
+    remark: '',
+    selected: true,
+    phase: props.phase,
+    editTrail: [],
+  })
+  ElMessage.success(`已新增凭证 ${no}`)
   appendSearchVisible.value = false
+}
+
+/**
+ * 人工删除（移出已勾选样本集合）某条凭证（R6.3）。
+ */
+function handleRemoveRow(row: SampledVoucher) {
+  const idx = props.vouchers.indexOf(row)
+  if (idx >= 0) props.vouchers.splice(idx, 1)
 }
 
 // ─── Methods ──────────────────────────────────────────────────────────────────
@@ -290,6 +340,28 @@ function handleConfirm() {
         </template>
       </el-table-column>
 
+      <!-- 高值必选标识（MUS，R17.4） -->
+      <el-table-column label="高值" width="70" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.isHighValue" size="small" type="danger" effect="plain">
+            高值必选
+          </el-tag>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+
+      <!-- 特定选取原因（inline 编辑，随样本回填，R6.5） -->
+      <el-table-column label="特定选取原因" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-model="row.selectionReason"
+            size="small"
+            placeholder="如：大额/关联方/异常"
+            clearable
+          />
+        </template>
+      </el-table-column>
+
       <!-- 备注（inline 编辑） -->
       <el-table-column label="备注" min-width="140">
         <template #default="{ row }">
@@ -298,6 +370,20 @@ function handleConfirm() {
             size="small"
             placeholder="输入备注"
             clearable
+          />
+        </template>
+      </el-table-column>
+
+      <!-- 操作：人工删除（移出样本，R6.3） -->
+      <el-table-column label="操作" width="70" align="center">
+        <template #default="{ row }">
+          <el-button
+            type="danger"
+            :icon="Delete"
+            circle
+            size="small"
+            plain
+            @click="handleRemoveRow(row)"
           />
         </template>
       </el-table-column>
@@ -330,27 +416,38 @@ function handleConfirm() {
       </el-button>
     </div>
 
-    <!-- ═══ 追加凭证搜索弹窗（Placeholder UI） ═══ -->
+    <!-- ═══ 人工增补凭证弹窗（凭证号去重）═══ -->
     <el-dialog
       v-model="appendSearchVisible"
-      title="追加凭证"
+      title="人工增补凭证"
       width="500px"
       append-to-body
       :close-on-click-modal="false"
     >
       <div class="append-search-content">
-        <el-input
-          v-model="appendSearchKeyword"
-          placeholder="输入凭证号/摘要/金额搜索"
-          clearable
-          style="margin-bottom: 12px"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <div class="append-search-placeholder">
-          <el-empty description="输入关键词从序时账中搜索凭证" :image-size="80" />
+        <el-form label-width="80px" size="small">
+          <el-form-item label="凭证号" required>
+            <el-input v-model="appendForm.voucherNo" placeholder="必填，如 记-0123" clearable>
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item label="日期">
+            <el-input v-model="appendForm.voucherDate" placeholder="如 2025-12-31" clearable />
+          </el-form-item>
+          <el-form-item label="借方金额">
+            <el-input v-model="appendForm.debitAmount" placeholder="选填（元）" clearable />
+          </el-form-item>
+          <el-form-item label="贷方金额">
+            <el-input v-model="appendForm.creditAmount" placeholder="选填（元）" clearable />
+          </el-form-item>
+          <el-form-item label="摘要">
+            <el-input v-model="appendForm.summary" placeholder="选填" clearable />
+          </el-form-item>
+        </el-form>
+        <div class="append-hint">
+          手工增补的凭证将默认勾选并纳入样本；相同凭证号自动去重。
         </div>
       </div>
       <template #footer>
@@ -462,16 +559,16 @@ function handleConfirm() {
   white-space: nowrap;
 }
 
-/* ── 追加搜索弹窗 ── */
+/* ── 人工增补弹窗 ── */
 .append-search-content {
   min-height: 200px;
 }
 
-.append-search-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 160px;
+.append-hint {
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  margin-top: 8px;
+  line-height: 1.5;
 }
 
 /* ── 表格内输入框优化 ── */

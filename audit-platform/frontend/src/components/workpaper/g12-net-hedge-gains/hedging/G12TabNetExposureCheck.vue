@@ -206,6 +206,14 @@
 
     </el-card>
 
+    <details class="methodology-hint">
+
+      <summary>📋 编制提示（CAS24 套期会计）</summary>
+
+      <p>按 5 区段逐项检查净敞口套期的合规性：净敞口定义、套期会计三要素、有效性条件、公允价值与文档、损益列报。每项须选择「是否合规」并评估风险等级；存在未合规项时须在结论中说明处理措施。全部行完成合规判断后方可「保存校验」。</p>
+
+    </details>
+
   </div>
 
 </template>
@@ -363,6 +371,10 @@ function rowClassName({ row }: { row: { compliance: string } }): string {
 .overall { margin-top: 8px; }
 
 .overall-head { display: flex; justify-content: space-between; align-items: center; }
+
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 
 .missing :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 

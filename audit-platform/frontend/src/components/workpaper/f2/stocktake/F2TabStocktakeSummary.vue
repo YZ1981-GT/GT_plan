@@ -1,5 +1,16 @@
 <template>
   <div class="f2-summary-wrapper">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表汇总监盘实施情况与结论，是存货监盘程序的总结底稿（CAS 1311 存货监盘）。</p>
+        <p>2. 记录实际监盘范围、抽盘结果、发现的差异及其处理，评价存货存在性与状况。</p>
+        <p>3. 对监盘中发现的异常（毁损 / 呆滞 / 第三方保管）应说明后续审计应对措施。</p>
+        <p>4. 可通过 📎 附件OCR识别，将现场记录内容填入对应字段。</p>
+      </div>
+    </details>
+
     <F2StocktakeSectionForm
       ref="sectionFormRef"
       title="监盘小结 F2-23"
@@ -100,6 +111,12 @@ function uploadOcr() {
 </script>
 
 <style scoped>
-.f2-summary-wrapper { font-size: 13px; }
+.f2-summary-wrapper { font-size: 13px; padding: 12px; }
 .ocr-attach-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid #ebeef5; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
 </style>

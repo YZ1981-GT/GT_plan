@@ -162,6 +162,18 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
   // 触发 debounce 2s 自动保存
   debounceSave()
 }
+
+/**
+ * 处理回写后 AI 复核弹窗 @applied（Req 26.5）：将确认后的复核意见填入审计结论。
+ * 确认前不定稿（弹窗内部保证），此处仅在用户确认后写入。
+ */
+function handleReviewApplied(text: string): void {
+  if (props.isReadonly || !text) return
+  const merged = auditConclusion.value
+    ? `${auditConclusion.value}\n\n【AI 复核意见】\n${text}`
+    : text
+  saveConclusion(merged)
+}
 </script>
 
 <template>
@@ -194,6 +206,7 @@ function handleAutoExtractFilled(payload: { samples: ExtractedVoucher[]; fillMod
             :project-id="projectId"
             :year="year"
             @filled="handleAutoExtractFilled"
+            @applied="handleReviewApplied"
           />
         </el-collapse-item>
       </el-collapse>

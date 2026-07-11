@@ -3,9 +3,15 @@
     <div class="section-head">
       <h3 class="sheet-title">G5-1 审定表</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G5-1" />
+        <el-tag size="small" type="info">共 {{ flatRows.length }} 行</el-tag>
         <GtReviewTrigger section-id="g5-1-adjudication" />
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      核对长期应收款原值、坏账准备、净值及一年内到期非流动资产的期初期末审定数，验证与试算表勾稽一致，分析重大变动原因。
+    </el-alert>
 
     <!-- TB差异提示 -->
     <div v-if="Math.abs(adjudication.variance.value) > 0.01" class="variance-alert">
@@ -73,12 +79,24 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>审定数 = 未审数 + AJE + RJE（期初、期末分别计算）</li>
+        <li>三、净值 = 一、原值合计 − 二、坏账准备合计</li>
+        <li>五、报表列示数 = 净值 − 四、一年内到期非流动资产</li>
+        <li>变动率 = (期末审定 − 期初审定) / 期初审定，绝对值超 20% 需填写原因分析（CAS 1301）</li>
+        <li>期末报表列示数应与试算表 1531 长期应收款审定余额一致</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useG5Adjudication } from '../../composables/useG5Adjudication'
+import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
@@ -114,6 +132,10 @@ function rowClassName({ row }: any) {
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .variance-alert { margin-bottom: 8px; }
+.audit-objective { margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .formula-cell {
   border-bottom: 1px dashed #999;
   cursor: help;

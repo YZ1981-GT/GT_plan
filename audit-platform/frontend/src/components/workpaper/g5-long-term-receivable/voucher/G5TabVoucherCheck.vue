@@ -3,12 +3,18 @@
     <div class="section-head">
       <h3 class="sheet-title">G5-12 凭证检查表</h3>
       <div class="head-actions">
+        <GtIndexChip value="wp:G5-12" />
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
         <GtReviewTrigger section-id="g5-12-voucher-check" />
         <GtVoucherSamplingEngine :project-id="props.projectId" :account-codes="[G5_ACCOUNT_CODE]" dialog-mode @filled="onSampleFilled" />
         <G5ImportExportDropdown :wp-id="props.wpId" sheet="G5-12" @imported="onImported" />
         <el-button size="small" type="primary" plain @click="vc.addRow()" :disabled="props.readonly">+ 新增</el-button>
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      对长期应收款重要凭证执行检查：核对摘要、对方科目、金额、日期、凭证号与业务实质，识别异常凭证并形成结论。
+    </el-alert>
 
     <div class="summary-bar" :class="{ 'summary-error': Math.abs(vc.debitTotal.value) > 0.01 }">
       借贷差额汇总：{{ fmt(vc.debitTotal.value) }} · 异常 {{ vc.abnormalCount.value }} 条
@@ -77,6 +83,16 @@
         </el-table-column>
       </template>
     </el-table>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>可用抽凭引擎按科目 1531 抽取样本，或用附件 📎 上传凭证 OCR 自动填入</li>
+        <li>"凭证基础"录入摘要/对方科目/金额/日期/凭证号；"核对内容"逐项打勾（✓/✗）</li>
+        <li>"结论"区标记是否异常并填写审计结论，来源标签区分手工/抽凭</li>
+        <li>借贷差额汇总应为 0，异常条数需在结论中说明处理情况</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -165,4 +181,8 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 .summary-error { background: #fef0f0; color: #f56c6c; }
 .segment-tabs { margin-bottom: 8px; }
 .attach-tag { font-size: 11px; color: #909399; }
+.audit-objective { margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 </style>

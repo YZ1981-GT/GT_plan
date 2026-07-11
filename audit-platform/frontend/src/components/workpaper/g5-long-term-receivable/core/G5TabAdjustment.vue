@@ -1,5 +1,18 @@
 <template>
   <div class="g5-adjustment">
+    <div class="section-head">
+      <h3 class="sheet-title">G5-4 调整分录汇总</h3>
+      <div class="head-actions">
+        <GtIndexChip value="wp:G5-4" />
+        <el-tag size="small" type="info">共 {{ adj.entries.value.length }} 行</el-tag>
+        <GtReviewTrigger section-id="g5-4-adjustment" />
+      </div>
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      汇总长期应收款相关审计调整分录（AJE）与重分类分录（RJE），校验借贷平衡，回写 G5-1 审定表调整列。
+    </el-alert>
+
     <!-- 借贷平衡提示 -->
     <div v-if="!adj.isBalanced.value" class="balance-alert">
       <el-alert type="error" :closable="false">
@@ -56,11 +69,23 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>每条分录须借贷平衡；表底借方合计应等于贷方合计，否则顶部红色告警</li>
+        <li>AJE（审计调整）影响审定数；RJE（重分类）不改变损益仅调整列报</li>
+        <li>摘要应清晰说明调整事由，科目代码/名称与会计科目表一致</li>
+        <li>调整分录经复核后回写 G5-1 审定表对应项目的 AJE/RJE 列</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useG5Adjustment } from '../../composables/useG5Adjustment'
+import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -78,6 +103,13 @@ function fmt(v: number): string {
 
 <style scoped>
 .g5-adjustment { font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .balance-alert { margin-bottom: 8px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .totals { font-size: 12px; color: #606266; margin-left: auto; }

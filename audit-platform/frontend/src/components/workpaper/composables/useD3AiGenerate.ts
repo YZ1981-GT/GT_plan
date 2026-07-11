@@ -15,6 +15,7 @@ export type D3AiSection =
   | 'analysis-note'
   | 'longterm-reason'
   | 'related-party-note'
+  | 'voucher-conclusion'
 
 export interface D3AiGenerateParams {
   section: D3AiSection

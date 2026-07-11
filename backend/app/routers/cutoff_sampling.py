@@ -44,7 +44,19 @@ router = APIRouter(
 
 
 class CutoffFillRequest(BaseModel):
-    """截止测试填充请求 — 记录日志"""
+    """截止测试填充请求 — 记录日志
+
+    extraction_criteria 为自由格式 JSON，除既有截止条件外，向后兼容承接抽样方法学
+    留痕字段（均可选，前端按需写入，后端原样持久化、不校验、不拒绝）：
+      - confidence_level      置信度/信赖水平
+      - tolerable_misstatement 可容忍错报
+      - expected_misstatement  预期错报
+      - suggested_sample_size  系统建议样本量
+      - resample_reason        重抽原因
+      - sampling_interval      MUS 抽样间隔
+    这些字段随 extraction_criteria 一并存入 workpaper_extraction_log，供
+    voucher-history 回显与版本链留痕使用。
+    """
 
     workpaper_id: UUID
     extraction_type: str = "cutoff"

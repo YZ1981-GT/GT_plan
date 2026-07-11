@@ -10,6 +10,18 @@
     </template>
 
     <template v-else>
+      <!-- 审计目标 -->
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="gt-confirmation-diff-securities__objective"
+      >
+        <template #title>
+          审计目标：核对证券投资函证回函的持仓数量、单位公允价值及总市值与账面记录是否一致，对存在差异的项目查明原因（估值时点／交易结算日／计量方法差异），确认账面金额的准确性与计价认定。
+        </template>
+      </el-alert>
+
       <div class="gt-confirmation-diff-securities__metrics">
         <el-row :gutter="12">
           <el-col :span="6">
@@ -28,7 +40,11 @@
       </div>
 
       <div class="gt-confirmation-diff-securities__toolbar">
-        <span class="gt-confirmation-diff-securities__section-title">证券投资函证差异核对</span>
+        <div class="gt-confirmation-diff-securities__toolbar-left">
+          <span class="gt-confirmation-diff-securities__section-title">证券投资函证差异核对</span>
+          <GtIndexChip value="wp:G0-3S" />
+          <el-tag size="small" type="info" effect="plain">共 {{ data.rows.value.length }} 行</el-tag>
+        </div>
         <div class="gt-confirmation-diff-securities__toolbar-right">
           <el-button v-if="!readonly" type="primary" size="small" @click="handleAdd">新增行</el-button>
           <el-button v-if="!readonly" type="success" size="small" :disabled="!data.isDirty.value" @click="handleSave">
@@ -85,7 +101,7 @@
         </el-table-column>
         <el-table-column label="数量差异" width="95" align="right">
           <template #default="{ row }">
-            <span class="formula-cell">{{ row.qty_diff }}</span>
+            <span class="formula-cell" title="回函持仓 − 账面持仓">{{ row.qty_diff }}</span>
           </template>
         </el-table-column>
         <el-table-column label="回函单位公允值" width="110" align="right">
@@ -102,7 +118,7 @@
         </el-table-column>
         <el-table-column label="公允价值差异" width="105" align="right">
           <template #default="{ row }">
-            <span class="formula-cell">{{ row.fv_diff }}</span>
+            <span class="formula-cell" title="回函单位公允值 − 账面单位公允值">{{ row.fv_diff }}</span>
           </template>
         </el-table-column>
         <el-table-column label="回函总市值" width="105" align="right">
@@ -119,7 +135,7 @@
         </el-table-column>
         <el-table-column label="市值差异" width="95" align="right">
           <template #default="{ row }">
-            <span class="formula-cell">{{ row.market_value_diff }}</span>
+            <span class="formula-cell" title="回函总市值 − 账面总市值">{{ row.market_value_diff }}</span>
           </template>
         </el-table-column>
         <el-table-column label="差异原因" min-width="130">
@@ -172,6 +188,16 @@
           </el-form-item>
         </el-form>
       </div>
+
+      <!-- 编制提示 -->
+      <details class="gt-confirmation-diff-securities__tips">
+        <summary>编制提示</summary>
+        <p>
+          依据 CAS 1312《函证》：证券投资一般通过中国结算（中登）或托管券商函证持仓与市值。回函与账面存在差异时，
+          应区分数量差异（持仓不符，追查交割单／对账单确认权属）与计价差异（单位公允值／总市值不符，多因估值时点或计量方法不同）。
+          有差异行以底色高亮，须在"差异原因／调节事项／核实结论"中记录处理，并评估是否需要调整分录。
+        </p>
+      </details>
     </template>
 
     <!-- 版本链抽屉 -->
@@ -195,6 +221,7 @@ import type { SecuritiesDiffRow } from './diffSecuritiesTypes'
 import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
 import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../../GtGridSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
@@ -257,6 +284,9 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
   padding: 12px;
   font-size: 13px;
 }
+.gt-confirmation-diff-securities__objective {
+  margin-bottom: 12px;
+}
 .gt-confirmation-diff-securities__metrics {
   margin-bottom: 12px;
 }
@@ -265,6 +295,11 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+}
+.gt-confirmation-diff-securities__toolbar-left {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 .gt-confirmation-diff-securities__section-title {
@@ -293,6 +328,27 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
   border-bottom: 1px dashed #c0c4cc;
   display: inline-block;
   min-width: 48px;
+  padding: 0 4px;
+  border-radius: 2px;
+  background: var(--el-fill-color-light);
+  cursor: help;
+}
+.gt-confirmation-diff-securities__tips {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  background: var(--el-fill-color-lighter);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.gt-confirmation-diff-securities__tips summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+}
+.gt-confirmation-diff-securities__tips p {
+  margin: 8px 0 0;
+  line-height: 1.6;
 }
 :deep(.row-has-diff) {
   background-color: #fdf6ec !important;

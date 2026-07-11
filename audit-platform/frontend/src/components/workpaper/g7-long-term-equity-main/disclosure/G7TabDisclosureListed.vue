@@ -1,5 +1,10 @@
 <template>
   <div class="g7-disclosure-listed">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：按上市公司附注格式披露长期股权投资的分类汇总、重要合营/联营企业信息、结构化主体、持股5%以上被投资单位及对外投资限制性条件，确认披露完整、准确并与审定数一致。
+    </el-alert>
+
     <!-- 附注披露信息（上市公司）：253行×13列，虚拟滚动 -->
     <el-skeleton v-if="!htmlData" :rows="8" animated />
     <template v-else>
@@ -427,6 +432,10 @@ function loadFromHtmlData(data: any): void {
 .g7-disclosure-listed {
   padding: 12px;
   font-size: 13px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
 }
 
 .virtual-scroll-container {

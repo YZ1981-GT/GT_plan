@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-3 交易性金融资产调整分录</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增分录</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-3-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实交易性金融资产（科目1501）审计调整分录（AJE）与重分类分录（RJE）的完整、准确与借贷平衡，确认调整依据充分、账务处理恰当。"
+      class="objective-alert"
+    />
 
     <el-table :data="rows" border size="small" max-height="500">
       <el-table-column prop="seq" label="序号" width="60">
@@ -91,7 +101,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>AJE=审计调整分录，RJE=重分类调整分录，需分别录入。</li>
         <li>每张凭证借贷方金额必须相等，底部实时校验借贷平衡。</li>
@@ -105,6 +115,7 @@
 import { ref, computed, inject, watch } from 'vue'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -199,9 +210,13 @@ watch(conclusion, (v) => {
 
 <style scoped>
 .g1-adjustment { padding: 12px; font-size: 13px; }
+.g1-adjustment :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-adjustment :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .balance-bar { display: flex; gap: 24px; align-items: center; margin: 14px 0; padding: 8px 12px; border-radius: 4px; }
 .balance-ok { background: #f0f9eb; color: #67c23a; }
 .balance-bad { background: #fef0f0; color: #f56c6c; }

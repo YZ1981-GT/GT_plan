@@ -5,7 +5,13 @@
       <p>有追索权保理通常<strong>不应</strong>终止确认 — 若企业终止确认=是，系统橙色警告</p>
     </div>
 
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      核查应收款保理业务是否满足金融资产终止确认条件，识别有追索权保理仍作终止确认的错误处理。
+    </el-alert>
+
     <div class="toolbar">
+      <GtIndexChip value="wp:G5-7" />
+      <el-tag size="small" type="info">共 {{ fc.rows.value.length }} 行</el-tag>
       <G5ImportExportDropdown :wp-id="props.wpId" sheet="G5-7" @imported="onImported" />
       <el-button size="small" type="primary" plain @click="fc.addRow()" :disabled="props.readonly">+ 新增</el-button>
     </div>
@@ -61,12 +67,23 @@
       <template #header><div class="section-header"><span>综合结论</span><el-button size="small" type="primary" text>AI 辅助</el-button></div></template>
       <el-input v-model="fc.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="props.readonly" />
     </el-card>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>终止确认五项条件：风险报酬转移、控制权转移、无继续涉入、无回购义务、公允反映</li>
+        <li>有追索权保理通常保留信用风险，一般<strong>不应</strong>终止确认；若企业已终止确认将橙色告警</li>
+        <li>逐笔录入债务人/保理商/金额/方式/终止确认判断及依据</li>
+        <li>结论应结合合同条款与风险报酬转移实质，异常笔数须专项说明（CAS 23）</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useG5FactoringCheck } from '../../composables/useG5FactoringCheck'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const fc = useG5FactoringCheck()
@@ -78,7 +95,11 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 <style scoped>
 .g5-factoring-check { font-size: 13px; }
 .method-context { margin-bottom: 12px; padding: 8px 12px; border-left: 3px solid #e6a23c; background: #fdf6ec; font-size: 12px; color: #865c0a; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 8px; }
+.audit-objective { margin-bottom: 12px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
+.toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
 .totals-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; font-size: 12px; }
 .warn-text { color: #e6a23c; font-weight: 600; }
 .conclusion-card { margin-top: 12px; }

@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-inventory-reconciliation">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：通过盘点日实存倒轧至资产负债表日，确认报表日证券结存数量与账面结存一致，差异已查明并说明。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section标题 + 复核按钮 -->
     <div class="section-header">
       <h3 class="section-title">G4-8 盘点倒轧结存表</h3>
@@ -240,18 +248,17 @@
  * - 差异行红色高亮 (|差异|>0)
  * - 合计行 + 审计结论 + AI辅助 + 复核对话
  */
-import { inject, toRef } from 'vue'
+import { inject, toRef, computed } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
 import { useG4SppiReconciliation, TAB_OPTIONS } from '@/composables/useG4SppiReconciliation'
 import type { ReconciliationItem, ReconciliationTab } from '@/composables/useG4SppiReconciliation'
+import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: any
-  debouncedSave: (itemId: string, data: any) => void
 }>()
 
 const emit = defineEmits<{
@@ -267,10 +274,17 @@ function emitAi(section: string): void {
   emit('aiGenerate', section)
 }
 
+// ─── 数据层（自包含：父级不传 allResponses/debouncedSave，对齐 G4TabBusinessModel） ───
+const formData = useG4SppiFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+formData.loadAll()
+
 // ─── composable ──────────────────────────────────────────────────────────────
 const reconciliationLogic = useG4SppiReconciliation({
-  allResponses: toRef(props, 'allResponses'),
-  debouncedSave: props.debouncedSave,
+  allResponses: formData.allResponses,
+  debouncedSave: formData.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
 })
 

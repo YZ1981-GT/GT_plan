@@ -129,6 +129,13 @@ function onUpdate(field: string, rowId: string, value: unknown): void {
 
 <style scoped>
 .f3-voucher-table-wrap { margin-bottom: 8px; }
+.f3-voucher-table-wrap :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.f3-voucher-table-wrap :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
 .scroll-hint {
   font-size: 12px;
   color: var(--el-text-color-secondary);

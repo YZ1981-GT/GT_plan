@@ -1,5 +1,13 @@
 <template>
   <div class="g4-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资期末余额（成本、利息调整、应计利息、减值准备、摊余成本）真实、准确、完整，审定数与试算平衡表勾稽一致。"
+      style="margin-bottom: 12px"
+    />
     <!-- Section 标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-1 债权投资审定表</h3>

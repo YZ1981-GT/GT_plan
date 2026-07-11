@@ -135,7 +135,7 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.5, 6.3
  * Requirements: 8.1-8.4
  */
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, toRef, defineAsyncComponent } from 'vue'
 import { Plus, Delete, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Litigation } from '../../composables/useK5Litigation'
@@ -149,7 +149,7 @@ const GtVoucherSamplingEngine = defineAsyncComponent(
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -157,6 +157,9 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+// 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const {
   litigationRows,
@@ -168,7 +171,7 @@ const {
   removeRow,
   setLawyerLetterRef,
 } = useK5Litigation({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   saveResponse: async (field: string, value: any) => {
     emit('save', `K5-${field}`, value)
   },

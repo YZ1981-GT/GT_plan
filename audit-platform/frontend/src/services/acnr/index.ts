@@ -16,3 +16,12 @@ export {
   type DisclosureSectionDeps,
   type DisclosureSectionReturn,
 } from './useDisclosureSection'
+
+export {
+  useAcnr,
+  type AcnrSheetEntry,
+  type AcnrCellEntry,
+  type AcnrResolveResult,
+  type AcnrInstanceResult,
+  type AcnrTreeNode,
+} from './useAcnr'

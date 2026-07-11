@@ -1,10 +1,15 @@
 <template>
   <div class="g13-adjustment">
+    <el-alert type="info" :closable="false" show-icon class="audit-objective"
+      title="审计目标：复核公允价值变动收益（6101）相关审计调整分录（AJE/RJE）借贷平衡、科目正确，并同步回明细表 G13-2（CAS 39 公允价值计量）" />
+
     <div class="adj-toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.addRow">+ 新增调整分录</el-button>
       <el-button size="small" :disabled="isReadonly || !adj.isBalanced.value" @click="adj.syncToDetail()">
         同步至明细表
       </el-button>
+      <el-tag size="small" type="info" effect="plain" data-testid="g13-adjustment-count">共 {{ adj.rows.value.length }} 行</el-tag>
+      <GtIndexChip value="wp:G13-3" :validate="false" />
       <CycleImportExportDropdown :wp-id="wpId" api-prefix="g13" sheet="G13-3"
         :disabled="isReadonly" @imported="emit('imported')" />
       <GtReviewTrigger section-id="G13-3-adjustment" />
@@ -85,6 +90,13 @@
         {{ adj.isBalanced.value ? '✓ 借贷平衡' : `✗ 差额：${fmtAmount(Math.abs(adj.balanceDiff.value))}` }}
       </span>
     </div>
+
+    <details class="compile-hint">
+      <summary>📋 编制提示</summary>
+      <p>1. AJE=审计调整分录，RJE=重分类调整分录；每笔分录借贷必须平衡后方可「同步至明细表」。</p>
+      <p>2. 公允价值变动损益科目编码 6101，借方增加对应损失、贷方增加对应收益；净额同步回 G13-2 明细表其他行。</p>
+      <p>3. 可经「截止性测试」结果一键回填基准日附近的跨期分录（CAS 39 公允价值计量）。</p>
+    </details>
   </div>
 </template>
 
@@ -97,6 +109,7 @@ import type { GCycleCutoffFilledDetail } from '../composables/gCycleCutoffFill'
 import { GCYCLE_CUTOFF_EVENT } from '../composables/gCycleCutoffFill'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtReviewDot from '../GtReviewDot.vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{
@@ -148,6 +161,9 @@ function fmtAmount(val: number): string {
 
 <style scoped>
 .g13-adjustment { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
+.compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 .adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 .balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
 .balanced { color: #67c23a; }

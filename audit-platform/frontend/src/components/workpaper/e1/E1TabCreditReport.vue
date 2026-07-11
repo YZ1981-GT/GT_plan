@@ -14,6 +14,7 @@
  * Requirements: 10.1-10.2
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount } from 'vue'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -212,6 +213,40 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="e1-tab-credit-report">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 通过中国人民银行征信系统查询企业信用报告，取得贷款卡编码及查询授权。</p>
+        <p>2. 核对征信报告披露的银行账户、贷款卡与账面记录（E1-10 账户核对）的一致性。</p>
+        <p>3. 关注征信报告中的未入账借款、对外担保、票据承兑等或有事项。</p>
+        <p>4. 核对差异应查明原因并评估对财务报表（负债完整性）的影响。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过征信报告核查银行账户与借款的完整性，识别未入账负债与或有事项。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-tag size="small" :type="variant === 'check' ? 'warning' : 'success'">
+          {{ variant === 'check' ? '征信核对 (E1-19)' : '征信查询 (E1-18)' }}
+        </el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-10" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- Query Mode (E1-18) -->
     <template v-if="variant === 'query'">
       <el-table :data="rows" border stripe size="small" max-height="500" style="width: 100%">
@@ -246,7 +281,7 @@ onBeforeUnmount(() => {
               @change="(val: string) => updateQueryCell(row.id, 'queryResult', val)" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="70" align="center">
+        <el-table-column label="操作" width="70" align="center" fixed="right">
           <template #default="{ row }">
             <el-button v-if="!isReadonly" type="danger" text size="small" @click="removeRow(row.id)">删除</el-button>
           </template>
@@ -277,9 +312,9 @@ onBeforeUnmount(() => {
               @change="(val: number) => updateCheckCell(row.id, 'bookAmount', val ?? 0)" />
           </template>
         </el-table-column>
-        <el-table-column label="差异" width="130" align="right">
+        <el-table-column label="差异" width="130" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            <span class="computed-cell">{{ displayPrefs.fmtAmount((row as CheckRow).diff) }}</span>
+            <span class="auto-calc-value">{{ displayPrefs.fmtAmount((row as CheckRow).diff) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="核对结果" min-width="120">
@@ -291,15 +326,13 @@ onBeforeUnmount(() => {
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="70" align="center">
+        <el-table-column label="操作" width="70" align="center" fixed="right">
           <template #default="{ row }">
             <el-button v-if="!isReadonly" type="danger" text size="small" @click="removeRow(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
     </template>
-
-    <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRow">+ 添加行</el-button>
   </div>
 </template>
 
@@ -307,11 +340,67 @@ onBeforeUnmount(() => {
 .e1-tab-credit-report {
   padding: 12px 0;
 }
-.computed-cell {
-  color: #606266;
-  font-style: italic;
+.e1-tab-credit-report :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
 }
-.add-btn {
+.e1-tab-credit-report :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
   margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
+}
+.auto-calc-value {
+  color: #606266;
 }
 </style>

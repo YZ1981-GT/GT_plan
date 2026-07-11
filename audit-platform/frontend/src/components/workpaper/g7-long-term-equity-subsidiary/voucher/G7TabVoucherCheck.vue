@@ -11,6 +11,11 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：抽取长期股权投资相关记账凭证，核对原始凭证完整性、授权审批、账务处理、金额准确性、科目分类及投资收益确认的正确性，确认凭证真实、合规且借贷平衡。
+    </el-alert>
+
     <el-skeleton v-if="!props.htmlData" :rows="6" animated />
     <div v-else class="voucher-check-content">
       <!-- 借贷差额汇总 -->
@@ -161,6 +166,19 @@
         placeholder="对凭证检查的审计结论..."
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>核对6要素：原始凭证完整、授权审批、账务处理正确、金额准确、科目分类恰当、投资收益确认无误</li>
+        <li>任一核对项未通过 → 该行"是否异常"自动标记为"是"，需在异常说明列填写原因</li>
+        <li>借贷合计应平衡，差额非0时红色高亮提示</li>
+        <li>可通过 📎 上传附件并OCR识别自动填充凭证信息</li>
+        <li>抽样应覆盖大额、异常及关联方相关的长期股权投资分录</li>
+        <li>3区段Tab（凭证基础/核对内容/结论）切换时保持行索引同步</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -280,6 +298,10 @@ async function handleAi(section: string): Promise<void> {
 
 <style scoped>
 .g7-tab-voucher-check { padding: 12px; font-size: 13px; }
+.audit-objective { margin-bottom: 12px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.prep-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.prep-hint ul { margin: 4px 0 0 16px; line-height: 1.8; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

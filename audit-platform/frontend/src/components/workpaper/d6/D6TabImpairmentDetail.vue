@@ -1,18 +1,52 @@
 <template>
 <div class="d6-tab-impairment-detail">
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 本表列示合同资产坏账准备（科目1403）明细，按"单项评估"与"信用风险组合"两类分别计提，对应 CAS22 金融工具减值 ECL 模型。</p>
+      <p>2. 灰色底纹列为自动计算列（期初审定/期末未审/期末审定），期末审定 = 期初审定 + 计提 + 其他增加 − 转回 − 核销 − 其他减少。</p>
+      <p>3. 单项评估适用于信用风险显著不同的合同资产；组合评估按账龄/信用风险特征分组，损失率取自 D6-8 ECL 测算。</p>
+      <p>4. 本表期末审定合计应与 D6-1 审定表坏账准备区块（block2）勾稽一致，差异需查明原因。</p>
+    </div>
+  </details>
+
+  <!-- 审计目标 -->
+  <el-alert
+    type="info"
+    :closable="false"
+    title="审计目标：确认合同资产坏账准备的计提方法（单项/组合）恰当，本期计提、转回、核销准确完整，期末余额与审定表及减值测算勾稽一致。"
+    class="objective-alert"
+  />
+
   <!-- 工具栏 -->
-  <div class="toolbar">
-    <el-button size="small" :disabled="isReadonly" @click="exportTemplate">导出空模板</el-button>
-    <el-button size="small" :disabled="isReadonly" @click="exportData">导出数据</el-button>
-    <el-upload
-      :show-file-list="false"
-      accept=".xlsx"
-      :auto-upload="false"
-      :disabled="isReadonly || importing"
-      @change="(f: any) => onImportFile(f.raw || f)"
-    >
-      <el-button size="small" :disabled="isReadonly || importing">导入数据</el-button>
-    </el-upload>
+  <div class="tab-toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+      <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData">导出数据</el-dropdown-item>
+            <el-dropdown-item>
+              <el-upload
+                :show-file-list="false"
+                accept=".xlsx"
+                :auto-upload="false"
+                :disabled="isReadonly || importing"
+                @change="(f: any) => onImportFile(f.raw || f)"
+              >
+                <span>导入数据</span>
+              </el-upload>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-1" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-8" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ singleRows.length + groupRows.length }} 行</el-tag>
+    </div>
   </div>
 
   <!-- 与 D6-1 block2 勾稽 -->
@@ -77,7 +111,7 @@
         </template>
       </el-table-column>
       <template v-for="col in numericCols" :key="'single-' + col.field">
-        <el-table-column :label="col.label" :width="col.width" align="right">
+        <el-table-column :label="col.label" :width="col.width" align="right" :class-name="col.auto ? 'auto-calc-col' : ''">
           <template #default="{ row }">
             <template v-if="row._isSubtotal">
               <span class="subtotal-amount">{{ fmtAmount(row[col.field]) }}</span>
@@ -125,7 +159,7 @@
         </template>
       </el-table-column>
       <template v-for="col in numericCols" :key="'group-' + col.field">
-        <el-table-column :label="col.label" :width="col.width" align="right">
+        <el-table-column :label="col.label" :width="col.width" align="right" :class-name="col.auto ? 'auto-calc-col' : ''">
           <template #default="{ row }">
             <template v-if="row._isSubtotal">
               <span class="subtotal-amount">{{ fmtAmount(row[col.field]) }}</span>
@@ -158,34 +192,54 @@
     <span>期末审定合计：<strong>{{ fmtAmount(totalRow.endAudited) }}</strong></span>
   </div>
 
-  <!-- 审计说明/结论 -->
-  <div class="audit-notes-section">
-    <h4>审计说明</h4>
-    <el-input
-      v-model="auditNotes.explanation"
-      type="textarea"
-      :autosize="{ minRows: 3, maxRows: 8 }"
-      :disabled="isReadonly"
-      placeholder="对减值准备明细的分析说明..."
-    />
-    <div class="note-actions">
-      <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genImpairmentNote">🤖AI</el-button>
-      <GtReviewTrigger section-id="D6-3-note-explanation" label="💬复核" />
+  <!-- 审计意见区（卡片式） -->
+  <el-card class="opinion-card" shadow="never">
+    <template #header>
+      <div class="opinion-header">
+        <span class="opinion-title">审计说明与结论</span>
+        <div class="opinion-chips">
+          <GtIndexChip value="wp:D6-1" :context-project-id="projectId" />
+          <GtIndexChip value="wp:D6-8" :context-project-id="projectId" />
+        </div>
+      </div>
+    </template>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">1. 审计说明</span>
+        <div class="opinion-actions">
+          <el-tooltip :content="aiTip" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoading"
+              :disabled="isReadonly || !aiAvailable" @click="genImpairmentNote">🤖 AI辅助</el-button>
+          </el-tooltip>
+          <GtReviewTrigger section-id="D6-3-note-explanation" label="💬 复核" />
+        </div>
+      </div>
+      <el-input
+        v-model="auditNotes.explanation"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="对减值准备明细的分析说明..."
+      />
     </div>
-  </div>
-  <div class="audit-notes-section">
-    <h4>审计结论</h4>
-    <el-input
-      v-model="auditNotes.conclusion"
-      type="textarea"
-      :autosize="{ minRows: 2, maxRows: 6 }"
-      :disabled="isReadonly"
-      placeholder="减值准备计提结论..."
-    />
-    <div class="note-actions">
-      <GtReviewTrigger section-id="D6-3-note-conclusion" label="💬复核" />
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">2. 审计结论</span>
+        <div class="opinion-actions">
+          <GtReviewTrigger section-id="D6-3-note-conclusion" label="💬 复核" />
+        </div>
+      </div>
+      <el-input
+        v-model="auditNotes.conclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="减值准备计提结论..."
+      />
     </div>
-  </div>
+  </el-card>
 </div>
 </template>
 
@@ -203,15 +257,20 @@ import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpe
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
+// @ts-ignore
+import GtIndexChip from '../GtIndexChip.vue'
+
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: any
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
@@ -238,7 +297,7 @@ const {
   updateCell,
   auditNotes,
 } = useD6ImpairmentDetail({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   crossSheet: props.crossSheet,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
@@ -247,6 +306,8 @@ const {
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD6AiGenerate(toRef(props, 'wpId'))
+
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 
 async function genImpairmentNote() {
   if (props.isReadonly) return
@@ -333,8 +394,54 @@ const {
 
 <style scoped>
 .d6-tab-impairment-detail { padding: 16px; }
+.d6-tab-impairment-detail :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d6-tab-impairment-detail :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
 
-.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .recon-alert { margin-bottom: 12px; }
 
@@ -344,13 +451,16 @@ const {
   gap: 12px;
   margin-bottom: 8px;
 }
-
 .virtual-hint { flex: 1; }
 
 .section-block { margin-bottom: 20px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-title { font-size: 14px; font-weight: 600; }
 
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
+}
 .auto-calc { background: #f5f7fa; padding: 2px 6px; border-radius: 2px; color: #909399; }
 .subtotal-label { font-weight: 700; }
 .subtotal-amount { font-weight: 700; }
@@ -366,7 +476,50 @@ const {
   font-size: 13px;
 }
 
-.audit-notes-section { margin-top: 16px; }
-.audit-notes-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.note-actions { display: flex; gap: 8px; margin-top: 6px; }
+/* 审计意见卡片 */
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 </style>

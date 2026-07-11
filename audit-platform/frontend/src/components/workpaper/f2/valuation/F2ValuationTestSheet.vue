@@ -1,5 +1,25 @@
 <template>
   <div class="f2-val-sheet">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 选取样本存货品种，按选定计价方法重新计算发出成本，与账面金额比对验证计价方法运用的正确性。</p>
+        <p>2. 灰色底纹列为自动计算列（审计金额 / 差异额 / 差异率），由系统按计价公式重算，不可手动编辑。</p>
+        <p>3. 差异率超过阈值（{{ thresholdRate }}%）的样本自动标红，须在测试结论中分析差异原因及影响。</p>
+        <p>4. {{ guidanceText }}</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：验证被审计单位发出存货计价方法运用的正确性与前后期一贯性，确认存货成本结转准确、无人为调节。"
+    />
+
     <header class="sheet-header">
       <div><h3>{{ title }}</h3><span class="code">{{ sheetCode }}</span></div>
       <div class="stat-row">
@@ -46,21 +66,27 @@
     </el-collapse>
 
     <!-- 工具栏 -->
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="$emit('addRow')">+ 新增样本</el-button>
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-val"
-        :sheet="sheetCode"
-        :disabled="isReadonly"
-        ai-section="valuation-conclusion"
-        :existing-content="testConclusion"
-        :related-context="{ exceedCount }"
-        :ai-title="`AI 生成 · ${title}结论`"
-        :review-section="`${sheetCode}-conclusion`"
-        @ai-filled="(t: string) => $emit('update:testConclusion', t)"
-      />
-      <el-segmented v-if="segments.length > 0" v-model="activeSegment" :options="segments" size="small" />
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="$emit('addRow')">+ 新增样本</el-button>
+        <el-segmented v-if="segments.length > 0" v-model="activeSegment" :options="segments" size="small" />
+      </div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-val"
+          :sheet="sheetCode"
+          :disabled="isReadonly"
+          ai-section="valuation-conclusion"
+          :existing-content="testConclusion"
+          :related-context="{ exceedCount }"
+          :ai-title="`AI 生成 · ${title}结论`"
+          :review-section="`${sheetCode}-conclusion`"
+          @ai-filled="(t: string) => $emit('update:testConclusion', t)"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ displayRows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- 动态行检查表(虚拟滚动>50行) -->
@@ -118,11 +144,6 @@
       />
     </el-card>
 
-    <!-- 编制提示(折叠) -->
-    <details class="guidance-details">
-      <summary>编制提示</summary>
-      <p>{{ guidanceText }}</p>
-    </details>
   </div>
 </template>
 
@@ -137,6 +158,7 @@ import { isVarianceExceeding } from '../../composables/useF2ValuationTestFormula
 import type { ValuationTestRow } from '../../composables/useF2ValuationTestFormulas'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 export interface SegmentOption {
@@ -208,18 +230,40 @@ defineExpose({ fmt, fmtRate, isExceed, activeSegment })
 
 <style scoped src="./f2ValSheetStyles.css"></style>
 <style scoped>
+.f2-val-sheet :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-val-sheet :deep(.el-table .cell) { font-size: 13px !important; }
+/* 编制提示（蓝色） */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+/* 审计目标 */
+.objective-alert { margin-bottom: 12px; }
+/* 抽样 */
 .sampling-form { margin-bottom: 8px; }
 .sampling-collapse { margin-bottom: 8px; }
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+/* 合计 */
 .totals { margin: 10px 0; font-size: 12px; color: #606266; }
 .exceed-stat { color: #f56c6c; font-weight: 600; }
+/* 计算列灰底 + 公式虚线 */
+.valuation-table :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .valuation-table :deep(.formula) {
   text-decoration: underline dotted #909399;
   cursor: help;
 }
-.conclusion-card { margin-top: 12px; }
-.conclusion-card :deep(.el-card__header) { padding: 8px 12px; font-size: 13px; }
-.conclusion-header { font-weight: 600; color: #606266; }
-.guidance-details { margin-top: 12px; font-size: 12px; color: #909399; }
-.guidance-details summary { cursor: pointer; font-weight: 500; }
-.guidance-details p { margin: 6px 0 0 12px; line-height: 1.6; }
+/* 结论卡片 */
+.conclusion-card { margin-top: 12px; border-radius: 8px; }
+.conclusion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.conclusion-header { font-weight: 600; color: #303133; font-size: 14px; }
 </style>

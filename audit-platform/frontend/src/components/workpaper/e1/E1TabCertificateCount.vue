@@ -10,9 +10,12 @@
  *
  * Requirements: 7.3
  */
-import { inject, toRef, type Ref } from 'vue'
+import { inject, toRef, computed, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useE1CashCount, type CertCountRow } from '../composables/useE1CashCount'
+import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
+import GtIndexChip from '../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +35,8 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
   fmtAmount: (v: number) =>
     v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 })
+
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -53,11 +58,79 @@ const {
   updateCell,
 } = useE1CashCount(options)
 
+// ─── 导入导出（E1-9） ─────────────────────────────────────────────────────────
+
+const sheetCode = computed(() => 'E1-9')
+const { exportTemplate, exportData, importData, isImporting } = useE1ImportExport({
+  wpId: toRef(props, 'wpId') as unknown as Ref<string>,
+  sheet: sheetCode as unknown as Ref<string>,
+})
+
+async function handleImport(file: File): Promise<boolean> {
+  const res = await importData(file)
+  if (res.success) {
+    ElMessage.success(res.message || '导入成功')
+    await reloadWorkpaperData?.()
+  } else {
+    ElMessage.warning(res.message || '导入失败')
+  }
+  return false
+}
+
 function asCert(row: any): CertCountRow { return row }
 </script>
 
 <template>
   <div class="e1-tab-certificate-count">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 检查大额存单/定期存单原件，核对存单编号、金额、存入日、到期日与利率是否与账面一致。</p>
+        <p>2. 关注存单是否存在质押、冻结、担保等权利受限情形，受限部分应单独披露。</p>
+        <p>3. 盘点结果为"未见"的存单应追查原因，必要时执行银行函证程序。</p>
+        <p>4. 核对存单是否已完整登记入账并在货币资金/其他货币资金审定表中恰当列示。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实大额存单/定期存款的存在性与权利归属，确认账实相符且无未披露的权利受限。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate()">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData()">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx,.xls"
+                  :before-upload="handleImport"
+                  :disabled="isImporting"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
         <el-table :data="rows" border stripe size="small" max-height="500" style="width: 100%">
@@ -154,7 +227,7 @@ function asCert(row: any): CertCountRow { return row }
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="80" align="center">
+          <el-table-column label="操作" width="80" align="center" fixed="right">
             <template #default="{ row }">
               <el-button
                 v-if="!isReadonly"
@@ -166,8 +239,6 @@ function asCert(row: any): CertCountRow { return row }
             </template>
           </el-table-column>
         </el-table>
-
-        <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRow">+ 添加行</el-button>
       </template>
     </el-skeleton>
   </div>
@@ -177,7 +248,59 @@ function asCert(row: any): CertCountRow { return row }
 .e1-tab-certificate-count {
   padding: 12px 0;
 }
-.add-btn {
-  margin-top: 8px;
+.e1-tab-certificate-count :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
 }
+.e1-tab-certificate-count :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 </style>

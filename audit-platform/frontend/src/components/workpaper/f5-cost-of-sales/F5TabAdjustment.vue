@@ -1,10 +1,13 @@
 <template>
   <div class="f5-adjustment">
-    <details class="f5-guide-details">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
       <summary>📋 编制提示</summary>
-      <div class="f5-guide-content">
-        <p>1. 调整分录用于记录审计发现的营业成本错报，借贷必须平衡。</p>
-        <p>2. 借贷不平衡时底部红色警告，保存前必须修正。</p>
+      <div class="guidance-content">
+        <p>1. 调整分录用于记录审计发现的营业成本（科目6401）错报，每笔分录借贷必须平衡。</p>
+        <p>2. 分录类型区分 AJE(账项调整) 与 RJE(重分类)，需填写摘要、科目、编制人及审批依据。</p>
+        <p>3. 借贷不平衡时底部红色警告，保存前必须修正差额。</p>
+        <p>4. 调整结果同步至 F5-1 审定表"账项调整/重分类"列参与审定计算。</p>
       </div>
     </details>
 
@@ -12,13 +15,18 @@
       ⚠️ 借贷不平衡：借方合计 {{ fmt(totalDebit) }} ≠ 贷方合计 {{ fmt(totalCredit) }}，差额 {{ fmt(Math.abs(totalDebit - totalCredit)) }}
     </el-alert>
 
-    <div class="f5-adj-toolbar">
-      <div class="f5-adj-left">
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
         <CycleImportExportDropdown v-if="ieCtx" :wp-id="wpId" :api-prefix="ieCtx.apiPrefix" :sheet="ieCtx.sheet"
           :disabled="isReadonly" @imported="$emit('imported')" />
       </div>
-      <el-button size="small" @click="openReview">💬 复核</el-button>
+      <div class="toolbar-right">
+        <el-button size="small" @click="openReview">💬 复核</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-table :data="rows" border size="small" style="width:100%;font-size:13px" max-height="480">
@@ -97,14 +105,18 @@
 
 <script setup lang="ts">
 /** F5TabAdjustment — F5-4 调整分录（借贷平衡校验 + 动态行 + 导入导出） */
-import { ref, computed, inject, watch, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from '../composables/useF5CosOfFormulaEngine'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 defineEmits<{ imported: [] }>()
-const props = defineProps<{ allResponses: Ref<Map<string, ChecklistResponse>>; wpId: string; isReadonly: boolean }>()
+const props = defineProps<{ allResponses: Map<string, ChecklistResponse>; wpId: string; isReadonly: boolean }>()
+
+// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const STORAGE_KEY = 'F5-4-rows'
@@ -124,7 +136,7 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 const rows = ref<AdjRow[]>([emptyRow(1)])
 
 function loadRows(): void {
-  const raw = props.allResponses.value.get(STORAGE_KEY)?.remark
+  const raw = allResponsesRef.value.get(STORAGE_KEY)?.remark
   if (!raw) return
   try {
     const parsed = JSON.parse(raw)
@@ -143,7 +155,7 @@ function loadRows(): void {
   } catch { /* ignore */ }
 }
 
-watch(() => props.allResponses.value.get(STORAGE_KEY)?.remark, () => {
+watch(() => allResponsesRef.value.get(STORAGE_KEY)?.remark, () => {
   if (rows.value.length <= 1 && !rows.value[0]?.accountCode) loadRows()
 }, { immediate: true })
 
@@ -168,11 +180,11 @@ function removeRow(rowId: string) {
 }
 function persist() {
   if (props.isReadonly) return
-  props.allResponses.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: JSON.stringify(rows.value) })
+  allResponsesRef.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: JSON.stringify(rows.value) })
   if (debounceTimer) clearTimeout(debounceTimer)
   debounceTimer = setTimeout(() => {
     debounceTimer = null
-    const item = props.allResponses.value.get(STORAGE_KEY)
+    const item = allResponsesRef.value.get(STORAGE_KEY)
     if (item) window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [item] } }))
   }, 2000)
 }
@@ -183,11 +195,23 @@ function openReview() { openReviewDialog('F5-4-adjustment') }
 </script>
 
 <style scoped>
-.f5-adjustment { padding: 12px; font-size: 13px; }
-.f5-guide-details { margin-bottom: 12px; }
-.f5-guide-content { padding: 8px 12px; background: #fffbeb; border-left: 3px solid #f59e0b; margin-top: 6px; font-size: 12px; line-height: 1.8; }
-.f5-adj-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.f5-adj-left { display: flex; gap: 8px; align-items: center; }
+.f5-adjustment { padding: 12px; }
+.f5-adjustment :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f5-adjustment :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 借贷平衡合计 */
 .f5-adj-subtotal { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-weight: 600; }
 .f5-adj-subtotal.balance-fail { background: #fef0f0; }
 .ok { color: #67c23a; margin-left: 12px; }

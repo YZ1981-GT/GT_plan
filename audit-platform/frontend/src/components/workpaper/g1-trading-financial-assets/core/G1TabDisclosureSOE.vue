@@ -5,9 +5,19 @@
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="dis.addRow()">新增行</el-button>
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+        <el-tag size="small" type="info">共 {{ dis.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-note-soe')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实交易性金融资产附注披露（国企格式）期末余额与变动原因披露的完整与准确，确认披露口径符合企业会计准则要求，并与审定表（科目1501）勾稽一致。"
+      class="objective-alert"
+    />
 
     <el-alert
       v-if="dis.adjudicatedAmount.value !== null"
@@ -76,6 +86,7 @@
 import { toRef, inject } from 'vue'
 import { useG1Disclosure } from '../../composables/useG1Disclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -105,9 +116,13 @@ function fillAiDraft() {
 
 <style scoped>
 .g1-disclosure-soe { padding: 12px; font-size: 13px; }
+.g1-disclosure-soe :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-disclosure-soe :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .sync-hint { margin-bottom: 12px; }
 .subtotal-line { margin-top: 10px; font-weight: 600; color: #303133; }
 .subtotal-label { margin-right: 12px; }

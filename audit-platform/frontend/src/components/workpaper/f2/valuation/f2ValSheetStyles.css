@@ -14,3 +14,33 @@
 .source-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px 12px; background: #ecf5ff; border-radius: 6px; font-size: 12px; color: #606266; }
 .footer { margin-top: 14px; }
 .footer h4 { margin: 0 0 8px; font-size: 13px; color: #606266; }
+
+/* ===== D4 精美组件 gold-standard 复用样式 ===== */
+/* 表格 13px */
+.f2-val-sheet :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-val-sheet :deep(.el-table .cell) { font-size: 13px !important; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: 13px; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏（左操作/右导入导出+索引+计数） */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }

@@ -3,11 +3,21 @@
     <div class="g9-toolbar">
       <h3 class="g9-title">G9-1 其他非流动金融资产审定表</h3>
       <div class="g9-actions">
+        <GtIndexChip value="wp:G9-1" />
+        <el-tag size="small" type="info">共 {{ adjRowCount }} 行</el-tag>
         <GtReviewTrigger section-id="G9-1-adjudication" />
         <el-button size="small" :loading="validateLoading" :disabled="isReadonly" data-testid="g9-validate-btn" @click="runValidate">校验公式</el-button>
         <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
       </div>
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：确认其他非流动金融资产（1504）期末余额真实存在、完整、计价准确，混合计量分类与附注列报恰当。"
+    />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -97,7 +107,7 @@
           </template>
         </el-table-column>
         <el-table-column label="期初审定" width="92" align="right">
-          <template #default="{ row }"><span class="formula-cell">{{ fmt(row.openingAdjusted) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="期初审定 = 期初未审 + AJE + RJE">{{ fmt(row.openingAdjusted) }}</span></template>
         </el-table-column>
         <el-table-column label="期末未审" width="88" align="right">
           <template #default="{ row }">
@@ -121,7 +131,7 @@
           </template>
         </el-table-column>
         <el-table-column label="期末审定" width="92" align="right">
-          <template #default="{ row }"><span class="formula-cell">{{ fmt(row.closingAdjusted) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="期末审定 = 期末未审 + AJE + RJE">{{ fmt(row.closingAdjusted) }}</span></template>
         </el-table-column>
         <el-table-column label="变动率" width="72" align="right">
           <template #default="{ row }">
@@ -216,6 +226,10 @@ const noteProxy = computed({
   set: (v: string) => adj.updateAuditNote(v),
 })
 
+const adjRowCount = computed(() =>
+  adj.groupedRows.value.reduce((n, g) => n + g.rows.length, 0),
+)
+
 const browseRows = computed(() =>
   adj.groupedRows.value.flatMap((g) =>
     g.rows.map((r) => ({
@@ -282,12 +296,14 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
 <style scoped>
 .g9-adjudication { font-size: 13px; }
 .g9-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.g9-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .g9-title { margin: 0; font-size: 15px; }
 .tb-bar { margin-bottom: 10px; padding: 8px; background: #f5f7fa; border-radius: 4px; }
 .tb-warn { color: #f56c6c; background: #fef0f0; }
 .group-head { cursor: pointer; padding: 8px; background: #fafafa; border: 1px solid #ebeef5; margin-top: 8px; display: flex; gap: 8px; align-items: center; }
 .group-sub { margin-left: auto; color: #606266; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #f5f7fa; display: inline-block; width: 100%; }
+.audit-objective { margin-bottom: 10px; }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 .reason-alert { margin-bottom: 8px; }
 :deep(.reason-required .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }

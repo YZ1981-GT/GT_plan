@@ -32,18 +32,35 @@ const {
 
 <template>
   <div class="f2-tab-adjustment">
-    <details class="guidance-details"><summary>📋 编制提示</summary><p>存货 AJE/RJE 分录，借贷须平衡；保存后自动联动 F2-1 账项调整行。</p></details>
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增分录</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="publishAdjustments">同步至审定表</el-button>
-      <CycleImportExportDropdown
-        :wp-id="wpId"
-        api-prefix="f2"
-        sheet="F2-14"
-        :disabled="isReadonly"
-        @imported="onImported"
-      />
-      <F2ReviewChip section-id="F2-14-adjustment" />
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 记录存货相关的审计调整分录：AJE（账项调整，影响科目余额）/ RJE（重分类调整，仅影响列报）。</p>
+        <p>2. 借贷合计必须平衡（借方合计 = 贷方合计），不平衡时无法同步。</p>
+        <p>3. 确认后的分录自动联动回写 F2-1 审定表的账项调整列。</p>
+        <p>4. 依《企业会计准则第 1 号——存货》，跌价准备计提/转回、成本结转差错等均通过本表调整。</p>
+      </div>
+    </details>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增分录</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="publishAdjustments">同步至审定表</el-button>
+        <F2ReviewChip section-id="F2-14-adjustment" />
+      </div>
+      <div class="toolbar-right">
+        <CycleImportExportDropdown
+          :wp-id="wpId"
+          api-prefix="f2"
+          sheet="F2-14"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-table :data="rows" border size="small" style="font-size:13px">
@@ -122,8 +139,22 @@ const {
 
 <style scoped>
 .f2-tab-adjustment { font-size: 13px; padding: 12px; }
-.toolbar { margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
+.f2-tab-adjustment :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-tab-adjustment :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .balance-bar { margin-top: 8px; text-align: right; font-weight: 600; }
 .balance-bar.unbalanced { color: #f56c6c; }
-.guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
 </style>

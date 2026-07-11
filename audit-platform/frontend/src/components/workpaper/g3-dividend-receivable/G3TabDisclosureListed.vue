@@ -16,8 +16,19 @@
       <div class="head-actions">
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
         <el-button size="small" @click="openReviewDialog('G3-disclosure-listed')">💬复核</el-button>
+        <GtIndexChip value="wp:G3-1" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ tableRows.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：复核上市公司应收股利附注披露的完整性与准确性，确保与审定数勾稽一致，符合列报披露要求。"
+    />
 
     <!-- 6列结构化表格 -->
     <el-table :data="tableRows" border size="small" max-height="400" class="disclosure-table">
@@ -88,14 +99,15 @@
     </el-card>
 
     <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>上市公司附注格式（36行×6列），按被投资方列示期初/期末金额</li>
-        <li>期末余额 = 期初余额 + 本期增加 - 本期减少</li>
-        <li>监听 substantive:adjudicated(1131) 自动同步审定数</li>
-        <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示（CAS 依据）</summary>
+      <div class="guidance-content">
+        <p>1. 上市公司附注格式（36 行 ×6 列），按被投资方列示期初/期末金额。</p>
+        <p>2. 期末余额 = 期初余额 + 本期增加 - 本期减少（灰色底纹为自动计算列）。</p>
+        <p>3. 监听 substantive:adjudicated(1131) 自动同步审定数。</p>
+        <p>4. 编辑后发布 disclosure:note-text-updated 联动附注模块。</p>
+        <p class="cas-basis">CAS 依据：应收股利应在财务报表附注中充分披露（《企业会计准则第 30 号——财务报表列报》、《企业会计准则第 37 号——金融工具列报》）。</p>
+      </div>
     </details>
   </div>
 </template>
@@ -103,6 +115,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // ─── Types ───
@@ -262,7 +275,10 @@ function fmtNum(v: unknown): string {
   cursor: help;
   display: inline-block;
   min-width: 40px;
+  padding: 0 4px;
   text-align: right;
+  background: #f5f7fa;
+  border-radius: 2px;
 }
 
 .delete-icon {
@@ -284,16 +300,36 @@ function fmtNum(v: unknown): string {
   align-items: center;
 }
 
-.prep-hint {
+/* 审计目标 */
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+/* 编制提示（guidance-details gold 样式） */
+.guidance-details {
   margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
 }
-.prep-hint summary {
+.guidance-details summary {
   cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
 }
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.guidance-content .cas-basis {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

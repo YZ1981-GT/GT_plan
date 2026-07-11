@@ -143,20 +143,36 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
 
   // ─── createSnapshot ────────────────────────────────────────────────────
 
-  async function createSnapshot(description?: string): Promise<void> {
+  /**
+   * 生成版本快照
+   *
+   * @param description 快照描述（含方法学要素时可携带方法/间隔/样本量/seed）
+   * @param options.snapshotType 快照类型，默认 'manual'；抽凭自动填充用 'auto_sampling'
+   * @param options.silent 静默模式：不弹成功提示、不刷新列表（供 fire-and-forget 场景）
+   *
+   * 执行人（user_id/user_name）与时间（created_at）由后端在快照记录中补全，
+   * 无需前端传入。
+   */
+  async function createSnapshot(
+    description?: string,
+    options?: { snapshotType?: SnapshotType; silent?: boolean },
+  ): Promise<void> {
+    const snapshotType: SnapshotType = options?.snapshotType ?? 'manual'
+    const silent = options?.silent ?? false
     loading.value = true
     try {
       await http.post(basePath(), {
-        snapshot_type: 'manual',
+        snapshot_type: snapshotType,
         description: description || null,
       })
 
-      ElMessage.success('版本快照已保存')
-
-      // 刷新列表到第一页
-      await loadVersions(1)
+      if (!silent) {
+        ElMessage.success('版本快照已保存')
+        // 刷新列表到第一页
+        await loadVersions(1)
+      }
     } catch (err: any) {
-      ElMessage.error(err?.message || '保存版本失败')
+      if (!silent) ElMessage.error(err?.message || '保存版本失败')
     } finally {
       loading.value = false
     }

@@ -13,7 +13,7 @@
 ## Tasks
 
 - [ ] 1. D2TabVoucherCheck 抽凭模式迁移
-  - [~] 1.1 迁移 D2TabVoucherCheck 为 dialog-mode
+  - [ ] 1.1 迁移 D2TabVoucherCheck 为 dialog-mode
     - 在 `d2/D2TabVoucherCheck.vue` 的 `<template>` 中：
       - 删除 `<el-collapse class="sampling-engine-collapse">` 及其内部 `<el-collapse-item>` 包裹结构
       - 在工具栏区域（section-head > head-actions）放置 `<GtVoucherSamplingEngine :project-id="projectId" :account-codes="['1122']" dialog-mode @filled="handleSamplingFilled" />`
@@ -24,7 +24,7 @@
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 2.4_
 
 - [ ] 2. F2ValuationTestSheet 抽凭模式迁移
-  - [~] 2.1 迁移 F2ValuationTestSheet 为 dialog-mode
+  - [ ] 2.1 迁移 F2ValuationTestSheet 为 dialog-mode
     - 在 `F2ValuationTestSheet.vue` 的 `<template>` 中：
       - 删除 `<el-collapse class="sampling-collapse">` 包裹结构
       - 在工具栏区域放置 `<GtVoucherSamplingEngine :project-id="projectId" :account-codes="[accountCode]" dialog-mode @filled="handleSamplingFilled" />`
@@ -35,7 +35,7 @@
     - _Requirements: 1.1, 1.4, 1.5, 1.6, 3.1, 3.2, 3.5_
 
 - [ ] 3. F2TabPurchaseInboundCheck 抽凭模式迁移
-  - [~] 3.1 迁移 F2TabPurchaseInboundCheck 为 dialog-mode
+  - [ ] 3.1 迁移 F2TabPurchaseInboundCheck 为 dialog-mode
     - 在 `F2TabPurchaseInboundCheck.vue` 的 `<template>` 中：
       - 删除 el-collapse 包裹抽凭引擎的结构（如有）
       - 在工具栏区域放置 `<GtVoucherSamplingEngine :project-id="projectId" :account-codes="[accountCode]" dialog-mode @filled="handleSamplingFilled" />`
@@ -45,7 +45,7 @@
     - _Requirements: 1.1, 1.4, 1.5, 1.6, 3.3, 3.5_
 
 - [ ] 4. F2TabMaterialUsageCheck 抽凭模式迁移
-  - [~] 4.1 迁移 F2TabMaterialUsageCheck 为 dialog-mode
+  - [ ] 4.1 迁移 F2TabMaterialUsageCheck 为 dialog-mode
     - 在 `F2TabMaterialUsageCheck.vue` 的 `<template>` 中：
       - 删除 el-collapse 包裹抽凭引擎的结构（如有）
       - 在工具栏区域放置 `<GtVoucherSamplingEngine :project-id="projectId" :account-codes="[accountCode]" dialog-mode @filled="handleSamplingFilled" />`
@@ -55,7 +55,7 @@
     - _Requirements: 1.1, 1.4, 1.5, 1.6, 3.4, 3.5_
 
 - [ ] 5. F5TabMajorAdjustment 抽凭模式迁移
-  - [~] 5.1 迁移 F5TabMajorAdjustment 为 dialog-mode
+  - [ ] 5.1 迁移 F5TabMajorAdjustment 为 dialog-mode
     - 在 `F5TabMajorAdjustment.vue` 的 `<template>` 中：
       - 删除 `<el-collapse class="f5-sampling">` 包裹结构
       - 在工具栏区域放置 `<GtVoucherSamplingEngine :project-id="projectId" :account-codes="['6401']" dialog-mode :phase="'final'" @filled="handleSamplingFilled" />`
@@ -65,13 +65,13 @@
     - 删除 f5-sampling 相关 CSS
     - _Requirements: 1.1, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 4.4_
 
-- [~] 6. Checkpoint - 抽凭迁移验证
+- [ ] 6. Checkpoint - 抽凭迁移验证
   - Ensure all tests pass, ask the user if questions arise.
   - 运行 `npx vitest run --reporter=verbose` 确认无类型错误
   - 确认 5 个组件的 el-collapse 引用已全部移除
 
 - [ ] 7. GtG5LongTermReceivable 版本链模式迁移
-  - [~] 7.1 迁移 GtG5LongTermReceivable 版本链为 useWorkpaperVersionToolbar
+  - [ ] 7.1 迁移 GtG5LongTermReceivable 版本链为 useWorkpaperVersionToolbar
     - 在 `GtG5LongTermReceivable.vue` 的 `<script setup>` 中：
       - 将 `import { useVersionTrail }` 替换为 `import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'`
       - 将 `const { autoSnapshot } = useVersionTrail(computed(() => props.wpId))` 替换为：
@@ -92,7 +92,7 @@
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 7.2_
 
 - [ ] 8. GtConfirmationAlternativeL05 版本链模式迁移
-  - [~] 8.1 迁移 GtConfirmationAlternativeL05 版本链为 useWorkpaperVersionToolbar
+  - [ ] 8.1 迁移 GtConfirmationAlternativeL05 版本链为 useWorkpaperVersionToolbar
     - 在 `confirmation/alternativeL05/GtConfirmationAlternativeL05.vue` 的 `<script setup>` 中：
       - 将 `import useVersionTrail from '../composables/useVersionTrail'` 替换为 `import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'`
       - 将 `const versionTrail = useVersionTrail({ projectId: projectIdRef, workpaperId: wpIdRefVt })` 替换为：
@@ -109,12 +109,12 @@
     - 添加 `<GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />` 组件（如缺少）
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.2_
 
-- [~] 9. Checkpoint - 版本链迁移验证
+- [ ] 9. Checkpoint - 版本链迁移验证
   - Ensure all tests pass, ask the user if questions arise.
   - 运行 `npx vitest run --reporter=verbose` 确认 versionTrail.spec.ts 全部通过
 
 - [ ] 10. 回归验证
-  - [~] 10.1 运行全量已有测试确认无破坏
+  - [ ] 10.1 运行全量已有测试确认无破坏
     - 运行 `npx vitest run` 确认以下测试全量通过：
       - `voucherSampling.property.spec.ts`（抽凭 PBT）
       - `versionTrail.spec.ts`（版本链单元测试）

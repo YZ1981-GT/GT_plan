@@ -206,7 +206,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useK6ImportExport } from '@/components/workpaper/composables/useK6ImportExport'
-import type { Ref } from 'vue'
 
 const K6_ACCOUNT_CODE_ASSET = '1481'  // 持有待售资产
 const K6_ACCOUNT_CODE_LIAB = '2245'   // 持有待售负债
@@ -215,7 +214,7 @@ const ITEM_PREFIX = 'K6-3-adj'
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 

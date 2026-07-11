@@ -1,5 +1,13 @@
 <template>
   <div class="g4-tab-sppi-test">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资合同现金流量特征仅为本金和利息的支付（SPPI 测试），作为以摊余成本计量分类的依据。"
+      style="margin-bottom: 12px"
+    />
     <!-- ═══ (一) 债券投资及委托贷款 SPPI分析 ═══ -->
     <div class="section-header">
       <h3 class="section-title">（一）债券投资及委托贷款 — 合同现金流量特征分析（SPPI测试）</h3>
@@ -362,19 +370,17 @@
  * - Part 2: 银行理财产品三步判断（step1/step2/step3 各自表格）
  * - 导入导出 slot + AI辅助 + 复核对话
  */
-import { inject, toRef } from 'vue'
+import { inject, toRef, computed } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
 import { useG4SppiTest, ANALYSIS_TYPE_OPTIONS, SPPI_CONCLUSION_OPTIONS } from '@/composables/useG4SppiTest'
 import type { BondSppiItem } from '@/composables/useG4SppiTest'
-import type { UseG4SppiFormDataOptions } from '@/composables/useG4SppiFormData'
+import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: any
-  debouncedSave: (itemId: string, data: any) => void
 }>()
 
 const emit = defineEmits<{
@@ -392,10 +398,19 @@ function emitAi(section: string): void {
   emit('aiGenerate', section)
 }
 
+// ─── 数据层（自包含：从 wpId/projectId 加载 checklist-responses） ───────────
+// 父级(GtG4BondInvestmentSppi)仅传 htmlData/wpId/projectId/isReadonly，不传
+// allResponses/debouncedSave，故本组件自行创建 formData（对齐 G4TabBusinessModel）
+const formData = useG4SppiFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+formData.loadAll()
+
 // ─── useG4SppiTest composable ──────────────────────────────────────────────
 const sppiTestLogic = useG4SppiTest({
-  allResponses: toRef(props, 'allResponses'),
-  debouncedSave: props.debouncedSave,
+  allResponses: formData.allResponses,
+  debouncedSave: formData.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
 })
 

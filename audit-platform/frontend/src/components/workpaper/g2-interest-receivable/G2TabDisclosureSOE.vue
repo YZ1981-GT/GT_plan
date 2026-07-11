@@ -1,9 +1,32 @@
 <template>
   <div class="g2-disclosure-soe">
-    <div class="section-head">
-      <h3 class="sheet-title">附注披露（国企）</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 国企附注格式（39行×5列），简化列示期初/期末金额。</p>
+        <p>2. 监听 substantive:adjudicated(1132) 自动同步审定数（来源 G2-1 审定表）。</p>
+        <p>3. 编辑后发布 disclosure:note-text-updated 联动附注模块。</p>
+        <p>4. 依据：CAS 37《金融工具列报》、CAS 30《财务报表列报》附注披露要求。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证国企应收利息附注披露的完整性、准确性与列报格式的合规性，确保与审定数一致。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">附注披露（国企）</span>
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-1" /></span>
         <el-button size="small" @click="openReviewDialog('G2-disclosure-soe')">💬复核</el-button>
       </div>
     </div>
@@ -12,20 +35,12 @@
       <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 8, maxRows: 30 }"
         :disabled="isReadonly" placeholder="国企应收利息附注披露内容..." />
     </el-card>
-
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>国企附注格式（39行×5列），简化列示期初/期末金额</li>
-        <li>监听 substantive:adjudicated(1132) 自动同步审定数</li>
-        <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, inject } from 'vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -69,10 +84,14 @@ function fillAiDraft() {
 
 <style scoped>
 .g2-disclosure-soe { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
-.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; }
-.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 </style>

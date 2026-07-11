@@ -8,6 +8,11 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      审计目标：按控制类型（子公司/合营/联营）分层汇总长期股权投资的期初、期末审定金额，验证未审数、AJE、RJE 调整的完整准确，确认长期股权投资净值与试算表（科目1511）勾稽一致。
+    </el-alert>
+
     <!-- TB取数信息条 -->
     <div class="tb-info-bar">
       <span class="tb-label">TB取数（科目1511）：</span>
@@ -616,6 +621,7 @@ onMounted(() => {
 
 <style scoped>
 .g7-adjudication { padding: 12px; font-size: 13px; }
+.audit-objective { margin-bottom: 12px; }
 
 /* Section 标题栏 */
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }

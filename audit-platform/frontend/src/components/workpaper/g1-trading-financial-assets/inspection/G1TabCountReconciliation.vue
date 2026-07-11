@@ -4,9 +4,19 @@
       <h3 class="sheet-title">G1-12 证券盘点倒轧表</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="recon.addRow()">新增倒轧行</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G1-11" /></span>
+        <el-tag size="small" type="info">共 {{ recon.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-12-conclusion')">💬复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：将监盘日证券结存倒轧至报表日，核实报表日推算余额与账面余额一致，确认交易性金融资产期末存在性与完整性。"
+      class="objective-alert"
+    />
 
     <div class="stats-bar">
       倒轧证券：<b>{{ recon.rows.value.length }}</b> 项 ·
@@ -23,6 +33,7 @@
         :label="col.label"
         :width="col.width"
         :align="col.type === 'number' ? 'right' : 'left'"
+        :class-name="col.formula ? 'auto-calc-col' : ''"
         :fixed="col.prop === 'securityName' ? 'left' : undefined"
       >
         <template #default="{ row, $index }">
@@ -73,7 +84,7 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
         <li>报表日推算余额 = 监盘日余额 + 盘点日至报表日增加 - 减少（数量与金额各算）。</li>
         <li>倒轧差异 = 推算余额 - 账面余额，差异不为 0 时橙色高亮。</li>
@@ -90,6 +101,7 @@ import {
   type G1ReconciliationRow,
 } from '../../composables/useG1CountReconciliation'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -141,13 +153,18 @@ function fmtNum(v: unknown): string {
 
 <style scoped>
 .g1-count-recon { padding: 12px; font-size: 13px; }
+.g1-count-recon :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g1-count-recon :deep(.el-table .cell) { font-size: 13px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #e6a23c; }
 .segment-bar { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa; }
 .diff-warn { color: #e6a23c; font-weight: 600; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-label { font-weight: 600; margin-right: 8px; }

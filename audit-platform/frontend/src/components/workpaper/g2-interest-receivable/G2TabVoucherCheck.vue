@@ -1,10 +1,36 @@
 <template>
   <div class="g2-voucher-check">
-    <div class="section-head">
-      <h3 class="sheet-title">G2-8 凭证检查表</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表通过抽凭检查应收利息的增加确认（借方）与收回核算（贷方）的真实性、准确性与截止恰当性。</p>
+        <p>2. 借方区：测算利息 = 面值 × 利率/100 × 计息天数/365（365天基准）；借方差异 = 测算利息 - 凭证金额。</p>
+        <p>3. 贷方区：关注是否到期收回，逾期天数判断利息回收风险。灰色底纹列为自动计算列。</p>
+        <p>4. 抽凭引擎按科目1132抽取样本，自动按借贷方向分配至对应区块。</p>
+        <p>5. 📎OCR：上传凭证扫描件→自动识别填入对应字段。</p>
+        <p>6. 依据：CAS 1101《注册会计师执行审计工作的总体目标》细节测试、CAS 22《金融工具确认和计量》。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过抽凭检查应收利息增加确认与收回核算的真实性、准确性与截止恰当性，验证利息核算合规。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">G2-8 凭证检查表</span>
         <el-button size="small" type="success" @click="openSamplingEngine">使用抽凭引擎</el-button>
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-8" /></span>
+        <el-tag size="small" type="info">共 {{ vc.debitRows.value.length + vc.creditRows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G2-8-voucher-check')">💬复核</el-button>
       </div>
     </div>
@@ -77,14 +103,14 @@
               @update:model-value="(v: number) => vc.updateDebitCell(row.id, 'accruedDays', v ?? 0)" />
           </template>
         </el-table-column>
-        <el-table-column label="测算利息" width="110" align="right">
+        <el-table-column label="测算利息" width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="formula-cell" title="测算利息 = 面值 × 利率/100 × 计息天数/365">
               {{ fmtNum(row.calculatedInterest) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="差异" width="100" align="right">
+        <el-table-column label="差异" width="100" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="formula-cell" title="差异 = 测算利息 - 金额">{{ fmtNum(row.variance) }}</span>
           </template>
@@ -180,9 +206,10 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="逾期天数" width="90" align="right">
+        <el-table-column label="逾期天数" width="90" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            <span :class="{ 'overdue-warn': row.overdueDays > 0 }">{{ row.overdueDays }}</span>
+            <span class="formula-cell" title="逾期天数 = 未到期收回时，凭证日期至今的天数"
+              :class="{ 'overdue-warn': row.overdueDays > 0 }">{{ row.overdueDays }}</span>
           </template>
         </el-table-column>
         <el-table-column label="审计结论" width="120">
@@ -219,17 +246,6 @@
         :disabled="isReadonly" placeholder="对凭证检查的复核结论..." />
     </el-card>
 
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>借方区：测算利息 = 面值 × 利率/100 × 计息天数/365（365天基准）</li>
-        <li>借方差异 = 测算利息 - 凭证金额</li>
-        <li>贷方区：关注是否到期收回，逾期天数判断利息回收风险</li>
-        <li>抽凭引擎按科目1132抽取样本，自动按借贷方向分配至对应区块</li>
-        <li>📎OCR：上传凭证扫描件→自动识别填入对应字段</li>
-      </ul>
-    </details>
-
     <!-- 抽凭引擎对话框（占位：集成时由GtVoucherSamplingEngine提供） -->
     <el-dialog v-model="showSamplingDialog" title="抽凭引擎 - 科目1132应收利息" width="800px" destroy-on-close>
       <p class="sampling-placeholder">抽凭引擎将在集成阶段接入（科目1132，样本按借贷方向分配）</p>
@@ -243,6 +259,7 @@
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
 import { useG2VoucherCheck } from '../../composables/useG2VoucherCheck'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -290,9 +307,19 @@ function fillAiDraft() {
 
 <style scoped>
 .g2-voucher-check { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.g2-voucher-check :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g2-voucher-check :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 
 .block-section { margin-bottom: 20px; }
 .block-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; }
@@ -304,7 +331,4 @@ function fillAiDraft() {
 .overdue-warn { color: #e6a23c; font-weight: 600; }
 .conclusion-card { margin-top: 12px; }
 .sampling-placeholder { color: #909399; text-align: center; padding: 20px; }
-.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; }
-.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
 </style>

@@ -232,16 +232,19 @@
  * - 动态行 "+新增" (ElMessageBox.prompt)
  * - 蓝色引导区 + 琥珀色方法论 + 编制提示 + AI辅助
  */
-import { inject, type Ref } from 'vue'
+import { inject, toRef, type Ref } from 'vue'
 import { MagicStick, Delete } from '@element-plus/icons-vue'
 import { useK6NoLongerCheck } from '@/components/workpaper/composables/useK6NoLongerCheck'
 
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+
+// 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -267,7 +270,7 @@ const {
   removeItem,
   saveConclusion,
 } = useK6NoLongerCheck({
-  allResponses: props.allResponses as unknown as Ref<Map<string, any>>,
+  allResponses: allResponsesRef,
   saveResponse,
 })
 

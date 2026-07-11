@@ -1,9 +1,35 @@
 <template>
   <div class="g2-overdue-check">
-    <div class="section-head">
-      <h3 class="sheet-title">G2-6 长期未收回检查</h3>
-      <div class="head-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表识别长期未收回应收利息，评估其可收回性与减值阶段迁移信号。</p>
+        <p>2. 逾期天数 = MAX(0, 当前日期 - 约定收回日)；灰色底纹列为自动计算列。</p>
+        <p>3. 逾期 &gt; 180天：红色高亮，建议转入 Stage3（已发生信用减值）。</p>
+        <p>4. 逾期 &gt; 90天：橙色高亮，建议转入 Stage2（信用风险显著增加）。</p>
+        <p>5. 须关注债务方信用状况变化，评估实际可收回性。</p>
+        <p>6. 依据：CAS 22《金融工具确认和计量》预期信用损失（ECL）阶段迁移。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：识别长期未收回应收利息，评估可收回性，为减值阶段迁移与坏账准备计提充分性提供依据。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="sheet-title">G2-6 长期未收回检查</span>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="overdue.addRow()">新增行</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G2-6" /></span>
+        <el-tag size="small" type="info">共 {{ overdue.dataRows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G2-6-overdue')">💬复核</el-button>
       </div>
     </div>
@@ -31,7 +57,7 @@
             @update:model-value="(v: string) => overdue.updateCell(row.id, 'agreedRecoveryDate', v ?? '')" />
         </template>
       </el-table-column>
-      <el-table-column label="逾期天数" width="100" align="right">
+      <el-table-column label="逾期天数" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="['formula-cell', overdueColorClass(row)]"
             title="逾期天数 = MAX(0, 当前日期 - 约定收回日)">
@@ -102,15 +128,6 @@
       </div>
     </div>
 
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>逾期天数 = MAX(0, 当前日期 - 约定收回日)</li>
-        <li>逾期 > 180天：红色高亮，建议转入Stage3（已发生信用减值）</li>
-        <li>逾期 > 90天：橙色高亮，建议转入Stage2（信用风险显著增加）</li>
-        <li>需关注债务方信用状况变化，评估实际可收回性</li>
-      </ul>
-    </details>
   </div>
 </template>
 
@@ -122,6 +139,7 @@ import {
   RISK_LEVEL_OPTIONS,
   type OverdueCheckRow,
 } from '../../composables/useG2OverdueCheck'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -163,10 +181,20 @@ function fmtNum(v: unknown): string {
 
 <style scoped>
 .g2-overdue-check { padding: 12px; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
-.head-actions { display: flex; gap: 8px; }
+.g2-overdue-check :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.g2-overdue-check :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .overdue-red { color: #f56c6c; font-weight: 600; }
 .overdue-orange { color: #e6a23c; font-weight: 600; }
 .no-suggestion { color: #c0c4cc; }

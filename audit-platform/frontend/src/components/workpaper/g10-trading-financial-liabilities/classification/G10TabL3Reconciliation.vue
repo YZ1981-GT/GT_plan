@@ -96,6 +96,15 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>依据 CAS 37《金融工具列报》，第三层次公允价值须披露期初到期末的调节过程。</p>
+        <p>计算期末 = 期初 + 本期新增 − 本期终止 + 转入L3 − 转出L3 + FV变动 + 利息费用 + 其他；「企业期末」与「计算期末」差异大于 0.01 时须核查并说明。</p>
+        <p>转入/转出 Level3 应说明触发层次调整的原因；本表期末合计应与 G10-5 公允价值测试中 Level3 负债勾稽。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -139,4 +148,6 @@ function fmt(v: number) {
 .formula { border-bottom: 1px dashed #909399; }
 .var-warn { color: #e6a23c; font-weight: 600; }
 .var-alert { margin-bottom: 8px; }
+.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
 </style>

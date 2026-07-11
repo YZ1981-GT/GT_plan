@@ -144,7 +144,8 @@
       "disabled": false,
       "autoApprove": [
         "resolve-library-id",
-        "query-docs"
+        "query-docs",
+        "get-library-docs"
       ]
     }
   }

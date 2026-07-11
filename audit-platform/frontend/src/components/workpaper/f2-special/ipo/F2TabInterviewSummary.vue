@@ -1,5 +1,21 @@
 <template>
   <div class="f2-interview-summary">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表汇总 IPO 供应商访谈情况，逐条记录访谈方式、受访人、内容摘要与结论。</p>
+        <p>2. 访谈应核实交易真实性、关联关系及是否存在体外资金循环、利益输送等异常。</p>
+        <p>3. 结论选择"存在疑点/需进一步核查/异常"的行须补充关注事项，并追加访谈明细（F2-72）。</p>
+        <p>4. 点击供应商行的 →F2-72 索引可跳转至对应访谈明细底稿。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>审计目标：通过供应商访谈验证采购交易的真实性与商业合理性，识别关联关系及异常交易迹象。</template>
+    </el-alert>
+
     <header class="sheet-header">
       <div>
         <h3>供应商访谈记录汇总</h3>
@@ -14,19 +30,25 @@
       </div>
     </header>
 
-    <div class="toolbar">
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="iv.addRow()">+ 新增访谈</el-button>
-      <F2SheetToolbar
-        :wp-id="wpId"
-        api-prefix="f2-spe"
-        sheet="F2-71"
-        :disabled="isReadonly"
-        ai-section="supplier-analysis"
-        :existing-content="iv.auditNote.value"
-        review-section="F2-71-interview"
-        @ai-filled="(t: string) => { iv.auditNote.value = t }"
-      />
-      <el-input v-model="iv.searchQuery.value" size="small" placeholder="搜索供应商/受访人" clearable class="search" />
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="iv.addRow()">+ 新增访谈</el-button>
+        <el-input v-model="iv.searchQuery.value" size="small" placeholder="搜索供应商/受访人" clearable class="search" />
+      </div>
+      <div class="toolbar-right">
+        <F2SheetToolbar
+          :wp-id="wpId"
+          api-prefix="f2-spe"
+          sheet="F2-71"
+          :disabled="isReadonly"
+          ai-section="supplier-analysis"
+          :existing-content="iv.auditNote.value"
+          review-section="F2-71-interview"
+          @ai-filled="(t: string) => { iv.auditNote.value = t }"
+        />
+        <GtIndexChip value="wp:F2-71" />
+        <el-tag size="small" type="info">共 {{ iv.filteredRows.value.length }} 行</el-tag>
+      </div>
     </div>
 
     <el-table
@@ -106,10 +128,16 @@
       </el-table-column>
     </el-table>
 
-    <footer class="footer">
-      <h4>访谈汇总说明</h4>
-      <el-input v-model="iv.auditNote.value" type="textarea" :rows="2" :disabled="isReadonly" />
-    </footer>
+    <!-- 访谈汇总说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">访谈汇总说明</span>
+        </div>
+      </template>
+      <el-input v-model="iv.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="汇总供应商访谈发现，说明异常/疑点行的处理及交易真实性判断……" />
+    </el-card>
   </div>
 </template>
 
@@ -138,14 +166,25 @@ function conclusionTag(c: InterviewConclusion | ''): '' | 'success' | 'warning' 
 
 <style scoped>
 .f2-interview-summary { padding: 12px 16px; font-size: 13px; background: linear-gradient(180deg, #f8fafc 0%, #fff 100px); border-radius: 8px; }
+.f2-interview-summary :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
+.f2-interview-summary :deep(.el-table .cell) { font-size: 13px !important; }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
 .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
 .sheet-header h3 { margin: 0; font-size: 16px; display: inline; }
 .code { font-size: 12px; color: #909399; margin-left: 8px; }
 .summary-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-.toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .search { width: 200px; }
 .supplier-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 :deep(.warn-row) { background: #fdf6ec !important; }
-.footer { margin-top: 14px; }
-.footer h4 { margin: 0 0 8px; font-size: 13px; color: #606266; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

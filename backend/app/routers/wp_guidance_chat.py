@@ -215,6 +215,25 @@ class AiGenerateTextResponse(BaseModel):
     content: str
 
 
+# section → 默认 system prompt 映射（仅当调用方未显式传 prompt 时作兜底）。
+# 该端点对 section 不做拒绝式白名单校验，任意 section 均放行；此处仅为
+# voucher-review / cutoff-review 等已知场景提供针对性的默认复核提示词。
+_SECTION_PROMPTS: dict[str, str] = {
+    # 抽凭回写后复核：识别金额异常/无原始凭证/对方科目异常/重复入账/跨期等
+    "voucher-review": (
+        "你是资深审计师。请基于提供的抽样回写凭证，识别潜在异常"
+        "（金额异常、缺少原始凭证、对方科目异常、重复入账、跨期确认等），"
+        "逐条指出可疑凭证及理由，并给出复核意见，作为审计说明草稿供人工确认。"
+    ),
+    # 截止性测试回写后复核：识别收入/成本/费用的跨期确认问题
+    "cutoff-review": (
+        "你是资深审计师。请基于提供的截止性测试回写凭证，识别是否存在跨期确认"
+        "（收入/成本/费用提前或滞后确认）问题，逐条指出可疑凭证及理由，"
+        "并给出截止准确性的复核意见，作为审计说明草稿供人工确认。"
+    ),
+}
+
+
 @router.post("/{wp_id}/ai/generate-text")
 async def workpaper_ai_generate_text(
     wp_id: str,
@@ -234,8 +253,12 @@ async def workpaper_ai_generate_text(
     if not settings.WP_AI_SERVICE_ENABLED:
         raise HTTPException(status_code=503, detail="AI 服务未启用")
 
-    # 构建 LLM 输入
-    system_msg = request.prompt or "请根据提供的上下文信息生成专业的审计文本。"
+    # 构建 LLM 输入：显式 prompt 优先，其次按 section 兜底，最后通用默认
+    system_msg = (
+        request.prompt
+        or _SECTION_PROMPTS.get(request.section)
+        or "请根据提供的上下文信息生成专业的审计文本。"
+    )
     user_parts = []
     if request.context:
         user_parts.append("【上下文信息】")

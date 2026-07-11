@@ -162,7 +162,7 @@ import http from '@/utils/http'
 
 // Lazy import voucher sampling engine
 const GtVoucherSamplingEngine = defineAsyncComponent(
-  () => import('@/components/workpaper/shared/GtVoucherSamplingEngine.vue'),
+  () => import('@/components/workpaper/voucher-sampling/GtVoucherSamplingEngine.vue'),
 )
 
 const props = defineProps<{

@@ -1,13 +1,46 @@
 <template>
 <div class="d6-tab-ecl-calculation">
-  <div class="toolbar">
-    <el-button-group size="small">
-      <el-button @click="exportTemplate">导出模板</el-button>
-      <el-button @click="exportData">导出数据</el-button>
-      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-        <el-button :loading="importing">导入数据</el-button>
-      </el-upload>
-    </el-button-group>
+  <!-- 编制提示 -->
+  <details class="guidance-details">
+    <summary>📋 编制提示</summary>
+    <div class="guidance-content">
+      <p>1. 本表依 CAS22 预期信用损失（ECL）模型测算合同资产（科目1402）应计提的坏账准备，分单项计提与账龄组合计提两部分。</p>
+      <p>2. 灰色底纹列为自动计算列：应计提 = 审定余额 × 损失率；差异 = 应计提 − 账面余额，差异≥0.01 时高亮提示。</p>
+      <p>3. 损失率应结合历史损失经验、当前状况及前瞻性信息确定，并与 D6-7 政策检查评价一致。</p>
+      <p>4. 合计应计提与账面的总差异应查明原因，测算结果回填 D6-3 减值准备明细，为审定表坏账准备提供依据。</p>
+    </div>
+  </details>
+
+  <!-- 审计目标 -->
+  <el-alert
+    type="info"
+    :closable="false"
+    title="审计目标：独立测算合同资产预期信用损失，评价被审计单位坏账准备计提的充分性与损失率选取的合理性。"
+    class="objective-alert"
+  />
+
+  <!-- 工具栏 -->
+  <div class="tab-toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+      <el-dropdown size="small" trigger="click">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData">导出数据</el-dropdown-item>
+            <el-dropdown-item>
+              <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
+                <span>导入数据</span>
+              </el-upload>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-7" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:D6-3" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ browseRowCount }} 行</el-tag>
+    </div>
   </div>
 
   <div v-if="useVirtualScroll" class="virtual-toolbar">
@@ -37,7 +70,7 @@
       <h4 class="block-title">(一) 单项计提坏账准备</h4>
       <el-button v-if="!isReadonly" size="small" type="primary" @click="addSingleRow">添加债务人</el-button>
     </div>
-    <el-table :data="singleRows" size="small" border style="width:100%">
+    <el-table :data="singleRows" size="small" border stripe style="width:100%">
       <el-table-column label="债务人名称" min-width="140">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" @change="(v: string) => updateSingleCell(row.rowId, 'debtorName', v)" />
@@ -56,7 +89,7 @@
           <span v-else>{{ fmtPct(row.lossRate) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="应计提③" width="120" align="right">
+      <el-table-column label="应计提③" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="auto-calc">{{ fmtAmt(row.expectedProvision) }}</span></template>
       </el-table-column>
       <el-table-column label="账面余额④" width="120" align="right">
@@ -65,7 +98,7 @@
           <span v-else>{{ fmtAmt(row.bookBalance) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="差异⑤" width="110" align="right">
+      <el-table-column label="差异⑤" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span :class="['auto-calc', { 'diff-warn': Math.abs(row.difference) >= 0.01 }]">{{ fmtAmt(row.difference) }}</span>
         </template>
@@ -113,7 +146,7 @@
         <span v-else class="group-name">{{ group.groupName || `组合${gIdx + 1}` }}</span>
         <el-button v-if="!isReadonly" type="danger" text size="small" @click="removeAgingGroup(group.groupId)">删除组合</el-button>
       </div>
-      <el-table :data="group.rows" size="small" border>
+      <el-table :data="group.rows" size="small" border stripe>
         <el-table-column prop="agingBand" label="账龄" width="100" />
         <el-table-column label="审定余额①" width="120" align="right">
           <template #default="{ row }">
@@ -127,7 +160,7 @@
             <span v-else>{{ fmtPct(row.lossRate) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="应计提③" width="120" align="right">
+        <el-table-column label="应计提③" width="120" align="right" class-name="auto-calc-col">
           <template #default="{ row }"><span class="auto-calc">{{ fmtAmt(row.expectedProvision) }}</span></template>
         </el-table-column>
         <el-table-column label="账面余额④" width="120" align="right">
@@ -136,7 +169,7 @@
             <span v-else>{{ fmtAmt(row.bookBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="差异⑤" width="110" align="right">
+        <el-table-column label="差异⑤" width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span :class="['auto-calc', { 'diff-warn': Math.abs(row.difference) >= 0.01 }]">{{ fmtAmt(row.difference) }}</span>
           </template>
@@ -153,29 +186,46 @@
     <span>合计应计提：<strong>{{ fmtAmt(grandTotal.expectedProvision) }}</strong></span>
     <span>合计账面：<strong>{{ fmtAmt(grandTotal.bookBalance) }}</strong></span>
     <span>总差异：<strong :class="{ 'diff-warn': Math.abs(grandTotal.totalDiff) >= 0.01 }">{{ fmtAmt(grandTotal.totalDiff) }}</strong></span>
-    <GtIndexChip wp-code="D6-7" label="→D6-7政策" style="margin-left:8px" />
-    <GtIndexChip wp-code="D6-3" label="→D6-3明细" style="margin-left:4px" />
+    <GtIndexChip value="wp:D6-7" :context-project-id="projectId" style="margin-left:8px" />
+    <GtIndexChip value="wp:D6-3" :context-project-id="projectId" style="margin-left:4px" />
   </div>
 
   <el-alert v-if="diffAlert" type="warning" :closable="false" show-icon style="margin-top:12px">
     {{ diffAlert }}
   </el-alert>
 
-  <!-- 审计说明/结论 -->
-  <div class="audit-notes-section">
-    <h4>审计说明</h4>
-    <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="ECL模型参数及损失率选取依据..." />
-    <div class="note-actions">
-      <el-button size="small" @click="openReview('D6-8-note-explanation')">💬复核</el-button>
+  <!-- 审计意见区（卡片式） -->
+  <el-card class="opinion-card" shadow="never">
+    <template #header>
+      <div class="opinion-header">
+        <span class="opinion-title">审计说明与结论</span>
+        <div class="opinion-chips">
+          <GtIndexChip value="wp:D6-7" :context-project-id="projectId" />
+          <GtIndexChip value="wp:D6-3" :context-project-id="projectId" />
+        </div>
+      </div>
+    </template>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">1. 审计说明</span>
+        <div class="opinion-actions">
+          <el-button size="small" @click="openReview('D6-8-note-explanation')">💬</el-button>
+        </div>
+      </div>
+      <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="ECL模型参数及损失率选取依据..." />
     </div>
-  </div>
-  <div class="audit-notes-section">
-    <h4>审计结论</h4>
-    <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="减值准备计提充分性结论..." />
-    <div class="note-actions">
-      <el-button size="small" @click="openReview('D6-8-note-conclusion')">💬复核</el-button>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">2. 审计结论</span>
+        <div class="opinion-actions">
+          <el-button size="small" @click="openReview('D6-8-note-conclusion')">💬</el-button>
+        </div>
+      </div>
+      <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="减值准备计提充分性结论..." />
     </div>
-  </div>
+  </el-card>
   </template>
 </div>
 </template>
@@ -184,7 +234,7 @@
 /**
  * D6TabEclCalculation.vue — 减值准备测算 D6-8
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useD6EclCalculation } from '../composables/useD6EclCalculation'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -200,11 +250,13 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
-  allResponses: Ref<Map<string, ChecklistResponse>>
+  allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD6CrossSheet>
 }>()
+
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
@@ -227,7 +279,7 @@ const {
   agingGroups, agingGroupTotals, addAgingGroup, removeAgingGroup, updateGroupName, updateAgingCell,
   grandTotal, diffAlert, auditNotes,
 } = useD6EclCalculation({
-  allResponses: props.allResponses,
+  allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
@@ -292,7 +344,55 @@ function fmtPct(rate: number): string {
 
 <style scoped>
 .d6-tab-ecl-calculation { padding: 16px; }
-.toolbar { margin-bottom: 12px; }
+.d6-tab-ecl-calculation :deep(.el-table) {
+  --el-table-font-size: 13px;
+  font-size: 13px;
+}
+.d6-tab-ecl-calculation :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+
+/* 编制提示 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.toolbar-left {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
+
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .virtual-hint { flex: 1; min-width: 200px; margin: 0; }
 .virtual-table { margin-bottom: 12px; }
@@ -313,9 +413,58 @@ function fmtPct(rate: number): string {
   align-items: center;
   font-size: 13px;
 }
+
+/* 自动计算列灰底 */
+:deep(.auto-calc-col) {
+  background-color: #f5f7fa !important;
+}
 .auto-calc { background: #f5f7fa; padding: 2px 6px; border-radius: 2px; color: #909399; }
 .diff-warn { color: #e6a23c; font-weight: 600; }
-.audit-notes-section { margin-top: 16px; }
-.audit-notes-section h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
-.note-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+/* 审计意见卡片 */
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.opinion-chips {
+  display: flex;
+  gap: 6px;
+}
+.opinion-section {
+  margin-bottom: 16px;
+}
+.opinion-section:last-child {
+  margin-bottom: 0;
+}
+.opinion-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.opinion-section-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+}
+.opinion-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 </style>

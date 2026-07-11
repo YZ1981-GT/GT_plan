@@ -1,5 +1,17 @@
 <template>
   <div class="g5-reversal-writeoff">
+    <div class="section-head">
+      <h3 class="sheet-title">G5-11 坏账准备转回核销检查</h3>
+      <div class="head-actions">
+        <GtIndexChip value="wp:G5-11" />
+        <GtReviewTrigger section-id="g5-11-reversal-writeoff" />
+      </div>
+    </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      检查长期应收款坏账准备的转回与核销：验证转回金额不超过累计计提、核销的审批完整性，关注关联交易异常。
+    </el-alert>
+
     <div class="segment-tabs">
       <el-segmented v-model="rw.activeTab.value" :options="tabOptions" size="small" />
       <div class="tab-actions">
@@ -60,12 +72,24 @@
     <div v-if="rw.invalidReversals.value.length" class="error-bar">
       ⚠ {{ rw.invalidReversals.value.length }} 条转回金额超过累计计提
     </div>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>转回金额不得超过累计计提金额，超出者红色标记（异常）</li>
+        <li>核销须有完整审批手续，关注核销依据与后续追偿</li>
+        <li>关联交易的转回/核销单独标记（橙色），警惕通过转回调节利润</li>
+        <li>转回原因、核销原因须逐笔说明并保留支持性证据（CAS 22）</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useG5ReversalWriteoff } from '../../composables/useG5ReversalWriteoff'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const rw = useG5ReversalWriteoff()
@@ -90,6 +114,13 @@ function onImported(rows: unknown[]) {
 
 <style scoped>
 .g5-reversal-writeoff { font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .tab-actions { margin-left: auto; display: flex; gap: 8px; }
 .error-bar { margin-top: 8px; padding: 8px 12px; background: #fef0f0; color: #f56c6c; font-size: 12px; border-radius: 4px; }

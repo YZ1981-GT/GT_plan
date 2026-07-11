@@ -1,6 +1,8 @@
 <template>
   <div class="g14-adjustment">
     <div class="adj-toolbar">
+      <GtIndexChip value="wp:G14-3" />
+      <el-tag size="small" type="info">共 {{ adj.rows.value.length }} 行</el-tag>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.addRow">+ 新增调整分录</el-button>
       <el-button size="small" :disabled="isReadonly || !adj.isBalanced.value" @click="adj.syncToDetail()">
         同步至明细表
@@ -9,6 +11,13 @@
         :disabled="isReadonly" @imported="emit('imported')" />
       <GtReviewTrigger section-id="G14-3-adjustment" />
     </div>
+
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：将信用减值损失（6702）相关账项/报表/重分类调整逐笔记录并保持借贷平衡，
+        账项调整净额回写 G14-2「其他」行，确保审定数与调整后账面一致（CAS 22 ECL 口径）。
+      </template>
+    </el-alert>
 
     <el-table :data="adj.rows.value" size="small" border stripe data-testid="g14-adjustment-table">
       <el-table-column label="调整事项说明" min-width="160">
@@ -106,6 +115,7 @@ import { useG14Detail } from '../composables/useG14Detail'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import type { GCycleCutoffFilledDetail } from '../composables/gCycleCutoffFill'
 import { GCYCLE_CUTOFF_EVENT } from '../composables/gCycleCutoffFill'
+import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
@@ -155,8 +165,9 @@ function fmtAmount(val: number): string {
 </script>
 
 <style scoped>
-.g14-adjustment { padding: 16px; }
-.adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+.g14-adjustment { padding: 16px; font-size: 13px; }
+.adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.audit-objective { margin-bottom: 12px; }
 .balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; font-weight: 600; }

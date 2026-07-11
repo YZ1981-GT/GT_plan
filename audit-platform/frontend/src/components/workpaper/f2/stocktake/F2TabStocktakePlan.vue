@@ -1,5 +1,24 @@
 <template>
   <div class="f2-plan-wrapper">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表记录存货监盘计划，明确监盘范围、时间、地点、人员分工及抽盘方法（CAS 1311 存货监盘）。</p>
+        <p>2. 应涵盖存放地点清单、监盘小组成员、抽盘比例与重点关注品种（高价值 / 易变质 / 账实易差异）。</p>
+        <p>3. 对无法实施监盘的存放地点，应设计替代审计程序并说明理由。</p>
+        <p>4. 可通过 📎 附件OCR识别，将盘点通知 / 计划文件内容填入对应字段。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：制定充分的存货监盘计划，确保监盘范围与抽样覆盖关键风险，为存货存在性与状况认定提供程序基础。"
+      class="objective-alert"
+    />
+
     <F2StocktakeSectionForm
       ref="sectionFormRef"
       title="监盘计划 F2-22"
@@ -100,6 +119,13 @@ function uploadOcr() {
 </script>
 
 <style scoped>
-.f2-plan-wrapper { font-size: 13px; }
+.f2-plan-wrapper { font-size: 13px; padding: 12px; }
 .ocr-attach-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid #ebeef5; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
 </style>
