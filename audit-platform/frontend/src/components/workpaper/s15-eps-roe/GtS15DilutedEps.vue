@@ -233,8 +233,9 @@
  *
  * Requirements: 2.5, 3.3, 3.4
  */
-import { reactive, computed, defineAsyncComponent } from 'vue'
+import { reactive, computed, watch, onMounted, nextTick, defineAsyncComponent } from 'vue'
 import { calcDilutedEps, type DilutedEpsInput } from '../composables/useS15FormulaEngine'
+import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -242,6 +243,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 本年输入 ────────────────────────────────────────────────
@@ -295,6 +298,27 @@ const priorYearResult = computed(() => calcDilutedEps(toDilutedInput(priorYear))
 function fmtEps(val: number): string {
   return val.toFixed(4)
 }
+
+// ─── 持久化接线（load seed + save；reactive 对象用 watch，hydrating 防回写） ───
+
+const CY_ID = 'S15-3-current'
+const PY_ID = 'S15-3-prior'
+const { save } = useSExpertPersist(() => props.allResponses)
+
+let hydrating = false
+
+onMounted(async () => {
+  hydrating = true
+  const cy = parseResponseValue(props.allResponses, CY_ID)
+  if (cy && typeof cy === 'object') Object.assign(currentYear, cy)
+  const py = parseResponseValue(props.allResponses, PY_ID)
+  if (py && typeof py === 'object') Object.assign(priorYear, py)
+  await nextTick()
+  hydrating = false
+})
+
+watch(currentYear, () => { if (!hydrating) save(CY_ID, { ...currentYear }) }, { deep: true })
+watch(priorYear, () => { if (!hydrating) save(PY_ID, { ...priorYear }) }, { deep: true })
 </script>
 
 <style scoped>

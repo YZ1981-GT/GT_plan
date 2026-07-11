@@ -370,6 +370,11 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
                         status_code=422,
                         detail=f"D2 应收账款 conclusion 值无效，收到: '{item.conclusion}'",
                     )
+            elif item.item_id.startswith(("S12-", "S13-", "S14-", "S15-", "S20-", "S21-")):
+                # S12/S13/S14/S15/S20/S21 专项底稿子表：自由格式（评价行/明细行/结论
+                # JSON 打包进 remark，conclusion 通常为 null；偶有评价结果字符串），
+                # 跳过白名单校验
+                pass
             else:
                 allowed = ("Y", "X/I", "X/W", "N/A")
                 if item.item_id.endswith("-sign-status"):

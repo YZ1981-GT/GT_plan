@@ -29,6 +29,7 @@
               v-model="row.executor"
               size="small"
               placeholder="—"
+              @change="saveRows"
             />
             <span v-else>{{ row.executor || '—' }}</span>
           </template>
@@ -42,6 +43,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="填写执行结论"
+              @change="saveRows"
             />
             <span v-else>{{ row.conclusion || '—' }}</span>
           </template>
@@ -76,6 +78,7 @@
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.2
  */
 import { ref, defineAsyncComponent } from 'vue'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -83,9 +86,11 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
-// 审计程序步骤
+// 审计程序步骤（骨架数据，seed 时从 responses 覆盖）
 const programSteps = ref([
   { procedure: '获取数据资产基本情况表，了解企业数据资产的类型、取得方式、摊销方法等基本信息。', executor: '', conclusion: '', ref: 'S21-1' },
   { procedure: '获取开发支出资本化分析表，检查资本化时点判断是否满足5项条件（技术可行性/使用出售意图/市场需求/技术财力支持/单独核算可靠计量）。', executor: '', conclusion: '', ref: 'S21-2' },
@@ -94,6 +99,16 @@ const programSteps = ref([
   { procedure: '检查摊销政策是否适当，包括摊销年限、残值率、摊销方法的选择依据。', executor: '', conclusion: '', ref: 'S21-4' },
   { procedure: '确认数据资产相关的会计政策披露是否完整、准确。', executor: '', conclusion: '', ref: '' },
 ])
+
+// ─── 持久化接线（load + save） ────────────────────────────────────────────────
+
+const ROWS_ID = 'S21-program-rows'
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([{ itemId: ROWS_ID, ref: programSteps }])
+
+function saveRows(): void {
+  save(ROWS_ID, programSteps.value)
+}
 </script>
 
 <style scoped>

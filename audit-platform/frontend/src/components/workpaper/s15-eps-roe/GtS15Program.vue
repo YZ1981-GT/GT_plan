@@ -29,6 +29,7 @@
               v-model="row.executor"
               size="small"
               placeholder="—"
+              @change="saveRows"
             />
             <span v-else>{{ row.executor || '—' }}</span>
           </template>
@@ -42,6 +43,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="填写执行结论"
+              @change="saveRows"
             />
             <span v-else>{{ row.conclusion || '—' }}</span>
           </template>
@@ -74,6 +76,7 @@
  */
 import { ref } from 'vue'
 import { defineAsyncComponent } from 'vue'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -81,15 +84,27 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
-// 审计程序步骤（实际从 render-config 加载）
+// 审计程序步骤（骨架数据，seed 时从 responses 覆盖）
 const programSteps = ref([
   { procedure: '获取本期每股收益和净资产收益率计算表，检查计算表数据来源是否与审定的财务报表数据一致。', executor: '', conclusion: '', ref: 'S15-2' },
   { procedure: '复核基本每股收益的计算是否正确，特别关注加权平均股本数的计算。', executor: '', conclusion: '', ref: 'S15-2' },
   { procedure: '复核稀释每股收益的计算是否正确，检查稀释性潜在普通股的影响。', executor: '', conclusion: '', ref: 'S15-3' },
   { procedure: '复核净资产收益率（全面摊薄和加权平均）的计算是否正确。', executor: '', conclusion: '', ref: 'S15-4' },
 ])
+
+// ─── 持久化接线（load + save） ────────────────────────────────────────────────
+
+const ROWS_ID = 'S15-program-rows'
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([{ itemId: ROWS_ID, ref: programSteps }])
+
+function saveRows(): void {
+  save(ROWS_ID, programSteps.value)
+}
 </script>
 
 <style scoped>

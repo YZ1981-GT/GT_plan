@@ -75,11 +75,14 @@
  */
 import { ref, computed } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // 金额格式化
@@ -101,8 +104,15 @@ function cellClassName({ column }: any): string {
   return ''
 }
 
+// ─── 持久化接线（load + save） ────────────────────────────────────────────────
+
+const ROWS_ID = 'S15-adjudication-rows'
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([{ itemId: ROWS_ID, ref: tableData }])
+
 function handleSave() {
-  // TODO: 保存审定表数据 + EventBus WORKPAPER_SAVED
+  // 持久化审定表数据（EventBus WORKPAPER_SAVED 由主入口/回写链处理）
+  save(ROWS_ID, tableData.value)
 }
 </script>
 

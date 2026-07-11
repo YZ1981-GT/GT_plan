@@ -251,7 +251,7 @@
  * Requirements: 5.1, 5.2, 5.3, 5.4, 5.6
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.2
  */
-import { ref, reactive, computed, defineAsyncComponent } from 'vue'
+import { ref, reactive, computed, watch, onMounted, nextTick, defineAsyncComponent } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import {
   useS21FormulaEngine,
@@ -259,6 +259,7 @@ import {
   type ResearchDevInput,
 } from '../composables/useS21FormulaEngine'
 import { useSEstimateImportExport } from '../composables/useSEstimateImportExport'
+import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 import { fmtAmount } from '@/utils/formatters'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
@@ -267,6 +268,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 5项资本化条件 ───────────────────────────────────────────
@@ -372,6 +375,35 @@ function _triggerFileUpload(): void {
 function fmtPercent(val: number): string {
   return (val * 100).toFixed(2) + '%'
 }
+
+// ─── 持久化接线（load seed + save；hydrating 防回写） ─────────────────────────
+
+const CONDITIONS_ID = 'S21-2-conditions'
+const MONTHLY_ID = 'S21-2-monthly'
+const CONCLUSION_ID = 'S21-2-conclusion'
+const { save } = useSExpertPersist(() => props.allResponses)
+
+let hydrating = false
+
+onMounted(async () => {
+  hydrating = true
+  const conds = parseResponseValue(props.allResponses, CONDITIONS_ID)
+  if (Array.isArray(conds) && conds.length) capitalizationConditions.value = conds
+  const monthly = parseResponseValue(props.allResponses, MONTHLY_ID)
+  if (monthly && typeof monthly === 'object') {
+    for (const cat of categories) {
+      if (Array.isArray(monthly[cat.key])) monthlyData[cat.key] = monthly[cat.key]
+    }
+  }
+  const conc = parseResponseValue(props.allResponses, CONCLUSION_ID)
+  if (typeof conc === 'string') auditConclusion.value = conc
+  await nextTick()
+  hydrating = false
+})
+
+watch(capitalizationConditions, () => { if (!hydrating) save(CONDITIONS_ID, capitalizationConditions.value) }, { deep: true })
+watch(monthlyData, () => { if (!hydrating) save(MONTHLY_ID, { ...monthlyData }) }, { deep: true })
+watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusion.value) })
 </script>
 
 <style scoped>

@@ -486,10 +486,11 @@
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.3
  * Requirements: 1.5, 4.4, 4.5
  */
-import { ref, reactive, computed, onMounted, watch, provide, defineAsyncComponent } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch, nextTick, provide, defineAsyncComponent } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import http from '@/utils/http'
+import { parseResponseValue } from '../composables/useSExpertPersist'
 import { useAuthStore } from '@/stores/auth'
 import { fmtAmount } from '@/utils/formatters'
 import {
@@ -528,6 +529,9 @@ const parentEmit = defineEmits<{
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+
+/** 持久化数据快照（item_id → {conclusion, remark}）；由 selfLoad 合并 responses_snapshot 填充 */
+const allResponses = ref<Map<string, any>>(new Map())
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -776,12 +780,14 @@ const summaryTableData = computed<SummaryRow[]>(() => {
 const otherMatters = ref('')
 const auditConclusion = ref('')
 
-// Watch 披露文本 → 发布 disclosure:note-text-updated（Req 8.2）
+// Watch 披露文本 → 发布 disclosure:note-text-updated（Req 8.2）+ 持久化
 watch(auditConclusion, (val) => {
   if (val) onDisclosureTextChange(val, 'S20-conclusion')
+  if (!hydrating) persistResponse(CONCLUSION_ID, auditConclusion.value)
 })
 watch(otherMatters, (val) => {
   if (val) onDisclosureTextChange(val, 'S20-other-matters')
+  if (!hydrating) persistResponse(OTHER_MATTERS_ID, otherMatters.value)
 })
 
 // ─── 动态行操作 ──────────────────────────────────────────────────────────────
@@ -883,17 +889,53 @@ provide('openVersionHistory', openVersionHistory)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 
+/** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  for (const [k, v] of Object.entries(src)) map.set(k, v)
+}
+
+/** 用 allResponses 中的存储值恢复本页可编辑状态（明细行/说明/结论） */
+function _hydrateFromResponses(): void {
+  hydrating = true
+  const unrelated = parseResponseValue(allResponses.value, UNRELATED_ID)
+  if (Array.isArray(unrelated)) unrelatedRows.splice(0, unrelatedRows.length, ...unrelated)
+  const noSub = parseResponseValue(allResponses.value, NO_SUBSTANCE_ID)
+  if (Array.isArray(noSub)) noSubstanceRows.splice(0, noSubstanceRows.length, ...noSub)
+  const om = parseResponseValue(allResponses.value, OTHER_MATTERS_ID)
+  if (typeof om === 'string') otherMatters.value = om
+  const conc = parseResponseValue(allResponses.value, CONCLUSION_ID)
+  if (typeof conc === 'string') auditConclusion.value = conc
+  nextTick(() => { hydrating = false })
+}
+
 /**
  * 当 htmlData 为 null（bundle 内嵌场景），自行调 render-config 加载数据。
+ * 合并 render 策略输出的 responses_snapshot（S20 render 实际输出键）到 allResponses，
+ * 恢复本页可编辑状态（此前丢弃 → 刷新丢失，本次修复）。
  */
 async function selfLoad() {
-  if (props.htmlData) {
-    isLoading.value = false
-    return
-  }
-
   try {
-    await http.get(`/api/workpapers/${props.wpId}/render-config`, { _silent: true } as any)
+    if (props.htmlData) {
+      const map = new Map<string, any>()
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.checklist_responses)
+      if (map.size > 0) allResponses.value = map
+    } else {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, { _silent: true } as any)
+      const data = res.data?.data || res.data
+      if (data?.sheets && Array.isArray(data.sheets)) {
+        const map = new Map<string, any>()
+        for (const sheet of data.sheets) {
+          _mergeResponses(map, sheet.html_data?.responses_snapshot)
+          _mergeResponses(map, sheet.html_data?.allResponses)
+          _mergeResponses(map, sheet.html_data?.checklist_responses)
+        }
+        if (map.size > 0) allResponses.value = map
+      }
+    }
+    if (allResponses.value.size > 0) _hydrateFromResponses()
   } catch (err) {
     console.warn('[GtS20RevenueDeduction] selfLoad failed:', err)
   }
@@ -902,6 +944,47 @@ async function selfLoad() {
 }
 
 provide('reloadWorkpaperData', selfLoad)
+
+// ─── 持久化（防抖 800ms 批量 PUT；乐观更新 Map；只读跳过） ────────────────────
+
+const UNRELATED_ID = 'S20-unrelated-rows'
+const NO_SUBSTANCE_ID = 'S20-no-substance-rows'
+const OTHER_MATTERS_ID = 'S20-other-matters'
+const CONCLUSION_ID = 'S20-conclusion'
+
+/** hydrating 期间抑制 watch 回写，避免 seed 触发无谓 PUT */
+let hydrating = false
+
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).catch((err: unknown) => console.warn('[GtS20RevenueDeduction] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
+provide('saveResponse', persistResponse)
+provide('allResponses', allResponses)
+
+// 明细行 / 说明 / 结论变更 → 持久化（hydrating 期间跳过）
+watch(unrelatedRows, () => { if (!hydrating) persistResponse(UNRELATED_ID, [...unrelatedRows]) }, { deep: true })
+watch(noSubstanceRows, () => { if (!hydrating) persistResponse(NO_SUBSTANCE_ID, [...noSubstanceRows]) }, { deep: true })
+
+onBeforeUnmount(() => {
+  for (const t of _saveTimers.values()) clearTimeout(t)
+  _saveTimers.clear()
+})
 
 // ─── EventBus + 披露联动（Task 5.2: Req 7.3, 8.1, 8.2, 8.3） ───────────────
 

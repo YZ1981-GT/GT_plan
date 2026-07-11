@@ -56,6 +56,7 @@
               size="small"
               placeholder="—"
               style="width: 80px"
+              @change="saveRows"
             >
               <el-option label="是" value="是" />
               <el-option label="否" value="否" />
@@ -73,6 +74,7 @@
               :autosize="{ minRows: 1, maxRows: 4 }"
               size="small"
               placeholder="填写执行结果"
+              @change="saveRows"
             />
             <span v-else class="wrap-text">{{ row.result || '—' }}</span>
           </template>
@@ -85,6 +87,7 @@
               size="small"
               placeholder="—"
               style="width: 100px"
+              @change="saveRows"
             >
               <el-option label="满意" value="满意" />
               <el-option label="有保留" value="有保留" />
@@ -123,6 +126,7 @@
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="填写关于应对会计估计重大错报风险的审计结论"
+        @change="saveConclusion"
       />
       <div v-else class="conclusion-text">{{ auditConclusion || '—' }}</div>
     </el-card>
@@ -156,6 +160,7 @@
 import { ref, inject } from 'vue'
 import { defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -163,6 +168,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -173,7 +180,7 @@ function handleOpenReview(sectionId: string, label: string) {
   openReviewDialog?.(sectionId, label)
 }
 
-// ─── 风险应对项目（实际从 render-config 加载，此为骨架数据） ─────────────────
+// ─── 风险应对项目（骨架数据，seed 时从 responses 覆盖） ─────────────────
 
 const riskItems = ref([
   {
@@ -261,6 +268,25 @@ const riskItems = ref([
 // ─── 审计结论 ────────────────────────────────────────────────────────────────
 
 const auditConclusion = ref('')
+
+// ─── 持久化接线（load + save） ────────────────────────────────────────────────
+
+const ROWS_ID = 'S14-3-rows'
+const CONCLUSION_ID = 'S14-3-conclusion'
+
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([
+  { itemId: ROWS_ID, ref: riskItems },
+  { itemId: CONCLUSION_ID, ref: auditConclusion },
+])
+
+function saveRows(): void {
+  save(ROWS_ID, riskItems.value)
+}
+
+function saveConclusion(): void {
+  save(CONCLUSION_ID, auditConclusion.value)
+}
 
 // ─── AI 辅助 ─────────────────────────────────────────────────────────────────
 

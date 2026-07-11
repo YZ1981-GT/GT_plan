@@ -171,13 +171,16 @@
  *
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.2
  */
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch, onMounted, nextTick } from 'vue'
 import { fmtAmount } from '@/utils/formatters'
+import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 检查要点 ────────────────────────────────────────────────
@@ -223,6 +226,31 @@ const monthlyAmortization = computed(() => {
 // ─── 审计结论 ────────────────────────────────────────────────
 
 const auditConclusion = ref('')
+
+// ─── 持久化接线（load seed + save；hydrating 防回写） ─────────────────────────
+
+const CHECK_ID = 'S21-4-check'
+const CALC_ID = 'S21-4-calc'
+const CONCLUSION_ID = 'S21-4-conclusion'
+const { save } = useSExpertPersist(() => props.allResponses)
+
+let hydrating = false
+
+onMounted(async () => {
+  hydrating = true
+  const items = parseResponseValue(props.allResponses, CHECK_ID)
+  if (Array.isArray(items) && items.length) checkItems.value = items
+  const calc = parseResponseValue(props.allResponses, CALC_ID)
+  if (calc && typeof calc === 'object') Object.assign(amortizationCalc, calc)
+  const conc = parseResponseValue(props.allResponses, CONCLUSION_ID)
+  if (typeof conc === 'string') auditConclusion.value = conc
+  await nextTick()
+  hydrating = false
+})
+
+watch(checkItems, () => { if (!hydrating) save(CHECK_ID, checkItems.value) }, { deep: true })
+watch(amortizationCalc, () => { if (!hydrating) save(CALC_ID, { ...amortizationCalc }) }, { deep: true })
+watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusion.value) })
 </script>
 
 <style scoped>

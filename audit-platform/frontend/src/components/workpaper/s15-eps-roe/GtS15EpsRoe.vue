@@ -34,6 +34,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="allResponses"
       />
       <!-- 审计程序 S15 -->
       <GtS15Program
@@ -41,6 +42,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="allResponses"
       />
       <!-- S15-2 基本每股收益计算表 -->
       <GtS15BasicEps
@@ -48,6 +50,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="allResponses"
       />
       <!-- S15-3 稀释每股收益计算表 -->
       <GtS15DilutedEps
@@ -55,6 +58,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="allResponses"
       />
       <!-- S15-4 净资产收益率计算 -->
       <GtS15Roe
@@ -62,6 +66,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="allResponses"
       />
       <!-- OnlyOffice fallback: 未匹配的 sheet -->
       <GtOnlyOfficeSheet
@@ -114,7 +119,7 @@
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.1
  * Requirements: 1.5, 2.5, 3.4, 3.5
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
 
@@ -153,6 +158,9 @@ const parentEmit = defineEmits<{
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+
+/** 子表持久化数据快照（item_id → {conclusion, remark}）；由 selfLoad 合并 responses_snapshot 填充 */
+const allResponses = ref<Map<string, any>>(new Map())
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -251,17 +259,38 @@ provide('openVersionHistory', openVersionHistory)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 
+/** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  for (const [k, v] of Object.entries(src)) map.set(k, v)
+}
+
 /**
  * 当 htmlData 为 null（bundle 内嵌场景），自行调 render-config 加载数据。
+ * 合并 render 策略输出的 responses_snapshot（S15 render 实际输出键）到 allResponses，
+ * 供子表 seed 恢复（此前丢弃 → 刷新丢失，本次修复）。
  */
 async function selfLoad() {
-  if (props.htmlData) {
-    isLoading.value = false
-    return
-  }
-
   try {
-    await http.get(`/api/workpapers/${props.wpId}/render-config`, { _silent: true } as any)
+    if (props.htmlData) {
+      const map = new Map<string, any>()
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.checklist_responses)
+      if (map.size > 0) allResponses.value = map
+    } else {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, { _silent: true } as any)
+      const data = res.data?.data || res.data
+      if (data?.sheets && Array.isArray(data.sheets)) {
+        const map = new Map<string, any>()
+        for (const sheet of data.sheets) {
+          _mergeResponses(map, sheet.html_data?.responses_snapshot)
+          _mergeResponses(map, sheet.html_data?.allResponses)
+          _mergeResponses(map, sheet.html_data?.checklist_responses)
+        }
+        if (map.size > 0) allResponses.value = map
+      }
+    }
   } catch (err) {
     console.warn('[GtS15EpsRoe] selfLoad failed:', err)
   }
@@ -270,6 +299,35 @@ async function selfLoad() {
 }
 
 provide('reloadWorkpaperData', selfLoad)
+
+// ─── 子表 save 持久化（子表 inject('saveResponse') 调用；防抖 800ms 批量 PUT） ──
+// 乐观更新本地 Map 供 selfLoad/跨表读取；结构化 value 序列化进 remark；只读跳过。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).catch((err: unknown) => console.warn('[GtS15EpsRoe] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
+provide('saveResponse', persistResponse)
+provide('allResponses', allResponses)
+
+onBeforeUnmount(() => {
+  for (const t of _saveTimers.values()) clearTimeout(t)
+  _saveTimers.clear()
+})
 
 // ─── EventBus + 披露联动（Task 5.2: Req 7.3, 8.1, 8.2, 8.3） ───────────────
 

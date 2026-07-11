@@ -221,18 +221,28 @@
         <li>确认条件：已收到或有确凿证据表明能够收到；金额能可靠计量</li>
         <li>覆盖率建议≥80%（检查金额合计/K10-2明细合计）</li>
         <li>📎列可上传凭证，OCR识别后自动填入备注</li>
-        <li>抽凭引擎可批量生成抽样方案</li>
+        <li>抽凭引擎（科目6117）可批量生成抽样方案，选样后凭证号回填至第一检查行备注</li>
       </ul>
     </details>
 
-    <!-- ═══ 抽凭引擎Dialog ═══ -->
-    <GtVoucherSamplingEngine
-      v-if="showVoucherSampling"
-      v-model:visible="showVoucherSampling"
-      :wp-id="props.wpId"
-      :project-id="props.projectId"
-      sheet-key="K10-6"
-    />
+    <!-- ═══ 抽凭引擎Dialog（科目 6117，wrap el-dialog + @filled 范式，对齐 K4/K8/G6） ═══ -->
+    <el-dialog
+      v-model="voucherDialogVisible"
+      title="⚡ 抽凭引擎（科目 6117 其他收益）"
+      width="720px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <GtVoucherSamplingEngine
+        v-if="voucherDialogVisible && props.wpId && props.projectId"
+        :project-id="props.projectId"
+        :workpaper-id="props.wpId"
+        account-code="6117"
+        phase="substantive"
+        :year="currentYear"
+        @filled="handleSampleFilled"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -250,7 +260,7 @@
  * - 覆盖率显示（检查金额合计/明细合计 %）
  * - 📎附件列（行级OCR）
  * - 不合规红色摘要提示
- * - 抽凭引擎(GtVoucherSamplingEngine dialog)
+ * - 抽凭引擎(GtVoucherSamplingEngine dialog，科目 6117，@filled 回填至检查行备注)
  * - Dropdown选项：合规/不合规/不适用
  */
 import { computed, defineAsyncComponent, inject, onMounted, ref } from 'vue'
@@ -297,7 +307,8 @@ const checkOptions: CheckStatus[] = ['合规', '不合规', '不适用']
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 
-const showVoucherSampling = ref(false)
+const voucherDialogVisible = ref(false)
+const currentYear = new Date().getFullYear()
 
 // ─── Computed: 覆盖率 ────────────────────────────────────────────────────────
 
@@ -383,7 +394,33 @@ async function handleOCR(row: any, file: any): Promise<void> {
 }
 
 function handleVoucherSampling(): void {
-  showVoucherSampling.value = true
+  voucherDialogVisible.value = true
+}
+
+/**
+ * 抽凭引擎 @filled 回调（payload: { samples, phase, fillMode, method }）。
+ * K10-6 抽凭为整表级（工具栏按钮），选样后将凭证号回填到第一检查行的备注；
+ * 若尚无检查行则提示用户先新增检查项。
+ */
+function handleSampleFilled(payload: { samples?: any[] } | any): void {
+  voucherDialogVisible.value = false
+  const samples: any[] = payload?.samples ?? []
+  if (samples.length === 0) return
+  const refs = samples
+    .map((s) => s.voucherNo || s.voucher_no || s.ref || '')
+    .filter((r: string) => !!r)
+  if (refs.length === 0) return
+
+  const rows = checks.incomeCheckRows.value
+  if (rows.length === 0) {
+    ElMessage.warning(`已选取 ${refs.length} 笔凭证，请先新增检查项目后再回填`)
+    return
+  }
+  // 回填到第一（最近新增在末尾，此处取第一检查行）检查行的备注
+  const targetRow = rows[0]
+  const existing = targetRow.remark ? `${targetRow.remark}；` : ''
+  checks.updateIncomeCheckCell(targetRow.rowKey, 'remark', `${existing}抽凭：${refs.join('、')}`)
+  ElMessage.success(`已选取 ${refs.length} 笔凭证并回填至检查项「${targetRow.checkItem || '第一项'}」备注`)
 }
 
 function handleAI(): void {

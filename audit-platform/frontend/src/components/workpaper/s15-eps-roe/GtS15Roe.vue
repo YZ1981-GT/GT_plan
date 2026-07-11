@@ -214,6 +214,7 @@
         :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly"
         placeholder="请填写净资产收益率审计结论..."
+        @change="saveConclusion"
       />
     </el-card>
 
@@ -263,8 +264,9 @@
  *
  * Requirements: 2.5, 3.1, 3.2, 3.4, 3.5
  */
-import { reactive, computed, ref, inject, defineAsyncComponent } from 'vue'
+import { reactive, computed, ref, inject, watch, onMounted, nextTick, defineAsyncComponent } from 'vue'
 import { calcDilutedRoe, calcDilutedRoeEx, type RoeInput } from '../composables/useS15FormulaEngine'
+import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -272,6 +274,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 披露联动（inject from parent GtS15EpsRoe） ──────────────────────────────
@@ -289,6 +293,7 @@ function handleDisclosureInput(val: string | Event) {
   const text = typeof val === 'string' ? val : (val?.target as HTMLTextAreaElement)?.value || ''
   disclosureNoteText.value = text
   sDisclosure?.onDisclosureTextChange(text, 'S15-4-roe-disclosure')
+  save(DISCLOSURE_ID, text)
 }
 
 async function handleAiDisclosure() {
@@ -300,6 +305,7 @@ async function handleAiDisclosure() {
   })
   if (result) {
     disclosureNoteText.value = result
+    save(DISCLOSURE_ID, result)
   }
 }
 // ─── 本年输入 ────────────────────────────────────────────────
@@ -352,6 +358,37 @@ const auditConclusion = ref('')
 function fmtPercent(val: number): string {
   return (val * 100).toFixed(2) + '%'
 }
+
+// ─── 持久化接线（reactive 用 watch；ref 用 seedOnMount + @change） ────────────
+
+const CY_ID = 'S15-4-current'
+const PY_ID = 'S15-4-prior'
+const CONCLUSION_ID = 'S15-4-conclusion'
+const DISCLOSURE_ID = 'S15-4-disclosure'
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([
+  { itemId: CONCLUSION_ID, ref: auditConclusion },
+  { itemId: DISCLOSURE_ID, ref: disclosureNoteText },
+])
+
+function saveConclusion(): void {
+  save(CONCLUSION_ID, auditConclusion.value)
+}
+
+let hydrating = false
+
+onMounted(async () => {
+  hydrating = true
+  const cy = parseResponseValue(props.allResponses, CY_ID)
+  if (cy && typeof cy === 'object') Object.assign(currentYear, cy)
+  const py = parseResponseValue(props.allResponses, PY_ID)
+  if (py && typeof py === 'object') Object.assign(priorYear, py)
+  await nextTick()
+  hydrating = false
+})
+
+watch(currentYear, () => { if (!hydrating) save(CY_ID, { ...currentYear }) }, { deep: true })
+watch(priorYear, () => { if (!hydrating) save(PY_ID, { ...priorYear }) }, { deep: true })
 </script>
 
 <style scoped>

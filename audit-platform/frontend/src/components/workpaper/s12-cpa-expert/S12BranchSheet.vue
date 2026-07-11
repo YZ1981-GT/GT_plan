@@ -66,6 +66,7 @@
               size="small"
               placeholder="—"
               style="width: 100px"
+              @change="saveRows"
             >
               <el-option label="满意" value="满意" />
               <el-option label="基本满意" value="基本满意" />
@@ -84,6 +85,7 @@
               :autosize="{ minRows: 1, maxRows: 4 }"
               size="small"
               placeholder="填写评价说明"
+              @change="saveRows"
             />
             <span v-else>{{ row.remark || '—' }}</span>
           </template>
@@ -122,6 +124,7 @@
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="填写评价结论"
+        @change="saveConclusion"
       />
       <div v-else class="conclusion-text">{{ conclusion || '—' }}</div>
     </el-card>
@@ -152,7 +155,7 @@
  * Spec: .kiro/specs/s-special-transaction-workpapers/ Task 4.3
  * Requirements: 4.1, 4.2, 4.3, 4.4
  */
-import { ref, computed, watch, inject } from 'vue'
+import { ref, computed, watch, inject, onMounted } from 'vue'
 import { defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import {
@@ -161,6 +164,7 @@ import {
   type ExpertDomain,
   type ExpertPrefix,
 } from '../composables/useS12S13ExpertBranch'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -169,6 +173,8 @@ const props = defineProps<{
   projectId: string
   isReadonly: boolean
   prefix: ExpertPrefix
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -270,16 +276,42 @@ function getFinancialInstrumentRows(prefix: ExpertPrefix) {
   ]
 }
 
-// 初始加载 + watch domain 变更
+// 初始加载 + watch domain 变更（切换域时重载骨架并 seed 该域已存数据）
 loadBranchRows(selectedDomain.value)
 watch(selectedDomain, (newDomain) => {
   loadBranchRows(newDomain)
   conclusion.value = ''
+  seedDomain(newDomain)
 })
 
 // ─── 结论 ────────────────────────────────────────────────────────────────────
 
 const conclusion = ref('')
+
+// ─── 持久化接线（load + save，item_id 按 prefix + domain） ────────────────────
+
+const { seed, save } = useSExpertPersist(() => props.allResponses)
+
+function domainRowsId(d: ExpertDomain): string {
+  return `${props.prefix}-branch-${d}-rows`
+}
+function domainConclusionId(d: ExpertDomain): string {
+  return `${props.prefix}-branch-${d}-conclusion`
+}
+function seedDomain(d: ExpertDomain): void {
+  seed([
+    { itemId: domainRowsId(d), ref: branchRows },
+    { itemId: domainConclusionId(d), ref: conclusion },
+  ])
+}
+function saveRows(): void {
+  save(domainRowsId(selectedDomain.value), branchRows.value)
+}
+function saveConclusion(): void {
+  save(domainConclusionId(selectedDomain.value), conclusion.value)
+}
+
+onMounted(() => seedDomain(selectedDomain.value))
 
 // ─── 编制提示 ────────────────────────────────────────────────────────────────
 

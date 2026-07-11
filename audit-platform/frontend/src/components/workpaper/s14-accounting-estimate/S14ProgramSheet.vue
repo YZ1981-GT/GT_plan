@@ -51,6 +51,7 @@
               size="small"
               placeholder="—"
               style="width: 80px"
+              @change="saveRows"
             >
               <el-option label="是" value="是" />
               <el-option label="否" value="否" />
@@ -67,6 +68,7 @@
               size="small"
               placeholder="—"
               style="width: 100px"
+              @change="saveRows"
             >
               <el-option label="检查" value="检查" />
               <el-option label="询问" value="询问" />
@@ -86,6 +88,7 @@
               v-model="row.executor"
               size="small"
               placeholder="—"
+              @change="saveRows"
             />
             <span v-else>{{ row.executor || '—' }}</span>
           </template>
@@ -99,6 +102,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="填写执行情况"
+              @change="saveRows"
             />
             <span v-else>{{ row.conclusion || '—' }}</span>
           </template>
@@ -137,6 +141,7 @@
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="填写审计结论"
+        @change="saveConclusion"
       />
       <div v-else class="conclusion-text">{{ auditConclusion || '—' }}</div>
     </el-card>
@@ -172,6 +177,7 @@
 import { ref, inject } from 'vue'
 import { defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -179,6 +185,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -189,7 +197,7 @@ function handleOpenReview(sectionId: string, label: string) {
   openReviewDialog?.(sectionId, label)
 }
 
-// ─── 审计程序步骤（实际从 render-config 加载，此为骨架数据） ─────────────────
+// ─── 审计程序步骤（骨架数据，seed 时从 responses 覆盖） ─────────────────
 
 const programSteps = ref([
   {
@@ -305,6 +313,25 @@ const programSteps = ref([
 // ─── 审计结论 ────────────────────────────────────────────────────────────────
 
 const auditConclusion = ref('')
+
+// ─── 持久化接线（load + save） ────────────────────────────────────────────────
+
+const ROWS_ID = 'S14-program-rows'
+const CONCLUSION_ID = 'S14-program-conclusion'
+
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([
+  { itemId: ROWS_ID, ref: programSteps },
+  { itemId: CONCLUSION_ID, ref: auditConclusion },
+])
+
+function saveRows(): void {
+  save(ROWS_ID, programSteps.value)
+}
+
+function saveConclusion(): void {
+  save(CONCLUSION_ID, auditConclusion.value)
+}
 
 // ─── AI 辅助 ─────────────────────────────────────────────────────────────────
 

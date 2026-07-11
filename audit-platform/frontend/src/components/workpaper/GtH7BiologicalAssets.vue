@@ -471,9 +471,9 @@ function onMeasurementModelChange(val: string | number) {
 
 async function saveMeasurementModel(model: string) {
   try {
-    await http.post(`/workpapers/${props.wpId}/checklist-responses`, {
-      item_id: 'H7-measurement-model',
-      content: model,
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: 'H7-measurement-model', conclusion: null, remark: model }],
     }, { _silent: true } as any)
   } catch (err) {
     console.warn('[GtH7BiologicalAssets] saveMeasurementModel failed:', err)
@@ -501,8 +501,8 @@ async function selfLoad(): Promise<void> {
         measurementModel.value = props.htmlData.measurement_model
       }
     } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      // selfLoad: 自行调用 render-config（/api 前缀，经 dev proxy 到后端）
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h7-biological-assets' },
         _silent: true,
       } as any)
@@ -520,9 +520,12 @@ async function selfLoad(): Promise<void> {
         allResponses.value = map
       }
     }
-    // 从 allResponses 恢复 measurement_model
-    const savedModel = allResponses.value.get('H7-measurement-model')
-    if (savedModel && (savedModel === 'cost' || savedModel === 'fair_value')) {
+    // 从 allResponses 恢复 measurement_model（存于 remark，兼容对象/原始值两种形态）
+    const savedModelRaw = allResponses.value.get('H7-measurement-model')
+    const savedModel = savedModelRaw && typeof savedModelRaw === 'object'
+      ? (savedModelRaw.remark ?? savedModelRaw.conclusion)
+      : savedModelRaw
+    if (savedModel === 'cost' || savedModel === 'fair_value') {
       measurementModel.value = savedModel
     }
   } catch (err) {
@@ -532,6 +535,28 @@ async function selfLoad(): Promise<void> {
   }
 }
 
+// ─── 子组件 save 持久化（子 tab 通过 inject('saveResponse') 调用） ──────────────
+// 子组件契约：saveResponse(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
+// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).catch((err: unknown) => console.warn('[GtH7] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
 // ─── provide for child components ────────────────────────────────────────────
 function openReviewDialog(sectionId: string, sectionLabel?: string): void {
   console.log('[H7] openReviewDialog:', sectionId, sectionLabel)
@@ -539,6 +564,26 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 provide('openReviewDialog', openReviewDialog)
 provide('measurementModel', measurementModel)
 provide('allResponses', allResponses)
+provide('saveResponse', persistResponse)
+
+// ─── AI 说明生成（子 tab 通过 inject('generateAiText') 调用通用端点） ──────────
+// 契约：generateAiText(section, context, existingContent) => Promise<string>（失败返回 ''，不抛错）
+async function generateAiText(section: string, context: string, existingContent: string): Promise<string> {
+  if (!props.wpId) return ''
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section,
+      prompt: `请基于 H7 生产性生物资产底稿的以下情况，生成专业、简洁的审计说明/结论：${context}`,
+      context,
+      existingContent: existingContent || '',
+    }, { _silent: true } as any)
+    return res.data?.data?.content || res.data?.content || res.data?.data?.text || res.data?.text || ''
+  } catch (err) {
+    console.warn('[GtH7] generateAiText failed:', err)
+    return ''
+  }
+}
+provide('generateAiText', generateAiText)
 
 // ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
 const versionTrail = useVersionTrail({

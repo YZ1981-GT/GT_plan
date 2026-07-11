@@ -51,6 +51,7 @@
               size="small"
               placeholder="—"
               style="width: 80px"
+              @change="saveRows"
             >
               <el-option label="是" value="是" />
               <el-option label="否" value="否" />
@@ -68,6 +69,7 @@
               :autosize="{ minRows: 1, maxRows: 4 }"
               size="small"
               placeholder="填写支持判断的审计证据或说明"
+              @change="saveRows"
             />
             <span v-else class="wrap-text">{{ row.evidence || '—' }}</span>
           </template>
@@ -102,6 +104,7 @@
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="填写关于管理层偏向迹象的评价结论"
+        @change="saveConclusion"
       />
       <div v-else class="conclusion-text">{{ auditConclusion || '—' }}</div>
     </el-card>
@@ -135,6 +138,7 @@
 import { ref, inject } from 'vue'
 import { defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -142,6 +146,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -152,7 +158,7 @@ function handleOpenReview(sectionId: string, label: string) {
   openReviewDialog?.(sectionId, label)
 }
 
-// ─── 偏向评价项目（实际从 render-config 加载，此为骨架数据） ─────────────────
+// ─── 偏向评价项目（骨架数据，seed 时从 responses 覆盖） ─────────────────
 
 const biasItems = ref([
   {
@@ -208,6 +214,25 @@ const biasItems = ref([
 // ─── 审计结论 ────────────────────────────────────────────────────────────────
 
 const auditConclusion = ref('')
+
+// ─── 持久化接线（load + save） ────────────────────────────────────────────────
+
+const ROWS_ID = 'S14-4-rows'
+const CONCLUSION_ID = 'S14-4-conclusion'
+
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([
+  { itemId: ROWS_ID, ref: biasItems },
+  { itemId: CONCLUSION_ID, ref: auditConclusion },
+])
+
+function saveRows(): void {
+  save(ROWS_ID, biasItems.value)
+}
+
+function saveConclusion(): void {
+  save(CONCLUSION_ID, auditConclusion.value)
+}
 
 // ─── AI 辅助 ─────────────────────────────────────────────────────────────────
 

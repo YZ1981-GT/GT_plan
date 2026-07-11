@@ -167,14 +167,17 @@
  * Requirements: 5.5
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.2
  */
-import { ref } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
+import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 interface AllocationRow {
@@ -197,6 +200,27 @@ const allocationRows = ref<AllocationRow[]>([
 ])
 
 const auditConclusion = ref('')
+
+// ─── 持久化接线（load seed + save；hydrating 防回写） ─────────────────────────
+
+const ROWS_ID = 'S21-3-rows'
+const CONCLUSION_ID = 'S21-3-conclusion'
+const { save } = useSExpertPersist(() => props.allResponses)
+
+let hydrating = false
+
+onMounted(async () => {
+  hydrating = true
+  const rows = parseResponseValue(props.allResponses, ROWS_ID)
+  if (Array.isArray(rows) && rows.length) allocationRows.value = rows
+  const conc = parseResponseValue(props.allResponses, CONCLUSION_ID)
+  if (typeof conc === 'string') auditConclusion.value = conc
+  await nextTick()
+  hydrating = false
+})
+
+watch(allocationRows, () => { if (!hydrating) save(ROWS_ID, allocationRows.value) }, { deep: true })
+watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusion.value) })
 
 async function addRow() {
   try {

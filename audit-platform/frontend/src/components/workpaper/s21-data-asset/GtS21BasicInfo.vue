@@ -182,14 +182,17 @@
  *
  * Spec: .kiro/specs/s-estimate-calculation-workpapers/ Task 4.2
  */
-import { ref } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
+import { useSExpertPersist, parseResponseValue } from '../composables/useSExpertPersist'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 interface AssetRow {
@@ -208,6 +211,27 @@ const assetRows = ref<AssetRow[]>([
 ])
 
 const auditNote = ref('')
+
+// ─── 持久化接线（load seed + save；ref 数组/字符串用 watch，hydrating 防回写） ──
+
+const ROWS_ID = 'S21-1-rows'
+const NOTE_ID = 'S21-1-note'
+const { save } = useSExpertPersist(() => props.allResponses)
+
+let hydrating = false
+
+onMounted(async () => {
+  hydrating = true
+  const rows = parseResponseValue(props.allResponses, ROWS_ID)
+  if (Array.isArray(rows) && rows.length) assetRows.value = rows
+  const note = parseResponseValue(props.allResponses, NOTE_ID)
+  if (typeof note === 'string') auditNote.value = note
+  await nextTick()
+  hydrating = false
+})
+
+watch(assetRows, () => { if (!hydrating) save(ROWS_ID, assetRows.value) }, { deep: true })
+watch(auditNote, () => { if (!hydrating) save(NOTE_ID, auditNote.value) })
 
 async function addRow() {
   try {

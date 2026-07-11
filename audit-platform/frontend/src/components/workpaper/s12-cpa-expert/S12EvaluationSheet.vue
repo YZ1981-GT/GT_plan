@@ -54,6 +54,7 @@
               size="small"
               placeholder="—"
               style="width: 100px"
+              @change="saveRows"
             >
               <el-option label="满意" value="满意" />
               <el-option label="基本满意" value="基本满意" />
@@ -72,6 +73,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="填写说明或依据"
+              @change="saveRows"
             />
             <span v-else>{{ row.remark || '—' }}</span>
           </template>
@@ -110,6 +112,7 @@
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="填写评价结论"
+        @change="saveConclusion"
       />
       <div v-else class="conclusion-text">{{ conclusion || '—' }}</div>
     </el-card>
@@ -142,6 +145,7 @@
 import { ref, computed, inject } from 'vue'
 import { defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { useSExpertPersist } from '../composables/useSExpertPersist'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -151,6 +155,8 @@ const props = defineProps<{
   isReadonly: boolean
   sheetKey: string
   title: string
+  /** 主入口透传的持久化快照（已解包纯 Map） */
+  allResponses?: Map<string, any>
 }>()
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -241,6 +247,25 @@ function getInitialRows(key: string) {
 // ─── 结论 ────────────────────────────────────────────────────────────────────
 
 const conclusion = ref('')
+
+// ─── 持久化接线（load + save，item_id 按 sheetKey） ──────────────────────────
+
+const rowsId = `${props.sheetKey}-rows`
+const conclusionId = `${props.sheetKey}-conclusion`
+
+const { seedOnMount, save } = useSExpertPersist(() => props.allResponses)
+seedOnMount([
+  { itemId: rowsId, ref: evaluationRows },
+  { itemId: conclusionId, ref: conclusion },
+])
+
+function saveRows(): void {
+  save(rowsId, evaluationRows.value)
+}
+
+function saveConclusion(): void {
+  save(conclusionId, conclusion.value)
+}
 
 // ─── 编制提示 ────────────────────────────────────────────────────────────────
 
