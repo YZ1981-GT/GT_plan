@@ -347,7 +347,7 @@
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
 import { computed, inject, toRef, type Ref } from 'vue'
-import { useF1ComprehensiveCheck } from '../composables/useF1ComprehensiveCheck'
+import { useF1VoucherCheck } from '../composables/useF1ComprehensiveCheck'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
@@ -375,7 +375,7 @@ const {
   removeSample,
   updateCell,
   updateSamplingParams,
-} = useF1ComprehensiveCheck({
+} = useF1VoucherCheck({
   allResponses: allResponsesRef,
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
