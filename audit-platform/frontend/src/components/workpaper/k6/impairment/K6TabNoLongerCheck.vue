@@ -49,7 +49,7 @@
         </div>
       </template>
 
-      <el-empty v-if="checkItems.length === 0" description="暂无检查项，点击"+ 新增"添加不再满足持有待售的项目" />
+      <el-empty v-if="checkItems.length === 0" description="暂无检查项，点击“+ 新增”添加不再满足持有待售的项目" />
 
       <el-table
         v-else

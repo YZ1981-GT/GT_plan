@@ -158,7 +158,7 @@
     <!-- ═══ 空状态 ═══ -->
     <el-empty
       v-if="lvt.rows.value.length === 0"
-      description="暂无项目数据，点击"新增项目"添加"
+      description="暂无项目数据，点击“新增项目”添加"
       :image-size="60"
     />
 

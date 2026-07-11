@@ -616,13 +616,11 @@ watch(saving, (isSaving, wasSaving) => {
     <!-- Loading -->
     <div v-if="loading" class="loading-mask">加载中...</div>
 
+    <!-- 进度指示 -->
+    <div class="tab-progress">完成进度: {{ overallProgress }}</div>
+
     <!-- Tab 容器 (Task 3.2) -->
     <el-tabs v-model="activeTab" type="border-card" class="b50-tabs">
-      <template #default>
-        <!-- 进度指示 -->
-        <div class="tab-progress">完成进度: {{ overallProgress }}</div>
-      </template>
-
       <!-- ═══ Tab 1: 风险因素识别 ═══ -->
       <el-tab-pane :label="`${tabStatusIcon(tab1Status)} 风险因素识别`" name="tab1">
         <div class="tab-content">

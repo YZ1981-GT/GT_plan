@@ -43,7 +43,7 @@
     </div>
 
     <!-- 无分组占位 -->
-    <el-empty v-if="calc.computedGroups.value.length === 0" description="暂无投资项目，点击"新增投资项目"开始" />
+    <el-empty v-if="calc.computedGroups.value.length === 0" description="暂无投资项目，点击“新增投资项目”开始" />
 
     <!-- 利率合理性告警 -->
     <el-alert

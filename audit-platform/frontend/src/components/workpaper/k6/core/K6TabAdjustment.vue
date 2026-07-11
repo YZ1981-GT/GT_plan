@@ -46,7 +46,7 @@
         </div>
       </template>
 
-      <el-empty v-if="entries.length === 0" description="暂无调整分录，点击"+ 新增"添加" />
+      <el-empty v-if="entries.length === 0" description="暂无调整分录，点击“+ 新增”添加" />
 
       <el-table
         v-else

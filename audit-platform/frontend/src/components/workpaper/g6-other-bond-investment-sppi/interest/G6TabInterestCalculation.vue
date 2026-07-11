@@ -170,7 +170,7 @@
       </el-card>
     </template>
 
-    <el-empty v-else description="暂无投资项目，请点击"新增投资项目"添加" :image-size="60" />
+    <el-empty v-else description="暂无投资项目，请点击“新增投资项目”添加" :image-size="60" />
 
     <!-- 底部操作区 -->
     <div class="bottom-actions">

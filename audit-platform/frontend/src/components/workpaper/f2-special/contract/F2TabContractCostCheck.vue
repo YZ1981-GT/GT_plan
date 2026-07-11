@@ -155,7 +155,7 @@ import { useF2SpecialContractOcr } from '../../composables/useF2SpecialContractO
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
-import F2SheetToolbar from '../../shared/F2SheetToolbar.vue'
+import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{

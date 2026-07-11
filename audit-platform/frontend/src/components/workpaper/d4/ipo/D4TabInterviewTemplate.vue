@@ -189,7 +189,7 @@ function removeRecord(index: number) {
 
     <!-- 空状态 -->
     <div v-if="records.length === 0" class="empty-state">
-      <el-empty description="暂无走访记录，请点击"新建走访记录"开始" />
+      <el-empty description="暂无走访记录，请点击“新建走访记录”开始" />
     </div>
 
     <!-- 当前记录编辑区 -->

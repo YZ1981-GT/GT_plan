@@ -28,7 +28,7 @@
     </div>
 
     <!-- 无数据占位 -->
-    <el-empty v-if="stageLogic.rows.value.length === 0" description="暂无投资项目，点击"新增投资项目"开始" />
+    <el-empty v-if="stageLogic.rows.value.length === 0" description="暂无投资项目，点击“新增投资项目”开始" />
 
     <!-- 主表格：行式汇总视图（虚拟滚动 max-height 61行阈值） -->
     <el-table

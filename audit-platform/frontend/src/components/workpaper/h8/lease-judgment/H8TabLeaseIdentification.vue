@@ -25,7 +25,7 @@
 
     <!-- 合同列表（段落型渲染） -->
     <div v-if="records.length === 0" class="empty-state">
-      <el-empty description="暂无租赁识别记录，请点击"+ 新增合同判断"开始" />
+      <el-empty description="暂无租赁识别记录，请点击“+ 新增合同判断”开始" />
     </div>
 
     <div v-for="record in records" :key="record.recordId" class="identification-card">

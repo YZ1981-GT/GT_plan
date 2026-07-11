@@ -74,7 +74,7 @@
         </div>
       </template>
 
-      <el-empty v-if="contingentItems.length === 0" description="暂无需披露的或有负债（K5-2明细中判定为"可能"的事项将自动出现于此）" />
+      <el-empty v-if="contingentItems.length === 0" description="暂无需披露的或有负债（K5-2明细中判定为“可能”的事项将自动出现于此）" />
 
       <el-table v-else :data="contingentItems" border size="small" style="width: 100%">
         <el-table-column type="index" label="序" width="48" align="center" />

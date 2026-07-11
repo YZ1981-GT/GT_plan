@@ -194,7 +194,7 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK3Checks, type K3RelatedPartyRow, type ComplianceState } from '../../composables/useK3Checks'
-import GtVoucherSamplingEngine from '../../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

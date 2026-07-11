@@ -178,7 +178,7 @@
     <!-- ═══ 空状态 ═══ -->
     <el-empty
       v-if="propertyTax.rows.value.length === 0"
-      description="暂无房产数据，点击"新增房产"添加"
+      description="暂无房产数据，点击“新增房产”添加"
       :image-size="60"
     />
 

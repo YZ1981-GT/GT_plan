@@ -324,7 +324,7 @@ import { useN1Detail } from '../../composables/useN1Detail'
 import { useN1ImportExport } from '../../composables/useN1ImportExport'
 import { useN1DualMode } from '../../composables/useN1DualMode'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
-import GtIndexChip from '@/components/common/GtIndexChip.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

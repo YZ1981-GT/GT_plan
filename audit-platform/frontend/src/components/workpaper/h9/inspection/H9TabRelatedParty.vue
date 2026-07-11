@@ -142,7 +142,7 @@
     </el-table>
 
     <!-- 空数据提示 -->
-    <el-empty v-if="rows.length === 0" description="暂无关联方租赁数据，请先在H9-2明细表中标记关联方后点击"从明细表刷新"" />
+    <el-empty v-if="rows.length === 0" description="暂无关联方租赁数据，请先在H9-2明细表中标记关联方后点击“从明细表刷新”" />
 
     <!-- 操作栏 -->
     <div class="action-bar" v-if="!props.isReadonly">

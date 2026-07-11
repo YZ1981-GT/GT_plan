@@ -107,19 +107,25 @@ const activeProductIdx = ref(0)
 
 function loadProducts() {
   const resp = props.allResponses.get('D4-8-products')
-  products.value = []
-  activeProductIdx.value = 0
-}     const p = JSON.parse(resp.remark)
+  if (resp?.remark) {
+    try {
+      const p = JSON.parse(resp.remark)
       if (Array.isArray(p) && p.length) {
         products.value = p.map((item: any) => ({
           name: item.name || '',
           months: (item.months || []).map((m: any) => ({ ...emptyMonth(), ...m })),
-function addProduct() {
-  if (props.isReadonly) return
-  products.value.push(defaultProduct(''))
-  activeProductIdx.value = products.value.length - 1
-  persistProducts()
-}       return
+          priorMonths: (item.priorMonths || []).map((m: any) => ({ ...emptyMonth(), ...m })),
+          industry: (Array.isArray(item.industry) && item.industry.length)
+            ? item.industry.map((r: any) => ({ ...defaultIndustry()[0], ...r }))
+            : defaultIndustry(),
+        }))
+        // 保证每个产品本期/上期各 12 个月
+        products.value.forEach((pr) => {
+          while (pr.months.length < 12) pr.months.push(emptyMonth())
+          while (pr.priorMonths.length < 12) pr.priorMonths.push(emptyMonth())
+        })
+        activeProductIdx.value = 0
+        return
       }
     } catch { /* ignore */ }
   }

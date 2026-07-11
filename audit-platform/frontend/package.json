@@ -41,6 +41,7 @@
     "dompurify": "^3.4.5",
     "echarts": "^6.0.0",
     "element-plus": "^2.9.1",
+    "exceljs": "^4.4.0",
     "mammoth": "^1.12.0",
     "marked": "^18.0.4",
     "mitt": "^3.0.1",

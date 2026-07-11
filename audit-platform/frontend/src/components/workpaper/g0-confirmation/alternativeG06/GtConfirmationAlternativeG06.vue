@@ -372,7 +372,7 @@ import { useAlternativeG06Data } from './composables/useAlternativeG06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../../confirmation/alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_G06 } from './blockColumnConfigsG06'
 import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
-import { useG0ReviewDialogProvide } from '../../composables/useG0ReviewDialogProvide'
+import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -382,7 +382,7 @@ import AlternativeD05Master from '../../confirmation/alternativeD05/AlternativeD
 // 复用 D0-5 的 CheckBlock 组件
 import CheckBlock from '../../confirmation/alternativeD05/CheckBlock.vue'
 
-const GtGridSheet = defineAsyncComponent(() => import('../../../GtGridSheet.vue'))
+const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
 const GtWpReviewDialogHost = defineAsyncComponent(() => import('../../GtWpReviewDialogHost.vue'))
 

@@ -94,7 +94,7 @@
         </div>
       </template>
 
-      <el-empty v-if="groupBasis.length === 0" description="暂无组合，点击"新增组合"添加" :image-size="60" />
+      <el-empty v-if="groupBasis.length === 0" description="暂无组合，点击“新增组合”添加" :image-size="60" />
       <el-table v-else :data="groupBasis" border size="small" class="ecl-table">
         <el-table-column label="组合名称" min-width="120">
           <template #default="{ row }">
@@ -192,7 +192,7 @@
         </div>
       </template>
 
-      <el-empty v-if="parameterEvaluation.length === 0" description="暂无参数，点击"新增参数"添加" :image-size="60" />
+      <el-empty v-if="parameterEvaluation.length === 0" description="暂无参数，点击“新增参数”添加" :image-size="60" />
       <el-table v-else :data="parameterEvaluation" border size="small" class="ecl-table">
         <el-table-column label="参数名称" min-width="100">
           <template #default="{ row }">
