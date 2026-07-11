@@ -313,7 +313,7 @@ function handleReviewApplied(text: string): void {
     <!-- 审计结论 -->
     <div class="section-subtitle">审计结论</div>
     <div class="note-section">
-      <el-input type="textarea" autosize :model-value="auditConclusion" placeholder="请输入截止测试结论..." :disabled="isReadonly" @change="saveConclusion" />
+      <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditConclusion" placeholder="请输入截止测试结论..." :disabled="isReadonly" @change="saveConclusion" />
       <div class="note-actions">
         <el-tooltip :content="aiAvailable ? 'AI 辅助生成结论' : 'AI 服务暂不可用'" placement="top">
           <el-button size="small" :loading="aiLoadingConclusion" :disabled="isReadonly || !aiAvailable" @click="generateConclusionAI">🤖 AI</el-button>

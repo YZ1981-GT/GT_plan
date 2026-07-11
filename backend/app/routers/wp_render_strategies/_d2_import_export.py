@@ -254,11 +254,16 @@ def _create_template_workbook(sheet: str, segments: list[Any] | None = None) -> 
     ws = wb.active
     ws.title = sheet
 
-    # D2-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
+    # D2-2 明细表：2 行合并表头，对齐前端 el-table 多级列头
     if sheet == 'D2-2':
-        columns = get_d2_2_columns(segments or [])
-    else:
-        columns = SHEET_COLUMNS[sheet]
+        _build_d2_2_multi_row_header(ws, segments or [])
+        # 编制说明 sheet（插入到第一个位置）
+        ws_instr = wb.create_sheet("编制说明", 0)
+        _build_d2_2_instruction_sheet(ws_instr, segments or [])
+        return wb
+
+    # 其他 sheet：单行表头
+    columns = SHEET_COLUMNS[sheet]
     header_font = Font(bold=True, size=11)
     header_fill = PatternFill(
         start_color="D9E1F2", end_color="D9E1F2", fill_type="solid"
@@ -282,7 +287,249 @@ def _create_template_workbook(sheet: str, segments: list[Any] | None = None) -> 
         for row_key, label in _D2_1_ROWS:
             ws.append([row_key, label] + [None] * (len(columns) - 2))
 
+    # 所有 sheet 都加编制说明（插入到第一个位置）
+    ws_instr = wb.create_sheet("编制说明", 0)
+    _build_generic_instruction_sheet(ws_instr, sheet, columns)
+
     return wb
+
+
+def _build_d2_2_multi_row_header(ws, segments: list[Any]) -> None:
+    """D2-2 明细表多行合并表头（对齐前端 el-table 嵌套 column）。
+
+    Row 1: 一级表头 — 固定列 + "期初审定账龄"(合并N列) + 固定列 + "期末未审账龄"(合并N列) + 固定列 + "期末审定账龄"(合并N列) + 尾部固定列
+    Row 2: 二级表头 — 账龄组合列下各段 label（1年以内/1-2年/...）
+
+    非账龄固定列纵向合并 rows 1-2。
+    """
+    from openpyxl.styles import Border, Side
+
+    n = len(segments)
+    band_labels = [s.label for s in segments] if segments else []
+
+    header_font = Font(bold=True, size=11)
+    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    thin_border = Border(
+        left=Side(style='thin'), right=Side(style='thin'),
+        top=Side(style='thin'), bottom=Side(style='thin'),
+    )
+
+    # 定义列布局: (col_name, is_group, sub_count)
+    # is_group=True 表示这是一组账龄合并列，sub_count=段数
+    layout: list[tuple[str, bool, int]] = [
+        ('序号', False, 0),
+        ('客户名称', False, 0),
+        ('公司代码', False, 0),
+        ('关联方类型', False, 0),
+        ('期初未审', False, 0),
+        ('期初AJE', False, 0),
+        ('期初RJE', False, 0),
+        ('期初审定', False, 0),
+        ('期初审定账龄', True, n),
+        ('借方发生', False, 0),
+        ('贷方发生', False, 0),
+        ('期末余额', False, 0),
+        ('重分类', False, 0),
+        ('期末未审', False, 0),
+        ('期末未审账龄', True, n),
+        ('期末AJE', False, 0),
+        ('期末RJE', False, 0),
+        ('期末审定', False, 0),
+        ('期末审定账龄', True, n),
+        ('信用风险组合方式', False, 0),
+        ('组合名称', False, 0),
+        ('是否函证', False, 0),
+        ('期后回款', False, 0),
+        ('备注', False, 0),
+    ]
+
+    col = 1
+    for name, is_group, sub_count in layout:
+        if is_group and sub_count > 0:
+            # Row 1: 父级合并表头
+            ws.cell(row=1, column=col, value=name)
+            if sub_count > 1:
+                ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col + sub_count - 1)
+            # Row 2: 各段 label
+            for i, label in enumerate(band_labels):
+                ws.cell(row=2, column=col + i, value=label)
+            col += sub_count
+        elif is_group and sub_count == 0:
+            # 无账龄段配置时跳过该组列（不占位）
+            pass
+        else:
+            # 固定列：纵向合并 rows 1-2
+            ws.cell(row=1, column=col, value=name)
+            ws.merge_cells(start_row=1, start_column=col, end_row=2, end_column=col)
+            col += 1
+
+    # 样式应用
+    total_cols = col - 1
+    for row in (1, 2):
+        for c in range(1, total_cols + 1):
+            cell = ws.cell(row=row, column=c)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            cell.border = thin_border
+
+    # 冻结到数据起始行
+    ws.freeze_panes = "A3"
+
+
+def _build_d2_2_instruction_sheet(ws, segments: list[Any]) -> None:
+    """D2-2 明细表编制说明 sheet。"""
+    bold = Font(bold=True)
+    row = 1
+
+    ws.cell(row=row, column=1, value="应收账款明细表 (D2-2) — 编制说明").font = bold
+    row += 2
+
+    # 一、各列含义
+    ws.cell(row=row, column=1, value="一、各列含义").font = bold
+    row += 1
+    for ci, h in enumerate(["列名", "说明"], 1):
+        ws.cell(row=row, column=ci, value=h).font = bold
+    row += 1
+
+    cols_info = [
+        ("序号", "行序号（自动生成）"),
+        ("客户名称", "客户/往来单位名称（手填）"),
+        ("公司代码", "内部公司代码（手填）"),
+        ("关联方类型", "非关联方/控股股东/实际控制人/其他关联方（下拉选择）"),
+        ("期初未审", "期初未审数（手填金额）"),
+        ("期初AJE", "期初审计调整（手填金额）"),
+        ("期初RJE", "期初重分类调整（手填金额）"),
+        ("期初审定", "期初审定数 = 未审+AJE+RJE（只读自动计算）"),
+        ("期初审定账龄", "期初审定余额按账龄段分拆（手填金额，各段之和应等于期初审定）"),
+        ("借方发生", "本期借方发生额（手填金额）"),
+        ("贷方发生", "本期贷方发生额（手填金额）"),
+        ("期末余额", "期末余额 = 期初审定+借方-贷方（只读自动计算）"),
+        ("重分类", "重分类调整金额（手填）"),
+        ("期末未审", "期末未审数 = 期末余额+重分类（只读自动计算）"),
+        ("期末未审账龄", "期末未审余额按账龄段分拆（手填金额）"),
+        ("期末AJE", "期末审计调整（手填金额）"),
+        ("期末RJE", "期末重分类调整（手填金额）"),
+        ("期末审定", "期末审定数 = 期末未审+AJE+RJE（只读自动计算）"),
+        ("期末审定账龄", "期末审定余额按账龄段分拆（可编辑金额）"),
+        ("信用风险组合方式", "单项计提/账龄组合/客户类型组合（下拉选择）"),
+        ("组合名称", "所属组合名称（手填或自动关联）"),
+        ("是否函证", "是否已发函（是/否）"),
+        ("期后回款", "期后回款金额（手填）"),
+        ("备注", "其他说明（手填）"),
+    ]
+    for col_name, col_desc in cols_info:
+        ws.cell(row=row, column=1, value=col_name)
+        ws.cell(row=row, column=2, value=col_desc)
+        row += 1
+
+    row += 1
+
+    # 二、账龄段说明
+    ws.cell(row=row, column=1, value="二、账龄段配置").font = bold
+    row += 1
+    if segments:
+        ws.cell(row=row, column=1, value=f"当前项目配置了 {len(segments)} 个账龄段：")
+        row += 1
+        for i, seg in enumerate(segments, 1):
+            ws.cell(row=row, column=1, value=f"  {i}. {seg.label}（键：{seg.key}）")
+            row += 1
+    else:
+        ws.cell(row=row, column=1, value="当前项目未配置账龄段，模板中不含账龄列。")
+        row += 1
+
+    row += 1
+    ws.cell(row=row, column=1, value="账龄段由项目管理员在「项目设置 → 底稿配置 → 账龄配置」中维护。")
+    row += 1
+    ws.cell(row=row, column=1, value="自定义账龄段的 key 值将作为数据存储键，导入时按列头 label 匹配。")
+    row += 2
+
+    # 三、填报规则
+    ws.cell(row=row, column=1, value="三、填报规则").font = bold
+    row += 1
+    ws.cell(row=row, column=1, value="• 每行代表一个客户/往来单位的应收账款明细")
+    row += 1
+    ws.cell(row=row, column=1, value="• 金额列填数字，空值视为 0")
+    row += 1
+    ws.cell(row=row, column=1, value="• 账龄各段之和应等于对应期间审定数（系统会校验）")
+    row += 1
+    ws.cell(row=row, column=1, value="• 关联方类型、信用风险组合方式为枚举值，请从选项中选择")
+    row += 2
+
+    # 四、导入注意事项
+    ws.cell(row=row, column=1, value="四、导入注意事项").font = bold
+    row += 1
+    ws.cell(row=row, column=1, value="• 行匹配：按「客户名称」精确匹配已有行，新名称自动新增行")
+    row += 1
+    ws.cell(row=row, column=1, value="• 只读列（期初审定/期末余额/期末未审/期末审定）：导入时忽略")
+    row += 1
+    ws.cell(row=row, column=1, value="• 账龄列：按列头 label 匹配（如'1年以内'），配置变更后旧列跳过并报 warning")
+    row += 1
+    ws.cell(row=row, column=1, value="• 空行自动跳过")
+    row += 1
+
+    # 列宽
+    ws.column_dimensions["A"].width = 20
+    ws.column_dimensions["B"].width = 60
+
+
+# Sheet 名称 → 中文说明映射
+_SHEET_DESCRIPTION: dict[str, str] = {
+    'D2-1': '应收账款审定表',
+    'D2-3': '坏账准备明细表（按单项计提/账龄组合/客户类型组合分区块）',
+    'D2-4': '调整分录汇总表',
+    'D2-5': '应收账款分析表',
+    'D2-6': '关联方及交易检查表',
+    'D2-7': '凭证检查抽样表',
+}
+
+
+def _build_generic_instruction_sheet(ws, sheet: str, columns: list[str]) -> None:
+    """通用编制说明 sheet（适用于 D2 除 D2-2 外的所有 sheet）。"""
+    bold = Font(bold=True)
+    row = 1
+
+    desc = _SHEET_DESCRIPTION.get(sheet, sheet)
+    ws.cell(row=row, column=1, value=f"{desc} ({sheet}) — 编制说明").font = bold
+    row += 2
+
+    # 一、各列含义
+    ws.cell(row=row, column=1, value="一、各列含义").font = bold
+    row += 1
+    for ci, h in enumerate(["列号", "列名"], 1):
+        ws.cell(row=row, column=ci, value=h).font = bold
+    row += 1
+    for i, col_name in enumerate(columns, 1):
+        ws.cell(row=row, column=1, value=i)
+        ws.cell(row=row, column=2, value=col_name)
+        row += 1
+
+    row += 1
+
+    # 二、填报规则
+    ws.cell(row=row, column=1, value="二、填报规则").font = bold
+    row += 1
+    ws.cell(row=row, column=1, value="• 按列头名称对应填写数据")
+    row += 1
+    ws.cell(row=row, column=1, value="• 金额列填数字，空值视为 0")
+    row += 1
+    ws.cell(row=row, column=1, value="• 文本列直接填写文字说明")
+    row += 2
+
+    # 三、导入注意事项
+    ws.cell(row=row, column=1, value="三、导入注意事项").font = bold
+    row += 1
+    ws.cell(row=row, column=1, value="• 列头名称必须与模板完全一致（不可增删列）")
+    row += 1
+    ws.cell(row=row, column=1, value="• 空行自动跳过")
+    row += 1
+    ws.cell(row=row, column=1, value="• 导入会覆盖已有数据（按行顺序匹配）")
+    row += 1
+
+    # 列宽
+    ws.column_dimensions["A"].width = 8
+    ws.column_dimensions["B"].width = 25
 
 
 def _validate_columns(ws: Any, sheet: str) -> list[str]:
@@ -1203,6 +1450,30 @@ async def export_template(
 ):
     """导出空白xlsx模板（含表头+格式）"""
     _validate_sheet(sheet)
+
+    # D2-1 审定表：走动态生成器（多行合并表头+编制说明+行骨架）
+    if sheet == 'D2-1':
+        from app.services.adjudication_export_template_service import (
+            AdjudicationExportTemplateService,
+        )
+        from urllib.parse import quote as _quote
+
+        buf, filename = await AdjudicationExportTemplateService.generate(
+            wp_id=wp_id,
+            wp_code='D2-1',
+            wp_name='应收账款',
+            db=db,
+            template_file_path=None,  # 行骨架从 _D2_1_ROWS 获取不依赖磁盘模板
+        )
+        fn_encoded = _quote(filename)
+        return StreamingResponse(
+            buf,
+            media_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".spreadsheetml.sheet"
+            ),
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{fn_encoded}"},
+        )
 
     # D2-2 明细表：账龄列头按项目账龄配置动态生成（Task 12.1）
     segments = await resolve_aging_segments(db, wp_id, 'D2') if sheet == 'D2-2' else None

@@ -56,6 +56,35 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
         }
       }
       allResponses.value = map
+
+      // 自动取试算平衡表 1122 科目余额
+      if (projectId?.value) {
+        try {
+          // 先取项目审计年度
+          let year = new Date().getFullYear() - 1
+          try {
+            const projRes = await api.get(`/api/projects/${projectId.value}`)
+            const proj = projRes?.data ?? projRes
+            if (proj?.audit_year) year = Number(proj.audit_year)
+          } catch { /* fallback */ }
+
+          const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
+            params: { year },
+          })
+          const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
+          const tbRow = tbData.find((r: any) => r.standard_account_code === '1122')
+          if (tbRow) {
+            const tbAmount = Number(tbRow.audited_amount ?? tbRow.unadjusted_amount ?? 0)
+            allResponses.value.set('D2-adj-tb-amount', {
+              item_id: 'D2-adj-tb-amount',
+              conclusion: null,
+              remark: String(tbAmount),
+            })
+          }
+        } catch {
+          // trial_balance 取数失败不阻断加载
+        }
+      }
     } catch {
       ElMessage.warning('数据加载失败，可手动填写')
     } finally {

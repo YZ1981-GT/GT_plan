@@ -138,29 +138,42 @@ const GUIDANCE_TEXTS = [
 
 <template>
   <div class="d2-tab-related-party">
+    <!-- ─── 标题行 ─── -->
     <div class="tab-header">
       <h4>关联方及交易检查 D2-6</h4>
+      <GtIndexChip value="wp:D2-6" />
       <GtReviewTrigger section-id="D2-relatedparty-header" />
     </div>
 
+    <!-- ─── 审计目标 ─── -->
     <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
       <template #default>
         <p>识别并核实应收账款关联方及交易，评价关联方清单完整性、交易定价公允性及披露充分性（CAS 1323）。</p>
       </template>
     </el-alert>
 
+    <!-- ─── 工具栏 ─── -->
     <div class="tab-toolbar">
-      <el-button-group>
-        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
-        <el-button size="small" @click="onExportData">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="handleImport" style="display:inline-block">
-          <el-button size="small">导入数据</el-button>
-        </el-upload>
-      </el-button-group>
+      <el-dropdown trigger="click" size="small">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="onExportTemplate">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="onExportData">导出数据</el-dropdown-item>
+            <el-dropdown-item>
+              <el-upload :show-file-list="false" accept=".xlsx" :before-upload="handleImport" style="width:100%">
+                <span style="display:block;width:100%">导入数据</span>
+              </el-upload>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加关联方</el-button>
       <el-button size="small" :disabled="isReadonly" @click="importFromDetail">从 D2-2 明细导入关联方</el-button>
+      <el-tag size="small" type="info" effect="plain" class="row-count-tag">共 {{ rows.length }} 行</el-tag>
     </div>
 
+    <!-- ─── 虚拟速览 ─── -->
     <div v-if="useVirtualScroll" class="virtual-toolbar">
       <el-alert type="info" :closable="false" class="virtual-hint">
         行数较多（{{ browseRows.length }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
@@ -181,7 +194,16 @@ const GUIDANCE_TEXTS = [
       class="virtual-table"
     />
 
-    <el-table v-if="!useVirtualScroll || !browseMode" :data="rows" border size="small" max-height="500" style="width: 100%">
+    <!-- ─── 主表格 ─── -->
+    <el-table
+      v-if="!useVirtualScroll || !browseMode"
+      :data="rows"
+      border
+      size="small"
+      max-height="500"
+      style="width: 100%"
+      class="rp-table"
+    >
       <el-table-column label="关联方名称" min-width="140" fixed="left">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.debtorName" size="small" placeholder="关联方名称" @change="(v: string) => updateCell(row.rowId, 'debtorName', v)" />
@@ -219,10 +241,10 @@ const GUIDANCE_TEXTS = [
           <span v-else>{{ displayPrefs.fmtAmount(row.creditAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期末余额" width="120" align="right">
+      <el-table-column label="期末余额" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <el-tooltip content="= 期初 + 借方 - 贷方（自动计算）" placement="top">
-            <span class="calc-cell">{{ displayPrefs.fmtAmount(row.endBalance) }}</span>
+            <span class="formula-cell">{{ displayPrefs.fmtAmount(row.endBalance) }}</span>
           </el-tooltip>
         </template>
       </el-table-column>
@@ -232,10 +254,10 @@ const GUIDANCE_TEXTS = [
           <span v-else>{{ displayPrefs.fmtAmount(row.badDebtProvision) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="账面价值" width="120" align="right">
+      <el-table-column label="账面价值" width="120" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <el-tooltip content="= 期末余额 - 坏账准备（自动计算）" placement="top">
-            <span class="calc-cell">{{ displayPrefs.fmtAmount(row.bookValue) }}</span>
+            <span class="formula-cell">{{ displayPrefs.fmtAmount(row.bookValue) }}</span>
           </el-tooltip>
         </template>
       </el-table-column>
@@ -265,39 +287,47 @@ const GUIDANCE_TEXTS = [
       <template #empty>暂无关联方记录，点击"+ 添加关联方"或"从 D2-2 明细导入"</template>
     </el-table>
 
-    <!-- 合计行 -->
+    <!-- ─── 合计行 ─── -->
     <div class="total-bar">
       <span class="total-label">合计</span>
-      <span>期初 {{ displayPrefs.fmtAmount(totalRow.priorBalance) }}</span>
-      <span>期末 {{ displayPrefs.fmtAmount(totalRow.endBalance) }}</span>
-      <span>坏账 {{ displayPrefs.fmtAmount(totalRow.badDebtProvision) }}</span>
-      <span>账面价值 {{ displayPrefs.fmtAmount(totalRow.bookValue) }}</span>
+      <el-tag size="small" effect="plain">期初 {{ displayPrefs.fmtAmount(totalRow.priorBalance) }}</el-tag>
+      <el-tag size="small" effect="plain" type="warning">期末 {{ displayPrefs.fmtAmount(totalRow.endBalance) }}</el-tag>
+      <el-tag size="small" effect="plain" type="danger">坏账 {{ displayPrefs.fmtAmount(totalRow.badDebtProvision) }}</el-tag>
+      <el-tag size="small" effect="plain" type="success">账面价值 {{ displayPrefs.fmtAmount(totalRow.bookValue) }}</el-tag>
     </div>
 
-    <!-- 审计说明 -->
-    <div class="section-subtitle">审计说明</div>
-    <div class="note-section">
-      <el-input type="textarea" autosize :model-value="auditNote" placeholder="请输入审计说明..." :disabled="isReadonly" @change="(v: string) => saveAuditNote(v || '')" />
-      <div class="note-actions">
-        <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计说明' : 'AI 服务暂不可用'" placement="top">
-          <el-button size="small" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI</el-button>
-        </el-tooltip>
-        <el-button v-if="openReviewDialog" size="small" @click="onReview('D2-relatedparty-note')">💬 复核</el-button>
-      </div>
-    </div>
+    <!-- ─── 审计意见区 ─── -->
+    <el-card class="audit-opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计说明' : 'AI 服务暂不可用'" placement="top">
+              <el-button type="primary" plain size="small" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI</el-button>
+            </el-tooltip>
+            <el-button v-if="openReviewDialog" size="small" @click="onReview('D2-relatedparty-note')">💬 复核</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" placeholder="请输入审计说明..." :disabled="isReadonly" @change="(v: string) => saveAuditNote(v || '')" />
+    </el-card>
 
-    <!-- 审计结论 -->
-    <div class="section-subtitle">审计结论</div>
-    <div class="note-section">
-      <el-input type="textarea" autosize :model-value="auditConclusion" placeholder="请输入审计结论..." :disabled="isReadonly" @change="(v: string) => saveAuditConclusion(v || '')" />
-      <div class="note-actions">
-        <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计结论' : 'AI 服务暂不可用'" placement="top">
-          <el-button size="small" :loading="aiLoadingConclusion" :disabled="isReadonly || !aiAvailable" @click="generateConclusionAI">🤖 AI</el-button>
-        </el-tooltip>
-        <el-button v-if="openReviewDialog" size="small" @click="onReview('D2-relatedparty-conclusion')">💬 复核</el-button>
-      </div>
-    </div>
+    <el-card class="audit-opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计结论' : 'AI 服务暂不可用'" placement="top">
+              <el-button type="primary" plain size="small" :loading="aiLoadingConclusion" :disabled="isReadonly || !aiAvailable" @click="generateConclusionAI">🤖 AI</el-button>
+            </el-tooltip>
+            <el-button v-if="openReviewDialog" size="small" @click="onReview('D2-relatedparty-conclusion')">💬 复核</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditConclusion" placeholder="请输入审计结论..." :disabled="isReadonly" @change="(v: string) => saveAuditConclusion(v || '')" />
+    </el-card>
 
+    <!-- ─── 编制提示 ─── -->
     <details class="guidance-fold">
       <summary>📋 编制提示</summary>
       <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
@@ -308,22 +338,43 @@ const GUIDANCE_TEXTS = [
 <style scoped>
 .d2-tab-related-party { padding: 12px; }
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.tab-header h4 { margin: 0; font-size: 15px; }
+.tab-header h4 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .audit-objective { margin-bottom: 12px; }
 .audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
 .tab-toolbar { display: flex; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap; }
+.row-count-tag { margin-left: auto; }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .virtual-hint { flex: 1; min-width: 200px; margin: 0; }
 .virtual-table { margin-bottom: 12px; }
-.calc-cell { color: #909399; font-variant-numeric: tabular-nums; }
+
+/* ─── 表格 13px + 紧凑 ─── */
+.rp-table { font-size: 13px; }
+.rp-table :deep(.el-table__cell) { padding: 4px 3px; }
+
+/* ─── 公式列：灰底 + 虚线下划线 + help 光标 ─── */
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+.formula-cell {
+  border-bottom: 1px dashed #909399;
+  cursor: help;
+  color: #606266;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── 合计栏 ─── */
 .total-bar {
-  display: flex; gap: 24px; align-items: center; padding: 8px 12px; margin-top: 8px;
+  display: flex; gap: 12px; align-items: center; padding: 8px 12px; margin-top: 8px;
   background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px; font-weight: 600;
 }
-.total-label { font-weight: 700; }
-.section-subtitle { font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
-.note-section { margin-bottom: 8px; }
-.note-actions { margin-top: 6px; display: flex; gap: 8px; }
+.total-label { font-weight: 700; margin-right: 4px; }
+
+/* ─── 审计意见卡片 ─── */
+.audit-opinion-card { margin-top: 16px; margin-bottom: 0; }
+.audit-opinion-card + .audit-opinion-card { margin-top: 12px; }
+.opinion-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-actions { margin-left: auto; display: flex; gap: 8px; }
+
+/* ─── 编制提示 ─── */
 .guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }

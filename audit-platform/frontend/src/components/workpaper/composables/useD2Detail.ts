@@ -497,8 +497,25 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
    */
   async function importFromAuxBalance(projectId: string): Promise<{ imported: number; updated: number; added: number }> {
     try {
+      // 获取当前审计年度——从项目 API 获取（最可靠）
+      const token = sessionStorage.getItem('token') || ''
+      const authHeaders = { 'Authorization': `Bearer ${token}` }
+      let year = String(new Date().getFullYear() - 1) // fallback: 上一年
+
+      try {
+        const projResp = await fetch(`/api/projects/${projectId}`, { headers: authHeaders })
+        if (projResp.ok) {
+          const projData = await projResp.json()
+          const proj = projData.data || projData
+          if (proj.audit_year || proj.auditYear) {
+            year = String(proj.audit_year || proj.auditYear)
+          }
+        }
+      } catch { /* fallback to current year - 1 */ }
+
       const response = await fetch(
-        `/api/projects/${projectId}/ledger/aux-balance-detail?account_code=1122&aux_type=customer`
+        `/api/projects/${projectId}/ledger/aux-balance-detail?account_code=1122&dim_type=${encodeURIComponent('客户')}&year=${year}`,
+        { headers: authHeaders }
       )
       if (!response.ok) {
         ElMessage.info('辅助余额表无数据或请求失败')
@@ -506,10 +523,22 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       }
 
       const result = await response.json()
-      const data: Array<{ aux_name: string; prior_balance?: number; end_balance?: number }> =
-        result.data || result || []
+      const rawData = result.data || result || []
+      // 后端返回字段: aux_name, opening_balance, debit_amount, credit_amount, closing_balance
+      // 同一客户可能有多条子科目记录(1122.01/02/...)，按 aux_name 聚合
+      const aggregated = new Map<string, { opening: number; debit: number; credit: number; closing: number }>()
+      for (const item of rawData) {
+        const name = (item.aux_name || '').trim()
+        if (!name) continue
+        const prev = aggregated.get(name) || { opening: 0, debit: 0, credit: 0, closing: 0 }
+        prev.opening += Number(item.opening_balance) || 0
+        prev.debit += Number(item.debit_amount) || 0
+        prev.credit += Number(item.credit_amount) || 0
+        prev.closing += Number(item.closing_balance) || 0
+        aggregated.set(name, prev)
+      }
 
-      if (!data.length) {
+      if (aggregated.size === 0) {
         ElMessage.info('辅助余额表中无1122科目客户维度数据')
         return { imported: 0, updated: 0, added: 0 }
       }
@@ -517,35 +546,26 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       let updated = 0
       let added = 0
 
-      for (const item of data) {
-        const customerName = item.aux_name?.trim()
-        if (!customerName) continue
-
+      for (const [customerName, amounts] of aggregated) {
         // 按客户名去重查找已有行
         const existing = rows.value.find(
           r => r.customerName.trim().toLowerCase() === customerName.toLowerCase()
         )
 
         if (existing) {
-          // merge: 仅更新 priorUnadjusted/endBalance，不覆盖手工字段
-          if (item.prior_balance !== undefined) {
-            existing.priorUnadjusted = item.prior_balance
-          }
-          if (item.end_balance !== undefined) {
-            existing.endBalance = item.end_balance
-          }
+          existing.priorUnadjusted = amounts.opening
+          existing.debitOccurrence = amounts.debit
+          existing.creditOccurrence = amounts.credit
+          existing.endBalance = amounts.closing
           recalcRow(existing)
           updated++
         } else {
-          // 新增行
           const newRow = createEmptyRow(rows.value.length + 1, segments.value)
           newRow.customerName = customerName
-          if (item.prior_balance !== undefined) {
-            newRow.priorUnadjusted = item.prior_balance
-          }
-          if (item.end_balance !== undefined) {
-            newRow.endBalance = item.end_balance
-          }
+          newRow.priorUnadjusted = amounts.opening
+          newRow.debitOccurrence = amounts.debit
+          newRow.creditOccurrence = amounts.credit
+          newRow.endBalance = amounts.closing
           recalcRow(newRow)
           rows.value.push(newRow)
           added++

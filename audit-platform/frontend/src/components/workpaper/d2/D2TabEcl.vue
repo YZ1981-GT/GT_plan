@@ -326,7 +326,7 @@ const GUIDANCE_TEXTS = [
       </el-tooltip>
       <el-button v-if="openReviewDialog" size="small" text @click="openReviewDialog('D2-ecl-note')">💬 复核</el-button>
     </div>
-    <el-input type="textarea" autosize :model-value="auditNote" placeholder="记录 ECL 测算方法、损失率依据、前瞻性调整及计提充分性评价..." :disabled="isReadonly" @change="saveNote" />
+    <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" placeholder="记录 ECL 测算方法、损失率依据、前瞻性调整及计提充分性评价..." :disabled="isReadonly" @change="saveNote" />
 
     <details class="guidance-fold">
       <summary>📋 编制提示</summary>

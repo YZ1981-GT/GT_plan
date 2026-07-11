@@ -272,7 +272,7 @@ const GUIDANCE_TEXTS = [
       </el-tooltip>
       <el-button v-if="openReviewDialog" size="small" text @click="openReviewDialog('D2-baddebt-conclusion')">💬 复核</el-button>
     </div>
-    <el-input type="textarea" autosize :model-value="auditConclusion" placeholder="评价坏账准备计提的充分性、方法一致性及与 ECL 测算的勾稽..." :disabled="isReadonly" @change="saveConclusion" />
+    <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditConclusion" placeholder="评价坏账准备计提的充分性、方法一致性及与 ECL 测算的勾稽..." :disabled="isReadonly" @change="saveConclusion" />
 
     <details class="guidance-fold">
       <summary>📋 编制提示</summary>

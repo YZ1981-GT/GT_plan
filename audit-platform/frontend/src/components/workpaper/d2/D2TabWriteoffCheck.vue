@@ -266,7 +266,7 @@ const GUIDANCE_TEXTS = [
       <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiSectionAnalysis">🤖 AI 生成</el-button>
       <el-button v-if="openReviewDialog" size="small" text @click="openReviewDialog('D2-writeoff-section-analysis')">💬 复核</el-button>
     </div>
-    <el-input v-model="sectionAnalysis" type="textarea" autosize :disabled="isReadonly" placeholder="分析转回与核销的合理性、与 D2-3 的勾稽及对利润的影响..." @change="saveSectionAnalysis" />
+    <el-input v-model="sectionAnalysis" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="分析转回与核销的合理性、与 D2-3 的勾稽及对利润的影响..." @change="saveSectionAnalysis" />
 
     <details class="guidance-fold">
       <summary>📋 编制提示</summary>

@@ -35,24 +35,11 @@
         <!-- 科目级覆盖 -->
         <div class="override-section">
           <div class="section-label" style="margin-top: 20px;">科目覆盖</div>
-          <div class="override-tip">允许 D3(预收) / F1(预付) 使用不同预设</div>
-          <div class="override-row">
-            <span class="override-subject">D3 预收账款</span>
+          <div class="override-tip">各含账龄的科目可独立选择预设方案（留空则跟随全局）</div>
+          <div v-for="item in AGING_SUBJECT_LIST" :key="item.key" class="override-row">
+            <span class="override-subject">{{ item.key }} {{ item.label }}</span>
             <el-select
-              v-model="form.subjectOverrides.D3"
-              size="small"
-              placeholder="跟随全局"
-              clearable
-              style="width: 120px;"
-            >
-              <el-option label="3年段" value="THREE_YEAR" />
-              <el-option label="5年段" value="FIVE_YEAR" />
-            </el-select>
-          </div>
-          <div class="override-row">
-            <span class="override-subject">F1 预付款项</span>
-            <el-select
-              v-model="form.subjectOverrides.F1"
+              v-model="form.subjectOverrides[item.key]"
               size="small"
               placeholder="跟随全局"
               clearable
@@ -154,6 +141,16 @@ import {
   type AgingPreset,
 } from '@/composables/useAgingConfig'
 
+/** 全部含账龄列的科目（与后端 AGING_SUBJECTS 对齐） */
+const AGING_SUBJECT_LIST = [
+  { key: 'D2', label: '应收账款' },
+  { key: 'D3', label: '预收账款' },
+  { key: 'F1', label: '预付款项' },
+  { key: 'K1', label: '短期借款' },
+  { key: 'K3', label: '预收款项' },
+  { key: 'G5', label: '长期应收款' },
+] as const
+
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 
 const props = defineProps<{
@@ -235,7 +232,7 @@ async function onDialogOpen() {
     )
     form.preset = res.preset || 'FIVE_YEAR'
     // 设置 subject overrides
-    form.subjectOverrides = { D3: '', F1: '', ...(res.subject_overrides || {}) }
+    form.subjectOverrides = { D2: '', D3: '', F1: '', K1: '', K3: '', G5: '', ...(res.subject_overrides || {}) }
 
     // 保存原始段标签（用于变更检测）
     if (res.effective_segments) {
@@ -254,7 +251,7 @@ async function onDialogOpen() {
     // 加载失败：使用默认值
     form.preset = 'FIVE_YEAR'
     form.customSegments = PRESET_SEGMENTS.FIVE_YEAR.map(s => s.label)
-    form.subjectOverrides = { D3: '', F1: '' }
+    form.subjectOverrides = { D2: '', D3: '', F1: '', K1: '', K3: '', G5: '' }
     originalSegmentLabels.value = PRESET_SEGMENTS.FIVE_YEAR.map(s => s.label)
   } finally {
     loading.value = false
@@ -287,8 +284,11 @@ function removeSegment(idx: number) {
 /** 构建保存 payload */
 function buildPayload() {
   const overrides: Record<string, string> = {}
-  if (form.subjectOverrides.D3) overrides.D3 = form.subjectOverrides.D3
-  if (form.subjectOverrides.F1) overrides.F1 = form.subjectOverrides.F1
+  for (const item of AGING_SUBJECT_LIST) {
+    if (form.subjectOverrides[item.key]) {
+      overrides[item.key] = form.subjectOverrides[item.key] as string
+    }
+  }
 
   const payload: any = {
     preset: form.preset,

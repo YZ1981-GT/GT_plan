@@ -217,12 +217,12 @@ export function useD2Analysis(options: UseD2BaseOptions) {
   /**
    * 更新 dataSource / remark 字段
    */
-  function updateMetaField(field: 'dataSource' | 'remark', value: string): void {
+  function updateMetaField(field: 'dataSource' | 'remark' | 'process', value: string): void {
     if (isReadonly.value) return
 
     if (field === 'dataSource') {
       dataSource.value = value
-    } else {
+    } else if (field === 'remark') {
       remark.value = value
     }
 

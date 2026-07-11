@@ -15,6 +15,7 @@
  * Requirements: 6.1, 6.2, 6.3, 6.4, 6.5
  */
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import { parseNum } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
 
@@ -146,16 +147,23 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
 
   /**
    * 从D2-2明细表筛选关联方客户（relationType≠'非关联方'）导入
+   * 如果 D2-2 无数据，提示用户先填写明细表
    */
   function importFromDetail(): void {
     if (isReadonly.value) return
 
     const detailJson = allResponses.value.get('D2-detail-rows')?.remark
-    if (!detailJson) return
+    if (!detailJson) {
+      ElMessage.warning('D2-2 明细表暂无数据，请先在"应收账款明细表 D2-2"中填入客户明细')
+      return
+    }
 
     try {
       const detailRows = JSON.parse(detailJson)
-      if (!Array.isArray(detailRows)) return
+      if (!Array.isArray(detailRows) || detailRows.length === 0) {
+        ElMessage.warning('D2-2 明细表暂无数据，请先在"应收账款明细表 D2-2"中填入客户明细')
+        return
+      }
 
       const filtered = detailRows.filter(
         (row: any) => {
@@ -164,21 +172,27 @@ export function useD2RelatedParty(options: UseD2BaseOptions) {
         }
       )
 
+      if (filtered.length === 0) {
+        ElMessage.info('D2-2 明细表中未发现关联方客户（所有客户关联关系均为"非关联方"或未标注）')
+        return
+      }
+
       const imported: RelatedPartyRow[] = filtered.map((row: any) => {
         const newRow = createEmptyRow()
-        newRow.debtorName = row.debtorName || row.clientName || ''
+        newRow.debtorName = row.debtorName || row.customerName || row.clientName || ''
         newRow.relationType = row.relationType || ''
-        newRow.priorBalance = parseNum(row.priorAudited)
-        newRow.endBalance = parseNum(row.currentAudited ?? row.auditedBalance)
+        newRow.priorBalance = parseNum(row.priorAudited ?? row.priorUnadjusted)
+        newRow.endBalance = parseNum(row.currentAudited ?? row.endBalance ?? row.auditedBalance)
         return recalcRow(newRow)
       })
 
       if (imported.length > 0) {
         rows.value = [...rows.value, ...imported]
         debounceSave()
+        ElMessage.success(`已从 D2-2 导入 ${imported.length} 个关联方客户`)
       }
     } catch {
-      // silent
+      ElMessage.error('解析 D2-2 明细数据失败')
     }
   }
 

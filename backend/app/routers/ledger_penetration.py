@@ -445,7 +445,7 @@ async def get_aux_balance_detail(
 
     where = [
         await get_active_filter(db, tbl, project_id, year),
-        tbl.c.account_code == account_code,
+        tbl.c.account_code.like(account_code + '%') if '.' not in account_code else tbl.c.account_code == account_code,
         tbl.c.aux_type == dim_type,
     ]
     if aux_code:

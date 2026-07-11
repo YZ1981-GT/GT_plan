@@ -477,7 +477,7 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
         <el-button size="small" text type="primary" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI 生成</el-button>
       </el-tooltip>
     </div>
-    <el-input type="textarea" autosize :model-value="auditNote" placeholder="记录细节测试的样本选取、核对结果、异常处理及总体结论..." :disabled="isReadonly" @change="saveNote" />
+    <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" placeholder="记录细节测试的样本选取、核对结果、异常处理及总体结论..." :disabled="isReadonly" @change="saveNote" />
 
     <details class="guidance-fold">
       <summary>📋 编制提示</summary>

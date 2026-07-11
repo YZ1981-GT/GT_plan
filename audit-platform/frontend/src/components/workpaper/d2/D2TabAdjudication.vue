@@ -286,12 +286,19 @@ const excelMainRows = computed<ExcelMainRow[]>(() => {
 })
 
 const BASE_AGING_OPTIONS = [
-  { key: 'within1Year', label: '一年以内' },
-  { key: 'y1to2', label: '一到二年' },
-  { key: 'y2to3', label: '二到三年' },
-  { key: 'y3to4', label: '三到四年' },
-  { key: 'y4to5', label: '四到五年' },
-  { key: 'over5', label: '五年以上' },
+  { key: 'within3m', label: '0-3个月' },
+  { key: 'within6m', label: '0-6个月' },
+  { key: 'm3to6', label: '3-6个月' },
+  { key: 'm3to12', label: '3个月-1年' },
+  { key: 'm6to12', label: '6个月-1年' },
+  { key: 'within1Year', label: '1年以内' },
+  { key: 'y1to2', label: '1-2年' },
+  { key: 'y2to3', label: '2-3年' },
+  { key: 'y3to4', label: '3-4年' },
+  { key: 'y4to5', label: '4-5年' },
+  { key: 'y3to5', label: '3-5年' },
+  { key: 'over3', label: '3年以上' },
+  { key: 'over5', label: '5年以上' },
 ] as const
 
 const AGING_PRESET_3Y: AgingBandDef[] = [
@@ -352,7 +359,7 @@ function saveCustomAgingBands(): void {
 function onCustomLabelChange(index: number, value: string): void {
   const target = customAgingBands.value[index]
   if (!target) return
-  target.label = value || `自定义账龄${index + 1}`
+  target.label = value
   saveCustomAgingBands()
 }
 
@@ -531,20 +538,6 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 
     <el-skeleton :loading="loading" :rows="8" animated>
       <template #default>
-        <div class="excel-header-card">
-          <div class="excel-title-main">致同会计师事务所</div>
-          <div class="excel-title-sub">应收账款审定表</div>
-          <div class="excel-meta-grid">
-            <div class="meta-cell"><span class="meta-label">被审计单位名称：</span><span class="meta-value">-</span></div>
-            <div class="meta-cell"><span class="meta-label">编制人：</span><span class="meta-value">-</span></div>
-            <div class="meta-cell"><span class="meta-label">编制日期：</span><span class="meta-value">-</span></div>
-            <div class="meta-cell"><span class="meta-label">索引号：</span><span class="meta-value">D2-1</span></div>
-            <div class="meta-cell"><span class="meta-label">截止日：</span><span class="meta-value">202X年12月31日</span></div>
-            <div class="meta-cell"><span class="meta-label">复核人：</span><span class="meta-value">-</span></div>
-            <div class="meta-cell"><span class="meta-label">复核日期：</span><span class="meta-value">-</span></div>
-            <div class="meta-cell"><span class="meta-label">页次：</span><span class="meta-value">1</span></div>
-          </div>
-        </div>
 
         <!-- 主表（按模板行结构） -->
         <div class="section-block section-gross">
@@ -622,6 +615,20 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
             </div>
           </div>
 
+          <el-alert type="info" :closable="true" class="aging-usage-hint">
+            <template #title>
+              <span style="font-weight:500">使用说明</span>
+            </template>
+            <template #default>
+              <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;line-height:1.8;color:#606266">
+                <li>选择"3年段"或"5年段"可快速切换预设账龄分段方案</li>
+                <li>选择"自定义"后可自由增减账龄段：点击"+ 新增账龄段"添加，点击"删除"移除</li>
+                <li>左侧可自由命名（如"0-3个月"），右侧选择对应区间（如"0-3个月"、"3个月-1年"、"3年以上"等）</li>
+                <li>修改后自动保存，D2-2/D2-3/ECL 等关联底稿的账龄列头同步变化</li>
+              </ul>
+            </template>
+          </el-alert>
+
           <div v-if="agingMode === 'custom'" class="custom-aging-editor">
             <div
               v-for="(band, idx) in customAgingBands"
@@ -632,19 +639,20 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
                 :model-value="band.label"
                 size="small"
                 :disabled="isReadonly"
-                placeholder="账龄段名称"
+                placeholder="如：0-3个月、3个月以上"
                 style="width: 170px"
-                @change="(v: string) => onCustomLabelChange(idx, v)"
+                @input="(v: string) => onCustomLabelChange(idx, v)"
               />
               <el-select
-                :model-value="band.keys"
+                :model-value="band.keys[0] || ''"
                 size="small"
-                multiple
-                collapse-tags
-                collapse-tags-tooltip
-                style="width: 360px"
+                filterable
+                allow-create
+                clearable
+                style="width: 200px"
                 :disabled="isReadonly"
-                @change="(v: string[]) => onCustomKeysChange(idx, v)"
+                placeholder="选择或输入账龄区间"
+                @change="(v: string) => onCustomKeysChange(idx, v ? [v] : [])"
               >
                 <el-option
                   v-for="opt in BASE_AGING_OPTIONS"
@@ -704,7 +712,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
             <el-input
               v-model="auditNote"
               type="textarea"
-              :rows="4"
+              :autosize="{ minRows: 5 }"
               :disabled="isReadonly"
               placeholder="说明应收账款变动原因..."
               @change="saveAuditField('note', auditNote)"
@@ -721,7 +729,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
             <el-input
               v-model="auditConclusion"
               type="textarea"
-              :rows="4"
+              :autosize="{ minRows: 5 }"
               :disabled="isReadonly"
               placeholder="审计结论..."
               @change="saveAuditField('conclusion', auditConclusion)"
@@ -827,6 +835,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
   gap: 8px;
 }
 .aging-mode-label { color: #606266; font-size: 13px; }
+.aging-usage-hint { margin: 8px 0 12px; }
 .custom-aging-editor {
   border: 1px dashed #dcdfe6;
   border-radius: 6px;

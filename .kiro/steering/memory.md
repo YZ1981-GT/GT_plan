@@ -24,7 +24,7 @@ inclusion: always
 - **源模板红字内容融入**：嵌入对应功能区域上方作为"方法论上下文"(琥珀色左边线+浅黄背景)
 - **多section底稿每个文本区都要AI辅助**：section标题行右侧放AI按钮，不只底部有
 - **🔴 交互点选优先(尤其C类控制测试等判断型底稿)**：判断/枚举字段一律下拉/单选/多选tag/按钮点选，减少手打；长文本才用autosize textarea+AI辅助。跳转联动一键完成(汇总↔子页↔B23/B50/A14一键带入)。必要处(样本证据/凭证/审计证据/过程记录)加📎附件上传+OCR识别自动填充。结论/缺陷/偏差回写(→B50 EventBus/→A14缺陷底稿/→C21-1汇总/→汇总表"是否偏差")。多加操作提示(顶部蓝色渐变引导区+方法论上下文琥珀块+字段tooltip+编制提示details)
-- **叙述式底稿UI规范**：仅核对+结论的底稿不加独立审计意见区；textarea用autosize
+- **叙述式底稿UI规范**：仅核对+结论的底稿不加独立审计意见区；textarea用`:autosize="{ minRows: 5 }"`（默认5行高度，内容多时自动扩展）
 - **抽凭表行级OCR**：📎附件列上传后复用`/d4/contract-ocr`端点OCR识别→确认弹窗填入
 - **🔴 示例内嵌编制参考（非Drawer被动查看）**：源模板示例内容必须内嵌到对应步骤/过程记录的编制界面中，用户填写时直接看到参照+一键套用，不是藏在Drawer里让用户主动找。核心：参照示例要求来完善底稿开发，让用户点点点就能完成编制
 - 功能收敛；git 单 commit；**push 前必先 fetch**；**协作走 PR 不直推 main**
@@ -60,6 +60,12 @@ inclusion: always
 - **D~N循环全sheet HTML组件化**：OnlyOffice仅为降级/偏好切换
 - **🔴 G4-9类列式转置结构**：源模板中"投资项目作为列头+检查项作为行"的转置表必须在前端转换为行式交互视图（列式→行式），不能直接套行式表格模板
 
+- **🟡 审定表导出模板动态生成器 adjudication-export-template**：新建 feature spec(requirements-first)，三件套齐(requirements 10条EARS+design 11属性P1-P11+tasks 8组5波)。解决现有`export-template`端点直接返回源xlsx(列结构不匹配前端HTML审定表+无编制说明)。单一`AdjudicationExportTemplateService`覆盖全部D~N审定表(^[A-N]\d+-1$)，openpyxl动态生成含多行合并表头+编制说明sheet+行骨架(extract_audit_rows)+账龄动态列(D2/D3/F1/K1/K3/G5复用build_aging_headers)+RFC5987中文文件名。仅改wp_render_config.export_template()添加正则分支,不改前端/不改导入导出。**待实现**。
+
+## 待办（复盘发现）
+
+- **🟡 底稿版本链全覆盖 + 变动说明（复盘 2026-07-11,待立 spec）**：`workpaper-version-trail` spec 已完成,通用组件就绪(`GtWpVersionTrail`+`VersionDiffPanel`+`useWorkpaperVersionToolbar`[版本按钮+保存后 debounce 自动快照]+后端 `POST /versions`)，但**覆盖不全**:仅 S 循环(S3-S6/S12-S15/S20/S21)+M8/M9+抽凭引擎接了,**D2/D3~D7/多数 D~N 结构化底稿未接**(grep D2 目录 14tab 无一 import 版本工具栏)。且 `createAutoSnapshot` description 恒为通用"编辑后自动快照"无实际变动说明(用户要"体现主要变动")。建议单独立 feature spec:①全底稿系统性接入 useWorkpaperVersionToolbar+GtWpVersionTrail(标准接线模板+CI 守卫检查底稿是否接版本工具栏)②保存时自动生成变动摘要(对比前后 checklist_responses/表格→"新增N行/改账龄/回填抽凭M笔")+允许手填③与抽凭/截止/一键刷新已有快照统一时间线。D2 作首个试点。**截止测试(GtCutoffAutoSampling)与抽凭(GtVoucherSamplingEngine)组件已存在且通用,D2 已接(D2TabCutoff/D2TabVoucherCheck),用户所需功能已满足**,仅小增强(金额阈值/基准日 UI 暴露+account-code 参数化不硬编码 1122)。
+
 ## 环境配置
 
 - Python 3.12 / Docker / PG 16 / Redis；后端 9980 / 前端 3030 / vLLM 8100；DB `audit_platform`
@@ -89,7 +95,7 @@ inclusion: always
 ### git
 - 分支 `work/2026-05-30-wp-specs`；最高迁移 **V102**（V100 formula-lib / V101 advanced-query模板共享 / V102 advanced_query_writeback addr_id；以 `migration_status` 为准）
 - 本次push：**composables 相对导入层级 bug 全树修复**(rebase 到 origin `282f8d80`)：125文件/244处 `../`深度错误→Vite transform 500崩溃(K类Playwright实测暴露),`fix_wp_composables_import_depth.py --apply`修复+`--check`挂CI(governance wp-ref-contract-check job)。9先前500 tab全转200,K1-1审定表实测0error正常渲染
-- origin `282f8d80`(协作者)：formula-management-library 实现 Req1-32 全链路(P0/P1缺口)+spec三件套修订(components/formula/*+template-library/*+draft_refresh 等)
+- origin `282f8d80`(我方)：formula-management-library 实现 Req1-32 全链路(P0/P1缺口)+spec三件套修订(components/formula/*+template-library/*+draft_refresh 等)
 - 更早push `4a6c753c`(补齐H~S遗留三项:H7 25tab实现+K10-6抽凭重接+S12-S21持久化useSExpertPersist,59文件)；`10134f81`(H~S 全循环 ref/selfLoad/导航系统性清扫+gold,275文件:selfLoad键名bug H6/H8/H9/K12/K13 _mergeResponses+导航navigate→navigate-sheet L1-L8/M1-M10/N1-N5+H6/H8/H9持久化断路+K4抽凭重接+K12-1 stub+后端render applicable_standard_v2列漂移)；`d8b27f2d`(acnr 100/100+advanced-query 85/85+formula-lib V100+voucher spec)
 - `origin/HEAD→origin/master` 落后 main 隐患仍在
 

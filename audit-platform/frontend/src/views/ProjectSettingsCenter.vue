@@ -235,10 +235,15 @@ const projectId = computed(() => route.params.projectId as string)
 const ctx = computed(() => projectStore.currentProjectContext)
 const yearOptions = computed(() => projectStore.yearOptions)
 
-const activeTab = ref('basic')
+const activeTab = ref((route.query.tab as string) || 'basic')
 
 // ─── 账龄段配置弹窗 ───
 const agingDialogVisible = ref(false)
+
+// 从 D2-2 跳转过来时自动打开账龄配置弹窗
+if (route.query.openAging === '1') {
+  agingDialogVisible.value = true
+}
 
 function onAgingConfigSaved() {
   ElMessage.success('账龄段配置已更新，相关明细表将自动刷新')
