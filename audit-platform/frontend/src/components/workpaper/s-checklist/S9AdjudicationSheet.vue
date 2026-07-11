@@ -1,5 +1,13 @@
 <template>
   <div class="s9-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：确认电子商务相关科目期末余额的存在、完整与准确，评价收入确认与相关成本费用计量的恰当性，并与试算平衡表核对一致。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 审定表 S9-1 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

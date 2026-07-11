@@ -1,5 +1,13 @@
 <template>
   <div class="s13-program">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        确定管理层在编制财务报表时是否利用了管理层的专家；评价该专家的胜任能力、专业素质和客观性，并评价其工作的适当性，从而对以其工作形成的信息作为审计证据的可靠性作出判断（CAS 1301）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -234,6 +242,15 @@ function handleAiConclusion() {
 <style scoped>
 .s13-program {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

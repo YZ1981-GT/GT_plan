@@ -5,6 +5,12 @@
       <p>H8-14关联交易检查：识别关联方租赁并评估公允性。价差率=(关联租金-市场租金)/市场租金×100%。价差率>10%需重点关注定价合理性。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-14" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 关联租赁检查表 -->
     <el-card shadow="never" class="table-card">
       <template #header>
@@ -124,6 +130,7 @@
  */
 import { ref, toRef, reactive, computed, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 interface RelatedPartyRow {
   rowId: string
@@ -245,6 +252,8 @@ function getRowClassName({ row }: { row: RelatedPartyRow }) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

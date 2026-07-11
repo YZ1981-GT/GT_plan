@@ -1,5 +1,13 @@
 <template>
   <div class="s17-tax-impact">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实非经常性损益项目所得税影响的计算是否准确，确认税后非经常性损益金额的列报与披露恰当。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ S17-21 非经常性损益项目的所得税影响 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

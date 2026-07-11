@@ -30,6 +30,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M5-2 明细表（法定+任意盈余公积） -->
       <M5TabDetail
@@ -37,6 +38,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M5-3 调整分录汇总（借贷平衡） -->
       <M5TabAdjustment
@@ -44,6 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M5-4 盈余公积计提检查（法定10%+50%上限） -->
       <M5TabAccrualTest
@@ -51,6 +54,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M5-5 盈余公积检查表 -->
       <M5TabReserveCheck
@@ -58,6 +62,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（上市公司） -->
       <M5TabDisclosureListed
@@ -65,6 +70,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（国有企业） -->
       <M5TabDisclosureSoe
@@ -72,6 +78,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet / 参考辅助 -->
       <GtOnlyOfficeSheet
@@ -159,14 +166,16 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
- * M5TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * 子组件目录行点击 / 返回目录 → 通知外层 GtWpRenderer 切换 sheetName。
+ * GtWpRenderer 监听的是 `@navigate-sheet`(onChildNavigateSheet)，故此处必须
+ * emit `navigate-sheet`（而非 `navigate`），否则二级导航静默失效。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────

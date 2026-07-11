@@ -24,7 +24,7 @@
         <el-table-column prop="description" label="减值迹象描述（CAS8）" min-width="350" />
         <el-table-column prop="result" label="判断" width="120" align="center">
           <template #default="{ row }">
-            <el-radio-group v-model="row.result" :disabled="isReadonly" size="small" @change="onIndicationChange(row)">
+            <el-radio-group v-model="row.result" :disabled="isReadonly" size="small" @change="onIndicationChange(row, 'result')">
               <el-radio-button value="Y">有</el-radio-button>
               <el-radio-button value="N">无</el-radio-button>
               <el-radio-button value="NA">N/A</el-radio-button>
@@ -33,7 +33,7 @@
         </el-table-column>
         <el-table-column prop="explanation" label="说明" min-width="200">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.explanation" size="small" placeholder="判断依据..." @change="onIndicationChange(row)" />
+            <el-input v-if="!isReadonly" v-model="row.explanation" size="small" placeholder="判断依据..." @change="onIndicationChange(row, 'explanation')" />
             <span v-else>{{ row.explanation }}</span>
           </template>
         </el-table-column>
@@ -59,19 +59,19 @@
         <el-table-column type="index" width="40" />
         <el-table-column prop="assetGroup" label="资产组" min-width="120">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.assetGroup" size="small" />
+            <el-input v-if="!isReadonly" v-model="row.assetGroup" size="small" @change="onCalcChange(row, 'assetGroup')" />
             <span v-else>{{ row.assetGroup }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="bookValue" label="账面价值" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" />
+            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" @change="onCalcChange(row, 'bookValue')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="fairValueLessDisposal" label="公允-处置费" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.fairValueLessDisposal" :controls="false" size="small" />
+            <el-input-number v-if="!isReadonly" v-model="row.fairValueLessDisposal" :controls="false" size="small" @change="onCalcChange(row, 'fairValueLessDisposal')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.fairValueLessDisposal) }}</span>
           </template>
         </el-table-column>
@@ -93,7 +93,10 @@
           </template>
         </el-table-column>
         <el-table-column prop="alreadyProvided" label="已计提" width="100" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.alreadyProvided) }}</span></template>
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.alreadyProvided" :controls="false" size="small" @change="onCalcChange(row, 'alreadyProvided')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.alreadyProvided) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="差异" width="100" align="right">
           <template #default="{ row }">
@@ -152,7 +155,8 @@ const state = useH1Impairment(toRef(props, 'wpId'), toRef(props, 'projectId'), a
 const hasImpairmentSign = computed(() => state.indications.value.some((i: any) => i.result === 'Y'))
 const signCount = computed(() => state.indications.value.filter((i: any) => i.result === 'Y').length)
 
-function onIndicationChange(_row: any) { /* persist */ }
+function onIndicationChange(row: any, field: string) { state.updateIndication(row.key, field as any, row[field]) }
+function onCalcChange(row: any, field: string) { state.updateCalcRow(row.rowId, field as any, row[field]) }
 
 async function handleAddCalcRow() {
   const { value: name } = await ElMessageBox.prompt('资产组名称', '新增减值测算', { confirmButtonText: '确定', cancelButtonText: '取消' })

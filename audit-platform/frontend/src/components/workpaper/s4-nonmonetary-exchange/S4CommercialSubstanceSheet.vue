@@ -1,5 +1,13 @@
 <template>
   <div class="s4-substance">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：逐项判断准则适用性（6项排除情形）与商业实质（未来现金流量风险、时间、金额是否显著不同），为交换采用公允价值或账面价值计量提供依据。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 方法论上下文（琥珀色左边线） ═══ -->
     <div class="methodology-context">
       <p class="methodology-title">准则依据</p>

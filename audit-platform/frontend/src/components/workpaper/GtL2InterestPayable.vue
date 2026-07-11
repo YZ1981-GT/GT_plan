@@ -153,15 +153,15 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
  * L2TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
- * 外层通过 sheet 目录行 chips 控制 sheetName prop，此处 emit 向上传递请求。
+ * 外层 GtWpRenderer 监听 @navigate-sheet（对齐 K1 范式），此处 emit 向上传递请求。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -176,6 +176,8 @@ const isReadonly = computed(() => !!props.readonly)
  */
 const currentSheet = computed(() => {
   const name = props.sheetName || 'L2'
+  // 底稿目录 sheet → 显示 L2 底稿目录（对齐 K1）
+  if (name.includes('底稿目录')) return 'L2'
   // 提取末尾的L2编码（L2/L2A/L2-1~L2-4）
   const match = name.match(/L2(?:-\d+)?[A-Z]?$|L2$/)
   if (match) return match[0]

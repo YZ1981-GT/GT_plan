@@ -251,6 +251,11 @@ defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -268,10 +273,7 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 // ─── 与审定交叉 ──────────────────────────────────────────────────────────────

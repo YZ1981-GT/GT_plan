@@ -1,13 +1,17 @@
 <template>
   <div class="h1-tab-operating-lease">
+    <el-alert type="info" :closable="false" show-icon class="obj-alert">
+      <template #title>审计目标：核实以经营租赁方式租出的固定资产租赁条款合理、租金收益率正常，市场租金偏离超阈值项目已获合理解释。</template>
+    </el-alert>
+
     <div class="methodology-context">
-      <p>检查以经营租赁方式租出的固定资产：租赁条款合理性、租金收益率、市场租金对比。23公式自动计算租赁净收益与投资收益率。</p>
+      <p>检查以经营租赁方式租出的固定资产：租赁条款合理性、租金收益率、市场租金对比。净收益=年租金-折旧分摊-维护费；收益率=净收益÷原值。</p>
     </div>
 
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
-          <span>H1-19 经营租出检查（{{ state.rows.value.length }} 项）</span>
+          <span>H1-19 经营租出检查 <el-tag size="small" type="info">共 {{ operatingRows.length }} 项</el-tag></span>
           <div class="title-actions">
             <el-button size="small" type="primary" @click="handleAddRow" :disabled="isReadonly">+ 新增</el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-19')">💬 复核</el-button>
@@ -15,51 +19,97 @@
         </div>
       </template>
 
-      <el-table :data="state.rows.value" border stripe size="small" max-height="450" class="lease-table">
+      <el-table :data="operatingRows" border stripe size="small" max-height="450" class="lease-table">
         <el-table-column type="index" width="40" fixed />
-        <el-table-column prop="assetName" label="资产名称" min-width="110" fixed />
-        <el-table-column prop="lessee" label="承租方" width="100" />
-        <el-table-column prop="leaseStart" label="起始日" width="100" />
-        <el-table-column prop="leaseEnd" label="终止日" width="100" />
-        <el-table-column prop="monthlyRent" label="月租金" width="100" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.monthlyRent) }}</span></template>
+        <el-table-column prop="assetName" label="资产名称" min-width="110" fixed>
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.assetName" size="small" @change="onCell(row, 'assetName')" />
+            <span v-else>{{ row.assetName }}</span>
+          </template>
         </el-table-column>
-        <el-table-column prop="annualRent" label="年租金收入" width="110" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="月租×12">{{ fmtAmt(row.annualRent) }}</span></template>
+        <el-table-column prop="lessee" label="承租方" width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.lessee" size="small" @change="onCell(row, 'lessee')" />
+            <span v-else>{{ row.lessee }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="leaseStart" label="起始日" width="120">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" v-model="row.leaseStart" type="date" value-format="YYYY-MM-DD" size="small" style="width:110px" @change="onCell(row, 'leaseStart')" />
+            <span v-else>{{ row.leaseStart }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="leaseEnd" label="终止日" width="120">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" v-model="row.leaseEnd" type="date" value-format="YYYY-MM-DD" size="small" style="width:110px" @change="onCell(row, 'leaseEnd')" />
+            <span v-else>{{ row.leaseEnd }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="annualRent" label="年租金" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.annualRent" :controls="false" size="small" @change="onCell(row, 'annualRent')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.annualRent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="月租金" width="100" align="right">
+          <template #default="{ row }"><span class="formula-cell" title="月租金=年租金÷12">{{ fmtAmt(row.monthlyRent) }}</span></template>
         </el-table-column>
         <el-table-column prop="originalCost" label="资产原值" width="110" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.originalCost) }}</span></template>
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" @change="onCell(row, 'originalCost')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
+          </template>
         </el-table-column>
-        <el-table-column prop="annualDep" label="年折旧" width="100" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.annualDep) }}</span></template>
+        <el-table-column prop="depAlloc" label="折旧分摊" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.depAlloc" :controls="false" size="small" @change="onCell(row, 'depAlloc')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.depAlloc) }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="maintenanceCost" label="维护费" width="100" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.maintenanceCost) }}</span></template>
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.maintenanceCost" :controls="false" size="small" @change="onCell(row, 'maintenanceCost')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.maintenanceCost) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="净收益" width="110" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="净收益=租金-折旧-维护">{{ fmtAmt(row.netIncome) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="净收益=年租金-折旧分摊-维护费">{{ fmtAmt(row.netIncome) }}</span></template>
         </el-table-column>
         <el-table-column label="收益率%" width="80" align="right">
           <template #default="{ row }">
             <span class="formula-cell" title="收益率=净收益÷原值×100%">{{ row.returnRate != null ? row.returnRate.toFixed(1) + '%' : '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="marketRent" label="市场月租" width="100" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.marketRent) }}</span></template>
+        <el-table-column prop="marketRent" label="市场年租" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.marketRent" :controls="false" size="small" @change="onCell(row, 'marketRent')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.marketRent) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="偏离%" width="80" align="right">
           <template #default="{ row }">
-            <span :class="['formula-cell', { 'error-amount': Math.abs(row.rentDeviation || 0) > 20 }]">
-              {{ row.rentDeviation != null ? row.rentDeviation.toFixed(1) + '%' : '-' }}
+            <span :class="['formula-cell', { 'error-amount': Math.abs(deviation(row) ?? 0) > 20 }]" title="偏离=(年租金-市场年租)÷市场年租×100%">
+              {{ deviation(row) != null ? deviation(row)!.toFixed(1) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="100" />
+        <el-table-column prop="remark" label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="onCell(row, 'remark')" />
+            <span v-else>{{ row.remark }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="50" v-if="!isReadonly">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow('19', row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <div class="summary-bar">
-        <span>年租金合计: <b class="amount-cell">{{ fmtAmt(state.rentTotal.value) }}</b></span>
-        <span>净收益合计: <b class="amount-cell">{{ fmtAmt(state.netIncomeTotal.value) }}</b></span>
+        <span>年租金合计: <b class="amount-cell">{{ fmtAmt(operatingSummary.totalRent) }}</b></span>
+        <span>净收益合计: <b class="amount-cell">{{ fmtAmt(operatingSummary.totalNetIncome) }}</b></span>
+        <span>平均收益率: <b>{{ operatingSummary.avgReturnRate.toFixed(1) }}%</b></span>
       </div>
     </el-card>
 
@@ -81,18 +131,29 @@
 <script setup lang="ts">
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { useH1LeaseCheck } from '../../composables/useH1LeaseCheck'
+import { useH1LeaseCheck, type OperatingLeaseRow } from '../../composables/useH1LeaseCheck'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
-const state = useH1LeaseCheck(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any, { variant: 'operatingLease' })
+const { operatingRows, operatingSummary, addOperatingRow, removeRow, updateOperatingCell } = useH1LeaseCheck(
+  toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any,
+)
+
+function deviation(row: OperatingLeaseRow): number | null {
+  return row.marketRent > 0 ? ((row.annualRent - row.marketRent) / row.marketRent * 100) : null
+}
 
 async function handleAddRow() {
   const { value: name } = await ElMessageBox.prompt('资产名称', '新增', { confirmButtonText: '确定', cancelButtonText: '取消' })
-  if (name) state.addRow(name)
+  if (name != null) {
+    addOperatingRow()
+    const last = operatingRows.value[operatingRows.value.length - 1]
+    if (last) updateOperatingCell(last.rowId, 'assetName', name)
+  }
 }
+function onCell(row: OperatingLeaseRow, field: keyof OperatingLeaseRow) { updateOperatingCell(row.rowId, field, (row as any)[field]) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
@@ -102,6 +163,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h1-tab-operating-lease { padding: 16px; font-size: 13px; }
+.obj-alert { margin-bottom: 12px; }
 .methodology-context { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

@@ -30,6 +30,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-2 明细表（89列极宽表区段Tab） -->
       <L4TabDetail
@@ -37,6 +38,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-3 划分为金融负债的其他金融工具 -->
       <L4TabFinLiabOther
@@ -44,6 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-4 调整分录 -->
       <L4TabAdjustment
@@ -51,6 +54,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-5 权益与负债划分检查 -->
       <L4TabEquityLiabCheck
@@ -58,6 +62,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-6 初始计量（发行价-交易费用+IRR） -->
       <L4TabInitialMeasure
@@ -65,6 +70,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-7 后续计量（2分支选择器！核心） -->
       <L4TabSubsequentBullet
@@ -72,12 +78,14 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <L4TabSubsequentInstallment
         v-else-if="currentSheet === 'L4-7' && bondBranch === '分期付息到期一次还本'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-8 账面核对（2分支与L4-7联动） -->
       <L4TabBookReconBullet
@@ -85,12 +93,14 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <L4TabBookReconInstallment
         v-else-if="currentSheet === 'L4-8' && bondBranch === '分期付息到期一次还本'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L4-9 应付债券检查表 -->
       <L4TabBondCheck
@@ -98,6 +108,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注（上市/国企） -->
       <L4TabDisclosureListed
@@ -105,12 +116,14 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <L4TabDisclosureSoe
         v-else-if="currentSheet === '附注国企'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet -->
       <GtOnlyOfficeSheet
@@ -218,14 +231,15 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
- * L4TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * L4TabIndex 目录行点击/子组件"返回目录"→通知外层 GtWpRenderer 切换 sheetName。
+ * 外层 GtWpRenderer 监听 @navigate-sheet（对齐 K1 范式），此处 emit 向上传递请求。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -251,6 +265,8 @@ const currentUser = computed(() => ({
  */
 const currentSheet = computed(() => {
   const name = props.sheetName || 'L4'
+  // 底稿目录 sheet → 显示 L4 底稿目录（对齐 K1）
+  if (name.includes('底稿目录')) return 'L4'
   // 提取末尾的L4编码（L4/L4A/L4-1~L4-9）
   const match = name.match(/L4(?:-\d+)?[A-Z]?$|L4$/)
   if (match) return match[0]

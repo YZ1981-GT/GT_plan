@@ -113,7 +113,7 @@ async def _load_project_context(ctx: RenderContext) -> dict:
     try:
         result = await ctx.db.execute(
             sa.text("""
-                SELECT p.client_name, p.audit_year, p.business_category, p.applicable_standards
+                SELECT p.client_name, p.audit_year, p.business_category, p.applicable_standard_v2 AS applicable_standards
                 FROM working_paper wp
                 JOIN projects p ON wp.project_id = p.id
                 WHERE wp.id = :wp_id

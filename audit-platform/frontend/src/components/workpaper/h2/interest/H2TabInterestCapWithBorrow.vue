@@ -8,7 +8,7 @@
       <p>③ 合计资本化金额 = 专门借款资本化 + 一般借款补充资本化</p>
     </div>
 
-    <!-- 专门借款明细 -->
+    <!-- 专门借款（汇总） -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
@@ -22,61 +22,33 @@
         </div>
       </template>
 
-      <el-table :data="state.specialLoanRows.value" border stripe size="small" class="loan-table">
-        <el-table-column prop="lender" label="贷款方" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.lender" size="small"
-              @change="onSpecialChange(row.rowId, 'lender', $event)" />
-            <span v-else>{{ row.lender || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="principal" label="本金" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.principal" :controls="false"
-              size="small" class="amt-input" @change="onSpecialChange(row.rowId, 'principal', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.principal) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="rate" label="年利率(%)" min-width="90" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.rate" :controls="false" :precision="4"
-              size="small" class="amt-input" @change="onSpecialChange(row.rowId, 'rate', $event)" />
-            <span v-else>{{ row.rate?.toFixed(4) ?? '-' }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="startDate" label="起借日" min-width="100">
-          <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" v-model="row.startDate" type="date" size="small"
-              value-format="YYYY-MM-DD" style="width:100%"
-              @change="onSpecialChange(row.rowId, 'startDate', $event)" />
-            <span v-else>{{ row.startDate || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="利息费用" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="=本金×利率×天数/365">{{ fmtAmt(row.interest) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="idleIncome" label="闲置收益" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.idleIncome" :controls="false"
-              size="small" class="amt-input" @change="onSpecialChange(row.rowId, 'idleIncome', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.idleIncome) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="资本化金额" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell highlight" title="=利息-闲置收益">{{ fmtAmt(row.capAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="" width="50" v-if="!isReadonly">
-          <template #default="{ row }">
-            <el-button size="small" type="danger" link @click="handleRemoveSpecial(row.rowId)">✕</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="add-row-bar" v-if="!isReadonly">
-        <el-button size="small" @click="handleAddSpecial">+ 新增专门借款</el-button>
+      <div class="calc-grid">
+        <div class="calc-item">
+          <span class="calc-label">专门借款金额：</span>
+          <el-input-number v-model="state.specialLoanData.value.specialLoanAmount" :controls="false"
+            size="small" :disabled="isReadonly" @change="onSpecialChange('specialLoanAmount', $event)" />
+        </div>
+        <div class="calc-item">
+          <span class="calc-label">专门借款利息费用：</span>
+          <el-input-number v-model="state.specialLoanData.value.specialInterest" :controls="false"
+            size="small" :disabled="isReadonly" @change="onSpecialChange('specialInterest', $event)" />
+        </div>
+        <div class="calc-item">
+          <span class="calc-label">闲置资金收益：</span>
+          <el-input-number v-model="state.specialLoanData.value.idleIncome" :controls="false"
+            size="small" :disabled="isReadonly" @change="onSpecialChange('idleIncome', $event)" />
+        </div>
+        <div class="calc-item">
+          <span class="calc-label">超出部分加权支出：</span>
+          <el-input-number v-model="state.specialLoanData.value.excessWeightedExp" :controls="false"
+            size="small" :disabled="isReadonly" @change="onSpecialChange('excessWeightedExp', $event)" />
+        </div>
+        <div class="calc-item total-item">
+          <span class="calc-label">专门借款资本化金额：</span>
+          <span class="calc-value formula-cell highlight" title="=专门借款利息-闲置资金收益">
+            {{ fmtAmt(state.specialLoanCap.value) }}
+          </span>
+        </div>
       </div>
     </el-card>
 
@@ -86,7 +58,7 @@
         <div class="section-header"><span>二、一般借款补充资本化</span></div>
       </template>
 
-      <el-table :data="state.generalLoanRows.value" border stripe size="small" class="loan-table">
+      <el-table :data="state.loansWithBorrow.value" border stripe size="small" class="loan-table">
         <el-table-column prop="lender" label="贷款方" min-width="120">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.lender" size="small"
@@ -108,9 +80,16 @@
             <span v-else>{{ row.rate?.toFixed(4) ?? '-' }}%</span>
           </template>
         </el-table-column>
-        <el-table-column prop="days" label="天数" width="60" align="right">
+        <el-table-column prop="days" label="天数" width="80" align="right">
           <template #default="{ row }">
-            <span class="formula-cell">{{ row.days ?? '-' }}</span>
+            <el-input-number v-if="!isReadonly" v-model="row.days" :controls="false"
+              size="small" class="amt-input" @change="onGeneralChange(row.rowId, 'days', $event)" />
+            <span v-else>{{ row.days ?? '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="利息" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="=本金×利率×天数/365">{{ fmtAmt(row.interest) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="" width="50" v-if="!isReadonly">
@@ -132,26 +111,26 @@
       <div class="calc-grid">
         <div class="calc-item">
           <span class="calc-label">专门借款资本化小计：</span>
-          <span class="calc-value formula-cell" title="Σ(利息-闲置收益)">
-            {{ fmtAmt(state.specialCapTotal.value) }}
+          <span class="calc-value formula-cell" title="专门借款利息-闲置收益">
+            {{ fmtAmt(state.specialLoanCap.value) }}
           </span>
         </div>
         <div class="calc-item">
-          <span class="calc-label">超出部分加权平均数：</span>
+          <span class="calc-label">超出部分加权支出：</span>
           <span class="calc-value formula-cell" title="超出专门借款的累计支出加权平均数">
-            {{ fmtAmt(state.excessWeightedExp.value) }}
+            {{ fmtAmt(state.specialLoanData.value.excessWeightedExp) }}
           </span>
         </div>
         <div class="calc-item">
           <span class="calc-label">一般借款加权资本化率：</span>
           <span class="calc-value formula-cell" title="一般借款加权平均利率">
-            {{ state.generalCapRate.value?.toFixed(4) ?? '-' }}%
+            {{ state.generalCapRate.value != null ? state.generalCapRate.value.toFixed(4) + '%' : '-' }}
           </span>
         </div>
         <div class="calc-item">
           <span class="calc-label">一般借款补充资本化：</span>
           <span class="calc-value formula-cell" title="=超出加权×一般利率">
-            {{ fmtAmt(state.generalCapAmount.value) }}
+            {{ fmtAmt(state.generalLoanSupp.value) }}
           </span>
         </div>
         <div class="calc-item total-item">
@@ -186,7 +165,7 @@
 <script setup lang="ts">
 /**
  * H2TabInterestCapWithBorrow.vue — H2-11 有专门借款利息资本化
- * 28列48行(15公式) + 专门借款+一般借款补充 + 合计
+ * 专门借款(汇总)+一般借款补充(动态行)+合计
  * Spec: Task 4.14 | Requirements: 10.1, 10.3, 10.5-10.10
  */
 import { inject, toRef, computed } from 'vue'
@@ -218,18 +197,18 @@ const state = useH2InterestCap({
   },
 })
 
-function onSpecialChange(rowId: string, field: string, value: any) {
-  state.updateSpecialLoanCell(rowId, field, value)
+const isReadonly = computed(() => props.isReadonly)
+
+function onSpecialChange(field: string, value: any) {
+  state.updateSpecialLoanData(field as any, Number(value) || 0)
 }
 
 function onGeneralChange(rowId: string, field: string, value: any) {
-  state.updateGeneralLoanCell(rowId, field, value)
+  state.updateLoanWithBorrow(rowId, field, value)
 }
 
-function handleAddSpecial() { state.addSpecialLoanRow() }
-function handleRemoveSpecial(rowId: string) { state.removeSpecialLoanRow(rowId) }
-function handleAddGeneral() { state.addGeneralLoanRow() }
-function handleRemoveGeneral(rowId: string) { state.removeGeneralLoanRow(rowId) }
+function handleAddGeneral() { state.addLoanWithBorrow() }
+function handleRemoveGeneral(rowId: string) { state.removeLoanWithBorrow(rowId) }
 
 function handleAiGenerate(section: string) {
   console.log('AI generate H2-11:', section)

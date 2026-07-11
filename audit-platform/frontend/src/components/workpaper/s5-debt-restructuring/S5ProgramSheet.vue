@@ -1,5 +1,13 @@
 <template>
   <div class="s5-program">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：识别债务重组方式，分别从债权人与债务人视角复核重组损益计算，评价损益确认时点是否恰当（不得提前确认），并确认非经常性损益披露充分。"
+      style="margin-bottom: 16px"
+    />
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">

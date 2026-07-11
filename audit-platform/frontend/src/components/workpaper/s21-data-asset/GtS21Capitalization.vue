@@ -1,5 +1,13 @@
 <template>
   <div class="s21-capitalization">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        核查数据资产开发支出资本化的合规性：验证资本化5项条件是否全部满足、开发支出按月归集的完整准确性、类目合计与占比计算，确认资本化金额符合《企业会计准则第6号——无形资产》确认条件。
+      </div>
+    </el-alert>
+
     <!-- ─── 蓝色渐变引导区（多步骤底稿） ─── -->
     <div class="guide-banner">
       <div class="guide-grid">
@@ -369,6 +377,15 @@ function fmtPercent(val: number): string {
 <style scoped>
 .s21-capitalization {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* 蓝色渐变引导区 */

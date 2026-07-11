@@ -1,5 +1,13 @@
 <template>
   <div class="s6-program">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：依据会计监管风险提示第9号，识别与核实大股东及关联方资金占用和违规担保，评价披露充分性及对审计报告意见类型的影响。"
+      style="margin-bottom: 16px"
+    />
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">

@@ -1,5 +1,14 @@
 <template>
   <div class="h9-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实租赁负债各合同期末余额、本期偿还与利息费用（实际利率法）计算准确、完整，确认与 H8 使用权资产及摊销表的勾稽关系符合 CAS21。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS21第26条：租赁负债按实际利率法后续计量，期末=期初-偿还(借方)+利息(贷方)。22列按3区段Tab展示，与H8使用权资产合同一一对应。</p>
@@ -410,6 +419,7 @@ function getSummaryAdjustment({ columns }: any) {
 <style scoped>
 .h9-tab-detail { padding: 16px; font-size: 13px; }
 
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;

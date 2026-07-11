@@ -1,5 +1,15 @@
 <template>
   <div class="n2-adjudication">
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="确认应交税费（2221）各税种期末余额的完整性与准确性：计提、缴纳记录完整，适用税率与计税依据正确，多税种测算（增值税/城建税及附加/房产税/土增税等）与明细表勾稽一致，期末余额已按 N2-1 审定并回写试算表。"
+    />
+
     <!-- ═══ Section Header ═══ -->
     <div class="section-header">
       <div class="section-title">
@@ -493,6 +503,8 @@ watch(
 </script>
 
 <style scoped>
+.audit-objective { margin-bottom: 16px; }
+.audit-objective :deep(.el-alert__description) { font-size: 13px; line-height: 1.6; }
 .n2-adjudication {
   padding: 12px;
   font-size: 13px;

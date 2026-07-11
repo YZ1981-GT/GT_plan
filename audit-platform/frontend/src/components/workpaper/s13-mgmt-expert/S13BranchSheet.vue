@@ -1,5 +1,13 @@
 <template>
   <div class="s13-branch">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        针对具体评价领域（通用评估 / 股份支付公允价值 / 金融工具公允价值），评价管理层利用专家编制信息在假设、方法、源数据和结论方面的适当性，及管理层对专家工作结果使用方式的恰当性。
+      </div>
+    </el-alert>
+
     <!-- 域选择器（el-segmented） -->
     <div class="domain-selector">
       <span class="domain-label">评价对象领域：</span>
@@ -313,6 +321,15 @@ function handleAiConclusion() {
 <style scoped>
 .s13-branch {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .domain-selector {

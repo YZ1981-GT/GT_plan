@@ -25,6 +25,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>确认其他非流动负债余额的存在、完整、准确与列报，核查项目分类（递延收益/保证金/押金等）的恰当性。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

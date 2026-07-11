@@ -43,8 +43,8 @@
 
     <el-card shadow="never" class="note-card">
       <template #header><div class="section-title"><span>审计结论</span></div></template>
-      <el-input v-model="state.auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="会计政策检查结论..." :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion)" />
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="会计政策检查结论..." :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
     </el-card>
 
     <details class="compile-hint">

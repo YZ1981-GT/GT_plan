@@ -126,12 +126,24 @@ export function useH3Depreciation(params: {
     _persist()
   }
 
+  /**
+   * 行变更：组件已 v-model 就地修改 row（同引用），此处重算折旧公式并持久化。
+   * 组件调用 updateRow(index, row)。
+   */
+  function updateRow(index: number, _row?: any): void {
+    const row = rows.value[index]
+    if (!row) return
+    const recalced = _normalize({ ...row })
+    Object.assign(row, recalced)
+    _persist()
+  }
+
   function _persist(): void { setValue(ITEM_ID, rows.value) }
   watch(allResponses, () => loadRows(), { immediate: true })
 
   return {
     branch, rows, totalAccDepCalc, totalAccDepBook, totalDifference, hasDiscrepancy,
-    setBranch, addRow, removeRow, updateCell, loadRows,
+    setBranch, addRow, removeRow, updateCell, updateRow, loadRows,
   }
 }
 

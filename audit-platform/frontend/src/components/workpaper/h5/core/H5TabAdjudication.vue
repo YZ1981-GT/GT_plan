@@ -216,10 +216,10 @@
       </template>
       <div class="net-value-row">
         <span>油气资产净值 = 原值审定 - 累计折耗审定 - 减值准备审定 = </span>
-        <span class="formula-cell" title="净值=原值-折耗-减值">{{ fmtAmt(state.netValueAudited) }}</span>
+        <span class="formula-cell" title="净值=原值-折耗-减值">{{ fmtAmt(state.netValueAudited.value) }}</span>
       </div>
       <el-divider />
-      <el-table :data="state.reconciliationResults" size="small" border>
+      <el-table :data="state.reconciliationResults.value" size="small" border>
         <el-table-column prop="layer" label="校验层" width="160" />
         <el-table-column label="差额" width="150" align="right">
           <template #default="{ row }">
@@ -237,12 +237,12 @@
       </el-table>
 
       <!-- 交叉验证H5-2 -->
-      <div v-if="state.crossValidation.hasCostWarning || state.crossValidation.hasDepWarning" class="cross-warning">
+      <div v-if="state.crossValidation.value.hasCostWarning || state.crossValidation.value.hasDepWarning" class="cross-warning">
         <el-alert type="warning" :closable="false" show-icon>
           <template #title>
             交叉验证异常（H5-2明细表）：
-            <span v-if="state.crossValidation.hasCostWarning">原值差异 {{ fmtAmt(state.crossValidation.costDiff) }}</span>
-            <span v-if="state.crossValidation.hasDepWarning"> 折耗差异 {{ fmtAmt(state.crossValidation.depDiff) }}</span>
+            <span v-if="state.crossValidation.value.hasCostWarning">原值差异 {{ fmtAmt(state.crossValidation.value.costDiff) }}</span>
+            <span v-if="state.crossValidation.value.hasDepWarning"> 折耗差异 {{ fmtAmt(state.crossValidation.value.depDiff) }}</span>
           </template>
         </el-alert>
       </div>
@@ -258,8 +258,8 @@
           </el-button>
         </div>
       </template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明..."
-        :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" />
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明..."
+        :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
     <!-- 操作按钮 -->

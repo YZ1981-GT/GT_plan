@@ -13,17 +13,15 @@
           </div>
         </div>
       </template>
-      <el-input v-model="state.summary.value.overview" type="textarea"
+      <el-input v-model="state.summary.value.overallSituation" type="textarea"
         :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly"
         placeholder="本次监盘覆盖X个在建工程项目，账面价值合计XXX元。经现场踏勘..."
-        @blur="onFieldChange('overview', state.summary.value.overview)" />
+        @blur="onFieldChange('overallSituation', state.summary.value.overallSituation)" />
       <div class="stats-bar">
-        <el-tag type="info" size="small">监盘工程: {{ state.stats.value.totalProjects }}</el-tag>
-        <el-tag type="success" size="small">正常施工: {{ state.stats.value.normalCount }}</el-tag>
-        <el-tag type="warning" size="small">停工/缓建: {{ state.stats.value.stopCount }}</el-tag>
-        <el-tag type="danger" size="small" v-if="state.stats.value.missingCount > 0">
-          不存在: {{ state.stats.value.missingCount }}
-        </el-tag>
+        <el-tag type="info" size="small">监盘工程: {{ state.checkStats.value.total }}</el-tag>
+        <el-tag type="success" size="small">施工中: {{ state.checkStats.value.inProgress }}</el-tag>
+        <el-tag type="warning" size="small">停工: {{ state.checkStats.value.stopped }}</el-tag>
+        <el-tag type="primary" size="small">完工: {{ state.checkStats.value.completed }}</el-tag>
       </div>
     </el-card>
 
@@ -33,6 +31,7 @@
         <div class="section-header">
           <span>二、异常情况清单</span>
           <div class="section-header-actions">
+            <el-button v-if="!isReadonly" size="small" @click="handleAddAnomaly">+ 新增异常</el-button>
             <el-button size="small" type="primary" link @click="handleAiGenerate('summary-anomaly')">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
@@ -40,36 +39,51 @@
         </div>
       </template>
 
-      <el-table v-if="state.anomalyRows.value.length > 0" :data="state.anomalyRows.value"
-        border stripe size="small" class="anomaly-table">
-        <el-table-column prop="name" label="工程项目" min-width="130" />
-        <el-table-column prop="anomalyType" label="异常类型" min-width="100">
+      <el-table v-if="state.summary.value.abnormalProjects.length > 0"
+        :data="state.summary.value.abnormalProjects" border stripe size="small" class="anomaly-table">
+        <el-table-column prop="name" label="工程项目" min-width="130">
           <template #default="{ row }">
-            <el-tag :type="row.anomalyType === '停工' ? 'danger' : 'warning'" size="small">
-              {{ row.anomalyType }}
-            </el-tag>
+            <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="onAnomalyChange()" />
+            <span v-else>{{ row.name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="bookValue" label="账面金额" min-width="110" align="right">
-          <template #default="{ row }"><span class="amt-cell">{{ fmtAmt(row.bookValue) }}</span></template>
+        <el-table-column prop="abnormalType" label="异常类型" min-width="110">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.abnormalType" size="small" style="width:100%"
+              @change="onAnomalyChange()">
+              <el-option label="停工" value="停工" />
+              <el-option label="进度异常" value="进度异常" />
+              <el-option label="质量问题" value="质量问题" />
+              <el-option label="不存在" value="不存在" />
+              <el-option label="其他" value="其他" />
+            </el-select>
+            <el-tag v-else :type="row.abnormalType === '停工' ? 'danger' : 'warning'" size="small">
+              {{ row.abnormalType || '-' }}
+            </el-tag>
+          </template>
         </el-table-column>
         <el-table-column prop="description" label="异常描述" min-width="200">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.description" size="small"
-              @change="onAnomalyChange(row.rowId, 'description', $event)" />
+              @change="onAnomalyChange()" />
             <span v-else>{{ row.description || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="followUp" label="后续处理" min-width="150">
+        <el-table-column prop="suggestion" label="后续处理建议" min-width="150">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.followUp" size="small" style="width:100%"
-              @change="onAnomalyChange(row.rowId, 'followUp', $event)">
+            <el-select v-if="!isReadonly" v-model="row.suggestion" size="small" style="width:100%"
+              @change="onAnomalyChange()">
               <el-option label="关注减值" value="关注减值" />
               <el-option label="追加说明" value="追加说明" />
               <el-option label="管理层书面说明" value="管理层书面说明" />
               <el-option label="建议调整" value="建议调整" />
             </el-select>
-            <span v-else>{{ row.followUp || '-' }}</span>
+            <span v-else>{{ row.suggestion || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="" width="50" v-if="!isReadonly">
+          <template #default="{ $index }">
+            <el-button size="small" type="danger" link @click="handleRemoveAnomaly($index)">✕</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -99,7 +113,7 @@
       <div class="sign-row">
         <span>编制人：</span>
         <el-input v-if="!isReadonly" v-model="state.summary.value.preparedBy" size="small" style="width:120px"
-          @change="onFieldChange('preparedBy', $event)" />
+          @change="onFieldChange('preparedBy', state.summary.value.preparedBy)" />
         <span v-else>{{ state.summary.value.preparedBy || '________' }}</span>
         <span style="margin-left:24px">日期：</span>
         <el-date-picker v-if="!isReadonly" v-model="state.summary.value.preparedDate" type="date" size="small"
@@ -113,7 +127,7 @@
       <summary>编制提示</summary>
       <ul>
         <li>踏勘总体情况应概述监盘范围/方法/覆盖率</li>
-        <li>异常清单从H2-13盘点检查表自动提取(停工/缓建/不存在)</li>
+        <li>异常清单登记停工/进度异常/不存在等情况</li>
         <li>结论需明确监盘程序是否达到审计目标</li>
         <li>停工项目应说明是否需要关注减值(→H2-15)</li>
       </ul>
@@ -128,6 +142,7 @@
  * Spec: Task 4.17 | Requirements: 11.3, 11.6
  */
 import { inject, toRef, computed } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Stocktake } from '../../composables/useH2Stocktake'
 
@@ -148,12 +163,31 @@ const state = useH2Stocktake({
   phase: 'summary',
 })
 
+const isReadonly = computed(() => props.isReadonly)
+
 function onFieldChange(field: string, value: any) {
-  state.updateSummaryField(field, value)
+  state.updateSummary(field as any, value)
 }
 
-function onAnomalyChange(rowId: string, field: string, value: any) {
-  state.updateAnomalyCell(rowId, field, value)
+/** 异常清单行内编辑后整体持久化 */
+function onAnomalyChange() {
+  state.updateSummary('abnormalProjects', state.summary.value.abnormalProjects)
+}
+
+async function handleAddAnomaly() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入异常工程名称', '新增异常', {
+      confirmButtonText: '确认', cancelButtonText: '取消',
+      inputPattern: /\S+/, inputErrorMessage: '名称不能为空',
+    })
+    if (value) state.addAbnormalProject(value)
+  } catch { /* cancelled */ }
+}
+
+function handleRemoveAnomaly(index: number) {
+  const list = [...state.summary.value.abnormalProjects]
+  list.splice(index, 1)
+  state.updateSummary('abnormalProjects', list)
 }
 
 function handleAiGenerate(section: string) {
@@ -162,11 +196,6 @@ function handleAiGenerate(section: string) {
 
 function openReview(id: string) {
   openReviewDialog(id)
-}
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 

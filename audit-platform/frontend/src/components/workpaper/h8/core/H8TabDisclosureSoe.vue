@@ -5,6 +5,11 @@
       <p>附注披露（国企）：按国资委信息公开要求和CAS21准则，披露使用权资产明细及变动。国企版含更详细的租赁分类信息。32行255列。</p>
     </div>
 
+    <!-- 索引 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-disc-S" />
+    </div>
+
     <!-- 披露摘要 -->
     <el-card shadow="never" class="summary-card">
       <template #header>
@@ -65,6 +70,7 @@
  * Spec: Task 4.10 | Requirements: 1.2
  */
 import { ref, defineAsyncComponent } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -88,6 +94,8 @@ const showOO = ref(true)
 
 <style scoped>
 .h8-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

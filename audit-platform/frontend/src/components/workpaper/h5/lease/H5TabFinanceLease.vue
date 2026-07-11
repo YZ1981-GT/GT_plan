@@ -70,7 +70,7 @@
     </el-card>
     <div class="action-bar" v-if="!isReadonly"><el-button size="small" @click="handleAddRow">+ 新增融资租出</el-button></div>
     <el-card shadow="never" class="note-card"><template #header><div class="section-title"><span>审计说明</span></div></template>
-      <el-input v-model="state.auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion)" /></el-card>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" /></el-card>
     <details class="compile-hint"><summary>编制提示</summary><ul>
       <li>净投资=本金(应收融资租赁款)-未确认融资收益</li><li>本期利息=期初净投资×内含利率</li><li>融资租出转移所有权风险报酬，终止确认油气资产</li></ul></details>
   </div>

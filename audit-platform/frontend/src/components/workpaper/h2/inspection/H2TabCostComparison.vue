@@ -18,97 +18,102 @@
       <el-table :data="displayRows" border stripe size="small" class="cost-table"
         :row-class-name="costRowClass">
         <el-table-column prop="name" label="工程项目" min-width="130" fixed />
-        <el-table-column prop="contractAmount" label="合同金额" min-width="110" align="right">
+        <el-table-column prop="contractBudget" label="合同预算" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.contractAmount"
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.contractBudget"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'contractAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.contractAmount) }}</span>
+              @change="onCellChange(row.rowId, 'contractBudget', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.contractBudget) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="budgetAmount" label="预算金额" min-width="110" align="right">
+        <el-table-column prop="adjustedBudget" label="调整预算" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.budgetAmount"
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.adjustedBudget"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'budgetAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.budgetAmount) }}</span>
+              @change="onCellChange(row.rowId, 'adjustedBudget', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.adjustedBudget) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="actualCost" label="实际造价" min-width="110" align="right">
+        <el-table-column prop="actualMaterial" label="实际-材料" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualCost"
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualMaterial"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'actualCost', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.actualCost) }}</span>
+              @change="onCellChange(row.rowId, 'actualMaterial', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.actualMaterial) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="合同差异" min-width="100" align="right">
+        <el-table-column prop="actualLabor" label="实际-人工" min-width="100" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="=实际-合同">{{ fmtAmt(row.contractDiff) }}</span>
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualLabor"
+              :controls="false" size="small" class="amt-input"
+              @change="onCellChange(row.rowId, 'actualLabor', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.actualLabor) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="合同差异率(%)" min-width="100" align="right">
+        <el-table-column prop="actualMachinery" label="实际-机械" min-width="100" align="right">
           <template #default="{ row }">
-            <span :class="['formula-cell', { 'error-amount': Math.abs(row.contractDiffRate ?? 0) > 10 }]"
-              :title="`=(实际-合同)/合同×100`">
-              {{ row.contractDiffRate != null ? row.contractDiffRate.toFixed(1) + '%' : '-' }}
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualMachinery"
+              :controls="false" size="small" class="amt-input"
+              @change="onCellChange(row.rowId, 'actualMachinery', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.actualMachinery) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="actualOther" label="实际-其他" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualOther"
+              :controls="false" size="small" class="amt-input"
+              @change="onCellChange(row.rowId, 'actualOther', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.actualOther) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="实际合计" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="=材料+人工+机械+其他">{{ fmtAmt(row.actualTotal) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="超支金额" min-width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="=max(实际合计-调整预算, 0)">{{ fmtAmt(row.overspendAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="超支率(%)" min-width="100" align="right">
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'error-amount': (row.overspendRate ?? 0) > 10 }]"
+              :title="`=超支金额/调整预算×100`">
+              {{ row.overspendRate != null ? row.overspendRate.toFixed(1) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="预算差异" min-width="100" align="right">
+        <el-table-column label="节余金额" min-width="100" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="=实际-预算">{{ fmtAmt(row.budgetDiff) }}</span>
+            <span class="formula-cell" title="=max(调整预算-实际合计, 0)">{{ fmtAmt(row.savingAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="预算差异率(%)" min-width="100" align="right">
+        <el-table-column label="预算执行率(%)" min-width="110" align="right">
           <template #default="{ row }">
-            <span :class="['formula-cell', { 'error-amount': (row.budgetDiffRate ?? 0) > 10 }]"
-              :title="`=(实际-预算)/预算×100`">
-              {{ row.budgetDiffRate != null ? row.budgetDiffRate.toFixed(1) + '%' : '-' }}
+            <span :class="['formula-cell', { 'warning-value': (row.executionRate ?? 0) > 100 }]"
+              :title="`=实际合计/调整预算×100`">
+              {{ row.executionRate != null ? row.executionRate.toFixed(1) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="materialCost" label="材料费" min-width="100" align="right">
+        <el-table-column prop="deviationReason" label="偏差原因" min-width="140">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.materialCost"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'materialCost', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.materialCost) }}</span>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.deviationReason" size="small"
+              @change="onCellChange(row.rowId, 'deviationReason', $event)" />
+            <span v-else>{{ row.deviationReason || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="laborCost" label="人工费" min-width="100" align="right">
+        <el-table-column prop="remark" label="备注" min-width="130">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.laborCost"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'laborCost', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.laborCost) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="材料占比(%)" min-width="90" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="=材料/实际×100">
-              {{ row.materialRate != null ? row.materialRate.toFixed(1) + '%' : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="人工占比(%)" min-width="90" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="=人工/实际×100">
-              {{ row.laborRate != null ? row.laborRate.toFixed(1) + '%' : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="unitCost" label="单位造价" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.unitCost"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'unitCost', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.unitCost) }}</span>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.remark" size="small"
+              @change="onCellChange(row.rowId, 'remark', $event)" />
+            <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="超支标记" width="80" align="center">
           <template #default="{ row }">
-            <el-tag v-if="(row.budgetDiffRate ?? 0) > 10" type="danger" size="small">超支</el-tag>
+            <el-tag v-if="!row.isTotal && (row.overspendRate ?? 0) > 10" type="danger" size="small">超支</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="" width="50" v-if="!isReadonly">
@@ -180,11 +185,14 @@ const state = useH2CostComparison({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const displayRows = computed(() => [...state.detailRows.value, state.totalRow.value])
+const displayRows = computed(() => [
+  ...state.rows.value,
+  { ...state.totalRow.value, isTotal: true, rowId: 'row-total', name: '合计' },
+])
 
 function costRowClass({ row }: any) {
   if (row.isTotal) return 'total-row'
-  if ((row.budgetDiffRate ?? 0) > 10) return 'over-budget-row'
+  if ((row.overspendRate ?? 0) > 10) return 'over-budget-row'
   return ''
 }
 
@@ -230,6 +238,7 @@ function fmtAmt(val: number | null | undefined): string {
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
+.warning-value { color: var(--el-color-warning); font-weight: 600; }
 .add-row-bar { margin-top: 12px; }
 .audit-note-card { margin-bottom: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

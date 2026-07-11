@@ -106,8 +106,8 @@
       <template #header>
         <div class="section-title"><span>审计说明</span></div>
       </template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="请填写调整分录说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" />
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写调整分录说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
     <details class="compile-hint">

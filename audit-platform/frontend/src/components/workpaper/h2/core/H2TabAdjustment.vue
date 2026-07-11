@@ -160,7 +160,7 @@ function handleRemove(rowId: string) {
 }
 
 function handlePushA13() {
-  state.pushToA13()
+  state.pushToA13(state.rows.value.map(r => r.rowId))
 }
 
 function handleAiGenerate() {

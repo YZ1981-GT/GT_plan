@@ -30,6 +30,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（上市公司） -->
       <M3TabDisclosureListed
@@ -37,6 +38,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M3-2 明细表（按回购批次列示，19列3区段Tab） -->
       <M3TabDetail
@@ -44,6 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M3-3 调整分录汇总（借贷平衡） -->
       <M3TabAdjustment
@@ -51,6 +54,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M3-4 外币投资汇率测算表（外币回购折算） -->
       <M3TabFxInvest
@@ -58,6 +62,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M3-5 库存股检查表（回购/注销核对） -->
       <M3TabTreasuryCheck
@@ -65,6 +70,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet / 会计规定辅助 -->
       <GtOnlyOfficeSheet
@@ -147,14 +153,16 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
- * M3TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * 子组件目录行点击 / 返回目录 → 通知外层 GtWpRenderer 切换 sheetName。
+ * GtWpRenderer 监听的是 `@navigate-sheet`(onChildNavigateSheet)，故此处必须
+ * emit `navigate-sheet`（而非 `navigate`），否则二级导航静默失效。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────

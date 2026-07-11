@@ -25,7 +25,7 @@
         </div>
       </template>
 
-      <el-table :data="state.loanRows.value" border stripe size="small" class="loan-table">
+      <el-table :data="state.loansNoBorrow.value" border stripe size="small" class="loan-table">
         <el-table-column prop="lender" label="贷款方" min-width="120">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.lender" size="small"
@@ -105,7 +105,7 @@
         <div class="calc-item">
           <span class="calc-label">资本化利息金额：</span>
           <span class="calc-value formula-cell highlight" title="=加权平均数×资本化率">
-            {{ fmtAmt(state.capAmount.value) }}
+            {{ fmtAmt(state.capAmountNoBorrow.value) }}
           </span>
         </div>
         <div class="calc-item">
@@ -122,13 +122,13 @@
       <template #header>
         <div class="section-header"><span>累计资产支出明细</span></div>
       </template>
-      <el-table :data="state.expenditureRows.value" border stripe size="small" class="exp-table">
-        <el-table-column prop="date" label="支出日期" min-width="100">
+      <el-table :data="state.expenditures.value" border stripe size="small" class="exp-table">
+        <el-table-column prop="month" label="支出日期/月份" min-width="120">
           <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" v-model="row.date" type="date" size="small"
+            <el-date-picker v-if="!isReadonly" v-model="row.month" type="date" size="small"
               value-format="YYYY-MM-DD" style="width:100%"
-              @change="onExpChange(row.rowId, 'date', $event)" />
-            <span v-else>{{ row.date || '-' }}</span>
+              @change="onExpChange(row.rowId, 'month', $event)" />
+            <span v-else>{{ row.month || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="amount" label="支出金额" min-width="110" align="right">
@@ -138,21 +138,16 @@
             <span v-else class="amt-cell">{{ fmtAmt(row.amount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="加权天数" min-width="80" align="right">
+        <el-table-column prop="days" label="占用天数" min-width="90" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="从支出日到期末的天数">{{ row.weightDays ?? '-' }}</span>
+            <el-input-number v-if="!isReadonly" v-model="row.days" :controls="false"
+              size="small" class="amt-input" @change="onExpChange(row.rowId, 'days', $event)" />
+            <span v-else>{{ row.days ?? '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="加权金额" min-width="110" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="=金额×加权天数/365">{{ fmtAmt(row.weightedAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="description" label="摘要" min-width="150">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.description" size="small"
-              @change="onExpChange(row.rowId, 'description', $event)" />
-            <span v-else>{{ row.description || '-' }}</span>
+            <span class="formula-cell" title="=支出金额×占用天数">{{ fmtAmt(row.weightedAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="" width="50" v-if="!isReadonly">
@@ -226,17 +221,17 @@ const state = useH2InterestCap({
 })
 
 function onLoanChange(rowId: string, field: string, value: any) {
-  state.updateLoanCell(rowId, field, value)
+  state.updateLoanNoBorrow(rowId, field, value)
 }
 
 function onExpChange(rowId: string, field: string, value: any) {
-  state.updateExpCell(rowId, field, value)
+  state.updateExpenditure(rowId, field, value)
 }
 
-function handleAddLoan() { state.addLoanRow() }
-function handleRemoveLoan(rowId: string) { state.removeLoanRow(rowId) }
-function handleAddExp() { state.addExpRow() }
-function handleRemoveExp(rowId: string) { state.removeExpRow(rowId) }
+function handleAddLoan() { state.addLoanNoBorrow() }
+function handleRemoveLoan(rowId: string) { state.removeLoanNoBorrow(rowId) }
+function handleAddExp() { state.addExpenditure() }
+function handleRemoveExp(rowId: string) { state.removeExpenditure(rowId) }
 
 function handleAiGenerate(section: string) {
   console.log('AI generate H2-10:', section)

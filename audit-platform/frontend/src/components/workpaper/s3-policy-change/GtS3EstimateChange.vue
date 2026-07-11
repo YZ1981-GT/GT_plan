@@ -1,5 +1,13 @@
 <template>
   <div class="s3-estimate-change">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：评价会计估计变更的理由是否充分、采用未来适用法处理是否恰当，确认对当期及未来期间影响的计量与披露准确。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <div class="context-content">

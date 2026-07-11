@@ -12,6 +12,12 @@
       </div>
     </div>
 
+    <!-- 索引 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-6" />
+      <el-tag size="small" type="info">按年计量</el-tag>
+    </div>
+
     <!-- 计量参数（上方参数区） -->
     <el-card shadow="never" class="params-card">
       <template #header>
@@ -141,6 +147,7 @@
  */
 import { ref, toRef, defineAsyncComponent } from 'vue'
 import { useH8Measurement, type H8MeasurementParams } from '../../composables/useH8Measurement'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // GtOnlyOfficeSheet可能尚未注册为全局组件，做防御性定义
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
@@ -195,6 +202,8 @@ function handleParamChange(field: keyof H8MeasurementParams, value: any) {
 .formula-title { font-weight: 700; font-size: 14px; color: #065f46; margin-bottom: 4px; }
 .formula-text { font-size: 13px; color: #047857; }
 .formula-result { font-size: 12px; color: #059669; margin-top: 4px; }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

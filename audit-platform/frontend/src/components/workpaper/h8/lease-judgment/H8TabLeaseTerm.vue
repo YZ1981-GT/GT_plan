@@ -5,6 +5,12 @@
       <p>CAS21第14-17条：租赁期 = 不可撤销期 + 合理确定行使的续租选择权期 - 合理确定行使的终止选择权期。需逐合同判断续租/终止选择权是否合理确定行使。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-5" />
+      <el-tag size="small" type="info">共 {{ records.length }} 份合同</el-tag>
+    </div>
+
     <!-- 顶部统计 -->
     <div class="stats-bar">
       <el-tag type="info" size="small">合同总数：{{ records.length }}</el-tag>
@@ -135,6 +141,18 @@
         </el-form>
       </el-card>
     </div>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>租赁期 = 不可撤销期 + 合理确定续租期 - 合理确定终止期（CAS21第14-17条）</li>
+        <li>续租选择权：仅当"合理确定行使"时才计入租赁期</li>
+        <li>终止选择权：仅当"合理确定行使"时才从租赁期扣减</li>
+        <li>合理确定的判断应考虑经济诱因、租赁改良、迁移成本、业务重要性等</li>
+        <li>租赁期直接影响 H8-6 计量与 H8-8 折旧期的确定</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -147,6 +165,7 @@
 import { toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8LeaseTerm } from '../../composables/useH8LeaseTerm'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -189,6 +208,12 @@ function handleUpdate(recordId: string, field: string, value: any) { updateField
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; }
 
 .stats-bar {
   display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;

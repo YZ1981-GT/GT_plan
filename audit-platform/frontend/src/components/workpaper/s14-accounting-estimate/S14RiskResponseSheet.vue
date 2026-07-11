@@ -1,5 +1,13 @@
 <template>
   <div class="s14-risk-response">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        针对评估的会计估计重大错报风险实施进一步审计程序：检验管理层作出估计的过程、必要时作出独立点/区间估计、评价截止日后事项，评价管理层估计的合理性或确定是否存在错报，并评价披露的充分性（CAS 1321）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -268,6 +276,15 @@ function handleAiConclusion() {
 <style scoped>
 .s14-risk-response {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

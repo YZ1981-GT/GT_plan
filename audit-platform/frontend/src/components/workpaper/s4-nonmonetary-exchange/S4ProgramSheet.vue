@@ -1,5 +1,13 @@
 <template>
   <div class="s4-program">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：判断交易是否适用非货币性资产交换准则、是否具有商业实质，复核以公允价值计量的交换损益与换入成本的确定是否正确，并确认非经常性损益披露充分。"
+      style="margin-bottom: 16px"
+    />
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">

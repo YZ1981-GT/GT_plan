@@ -177,13 +177,18 @@ export function useH1DisposalCheck(
     return { checkedCount, disposalAmountTotal, gainLossTotal, coverageRate }
   })
 
+  /** 处置收入合计 */
+  const incomeTotal = computed(() => calcSubtotal(rows.value.map((r) => r.disposalIncome)))
+  /** 处置损益合计 */
+  const gainLossTotal = computed(() => calcSubtotal(rows.value.map((r) => r.disposalGainLoss)))
+
   // ─── CRUD ──────────────────────────────────────────────────────────────────
 
-  function addRow(): void {
+  function addRow(name = ''): void {
     const newRow: DisposalRow = {
       rowId: `disp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       seq: rows.value.length + 1,
-      name: '', assetNo: '', disposalDate: '', disposalMethod: '',
+      name, assetNo: '', disposalDate: '', disposalMethod: '',
       originalCost: 0, accDep: 0, impairment: 0, disposalIncome: 0,
       netValue: 0, disposalCost: 0, disposalGainLoss: 0,
       approvalDoc: '', evaluationReport: '', paymentVoucher: '',
@@ -264,6 +269,8 @@ export function useH1DisposalCheck(
     auditNote,
     auditConclusion,
     summary,
+    incomeTotal,
+    gainLossTotal,
     addRow,
     removeRow,
     updateCell,

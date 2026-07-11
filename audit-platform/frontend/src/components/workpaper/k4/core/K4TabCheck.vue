@@ -113,14 +113,24 @@
       </el-card>
     </div>
 
-    <!-- 抽凭引擎 Dialog -->
-    <GtVoucherSamplingEngine
-      v-if="voucherDialogVisible"
-      v-model:visible="voucherDialogVisible"
-      :wp-id="wpId"
-      :project-id="projectId"
-      @sample-selected="handleSampleSelected"
-    />
+    <!-- 抽凭引擎 Dialog（科目 2245，wrap el-dialog + @filled 范式，对齐 K8/G6） -->
+    <el-dialog
+      v-model="voucherDialogVisible"
+      title="⚡ 抽凭引擎（科目 2245 其他流动负债）"
+      width="720px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <GtVoucherSamplingEngine
+        v-if="voucherDialogVisible && wpId && projectId"
+        :project-id="projectId"
+        :workpaper-id="wpId"
+        account-code="2245"
+        phase="substantive"
+        :year="currentYear"
+        @filled="handleSampleFilled"
+      />
+    </el-dialog>
 
     <!-- OCR file input -->
     <input ref="ocrFileInput" type="file" accept="image/*,.pdf" style="display:none" @change="handleOcrFileSelected" />
@@ -155,7 +165,7 @@
  *
  * 科目：2245 其他流动负债（负债类，完整性认定为主）
  */
-import { ref, inject, onMounted, defineAsyncComponent, toRef } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, toRef } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useK4Check, type K4ComplianceState } from '@/components/workpaper/composables/useK4Check'
 import http from '@/utils/http'
@@ -199,6 +209,7 @@ const {
 
 // ═══ 抽凭引擎 ═══
 const voucherDialogVisible = ref(false)
+const currentYear = computed(() => new Date().getFullYear())
 let currentVoucherItemId = ''
 
 function handleVoucherSampling(itemId: string): void {
@@ -206,13 +217,21 @@ function handleVoucherSampling(itemId: string): void {
   voucherDialogVisible.value = true
 }
 
-function handleSampleSelected(sample: any): void {
-  if (currentVoucherItemId && sample) {
-    const ref = sample.voucherNo || sample.voucher_no || sample.ref || ''
-    setVoucherRef(currentVoucherItemId, ref)
-    ElMessage.success(`已选取凭证：${ref}`)
-  }
+/**
+ * 抽凭引擎 @filled 回调（payload: { samples, phase, fillMode, method }）
+ * 将选取的凭证号映射回当前检查项的凭证号字段（K4 行模型）。
+ */
+function handleSampleFilled(payload: { samples?: any[] } | any): void {
   voucherDialogVisible.value = false
+  const samples: any[] = payload?.samples ?? []
+  if (!currentVoucherItemId || samples.length === 0) return
+  const refs = samples
+    .map((s) => s.voucherNo || s.voucher_no || s.ref || '')
+    .filter((r: string) => !!r)
+  if (refs.length) {
+    setVoucherRef(currentVoucherItemId, refs.join('、'))
+    ElMessage.success(`已选取 ${refs.length} 笔凭证：${refs.join('、')}`)
+  }
 }
 
 // ═══ 行级OCR ═══

@@ -1,5 +1,13 @@
 <template>
   <div class="s15-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        汇总每股收益与净资产收益率相关科目（归母净利润、扣非净利润、净资产等）的审定数，核对未审数、调整数与审定数的勾稽关系，并回写试算表。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -101,6 +109,13 @@ function handleSave() {
 <style scoped>
 .s15-adjudication {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .section-header {
   display: flex;

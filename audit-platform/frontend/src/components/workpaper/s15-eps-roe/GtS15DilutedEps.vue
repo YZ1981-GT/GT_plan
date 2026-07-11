@@ -1,5 +1,13 @@
 <template>
   <div class="s15-diluted-eps">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        复核稀释每股收益计算，验证稀释性潜在普通股的识别、分子（利息与转换费用的税后调整）与分母（加权稀释股数）调整是否符合《企业会计准则第34号——每股收益》，确认稀释后金额不高于基本每股收益。
+      </div>
+    </el-alert>
+
     <!-- 本年/上年对比标题 -->
     <div class="period-comparison-header">
       <el-tag type="primary" size="small">本年</el-tag>
@@ -292,6 +300,13 @@ function fmtEps(val: number): string {
 <style scoped>
 .s15-diluted-eps {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .period-comparison-header {
   display: flex;

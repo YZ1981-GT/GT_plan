@@ -169,6 +169,11 @@ export function useH2TransferCheck(options: {
     transferTotal.value - h1Total.value,
   )
 
+  /** 满足五条件的工程数量 */
+  const metCount: ComputedRef<number> = computed(() =>
+    rows.value.filter(r => r.allConditionsMet).length,
+  )
+
   /** 与H2-1交叉验证（从allResponses取H2-2的transfer合计） */
   const crossValidationH1: ComputedRef<{ diff: number; isMatch: boolean }> = computed(() => {
     const resp = options.allResponses.value.get('H2-2-rows')
@@ -320,8 +325,11 @@ export function useH2TransferCheck(options: {
     auditNote,
     auditConclusion,
     transferTotal,
+    /** 别名：H2TabTransferCheck 模板使用 state.totalTransfer.value */
+    totalTransfer: transferTotal,
     h1Total,
     totalDifference,
+    metCount,
     crossValidationH1,
     rowHighlights,
     addRow,

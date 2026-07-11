@@ -30,6 +30,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>分析财务费用各项目月度发生额构成的合理性与期间归属，明细合计与审定表 L8-1 勾稽一致（损益类发生额口径）。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

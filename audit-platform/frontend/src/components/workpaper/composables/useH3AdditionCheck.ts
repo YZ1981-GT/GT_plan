@@ -165,9 +165,29 @@ export function useH3AdditionCheck(params: {
     }
   }
 
+  // ─── 汇总合计（组件 H3TabAdditionCost / H3TabAdditionFair 使用） ──────────────
+  const totalOriginalCost = computed(() => calcSubtotal(costRows.value.map((r) => r.originalCost)))
+  const totalNetValue = computed(() => calcSubtotal(costRows.value.map((r) => (Number(r.originalCost) || 0) - (Number(r.accDep) || 0))))
+  const totalFairValue = computed(() => calcSubtotal(fairRows.value.map((r) => r.fairValue)))
+  const totalFairChange = computed(() => calcSubtotal(fairRows.value.map((r) => r.fairValueChange)))
+  /** 损益影响合计（按当前计量模式取对应区块） */
+  const totalPlImpact = computed(() =>
+    measurementModel.value === 'cost'
+      ? calcSubtotal(costRows.value.map((r) => r.plImpact))
+      : calcSubtotal(fairRows.value.map((r) => r.plImpact)),
+  )
+
   watch(allResponses, () => loadRows(), { immediate: true })
 
-  return { costRows, fairRows, activeRows, summary, addRow, removeRow, updateCell, loadRows }
+  return {
+    costRows, fairRows, activeRows, summary, addRow, removeRow, updateCell, loadRows,
+    // 组件 API 别名（addRow/updateCell 按 measurementModel 自动分发成本/公允区块）
+    addCostRow: addRow,
+    addFairRow: addRow,
+    updateCostCell: updateCell,
+    updateFairCell: updateCell,
+    totalOriginalCost, totalNetValue, totalFairValue, totalFairChange, totalPlImpact,
+  }
 }
 
 export default useH3AdditionCheck

@@ -25,6 +25,16 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective-alert">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        确认实收资本（股本，4001）的<strong>存在与权利</strong>（出资真实、验资到位）、
+        <strong>完整性</strong>、<strong>计价准确性</strong>（非货币出资作价合规）、
+        <strong>列报恰当性</strong>（实收资本与注册资本一致、股本结构充分披露）。
+      </div>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -672,6 +682,15 @@ function _restoreRemarks(): void {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
+}
+
+.audit-objective-alert {
+  margin-bottom: 16px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .methodology-context {

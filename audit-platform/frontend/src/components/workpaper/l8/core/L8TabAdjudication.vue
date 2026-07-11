@@ -26,6 +26,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>确认财务费用发生额的真实、完整、准确与期间归属（损益类取发生额），核查利息费用、汇兑损益及手续费的合理性。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

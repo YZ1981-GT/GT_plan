@@ -35,6 +35,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>确认长期应付款及未确认融资费用余额的存在、完整、准确与列报，验证实际利率法摊销与净额计算正确，检查关联方交易公允性。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

@@ -5,6 +5,12 @@
       <p>使用权资产审定表：科目1901（借方/资产类）+ 累计折旧（贷方/备抵类）。原值期末=期初+借-贷；折旧期末=期初+贷-借。审定数=未审+AJE+RJE。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-1" />
+      <el-tag size="small" type="info">共 {{ costRows.length + accDepRows.length }} 行</el-tag>
+    </div>
+
     <!-- 区块1: 使用权资产-原值 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -223,6 +229,18 @@
         </el-form-item>
       </el-form>
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>使用权资产原值（1901）为借方资产类：期末=期初+借方-贷方</li>
+        <li>累计折旧为备抵类（贷方）：期末=期初+贷方-借方</li>
+        <li>审定数=未审数+AJE+RJE；净值=原值审定数-累计折旧审定数</li>
+        <li>核心公式（CAS21）：初始计量=H9租赁负债初始确认+初始直接费用-租赁激励</li>
+        <li>审定完成后点击"审定数回写TB"，同步至试算表科目1901及累计折旧</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -235,6 +253,7 @@ import { ref, toRef, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8Adjudication, type H8AdjudicationRow } from '../../composables/useH8Adjudication'
 import { useH8CrossSheet } from '../../composables/useH8CrossSheet'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -342,6 +361,8 @@ function getDepSummary({ columns, data }: { columns: any[]; data: H8Adjudication
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
 
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }
 
@@ -368,4 +389,6 @@ function getDepSummary({ columns, data }: { columns: any[]; data: H8Adjudication
 .note-card { margin-bottom: 16px; }
 
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; }
 </style>

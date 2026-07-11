@@ -95,10 +95,28 @@ export function useH3Stocktake(params: {
     if (row) { (row as any)[field] = value; _persist() }
   }
 
+  /** 行变更：组件已 v-model 就地修改，持久化（组件调用 updateRow(index, row)） */
+  function updateRow(index: number, _row?: any): void {
+    if (!rows.value[index]) return
+    _persist()
+  }
+
+  // ─── 汇总（组件 H3TabStocktakeCheck 使用） ────────────────────────────────────
+  const rentedCount = computed(() => rows.value.filter((r) => r.leaseStatus === '已出租').length)
+  const vacantCount = computed(() => rows.value.filter((r) => r.leaseStatus === '空置').length)
+  /** 空置率（百分比，0-100） */
+  const vacantRate = computed(() => {
+    const total = rows.value.length
+    return total > 0 ? (vacantCount.value / total) * 100 : 0
+  })
+
   function _persist(): void { setValue(ITEM_ID, rows.value) }
   watch(allResponses, () => loadRows(), { immediate: true })
 
-  return { rows, summary, vacantIndices, addRow, removeRow, updateCell, loadRows }
+  return {
+    rows, summary, vacantIndices, addRow, removeRow, updateCell, updateRow, loadRows,
+    rentedCount, vacantCount, vacantRate,
+  }
 }
 
 export default useH3Stocktake

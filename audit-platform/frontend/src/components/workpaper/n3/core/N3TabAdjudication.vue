@@ -1,5 +1,15 @@
 <template>
   <div class="n3-adjudication">
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="确认递延所得税负债（2901）期末余额的存在性与计价准确性：应纳税暂时性差异识别完整、适用税率正确，商誉初始确认及拟长期持有的长期股权投资等特殊项处理恰当，与 N3-2 明细表勾稽一致并回写试算表。"
+    />
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <p><strong>递延所得税负债(2901)</strong>：应纳税暂时性差异×适用税率。资产账面价值＞计税基础，或负债账面价值＜计税基础时产生应纳税暂时性差异，确认递延所得税负债。</p>
@@ -591,6 +601,8 @@ watch(
 </script>
 
 <style scoped>
+.audit-objective { margin-bottom: 16px; }
+.audit-objective :deep(.el-alert__description) { font-size: 13px; line-height: 1.6; }
 .n3-adjudication {
   padding: 12px;
   font-size: 13px;

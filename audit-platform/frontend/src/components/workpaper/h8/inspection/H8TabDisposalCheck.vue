@@ -5,6 +5,12 @@
       <p>H8-12减少检查表：租赁终止/提前退租检查。核心公式：终止损益=租赁负债余额-使用权资产净值。终止时H9租赁负债同步终止确认。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-12" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 区段Tab切换 -->
     <el-tabs v-model="activeTab" type="border-card">
       <!-- 区段1: 基本信息 -->
@@ -253,6 +259,8 @@ function getCalcSummary({ columns }: { columns: any[] }) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

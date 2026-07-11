@@ -1,5 +1,13 @@
 <template>
   <div class="s17-non-recurring-detail">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实非经常性损益各项目的识别、归类与金额准确，确认合并与个别报表口径的一致性，并与营业外收支等科目核对相符。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 非经常性损益明细（S17-1 审定表 / S17-2 合并 / S17-3 个别） ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

@@ -282,13 +282,13 @@
     <!-- ═══ 跨底稿联动（cross_wp_ref GtIndexChip） ═══ -->
     <div class="cross-wp-links">
       <span class="cross-wp-label">cross_wp_ref 关联底稿：</span>
-      <GtIndexChip value="M6-2" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:M6-2" :context-project-id="props.projectId" />
       <span class="cross-wp-desc">明细表（期末交叉验证）</span>
-      <GtIndexChip value="M5" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:M5" :context-project-id="props.projectId" />
       <span class="cross-wp-desc">盈余公积计提</span>
-      <GtIndexChip value="M1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:M1" :context-project-id="props.projectId" />
       <span class="cross-wp-desc">应付股利宣告</span>
-      <GtIndexChip value="A" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:A" :context-project-id="props.projectId" />
       <span class="cross-wp-desc">本年利润（结转来源）</span>
     </div>
 

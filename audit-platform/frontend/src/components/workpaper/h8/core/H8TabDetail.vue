@@ -1,8 +1,23 @@
 <template>
   <div class="h8-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实使用权资产各租赁合同初始计量、折旧计提及后续变更的准确性与完整性，确认与 H9 租赁负债初始确认的勾稽关系符合 CAS21。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS21第16条：使用权资产入账值 = H9租赁负债初始确认 + 初始直接费用 - 租赁激励。58列分4区段Tab展示。</p>
+    </div>
+
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-2" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
     </div>
 
     <!-- 4区段切换 -->
@@ -173,6 +188,18 @@
       <span>入账值合计：{{ fmtAmt(initialTotal) }}元</span>
       <span>期末净值合计：{{ fmtAmt(subtotalRow.netValue) }}元</span>
     </div>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>逐笔租赁合同登记，58列分基础/初始计量/折旧/变更4区段展示</li>
+        <li>入账值 = H9租赁负债初始确认 + 初始直接费用 - 租赁激励（CAS21第16条）</li>
+        <li>H9初始金额可点击"H9"索引跳转至 H9-2 租赁负债明细核对</li>
+        <li>累计折旧期末 = 期初 + 本期计提；期末净值 = 入账值 - 累计折旧期末</li>
+        <li>明细表合计应与 H8-1 审定表、H8-8 折旧测算表交叉验证</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -256,10 +283,17 @@ function getSummaryDep({ columns }: any) {
 <style scoped>
 .h8-tab-detail { padding: 16px; font-size: 13px; }
 
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; }
 
 .segment-bar {
   display: flex; align-items: center; justify-content: space-between;

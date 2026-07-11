@@ -24,7 +24,7 @@
         </div>
       </template>
 
-      <el-table :data="state.rows.value" border stripe size="small" max-height="500" class="dep-table">
+      <el-table :data="rows" border stripe size="small" max-height="500" class="dep-table">
         <el-table-column type="index" width="35" fixed />
         <el-table-column prop="category" label="分类" width="80" fixed />
         <el-table-column prop="originalCost" label="原值" width="110" align="right">
@@ -70,9 +70,9 @@
 
       <!-- 合计行 -->
       <div class="totals-bar">
-        <span>测算折旧合计: <b class="amount-cell">{{ fmtAmt(state.periodTotalSum.value) }}</b></span>
-        <span>账面折旧合计: <b class="amount-cell">{{ fmtAmt(state.bookDepSum.value) }}</b></span>
-        <span>差异合计: <b :class="['amount-cell', { 'error-amount': Math.abs(state.diffSum.value) > 0.01 }]">{{ fmtAmt(state.diffSum.value) }}</b></span>
+        <span>测算折旧合计: <b class="amount-cell">{{ fmtAmt(summary.calculatedTotal) }}</b></span>
+        <span>账面折旧合计: <b class="amount-cell">{{ fmtAmt(summary.bookTotal) }}</b></span>
+        <span>差异合计: <b :class="['amount-cell', { 'error-amount': Math.abs(summary.totalDifference) > 0.01 }]">{{ fmtAmt(summary.totalDifference) }}</b></span>
       </div>
     </el-card>
 
@@ -112,7 +112,7 @@ const branchOptions = [
   { label: '多次减值', value: 'C' },
 ]
 
-const state = useH1Depreciation(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any, { branch: depBranch })
+const { rows, summary } = useH1Depreciation(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
 function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }

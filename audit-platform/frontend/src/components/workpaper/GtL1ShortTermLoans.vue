@@ -49,6 +49,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-2 明细表 -->
       <L1TabDetail
@@ -56,6 +57,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-3 调整分录 -->
       <L1TabAdjustment
@@ -63,6 +65,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-4 征信报告核对 -->
       <L1TabCreditCheck
@@ -70,6 +73,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-5 利息测算表（核心！联动L2/L8） -->
       <L1TabInterestCalc
@@ -77,6 +81,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-6 贷款合同检查 -->
       <L1TabContractCheck
@@ -84,6 +89,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-7 逾期贷款检查 -->
       <L1TabOverdueCheck
@@ -91,6 +97,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-8 抵质押资产检查 -->
       <L1TabPledgeCheck
@@ -98,6 +105,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L1-9 短期借款检查表 -->
       <L1TabStLoanCheck
@@ -105,6 +113,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注（上市/国企） -->
       <L1TabDisclosureListed
@@ -112,12 +121,14 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <L1TabDisclosureSoe
         v-else-if="currentSheet === '附注国企'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet -->
       <GtOnlyOfficeSheet
@@ -198,15 +209,15 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
- * L1TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
- * 外层通过 sheet 目录行 chips 控制 sheetName prop，此处 emit 向上传递请求。
+ * L1TabIndex 目录行点击/子组件"返回目录"→通知外层 GtWpRenderer 切换 sheetName。
+ * 外层 GtWpRenderer 监听 @navigate-sheet（对齐 K1 范式），此处 emit 向上传递请求。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -247,6 +258,8 @@ provide('publishInterestCalculated', crossSheet.publishInterestCalculated)
  */
 const currentSheet = computed(() => {
   const name = props.sheetName || 'L1'
+  // 底稿目录 sheet → 显示 L1 底稿目录（对齐 K1）
+  if (name.includes('底稿目录')) return 'L1'
   // 提取末尾的L1编码（L1/L1A/L1-1~L1-9）
   const match = name.match(/L1(?:-\d+)?[A-Z]?$|L1$/)
   if (match) return match[0]

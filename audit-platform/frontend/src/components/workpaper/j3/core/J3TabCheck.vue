@@ -1,5 +1,18 @@
 <template>
   <div class="j3-tab-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：依据 CAS 11《股份支付》逐项核验授予条件、验证 Black-Scholes 定价参数（波动率、无风险利率、期限等）的合理性，形成股份支付会计处理的检查结论。
+      </template>
+    </el-alert>
+
+    <!-- 工具栏 -->
+    <div class="check-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:J3-1" :context-project-id="props.projectId" /></span>
+      <el-tag size="small" type="info">共 {{ checkData.sections.value.length }} 检查区</el-tag>
+    </div>
+
     <!-- 顶部引导 -->
     <div class="guide-banner">
       <div class="guide-step"><span class="step-num">①</span> 逐项核验授予条件</div>
@@ -119,6 +132,17 @@
         :disabled="isReadonly"
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 依据 CAS 11《股份支付》，须核验授予日、行权价、等待期、可行权条件（服务/业绩条件）等关键要素。</p>
+        <p>2. Black-Scholes 参数中，波动率应参考同行业可比公司历史波动率，无风险利率取等待期匹配的国债收益率。</p>
+        <p>3. 上市公司/拟 IPO 企业须重点关注股份支付费用对净利润的影响及信息披露充分性。</p>
+        <p>4. 检查结论"存在不符合事项"的须在说明栏列明并评估对财务报表的影响。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -131,6 +155,7 @@ import { useJ3Check } from '@/composables/workpaper/j3/useJ3Check'
 import { useJ3Disclosure } from '@/composables/workpaper/j3/useJ3Disclosure'
 import { calcBlackScholes } from '@/composables/workpaper/j3/useJ3OptionPricingEngine'
 import { useJ3FormData } from '@/composables/workpaper/j3/useJ3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -176,6 +201,13 @@ formData.loadData()
 
 <style scoped>
 .j3-tab-check { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.check-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
 .guide-banner {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -268,7 +268,7 @@ const segmentOptions = [
 
 const selectedRowId = ref<string | null>(null)
 
-const { rows, subtotals, addRow, removeRow, updateField } = useH1Detail(
+const { rows, subtotalRow: subtotals, addRow, removeRow, updateCell: updateField } = useH1Detail(
   toRef(props, 'wpId'),
   toRef(props, 'projectId'),
   allResponsesRef as any,

@@ -30,6 +30,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M9-2 明细表（OCI分项+税后净额，30列区段Tab） -->
       <M9TabDetail
@@ -37,6 +38,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M9-3 调整分录汇总（借贷平衡） -->
       <M9TabAdjustment
@@ -44,6 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- M9-4 OCI核对表（多来源核对：G8公允变动+J2重计量+外币折算，13公式） -->
       <M9TabOciReconcile
@@ -51,6 +54,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（上市公司） -->
       <M9TabDisclosureListed
@@ -58,6 +62,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（国有企业，67×21，20公式） -->
       <M9TabDisclosureSoe
@@ -65,6 +70,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet / 参考辅助 -->
       <GtOnlyOfficeSheet
@@ -149,14 +155,15 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
  * M9TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * 注意：GtWpRenderer 监听 @navigate-sheet，故此处必须 emit 'navigate-sheet'。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────

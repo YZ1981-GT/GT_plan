@@ -1,5 +1,13 @@
 <template>
   <div class="s15-program">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        执行每股收益与净资产收益率的审计程序，确认计算表数据来源与审定财务报表一致，复核基本/稀释每股收益及全面摊薄/加权平均净资产收益率计算的正确性和完整性。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -87,6 +95,13 @@ const programSteps = ref([
 <style scoped>
 .s15-program {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .section-header {
   display: flex;

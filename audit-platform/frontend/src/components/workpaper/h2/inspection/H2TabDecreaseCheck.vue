@@ -13,26 +13,26 @@
       <div class="params-grid">
         <div class="param-item">
           <span class="param-label">总体金额：</span>
-          <el-input-number v-model="state.params.value.totalAmount" :controls="false" size="small"
-            :disabled="isReadonly" @change="onParamChange('totalAmount', $event)" />
+          <el-input-number v-model="state.samplingParams.value.populationAmount" :controls="false" size="small"
+            :disabled="isReadonly" @change="onParamChange('populationAmount', $event)" />
         </div>
         <div class="param-item">
           <span class="param-label">重要性水平：</span>
-          <el-input-number v-model="state.params.value.materiality" :controls="false" size="small"
-            :disabled="isReadonly" @change="onParamChange('materiality', $event)" />
+          <el-input-number v-model="state.samplingParams.value.materialityLevel" :controls="false" size="small"
+            :disabled="isReadonly" @change="onParamChange('materialityLevel', $event)" />
         </div>
         <div class="param-item">
           <span class="param-label">抽样方法：</span>
-          <el-select v-model="state.params.value.method" size="small" :disabled="isReadonly"
-            @change="onParamChange('method', $event)">
-            <el-option label="货币单位抽样" value="MUS" />
-            <el-option label="随机抽样" value="RANDOM" />
-            <el-option label="判断抽样" value="JUDGMENTAL" />
+          <el-select v-model="state.samplingParams.value.samplingMethod" size="small" :disabled="isReadonly"
+            @change="onParamChange('samplingMethod', $event)">
+            <el-option label="货币单元抽样" value="货币单元抽样" />
+            <el-option label="随机抽样" value="随机抽样" />
+            <el-option label="判断抽样" value="判断抽样" />
           </el-select>
         </div>
         <div class="param-item">
           <span class="param-label">样本量：</span>
-          <span class="param-value">{{ state.params.value.sampleSize ?? '-' }}</span>
+          <span class="param-value">{{ state.samplingParams.value.sampleSize ?? '-' }}</span>
         </div>
       </div>
     </el-card>
@@ -55,51 +55,62 @@
         <el-table-column prop="seq" label="序号" width="50" align="center" fixed>
           <template #default="{ $index }">{{ $index + 1 }}</template>
         </el-table-column>
-        <el-table-column prop="projectName" label="工程项目" min-width="120" fixed>
+        <el-table-column prop="name" label="工程项目" min-width="120" fixed>
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.projectName" size="small"
-              @change="onCellChange(row.rowId, 'projectName', $event)" />
-            <span v-else>{{ row.projectName || '-' }}</span>
+            <el-input v-if="!isReadonly" v-model="row.name" size="small"
+              @change="onCellChange(row.rowId, 'name', $event)" />
+            <span v-else>{{ row.name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="decreaseType" label="减少类型" min-width="100">
+        <el-table-column prop="decreaseDate" label="减少日期" min-width="110">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.decreaseType" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'decreaseType', $event)">
-              <el-option label="转固" value="转固" />
+            <el-date-picker v-if="!isReadonly" v-model="row.decreaseDate" type="date" size="small"
+              value-format="YYYY-MM-DD" style="width:100%"
+              @change="onCellChange(row.rowId, 'decreaseDate', $event)" />
+            <span v-else>{{ row.decreaseDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="decreaseReason" label="减少原因" min-width="100">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.decreaseReason" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'decreaseReason', $event)">
               <el-option label="报废" value="报废" />
-              <el-option label="出售" value="出售" />
-              <el-option label="损失" value="损失" />
+              <el-option label="毁损" value="毁损" />
+              <el-option label="转出" value="转出" />
               <el-option label="其他" value="其他" />
             </el-select>
-            <span v-else>{{ row.decreaseType || '-' }}</span>
+            <span v-else>{{ row.decreaseReason || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="lossCategory" label="损失分类" min-width="100">
+        <el-table-column prop="originalValue" label="原账面值" min-width="110" align="right">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly && (row.decreaseType === '报废' || row.decreaseType === '损失')"
-              v-model="row.lossCategory" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'lossCategory', $event)">
-              <el-option label="正常损耗" value="正常损耗" />
-              <el-option label="管理不善" value="管理不善" />
-              <el-option label="自然灾害" value="自然灾害" />
-              <el-option label="技术淘汰" value="技术淘汰" />
-            </el-select>
-            <span v-else>{{ row.lossCategory || '-' }}</span>
+            <el-input-number v-if="!isReadonly" v-model="row.originalValue" :controls="false"
+              size="small" class="amt-input" @change="onCellChange(row.rowId, 'originalValue', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.originalValue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="voucherNo" label="凭证编号" min-width="100">
+        <el-table-column prop="residualValue" label="残值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.voucherNo" size="small"
-              @change="onCellChange(row.rowId, 'voucherNo', $event)" />
-            <span v-else>{{ row.voucherNo || '-' }}</span>
+            <el-input-number v-if="!isReadonly" v-model="row.residualValue" :controls="false"
+              size="small" class="amt-input" @change="onCellChange(row.rowId, 'residualValue', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.residualValue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="amount" label="减少金额" min-width="110" align="right">
+        <el-table-column label="损失金额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false"
-              size="small" class="amt-input" @change="onCellChange(row.rowId, 'amount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.amount) }}</span>
+            <span class="formula-cell" title="=原账面值-残值">{{ fmtAmt(row.lossAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="insuranceClaim" label="保险理赔" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.insuranceClaim" :controls="false"
+              size="small" class="amt-input" @change="onCellChange(row.rowId, 'insuranceClaim', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.insuranceClaim) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="净损失" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="=损失金额-保险理赔">{{ fmtAmt(row.netLoss) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="approvalDoc" label="审批文件" min-width="120">
@@ -109,16 +120,23 @@
             <span v-else>{{ row.approvalDoc || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="checkResult" label="检查结论" min-width="100">
+        <el-table-column prop="disposalMethod" label="处置方式" min-width="110">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.checkResult" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'checkResult', $event)">
+            <el-input v-if="!isReadonly" v-model="row.disposalMethod" size="small"
+              @change="onCellChange(row.rowId, 'disposalMethod', $event)" />
+            <span v-else>{{ row.disposalMethod || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="auditConclusion" label="检查结论" min-width="100">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.auditConclusion" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'auditConclusion', $event)">
               <el-option label="无异常" value="无异常" />
               <el-option label="存疑" value="存疑" />
               <el-option label="需调整" value="需调整" />
             </el-select>
-            <el-tag v-else :type="row.checkResult === '无异常' ? 'success' : 'warning'" size="small">
-              {{ row.checkResult || '待检' }}
+            <el-tag v-else :type="row.auditConclusion === '无异常' ? 'success' : 'warning'" size="small">
+              {{ row.auditConclusion || '待检' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -137,7 +155,9 @@
       </el-table>
 
       <div class="summary-line">
-        样本合计: <strong>{{ fmtAmt(state.sampleTotal.value) }}</strong>
+        原账面合计: <strong>{{ fmtAmt(state.originalTotal.value) }}</strong>
+        <span style="margin-left:16px">损失合计: <strong>{{ fmtAmt(state.lossTotal.value) }}</strong></span>
+        <span style="margin-left:16px">净损失合计: <strong>{{ fmtAmt(state.netLossTotal.value) }}</strong></span>
       </div>
       <div class="add-row-bar" v-if="!isReadonly">
         <el-button size="small" @click="handleAddRow">+ 新增检查项</el-button>
@@ -148,24 +168,37 @@
     <details class="edit-tips">
       <summary>编制提示</summary>
       <ul>
-        <li>减少类型：转固/报废/出售/损失/其他</li>
-        <li>损失分类仅在"报废"或"损失"时显示</li>
-        <li>报废/损失需附审批文件(董事会决议等)</li>
+        <li>减少原因：报废/毁损/转出/其他</li>
+        <li>损失金额=原账面值-残值；净损失=损失金额-保险理赔（公式列自动计算）</li>
+        <li>报废/毁损需附审批文件(董事会决议等)</li>
         <li>先使用"抽凭引擎"确定样本，再逐项检查</li>
       </ul>
     </details>
+
+    <!-- 抽凭引擎 dialog -->
+    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 1604 在建工程-减少）" width="720px"
+      :close-on-click-modal="false" destroy-on-close>
+      <GtVoucherSamplingEngine
+        v-if="showSamplingDialog && props.wpId && props.projectId"
+        :project-id="props.projectId"
+        :account-codes="['1604']"
+        dialog-mode
+        @filled="onSampleFilled"
+      />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
  * H2TabDecreaseCheck.vue — H2-9 减少检查
- * 双区域(抽样参数+明细) + 损失分类 + 抽凭
+ * 双区域(抽样参数+明细) + 损失/净损失公式 + 抽凭引擎
  * Spec: Task 4.11 | Requirements: 9.3-9.5, 9.7-9.8
  */
-import { inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2DecreaseCheck } from '../../composables/useH2DecreaseCheck'
+import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 
 const props = defineProps<{
   wpId: string
@@ -175,6 +208,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const showSamplingDialog = ref(false)
 
 const state = useH2DecreaseCheck({
   wpId: toRef(props, 'wpId'),
@@ -183,16 +217,41 @@ const state = useH2DecreaseCheck({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
+const isReadonly = computed(() => props.isReadonly)
+
 function onParamChange(field: string, value: any) {
-  state.updateParam(field, value)
+  state.updateSamplingParams({ [field]: value } as any)
 }
 
 function onCellChange(rowId: string, field: string, value: any) {
   state.updateCell(rowId, field, value)
 }
 
+/** 打开抽凭引擎 dialog */
 function handleSampling() {
-  state.openSamplingEngine()
+  showSamplingDialog.value = true
+}
+
+/** 抽凭引擎完成后回调：将样本行填入检查表 */
+function onSampleFilled(samples: any[]) {
+  showSamplingDialog.value = false
+  if (!samples?.length) return
+  for (const s of samples) {
+    state.addRow()
+    const lastRow = state.rows.value[state.rows.value.length - 1]
+    if (lastRow) {
+      if (s.amount != null) lastRow.originalValue = Number(s.amount) || 0
+      if (s.summary || s.description) lastRow.name = s.summary || s.description
+      if (s.date) lastRow.decreaseDate = s.date
+      lastRow.samplingStatus = '待检查'
+    }
+  }
+  state.fillSamplingResults(
+    samples.map((_s, i) => ({
+      rowId: state.rows.value[state.rows.value.length - samples.length + i]?.rowId ?? '',
+      status: '待检查',
+    })),
+  )
 }
 
 function handleAddRow() {
@@ -229,6 +288,7 @@ function fmtAmt(val: number | null | undefined): string {
 .check-table { font-size: 13px; }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .summary-line { padding: 12px 0; font-size: 13px; border-top: 1px solid var(--el-border-color-lighter); margin-top: 12px; }
 .add-row-bar { margin-top: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

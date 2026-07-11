@@ -489,6 +489,11 @@ onMounted(() => {
   width: 100%;
 }
 
+/* 自动计算列灰底 (gold ④) */
+.gt-s35-detail__table :deep(.gt-s35-detail__formula-col) {
+  background: var(--gt-color-bg-elevated, #fafafa);
+}
+
 /* 公式列只读：虚线下划线 + cursor:help (memory 铁律) */
 .gt-s35-detail__formula-cell {
   display: inline-block;

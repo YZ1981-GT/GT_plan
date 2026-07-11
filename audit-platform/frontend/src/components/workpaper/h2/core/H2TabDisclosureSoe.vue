@@ -16,46 +16,85 @@
         </div>
       </template>
 
-      <!-- 表格型子节 -->
-      <template v-if="section.type === 'table'">
-        <el-table :data="section.rows" border stripe size="small" class="disc-table">
-          <el-table-column v-for="col in section.columns" :key="col.prop"
-            :prop="col.prop" :label="col.label" :min-width="col.width || 100" :align="col.align || 'left'">
-            <template #default="{ row }">
-              <template v-if="col.isFormula">
-                <span class="formula-cell" :title="col.formulaTip">{{ fmtAmt(row[col.prop]) }}</span>
-              </template>
-              <template v-else-if="col.isEditable && !isReadonly">
-                <el-input-number v-if="col.type === 'number'" v-model="row[col.prop]"
-                  :controls="false" size="small" class="amt-input"
-                  @change="onCellChange(section.id, row.rowId, col.prop, $event)" />
-                <el-input v-else v-model="row[col.prop]" size="small"
-                  @change="onCellChange(section.id, row.rowId, col.prop, $event)" />
-              </template>
-              <template v-else>
-                <span :class="{ 'amt-cell': col.type === 'number' }">
-                  {{ col.type === 'number' ? fmtAmt(row[col.prop]) : (row[col.prop] || '-') }}
-                </span>
-              </template>
-            </template>
-          </el-table-column>
-        </el-table>
-        <!-- 合计行 -->
-        <div v-if="section.showTotal" class="total-line">
-          合计: <strong>{{ fmtAmt(section.totalAmount) }}</strong>
+      <!-- 自动取数字段（跨sheet只读） -->
+      <div v-if="section.autoFields && section.autoFields.length" class="auto-fields">
+        <div v-for="f in section.autoFields" :key="f.key" class="auto-field">
+          <span class="af-label">{{ f.label }}</span>
+          <span class="af-value formula-cell" :title="'来源：' + f.source">{{ fmtAmt(f.value) }}</span>
         </div>
-        <!-- 动态行操作 -->
-        <div v-if="section.isDynamic && !isReadonly" class="add-row-bar">
-          <el-button size="small" @click="handleAddRow(section.id)">+ 新增行</el-button>
-        </div>
-      </template>
+      </div>
 
-      <!-- 文本型子节 -->
-      <template v-if="section.type === 'text'">
-        <el-input v-model="section.content" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-          :placeholder="section.placeholder" :disabled="isReadonly"
-          @blur="onTextChange(section.id, section.content)" />
-      </template>
+      <!-- 动态明细行 -->
+      <el-table :data="section.rows" border stripe size="small" class="disc-table">
+        <el-table-column prop="name" label="项目名称" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.name" size="small"
+              @change="onCellChange(section.id, row.rowId, 'name', row.name)" />
+            <span v-else>{{ row.name || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small"
+              class="amt-input" @change="onCellChange(section.id, row.rowId, 'beginBalance', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.beginBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.increase" :controls="false" size="small"
+              class="amt-input" @change="onCellChange(section.id, row.rowId, 'increase', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.increase) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.decrease" :controls="false" size="small"
+              class="amt-input" @change="onCellChange(section.id, row.rowId, 'decrease', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.decrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期转固" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.transfer" :controls="false" size="small"
+              class="amt-input" @change="onCellChange(section.id, row.rowId, 'transfer', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.transfer) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.endBalance" :controls="false" size="small"
+              class="amt-input" @change="onCellChange(section.id, row.rowId, 'endBalance', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.endBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small"
+              @change="onCellChange(section.id, row.rowId, 'remark', row.remark)" />
+            <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="" width="50" v-if="!isReadonly">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="handleRemoveRow(section.id, row.rowId)">✕</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="section-total-line">
+        本节期末合计：<strong>{{ fmtAmt(state.sectionTotals.value[section.id] || 0) }}</strong>
+      </div>
+      <div v-if="!isReadonly" class="add-row-bar">
+        <el-button size="small" @click="handleAddRow(section.id)">+ 新增行</el-button>
+      </div>
+
+      <!-- 披露说明文本 -->
+      <div class="note-text-block">
+        <div class="note-label">披露说明</div>
+        <el-input v-model="section.noteText" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+          placeholder="请填写披露说明..." :disabled="isReadonly"
+          @blur="onTextChange(section.id, section.noteText)" />
+      </div>
     </el-card>
 
     <!-- 编制提示 -->
@@ -108,15 +147,19 @@ const state = useH2Disclosure({
 })
 
 function onCellChange(sectionId: string, rowId: string, field: string, value: any) {
-  state.updateCell(sectionId, rowId, field, value)
+  state.updateRow(sectionId, rowId, field, value)
 }
 
 function onTextChange(sectionId: string, content: string) {
-  state.updateText(sectionId, content)
+  state.updateSectionNote(sectionId, content)
 }
 
 function handleAddRow(sectionId: string) {
-  state.addRow(sectionId)
+  state.addRow(sectionId, '')
+}
+
+function handleRemoveRow(sectionId: string, rowId: string) {
+  state.removeRow(sectionId, rowId)
 }
 
 function handleAiGenerate(sectionId: string) {
@@ -144,7 +187,14 @@ function fmtAmt(val: number | null | undefined): string {
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .total-line { padding: 8px 0; font-size: 13px; text-align: right; }
+.section-total-line { padding: 8px 0; font-size: 13px; text-align: right; }
 .add-row-bar { margin-top: 8px; }
+.auto-fields { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
+.auto-field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.af-label { color: var(--el-text-color-secondary); }
+.af-value { font-weight: 600; }
+.note-text-block { margin-top: 12px; }
+.note-label { font-size: 13px; color: var(--el-text-color-secondary); margin-bottom: 6px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }
 .edit-tips ul { padding-left: 20px; margin-top: 8px; }

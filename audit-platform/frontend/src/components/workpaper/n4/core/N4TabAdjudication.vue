@@ -1,5 +1,15 @@
 <template>
   <div class="n4-adjudication">
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="确认税金及附加（6403）本期发生额的完整性与准确性：各税种（消费税/城建税及附加/房产税/城镇土地使用税/印花税等）计入费用的金额正确，与 N2 应交税费各税种本期计提额一致，并计入利润表勾稽无误。"
+    />
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <p><strong>税金及附加(6403)</strong>：损益类借方科目，取本期发生额。包含消费税、城建税、教育费附加、地方教育附加、房产税、城镇土地使用税、车船税、印花税、资源税等。费用确认额应与N2应交税费各税种本期计提额一致。</p>
@@ -470,6 +480,8 @@ function yoyClass(val: number | null | undefined): string {
 </script>
 
 <style scoped>
+.audit-objective { margin-bottom: 16px; }
+.audit-objective :deep(.el-alert__description) { font-size: 13px; line-height: 1.6; }
 .n4-adjudication { padding: 12px; font-size: 13px; }
 
 /* ─── 方法论上下文 ─── */

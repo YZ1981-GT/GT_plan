@@ -130,7 +130,7 @@ const disclosure = useH1Disclosure(
   },
 )
 
-const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow: _addDynamic, saveSectionNote } = disclosure
+const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow: _addDynamic } = disclosure
 
 // ─── 6.6 EventBus: subscribe 'substantive:adjudicated' 刷新附注取数 ─────────
 let eventSource: EventSource | null = null

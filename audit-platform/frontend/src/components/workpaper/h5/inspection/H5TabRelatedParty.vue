@@ -77,7 +77,7 @@
     </el-card>
     <div class="action-bar" v-if="!isReadonly"><el-button size="small" @click="handleAddRow">+ 新增关联交易</el-button></div>
     <el-card shadow="never" class="note-card"><template #header><div class="section-title"><span>审计说明</span></div></template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" /></el-card>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" /></el-card>
     <details class="compile-hint"><summary>编制提示</summary><ul>
       <li>价差率=(交易价格-市场价格)/市场价格×100%</li><li>价差率>10%自动高亮为异常项</li><li>关联交易需评价定价公允性</li></ul></details>
   </div>

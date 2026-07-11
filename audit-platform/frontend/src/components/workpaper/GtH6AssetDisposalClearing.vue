@@ -227,17 +227,21 @@ const currentSheet = computed(() => {
 })
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
+/** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  for (const [k, v] of Object.entries(src)) map.set(k, v)
+}
+
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
       // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
-      }
+      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H6 render 策略实际输出）
+      const map = new Map<string, any>()
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
@@ -248,11 +252,8 @@ async function selfLoad(): Promise<void> {
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
+          _mergeResponses(map, sheet.html_data?.allResponses)
+          _mergeResponses(map, sheet.html_data?.responses_snapshot)
         }
         allResponses.value = map
       }
@@ -264,12 +265,34 @@ async function selfLoad(): Promise<void> {
   }
 }
 
+// ─── 子组件 save 持久化（Bug C 修复：子 tab 此前仅写内存 Map，从不落库 → 刷新丢数据） ──
+// 子组件通过 inject('saveResponse') 调用；防抖 800ms 批量 PUT /checklist-responses。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).catch((err: unknown) => console.warn('[GtH6] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
 // ─── provide for child components ────────────────────────────────────────────
 function openReviewDialog(sectionId: string, sectionLabel?: string): void {
   console.log('[H6] openReviewDialog:', sectionId, sectionLabel)
 }
 provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
+provide('saveResponse', persistResponse)
 
 // ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
 const versionTrail = useVersionTrail({
@@ -349,6 +372,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
   window.removeEventListener('h1:disposal-completed', _handleDisposalInitiated)
   window.removeEventListener('disposal:source-updated', _handleDisposalSourceUpdated)
+  for (const t of _saveTimers.values()) clearTimeout(t)
 })
 
 /**

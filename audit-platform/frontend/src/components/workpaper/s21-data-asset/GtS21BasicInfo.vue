@@ -1,5 +1,13 @@
 <template>
   <div class="s21-basic-info">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        了解并记录被审计单位数据资产的基本信息（名称、类型、取得方式、原始成本、摊销方法、使用年限），关注数据资产确认条件（可辨认性、控制、未来经济利益流入）是否满足。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -233,6 +241,13 @@ function removeRow(index: number) {
 <style scoped>
 .s21-basic-info {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .section-header {
   display: flex;

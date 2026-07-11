@@ -269,8 +269,8 @@ const state = useH2Detail({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const displayRows = computed(() => [...state.detailRows.value, state.subtotalRow.value])
-const crossDiff = computed(() => state.crossValidationDiff?.value ?? 0)
+const displayRows = computed(() => [...state.rows.value, state.subtotalRow.value])
+const crossDiff = computed(() => state.crossValidationH1.value.diff)
 
 function detailRowClass({ row }: any) {
   if (row.isTotal) return 'total-row'

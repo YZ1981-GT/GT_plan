@@ -1,5 +1,13 @@
 <template>
   <div class="s3-ifrs16-adjust">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：复核首次执行新租赁准则（CAS 21）追溯调整，确认使用权资产与租赁负债的初始计量、折现处理及留存收益调整的准确性。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <div class="context-content">

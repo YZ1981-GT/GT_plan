@@ -67,6 +67,7 @@ import GtS35Bundle from '../GtS35Bundle.vue'
 // ─── el-* stubs ───
 
 const stubs = {
+  'el-alert': { template: '<div class="el-alert"><slot name="title" /><slot /></div>' },
   'el-tabs': {
     props: ['modelValue'],
     emits: ['update:modelValue'],

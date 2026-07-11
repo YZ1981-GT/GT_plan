@@ -1,5 +1,12 @@
 <template>
   <div class="j3-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：验证股份支付各方案授予日公允价值（Black-Scholes 定价）、等待期费用分摊及权益/现金结算分类的准确性，核验费用确认是否随等待期正确摊销。
+      </template>
+    </el-alert>
+
     <!-- 顶部引导区 -->
     <div class="guide-banner">
       <div class="guide-step"><span class="step-num">①</span> 录入各方案基本信息</div>
@@ -11,6 +18,8 @@
     <div class="toolbar">
       <el-segmented v-model="dualMode.mode.value" :options="modeOptions" size="small" />
       <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:J3-2" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ detail.filteredPlans.value.length }} 个方案</el-tag>
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -47,24 +56,24 @@
         <el-table-column prop="sharesCount" label="标的股数" width="100" align="right" />
         <el-table-column prop="vestingPeriod" label="等待期(年)" width="80" align="center" />
         <el-table-column prop="serviceYears" label="已服务(年)" width="80" align="center" />
-        <el-table-column prop="unitFairValue" label="单位FV" width="90" align="right">
+        <el-table-column prop="unitFairValue" label="单位FV" width="90" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            <span class="formula-cell" title="Black-Scholes定价">{{ row.unitFairValue?.toFixed(4) }}</span>
+            <span class="formula-cell" title="Black-Scholes定价：C=S·N(d1)-K·e^(-rT)·N(d2)">{{ row.unitFairValue?.toFixed(4) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期费用" width="110" align="right">
+        <el-table-column label="本期费用" width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            <span class="computed-value">{{ row.currentExpense?.toFixed(2) }}</span>
+            <span class="computed-value formula-cell" title="本期费用=总公允价值÷等待期×已服务年数 - 以前累计">{{ row.currentExpense?.toFixed(2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="累计费用" width="110" align="right">
+        <el-table-column label="累计费用" width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            {{ row.cumulativeExpense?.toFixed(2) }}
+            <span class="formula-cell" title="累计费用=总公允价值×(已服务年数÷等待期)">{{ row.cumulativeExpense?.toFixed(2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="剩余费用" width="110" align="right">
+        <el-table-column label="剩余费用" width="110" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            {{ row.remainingExpense?.toFixed(2) }}
+            <span class="formula-cell" title="剩余费用=总公允价值-累计费用">{{ row.remainingExpense?.toFixed(2) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="80" align="center">
@@ -107,6 +116,17 @@
         </el-card>
       </div>
     </template>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 依据 CAS 11《股份支付》，权益结算按授予日权益工具公允价值计量（贷记资本公积 M4），不后续重新计量。</p>
+        <p>2. 现金结算按每个资产负债表日重新计量的公允价值计量（贷记应付职工薪酬 J1）。</p>
+        <p>3. 灰色底纹列为自动计算列（Black-Scholes 定价、等待期费用分摊），不可手动编辑。</p>
+        <p>4. 费用应在等待期内按最佳估计的可行权数量分期确认，取消/失效时按 CAS 11 加速或转回处理。</p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -120,6 +140,7 @@ import { useJ3Detail } from '@/composables/workpaper/j3/useJ3Detail'
 import { useJ3CrossSheet } from '@/composables/workpaper/j3/useJ3CrossSheet'
 import { useJ3DualMode } from '@/composables/workpaper/j3/useJ3DualMode'
 import { useJ3ImportExport } from '@/composables/workpaper/j3/useJ3ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -207,6 +228,13 @@ function handleImportExport(command: string) {
 
 <style scoped>
 .j3-tab-detail { padding: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+.guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
 .guide-banner {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

@@ -14,6 +14,12 @@
       </div>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-8" />
+      <el-tag size="small" type="info">共 {{ depRows.length }} 行</el-tag>
+    </div>
+
     <!-- 折旧参数摘要 -->
     <el-card shadow="never" class="params-card">
       <template #header>
@@ -160,6 +166,7 @@
 import { ref, toRef, defineAsyncComponent } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8Depreciation } from '../../composables/useH8Depreciation'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -229,6 +236,8 @@ function getDepSummary({ columns }: { columns: any[] }) {
 .formula-content { flex: 1; }
 .formula-title { font-weight: 700; font-size: 14px; color: #92400e; margin-bottom: 4px; }
 .formula-text { font-size: 13px; color: #a16207; }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

@@ -5,6 +5,12 @@
       <p>H8-3调整分录汇总：记录审计调整(AJE)和重分类(RJE)分录。借贷必须平衡，调整结果双向同步H8-1审定表。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-3" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 标题行 -->
     <div class="section-header">
       <span class="section-title-text">调整分录汇总表</span>
@@ -93,6 +99,18 @@
       </el-button>
       <span v-if="!balanceCheck.isBalanced" class="publish-hint">借贷不平衡时不可同步</span>
     </div>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>AJE=审计调整分录，RJE=重分类调整分录，分别标注类型</li>
+        <li>每笔分录借贷必须平衡，借方合计=贷方合计方可同步</li>
+        <li>同步后调整结果双向影响 H8-1 审定表审定数（未审+AJE+RJE）</li>
+        <li>使用权资产相关科目：1901使用权资产、累计折旧、租赁负债、使用权资产减值准备</li>
+        <li>借贷不平衡时"同步"按钮禁用，须先修正后再推送 A13</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -103,6 +121,7 @@
  */
 import { toRef } from 'vue'
 import { useH8Adjustment } from '../../composables/useH8Adjustment'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -161,6 +180,12 @@ function getSummary({ columns }: any) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; }
 
 .section-header {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;

@@ -1,5 +1,13 @@
 <template>
   <div class="s12-program">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        确定审计工作中是否需要利用注册会计师的专家的工作；评价专家的胜任能力、专业素质和客观性，以及专家工作对实现审计目的的恰当性，从而为相关审计事项获取充分、适当的审计证据（CAS 1421）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -263,6 +271,15 @@ function handleAiConclusion() {
 <style scoped>
 .s12-program {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

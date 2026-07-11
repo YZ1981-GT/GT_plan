@@ -1,5 +1,13 @@
 <template>
   <div class="s6-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：汇总大股东及关联方资金占用与违规担保情况，确认占用/担保金额的完整、准确，评估对财务报表及审计意见的影响。"
+      style="margin-bottom: 16px"
+    />
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">

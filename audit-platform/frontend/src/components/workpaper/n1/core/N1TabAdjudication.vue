@@ -12,6 +12,16 @@
 
     <!-- ═══ 结构化 / 矩阵视图 ═══ -->
     <template v-else>
+      <!-- ═══ 审计目标 ═══ -->
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="audit-objective"
+        title="审计目标"
+        description="确认递延所得税资产（1811）期末余额的存在性、完整性与计价准确性：可抵扣暂时性差异及可弥补亏损的确认依据充分，适用税率正确，且预期未来有足够应纳税所得额予以利用，与 N1-2 明细表/N1-4 测算表勾稽一致。"
+      />
+
       <!-- ═══ 蓝色渐变引导区（多步骤引导） ═══ -->
       <div class="n1-guidance-banner">
         <div class="guidance-grid">
@@ -472,6 +482,13 @@ function handleAI(section: string) {
 </script>
 
 <style scoped>
+.audit-objective {
+  margin-bottom: 16px;
+}
+.audit-objective :deep(.el-alert__description) {
+  font-size: 13px;
+  line-height: 1.6;
+}
 .n1-tab-adjudication {
   padding: 12px;
   font-size: 13px;

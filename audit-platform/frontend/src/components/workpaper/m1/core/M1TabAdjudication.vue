@@ -25,6 +25,16 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective-alert">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        确认应付股利（2232）的<strong>完整性</strong>（所有已宣告分配的股利均已入账）、
+        <strong>计价准确性</strong>（金额及外币折算正确）、
+        <strong>列报恰当性</strong>（作为流动负债列示，关联方股利充分披露）。
+      </div>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -594,6 +604,15 @@ function _restoreRows(): M1AdjudicationRow[] {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
+}
+
+.audit-objective-alert {
+  margin-bottom: 16px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .methodology-context {

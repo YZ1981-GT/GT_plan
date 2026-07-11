@@ -1,5 +1,13 @@
 <template>
   <div class="s14-program">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        了解与会计估计相关的环境与内部控制，识别和评估会计估计的重大错报风险并设计实施应对程序，评价管理层会计估计的合理性、是否存在管理层偏向，以及相关披露是否符合适用的财务报告编制基础（CAS 1321）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -312,6 +320,15 @@ function handleAiConclusion() {
 <style scoped>
 .s14-program {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

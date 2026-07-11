@@ -30,6 +30,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>核实长期应付款各笔款项的真实性、完整性与计价（现值/折现率），明细合计与审定表 L5-1 勾稽一致，各行与 L5-5 摊销测算一一对应。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

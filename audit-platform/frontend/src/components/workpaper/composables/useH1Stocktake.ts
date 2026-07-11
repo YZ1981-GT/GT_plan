@@ -223,6 +223,26 @@ export function useH1Stocktake(
     options?.onSave?.(`${ITEM_PREFIX_PLAN}-info`, planInfo.value)
   }
 
+  function addSampleRow(category = ''): void {
+    sampleSelections.value.push({
+      rowId: `sel-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      category,
+      selectionCriteria: '',
+      sampleSize: 0,
+      coverageAmount: 0,
+      coverageRate: 0,
+    })
+    options?.onSave?.(`${ITEM_PREFIX_PLAN}-selections`, sampleSelections.value)
+  }
+
+  function removeSampleRow(rowId: string): void {
+    const idx = sampleSelections.value.findIndex((r) => r.rowId === rowId)
+    if (idx >= 0) {
+      sampleSelections.value.splice(idx, 1)
+      options?.onSave?.(`${ITEM_PREFIX_PLAN}-selections`, sampleSelections.value)
+    }
+  }
+
   // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persistCheck(): void {
@@ -250,6 +270,8 @@ export function useH1Stocktake(
     planInfo,
     sampleSelections,
     updatePlanInfo,
+    addSampleRow,
+    removeSampleRow,
     // Check (H1-10)
     checkRows,
     addCheckRow,

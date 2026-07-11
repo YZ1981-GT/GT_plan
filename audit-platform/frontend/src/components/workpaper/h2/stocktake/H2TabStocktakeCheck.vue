@@ -26,72 +26,92 @@
 
       <el-table :data="state.checkRows.value" border stripe size="small" class="check-table"
         :row-class-name="checkRowClass">
-        <el-table-column prop="name" label="工程项目" min-width="130" fixed />
-        <el-table-column prop="location" label="所在地点" min-width="100">
+        <el-table-column prop="name" label="工程项目" min-width="130" fixed>
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.location" size="small"
-              @change="onCellChange(row.rowId, 'location', $event)" />
-            <span v-else>{{ row.location || '-' }}</span>
+            <el-input v-if="!isReadonly" v-model="row.name" size="small"
+              @change="onCellChange(row.rowId, 'name', row.name)" />
+            <span v-else>{{ row.name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="bookValue" label="账面金额" min-width="110" align="right">
+        <el-table-column prop="siteLocation" label="现场位置" min-width="110">
           <template #default="{ row }">
-            <span class="amt-cell">{{ fmtAmt(row.bookValue) }}</span>
+            <el-input v-if="!isReadonly" v-model="row.siteLocation" size="small"
+              @change="onCellChange(row.rowId, 'siteLocation', row.siteLocation)" />
+            <span v-else>{{ row.siteLocation || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="actualStatus" label="实际状态" min-width="100">
+        <el-table-column prop="visibleProgress" label="形象进度(%)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.actualStatus" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'actualStatus', $event)">
-              <el-option label="正常施工" value="正常施工" />
-              <el-option label="已完工" value="已完工" />
-              <el-option label="停工" value="停工" />
-              <el-option label="缓建" value="缓建" />
-              <el-option label="不存在" value="不存在" />
-            </el-select>
-            <span v-else>{{ row.actualStatus || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="completionEstimate" label="预计进度(%)" min-width="90" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.completionEstimate" :controls="false"
+            <el-input-number v-if="!isReadonly" v-model="row.visibleProgress" :controls="false"
               :min="0" :max="100" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'completionEstimate', $event)" />
-            <span v-else>{{ row.completionEstimate ?? '-' }}%</span>
+              @change="onCellChange(row.rowId, 'visibleProgress', $event)" />
+            <span v-else>{{ row.visibleProgress ?? '-' }}%</span>
           </template>
         </el-table-column>
-        <el-table-column prop="stopReason" label="停工原因" min-width="120">
+        <el-table-column prop="constructionStatus" label="施工状态" min-width="100">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly && (row.actualStatus === '停工' || row.actualStatus === '缓建')"
-              v-model="row.stopReason" size="small"
-              @change="onCellChange(row.rowId, 'stopReason', $event)" />
-            <span v-else>{{ row.stopReason || '-' }}</span>
+            <el-select v-if="!isReadonly" v-model="row.constructionStatus" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'constructionStatus', $event)">
+              <el-option label="施工中" value="施工中" />
+              <el-option label="停工" value="停工" />
+              <el-option label="完工" value="完工" />
+            </el-select>
+            <span v-else>{{ row.constructionStatus || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="stopDays" label="停工天数" min-width="80" align="right">
+        <el-table-column prop="workers" label="施工人员" min-width="100">
           <template #default="{ row }">
-            <span :class="{ 'error-amount': (row.stopDays ?? 0) > 180 }">
-              {{ row.stopDays ?? '-' }}
-            </span>
+            <el-input v-if="!isReadonly" v-model="row.workers" size="small"
+              @change="onCellChange(row.rowId, 'workers', row.workers)" />
+            <span v-else>{{ row.workers || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="existenceConfirmed" label="存在性" width="70" align="center">
+        <el-table-column prop="materialStorage" label="材料堆存" min-width="110">
           <template #default="{ row }">
-            <el-checkbox v-model="row.existenceConfirmed" :disabled="isReadonly"
-              @change="onCellChange(row.rowId, 'existenceConfirmed', $event)" />
+            <el-input v-if="!isReadonly" v-model="row.materialStorage" size="small"
+              @change="onCellChange(row.rowId, 'materialStorage', row.materialStorage)" />
+            <span v-else>{{ row.materialStorage || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="photoRef" label="照片编号" min-width="100">
+        <el-table-column prop="equipmentCondition" label="设备状况" min-width="110">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.photoRef" size="small"
-              @change="onCellChange(row.rowId, 'photoRef', $event)" />
-            <span v-else>{{ row.photoRef || '-' }}</span>
+            <el-input v-if="!isReadonly" v-model="row.equipmentCondition" size="small"
+              @change="onCellChange(row.rowId, 'equipmentCondition', row.equipmentCondition)" />
+            <span v-else>{{ row.equipmentCondition || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="qualityAppearance" label="质量观感" min-width="110">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.qualityAppearance" size="small"
+              @change="onCellChange(row.rowId, 'qualityAppearance', row.qualityAppearance)" />
+            <span v-else>{{ row.qualityAppearance || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="progressDifference" label="与账面进度差异" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.progressDifference" size="small"
+              @change="onCellChange(row.rowId, 'progressDifference', row.progressDifference)" />
+            <span v-else>{{ row.progressDifference || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="photos" label="照片附件" min-width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.photos" size="small"
+              @change="onCellChange(row.rowId, 'photos', row.photos)" />
+            <span v-else>{{ row.photos || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="auditConclusion" label="审计结论" min-width="110">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.auditConclusion" size="small"
+              @change="onCellChange(row.rowId, 'auditConclusion', row.auditConclusion)" />
+            <span v-else>{{ row.auditConclusion || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="120">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.remark" size="small"
-              @change="onCellChange(row.rowId, 'remark', $event)" />
+              @change="onCellChange(row.rowId, 'remark', row.remark)" />
             <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
@@ -108,11 +128,11 @@
     </el-card>
 
     <!-- 停工汇总 -->
-    <el-alert v-if="state.stopCount.value > 0" type="warning" :closable="false" show-icon
+    <el-alert v-if="state.checkStats.value.stopped > 0" type="warning" :closable="false" show-icon
       style="margin-bottom:12px">
       <template #title>
-        发现 {{ state.stopCount.value }} 个停工/缓建项目，
-        涉及金额 {{ fmtAmt(state.stopTotalAmount.value) }}，需关注减值迹象(→H2-15)
+        发现 {{ state.checkStats.value.stopped }} 个停工项目（{{ state.stoppedProjectNames.value.join('、') }}），
+        需关注减值迹象(→H2-15)
       </template>
     </el-alert>
 
@@ -120,9 +140,9 @@
     <details class="edit-tips">
       <summary>编制提示</summary>
       <ul>
-        <li>停工/缓建项目红色高亮，停工>180天需重点关注减值</li>
-        <li>存在性确认：现场踏勘能确认工程实物存在</li>
-        <li>照片编号对应审计工作底稿附件</li>
+        <li>停工项目红色高亮，需重点关注减值迹象</li>
+        <li>形象进度应与账面进度核对，差异较大需说明</li>
+        <li>照片附件对应审计工作底稿附件编号</li>
         <li>可通过"导入导出"批量处理盘点数据</li>
       </ul>
     </details>
@@ -136,6 +156,7 @@
  * Spec: Task 4.16 | Requirements: 11.2, 11.5
  */
 import { inject, toRef, computed } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Stocktake } from '../../composables/useH2Stocktake'
 
@@ -156,18 +177,25 @@ const state = useH2Stocktake({
   phase: 'check',
 })
 
+const isReadonly = computed(() => props.isReadonly)
+
 function checkRowClass({ row }: any) {
-  if (row.actualStatus === '停工' || row.actualStatus === '缓建') return 'stop-row'
-  if (row.actualStatus === '不存在') return 'missing-row'
+  if (row.constructionStatus === '停工') return 'stop-row'
   return ''
 }
 
 function onCellChange(rowId: string, field: string, value: any) {
-  state.updateCheckCell(rowId, field, value)
+  state.updateCheckRow(rowId, field, value)
 }
 
-function handleAddRow() {
-  state.addCheckRow()
+async function handleAddRow() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入工程项目名称', '新增检查项', {
+      confirmButtonText: '确认', cancelButtonText: '取消',
+      inputPattern: /\S+/, inputErrorMessage: '名称不能为空',
+    })
+    if (value) state.addCheckRow(value)
+  } catch { /* cancelled */ }
 }
 
 function handleRemove(rowId: string) {
@@ -185,11 +213,6 @@ function handleAiGenerate() {
 function openReview(id: string) {
   openReviewDialog(id)
 }
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 </script>
 
 <style scoped>
@@ -198,13 +221,10 @@ function fmtAmt(val: number | null | undefined): string {
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 .check-table { font-size: 13px; }
-.amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
-.error-amount { color: var(--el-color-danger); font-weight: 600; }
 .add-row-bar { margin-top: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }
 .edit-tips ul { padding-left: 20px; margin-top: 8px; }
 :deep(.stop-row) { background-color: #fef0f0 !important; }
-:deep(.missing-row) { background-color: #fde2e2 !important; }
 </style>

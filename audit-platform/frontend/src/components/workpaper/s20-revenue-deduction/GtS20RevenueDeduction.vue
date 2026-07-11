@@ -41,6 +41,14 @@
 
       <!-- HTML 模式：单页多区段渲染 -->
       <div v-else class="s20-content">
+        <!-- 审计目标 -->
+        <el-alert type="info" :closable="false" show-icon class="audit-objective">
+          <template #title>审计目标</template>
+          <div class="audit-objective-text">
+            核查营业收入扣除情况：逐项识别与主营业务无关的业务收入和不具备商业实质的收入，计算扣除后营业收入金额，判断是否触及退市风险警示（利润总额/净利润/扣非净利润孰低为负值且扣除后营业收入低于人民币 3 亿元）。
+          </div>
+        </el-alert>
+
         <!-- ─── 顶部引导区（蓝色渐变 2列grid） ─── -->
         <div class="s20-guide-banner">
           <div class="guide-grid">
@@ -952,6 +960,11 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* ─── 顶部蓝色渐变引导区 ─── */

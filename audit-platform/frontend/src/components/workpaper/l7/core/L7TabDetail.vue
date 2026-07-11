@@ -30,6 +30,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>核实其他非流动负债各项目的性质、形成原因与到期情况，明细合计与审定表 L7-1 逐项勾稽一致。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

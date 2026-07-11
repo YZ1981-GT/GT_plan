@@ -30,6 +30,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L5-2 明细表（按款项列示，30列区段Tab） -->
       <L5TabDetail
@@ -37,6 +38,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L5-3 未确认融资费用明细表 -->
       <L5TabUnrecognizedDetail
@@ -44,6 +46,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L5-4 调整分录 -->
       <L5TabAdjustment
@@ -51,6 +54,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L5-5 未确认融资费用测算表（核心！实际利率法摊销） -->
       <L5TabAmortization
@@ -58,6 +62,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L5-6 关联方及交易检查表 -->
       <L5TabRelatedParty
@@ -65,6 +70,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- L5-7 长期应付款检查表 -->
       <L5TabLtPayableCheck
@@ -72,6 +78,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注（上市/国企） -->
       <L5TabDisclosureListed
@@ -79,12 +86,14 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <L5TabDisclosureSoe
         v-else-if="currentSheet === '附注国企'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet -->
       <GtOnlyOfficeSheet
@@ -174,14 +183,16 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
- * L5TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * 子组件目录行点击 / "← 返回目录" 按钮 emit 'navigate' → 转发为 'navigate-sheet'，
+ * 由外层 GtWpRenderer 的 @navigate-sheet(onChildNavigateSheet) 按 sheet_name 子串匹配切换 sheet。
+ * 注意：GtWpRenderer 监听的是 'navigate-sheet' 而非 'navigate'，此处必须转发正确的事件名。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────

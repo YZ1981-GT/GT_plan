@@ -1,5 +1,13 @@
 <template>
   <div class="s3-simplified-retro1">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：复核采用简化追溯调整法处理准则变更的适用条件与折现计算过程，确认累积影响数计入期初留存收益的准确性。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- 蓝色渐变引导区（多步骤底稿） -->
     <div class="guide-banner">
       <div class="guide-grid">

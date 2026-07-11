@@ -1,5 +1,13 @@
 <template>
   <div class="s14-control">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        了解被审计单位与会计估计相关的内部控制，包括估计过程的监督、数据完整性、假设审查与批准、模型控制、职责分离及回顾性分析，评价相关控制的设计有效性并确定是否测试其运行有效性（CAS 1321）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -277,6 +285,15 @@ function handleAiConclusion() {
 <style scoped>
 .s14-control {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

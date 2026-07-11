@@ -294,6 +294,28 @@ export function useH2InterestCap(options: {
     totalCapAmount.value - clientCapAmount.value,
   )
 
+  // ─── Computed: 利息费用化金额（利息总额 - 资本化金额） ──────────────────────
+
+  /** 无专门借款分支：一般借款利息总额 */
+  const totalInterestNoBorrow: ComputedRef<number> = computed(() =>
+    calcSubtotal(loansNoBorrow.value.map(l => l.interest)),
+  )
+
+  /** 无专门借款分支：利息费用化金额 = 利息总额 - 资本化金额 */
+  const expenseAmount: ComputedRef<number> = computed(() =>
+    totalInterestNoBorrow.value - capAmountNoBorrow.value,
+  )
+
+  /** 有专门借款分支：利息总额 = 专门借款利息 + 一般借款利息合计 */
+  const totalInterestWithBorrow: ComputedRef<number> = computed(() =>
+    specialLoanData.value.specialInterest + calcSubtotal(loansWithBorrow.value.map(l => l.interest)),
+  )
+
+  /** 有专门借款分支：利息费用化金额 = 利息总额 - 资本化合计 */
+  const totalExpenseAmount: ComputedRef<number> = computed(() =>
+    totalInterestWithBorrow.value - capAmountWithBorrow.value,
+  )
+
   /** 交叉验证H2-2（各工程利息列之和 vs 资本化金额） */
   const crossValidation: ComputedRef<{ diff: number; isMatch: boolean }> = computed(() => {
     const diff = clientCapAmount.value - totalCapAmount.value
@@ -486,6 +508,8 @@ export function useH2InterestCap(options: {
     specialLoanCap, generalCapRate, generalLoanSupp, capAmountWithBorrow,
     // Computed: 通用
     totalCapAmount, capDifference, crossValidation,
+    totalInterestNoBorrow, expenseAmount,
+    totalInterestWithBorrow, totalExpenseAmount,
     // Actions
     setBranch,
     addLoanNoBorrow, removeLoanNoBorrow, updateLoanNoBorrow,

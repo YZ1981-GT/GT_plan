@@ -115,7 +115,10 @@ const { getValue, setValue, saveImmediate } = useH3FormData({
 })
 
 const {
-  fairRows, fairTotal, totalFairValueChange, updateFairCell,
+  rows: fairRows,
+  total: fairTotal,
+  fairValueChangePL: totalFairValueChange,
+  updateCell: updateFairCell,
 } = useH3AdjudicationFair({
   allResponses: computed(() => props.allResponses) as any,
   wpId: toRef(props, 'wpId'),

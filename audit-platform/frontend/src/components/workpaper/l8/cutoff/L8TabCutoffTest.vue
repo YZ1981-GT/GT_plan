@@ -33,6 +33,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>核查报告日前后财务费用的期间归属正确性，识别跨期入账，确认费用截止无重大错报。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

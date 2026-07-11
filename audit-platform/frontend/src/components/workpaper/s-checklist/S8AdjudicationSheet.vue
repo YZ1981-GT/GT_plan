@@ -1,5 +1,13 @@
 <template>
   <div class="s8-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：确认租赁相关科目期末余额的存在、完整与准确，评价使用权资产与租赁负债计量的恰当性，并与试算平衡表核对一致。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 审定表 S8-1 — 租赁 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

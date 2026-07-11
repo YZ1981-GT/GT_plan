@@ -5,7 +5,7 @@
       <div class="section-header-left">
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">M7-4 专项储备计提测试表</h3>
-        <GtIndexChip value="M7-2" :context-project-id="projectId" />
+        <GtIndexChip value="wp:M7-2" :context-project-id="projectId" />
       </div>
       <div class="section-header-right">
         <el-button size="small" @click="handleAI('accrualTest')">
@@ -280,9 +280,9 @@
     <!-- ═══ cross_wp_ref 跨底稿引用区 ═══ -->
     <div class="cross-wp-links">
       <span class="cross-wp-label">cross_wp_ref 联动：</span>
-      <GtIndexChip value="M7-2" :context-project-id="projectId" />
+      <GtIndexChip value="wp:M7-2" :context-project-id="projectId" />
       <span class="cross-wp-desc">明细表（计提金额来源）</span>
-      <GtIndexChip value="M7-1" :context-project-id="projectId" />
+      <GtIndexChip value="wp:M7-1" :context-project-id="projectId" />
       <span class="cross-wp-desc">审定表（期末余额）</span>
     </div>
 

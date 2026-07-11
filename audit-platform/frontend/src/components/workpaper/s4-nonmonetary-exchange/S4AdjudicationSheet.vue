@@ -1,5 +1,13 @@
 <template>
   <div class="s4-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：确认非货币性资产交换以公允价值计量的交换损益（=换出公允价值-换出账面价值）与换入资产入账成本的计算准确，并将交换损益标注为非经常性损益在附注披露。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 审定表 S4-1 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

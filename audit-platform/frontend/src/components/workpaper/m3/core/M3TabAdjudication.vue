@@ -28,6 +28,16 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective-alert">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        确认库存股（4002）的<strong>存在性</strong>（回购交易真实发生）、
+        <strong>计价准确性</strong>（按回购成本法核算，注销/再售会计处理正确）、
+        <strong>完整性</strong>、<strong>列报恰当性</strong>（作为所有者权益备减项列示）。
+      </div>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景）─── 借方方向说明 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -634,6 +644,15 @@ function _restoreRows(): M3AdjudicationRow[] {
 
 .contra-equity-badge {
   font-weight: 600;
+}
+
+.audit-objective-alert {
+  margin-bottom: 16px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .methodology-context {

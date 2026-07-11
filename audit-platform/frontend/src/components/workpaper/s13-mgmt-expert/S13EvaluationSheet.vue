@@ -1,5 +1,11 @@
 <template>
   <div class="s13-evaluation">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">{{ auditObjective }}</div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -155,6 +161,18 @@ function handleOpenReview(sectionId: string, label: string) {
   openReviewDialog?.(sectionId, label)
 }
 
+// ─── 审计目标 ────────────────────────────────────────────────────────────────
+
+const auditObjective = computed(() => {
+  const objMap: Record<string, string> = {
+    'S13-1': '评价管理层的专家是否具有实现管理层目的所必需的胜任能力、专业素质和客观性，尤其关注其客观性可能受被审计单位控制或影响的情形。',
+    'S13-2': '了解管理层的专家的工作性质、范围、目标、假设、方法和数据来源，为评价其工作结果的适当性奠定基础。',
+    'S13-3': '评价管理层的专家工作结果的适当性，包括源数据的相关性与可靠性、假设和方法的合理性，以及结论与其他审计证据的一致性。',
+    'S13-3-1': '获取并审阅管理层的专家出具的报告，评价其发现事项、结论和建议是否充分支持财务报表相关认定。',
+  }
+  return objMap[props.sheetKey] || '评价管理层的专家编制信息作为审计证据的可靠性与适当性。'
+})
+
 // ─── 方法论上下文 ────────────────────────────────────────────────────────────
 
 const methodologyContext = computed(() => {
@@ -264,6 +282,15 @@ function handleAiConclusion() {
 <style scoped>
 .s13-evaluation {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

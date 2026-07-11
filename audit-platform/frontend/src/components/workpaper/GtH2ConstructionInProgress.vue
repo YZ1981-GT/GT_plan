@@ -350,17 +350,21 @@ const showHtmlToolbar = computed(() => {
 })
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
+/** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  for (const [k, v] of Object.entries(src)) map.set(k, v)
+}
+
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
       // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
-      }
+      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H2 render 策略实际输出）
+      const map = new Map<string, any>()
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
@@ -371,11 +375,8 @@ async function selfLoad(): Promise<void> {
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
+          _mergeResponses(map, sheet.html_data?.allResponses)
+          _mergeResponses(map, sheet.html_data?.responses_snapshot)
         }
         allResponses.value = map
       }

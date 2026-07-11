@@ -160,6 +160,27 @@ onMounted(async () => {
     </div>
 
     <template v-else>
+      <!-- 审计目标 (gold) -->
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="gt-s35-bundle__objective"
+      >
+        <template #title>审计目标</template>
+        <div class="objective-text">
+          对再融资审核关注的关联交易、财务性投资、现金分红、商誉减值、募集资金涉及收购五类事项执行专项核查，评估其合规性与信息披露充分性，并形成核查结论。
+        </div>
+      </el-alert>
+
+      <!-- 编制提示 (gold) -->
+      <details class="gt-s35-bundle__prep">
+        <summary>编制提示</summary>
+        <div class="prep-content">
+          逐个 Tab 核查程序表并填写结论；关联交易 / 财务性投资 / 现金分红可切换至明细核查表录入数据，其中合计、占比为公式自动计算列（只读，悬停查看计算来源）。
+        </div>
+      </details>
+
       <!-- 完成进度仪表盘 (Req 8.1, 8.2, 8.3) -->
       <div class="gt-s35-bundle__dashboard" data-testid="s35-dashboard">
         <div class="dashboard-stats">
@@ -263,6 +284,41 @@ onMounted(async () => {
 <style scoped>
 .gt-s35-bundle {
   padding: var(--gt-space-4, 16px);
+}
+
+/* ─── 审计目标 (gold) ─── */
+.gt-s35-bundle__objective {
+  margin-bottom: 12px;
+}
+.gt-s35-bundle__objective :deep(.el-alert__title) {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gt-s35-bundle__objective .objective-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── 编制提示 (gold) ─── */
+.gt-s35-bundle__prep {
+  margin-bottom: 12px;
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  border-radius: var(--gt-radius-sm, 4px);
+  background: var(--gt-color-bg-elevated, #fafafa);
+}
+.gt-s35-bundle__prep summary {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gt-color-text-secondary, #606266);
+  cursor: pointer;
+  user-select: none;
+}
+.gt-s35-bundle__prep .prep-content {
+  padding: 4px 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gt-color-text-secondary, #606266);
 }
 
 /* ─── Dashboard (Req 8.2) ─── */

@@ -1,5 +1,13 @@
 <template>
   <div class="s21-program">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        执行数据资产审计程序，确认开发支出资本化的合规性、成本归集与分摊的合理性、摊销政策的适当性，以及相关会计政策披露的完整准确（CAS 6）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -91,6 +99,13 @@ const programSteps = ref([
 <style scoped>
 .s21-program {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .section-header {
   display: flex;

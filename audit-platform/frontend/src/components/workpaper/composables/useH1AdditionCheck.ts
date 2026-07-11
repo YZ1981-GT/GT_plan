@@ -157,17 +157,17 @@ export function useH1AdditionCheck(
     const checkedAmount = calcSubtotal(rows.value.map((r) => r.originalCost))
     const totalAdd = options?.totalAdditionAmount?.value ?? samplingParams.value.totalPopulation
     const coverageRate = totalAdd > 0 ? (checkedAmount / totalAdd * 100) : 0
-    const anomalyCount = rows.value.filter((r) => r.checkResult === '有异常').length
+    const anomalyCount = rows.value.filter((r) => r.checkResult === '有异常' || r.checkResult === 'ERR' || r.checkResult === '异常').length
     return { checkedCount, checkedAmount, coverageRate, anomalyCount }
   })
 
   // ─── CRUD ──────────────────────────────────────────────────────────────────
 
-  function addRow(): void {
+  function addRow(name = ''): void {
     const newRow: AdditionRow = {
       rowId: `add-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       seq: rows.value.length + 1,
-      name: '', assetNo: '', acquisitionDate: '', originalCost: 0,
+      name, assetNo: '', acquisitionDate: '', originalCost: 0,
       contractRef: '', contractAmount: 0, invoiceRef: '', invoiceAmount: 0,
       acceptanceRef: '', paymentRef: '', paymentAmount: 0,
       capitalizationBasis: '', expenseOrCapital: '资本化', accountCode: '',

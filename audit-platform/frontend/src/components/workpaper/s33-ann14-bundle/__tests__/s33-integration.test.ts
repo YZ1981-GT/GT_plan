@@ -73,6 +73,7 @@ function createWrapper(props: Record<string, unknown> = {}) {
           template: '<div class="mock-program-console" :data-wp-id="wpId" :data-readonly="readonly" :data-sheet="sheetName">ProgramConsole</div>',
           props: ['wpId', 'sheetName', 'readonly'],
         },
+        'el-alert': { template: '<div class="el-alert"><slot name="title" /><slot /></div>' },
         'el-tabs': {
           template: '<div class="el-tabs"><slot /></div>',
           props: ['modelValue'],

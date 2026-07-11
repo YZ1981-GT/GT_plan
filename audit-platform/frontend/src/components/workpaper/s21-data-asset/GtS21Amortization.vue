@@ -1,5 +1,13 @@
 <template>
   <div class="s21-amortization">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        检查数据资产摊销政策的适当性：摊销方法是否匹配经济利益实现方式、使用寿命与残值估计是否合理、摊销起始时点与会计处理是否正确，并核对年/月摊销额计算。
+      </div>
+    </el-alert>
+
     <!-- ─── 摊销政策检查 ─── -->
     <el-card shadow="never" class="audit-section">
       <template #header>
@@ -220,6 +228,13 @@ const auditConclusion = ref('')
 <style scoped>
 .s21-amortization {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .section-header {
   display: flex;

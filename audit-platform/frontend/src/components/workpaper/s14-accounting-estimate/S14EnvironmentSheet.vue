@@ -1,5 +1,13 @@
 <template>
   <div class="s14-environment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        了解被审计单位及其环境中与会计估计相关的方面，包括行业与监管状况、会计估计的性质、管理层作出估计的方法、重大假设与数据来源，以及上期估计的回顾性复核，为识别和评估重大错报风险奠定基础（CAS 1321）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -242,6 +250,15 @@ function handleAiConclusion() {
 <style scoped>
 .s14-environment {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

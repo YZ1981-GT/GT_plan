@@ -5,6 +5,12 @@
       <p>CAS21第32条简化处理：短期租赁(≤12月)或低价值资产租赁(≤4万)可选择不确认使用权资产和租赁负债，直接计入当期费用。不符合条件的应确认使用权资产。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-13" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 检查表 -->
     <el-card shadow="never" class="table-card">
       <template #header>
@@ -160,6 +166,7 @@
 import { toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8SimplifiedCheck } from '../../composables/useH8SimplifiedCheck'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -217,6 +224,8 @@ function getSummary({ columns }: { columns: any[] }) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

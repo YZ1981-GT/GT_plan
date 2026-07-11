@@ -38,18 +38,18 @@
             <span v-else>{{ row.transferDate || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="completionDate" label="竣工日期" min-width="100">
+        <el-table-column prop="conditionsMetDate" label="达到可用状态日" min-width="110">
           <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" v-model="row.completionDate" type="date" size="small"
+            <el-date-picker v-if="!isReadonly" v-model="row.conditionsMetDate" type="date" size="small"
               value-format="YYYY-MM-DD" style="width:100%"
-              @change="onCellChange(row.rowId, 'completionDate', $event)" />
-            <span v-else>{{ row.completionDate || '-' }}</span>
+              @change="onCellChange(row.rowId, 'conditionsMetDate', $event)" />
+            <span v-else>{{ row.conditionsMetDate || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="延迟天数" min-width="80" align="right">
           <template #default="{ row }">
             <span :class="['formula-cell', { 'error-amount': row.delayDays > 180, 'warning-value': row.delayDays > 30 }]"
-              :title="`=转固日期-竣工日期`">
+              :title="`=转固日期-达到可用状态日`">
               {{ row.delayDays ?? '-' }}
             </span>
           </template>
@@ -71,32 +71,32 @@
         <!-- CAS4五条件 -->
         <el-table-column label="条件①" width="60" align="center">
           <template #default="{ row }">
-            <el-checkbox v-model="row.cond1" :disabled="isReadonly"
-              @change="onCellChange(row.rowId, 'cond1', $event)" />
+            <el-checkbox v-model="row.condition1" :disabled="isReadonly"
+              @change="onCellChange(row.rowId, 'condition1', $event)" />
           </template>
         </el-table-column>
         <el-table-column label="条件②" width="60" align="center">
           <template #default="{ row }">
-            <el-checkbox v-model="row.cond2" :disabled="isReadonly"
-              @change="onCellChange(row.rowId, 'cond2', $event)" />
+            <el-checkbox v-model="row.condition2" :disabled="isReadonly"
+              @change="onCellChange(row.rowId, 'condition2', $event)" />
           </template>
         </el-table-column>
         <el-table-column label="条件③" width="60" align="center">
           <template #default="{ row }">
-            <el-checkbox v-model="row.cond3" :disabled="isReadonly"
-              @change="onCellChange(row.rowId, 'cond3', $event)" />
+            <el-checkbox v-model="row.condition3" :disabled="isReadonly"
+              @change="onCellChange(row.rowId, 'condition3', $event)" />
           </template>
         </el-table-column>
         <el-table-column label="条件④" width="60" align="center">
           <template #default="{ row }">
-            <el-checkbox v-model="row.cond4" :disabled="isReadonly"
-              @change="onCellChange(row.rowId, 'cond4', $event)" />
+            <el-checkbox v-model="row.condition4" :disabled="isReadonly"
+              @change="onCellChange(row.rowId, 'condition4', $event)" />
           </template>
         </el-table-column>
         <el-table-column label="条件⑤" width="60" align="center">
           <template #default="{ row }">
-            <el-checkbox v-model="row.cond5" :disabled="isReadonly"
-              @change="onCellChange(row.rowId, 'cond5', $event)" />
+            <el-checkbox v-model="row.condition5" :disabled="isReadonly"
+              @change="onCellChange(row.rowId, 'condition5', $event)" />
           </template>
         </el-table-column>
         <el-table-column label="判定" width="80" align="center">

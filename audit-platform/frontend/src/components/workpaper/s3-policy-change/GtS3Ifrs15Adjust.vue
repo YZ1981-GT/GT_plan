@@ -1,5 +1,13 @@
 <template>
   <div class="s3-ifrs15-adjust">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：复核首次执行新收入准则（CAS 14）追溯调整的计量与列报，确认收入确认时点、合同资产/合同负债重分类及留存收益调整的恰当性。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <div class="context-content">

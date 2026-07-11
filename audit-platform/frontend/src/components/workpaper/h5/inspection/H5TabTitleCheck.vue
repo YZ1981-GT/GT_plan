@@ -82,7 +82,7 @@
     </el-card>
     <div class="action-bar" v-if="!isReadonly"><el-button size="small" @click="handleAddRow">+ 新增权属项</el-button></div>
     <el-card shadow="never" class="note-card"><template #header><div class="section-title"><span>审计说明</span></div></template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" /></el-card>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" /></el-card>
     <details class="compile-hint"><summary>编制提示</summary><ul>
       <li>采矿权到期日&lt;1年自动黄色预警</li><li>已抵押资产需披露并关注持续经营影响</li><li>权属核验需查阅原始证照</li></ul></details>
   </div>

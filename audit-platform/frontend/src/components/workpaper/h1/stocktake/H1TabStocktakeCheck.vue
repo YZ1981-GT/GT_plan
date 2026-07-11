@@ -80,10 +80,10 @@
       </el-table>
 
       <div class="summary-bar">
-        <span>账实相符: <b>{{ state.matchCount.value }}</b></span>
-        <span>盘盈: <b>{{ state.surplusCount.value }}</b></span>
-        <span>盘亏: <b :class="{ 'error-amount': state.shortageCount.value > 0 }">{{ state.shortageCount.value }}</b></span>
-        <span>相符率: <b>{{ state.matchRate.value }}%</b></span>
+        <span>账实相符: <b>{{ state.statistics.value.matchCount }}</b></span>
+        <span>盘盈: <b>{{ state.statistics.value.surplusCount }}</b></span>
+        <span>盘亏: <b :class="{ 'error-amount': state.statistics.value.deficitCount > 0 }">{{ state.statistics.value.deficitCount }}</b></span>
+        <span>相符率: <b>{{ state.statistics.value.matchRate.toFixed(1) }}%</b></span>
       </div>
     </el-card>
 

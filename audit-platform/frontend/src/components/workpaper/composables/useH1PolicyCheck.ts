@@ -167,6 +167,28 @@ export function useH1PolicyCheck(
     _persistParams()
   }
 
+  function addDepParam(category = ''): void {
+    depParams.value.push({
+      rowId: `dp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      category,
+      depMethod: '直线法',
+      usefulLifeMin: 0,
+      usefulLifeMax: 0,
+      salvageRate: 0,
+      isReasonable: '',
+      remark: '',
+    })
+    _persistParams()
+  }
+
+  function removeDepParam(rowId: string): void {
+    const idx = depParams.value.findIndex((r) => r.rowId === rowId)
+    if (idx >= 0) {
+      depParams.value.splice(idx, 1)
+      _persistParams()
+    }
+  }
+
   // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persistSections(): void {
@@ -190,6 +212,8 @@ export function useH1PolicyCheck(
     completedCount,
     updateSection,
     updateDepParam,
+    addDepParam,
+    removeDepParam,
     SECTION_DEFINITIONS,
   }
 }

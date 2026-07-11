@@ -140,6 +140,18 @@ export function useH3TransferReview(params: {
     _persist()
   }
 
+  /**
+   * 行变更（组件按方向分组视图调用 updateTransferRow(direction, index, row)）。
+   * 组件已 v-model 就地修改 row（与 rows 中同引用），此处按 rowId 定位后重算公式并持久化。
+   */
+  function updateTransferRow(_direction: string, _index: number, row: any): void {
+    const target = row?.rowId ? rows.value.find((r) => r.rowId === row.rowId) : null
+    if (!target) return
+    const recalced = _normalize({ ...target })
+    Object.assign(target, recalced)
+    _persist()
+  }
+
   /** EventBus发布互转事件 */
   function publishTransferEvents(): void {
     window.dispatchEvent(new CustomEvent('h3:transfer-from-h1', {
@@ -156,7 +168,7 @@ export function useH3TransferReview(params: {
   return {
     rows, selfToInvestRows, investToSelfRows, cipToInvestRows,
     hasImbalance, totalSummary,
-    addRow, removeRow, updateCell, publishTransferEvents, loadRows,
+    addRow, removeRow, updateCell, updateTransferRow, publishTransferEvents, loadRows,
   }
 }
 

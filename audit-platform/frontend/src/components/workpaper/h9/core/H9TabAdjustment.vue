@@ -187,6 +187,12 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。
+// Bug C 修复：此前 onSave 仅写内存 Map，从不落库 → 刷新丢数据。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 const saving = ref(false)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -199,10 +205,7 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onPublishAdjustment: (_aje: number, _rje: number) => {
     // EventBus已在composable内部通过window.dispatchEvent发布
   },
@@ -221,7 +224,7 @@ const noteData = props.allResponses.get('H9-4-note')
 if (noteData) auditNote.value = noteData.remark ?? noteData.conclusion ?? ''
 
 function saveAuditNote() {
-  props.allResponses.set('H9-4-note', { item_id: 'H9-4-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H9-4-note', auditNote.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────

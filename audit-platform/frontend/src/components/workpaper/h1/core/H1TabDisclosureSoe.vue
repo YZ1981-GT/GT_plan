@@ -102,14 +102,14 @@ const allResponsesRef = computed(() => props.allResponses)
 const disclosureNote = ref('')
 const sections = SOE_SECTIONS
 
-const { overviewRows, dynamicRowsMap, addDynamicRow: _addDynamic } = useH1Disclosure(
+const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow: _addDynamic } = useH1Disclosure(
   toRef(props, 'wpId'),
   toRef(props, 'projectId'),
   allResponsesRef as any,
-  { variant: 'soe' },
+  { variant: ref('soe') },
 )
 
-function getDynamicRows(key: string) { return dynamicRowsMap.value.get(key) ?? [] }
+function getDynamicRows(key: string) { return dynamicRowsMap.value?.[key] ?? [] }
 function getDynamicSubtotal(key: string): number {
   return getDynamicRows(key).reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0)
 }

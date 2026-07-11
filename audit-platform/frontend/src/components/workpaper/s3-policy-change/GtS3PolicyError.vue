@@ -1,5 +1,13 @@
 <template>
   <div class="s3-policy-error">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：区分会计政策变更、前期差错更正与会计估计变更三类事项，评价追溯调整（追溯重述）处理的恰当性，并识别应标注为非经常性损益的项目。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- 三类事项选择器（Req 6.2）：会计政策变更 / 前期差错更正 / 会计估计变更 -->
     <div class="event-type-selector">
       <span class="selector-label">事项类型：</span>

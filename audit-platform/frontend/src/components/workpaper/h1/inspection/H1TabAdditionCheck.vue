@@ -13,10 +13,10 @@
         </div>
       </template>
       <el-descriptions :column="4" border size="small">
-        <el-descriptions-item label="总体金额">{{ fmtAmt(state.populationAmount.value) }}</el-descriptions-item>
-        <el-descriptions-item label="样本量">{{ state.sampleSize.value }}</el-descriptions-item>
-        <el-descriptions-item label="覆盖率">{{ state.coverageRate.value }}%</el-descriptions-item>
-        <el-descriptions-item label="抽样方法">{{ state.samplingMethod.value || '待确定' }}</el-descriptions-item>
+        <el-descriptions-item label="总体金额">{{ fmtAmt(state.samplingParams.value.totalPopulation) }}</el-descriptions-item>
+        <el-descriptions-item label="样本量">{{ state.samplingParams.value.sampleSize }}</el-descriptions-item>
+        <el-descriptions-item label="覆盖率">{{ state.summary.value.coverageRate.toFixed(1) }}%</el-descriptions-item>
+        <el-descriptions-item label="抽样方法">{{ state.samplingParams.value.samplingMethod || '待确定' }}</el-descriptions-item>
       </el-descriptions>
     </el-card>
 
@@ -78,8 +78,8 @@
       </el-table>
 
       <div class="summary-bar">
-        <span>样本金额合计: <b class="amount-cell">{{ fmtAmt(state.sampleAmountTotal.value) }}</b></span>
-        <span>异常: <b :class="{ 'error-amount': state.errorCount.value > 0 }">{{ state.errorCount.value }}</b> 项</span>
+        <span>样本金额合计: <b class="amount-cell">{{ fmtAmt(state.summary.value.checkedAmount) }}</b></span>
+        <span>异常: <b :class="{ 'error-amount': state.summary.value.anomalyCount > 0 }">{{ state.summary.value.anomalyCount }}</b> 项</span>
       </div>
     </el-card>
 

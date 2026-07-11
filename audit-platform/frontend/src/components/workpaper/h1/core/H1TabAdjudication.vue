@@ -146,10 +146,10 @@
       </template>
       <div class="net-value-row">
         <span>固定资产净值 = 原值审定 - 累计折旧审定 = </span>
-        <span class="formula-cell" title="净值=原值-折旧-减值">{{ fmtAmt(state.netValueAudited) }}</span>
+        <span class="formula-cell" title="净值=原值-折旧-减值">{{ fmtAmt(netValueAudited) }}</span>
       </div>
       <el-divider />
-      <el-table :data="state.reconciliationResults" size="small" border>
+      <el-table :data="reconciliationResults" size="small" border>
         <el-table-column prop="layer" label="校验层" width="120" />
         <el-table-column label="差额" width="150" align="right">
           <template #default="{ row }">
@@ -167,9 +167,9 @@
         </el-table-column>
       </el-table>
       <!-- TB差异 -->
-      <div class="tb-diff-section" v-if="state.differenceRows.length">
+      <div class="tb-diff-section" v-if="differenceRows.length">
         <h4>TB差异核对</h4>
-        <el-table :data="state.differenceRows" size="small" border>
+        <el-table :data="differenceRows" size="small" border>
           <el-table-column prop="label" label="科目" width="150" />
           <el-table-column prop="audited" label="审定数" align="right" width="130">
             <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.audited) }}</span></template>
@@ -185,12 +185,12 @@
         </el-table>
       </div>
       <!-- 交叉验证H1-2 -->
-      <div v-if="state.crossValidation.hasCostWarning || state.crossValidation.hasDepWarning" class="cross-warning">
+      <div v-if="crossValidation.hasCostWarning || crossValidation.hasDepWarning" class="cross-warning">
         <el-alert type="warning" :closable="false" show-icon>
           <template #title>
             交叉验证异常：
-            <span v-if="state.crossValidation.hasCostWarning">原值差异 {{ fmtAmt(state.crossValidation.costDiff) }}</span>
-            <span v-if="state.crossValidation.hasDepWarning"> 折旧差异 {{ fmtAmt(state.crossValidation.depDiff) }}</span>
+            <span v-if="crossValidation.hasCostWarning">原值差异 {{ fmtAmt(crossValidation.costDiff) }}</span>
+            <span v-if="crossValidation.hasDepWarning"> 折旧差异 {{ fmtAmt(crossValidation.depDiff) }}</span>
           </template>
         </el-alert>
       </div>
@@ -206,8 +206,8 @@
           </el-button>
         </div>
       </template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明..."
-        :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明..."
+        :disabled="isReadonly" @blur="saveNote(auditNote)" />
     </el-card>
 
     <!-- 审计结论 -->
@@ -220,8 +220,8 @@
           </el-button>
         </div>
       </template>
-      <el-input v-model="state.auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写审计结论..."
-        :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion)" />
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写审计结论..."
+        :disabled="isReadonly" @blur="saveConclusion(auditConclusion)" />
     </el-card>
 
     <!-- 操作按钮 -->
@@ -262,36 +262,51 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const allResponsesRef = computed(() => props.allResponses)
 const publishing = ref(false)
 
-const state = useH1Adjudication(
+const {
+  costRows,
+  depRows,
+  auditNote,
+  auditConclusion,
+  costSubtotal,
+  depSubtotal,
+  netValueAudited,
+  reconciliationResults,
+  differenceRows,
+  crossValidation,
+  updateCell,
+  publishAdjudicated,
+  saveNote,
+  saveConclusion,
+} = useH1Adjudication(
   toRef(props, 'wpId'),
   toRef(props, 'projectId'),
   allResponsesRef as any,
 )
 
 const costDisplayRows = computed(() => {
-  const rows = [...state.costRows.value]
-  rows.push({ ...state.costSubtotal.value })
+  const rows = [...costRows.value]
+  rows.push({ ...costSubtotal.value })
   return rows
 })
 
 const depDisplayRows = computed(() => {
-  const rows = [...state.depRows.value]
-  rows.push({ ...state.depSubtotal.value })
+  const rows = [...depRows.value]
+  rows.push({ ...depSubtotal.value })
   return rows
 })
 
 function onCellChange(block: 'cost' | 'dep', rowId: string, field: string, value: number) {
-  state.updateCell(block, rowId, field as any, value ?? 0)
+  updateCell(block, rowId, field as any, value ?? 0)
 }
 
-function costSummaryMethod({ data }: any) {
+function costSummaryMethod(_ctx: any) {
   return [] // handled by subtotal row
 }
 
 async function handlePublish() {
   publishing.value = true
   try {
-    await state.publishAdjudicated()
+    await publishAdjudicated()
   } finally {
     publishing.value = false
   }

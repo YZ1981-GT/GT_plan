@@ -220,6 +220,8 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
+/** TB 取数 (科目1605) 种子值：来自 render 策略 tb_values（供 H4-1 审定表只读核对） */
+const tbValues = ref<Record<string, number>>({})
 
 // ─── 双模式切换（简化版，Phase 3 替换为 useH4DualMode） ──────────────────────
 const currentMode = ref<'html' | 'onlyoffice'>('html')
@@ -251,17 +253,22 @@ const currentSheet = computed(() => {
 })
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
+/** 合并一个 responses 对象（{item_id: {conclusion, remark}}）到目标 Map */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  for (const [k, v] of Object.entries(src)) map.set(k, v)
+}
+
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
       // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
-      }
+      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H4 render 策略实际输出）
+      const map = new Map<string, any>()
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      if (map.size > 0) allResponses.value = map
+      if (props.htmlData.tb_values) tbValues.value = props.htmlData.tb_values
     } else {
       // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
@@ -272,10 +279,10 @@ async function selfLoad(): Promise<void> {
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
+          _mergeResponses(map, sheet.html_data?.allResponses)
+          _mergeResponses(map, sheet.html_data?.responses_snapshot)
+          if (sheet.html_data?.tb_values) {
+            tbValues.value = { ...tbValues.value, ...sheet.html_data.tb_values }
           }
         }
         allResponses.value = map
@@ -294,6 +301,8 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 }
 provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
+// TB 取数种子（H4-1 审定表 inject 消费，科目1605 未审数/审定数只读核对）
+provide('h4TbValues', tbValues)
 
 // ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
 const versionTrail = useVersionTrail({

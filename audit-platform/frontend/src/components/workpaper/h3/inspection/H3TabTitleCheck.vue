@@ -18,9 +18,9 @@
           <el-input v-model.number="row.bookValue" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="titleNo" label="产权证号" min-width="110">
+      <el-table-column prop="titleCertNo" label="产权证号" min-width="110">
         <template #default="{ row, $index }">
-          <el-input v-model="row.titleNo" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
+          <el-input v-model="row.titleCertNo" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
       <el-table-column prop="certArea" label="证载面积" width="90" align="right">
@@ -68,20 +68,20 @@
           <el-input v-model="row.restriction" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="certUsage" label="证载用途" width="80">
+      <el-table-column prop="certPurpose" label="证载用途" width="80">
         <template #default="{ row, $index }">
-          <el-input v-model="row.certUsage" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
+          <el-input v-model="row.certPurpose" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="actualUsage" label="实际用途" width="80">
+      <el-table-column prop="actualPurpose" label="实际用途" width="80">
         <template #default="{ row, $index }">
-          <el-input v-model="row.actualUsage" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
+          <el-input v-model="row.actualPurpose" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
       <el-table-column label="用途一致" width="80" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.certUsage === row.actualUsage ? 'success' : 'warning'" size="small">
-            {{ row.certUsage === row.actualUsage ? '是' : '否' }}
+          <el-tag :type="row.certPurpose === row.actualPurpose ? 'success' : 'warning'" size="small">
+            {{ row.certPurpose === row.actualPurpose ? '是' : '否' }}
           </el-tag>
         </template>
       </el-table-column>

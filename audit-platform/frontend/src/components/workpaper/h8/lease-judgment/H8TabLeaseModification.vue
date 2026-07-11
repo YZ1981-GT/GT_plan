@@ -5,6 +5,12 @@
       <p>CAS21第28-30条：租赁变更会计处理——①增加范围+价格合理→单独租赁 ②减少范围→按比例终止 ③其他变更→重新计量租赁负债+调整使用权资产(calcRemeasurement)。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-7" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 标题行 -->
     <div class="section-header">
       <div class="header-left">
@@ -106,6 +112,18 @@
     <div class="stat-bar">
       <span>变更调整合计：{{ fmtAmt(totalAdjustment) }}元</span>
     </div>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>单独租赁：变更增加租赁范围且对价与单独价格相符→作为新租赁单独核算</li>
+        <li>范围减少：终止部分按比例冲减使用权资产与租赁负债，差额计入损益</li>
+        <li>其他变更：以修订折现率重新计量租赁负债，对应调整使用权资产账面价值</li>
+        <li>重新计量后 = 原使用权资产 + 调整额（calcRemeasurement）</li>
+        <li>变更类型判断结论影响后续折旧基数与摊销安排</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -118,6 +136,7 @@
 import { toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8LeaseModification } from '../../composables/useH8LeaseModification'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -171,6 +190,12 @@ function handleDelete(rowId: string) { deleteRow(rowId) }
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; }
 
 .section-header {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;

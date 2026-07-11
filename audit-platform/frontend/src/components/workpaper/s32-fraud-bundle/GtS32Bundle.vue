@@ -271,6 +271,27 @@ onMounted(async () => {
     </div>
 
     <template v-else-if="visibleTabs.length > 0">
+      <!-- 审计目标 (gold) -->
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="gt-s32-bundle__objective"
+      >
+        <template #title>审计目标</template>
+        <div class="objective-text">
+          针对财务报表舞弊风险，按舞弊情形分类执行专项核查程序，评估管理层凌驾于控制之上、收入舞弊、资产不实等风险迹象，并形成核查结论（CAS 1141《财务报表审计中与舞弊相关的责任》）。
+        </div>
+      </el-alert>
+
+      <!-- 编制提示 (gold) -->
+      <details class="gt-s32-bundle__prep">
+        <summary>编制提示</summary>
+        <div class="prep-content">
+          逐一核查各舞弊情形程序表，填写核查过程与结论；含导引表 / 披露格式参考的情形可通过子表切换查看；核查中如发现舞弊迹象，应及时与项目负责人沟通并评估对整体审计策略与风险评估的影响。
+        </div>
+      </details>
+
       <!-- 完成进度仪表盘 (Req 7.2) -->
       <div class="gt-s32-bundle__dashboard">
         <span class="dashboard-stat dashboard-stat--success">
@@ -370,6 +391,41 @@ onMounted(async () => {
 <style scoped>
 .gt-s32-bundle {
   padding: var(--gt-space-4, 16px);
+}
+
+/* ─── 审计目标 (gold) ─── */
+.gt-s32-bundle__objective {
+  margin-bottom: 12px;
+}
+.gt-s32-bundle__objective :deep(.el-alert__title) {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gt-s32-bundle__objective .objective-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── 编制提示 (gold) ─── */
+.gt-s32-bundle__prep {
+  margin-bottom: 12px;
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  border-radius: var(--gt-radius-sm, 4px);
+  background: var(--gt-color-bg-elevated, #fafafa);
+}
+.gt-s32-bundle__prep summary {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gt-color-text-secondary, #606266);
+  cursor: pointer;
+  user-select: none;
+}
+.gt-s32-bundle__prep .prep-content {
+  padding: 4px 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gt-color-text-secondary, #606266);
 }
 
 /* ─── Dashboard ─── */

@@ -28,6 +28,16 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective-alert">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        确认盈余公积（4101）的<strong>计提合规性</strong>（法定盈余公积按10%足额计提，累计50%上限判断正确）、
+        <strong>完整性</strong>、<strong>计价准确性</strong>、
+        <strong>列报恰当性</strong>（法定与任意盈余公积分项列示）。
+      </div>
+    </el-alert>
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -474,6 +484,8 @@ function _restoreRows(): M5AdjudicationRow[] {
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .equity-badge { font-weight: 600; }
+.audit-objective-alert { margin-bottom: 16px; }
+.audit-objective-text { font-size: 13px; line-height: 1.6; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
 .block-section { margin-bottom: 24px; }

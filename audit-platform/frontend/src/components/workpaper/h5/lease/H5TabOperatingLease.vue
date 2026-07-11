@@ -64,7 +64,7 @@
     </el-card>
     <div class="action-bar" v-if="!isReadonly"><el-button size="small" @click="handleAddRow">+ 新增经营租出</el-button></div>
     <el-card shadow="never" class="note-card"><template #header><div class="section-title"><span>审计说明</span></div></template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" /></el-card>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" /></el-card>
     <details class="compile-hint"><summary>编制提示</summary><ul>
       <li>收益率=年租金÷资产净值×100%</li><li>收益率过低可能暗示资产减值或租金不公允</li><li>经营租出不转移所有权，资产仍计入本科目</li></ul></details>
   </div>

@@ -1,5 +1,13 @@
 <template>
   <div class="s5-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：分别核实债权人与债务人视角的债务重组损益计算（债权人=D8-E8+F8；债务人=C16-E16-F16-G16），并将重组损益标注为非经常性损益在附注披露。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 第一部分：作为债权人 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

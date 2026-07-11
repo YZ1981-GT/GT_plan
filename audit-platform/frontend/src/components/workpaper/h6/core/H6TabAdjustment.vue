@@ -187,6 +187,11 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复：此前仅写内存 Map。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 const saving = ref(false)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -199,17 +204,14 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onPublishEvent: (event: string, payload: any) => {
     window.dispatchEvent(new CustomEvent(event, { detail: payload }))
   },
   onSyncToAdjudication: (ajeNet: number, rjeNet: number) => {
-    // 同步AJE/RJE净额到H6-1审定表（通过allResponses共享）
-    props.allResponses.set('H6-3-aje-net', { item_id: 'H6-3-aje-net', remark: String(ajeNet), conclusion: null })
-    props.allResponses.set('H6-3-rje-net', { item_id: 'H6-3-rje-net', remark: String(rjeNet), conclusion: null })
+    // 同步AJE/RJE净额到H6-1审定表（通过allResponses共享 + 持久化）
+    saveResponse('H6-3-aje-net', String(ajeNet))
+    saveResponse('H6-3-rje-net', String(rjeNet))
   },
 })
 
@@ -230,7 +232,7 @@ onMounted(() => {
 })
 
 function saveAuditNote() {
-  props.allResponses.set('H6-3-note', { item_id: 'H6-3-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H6-3-note', auditNote.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────

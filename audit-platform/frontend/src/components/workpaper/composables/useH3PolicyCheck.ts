@@ -7,7 +7,7 @@
  * Task: 3.9
  * Requirements: 5.1-5.5
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, reactive, computed, watch, type Ref } from 'vue'
 import type { ChecklistItem } from './useH3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -44,6 +44,60 @@ export function useH3PolicyCheck(params: {
 }) {
   const { allResponses, getValue, setValue, measurementModel } = params
   const sections = ref<PolicySection[]>([])
+
+  // ─── 组件驱动的 keyed API（H3TabPolicyCheck，按 para.key 存储） ────────────────
+  // 组件段落键：recognition/measurement/subsequent/conversion/disposal（CAS3 五段落）
+  const policyTexts = reactive<Record<string, string>>({})
+  const evaluationTexts = reactive<Record<string, string>>({})
+  const conclusions = reactive<Record<string, string>>({})
+
+  /** CAS3 固定五段落，用作进度分母 */
+  const TOTAL_PARAGRAPHS = 5
+
+  function _policyItemId(key: string): string {
+    return `${ITEM_PREFIX}-${key}`
+  }
+
+  function _persistKeyed(key: string): void {
+    setValue(_policyItemId(key), {
+      actualPolicy: policyTexts[key] ?? '',
+      auditorComment: evaluationTexts[key] ?? '',
+      conclusion: conclusions[key] ?? '',
+    })
+  }
+
+  function updatePolicyText(key: string, text: string): void {
+    policyTexts[key] = text
+    _persistKeyed(key)
+  }
+  function updateEvaluationText(key: string, text: string): void {
+    evaluationTexts[key] = text
+    _persistKeyed(key)
+  }
+  function updateConclusion(key: string, value: string): void {
+    conclusions[key] = value
+    _persistKeyed(key)
+  }
+
+  /** 从 allResponses 水合 keyed 段落数据（扫描 H3-4-policy-* 前缀） */
+  function _hydrateKeyed(): void {
+    const prefix = `${ITEM_PREFIX}-`
+    for (const mapKey of allResponses.value.keys()) {
+      if (!mapKey.startsWith(prefix)) continue
+      const key = mapKey.slice(prefix.length)
+      const raw = getValue(mapKey)
+      const data = raw && typeof raw === 'object' ? raw : {}
+      policyTexts[key] = data.actualPolicy ?? ''
+      evaluationTexts[key] = data.auditorComment ?? ''
+      conclusions[key] = data.conclusion ?? ''
+    }
+  }
+
+  /** 整体进度（已填结论数 / 5 CAS3 段落，百分比） */
+  const progressPct = computed(() => {
+    const filled = Object.values(conclusions).filter((c) => c && c !== '').length
+    return Math.round(Math.min(filled, TOTAL_PARAGRAPHS) / TOTAL_PARAGRAPHS * 100)
+  })
 
   function loadSections(): void {
     sections.value = SECTIONS.map((s) => {
@@ -89,9 +143,14 @@ export function useH3PolicyCheck(params: {
     return ''
   })
 
-  watch(allResponses, () => loadSections(), { immediate: true })
+  watch(allResponses, () => { loadSections(); _hydrateKeyed() }, { immediate: true })
 
-  return { sections, currentModelLabel, progress, overallConclusion, updateSection, loadSections }
+  return {
+    sections, currentModelLabel, progress, overallConclusion, updateSection, loadSections,
+    // keyed API（H3TabPolicyCheck 使用）
+    policyTexts, evaluationTexts, conclusions, progressPct,
+    updatePolicyText, updateEvaluationText, updateConclusion,
+  }
 }
 
 export default useH3PolicyCheck

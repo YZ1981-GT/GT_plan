@@ -21,6 +21,13 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>识别关联方长期应付款交易，核实关联关系与定价依据，评估是否存在非公允安排（低息/免息/超长期限）及披露完整性。
+      </template>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">

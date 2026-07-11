@@ -5,6 +5,11 @@
       <p>附注披露（上市公司）：按CAS21准则及证监会信息披露要求，披露使用权资产分类、折旧金额、期初期末余额变动等信息。48行7列。</p>
     </div>
 
+    <!-- 索引 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-disc-L" />
+    </div>
+
     <!-- 披露摘要 -->
     <el-card shadow="never" class="summary-card">
       <template #header>
@@ -65,6 +70,7 @@
  * Spec: Task 4.10 | Requirements: 1.2
  */
 import { ref, defineAsyncComponent } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -88,6 +94,8 @@ const showOO = ref(true)
 
 <style scoped>
 .h8-tab-disclosure-listed { padding: 16px; font-size: 13px; }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

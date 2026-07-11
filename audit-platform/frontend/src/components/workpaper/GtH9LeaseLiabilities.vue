@@ -63,6 +63,7 @@
         <!-- H9-1 审定表（负债类双区块：租赁负债+未确认融资费用） -->
         <H9TabAdjudication
           v-else-if="currentSheet === 'H9-1'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -72,6 +73,7 @@
         <!-- 附注披露信息（上市公司） -->
         <H9TabDisclosureListed
           v-else-if="currentSheet === '附注上市'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -81,6 +83,7 @@
         <!-- 附注披露信息（国企） -->
         <H9TabDisclosureSoe
           v-else-if="currentSheet === '附注国企'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -90,6 +93,7 @@
         <!-- H9-2 租赁负债明细表 -->
         <H9TabDetail
           v-else-if="currentSheet === 'H9-2'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -100,6 +104,7 @@
         <!-- H9-3 未确认融资费用明细表 -->
         <H9TabFinanceCost
           v-else-if="currentSheet === 'H9-3'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -274,13 +279,15 @@ async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
       // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
+      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H9 render 策略实际输出）
+      const map = new Map<string, any>()
+      if (props.htmlData.allResponses && typeof props.htmlData.allResponses === 'object') {
+        for (const [k, v] of Object.entries(props.htmlData.allResponses)) map.set(k, v)
       }
+      if (props.htmlData.responses_snapshot && typeof props.htmlData.responses_snapshot === 'object') {
+        for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) map.set(k, v)
+      }
+      if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
@@ -312,12 +319,35 @@ async function selfLoad(): Promise<void> {
   }
 }
 
+// ─── 子组件 save 持久化（Bug C 修复：子 tab emit('save') 此前无人接线 → 数据不落库） ──
+// 子组件契约：emit('save', itemId, value)。value 为字符串或对象（对象序列化进 remark）。
+// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).catch((err: unknown) => console.warn('[GtH9] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
 // ─── provide for child components ────────────────────────────────────────────
 function openReviewDialog(sectionId: string, sectionLabel?: string): void {
   console.log('[H9] openReviewDialog:', sectionId, sectionLabel)
 }
 provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
+provide('saveResponse', persistResponse)
 
 // ─── 版本追踪 useVersionTrail ────────────────────────────────────────────────
 const versionTrail = useVersionTrail({
@@ -369,6 +399,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
   window.removeEventListener('h8:lease-terminated', _handleH8LeaseTerminated)
   window.removeEventListener('h8:asset-updated', _handleH8Updated)
+  for (const t of _saveTimers.values()) clearTimeout(t)
 })
 </script>
 

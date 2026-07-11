@@ -1,5 +1,13 @@
 <template>
   <div class="s3-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：汇总会计政策变更、前期差错更正及会计估计变更相关科目的审定金额，确认追溯调整的计量准确、列报恰当，并与试算平衡表核对一致。"
+      style="margin-bottom: 16px"
+    />
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">

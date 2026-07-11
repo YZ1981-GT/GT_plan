@@ -1,5 +1,13 @@
 <template>
   <div class="s15-roe">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        复核全面摊薄与加权平均净资产收益率（归母、扣非）计算，验证分子净利润口径与分母净资产加权处理是否符合《公开发行证券的公司信息披露编报规则第9号》，并核对相关披露的准确性与一致性。
+      </div>
+    </el-alert>
+
     <!-- 本年/上年对比标题 -->
     <div class="period-comparison-header">
       <el-tag type="primary" size="small">本年</el-tag>
@@ -349,6 +357,13 @@ function fmtPercent(val: number): string {
 <style scoped>
 .s15-roe {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .period-comparison-header {
   display: flex;

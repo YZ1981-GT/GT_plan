@@ -5,6 +5,12 @@
       <p>折旧分配分析表H8-9：将使用权资产本期折旧按费用类型分配（管理费用/销售费用/制造费用等）。分配比例合计应=100%，分配金额合计应=折旧总额。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-9" />
+      <el-tag size="small" type="info">共 {{ allocRows.length }} 行</el-tag>
+    </div>
+
     <!-- 折旧分配表 -->
     <el-card shadow="never" class="alloc-card">
       <template #header>
@@ -122,6 +128,7 @@
 import { ref, toRef, defineAsyncComponent } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8Depreciation } from '../../composables/useH8Depreciation'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -181,6 +188,8 @@ function getAllocSummary({ columns }: { columns: any[] }) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

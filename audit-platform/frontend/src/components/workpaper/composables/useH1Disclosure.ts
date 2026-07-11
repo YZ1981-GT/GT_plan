@@ -185,7 +185,7 @@ export function useH1Disclosure(
 
   // ─── CRUD: 动态行 ─────────────────────────────────────────────────────────
 
-  function addDynamicRow(sectionKey: string, name: string): void {
+  function addDynamicRow(sectionKey: string, name = ''): void {
     const rows = sectionRows.value[sectionKey]
     if (!rows) return
     rows.push({

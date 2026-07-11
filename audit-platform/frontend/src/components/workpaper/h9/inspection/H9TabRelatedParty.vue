@@ -206,6 +206,11 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 const saving = ref(false)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -218,10 +223,7 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 // ─── Audit Conclusion ────────────────────────────────────────────────────────
@@ -230,7 +232,7 @@ const conclusionData = props.allResponses.get('H9-6-conclusion')
 if (conclusionData) auditConclusion.value = conclusionData.remark ?? conclusionData.conclusion ?? ''
 
 function saveConclusion() {
-  props.allResponses.set('H9-6-conclusion', { item_id: 'H9-6-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H9-6-conclusion', auditConclusion.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────

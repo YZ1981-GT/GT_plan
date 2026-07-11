@@ -5,6 +5,12 @@
       <p>CAS21第4-13条：租赁识别三要素——①已识别资产 ②取得控制权（主导使用+获得利益）③供应商无实质替换权。每份租赁合同逐项判断。</p>
     </div>
 
+    <!-- 索引 + 行数 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-4" />
+      <el-tag size="small" type="info">共 {{ records.length }} 份合同</el-tag>
+    </div>
+
     <!-- 顶部统计 -->
     <div class="stats-bar">
       <el-tag type="info" size="small">合同总数：{{ records.length }}</el-tag>
@@ -92,6 +98,18 @@
         <p v-else-if="record.auditNote" class="note-display">{{ record.auditNote }}</p>
       </el-card>
     </div>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ul>
+        <li>租赁识别三要素（CAS21第4-13条）须全部满足才构成租赁：</li>
+        <li>① 已识别资产：合同标的为特定可识别资产（明确指定或隐含指定）</li>
+        <li>② 控制权：承租人在使用期内主导资产使用并获得几乎全部经济利益</li>
+        <li>③ 替换权：供应商不具有实质性资产替换权</li>
+        <li>三要素齐备→属于租赁（确认使用权资产）；否则不属于租赁</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -104,6 +122,7 @@
 import { toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8LeaseIdentification } from '../../composables/useH8LeaseIdentification'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -164,6 +183,12 @@ function handleUpdateNote(recordId: string, note: string) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+
+.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; }
 
 .stats-bar {
   display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;

@@ -125,10 +125,27 @@ export function useH3DetailCost(params: {
     _persist()
   }
 
-  function updateCell(index: number, field: keyof DetailCostRow, value: any): void {
-    const row = rows.value[index]
+  /**
+   * 更新单元格：组件已通过 v-model 就地修改 row 对象（同引用），
+   * 此处按 rowId 定位后重算公式列并持久化。
+   * （组件调用 updateCell(row.rowId, row)，第二参忽略）
+   */
+  function updateCell(rowId: string): void {
+    const row = rows.value.find((r) => r.rowId === rowId)
     if (!row) return
-    ;(row as any)[field] = typeof value === 'number' ? value : (Number(value) || value)
+    // 类型安全：数字列转 number
+    row.area = Number(row.area) || 0
+    row.originalCost = Number(row.originalCost) || 0
+    row.costBegin = Number(row.costBegin) || 0
+    row.costIncrease = Number(row.costIncrease) || 0
+    row.costDecrease = Number(row.costDecrease) || 0
+    row.transferIn = Number(row.transferIn) || 0
+    row.transferOut = Number(row.transferOut) || 0
+    row.accDepBegin = Number(row.accDepBegin) || 0
+    row.depProvision = Number(row.depProvision) || 0
+    row.depReversal = Number(row.depReversal) || 0
+    row.impairmentBegin = Number(row.impairmentBegin) || 0
+    row.impairmentProvision = Number(row.impairmentProvision) || 0
     // 重算公式
     row.costEnd = row.costBegin + row.costIncrease - row.costDecrease + row.transferIn - row.transferOut
     row.accDepEnd = row.accDepBegin + row.depProvision - row.depReversal
@@ -150,6 +167,19 @@ export function useH3DetailCost(params: {
     costDecrease: calcSubtotal(rows.value.map((r) => r.costDecrease)),
   }))
 
+  // ─── 交叉验证：明细期末原值合计 vs H3-1 审定表原值审定合计 ──────────────────
+
+  /**
+   * crossValidationDiff = 明细期末原值合计 − H3-1 成本审定表原值审定合计。
+   * H3-1 未编制（无数据）时返回 0（不触发告警）。
+   */
+  const crossValidationDiff = computed(() => {
+    const h31 = getValue('H3-1-cost-original-rows')
+    if (!Array.isArray(h31) || h31.length === 0) return 0
+    const h31Audited = h31.reduce((sum: number, r: any) => sum + (Number(r?.audited) || 0), 0)
+    return subtotal.value.costEnd - h31Audited
+  })
+
   // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persist(): void {
@@ -163,6 +193,7 @@ export function useH3DetailCost(params: {
   return {
     rows,
     subtotal,
+    crossValidationDiff,
     addRow,
     removeRow,
     updateCell,

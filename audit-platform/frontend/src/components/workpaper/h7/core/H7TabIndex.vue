@@ -8,10 +8,11 @@
       <el-tag :type="measurementModel === 'cost' ? 'primary' : 'warning'" size="small">
         {{ measurementModel === 'cost' ? '成本模式' : '公允价值模式' }}
       </el-tag>
+      <el-tag type="info" size="small">共 {{ visibleCount }} 张底稿</el-tag>
     </div>
 
     <!-- 底稿目录表 -->
-    <el-table :data="sheetList" stripe border size="small" style="margin-top: 12px">
+    <el-table :data="sheetList" stripe border size="small" class="h7-index-table" style="margin-top: 12px">
       <el-table-column prop="code" label="编号" width="80" />
       <el-table-column prop="name" label="底稿名称" min-width="200">
         <template #default="{ row }">
@@ -127,6 +128,8 @@ const sheetList = computed(() => {
     }
   })
 })
+
+const visibleCount = computed(() => sheetList.value.filter((s) => s.visible).length)
 </script>
 
 <style scoped>
@@ -137,5 +140,8 @@ const sheetList = computed(() => {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+.h7-index-table :deep(.el-table__cell) {
+  font-size: 13px;
 }
 </style>

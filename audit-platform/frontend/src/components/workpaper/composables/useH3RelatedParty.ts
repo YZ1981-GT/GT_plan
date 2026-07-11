@@ -92,10 +92,28 @@ export function useH3RelatedParty(params: {
     _persist()
   }
 
+  /**
+   * 行变更：组件已 v-model 就地修改 row（同引用），此处重算差异率并持久化。
+   * 组件调用 updateRow(index, row)。
+   */
+  function updateRow(index: number, _row?: any): void {
+    const row = rows.value[index]
+    if (!row) return
+    const amt = Number(row.amount) || 0
+    const mkt = Number(row.marketRef) || 0
+    row.amount = amt
+    row.marketRef = mkt
+    row.diffRate = mkt !== 0 ? ((amt - mkt) / mkt) * 100 : 0
+    _persist()
+  }
+
+  /** 金额合计 */
+  const totalAmount = computed(() => rows.value.reduce((s, r) => s + (Number(r.amount) || 0), 0))
+
   function _persist(): void { setValue(ITEM_ID, rows.value) }
   watch(allResponses, () => loadRows(), { immediate: true })
 
-  return { rows, highDiffRows, addRow, removeRow, updateCell, loadRows }
+  return { rows, highDiffRows, addRow, removeRow, updateCell, updateRow, totalAmount, loadRows }
 }
 
 export default useH3RelatedParty

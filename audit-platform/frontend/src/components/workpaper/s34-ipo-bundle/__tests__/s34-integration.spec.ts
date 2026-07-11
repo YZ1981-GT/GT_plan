@@ -224,6 +224,7 @@ function mountBundle(propsOverride: Record<string, any> = {}) {
         GtAProgramConsole: GtAProgramConsoleStub,
         GtS34SubCheckTable: GtS34SubCheckTableStub,
         GtS34ChecklistOverview: GtS34ChecklistOverviewStub,
+        ElAlert: { template: '<div class="el-alert"><slot name="title" /><slot /></div>' },
         ElTabs: ElTabsStub,
         ElTabPane: ElTabPaneStub,
         ElResult: {

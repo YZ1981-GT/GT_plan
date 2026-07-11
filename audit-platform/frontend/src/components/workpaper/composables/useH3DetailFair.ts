@@ -93,10 +93,21 @@ export function useH3DetailFair(params: {
     _persist()
   }
 
-  function updateCell(index: number, field: keyof DetailFairRow, value: any): void {
-    const row = rows.value[index]
+  /**
+   * 更新单元格：组件已通过 v-model 就地修改 row（同引用），
+   * 此处按 rowId 定位后重算期末公允并持久化。
+   * （组件调用 updateCell(row.rowId, row)，第二参忽略）
+   */
+  function updateCell(rowId: string): void {
+    const row = rows.value.find((r) => r.rowId === rowId)
     if (!row) return
-    ;(row as any)[field] = typeof value === 'number' ? value : (Number(value) || value)
+    row.area = Number(row.area) || 0
+    row.fairValueBegin = Number(row.fairValueBegin) || 0
+    row.fairIncrease = Number(row.fairIncrease) || 0
+    row.fairDecrease = Number(row.fairDecrease) || 0
+    row.transferIn = Number(row.transferIn) || 0
+    row.transferOut = Number(row.transferOut) || 0
+    row.fairValueChange = Number(row.fairValueChange) || 0
     const transfer = row.transferIn - row.transferOut
     row.fairValueEnd = calcFairEndBalance(
       row.fairValueBegin, row.fairIncrease, row.fairDecrease, transfer, row.fairValueChange,

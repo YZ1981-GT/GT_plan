@@ -71,14 +71,14 @@
     <el-table v-if="activeSegment === '增减转换'" :data="rows" border size="small" class="audit-table" show-summary :summary-method="getSummary">
       <el-table-column prop="assetName" label="资产名称" min-width="140" fixed />
       <el-table-column prop="assetType" label="类型" min-width="100" fixed />
-      <el-table-column prop="periodIncrease" label="本期增加" min-width="100" align="right">
+      <el-table-column prop="costIncrease" label="本期增加" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.periodIncrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
+          <el-input v-model.number="row.costIncrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="periodDecrease" label="本期减少" min-width="100" align="right">
+      <el-table-column prop="costDecrease" label="本期减少" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.periodDecrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
+          <el-input v-model.number="row.costDecrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
         </template>
       </el-table-column>
       <el-table-column prop="transferIn" label="转入" min-width="90" align="right">
@@ -93,7 +93,7 @@
       </el-table-column>
       <el-table-column label="期末原值" min-width="110" align="right" class-name="formula-col">
         <template #default="{ row }">
-          <span class="formula-value" title="期初+增加-减少±转入/转出">{{ fmtNum(row.endOriginalCost) }}</span>
+          <span class="formula-value" title="期初+增加-减少±转入/转出">{{ fmtNum(row.costEnd) }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -151,7 +151,7 @@ const { getValue, setValue, saveImmediate } = useH3FormData({
 })
 
 const {
-  rows, subtotalRow, crossValidationDiff, addRow, updateCell, removeRow,
+  rows, subtotal: subtotalRow, crossValidationDiff, addRow, updateCell, removeRow,
 } = useH3DetailCost({
   allResponses: computed(() => props.allResponses) as any,
   wpId: toRef(props, 'wpId'),

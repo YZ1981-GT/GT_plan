@@ -1,5 +1,13 @@
 <template>
   <div class="s10-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：确认环境事项相关科目（如预计负债、环保支出）期末余额的存在、完整与准确，评价环境负债计量与披露的恰当性，并与试算平衡表核对一致。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 审定表 S10-1 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

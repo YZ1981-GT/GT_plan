@@ -1,5 +1,15 @@
 <template>
   <div class="n5-adjudication">
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="确认所得税费用（6801）本期发生额的准确性与完整性：当期所得税（应纳税所得额×税率）与递延所得税费用（递延税负债增减、递延税资产增减）计算正确，有效税率合理，与 N5-4 当期计算表/N5-8 递延核对表勾稽一致并计入利润表。"
+    />
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <p><strong>所得税费用(6801)</strong>：损益类借方科目，取本期发生额。所得税费用 = 当期所得税 + 递延所得税费用。当期所得税=应纳税所得额×税率；递延=递延税负债增−递延税资产增。</p>
@@ -273,6 +283,8 @@ function fmtPercent(val: number | null | undefined): string {
 </script>
 
 <style scoped>
+.audit-objective { margin-bottom: 16px; }
+.audit-objective :deep(.el-alert__description) { font-size: 13px; line-height: 1.6; }
 .n5-adjudication { padding: 12px; font-size: 13px; }
 .methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: 13px; color: #92400e; line-height: 1.7; }
 .methodology-context p { margin: 0; }

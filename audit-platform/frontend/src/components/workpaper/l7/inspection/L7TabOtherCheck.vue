@@ -1,5 +1,12 @@
 <template>
   <div class="l7-tab-other-check">
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon style="margin-bottom: 12px">
+      <template #title>
+        <strong>审计目标：</strong>核查其他非流动负债各项目的性质、确认依据、计量准确性与列报披露的完整性，形成分项审计结论。
+      </template>
+    </el-alert>
+
     <!-- ═══ 完成度统计进度条 ═══ -->
     <div class="completion-bar">
       <span class="completion-label">检查完成度</span>

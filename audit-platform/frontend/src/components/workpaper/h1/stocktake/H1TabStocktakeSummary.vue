@@ -91,15 +91,15 @@ const summaryConclusion = ref('')
 const state = useH1Stocktake(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
 const stats = computed(() => ({
-  totalCount: state.checkRows.value.length,
-  matchCount: state.matchCount.value,
-  surplusCount: state.surplusCount.value,
-  shortageCount: state.shortageCount.value,
-  matchRate: state.matchRate.value,
+  totalCount: state.statistics.value.totalChecked,
+  matchCount: state.statistics.value.matchCount,
+  surplusCount: state.statistics.value.surplusCount,
+  shortageCount: state.statistics.value.deficitCount,
+  matchRate: Math.round(state.statistics.value.matchRate),
 }))
 
-const surplusRows = computed(() => state.checkRows.value.filter((r: any) => r.result === '盘盈'))
-const shortageRows = computed(() => state.checkRows.value.filter((r: any) => r.result === '盘亏'))
+const surplusRows = computed(() => state.surplusRows.value)
+const shortageRows = computed(() => state.deficitRows.value)
 
 function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }

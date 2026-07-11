@@ -1,5 +1,13 @@
 <template>
   <div class="s15-basic-eps">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        复核基本每股收益计算的准确性，验证归母净利润与发行在外普通股加权平均数的计算口径、股本变动加权处理是否符合《企业会计准则第34号——每股收益》，并核对本年与上年披露的一致性。
+      </div>
+    </el-alert>
+
     <!-- 本年/上年对比标题 -->
     <div class="period-comparison-header">
       <el-tag type="primary" size="small">本年</el-tag>
@@ -445,6 +453,13 @@ function fmtEps(val: number): string {
 <style scoped>
 .s15-basic-eps {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 .period-comparison-header {
   display: flex;

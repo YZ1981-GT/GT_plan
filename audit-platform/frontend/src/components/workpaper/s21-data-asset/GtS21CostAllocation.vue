@@ -1,5 +1,13 @@
 <template>
   <div class="s21-cost-allocation">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        检查数据资产开发支出的成本归集范围是否合理（仅限开发阶段直接相关支出）、分摊方法是否适当、分摊结果是否与实际受益程度匹配，防止研究阶段支出或期间费用被误计入资本化成本。
+      </div>
+    </el-alert>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>成本归集检查应关注：① 归集范围是否合理（仅开发阶段直接相关支出）；② 分摊方法是否适当（工时/直接成本比例等）；③ 分摊结果是否与实际受益程度匹配。</p>
@@ -220,6 +228,13 @@ function removeRow(index: number) {
 <style scoped>
 .s21-cost-allocation {
   padding: 12px;
+}
+.audit-objective {
+  margin-bottom: 12px;
+}
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 /* 方法论上下文 */

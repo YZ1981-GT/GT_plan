@@ -50,8 +50,8 @@
         </el-table-column>
         <el-table-column label="减值迹象" width="80" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.hasImpairmentSign ? 'danger' : 'success'" size="small">
-              {{ row.hasImpairmentSign ? '有' : '无' }}
+            <el-tag :type="state.hasImpairmentIndication(row) ? 'danger' : 'success'" size="small">
+              {{ state.hasImpairmentIndication(row) ? '有' : '无' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -70,9 +70,9 @@
 
       <!-- 汇总统计 -->
       <div class="summary-bar">
-        <span>闲置资产: {{ state.idleCount.value }} 项</span>
-        <span>闲置净值合计: <b class="amount-cell">{{ fmtAmt(state.idleNetValueTotal.value) }}</b></span>
-        <span>有减值迹象: <b :class="{ 'error-amount': state.impairmentSignCount.value > 0 }">{{ state.impairmentSignCount.value }}</b> 项</span>
+        <span>闲置资产: {{ state.statistics.value.totalCount }} 项</span>
+        <span>闲置净值合计: <b class="amount-cell">{{ fmtAmt(state.statistics.value.totalNetValue) }}</b></span>
+        <span>有减值迹象: <b :class="{ 'error-amount': state.statistics.value.notImpairedCount > 0 }">{{ state.statistics.value.notImpairedCount }}</b> 项</span>
       </div>
     </el-card>
 

@@ -1,5 +1,13 @@
 <template>
   <div class="s17-reconciliation">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：将非经常性损益明细与营业外收支等相关科目进行核对，确认列示的非经常性损益项目完整、准确且无遗漏或重复。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ S17-11 与营业外收支等核对表 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

@@ -60,7 +60,7 @@
           <el-button size="small" type="primary" @click="handleAddSample" :disabled="isReadonly">+ 新增</el-button>
         </div>
       </template>
-      <el-table :data="state.sampleSelection.value" border stripe size="small">
+      <el-table :data="state.sampleSelections.value" border stripe size="small">
         <el-table-column prop="category" label="资产分类" min-width="100" />
         <el-table-column prop="selectionCriteria" label="选取标准" min-width="160" />
         <el-table-column prop="sampleSize" label="样本量" width="80" align="right" />

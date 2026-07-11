@@ -224,6 +224,15 @@ export function useH1Impairment(
     calcRows.value.filter((r) => r.impairmentAmount > 0 && r.difference > 0.01),
   )
 
+  // ─── Computed: 测算表合计 ──────────────────────────────────────────────────
+
+  /** 应计提减值合计 */
+  const impairmentTotal = computed(() => calcSubtotal(calcRows.value.map((r) => r.impairmentAmount)))
+  /** 已计提减值合计 */
+  const alreadyProvidedTotal = computed(() => calcSubtotal(calcRows.value.map((r) => r.alreadyProvided)))
+  /** 差异合计 = 应计提 - 已计提 */
+  const totalDiff = computed(() => impairmentTotal.value - alreadyProvidedTotal.value)
+
   // ─── CRUD ──────────────────────────────────────────────────────────────────
 
   function updateIndication(key: string, field: keyof ImpairmentIndication, value: any): void {
@@ -307,6 +316,9 @@ export function useH1Impairment(
     sensitivityMatrix,
     hasIndication,
     rowsNeedingImpairment,
+    impairmentTotal,
+    alreadyProvidedTotal,
+    totalDiff,
     // Actions
     updateIndication,
     updateCalcRow,

@@ -44,6 +44,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
+          @navigate="handleNavigate"
         />
         <!-- M8-2 明细表（22公式，权益类计提明细） -->
         <M8TabDetail
@@ -51,6 +52,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
+          @navigate="handleNavigate"
         />
         <!-- M8-3 调整分录汇总（借贷平衡） -->
         <M8TabAdjustment
@@ -58,6 +60,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
+          @navigate="handleNavigate"
         />
         <!-- M8-4 一般风险准备测试表（风险资产计提测试，13公式） -->
         <M8TabRiskTest
@@ -65,6 +68,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
+          @navigate="handleNavigate"
         />
         <!-- 附注披露信息（上市公司） -->
         <M8TabDisclosureListed
@@ -72,6 +76,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
+          @navigate="handleNavigate"
         />
         <!-- 附注披露信息（国有企业） -->
         <M8TabDisclosureSoe
@@ -79,6 +84,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
+          @navigate="handleNavigate"
         />
         <!-- OnlyOffice fallback: 未迁移 sheet / Q8A修订前 / 针对性测试删除 -->
         <GtOnlyOfficeSheet
@@ -173,14 +179,15 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
  * M8TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * 注意：GtWpRenderer 监听 @navigate-sheet，故此处必须 emit 'navigate-sheet'。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────

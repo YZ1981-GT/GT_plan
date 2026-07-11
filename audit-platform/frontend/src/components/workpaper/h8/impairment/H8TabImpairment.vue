@@ -5,6 +5,11 @@
       <p>CAS8资产减值：使用权资产应当在资产负债表日评估是否存在减值迹象，存在减值迹象的应进行减值测试。可收回金额=max(公允价值-处置费用, 未来现金流量现值)。减值一经确认不得转回。</p>
     </div>
 
+    <!-- 索引 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-10" />
+    </div>
+
     <!-- 减值摘要卡片 -->
     <el-card shadow="never" class="summary-card">
       <template #header>
@@ -109,6 +114,7 @@
  * Spec: Task 4.7 | Requirements: 7.1-7.2
  */
 import { ref, reactive, computed, toRef, defineAsyncComponent } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -167,6 +173,8 @@ function handleParamChange(field: string, value: any) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

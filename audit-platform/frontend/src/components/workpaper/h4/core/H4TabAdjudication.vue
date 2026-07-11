@@ -354,7 +354,7 @@
  * Task: 4.2
  * Requirements: 2.1-2.10
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH4Adjudication, type H4AdjudicationRow } from '../../composables/useH4Adjudication'
@@ -374,10 +374,18 @@ const publishing = ref(false)
 // ─── Composable: useH4Adjudication ──────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses)
 
+// TB 取数种子（科目1605）：主入口 provide 的 render 策略 tb_values，供审定表只读核对
+const tbValues = inject<Ref<Record<string, number>>>('h4TbValues', ref({}))
+const tbData = computed(() => ({
+  unadjusted1605: Number(tbValues.value?.eng_mat_1605_unadjusted) || 0,
+  audited1605: Number(tbValues.value?.eng_mat_1605_audited) || 0,
+}))
+
 const state = useH4Adjudication({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
+  tbData,
   onSave: (itemId: string, value: any) => {
     const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
     props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })

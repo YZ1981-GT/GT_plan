@@ -63,6 +63,7 @@
         <!-- H8-1 审定表（双区块：使用权资产原值+累计折旧+净值） -->
         <H8TabAdjudication
           v-else-if="currentSheet === 'H8-1'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -72,6 +73,7 @@
         <!-- 附注披露信息（上市公司） -->
         <H8TabDisclosureListed
           v-else-if="currentSheet === '附注上市'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -81,6 +83,7 @@
         <!-- 附注披露信息（国有企业） -->
         <H8TabDisclosureSoe
           v-else-if="currentSheet === '附注国企'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -90,6 +93,7 @@
         <!-- H8-2 明细表（58列4区段Tab） -->
         <H8TabDetail
           v-else-if="currentSheet === 'H8-2'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -100,6 +104,7 @@
         <!-- H8-3 调整分录汇总 -->
         <H8TabAdjustment
           v-else-if="currentSheet === 'H8-3'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -109,6 +114,7 @@
         <!-- H8-4 租赁的识别（段落型90行） -->
         <H8TabLeaseIdentification
           v-else-if="currentSheet === 'H8-4'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -118,6 +124,7 @@
         <!-- H8-5 租赁期的确定（段落型52行） -->
         <H8TabLeaseTerm
           v-else-if="currentSheet === 'H8-5'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -135,6 +142,7 @@
           </div>
           <H8TabMeasurementAnnual
             v-if="measurementBranch === '按年计量'"
+            @save="persistResponse"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
@@ -142,6 +150,7 @@
           />
           <H8TabMeasurementMonthly
             v-else
+            @save="persistResponse"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
@@ -152,6 +161,7 @@
         <!-- H8-7 租赁变更（100行11列） -->
         <H8TabLeaseModification
           v-else-if="currentSheet === 'H8-7'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -169,6 +179,7 @@
           </div>
           <H8TabDepreciationNoImpair
             v-if="depreciationBranch === '不含减值'"
+            @save="persistResponse"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
@@ -176,6 +187,7 @@
           />
           <H8TabDepreciationWithImpair
             v-else
+            @save="persistResponse"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
@@ -186,6 +198,7 @@
         <!-- H8-9 折旧分配分析表 -->
         <H8TabDepreciationAlloc
           v-else-if="currentSheet === 'H8-9'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -195,6 +208,7 @@
         <!-- H8-10 减值测算表 -->
         <H8TabImpairment
           v-else-if="currentSheet === 'H8-10'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -204,6 +218,7 @@
         <!-- H8-11 可收回金额测试表 -->
         <H8TabRecoverable
           v-else-if="currentSheet === 'H8-11'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -213,6 +228,7 @@
         <!-- H8-12 减少检查表（租赁终止） -->
         <H8TabDisposalCheck
           v-else-if="currentSheet === 'H8-12'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -223,6 +239,7 @@
         <!-- H8-13 简化处理的租赁检查表 -->
         <H8TabSimplifiedCheck
           v-else-if="currentSheet === 'H8-13'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -232,6 +249,7 @@
         <!-- H8-14 关联交易检查表 -->
         <H8TabRelatedParty
           v-else-if="currentSheet === 'H8-14'"
+          @save="persistResponse"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -396,13 +414,15 @@ async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
       // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
+      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H8 render 策略实际输出）
+      const map = new Map<string, any>()
+      if (props.htmlData.allResponses && typeof props.htmlData.allResponses === 'object') {
+        for (const [k, v] of Object.entries(props.htmlData.allResponses)) map.set(k, v)
       }
+      if (props.htmlData.responses_snapshot && typeof props.htmlData.responses_snapshot === 'object') {
+        for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) map.set(k, v)
+      }
+      if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
@@ -434,12 +454,35 @@ async function selfLoad(): Promise<void> {
   }
 }
 
+// ─── 子组件 save 持久化（Bug C 修复：子 tab emit('save') 此前无人接线 → 数据不落库） ──
+// 子组件契约：emit('save', itemId, value)。value 为字符串或对象（对象序列化进 remark）。
+// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).catch((err: unknown) => console.warn('[GtH8] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
 // ─── provide for child components ────────────────────────────────────────────
 function openReviewDialog(sectionId: string, sectionLabel?: string): void {
   console.log('[H8] openReviewDialog:', sectionId, sectionLabel)
 }
 provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
+provide('saveResponse', persistResponse)
 
 // ─── 版本追踪 useVersionTrail ────────────────────────────────────────────────
 const versionTrail = useVersionTrail({
@@ -482,6 +525,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
   window.removeEventListener('h9:liability-updated', _handleH9Updated)
   window.removeEventListener('h9:lease-payment-updated', _handleH9PaymentUpdated)
+  for (const t of _saveTimers.values()) clearTimeout(t)
 })
 </script>
 

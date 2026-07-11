@@ -1,5 +1,9 @@
 <template>
   <div class="h1-tab-finance-lease">
+    <el-alert type="info" :closable="false" show-icon class="obj-alert">
+      <template #title>审计目标：验证以融资租赁方式租出的固定资产分类正确（CAS21五项判断满足任一即为融资租赁），利息分摊与本金回收计算准确。</template>
+    </el-alert>
+
     <div class="methodology-context">
       <p>检查以融资租赁方式租出的固定资产：核实CAS21五项判断条件中任一满足即为融资租赁，验证利息分摊正确性。</p>
     </div>
@@ -7,7 +11,7 @@
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
-          <span>H1-20 融资租出检查（{{ state.rows.value.length }} 项）</span>
+          <span>H1-20 融资租出检查 <el-tag size="small" type="info">共 {{ financeRows.length }} 项</el-tag></span>
           <div class="title-actions">
             <el-button size="small" type="primary" @click="handleAddRow" :disabled="isReadonly">+ 新增</el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-20')">💬 复核</el-button>
@@ -15,36 +19,75 @@
         </div>
       </template>
 
-      <el-table :data="state.rows.value" border stripe size="small" max-height="420">
+      <el-table :data="financeRows" border stripe size="small" max-height="420">
         <el-table-column type="index" width="40" fixed />
-        <el-table-column prop="assetName" label="资产名称" min-width="110" fixed />
-        <el-table-column prop="lessee" label="承租方" width="100" />
-        <el-table-column prop="leaseStart" label="起租日" width="100" />
-        <el-table-column prop="leaseTerm" label="租期(月)" width="80" align="right" />
-        <el-table-column prop="usefulLife" label="资产寿命(月)" width="95" align="right" />
-        <el-table-column label="租期/寿命" width="80" align="right">
+        <el-table-column prop="assetName" label="资产名称" min-width="110" fixed>
           <template #default="{ row }">
-            <span class="formula-cell" title="≥75%为融资租赁条件之一">{{ row.termLifeRatio?.toFixed(0) }}%</span>
+            <el-input v-if="!isReadonly" v-model="row.assetName" size="small" @change="onCell(row, 'assetName')" />
+            <span v-else>{{ row.assetName }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="leasePvTotal" label="租金现值" width="110" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.leasePvTotal) }}</span></template>
-        </el-table-column>
-        <el-table-column prop="fairValue" label="公允价值" width="110" align="right">
-          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.fairValue) }}</span></template>
-        </el-table-column>
-        <el-table-column label="PV/FV" width="80" align="right">
+        <el-table-column prop="lessee" label="承租方" width="110">
           <template #default="{ row }">
-            <span class="formula-cell" title="≥90%为融资租赁条件之一">{{ row.pvFvRatio?.toFixed(0) }}%</span>
+            <el-input v-if="!isReadonly" v-model="row.lessee" size="small" @change="onCell(row, 'lessee')" />
+            <span v-else>{{ row.lessee }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="implicitRate" label="内含利率%" width="85" align="right" />
-        <el-table-column prop="classificationResult" label="分类判断" width="80" align="center">
+        <el-table-column prop="originalCost" label="原值" width="110" align="right">
           <template #default="{ row }">
-            <el-tag :type="row.classificationResult === '融资' ? 'success' : 'warning'" size="small">{{ row.classificationResult }}</el-tag>
+            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" @change="onCell(row, 'originalCost')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="100" />
+        <el-table-column v-for="n in 5" :key="n" :label="`判断${n}`" width="70" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row[`classResult${n}`]" size="small" style="width:56px" @change="onCell(row, `classResult${n}` as any)">
+              <el-option label="是" value="Y" />
+              <el-option label="否" value="N" />
+            </el-select>
+            <span v-else>{{ row[`classResult${n}`] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="分类判断" width="80" align="center">
+          <template #default="{ row }">
+            <el-tag :type="classify(row) === '融资' ? 'success' : 'warning'" size="small">{{ classify(row) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="minLeasePayment" label="最低租赁付款额" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.minLeasePayment" :controls="false" size="small" @change="onCell(row, 'minLeasePayment')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.minLeasePayment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="presentValue" label="现值" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.presentValue" :controls="false" size="small" @change="onCell(row, 'presentValue')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.presentValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="allocRate" label="分摊利率%" width="90" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.allocRate" :controls="false" size="small" @change="onCell(row, 'allocRate')" />
+            <span v-else>{{ row.allocRate }}%</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="periodInterest" label="各期利息" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.periodInterest" :controls="false" size="small" @change="onCell(row, 'periodInterest')" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.periodInterest) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="onCell(row, 'remark')" />
+            <span v-else>{{ row.remark }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="50" v-if="!isReadonly">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow('20', row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
       </el-table>
 
       <!-- 五项分类判断标准 -->
@@ -68,7 +111,7 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>五项满足任一 → 融资租赁；均不满足 → 经营租赁</li>
+        <li>五项判断满足任一 → 融资租赁；均不满足 → 经营租赁</li>
         <li>融资租出不在本科目核算(转应收融资租赁款)，关注分类正确性</li>
       </ul>
     </details>
@@ -78,18 +121,30 @@
 <script setup lang="ts">
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { useH1LeaseCheck } from '../../composables/useH1LeaseCheck'
+import { useH1LeaseCheck, type FinanceLeaseRow } from '../../composables/useH1LeaseCheck'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
-const state = useH1LeaseCheck(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any, { variant: 'financeLease' })
+const { financeRows, addFinanceRow, removeRow, updateFinanceCell } = useH1LeaseCheck(
+  toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any,
+)
+
+function classify(row: FinanceLeaseRow): string {
+  const anyYes = [row.classResult1, row.classResult2, row.classResult3, row.classResult4, row.classResult5].some((v) => v === 'Y')
+  return anyYes ? '融资' : '经营'
+}
 
 async function handleAddRow() {
   const { value: name } = await ElMessageBox.prompt('资产名称', '新增', { confirmButtonText: '确定', cancelButtonText: '取消' })
-  if (name) state.addRow(name)
+  if (name != null) {
+    addFinanceRow()
+    const last = financeRows.value[financeRows.value.length - 1]
+    if (last) updateFinanceCell(last.rowId, 'assetName', name)
+  }
 }
+function onCell(row: FinanceLeaseRow, field: keyof FinanceLeaseRow) { updateFinanceCell(row.rowId, field, (row as any)[field]) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
@@ -99,11 +154,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h1-tab-finance-lease { padding: 16px; font-size: 13px; }
+.obj-alert { margin-bottom: 12px; }
 .methodology-context { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
-.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .classification-criteria { margin-top: 16px; }
 .classification-criteria h4 { font-size: 13px; margin-bottom: 8px; }
 .note-card { margin-top: 12px; }

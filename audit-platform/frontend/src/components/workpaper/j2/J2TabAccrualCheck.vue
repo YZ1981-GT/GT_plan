@@ -1,6 +1,16 @@
 <template>
   <div class="j2-tab-accrual-check">
-    <h3 class="section-title">长期应付职工薪酬/设定受益计划净资产检查表</h3>
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：评估设定受益计划精算假设（折现率、薪酬增长率、死亡率、离职率）的合理性，并依据 ISA 620 评价精算师工作的胜任能力、客观性与充分性，判断计提充分性。
+      </template>
+    </el-alert>
+
+    <div class="title-row">
+      <h3 class="section-title">长期应付职工薪酬/设定受益计划净资产检查表</h3>
+      <span class="chip-wrap"><GtIndexChip value="wp:J2-1" :context-project-id="projectId" /></span>
+    </div>
 
     <!-- 精算假设面板 -->
     <el-card class="assumption-card" shadow="never">
@@ -150,12 +160,24 @@
         placeholder="经检查，设定受益计划义务的精算假设合理，计提金额充分/不充分..."
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 依据 CAS 9《职工薪酬》，设定受益义务须由精算师采用预期累计福利单位法计量。</p>
+        <p>2. 折现率应参考资产负债表日高质量公司债券（或国债）市场收益率，与货币、期限匹配。</p>
+        <p>3. 依据 ISA 620，须评价精算师的胜任能力与客观性、工作范围充分性，形成利用结论。</p>
+        <p>4. 参数偏离上期或行业基准较大的须查明原因，评估计提是否充分。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useJ2AccrualCheck } from '@/composables/workpaper/j2/useJ2AccrualCheck'
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -177,7 +199,14 @@ onMounted(() => {
 
 <style scoped>
 .j2-tab-accrual-check { padding: 16px; }
-.section-title { font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 16px; }
+.audit-objective { margin-bottom: 12px; }
+.title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.section-title { font-size: 15px; font-weight: 600; margin: 0; }
+.guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
 .assumption-card, .isa620-card, .conclusion-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .unit-hint { font-size: 11px; color: #909399; margin-left: 8px; }

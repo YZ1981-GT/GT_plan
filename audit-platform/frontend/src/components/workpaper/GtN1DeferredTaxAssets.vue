@@ -52,6 +52,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（上市公司） -->
       <N1TabDisclosureListed
@@ -59,6 +60,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- 附注披露信息（国企） -->
       <N1TabDisclosureSoe
@@ -66,6 +68,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- N1-2 明细表（14列14公式，按暂时性差异项目明细） -->
       <N1TabDetail
@@ -73,6 +76,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- N1-3 调整分录汇总 -->
       <N1TabAdjustment
@@ -80,6 +84,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- N1-4 递延所得税资产（负债）测算表（63×15，21公式，核心引擎） -->
       <N1TabCalcTable
@@ -87,6 +92,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- N1-5 可用以后年度税前利润弥补的亏损检查表 -->
       <N1TabLossCheck
@@ -94,6 +100,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet / 参考辅助 -->
       <GtOnlyOfficeSheet
@@ -184,14 +191,15 @@ const props = defineProps<{
 const parentEmit = defineEmits<{
   (e: 'save'): void
   (e: 'completed'): void
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
 /**
  * N1TabIndex 目录行点击→通知外层 GtWpRenderer 切换 sheetName。
+ * 铁律：GtWpRenderer 监听 @navigate-sheet，主入口必须 emit 'navigate-sheet'（非 'navigate'）。
  */
 function handleNavigate(sheetName: string) {
-  parentEmit('navigate', sheetName)
+  parentEmit('navigate-sheet', sheetName)
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────

@@ -221,6 +221,55 @@ export function useH2Analysis(options: {
     progressAnalysis.value.filter(p => p.isOverBudget).map(p => p.name),
   )
 
+  // ─── Computed: 展示行（对齐 H2TabAnalysis 模板列结构） ─────────────────────
+
+  /** 工程进度分析展示行（含预算/累计投入/完工率/超预算率） */
+  const progressRows: ComputedRef<Array<{
+    name: string; budget: number; accumulated: number
+    completionRate: number | null; overBudgetRate: number | null
+  }>> = computed(() =>
+    projects.value.map(p => ({
+      name: p.name,
+      budget: p.budget,
+      accumulated: p.accumulatedInput,
+      completionRate: calcCompletionRate(p.accumulatedInput, p.budget),
+      overBudgetRate: calcOverBudgetRate(p.accumulatedInput, p.budget),
+    })),
+  )
+
+  /** 资本化率分析展示行（资本化利息/在建余额/实际资本化率/基准利率） */
+  const capRateRows: ComputedRef<Array<{
+    name: string; interestAmount: number; cipBalance: number
+    actualCapRate: number | null; benchmarkRate: number | null
+  }>> = computed(() =>
+    projects.value.map(p => ({
+      name: p.name,
+      interestAmount: p.interestCap,
+      cipBalance: p.cipEnd,
+      actualCapRate: p.cipEnd > 0 ? (p.interestCap / p.cipEnd) * 100 : null,
+      benchmarkRate: p.capRate,
+    })),
+  )
+
+  /** 工期分析展示行（开工/预计竣工/实际竣工/超期天数） */
+  const durationRows: ComputedRef<Array<{
+    name: string; startDate: string; plannedEnd: string
+    actualEnd: string; overdueDays: number
+  }>> = computed(() =>
+    projects.value
+      .filter(p => p.plannedEndDate)
+      .map(p => {
+        const checkDate = p.actualEndDate || new Date().toISOString().slice(0, 10)
+        return {
+          name: p.name,
+          startDate: p.startDate,
+          plannedEnd: p.plannedEndDate,
+          actualEnd: p.actualEndDate,
+          overdueDays: calcOverdueDays(checkDate, p.plannedEndDate),
+        }
+      }),
+  )
+
   // ─── Actions ───────────────────────────────────────────────────────────────
 
   function saveNote(note: string): void {
@@ -239,9 +288,15 @@ export function useH2Analysis(options: {
     projects,
     auditNote,
     auditConclusion,
+    /** 别名：H2TabAnalysis 模板使用 state.conclusion.value */
+    conclusion: auditConclusion,
     progressAnalysis,
     durationAnalysis,
     capRateAnalysis,
+    // 展示行（对齐模板列结构）
+    progressRows,
+    capRateRows,
+    durationRows,
     summaryStats,
     severeOverdueProjects,
     overBudgetProjects,

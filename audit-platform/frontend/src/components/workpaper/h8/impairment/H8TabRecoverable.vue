@@ -5,6 +5,11 @@
       <p>CAS8可收回金额测试：可收回金额=max(公允价值-处置费用, 资产预计未来现金流量现值)。本表采用DCF法计算现值，折现率取增量借款利率。90行28列DCF模型。</p>
     </div>
 
+    <!-- 索引 -->
+    <div class="h8-tab-toolbar">
+      <GtIndexChip value="wp:H8-11" />
+    </div>
+
     <!-- DCF参数卡片 -->
     <el-card shadow="never" class="params-card">
       <template #header>
@@ -99,6 +104,7 @@
  * Spec: Task 4.7 | Requirements: 7.1-7.2
  */
 import { ref, reactive, computed, defineAsyncComponent } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -173,6 +179,8 @@ function handleParamChange() {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }

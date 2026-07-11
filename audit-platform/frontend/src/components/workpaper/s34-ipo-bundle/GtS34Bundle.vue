@@ -174,6 +174,27 @@ onMounted(async () => {
     </div>
 
     <template v-else>
+      <!-- 审计目标 (gold) -->
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="gt-s34-bundle__objective"
+      >
+        <template #title>审计目标</template>
+        <div class="objective-text">
+          对照证监会发行监管问答及沪深北交易所审核规则，对首发上市各专项事项执行核查，评估相关信息披露的充分性与合规性，并形成核查结论。
+        </div>
+      </el-alert>
+
+      <!-- 编制提示 (gold) -->
+      <details class="gt-s34-bundle__prep">
+        <summary>编制提示</summary>
+        <div class="prep-content">
+          先在「核查事项清单」总览确认各事项的适用性与完成进度，不适用项填写理由；点击事项名称可跳转到对应专项底稿；各专项底稿上方展示对应监管条文溯源，据以确定核查范围与依据。
+        </div>
+      </details>
+
       <!-- 完成进度仪表盘 (Req 10.2, 10.3, 10.4) -->
       <!-- 联动 overview：点击统计数字跳转到 overview 面板查看详情 -->
       <div class="gt-s34-bundle__dashboard" data-testid="s34-dashboard">
@@ -332,6 +353,41 @@ onMounted(async () => {
 <style scoped>
 .gt-s34-bundle {
   padding: var(--gt-space-4, 16px);
+}
+
+/* ─── 审计目标 (gold) ─── */
+.gt-s34-bundle__objective {
+  margin-bottom: 12px;
+}
+.gt-s34-bundle__objective :deep(.el-alert__title) {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gt-s34-bundle__objective .objective-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── 编制提示 (gold) ─── */
+.gt-s34-bundle__prep {
+  margin-bottom: 12px;
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  border-radius: var(--gt-radius-sm, 4px);
+  background: var(--gt-color-bg-elevated, #fafafa);
+}
+.gt-s34-bundle__prep summary {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gt-color-text-secondary, #606266);
+  cursor: pointer;
+  user-select: none;
+}
+.gt-s34-bundle__prep .prep-content {
+  padding: 4px 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gt-color-text-secondary, #606266);
 }
 
 /* ─── Dashboard (Req 10.2, 10.3) ─── */

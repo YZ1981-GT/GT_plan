@@ -16,11 +16,11 @@
 
       <el-table :data="displayRows" border stripe size="small" class="rp-table"
         :row-class-name="rpRowClass">
-        <el-table-column prop="relatedPartyName" label="关联方名称" min-width="120" fixed>
+        <el-table-column prop="partyName" label="关联方名称" min-width="120" fixed>
           <template #default="{ row }">
-            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.relatedPartyName" size="small"
-              @change="onCellChange(row.rowId, 'relatedPartyName', $event)" />
-            <span v-else>{{ row.relatedPartyName || '-' }}</span>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.partyName" size="small"
+              @change="onCellChange(row.rowId, 'partyName', $event)" />
+            <span v-else>{{ row.partyName || (row.isTotal ? '合计' : '-') }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="relationship" label="关联关系" min-width="100">
@@ -37,24 +37,16 @@
             <span v-else>{{ row.relationship || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="transType" label="交易类型" min-width="100">
+        <el-table-column prop="transactionType" label="交易类型" min-width="100">
           <template #default="{ row }">
-            <el-select v-if="!row.isTotal && !isReadonly" v-model="row.transType" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'transType', $event)">
-              <el-option label="工程建设" value="工程建设" />
-              <el-option label="材料采购" value="材料采购" />
-              <el-option label="设备采购" value="设备采购" />
-              <el-option label="劳务" value="劳务" />
-              <el-option label="其他" value="其他" />
+            <el-select v-if="!row.isTotal && !isReadonly" v-model="row.transactionType" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'transactionType', $event)">
+              <el-option label="施工" value="施工" />
+              <el-option label="供材" value="供材" />
+              <el-option label="设计" value="设计" />
+              <el-option label="监理" value="监理" />
             </el-select>
-            <span v-else>{{ row.transType || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="projectName" label="工程项目" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.projectName" size="small"
-              @change="onCellChange(row.rowId, 'projectName', $event)" />
-            <span v-else>{{ row.projectName || '-' }}</span>
+            <span v-else>{{ row.transactionType || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="contractAmount" label="合同金额" min-width="110" align="right">
@@ -65,15 +57,23 @@
             <span v-else class="amt-cell">{{ fmtAmt(row.contractAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="transAmount" label="交易金额" min-width="110" align="right">
+        <el-table-column prop="currentAmount" label="本期发生额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.transAmount"
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.currentAmount"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'transAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.transAmount) }}</span>
+              @change="onCellChange(row.rowId, 'currentAmount', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.currentAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="marketPrice" label="市场价格" min-width="110" align="right">
+        <el-table-column prop="cumulativeAmount" label="累计发生额" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.cumulativeAmount"
+              :controls="false" size="small" class="amt-input"
+              @change="onCellChange(row.rowId, 'cumulativeAmount', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.cumulativeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="marketPrice" label="市场价参考" min-width="110" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.marketPrice"
               :controls="false" size="small" class="amt-input"
@@ -83,45 +83,47 @@
         </el-table-column>
         <el-table-column label="价格差异" min-width="100" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="=交易-市场">{{ fmtAmt(row.priceDiff) }}</span>
+            <span class="formula-cell" title="=合同金额-市场价参考">{{ fmtAmt(row.priceDifference) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="差异率(%)" min-width="90" align="right">
           <template #default="{ row }">
-            <span :class="['formula-cell', { 'error-amount': Math.abs(row.priceDiffRate ?? 0) > 10 }]"
-              :title="`=(交易-市场)/市场×100`">
-              {{ row.priceDiffRate != null ? row.priceDiffRate.toFixed(1) + '%' : '-' }}
+            <span :class="['formula-cell', { 'error-amount': Math.abs(row.differenceRate ?? 0) > 10 }]"
+              :title="`=(合同-市场)/市场×100`">
+              {{ row.differenceRate != null ? row.differenceRate.toFixed(1) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="pricingBasis" label="定价依据" min-width="120">
+        <el-table-column prop="pricingMethod" label="定价方式" min-width="120">
           <template #default="{ row }">
-            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.pricingBasis" size="small"
-              @change="onCellChange(row.rowId, 'pricingBasis', $event)" />
-            <span v-else>{{ row.pricingBasis || '-' }}</span>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.pricingMethod" size="small"
+              @change="onCellChange(row.rowId, 'pricingMethod', $event)" />
+            <span v-else>{{ row.pricingMethod || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="approvalStatus" label="审批状态" min-width="90">
+        <el-table-column prop="approvalDoc" label="审批文件" min-width="100">
           <template #default="{ row }">
-            <el-select v-if="!row.isTotal && !isReadonly" v-model="row.approvalStatus" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'approvalStatus', $event)">
-              <el-option label="已审批" value="已审批" />
-              <el-option label="未审批" value="未审批" />
-            </el-select>
-            <el-tag v-else :type="row.approvalStatus === '已审批' ? 'success' : 'danger'" size="small">
-              {{ row.approvalStatus || '-' }}
-            </el-tag>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.approvalDoc" size="small"
+              @change="onCellChange(row.rowId, 'approvalDoc', $event)" />
+            <span v-else>{{ row.approvalDoc || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="conclusion" label="检查结论" min-width="100">
+        <el-table-column prop="independentDirectorOpinion" label="独立董事意见" min-width="130">
           <template #default="{ row }">
-            <el-select v-if="!row.isTotal && !isReadonly" v-model="row.conclusion" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'conclusion', $event)">
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.independentDirectorOpinion" size="small"
+              @change="onCellChange(row.rowId, 'independentDirectorOpinion', $event)" />
+            <span v-else>{{ row.independentDirectorOpinion || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="auditConclusion" label="检查结论" min-width="100">
+          <template #default="{ row }">
+            <el-select v-if="!row.isTotal && !isReadonly" v-model="row.auditConclusion" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'auditConclusion', $event)">
               <el-option label="公允" value="公允" />
               <el-option label="存疑" value="存疑" />
               <el-option label="不公允" value="不公允" />
             </el-select>
-            <span v-else>{{ row.conclusion || '-' }}</span>
+            <span v-else>{{ row.auditConclusion || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="120">
@@ -183,11 +185,14 @@ const state = useH2RelatedParty({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const displayRows = computed(() => [...state.detailRows.value, state.totalRow.value])
+const displayRows = computed(() => [
+  ...state.rows.value,
+  { ...state.totalRow.value, isTotal: true, rowId: 'row-total', partyName: '合计' },
+])
 
 function rpRowClass({ row }: any) {
   if (row.isTotal) return 'total-row'
-  if (Math.abs(row.priceDiffRate ?? 0) > 10) return 'price-alert-row'
+  if (Math.abs(row.differenceRate ?? 0) > 10) return 'price-alert-row'
   return ''
 }
 

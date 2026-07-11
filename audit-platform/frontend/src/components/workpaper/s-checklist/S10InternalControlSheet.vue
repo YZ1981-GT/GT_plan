@@ -1,5 +1,13 @@
 <template>
   <div class="s10-internal-control">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：了解并评价环境事项相关的内部控制设计与运行有效性，识别环境合规、环境负债确认与披露相关的重大错报风险。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 内部控制调查表 S10-2（环境事项相关） ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

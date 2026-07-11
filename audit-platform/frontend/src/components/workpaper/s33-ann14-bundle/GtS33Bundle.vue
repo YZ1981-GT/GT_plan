@@ -184,6 +184,27 @@ onMounted(async () => {
     </div>
 
     <template v-else-if="visibleTabs.length > 0">
+      <!-- 审计目标 (gold) -->
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="gt-s33-bundle__objective"
+      >
+        <template #title>审计目标</template>
+        <div class="objective-text">
+          应对《监管规则适用指引》（14号公告）提示的高风险领域，对各核查事项执行针对性程序，识别财务信息披露与合规风险并形成核查结论。
+        </div>
+      </el-alert>
+
+      <!-- 编制提示 (gold) -->
+      <details class="gt-s33-bundle__prep">
+        <summary>编制提示</summary>
+        <div class="prep-content">
+          逐项核查程序表并填写结论；部分底稿提供精简版 / 完整版程序表切换（默认精简版）；含核查提示的底稿可展开查看要点后再执行核查。
+        </div>
+      </details>
+
       <!-- 完成进度仪表盘 (Req 7.2, 7.3, 7.4) -->
       <div class="gt-s33-bundle__dashboard" data-testid="s33-dashboard">
         <div class="dashboard-stats">
@@ -277,6 +298,41 @@ onMounted(async () => {
 <style scoped>
 .gt-s33-bundle {
   padding: var(--gt-space-4, 16px);
+}
+
+/* ─── 审计目标 (gold) ─── */
+.gt-s33-bundle__objective {
+  margin-bottom: 12px;
+}
+.gt-s33-bundle__objective :deep(.el-alert__title) {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gt-s33-bundle__objective .objective-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ─── 编制提示 (gold) ─── */
+.gt-s33-bundle__prep {
+  margin-bottom: 12px;
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  border-radius: var(--gt-radius-sm, 4px);
+  background: var(--gt-color-bg-elevated, #fafafa);
+}
+.gt-s33-bundle__prep summary {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gt-color-text-secondary, #606266);
+  cursor: pointer;
+  user-select: none;
+}
+.gt-s33-bundle__prep .prep-content {
+  padding: 4px 12px 12px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--gt-color-text-secondary, #606266);
 }
 
 /* ─── Dashboard (Req 7.2, 7.3, 7.4) ─── */

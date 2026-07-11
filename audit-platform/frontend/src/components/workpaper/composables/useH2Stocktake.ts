@@ -75,6 +75,10 @@ export interface H2StocktakeSummary {
   abnormalProjects: StocktakeAbnormalItem[]
   /** 监盘结论 */
   conclusion: string
+  /** 编制人 */
+  preparedBy: string
+  /** 编制日期 */
+  preparedDate: string
 }
 
 export interface StocktakeAbnormalItem {
@@ -99,6 +103,8 @@ export function useH2Stocktake(options: {
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   isReadonly: Ref<boolean>
+  /** 当前阶段（plan/check/summary），仅用于组件侧标识 */
+  phase?: 'plan' | 'check' | 'summary'
   onSave?: (itemId: string, value: any) => void
 }) {
   // ─── State ─────────────────────────────────────────────────────────────────
@@ -118,6 +124,8 @@ export function useH2Stocktake(options: {
     overallSituation: '',
     abnormalProjects: [],
     conclusion: '',
+    preparedBy: '',
+    preparedDate: '',
   })
 
   const auditNote = ref('')
@@ -198,6 +206,8 @@ export function useH2Stocktake(options: {
             }))
           : [],
         conclusion: summaryData.conclusion ?? '',
+        preparedBy: summaryData.preparedBy ?? '',
+        preparedDate: summaryData.preparedDate ?? '',
       }
     }
 

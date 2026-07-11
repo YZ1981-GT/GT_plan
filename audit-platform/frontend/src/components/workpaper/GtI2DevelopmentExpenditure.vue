@@ -44,6 +44,7 @@
         <!-- 底稿目录 I2 -->
         <I2TabIndex
           v-if="currentSheet === 'I2'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -64,27 +65,33 @@
         <!-- I2-1 审定表 -->
         <I2TabAdjudication
           v-else-if="currentSheet === 'I2-1'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-2 明细表 -->
         <I2TabDetail
           v-else-if="currentSheet === 'I2-2'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-3 调整分录 -->
         <I2TabAdjustment
           v-else-if="currentSheet === 'I2-3'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
@@ -100,126 +107,154 @@
         <!-- I2-5 实质性分析 -->
         <I2TabAnalysis
           v-else-if="currentSheet === 'I2-5'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-6 资本化时点判断（CAS6五条件核心） -->
         <I2TabCapitalization
           v-else-if="currentSheet === 'I2-6'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-7 研发项目构成明细表 -->
         <I2TabProjectDetail
           v-else-if="currentSheet === 'I2-7'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-8 研发材料投入检查 -->
         <I2TabMaterialCheck
           v-else-if="currentSheet === 'I2-8'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-9 研发人员认定检查 -->
         <I2TabStaffCheck
           v-else-if="currentSheet === 'I2-9'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-10 研发人员工时检查 -->
         <I2TabWorkHourCheck
           v-else-if="currentSheet === 'I2-10'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-11 委外研发检查 -->
         <I2TabOutsourceCheck
           v-else-if="currentSheet === 'I2-11'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-12 针对性检查 -->
         <I2TabTargetedCheck
           v-else-if="currentSheet === 'I2-12'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-13 截止性测试（账到单据） -->
         <I2TabCutoffForward
           v-else-if="currentSheet === 'I2-13'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-14 截止性测试（单据到账） -->
         <I2TabCutoffBackward
           v-else-if="currentSheet === 'I2-14'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-15 减值准备测试 -->
         <I2TabImpairment
           v-else-if="currentSheet === 'I2-15'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- I2-16 可收回金额测试 -->
         <I2TabRecoverable
           v-else-if="currentSheet === 'I2-16'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- 附注披露（上市公司） -->
         <I2TabDisclosureListed
           v-else-if="currentSheet === '附注上市'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
         <!-- 附注披露（国企） -->
         <I2TabDisclosureSoe
           v-else-if="currentSheet === '附注国企'"
+          :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 
@@ -350,6 +385,28 @@ const modeOptions = dualMode.modeOptions
 // ─── 双模式切换 ──────────────────────────────────────────────────────────────
 function onModeChange(mode: string | number) {
   dualMode.onModeChange(mode)
+}
+
+// ─── 子组件 saveResponse 回调（持久化 checklist_responses） ─────────────────
+// I2 子组件契约: props.saveResponse(sheetCode, { [itemId]: value }) => Promise<void>
+// 父级须提供此函数，否则子组件保存时调用 undefined 崩溃（Bug C）。
+async function saveResponse(_sheetCode: string, data: Record<string, any>): Promise<void> {
+  if (!props.wpId) return
+  const items = Object.entries(data).map(([item_id, value]) => ({
+    item_id,
+    conclusion: null,
+    remark: value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null,
+  }))
+  // 乐观更新本地 Map
+  for (const it of items) allResponses.value.set(it.item_id, it)
+  try {
+    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items,
+    })
+  } catch {
+    // 静默失败，数据保留在本地
+  }
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 <template>
   <div class="h5-tab-detail">
     <!-- 区段Tab切换 -->
-    <el-segmented v-model="state.activeSegment" :options="segmentOptions" class="segment-bar" />
+    <el-segmented v-model="state.activeSegment.value" :options="segmentOptions" class="segment-bar" />
 
     <!-- Section标题 -->
     <el-card shadow="never" class="block-card">
@@ -20,7 +20,7 @@
       </template>
 
       <!-- 区段1: 基础信息 -->
-      <el-table v-if="state.activeSegment === 'basic'" :data="displayRows" border stripe size="small" class="detail-table">
+      <el-table v-if="state.activeSegment.value === 'basic'" :data="displayRows" border stripe size="small" class="detail-table">
         <el-table-column prop="category" label="资产分类" min-width="100">
           <template #default="{ row }">
             <el-input v-if="row.rowId !== 'subtotal' && !isReadonly" v-model="row.category" size="small"
@@ -52,7 +52,7 @@
       </el-table>
 
       <!-- 区段2: 原值变动 -->
-      <el-table v-if="state.activeSegment === 'cost'" :data="displayRows" border stripe size="small" class="detail-table">
+      <el-table v-if="state.activeSegment.value === 'cost'" :data="displayRows" border stripe size="small" class="detail-table">
         <el-table-column prop="name" label="资产" min-width="100" fixed />
         <el-table-column prop="originalCostBegin" label="期初原值" min-width="110" align="right">
           <template #default="{ row }">
@@ -90,7 +90,7 @@
       </el-table>
 
       <!-- 区段3: 折耗 -->
-      <el-table v-if="state.activeSegment === 'depletion'" :data="displayRows" border stripe size="small" class="detail-table">
+      <el-table v-if="state.activeSegment.value === 'depletion'" :data="displayRows" border stripe size="small" class="detail-table">
         <el-table-column prop="name" label="资产" min-width="100" fixed />
         <el-table-column prop="accDepletionBegin" label="期初折耗" min-width="110" align="right">
           <template #default="{ row }">
@@ -151,8 +151,8 @@
           </el-button>
         </div>
       </template>
-      <el-input v-model="state.auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="请填写审计说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote)" />
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
     <!-- 编制提示 -->

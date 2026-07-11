@@ -163,6 +163,11 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复：此前仅写内存 Map。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 
 // ─── Dual Mode ───────────────────────────────────────────────────────────────
 const dualMode = useH6DualMode({
@@ -233,9 +238,7 @@ const noteResp = props.allResponses.get('H6-disclosure-soe-text')
 if (noteResp?.remark) noteText.value = noteResp.remark
 
 function saveNoteText() {
-  props.allResponses.set('H6-disclosure-soe-text', {
-    item_id: 'H6-disclosure-soe-text', remark: noteText.value, conclusion: null,
-  })
+  saveResponse('H6-disclosure-soe-text', noteText.value)
 }
 
 // ─── EventBus Subscribe ──────────────────────────────────────────────────────

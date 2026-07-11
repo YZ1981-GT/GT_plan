@@ -29,9 +29,9 @@
         </template>
       </el-table-column>
       <el-table-column prop="acquireDate" label="取得日期" min-width="110" />
-      <el-table-column prop="beginFair" label="期初公允" min-width="110" align="right">
+      <el-table-column prop="fairValueBegin" label="期初公允" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.beginFair" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
+          <el-input v-model.number="row.fairValueBegin" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
         </template>
       </el-table-column>
     </el-table>
@@ -40,14 +40,14 @@
     <el-table v-if="activeSegment === '公允变动'" :data="rows" border size="small" class="audit-table" show-summary :summary-method="getSummary">
       <el-table-column prop="assetName" label="资产名称" min-width="140" fixed />
       <el-table-column prop="assetType" label="类型" min-width="100" fixed />
-      <el-table-column prop="periodIncrease" label="本期增加" min-width="100" align="right">
+      <el-table-column prop="fairIncrease" label="本期增加" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.periodIncrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
+          <el-input v-model.number="row.fairIncrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="periodDecrease" label="本期减少" min-width="100" align="right">
+      <el-table-column prop="fairDecrease" label="本期减少" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input v-model.number="row.periodDecrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
+          <el-input v-model.number="row.fairDecrease" size="small" :disabled="isReadonly" @change="onCellChange(row)" />
         </template>
       </el-table-column>
       <el-table-column prop="transferIn" label="转入" min-width="90" align="right">
@@ -67,7 +67,7 @@
       </el-table-column>
       <el-table-column label="期末公允" min-width="110" align="right" class-name="formula-col">
         <template #default="{ row }">
-          <span class="formula-value" title="期初+增加-减少±转换+变动">{{ fmtNum(row.endFair) }}</span>
+          <span class="formula-value" title="期初+增加-减少±转换+变动">{{ fmtNum(row.fairValueEnd) }}</span>
         </template>
       </el-table-column>
     </el-table>
@@ -118,7 +118,7 @@ const { getValue, setValue, saveImmediate } = useH3FormData({
 })
 
 const {
-  rows, subtotalRow, addRow, updateCell,
+  rows, subtotal: subtotalRow, addRow, updateCell,
 } = useH3DetailFair({
   allResponses: computed(() => props.allResponses) as any,
   wpId: toRef(props, 'wpId'),

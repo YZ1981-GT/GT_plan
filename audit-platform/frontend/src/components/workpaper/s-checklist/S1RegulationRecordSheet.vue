@@ -1,5 +1,13 @@
 <template>
   <div class="s1-regulation-record">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：记录对被审计单位遵守法律法规情况的考虑，识别违反法律法规行为对财务报表的潜在影响及所需的审计应对。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ S1-1 对法律法规的考虑记录表 ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

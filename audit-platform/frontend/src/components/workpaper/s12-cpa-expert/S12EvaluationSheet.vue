@@ -1,5 +1,11 @@
 <template>
   <div class="s12-evaluation">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">{{ auditObjective }}</div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -155,6 +161,19 @@ function handleOpenReview(sectionId: string, label: string) {
   openReviewDialog?.(sectionId, label)
 }
 
+// ─── 审计目标 ────────────────────────────────────────────────────────────────
+
+const auditObjective = computed(() => {
+  const objMap: Record<string, string> = {
+    'S12-1': '评价注册会计师的专家是否具有实现审计目的所必需的胜任能力、专业素质和客观性。',
+    'S12-1-1': '识别并评价可能影响专家客观性的利益关系、雇佣关系及其他威胁，并评估已采取防范措施的有效性。',
+    'S12-2': '充分了解专家的专长领域，确认其专业知识与审计目标中相关事项相匹配，以确定专家工作能否实现审计目的。',
+    'S12-3': '评价专家工作结果的恰当性，包括假设和方法的适当性、源数据的相关性和完整性、结论与其他审计证据的一致性。',
+    'S12-3-1': '获取并审阅专家出具的报告，评价报告内容是否充分、明确且能支持其结论。',
+  }
+  return objMap[props.sheetKey] || '评价注册会计师的专家工作，为相关审计事项获取充分、适当的审计证据。'
+})
+
 // ─── 方法论上下文 ────────────────────────────────────────────────────────────
 
 const methodologyContext = computed(() => {
@@ -270,6 +289,15 @@ function handleAiConclusion() {
 <style scoped>
 .s12-evaluation {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

@@ -1,6 +1,17 @@
 <template>
   <div class="j2-tab-adjustment">
-    <h3 class="section-title">长期应付职工薪酬调整分录汇总表</h3>
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        审计目标：汇总设定受益计划相关的审计调整分录（AJE/RJE），核验调整依据、借贷科目与金额的准确性及借贷平衡，确保调整正确传导至审定表与报表。
+      </template>
+    </el-alert>
+
+    <div class="title-row">
+      <h3 class="section-title">长期应付职工薪酬调整分录汇总表</h3>
+      <span class="chip-wrap"><GtIndexChip value="wp:J2-1" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ entries.length }} 笔</el-tag>
+    </div>
 
     <el-table :data="entries" border stripe style="width: 100%; font-size: 13px">
       <el-table-column type="index" label="序号" width="60" align="center" />
@@ -64,11 +75,23 @@
     <el-button v-if="!isReadonly" type="primary" plain size="small" @click="addEntry" style="margin-top: 12px">
       + 新增调整分录
     </el-button>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 汇总本底稿形成的审计调整分录，区分报表调整（RJE）与账项调整（AJE）。</p>
+        <p>2. 每笔调整须借贷平衡，注明调整事项说明、报表项目、科目名称及索引来源。</p>
+        <p>3. 调整后金额传导至审定表（J2-1）审定数列，并回写试算平衡表科目 2221。</p>
+        <p>4. 调整分录应与 A2 调整分录汇总台账保持一致。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import GtIndexChip from '../GtIndexChip.vue'
 
 interface AdjEntry {
   description: string
@@ -125,7 +148,14 @@ onMounted(() => {
 
 <style scoped>
 .j2-tab-adjustment { padding: 16px; }
-.section-title { font-size: 15px; font-weight: 600; text-align: center; margin-bottom: 12px; }
+.audit-objective { margin-bottom: 12px; }
+.title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.section-title { font-size: 15px; font-weight: 600; margin: 0; }
+.guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
 .balance-check { display: flex; gap: 16px; align-items: center; margin-top: 12px; font-size: 13px; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; }

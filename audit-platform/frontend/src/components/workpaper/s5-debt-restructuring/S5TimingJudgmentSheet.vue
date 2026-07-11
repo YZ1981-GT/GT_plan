@@ -1,5 +1,13 @@
 <template>
   <div class="s5-timing">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实债务重组损益确认的关键时点与条件满足情况，判断确认时点是否恰当，防止在重大不确定性消除前提前确认债务重组收益。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 方法论上下文（琥珀色左边线）— 不得提前确认警示 ═══ -->
     <div class="methodology-context warning-context">
       <p class="methodology-title">⚠️ 重要提示 — 不得提前确认债务重组收益</p>

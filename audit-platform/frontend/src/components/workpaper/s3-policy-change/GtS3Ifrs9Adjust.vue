@@ -1,5 +1,13 @@
 <template>
   <div class="s3-ifrs9-adjust">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：复核首次执行新金融工具准则（CAS 22/23/24）追溯调整的计量与列报，确认金融资产分类、减值（ECL）及留存收益/其他综合收益调整的准确性。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <div class="context-content">

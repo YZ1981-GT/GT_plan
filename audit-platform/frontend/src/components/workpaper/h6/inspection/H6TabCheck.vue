@@ -1,5 +1,14 @@
 <template>
   <div class="h6-tab-check">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：检查固定资产清理各环节（审批、评估、税务、会计处理、收入费用确认、结转时点）的合规性与恰当性，识别不合规事项并评估其对财务报表的影响。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H6-4检查表：对每个固定资产清理项目进行合规性逐项检查，涵盖清理审批/资产评估/税务处理/会计处理/收入确认/费用归集/结转时点/核查结论8个维度。每个检查行对应H6-2明细表的一个清理项目。</p>
@@ -207,6 +216,11 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string, label?: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复：此前仅写内存 Map。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses)
@@ -227,10 +241,7 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 // ─── 检查维度列定义 ──────────────────────────────────────────────────────────
@@ -255,7 +266,7 @@ if (existingNote) {
 }
 
 function saveAuditNote() {
-  props.allResponses.set('H6-4-note', { item_id: 'H6-4-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H6-4-note', auditNote.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -355,6 +366,7 @@ function optionShort(opt: ComplianceOption): string {
 <style scoped>
 .h6-tab-check { padding: 16px; font-size: 13px; }
 
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
   border-left: 4px solid #d97706;
   background: #fffbeb;

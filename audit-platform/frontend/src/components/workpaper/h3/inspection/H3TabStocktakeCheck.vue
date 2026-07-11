@@ -28,9 +28,9 @@
           <el-input v-model="row.location" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="titleNo" label="产权证号" min-width="110">
+      <el-table-column prop="titleCertNo" label="产权证号" min-width="110">
         <template #default="{ row, $index }">
-          <el-input v-model="row.titleNo" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
+          <el-input v-model="row.titleCertNo" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
       <el-table-column prop="area" label="面积(㎡)" width="90" align="right">
@@ -38,9 +38,9 @@
           <el-input v-model.number="row.area" size="small" :disabled="isReadonly" @change="onCellChange($index, row)" />
         </template>
       </el-table-column>
-      <el-table-column prop="usage" label="用途" width="90">
+      <el-table-column prop="purpose" label="用途" width="90">
         <template #default="{ row, $index }">
-          <el-select v-model="row.usage" size="small" :disabled="isReadonly" @change="onCellChange($index, row)">
+          <el-select v-model="row.purpose" size="small" :disabled="isReadonly" @change="onCellChange($index, row)">
             <el-option label="出租" value="出租" />
             <el-option label="增值" value="增值" />
           </el-select>

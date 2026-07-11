@@ -1,5 +1,14 @@
 <template>
   <div class="h6-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实固定资产清理各项目原值、累计折旧及净损益计算准确，确认清理事项真实、结转及时，为 1606 过渡科目期末应清零及 H10 处置损益提供审定依据。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H6-2明细表：逐项登记每笔固定资产清理项目的全过程。25列拆分为2区段Tab展示（基础信息/清理信息）。核心公式：净值=原值-累计折旧；净损益=处置收入-净值-清理费用-税费。过渡科目期末余额应为0。</p>
@@ -316,6 +325,11 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复：此前仅写内存 Map。
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses)
@@ -327,10 +341,7 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 // ─── 注册 createFromH1Disposal 到主入口（EventBus联动） ──────────────────────
@@ -366,7 +377,7 @@ const hasTransferWarning = computed(() => {
 // ─── Audit Note ──────────────────────────────────────────────────────────────
 const auditNote = ref('')
 function saveAuditNote() {
-  props.allResponses.set('H6-2-note', { item_id: 'H6-2-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H6-2-note', auditNote.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -473,6 +484,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .h6-tab-detail { padding: 16px; font-size: 13px; }
 
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
   margin-bottom: 12px;
   padding: 8px 12px;

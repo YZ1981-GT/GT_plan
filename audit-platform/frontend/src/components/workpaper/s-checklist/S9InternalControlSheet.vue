@@ -1,5 +1,13 @@
 <template>
   <div class="s9-internal-control">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：了解并评价电子商务相关业务的内部控制设计与运行有效性，识别与收入确认、平台交易及电子支付相关的重大错报风险。"
+      style="margin-bottom: 16px"
+    />
+
     <!-- ═══ 内部控制调查表 S9-2（电子商务相关） ═══ -->
     <el-card shadow="never" class="audit-section">
       <template #header>

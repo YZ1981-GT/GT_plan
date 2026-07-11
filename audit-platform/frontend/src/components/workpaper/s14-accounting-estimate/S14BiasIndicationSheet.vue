@@ -1,5 +1,13 @@
 <template>
   <div class="s14-bias">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>审计目标</template>
+      <div class="audit-objective-text">
+        评价管理层在作出会计估计时是否存在偏向的迹象（如假设/方法的系统性倾向、临近报告日的有利调整、选择性使用信息），并评估偏向迹象的累积影响是否导致财务报表整体的重大错报（CAS 1321）。
+      </div>
+    </el-alert>
+
     <el-card shadow="never" class="audit-section">
       <template #header>
         <div class="section-header">
@@ -215,6 +223,15 @@ function handleAiConclusion() {
 <style scoped>
 .s14-bias {
   padding: 12px;
+}
+
+.audit-objective {
+  margin-bottom: 12px;
+}
+
+.audit-objective-text {
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .audit-section {

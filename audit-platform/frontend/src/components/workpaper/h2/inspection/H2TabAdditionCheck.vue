@@ -13,26 +13,26 @@
       <div class="params-grid">
         <div class="param-item">
           <span class="param-label">总体金额：</span>
-          <el-input-number v-model="state.params.value.totalAmount" :controls="false" size="small"
-            :disabled="isReadonly" @change="onParamChange('totalAmount', $event)" />
+          <el-input-number v-model="state.samplingParams.value.populationAmount" :controls="false" size="small"
+            :disabled="isReadonly" @change="onParamChange('populationAmount', $event)" />
         </div>
         <div class="param-item">
           <span class="param-label">重要性水平：</span>
-          <el-input-number v-model="state.params.value.materiality" :controls="false" size="small"
-            :disabled="isReadonly" @change="onParamChange('materiality', $event)" />
+          <el-input-number v-model="state.samplingParams.value.materialityLevel" :controls="false" size="small"
+            :disabled="isReadonly" @change="onParamChange('materialityLevel', $event)" />
         </div>
         <div class="param-item">
           <span class="param-label">抽样方法：</span>
-          <el-select v-model="state.params.value.method" size="small" :disabled="isReadonly"
-            @change="onParamChange('method', $event)">
-            <el-option label="货币单位抽样" value="MUS" />
-            <el-option label="随机抽样" value="RANDOM" />
-            <el-option label="判断抽样" value="JUDGMENTAL" />
+          <el-select v-model="state.samplingParams.value.samplingMethod" size="small" :disabled="isReadonly"
+            @change="onParamChange('samplingMethod', $event)">
+            <el-option label="货币单元抽样" value="货币单元抽样" />
+            <el-option label="随机抽样" value="随机抽样" />
+            <el-option label="判断抽样" value="判断抽样" />
           </el-select>
         </div>
         <div class="param-item">
           <span class="param-label">样本量：</span>
-          <span class="param-value">{{ state.params.value.sampleSize ?? '-' }}</span>
+          <span class="param-value">{{ state.samplingParams.value.sampleSize ?? '-' }}</span>
         </div>
       </div>
     </el-card>
@@ -55,30 +55,31 @@
         <el-table-column prop="seq" label="序号" width="50" align="center" fixed>
           <template #default="{ $index }">{{ $index + 1 }}</template>
         </el-table-column>
-        <el-table-column prop="projectName" label="工程项目" min-width="120" fixed>
+        <el-table-column prop="name" label="工程项目" min-width="120" fixed>
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.projectName" size="small"
-              @change="onCellChange(row.rowId, 'projectName', $event)" />
-            <span v-else>{{ row.projectName || '-' }}</span>
+            <el-input v-if="!isReadonly" v-model="row.name" size="small"
+              @change="onCellChange(row.rowId, 'name', $event)" />
+            <span v-else>{{ row.name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="costType" label="费用类型" min-width="100">
+        <el-table-column prop="category" label="费用类别" min-width="100">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.costType" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'costType', $event)">
-              <el-option label="材料费" value="材料费" />
-              <el-option label="人工费" value="人工费" />
-              <el-option label="机械费" value="机械费" />
+            <el-select v-if="!isReadonly" v-model="row.category" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'category', $event)">
+              <el-option label="材料" value="材料" />
+              <el-option label="人工" value="人工" />
+              <el-option label="机械" value="机械" />
+              <el-option label="利息" value="利息" />
               <el-option label="其他" value="其他" />
             </el-select>
-            <span v-else>{{ row.costType || '-' }}</span>
+            <span v-else>{{ row.category || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="voucherNo" label="凭证编号" min-width="100">
+        <el-table-column prop="invoiceNo" label="凭证/发票号" min-width="110">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.voucherNo" size="small"
-              @change="onCellChange(row.rowId, 'voucherNo', $event)" />
-            <span v-else>{{ row.voucherNo || '-' }}</span>
+            <el-input v-if="!isReadonly" v-model="row.invoiceNo" size="small"
+              @change="onCellChange(row.rowId, 'invoiceNo', $event)" />
+            <span v-else>{{ row.invoiceNo || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="amount" label="金额" min-width="110" align="right">
@@ -107,16 +108,16 @@
             <el-button size="small" link @click="handleOcr(row.rowId)" :disabled="isReadonly">📎</el-button>
           </template>
         </el-table-column>
-        <el-table-column prop="checkResult" label="检查结论" min-width="100">
+        <el-table-column prop="auditConclusion" label="检查结论" min-width="100">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.checkResult" size="small" style="width:100%"
-              @change="onCellChange(row.rowId, 'checkResult', $event)">
+            <el-select v-if="!isReadonly" v-model="row.auditConclusion" size="small" style="width:100%"
+              @change="onCellChange(row.rowId, 'auditConclusion', $event)">
               <el-option label="无异常" value="无异常" />
               <el-option label="存疑" value="存疑" />
               <el-option label="需调整" value="需调整" />
             </el-select>
-            <el-tag v-else :type="row.checkResult === '无异常' ? 'success' : 'warning'" size="small">
-              {{ row.checkResult || '待检' }}
+            <el-tag v-else :type="row.auditConclusion === '无异常' ? 'success' : 'warning'" size="small">
+              {{ row.auditConclusion || '待检' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -135,8 +136,8 @@
       </el-table>
 
       <div class="summary-line">
-        样本合计: <strong>{{ fmtAmt(state.sampleTotal.value) }}</strong>
-        <span style="margin-left:16px">覆盖率: {{ state.coverageRate.value?.toFixed(1) ?? '-' }}%</span>
+        样本合计: <strong>{{ fmtAmt(state.amountTotal.value) }}</strong>
+        <span style="margin-left:16px">覆盖率: {{ state.actualCoverageRate.value?.toFixed(1) ?? '-' }}%</span>
       </div>
       <div class="add-row-bar" v-if="!isReadonly">
         <el-button size="small" @click="handleAddRow">+ 新增检查项</el-button>
