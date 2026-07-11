@@ -982,10 +982,13 @@ async def execute_query(
     if is_index_building():
         response.headers["X-Index-Status"] = "building"
 
-    # ─── 项目可见性校验（BEFORE cache read）§5.12 fix ────────────────────
-    visible_ids = await get_visible_project_ids(current_user, db)
-    if uuid.UUID(body.project_id) not in visible_ids:
-        raise HTTPException(status_code=403, detail={"error_code": "PROJECT_NOT_VISIBLE"})
+    # ─── OwnershipGuard 单点准入（BEFORE cache read）R9.1/R9.2/R9.5 ─────────
+    # 注册/查询路径统一经 OwnershipGuard 强制 project 归属校验（防 IDOR）；
+    # 不通过 → 403 FORBIDDEN_PROJECT 且不触达缓存/数据读写层。
+    from app.services.custom_query.ownership_guard import ownership_guard
+    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=body.project_id, db=db
+    )
 
     source = body.source
     pid = body.project_id
@@ -1081,37 +1084,29 @@ async def execute_query(
     await set_cached_result(cache_key, result)
 
     # 审计日志（关键路径：底稿/合并/附注/调整 写日志，普通试算/报表/工时跳过避免噪声）
-    # 节流：相同 (user_id, source, filters) 5s 窗口内只记 1 条
+    # 查询执行按 60s 窗口节流为 1 条（advanced-query-module R14.4，audit_helper 单点接线）
     _SENSITIVE_PREFIXES = ("workpaper:", "consol_unit:", "disclosure_note:", "adj_", "disclosure")
     if source.startswith(_SENSITIVE_PREFIXES) or source in ("workpaper", "adjustment", "disclosure"):
         try:
             from app.core.redis import get_redis
-            from app.services.audit_logger_enhanced import audit_logger
-            from app.services.audit_throttle import should_record
+            from app.services.custom_query.audit_helper import record_query_execution
 
             redis = await get_redis()
-            record = await should_record(
+            await record_query_execution(
                 redis=redis,
-                user_id=str(current_user.id),
+                user_id=current_user.id,
                 source=source,
                 filters=filters,
+                project_id=pid,
                 action="custom_query.execute",
+                details={
+                    "source": source,
+                    "year": year,
+                    "filters": {k: v for k, v in filters.items() if not isinstance(v, (dict, list)) or len(str(v)) < 200},
+                    "row_count": result.get("total", 0),
+                    "has_error": "error" in result,
+                },
             )
-            if record:
-                await audit_logger.log_action(
-                    user_id=current_user.id,
-                    action="custom_query.execute",
-                    object_type="custom_query",
-                    object_id=None,
-                    project_id=pid,
-                    details={
-                        "source": source,
-                        "year": year,
-                        "filters": {k: v for k, v in filters.items() if not isinstance(v, (dict, list)) or len(str(v)) < 200},
-                        "row_count": result.get("total", 0),
-                        "has_error": "error" in result,
-                    },
-                )
         except Exception as audit_e:
             logger.warning("audit_log enqueue failed for custom_query: %s", audit_e)
 
@@ -2041,10 +2036,11 @@ async def batch_execute(
     if is_index_building():
         response.headers["X-Index-Status"] = "building"
 
-    # ─── 项目可见性校验（BEFORE sub-query loop）§5.12 fix ────────────────
-    visible_ids = await get_visible_project_ids(current_user, db)
-    if uuid.UUID(body.project_id) not in visible_ids:
-        raise HTTPException(status_code=403, detail={"error_code": "PROJECT_NOT_VISIBLE"})
+    # ─── OwnershipGuard 单点准入（BEFORE sub-query loop）R9.1/R9.2/R9.5 ─────
+    from app.services.custom_query.ownership_guard import ownership_guard
+    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=body.project_id, db=db
+    )
 
     results: dict[str, Any] = {}
     total_success = 0
@@ -2077,36 +2073,28 @@ async def batch_execute(
             results[wp_code] = {"error": str(e), "rows": [], "columns": [], "total": 0}
             total_failed += 1
 
-    # 审计日志聚合（节流适用）
+    # 审计日志聚合（查询执行按 60s 窗口节流为 1 条，R14.4，audit_helper 单点接线）
     try:
         from app.core.redis import get_redis
-        from app.services.audit_logger_enhanced import audit_logger
-        from app.services.audit_throttle import should_record
+        from app.services.custom_query.audit_helper import record_query_execution
 
         redis = await get_redis()
-        record = await should_record(
+        await record_query_execution(
             redis=redis,
-            user_id=str(current_user.id),
+            user_id=current_user.id,
             source=f"batch:{','.join(body.wp_codes[:5])}",
             filters=body.filters,
-            action="custom_query.execute",
+            project_id=body.project_id,
+            action="custom_query.batch_execute",
+            details={
+                "wp_codes": body.wp_codes,
+                "year": body.year,
+                "total_success": total_success,
+                "total_failed": total_failed,
+                "cell_range": body.cell_range,
+                "sheet_name": body.sheet_name,
+            },
         )
-        if record:
-            await audit_logger.log_action(
-                user_id=current_user.id,
-                action="custom_query.batch_execute",
-                object_type="custom_query",
-                object_id=None,
-                project_id=body.project_id,
-                details={
-                    "wp_codes": body.wp_codes,
-                    "year": body.year,
-                    "total_success": total_success,
-                    "total_failed": total_failed,
-                    "cell_range": body.cell_range,
-                    "sheet_name": body.sheet_name,
-                },
-            )
     except Exception as audit_e:
         logger.warning("audit_log enqueue failed for batch_execute: %s", audit_e)
 
@@ -2145,8 +2133,11 @@ async def cell_writeback(
     Response 403: {error: "no_write_permission"} or {error: "non_workpaper_source"}
     """
     from app.services.custom_query.snapshot_writer import (
+        AuditWriteFailed,
         WritebackConflict,
         WritebackPermissionDenied,
+        WritebackResolveUnavailable,
+        WritebackTargetUnresolvable,
         snapshot_writer,
     )
 
@@ -2227,31 +2218,56 @@ async def cell_writeback(
             status_code=403,
             detail={"error": e.reason},
         )
+    except WritebackTargetUnresolvable as e:
+        # R3.4：回写目标无法解析为有效 addr_id → 中止、数据不变
+        await db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail={"error_code": e.error_code, "message": e.message},
+        )
+    except WritebackResolveUnavailable as e:
+        # R3.5：resolve 不可用/5s 无响应 → 中止、数据不变
+        await db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail={"error_code": e.error_code, "message": e.message},
+        )
+    except AuditWriteFailed as e:
+        # R14.8「无审计不回写」：审计写入失败 → 回滚回写改动
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail={"error_code": e.error_code, "message": e.message},
+        )
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
-    # 审计日志 — 敏感操作不节流（每次必记）
-    try:
-        from app.services.audit_logger_enhanced import audit_logger
+    # 审计日志 — 回写逐次记录（不节流，R14.3/R14.4）：操作者/UTC 秒级时间戳/操作类型/
+    # 目标 addr_id 集合/新旧值/结果，经 audit_helper 单点接线。
+    # workpaper 模块已在回写事务内记审计（R14.8「无审计不回写」，见 snapshot_writer 第 10 步），
+    # 此处避免重复；其余模块仍在此按「不节流」补记。
+    if not write_result.get("audit_logged"):
+        try:
+            from app.services.custom_query.audit_helper import record_writeback
 
-        await audit_logger.log_action(
-            user_id=current_user.id,
-            action="custom_query.cell_writeback",
-            object_type="working_paper",
-            object_id=wp_id,
-            project_id=None,
-            details={
-                "wp_code": body.wp_code,
-                "sheet_name": body.sheet_name,
-                "cell_ref": body.cell_ref,
-                "old_value": write_result.get("old_value"),
-                "new_value": body.new_value,
-                "module": body.module,
-            },
-        )
-    except Exception as audit_e:
-        logger.warning("audit_log for cell_writeback failed: %s", audit_e)
+            await record_writeback(
+                user_id=current_user.id,
+                addr_ids=write_result.get("addr_id"),
+                old_value=write_result.get("old_value"),
+                new_value=body.new_value,
+                result="success",
+                project_id=body.project_id,
+                object_id=wp_id,
+                extra={
+                    "wp_code": body.wp_code,
+                    "sheet_name": body.sheet_name,
+                    "cell_ref": body.cell_ref,
+                    "module": body.module,
+                },
+            )
+        except Exception as audit_e:
+            logger.warning("audit_log for cell_writeback failed: %s", audit_e)
 
     return {
         "success": True,
@@ -2320,10 +2336,21 @@ async def cross_sheet_trace(
         RefChainResponse,
     )
 
-    # 查找 working_paper 的 parsed_data
+    # ─── OwnershipGuard 单点准入（BEFORE 任何数据读取）R9.1/R9.2/R9.5 ─────────
+    # 溯源（override/trace）路径统一经 OwnershipGuard 强制 project 归属校验（防 IDOR）；
+    # 不通过 → 403 FORBIDDEN_PROJECT 且不触达 working_paper 读取层。
+    from app.services.custom_query.ownership_guard import ownership_guard
+    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=project_id, db=db
+    )
+
+    # 查找 working_paper 的 parsed_data（限定 project_id，防跨项目 wp_code 撞车）
     result = await db.execute(
-        text("SELECT id, parsed_data FROM working_paper WHERE wp_code = :code LIMIT 1"),
-        {"code": wp_code},
+        text(
+            "SELECT id, parsed_data FROM working_paper "
+            "WHERE wp_code = :code AND project_id = CAST(:pid AS uuid) LIMIT 1"
+        ),
+        {"code": wp_code, "pid": project_id},
     )
     wp_row = result.first()
     if not wp_row:
@@ -2347,17 +2374,24 @@ async def cross_sheet_trace(
         max_depth=max_depth,
     )
 
-    # 审计日志 — 敏感操作不节流（每次必记）
+    # 审计日志 — 跨 sheet 溯源逐次记录（不节流，R14.3/R14.4）：操作者/UTC 秒级时间戳/
+    # 操作类型/目标 addr_id 集合/结果，经 audit_helper 单点接线
     try:
-        from app.services.audit_logger_enhanced import audit_logger
+        from app.services.custom_query.audit_helper import record_cross_sheet_trace
 
-        await audit_logger.log_action(
+        # 目标 addr_id 集合：根目标 + 溯源链节点（best-effort，本端点走同步 BFS 无 orchestrator addr_id）
+        trace_addr_ids = [f"{wp_code}/{sheet_name}/{cell_ref}"]
+        trace_addr_ids.extend(
+            getattr(node, "uri", None) for node in trace_result.chain
+        )
+
+        await record_cross_sheet_trace(
             user_id=current_user.id,
-            action="custom_query.cross_sheet_trace",
-            object_type="working_paper",
-            object_id=wp_id,
+            addr_ids=trace_addr_ids,
+            result="success",
             project_id=project_id,
-            details={
+            object_id=wp_id,
+            extra={
                 "wp_code": wp_code,
                 "sheet_name": sheet_name,
                 "cell_ref": cell_ref,

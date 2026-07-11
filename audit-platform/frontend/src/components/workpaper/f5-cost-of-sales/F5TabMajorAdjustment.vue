@@ -1,43 +1,16 @@
 <template>
   <div class="f5-major-adj">
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 本表核查营业成本（科目6401）本期发生的重大调整事项，逐笔记录调整日期、事项、金额、原因及审批依据。</p>
-        <p>2. 单笔调整金额超过重要性水平自动标橙（底部统计超重要性笔数），须重点关注授权审批与凭证支持。</p>
-        <p>3. 可通过下方"自动抽凭"按方法选取 6401 重大成本调整凭证，样本自动填入核查行。</p>
-        <p>4. 核查结论应说明重大调整的合理性、授权完整性及是否存在跨期或人为调节成本的迹象。</p>
-      </div>
-    </details>
-
-    <!-- 工具栏 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
+    <div class="f5-ma-toolbar">
+      <span class="f5-ma-title">F5-8 重大调整核查表</span>
+      <div class="f5-ma-actions">
+        <GtVoucherSamplingEngine :project-id="projectId" :account-codes="['6401']" dialog-mode :phase="'final'"
+          @filled="handleSamplingFilled" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
         <CycleImportExportDropdown v-if="ieCtx" :wp-id="wpId" :api-prefix="ieCtx.apiPrefix" :sheet="ieCtx.sheet"
           :disabled="isReadonly" @imported="$emit('imported')" />
-      </div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <el-button size="small" @click="openReview">💬 复核</el-button>
       </div>
     </div>
-
-    <!-- 抽凭引擎 -->
-    <el-collapse v-if="wpId && projectId && !isReadonly" class="f5-sampling">
-      <el-collapse-item title="⚡ 自动抽凭（科目 6401 营业成本，选取重大成本调整凭证）" name="sampling">
-        <GtVoucherSamplingEngine
-          account-code="6401"
-          phase="final"
-          default-method="monetary"
-          :workpaper-id="wpId"
-          :project-id="projectId"
-          :year="auditYear"
-          @filled="handleSamplingFilled"
-        />
-      </el-collapse-item>
-    </el-collapse>
 
     <el-table :data="rows" size="small" border stripe :row-class-name="rowClass" max-height="480">
       <el-table-column prop="seq" label="序号" width="56" />
@@ -96,18 +69,11 @@
       <span>超重要性笔数：<b class="is-warn">{{ exceedCount }}</b></span>
     </div>
 
-    <!-- 审计意见区（卡片式） -->
-    <el-card class="opinion-card" shadow="never">
+    <el-card class="f5-ma-note" shadow="never">
       <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
-          <div class="opinion-actions">
-            <el-button size="small" @click="openReview">💬</el-button>
-          </div>
-        </div>
+        <div class="f5-card-header"><span>审计结论</span></div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="重大调整核查结论（调整合理性、授权完整性、是否存在跨期或人为调节等）..." @change="saveConclusion" />
+      <el-input v-model="conclusion" type="textarea" autosize :disabled="isReadonly" placeholder="重大调整核查结论..." @change="saveConclusion" />
     </el-card>
   </div>
 </template>
@@ -119,8 +85,7 @@ import { parseNum, calcSubtotal } from '../composables/useF5CosOfFormulaEngine'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
-import GtIndexChip from '../GtIndexChip.vue'
-import type { SampledVoucher } from '../composables/useSamplingAlgorithms'
+import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 defineEmits<{ imported: [] }>()
@@ -139,7 +104,6 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const STORAGE_KEY = 'F5-8-rows'
 const CONCLUSION_KEY = 'F5-8-conclusion'
-const auditYear = computed(() => props.auditYear ?? new Date().getFullYear())
 
 interface MajorAdjRow {
   rowId: string; seq: number; adjustmentDate: string; adjustmentItem: string
@@ -214,7 +178,8 @@ function persist() {
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
 
 /** 抽凭引擎填充：将样本凭证映射为重大调整行 */
-function handleSamplingFilled(samples: SampledVoucher[]) {
+function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode?: FillMode }) {
+  const samples = payload?.samples
   if (props.isReadonly || !Array.isArray(samples) || !samples.length) return
   const mapped: MajorAdjRow[] = samples.map((s: any, i: number) => ({
     ...emptyRow(rows.value.length + i + 1),
@@ -244,35 +209,14 @@ function openReview() { openReviewDialog('F5-8-conclusion') }
 </script>
 
 <style scoped>
-.f5-major-adj { padding: 12px; }
-.f5-major-adj :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.f5-major-adj :deep(.el-table .cell) { font-size: 13px !important; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-/* 抽凭引擎 */
-.f5-sampling { margin-bottom: 12px; }
-
-/* 汇总 */
+.f5-major-adj { padding: 12px; font-size: 13px; }
+.f5-ma-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.f5-ma-title { font-weight: 600; }
+.f5-ma-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .f5-ma-summary { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; }
 .f5-ma-summary .is-warn { color: #e6a23c; }
 .is-warn { color: #e6a23c; font-weight: 600; }
-
-/* 审计意见卡片 */
-.opinion-card { margin-top: 12px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-actions { display: flex; gap: 6px; }
+.f5-ma-note { margin-top: 12px; }
+.f5-card-header { display: flex; align-items: center; justify-content: space-between; }
 :deep(.f5-row-orange) { background: #fdf6ec; }
 </style>

@@ -370,7 +370,7 @@ async def test_auditor_role_is_forbidden(db_session: AsyncSession):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
         resp = await ac.get("/api/query/schema")
     assert resp.status_code == 403
-    assert resp.json()["detail"]["error_code"] == "QUERY_BUILDER_FORBIDDEN"
+    assert resp.json()["detail"]["error_code"] == "ROLE_FORBIDDEN"
 
 
 @pytest.mark.asyncio

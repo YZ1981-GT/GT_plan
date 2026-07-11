@@ -20,7 +20,7 @@
     <div v-if="!embedded" class="gt-aqb-header">
       <h2 class="gt-aqb-title">高级查询构建器</h2>
       <span class="gt-aqb-subtitle">
-        可视化条件 · SQL 预览 · 结果导出 · 仅 admin / manager 可访问
+        可视化条件 · SQL 预览 · 结果导出 · 仅 admin / manager / partner 可访问
       </span>
     </div>
 
@@ -59,6 +59,11 @@
                 >{{ f }}</el-checkbox>
               </el-checkbox-group>
             </div>
+          </el-form-item>
+
+          <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树；跨模块 cell 级字段） -->
+          <el-form-item label="ACNR 选字段（跨模块单元格）">
+            <CustomQueryFieldPicker v-model="acnrFieldIds" />
           </el-form-item>
 
           <!-- 过滤条件 -->
@@ -259,13 +264,34 @@
             max-height="500"
           >
             <el-table-column
-              v-for="col in result.columns"
-              :key="col"
-              :prop="col"
-              :label="col"
-              show-overflow-tooltip
+              v-for="col in resultColumns"
+              :key="col.key"
+              :prop="col.key"
+              :label="col.title"
+              :show-overflow-tooltip="!col.drillable"
               min-width="140"
-            />
+            >
+              <template #default="{ row }">
+                <!-- 可下钻列：显示值 + GtIndexChip（value=addr_id，经 resolveIndex 拿 jump_route 下钻，R4.3） -->
+                <span
+                  v-if="col.drillable && cellAddrId(row, col)"
+                  class="gt-aqb-drill-cell"
+                >
+                  <span>{{ row[col.key] }}</span>
+                  <GtIndexChip
+                    :value="addrIdToIndexRef(cellAddrId(row, col)) || ''"
+                    :context-project-id="(route.params.projectId as string) || ''"
+                    :validate="false"
+                    prevent-navigate
+                    context="下钻到数据来源底稿格"
+                    class="gt-aqb-drill-chip"
+                    @click="drill(cellAddrId(row, col))"
+                  />
+                </span>
+                <!-- 无 addr_id → 不可下钻普通文本列（R4.5） -->
+                <span v-else>{{ row[col.key] }}</span>
+              </template>
+            </el-table-column>
             <!-- P2-6: 公式引用列——当 formula_refs 有非 null 值时显示，支持一键复制到公式编辑器 -->
             <el-table-column
               v-if="hasFormulaRefs"
@@ -296,11 +322,21 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { DocumentCopy } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import {
+  useAcnrDrill,
+  normalizeColumns,
+  cellAddrId,
+  addrIdToIndexRef,
+  type QueryColumnMeta,
+} from '@/composables/useAcnrDrill'
 
 withDefaults(defineProps<{ embedded?: boolean }>(), { embedded: false })
 
@@ -335,7 +371,8 @@ interface AggregateRow {
 }
 interface QueryResult {
   rows: Record<string, any>[]
-  columns: string[]
+  // 后端可能返回 ColumnMeta[]（含 addr_id/drillable）或 legacy string[]，统一由 normalizeColumns 归一
+  columns: Array<string | Record<string, any>>
   total: number
   table: string
   sql: string
@@ -343,10 +380,21 @@ interface QueryResult {
 }
 
 const schema = ref<Schema | null>(null)
+// ACNR 选字段：选中 cell 节点的 addr_id 列表（R2.4，作跨模块查询字段标识）
+const acnrFieldIds = ref<string[]>([])
 // schema 缓存（sessionStorage）
 const SCHEMA_CACHE_KEY = 'gt:query-builder:schema-v1'
 const sqlPreview = ref<string>('')
 const result = ref<QueryResult | null>(null)
+
+// 结果列下钻（R4.2/R4.4/R4.6/R4.7）：project 上下文取自路由（构建器可在项目内嵌入使用）
+const route = useRoute()
+const { drill } = useAcnrDrill(() => (route.params.projectId as string) || '')
+// 归一结果列为 QueryColumnMeta（含 addr_id/drillable）
+const resultColumns = computed<QueryColumnMeta[]>(() =>
+  normalizeColumns(result.value?.columns),
+)
+
 const loadingPreview = ref(false)
 const loadingExecute = ref(false)
 const loadingExport = ref(false)
@@ -527,6 +575,8 @@ function buildPayload() {
     })),
     group_by: dsl.group_by,
     limit: dsl.limit,
+    // ACNR 选字段：以 addr_id 作为跨模块查询字段标识（R2.4）
+    acnr_targets: acnrFieldIds.value,
   }
 }
 
@@ -751,5 +801,14 @@ function copyFormulaRef(index: number) {
 }
 .gt-aqb-formula-ref:hover {
   background: #e8ddf4;
+}
+.gt-aqb-drill-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.gt-aqb-drill-chip {
+  flex-shrink: 0;
 }
 </style>

@@ -816,6 +816,33 @@ class WpFormula(Base):
         sa.DateTime(timezone=True), server_default=func.now()
     )
 
+    # ── V100 公式管理库扩展列（formula-management-library）──────────────
+    # 三类型公式治理 + 最近计算时间 + 规范化引用 + 初稿语义/来源标记。
+    # formula_type ∈ {auto_calc, logic_check, reasonability}
+    formula_type: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'auto_calc'")
+    )
+    last_computed_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    # refs: [{addr_id | formula_ref, ...}] —— 规范化引用，禁裸字符串
+    # NOTE: 不写 `'[]'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # 会导致建表 DDL 报 "unrecognized token"。`'[]'` 在 PG/SQLite 双方言下
+    # 都能解析为合法空 JSON 数组（同 custom_query_models / review_template_models 约定）。
+    refs: Mapped[list | dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'[]'")
+    )
+    issue_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    hint_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # formula_source ∈ {preset, custom, reference}
+    formula_source: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'custom'")
+    )
+    # reference 来源指向被参照源公式；非 reference 来源为 NULL
+    reference_formula_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+
     __table_args__ = (
         Index(
             "uq_wp_formula_wp_sheet_cell",
@@ -823,4 +850,113 @@ class WpFormula(Base):
             unique=True,
         ),
         Index("idx_wp_formula_project", "project_id"),
+    )
+
+
+class DraftMarker(Base):
+    """初稿标记（V100 formula-management-library）。
+
+    可查询、可区分初稿 vs 已审定；对应迁移 V100 的 draft_marker 表。
+    """
+
+    __tablename__ = "draft_marker"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    # 数据单元定位（如 audit_sheet:{wp_id}:{cell} / report:{row_code}）
+    unit_scope: Mapped[str] = mapped_column(String(255), nullable=False)
+    # state ∈ {draft, human_edited}
+    state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'draft'")
+    )
+    # 关联生成它的刷新批次
+    refresh_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_draft_marker_unit",
+            "project_id", "year", "unit_scope",
+            unique=True,
+        ),
+    )
+
+
+class DraftRefreshAudit(Base):
+    """初稿刷新审计留痕（append-only，V100 formula-management-library）。
+
+    仅 append，不暴露 UPDATE/DELETE；对应迁移 V100 的 draft_refresh_audit 表。
+    """
+
+    __tablename__ = "draft_refresh_audit"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    operator_id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), nullable=False)
+    operator_role: Mapped[str] = mapped_column(String(50), nullable=False)
+    operated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+    scope: Mapped[str] = mapped_column(String(100), nullable=False)
+    # 幂等键
+    tb_snapshot_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    affected_count: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, server_default=text("0")
+    )
+    # result_status ∈ {success, blocked, rolled_back}
+    result_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # NOTE: 不写 `'{}'::jsonb`（PG 字面 cast）—— SQLite 测试 dialect 不识别 `::`
+    # `'{}'` 在 PG/SQLite 双方言下都能解析为合法空 JSON 对象（同 custom_query_models 约定）。
+    detail: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
+    )
+
+    __table_args__ = (
+        Index(
+            "idx_draft_audit_project_year",
+            "project_id", "year", sa.text("operated_at DESC"),
+        ),
+    )
+
+
+class DraftRefreshSnapshot(Base):
+    """初稿刷新回滚快照（V100 formula-management-library）。
+
+    覆盖前内容，供回滚恢复；对应迁移 V100 的 draft_refresh_snapshot 表。
+    """
+
+    __tablename__ = "draft_refresh_snapshot"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    refresh_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("draft_refresh_audit.id"), nullable=False
+    )
+    unit_scope: Mapped[str] = mapped_column(String(255), nullable=False)
+    # 覆盖前内容（供回滚恢复）
+    before_value: Mapped[dict | list] = mapped_column(JSONB, nullable=False)
+    # 被覆盖的人工编辑者标识（Req 4.3）
+    editor_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("idx_draft_snapshot_refresh", "refresh_id"),
     )

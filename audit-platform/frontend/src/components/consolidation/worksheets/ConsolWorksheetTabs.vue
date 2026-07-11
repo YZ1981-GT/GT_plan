@@ -67,7 +67,7 @@
         :equity-rows="data.elimEquity" :income-rows="data.elimIncome" :cross-rows="data.elimCross"
         :imported-entries="allImportedEntries"
         @save="onSave('合并抵消分录', $event)" @open-formula="onOpenFormula"
-        @goto-sheet="(k: string) => activeSheet = k" />
+        @goto-sheet="onGotoSheet" />
       <CapitalReserveSheet v-else-if="activeSheet === 'capital'" :companies="companyColumns"
         v-model="data.capitalReserve" :elimination-data="elimSummaryForCapital"
         @save="onSave('资本公积变动', $event)" @open-formula="onOpenFormula" />
@@ -84,17 +84,17 @@
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :investment-equity="data.investmentEquity" :equity-sim-direct="data.equitySimDirect"
         :elim-equity="data.elimEquity" @save="onSave('抵消后长投', $event)" @open-formula="onOpenFormula"
-        @goto-sheet="(k: string) => activeSheet = k" />
+        @goto-sheet="onGotoSheet" />
       <PostElimIncomeSheet v-else-if="activeSheet === 'post_income'"
         :companies="companyColumns" :investment-cost="data.investmentCost"
         :equity-sim-direct="data.equitySimDirect" :elim-income="data.elimIncome"
         @save="onSave('抵消后投资收益', $event)"
-        @goto-sheet="(k: string) => activeSheet = k" @open-formula="onOpenFormula" />
+        @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <MinorityInterestSheet v-else-if="activeSheet === 'minority'"
         :companies="companyColumns" :net-asset-data="data.netAsset"
         :equity-sim-direct="data.equitySimDirect" :elim-equity="data.elimEquity"
         :elim-income="data.elimIncome" @save="onSave('少数股东权益损益', $event)"
-        @goto-sheet="(k: string) => activeSheet = k" @open-formula="onOpenFormula" />
+        @goto-sheet="onGotoSheet" @open-formula="onOpenFormula" />
       <!-- 内部抵消表 -->
       <InternalArApSheet v-else-if="activeSheet === 'internal_arap'"
         :companies="companyColumns" @save="onSave('内部往来抵消', $event)" @open-formula="onOpenFormula"
@@ -639,8 +639,23 @@ const allImportedEntries = computed(() => [
   ...internalEntries.cashflow,
 ])
 
+// ─── 公式 / 跨表导航统一接线（acnr-consumer-wiring Req 20.5/20.6/20.7, task 31.3）──
+// 单一父级接线点：所有 ~15 个子 worksheet 的 `open-formula` 事件都绑定到此处，
+// 经 EventBus `open-formula-manager` → ThreeColumnLayout 顶层挂载的全局
+// FormulaManagerDialog → FormulaEditDialog（已于 task 18.3 迁移到 ACNR：
+// useAcnr().listSheets/listCells + mapAcnrCellsToPickerRows）。
+// 因此「一处接线惠及全部 worksheet」：子组件无需各自接 ACNR picker。
+// miss/picker 不可用时由 FormulaEditDialog 内部回退 legacy 地址注册表（Req 20.7 无回归）。
 function onOpenFormula(sheetKey: string) {
   eventBus.emit('open-formula-manager', { nodeKey: sheetKey })
+}
+
+// `goto-sheet`：合并工作底稿模块内部的表样切换（如 elimination→net_asset），
+// 目标为本模块内的本地 sheet key（非跨底稿 wp_code），按 Req 20.5 合并模块内
+// 跳转合法保持本地切换；真正的跨底稿跳转由 GtIndexChip / ACNR resolve 承载
+// （本模块 worksheet 未产生跨底稿目标）。
+function onGotoSheet(k: string) {
+  activeSheet.value = k
 }
 </script>
 

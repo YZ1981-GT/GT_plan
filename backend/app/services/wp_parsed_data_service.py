@@ -17,7 +17,6 @@ from typing import Any
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.models.workpaper_models import WorkingPaper
-from app.services.address_registry import address_registry
 
 logger = logging.getLogger(__name__)
 
@@ -68,12 +67,20 @@ def format_cell_display_value(value: Decimal | Any) -> Any:
 
 
 async def touch_wp_registry(project_id: uuid.UUID | str) -> None:
-    """使项目 WP 域地址注册表缓存失效（L1 + L2）。
+    """使项目 WP 域地址注册表缓存失效（汇入 canonical ACNR invalidate）。
 
-    失败仅 warning，不阻断主流程；TTL 120s 为最终兜底。
+    Req 10.1/10.2/10.3/10.4：改调 canonical `acnr.events.invalidate`（in-process
+    直调，不 re-publish WORKPAPER_SAVED 事件，避免 handler 重复 fan-out）。canonical
+    invalidate 的全链（L3 RuntimeIndex → L2 overlay → FormulaReverseIndex →
+    legacy `address_registry.invalidate_async(domain="wp")`）是原直接调用的超集，
+    确保 reverse_index 清理在该热路径也触发（修复死代码风险）。
+
+    失败仅 warning，不 raise，不阻断主流程；TTL 120s 为最终兜底。
     """
     try:
-        await address_registry.invalidate_async(str(project_id), domain="wp")
+        from app.services.acnr.events import invalidate as acnr_invalidate
+
+        await acnr_invalidate(str(project_id), trigger="touch_wp_registry")
     except Exception as e:
         logger.warning(
             "touch_wp_registry 失败 project_id=%s: %s", project_id, e

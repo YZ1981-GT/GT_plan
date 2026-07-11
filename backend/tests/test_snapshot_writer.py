@@ -19,11 +19,51 @@ import pytest
 from hypothesis import given, settings, strategies as st
 
 from app.services.custom_query.snapshot_writer import (
+    AuditWriteFailed,
     SnapshotWriter,
     WritebackConflict,
     WritebackPermissionDenied,
+    WritebackResolveUnavailable,
+    WritebackTargetUnresolvable,
     _parse_cell_ref,
     snapshot_writer,
+)
+from app.services.custom_query.addressing_service import ResolvedTarget
+
+
+# ─── addr_id resolve mock helper (Task 15.3) ─────────────────────────────────
+#
+# 自 Task 15.3 起，写回 Step 4 强制经 full_resolve（AddressingService）解析
+# canonical addr_id 身份：无法解析 → 中止（R3.4），resolve 不可用/超时 → 中止（R3.5）。
+# 因此 happy-path 写回测试必须先让 AddressingService.resolve_target 命中，否则写回
+# 会按 R3.4 正确中止。以下 helper 生成一个返回「已解析」ResolvedTarget 的桩。
+
+
+def _resolve_found_fake(
+    addr_id: str,
+    *,
+    jump_route: str | None = "/workpapers/x?sheet=s&cell=c",
+    entry_type: str = "cell",
+):
+    """返回一个替换 addressing_service.resolve_target 的异步桩：恒解析为给定 addr_id。"""
+
+    async def _fake(raw, *, project_id=None, db=None, timeout_s=5.0):
+        return ResolvedTarget(
+            raw=raw,
+            found=True,
+            addr_id=addr_id,
+            wp_id=None,
+            jump_route=jump_route,
+            entry_type=entry_type,
+        )
+
+    return _fake
+
+
+# 命中桩的 patch 目标（模块级单例的方法）——两处使用方（snapshot_writer 单例 / 新建
+# SnapshotWriter 实例）在 _resolve_writeback_identity 中都消费该单例。
+_RESOLVE_TARGET_PATH = (
+    "app.services.custom_query.addressing_service.addressing_service.resolve_target"
 )
 
 
@@ -159,7 +199,8 @@ class TestProperty3WriteTransactionalConsistency:
 
         writer = SnapshotWriter()
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-2/A1")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
 
             result = await writer.write_cell(
@@ -211,7 +252,8 @@ class TestProperty3WriteTransactionalConsistency:
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-2/B7")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
 
             result = await snapshot_writer.write_cell(
@@ -304,7 +346,8 @@ class TestProperty4OptimisticLockConflict:
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-2/A1")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
 
             result = await snapshot_writer.write_cell(
@@ -522,7 +565,8 @@ class TestProperty26CrossModuleWriteRouting:
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-2/A1")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
 
             await snapshot_writer.write_cell(
@@ -690,7 +734,8 @@ class TestCellWritebackE2E:
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-1/B7")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
             # 新版: snapshot_writer 使用 orchestrator，需 mock ORM 查询 + orchestrator
             with patch("app.services.workpaper_save_orchestrator.orchestrator.after_save", new_callable=AsyncMock) as mock_orch:
@@ -795,7 +840,8 @@ class TestSnapshotWriterAcnrAddrId:
         mock_catalog.sheets_by_code = {"D2-2": [mock_sheet_entry]}
         mock_catalog.cells_by_addr_id = {}
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-2/B7")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
             with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
                 result = await snapshot_writer.write_cell(
@@ -861,7 +907,8 @@ class TestSnapshotWriterAcnrAddrId:
         mock_catalog.sheets_by_code = {"D2-2": [mock_sheet_entry]}
         mock_catalog.cells_by_addr_id = {"D2/D2-2/E100": mock_cell_entry}
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-2/E100")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
             with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
                 result = await snapshot_writer.write_cell(
@@ -926,7 +973,8 @@ class TestSnapshotWriterAcnrAddrId:
 
         writer._resolve_addr_id = tracking_resolve
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/Sheet1/A1")):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
 
             await writer.write_cell(
@@ -948,15 +996,20 @@ class TestSnapshotWriterAcnrAddrId:
         assert resolve_calls[0]["cell_ref"] == "A1"
 
     @pytest.mark.asyncio
-    async def test_acnr_miss_falls_back_gracefully(self):
-        """ACNR catalog miss 时降级返回构造的 addr_id，不阻塞写回。
+    async def test_target_unresolvable_aborts_writeback(self):
+        """回写目标无法解析为有效 addr_id → 中止、不改任何数据（R3.4，Task 15.3）。
 
-        **Validates: Requirements 15.1**
+        行为变更：Task 15.3 之前 addr_id 解析失败为非致命降级（仍写回）；现按 R3.4
+        要求「无法解析即中止、不改数据、TARGET_UNRESOLVABLE」。
+
+        **Validates: Requirements 3.4**
         """
         sheet_name = "未注册Sheet"
         parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old")
         now = datetime.now(timezone.utc)
         project_id = "00000000-0000-0000-0000-000000000004"
+
+        update_executed: list[str] = []
 
         async def mock_execute(stmt, params=None):
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
@@ -965,22 +1018,19 @@ class TestSnapshotWriterAcnrAddrId:
                 mock_result.first.return_value = (now, parsed_data, "X9", "", project_id)
                 return mock_result
             elif "UPDATE" in stmt_str:
+                update_executed.append(stmt_str)
                 return MagicMock()
             return MagicMock(first=MagicMock(return_value=None))
 
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        # Mock catalog that returns empty for all lookups (miss)
-        mock_catalog = MagicMock()
-        mock_catalog.sheets_by_alias = {}
-        mock_catalog.sheets_by_code = {}
-        mock_catalog.cells_by_addr_id = {}
+        async def _fake_unresolvable(raw, *, project_id=None, db=None, timeout_s=5.0):
+            return ResolvedTarget(raw=raw, found=False, error="unresolvable")
 
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
-            with patch("app.services.acnr.catalog.get_catalog", return_value=mock_catalog):
-                result = await snapshot_writer.write_cell(
+        with patch(_RESOLVE_TARGET_PATH, new=_fake_unresolvable):
+            with pytest.raises(WritebackTargetUnresolvable):
+                await snapshot_writer.write_cell(
                     db=mock_db,
                     user=_make_mock_user(),
                     wp_id="wp-001",
@@ -991,25 +1041,24 @@ class TestSnapshotWriterAcnrAddrId:
                     project_id=project_id,
                 )
 
-        # 写回仍然成功（不阻塞）
-        assert result["success"] is True
-        # 降级 addr_id 仍有值（最大努力）
-        assert result["addr_id"] is not None
-        assert "X9" in result["addr_id"]
-        # column_metadata 降级但仍存在
-        assert result["column_metadata"] is not None
-        assert result["column_metadata"]["drilldown_enabled"] is False
+        # R3.4: 中止时不改任何数据（无任何 UPDATE 被执行）
+        assert update_executed == []
 
     @pytest.mark.asyncio
-    async def test_acnr_error_does_not_block_write(self):
-        """ACNR 解析异常时不阻塞写回主流程（降级策略）。
+    async def test_resolve_unavailable_aborts_writeback(self):
+        """Resolve 服务不可用/5s 无响应 → 中止、数据不变（R3.5，Task 15.3）。
 
-        **Validates: Requirements 15.1**
+        行为变更：Task 15.3 之前 ACNR 解析异常为非致命降级（仍写回）；现按 R3.5
+        要求「resolve 不可用即中止、数据不变、RESOLVE_UNAVAILABLE」。
+
+        **Validates: Requirements 3.5**
         """
         sheet_name = "Sheet1"
         parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old")
         now = datetime.now(timezone.utc)
         project_id = "00000000-0000-0000-0000-000000000005"
+
+        update_executed: list[str] = []
 
         async def mock_execute(stmt, params=None):
             stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
@@ -1018,20 +1067,19 @@ class TestSnapshotWriterAcnrAddrId:
                 mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
                 return mock_result
             elif "UPDATE" in stmt_str:
+                update_executed.append(stmt_str)
                 return MagicMock()
             return MagicMock(first=MagicMock(return_value=None))
 
         mock_db = AsyncMock()
         mock_db.execute = mock_execute
 
-        # Mock catalog that raises an exception
-        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop:
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
-            with patch(
-                "app.services.acnr.catalog.get_catalog",
-                side_effect=RuntimeError("catalog not loaded"),
-            ):
-                result = await snapshot_writer.write_cell(
+        async def _fake_unavailable(raw, *, project_id=None, db=None, timeout_s=5.0):
+            return ResolvedTarget(raw=raw, found=False, error="resolve_unavailable")
+
+        with patch(_RESOLVE_TARGET_PATH, new=_fake_unavailable):
+            with pytest.raises(WritebackResolveUnavailable):
+                await snapshot_writer.write_cell(
                     db=mock_db,
                     user=_make_mock_user(),
                     wp_id="wp-001",
@@ -1042,11 +1090,8 @@ class TestSnapshotWriterAcnrAddrId:
                     project_id=project_id,
                 )
 
-        # 写回成功不受 ACNR 故障影响
-        assert result["success"] is True
-        assert result["updated_at"] is not None
-        # 降级 addr_id 仍有值
-        assert result["addr_id"] == "D2/Sheet1/A1"
+        # R3.5: 中止时数据不变（无任何 UPDATE 被执行）
+        assert update_executed == []
 
     @pytest.mark.asyncio
     async def test_cell_in_l1_seeds_gets_rich_metadata(self):
@@ -1135,3 +1180,125 @@ class TestSnapshotWriterAcnrAddrId:
         meta = result["column_metadata"]
         assert meta["drilldown_enabled"] is True
         assert meta["cell_address"] == "B7"
+
+
+# ---------------------------------------------------------------------------
+# Task 15.3: 无审计不回写 (R14.8) + advanced_query_writeback 身份落库 (R3.1/R14.3)
+# Feature: advanced-query-module, Task 15.3
+# ---------------------------------------------------------------------------
+
+
+class TestWritebackAddrIdIdentityAndAudit:
+    """Task 15.3：回写身份升级为 addr_id + 无审计不回写 + 身份落库。"""
+
+    @pytest.mark.asyncio
+    async def test_audit_failure_raises_audit_write_failed(self):
+        """审计写入失败 → 抛 AuditWriteFailed（无审计不回写，R14.8）。
+
+        把 log_action 纳入回写事务成功判定：审计写入失败即视为回写失败，由 router
+        回滚回写改动（数据不变）。service 只 flush 不 commit，故此处只需断言异常抛出。
+
+        **Validates: Requirements 14.8**
+        """
+        sheet_name = "Sheet1"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-000000000009"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
+                return mock_result
+            return MagicMock(first=MagicMock(return_value=None))
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake("D2/D2-1/A1")), \
+                patch(
+                    "app.services.audit_logger_enhanced.audit_logger.log_action",
+                    new_callable=AsyncMock,
+                ) as mock_audit:
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+            # 审计写入抛错 → 触发无审计不回写
+            mock_audit.side_effect = RuntimeError("audit backend down")
+
+            with pytest.raises(AuditWriteFailed):
+                await snapshot_writer.write_cell(
+                    db=mock_db,
+                    user=_make_mock_user(),
+                    wp_id="wp-001",
+                    sheet_name=sheet_name,
+                    cell_ref="A1",
+                    new_value="new",
+                    opened_at=now,
+                    project_id=project_id,
+                )
+
+    @pytest.mark.asyncio
+    async def test_writeback_identity_persisted_with_addr_id(self):
+        """成功回写将 addr_id 身份 + 新旧值落 advanced_query_writeback（R3.1/R14.3）。
+
+        断言 db.add 收到 AdvancedQueryWriteback 记录，且以 canonical addr_id 作身份，
+        result='success'（取代裸 (wp_id, sheet_name, cell_ref)）。
+
+        **Validates: Requirements 3.1, 14.3**
+        """
+        from app.models.custom_query_models import AdvancedQueryWriteback
+
+        sheet_name = "Sheet1"
+        parsed_data = _make_snapshot_with_cell(sheet_name, 0, 0, "old_val")
+        now = datetime.now(timezone.utc)
+        project_id = "00000000-0000-0000-0000-00000000000a"
+        addr_id = "D2/D2-1/A1"
+
+        async def mock_execute(stmt, params=None):
+            stmt_str = str(stmt.text) if hasattr(stmt, 'text') else str(stmt)
+            if "SELECT" in stmt_str and "FOR UPDATE" in stmt_str:
+                mock_result = MagicMock()
+                mock_result.first.return_value = (now, parsed_data, "D2", "", project_id)
+                return mock_result
+            return MagicMock(first=MagicMock(return_value=None))
+
+        added_records: list = []
+
+        mock_db = AsyncMock()
+        mock_db.execute = mock_execute
+        mock_db.add = lambda obj: added_records.append(obj)
+
+        with patch("app.services.custom_query.snapshot_writer.asyncio.get_event_loop") as mock_loop, \
+                patch(_RESOLVE_TARGET_PATH, new=_resolve_found_fake(addr_id)), \
+                patch(
+                    "app.services.workpaper_save_orchestrator.orchestrator.after_save",
+                    new_callable=AsyncMock,
+                ), \
+                patch(
+                    "app.services.audit_logger_enhanced.audit_logger.log_action",
+                    new_callable=AsyncMock,
+                ):
+            mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
+
+            result = await snapshot_writer.write_cell(
+                db=mock_db,
+                user=_make_mock_user(user_id="00000000-0000-0000-0000-0000000000ff"),
+                wp_id="00000000-0000-0000-0000-000000000101",
+                sheet_name=sheet_name,
+                cell_ref="A1",
+                new_value="new_val",
+                opened_at=now,
+                project_id=project_id,
+            )
+
+        assert result["success"] is True
+        assert result["addr_id"] == addr_id
+        # R3.1/R14.3: 身份记录落库，addr_id 为 canonical 身份，result=success
+        wb_records = [r for r in added_records if isinstance(r, AdvancedQueryWriteback)]
+        assert len(wb_records) == 1
+        rec = wb_records[0]
+        assert rec.addr_id == addr_id
+        assert rec.result == "success"
+        assert rec.old_value == "old_val"
+        assert rec.new_value == "new_val"

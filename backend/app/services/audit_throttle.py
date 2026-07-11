@@ -40,6 +40,7 @@ async def should_record(
     source: str,
     filters: dict[str, Any],
     action: str | None = None,
+    window_seconds: int = THROTTLE_WINDOW_SECONDS,
 ) -> bool:
     """判断是否应该记录本次审计日志。
 
@@ -55,6 +56,9 @@ async def should_record(
         查询过滤条件。
     action : str | None
         操作类型，若为敏感操作则绕过节流。
+    window_seconds : int
+        节流窗口 TTL（秒），默认 5s。查询执行审计按 60s 窗口聚合为 1 条
+        （advanced-query-module design §Components 11 / R14.4）时传 60。
 
     Returns
     -------
@@ -73,8 +77,8 @@ async def should_record(
     key = _build_throttle_key(user_id, source, filters)
 
     try:
-        # SET NX EX 5：仅当 key 不存在时设置，TTL=5s
-        result = await redis.set(key, "1", nx=True, ex=THROTTLE_WINDOW_SECONDS)
+        # SET NX EX {window}：仅当 key 不存在时设置，TTL=window_seconds
+        result = await redis.set(key, "1", nx=True, ex=window_seconds)
         return result is not None  # True = 首次（key 不存在），应记录
     except RedisError as e:
         logger.warning("Redis unavailable for audit throttle, fallback to always-record: %s", e)

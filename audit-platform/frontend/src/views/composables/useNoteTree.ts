@@ -7,6 +7,7 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDisclosureNoteTree, type DisclosureNoteTreeItem } from '@/services/auditPlatformApi'
 import { api } from '@/services/apiProxy'
+import { useAcnr } from '@/services/acnr/useAcnr'
 import { withLoading } from '@/composables/useLoading'
 import { handleApiError } from '@/utils/errorHandler'
 
@@ -16,6 +17,13 @@ export interface TreeNode {
   data?: any
   children?: TreeNode[]
   isGroup?: boolean
+  /**
+   * ACNR NOTE-domain index reference for leaf (real note) nodes, e.g. `note:{note_section}`.
+   * Additive metadata only — group/chapter nodes (isGroup) do NOT carry an indexRef.
+   * Consumers resolve this via `useAcnr().resolveIndex(indexRef)` for chip/jump.
+   * Req 17.1
+   */
+  indexRef?: string
 }
 
 export interface UseNoteTreeOptions {
@@ -37,6 +45,12 @@ export interface UseNoteTreeReturn {
   filteredTreeData: ComputedRef<TreeNode[]>
   flatNoteList: ComputedRef<DisclosureNoteTreeItem[]>
   fetchTree: () => Promise<void>
+  /**
+   * 解析附注节点索引（`note:{note_section}`）为 jump_route（Req 17.2）。
+   * 命中返回 jump_route；未命中（found=false / 错误 / 空 indexRef）返回 null，
+   * 调用方回退到现有 note 导航（不改动既有导航行为）。
+   */
+  resolveNoteIndexRoute: (indexRef?: string) => Promise<string | null>
   allowTreeDrop: (draggingNode: any, dropNode: any, type: 'prev' | 'next' | 'inner') => boolean
   onTreeNodeDrop: (draggingNode: any, dropNode: any, dropType: 'before' | 'after' | 'inner', _evt: DragEvent) => Promise<void>
   expandAll: () => void
@@ -119,6 +133,15 @@ const RELATED_GROUPS: Record<string, { label: string; keywords: string[] }> = {
 
 // ─── 通用分组函数 ────────────────────────────────────────────────────────────────
 
+/**
+ * 构建叶子 TreeNode（真实附注节点）。
+ * 在原 `{ id, label, data }` 基础上 additive 附加 `indexRef = note:{note_section}`（Req 17.1）。
+ * 不改变 id/label/data，故树结构/分组/拖拽行为保持不变（Req 17.3）。
+ */
+function makeNoteLeaf(n: DisclosureNoteTreeItem): TreeNode {
+  return { id: n.id, label: n.section_title, data: n, indexRef: `note:${n.note_section}` }
+}
+
 function buildGroupedChildren(
   items: DisclosureNoteTreeItem[],
   groups: Record<string, { label: string; keywords: string[] }>,
@@ -132,7 +155,7 @@ function buildGroupedChildren(
       matched.forEach(n => used.add(n.id))
       children.push({
         id: `${idPrefix}_${gk}`, label: gv.label, isGroup: true,
-        children: matched.map(n => ({ id: n.id, label: n.section_title, data: n })),
+        children: matched.map(makeNoteLeaf),
       })
     }
   }
@@ -140,7 +163,7 @@ function buildGroupedChildren(
   if (ungrouped.length) {
     children.push({
       id: `${idPrefix}_other`, label: '其他', isGroup: true,
-      children: ungrouped.map(n => ({ id: n.id, label: n.section_title, data: n })),
+      children: ungrouped.map(makeNoteLeaf),
     })
   }
   return children
@@ -188,7 +211,7 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
       if ((ch.prefix === '三' || ch.prefix === '四') && items.length > 10) {
         result.push({
           id: `chapter_${ch.prefix}`, label: `${chLabel}（${items.length}）`, isGroup: true,
-          children: items.map(n => ({ id: n.id, label: n.section_title, data: n })),
+          children: items.map(makeNoteLeaf),
         })
 
       // 报表注释（国企八/上市五）：按资产/负债/权益/损益分组
@@ -202,7 +225,7 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
           if (matched.length) {
             subChildren.push({
               id: `group_${ch.prefix}_${gKey}`, label: gInfo.label, isGroup: true,
-              children: matched.map(n => ({ id: n.id, label: n.section_title, data: n })),
+              children: matched.map(makeNoteLeaf),
             })
           }
         }
@@ -228,7 +251,7 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
           id: `chapter_${ch.prefix}`,
           label: items.length > 3 ? `${chLabel}（${items.length}）` : chLabel,
           isGroup: true,
-          children: items.map(n => ({ id: n.id, label: n.section_title, data: n })),
+          children: items.map(makeNoteLeaf),
         })
       }
     }
@@ -279,6 +302,25 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
     }
     return list
   })
+
+  // ─── ACNR NOTE 索引解析（Req 17.2 / 17.4） ──────────────────────────────────
+  const acnr = useAcnr()
+
+  /**
+   * 将附注节点的 indexRef（`note:{note_section}`）经 ACNR resolveIndex 解析为 jump_route。
+   * NOTE 域走 full_resolve V1 delegation，无需预登记 L1 catalog（Req 17.4）。
+   * 命中 → 返回 jump_route；unresolved（found=false / 无 jump_route / 空 indexRef / 异常）
+   * → 返回 null，调用方回退现有 note 导航（Req 17.2）。
+   */
+  async function resolveNoteIndexRoute(indexRef?: string): Promise<string | null> {
+    if (!indexRef) return null
+    try {
+      const res = await acnr.resolveIndex(indexRef)
+      return res.found && res.jump_route ? res.jump_route : null
+    } catch {
+      return null
+    }
+  }
 
   // ─── 树节点展开/收起 ───────────────────────────────────────────────────────
   function expandAll() {
@@ -340,6 +382,7 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
     filteredTreeData,
     flatNoteList,
     fetchTree,
+    resolveNoteIndexRoute,
     allowTreeDrop,
     onTreeNodeDrop,
     expandAll,

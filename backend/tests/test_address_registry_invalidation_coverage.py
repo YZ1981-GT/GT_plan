@@ -89,7 +89,12 @@ async def test_note_handler_calls_invalidate_with_note_domain(monkeypatch):
     ))
 
     assert captured.get("domain") == "note"
-    assert captured.get("project_id") == pid
+    # Req 11.1/11.2: handler now routes through acnr.events.invalidate_domain,
+    # which normalizes project_id via str(...) (canonical parity with the WP
+    # invalidate() path) before delegating to legacy invalidate_async. The
+    # registry's cache slots are string-keyed ({pid}:{year}:{tpl}:{domain}), so
+    # the str form is the correct value to match against.
+    assert captured.get("project_id") == str(pid)
 
 
 # ─── P1-4: 报表 / 公式 Redis 缓存失效事件挂接（统一缓存治理）────────────────────

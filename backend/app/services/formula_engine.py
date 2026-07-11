@@ -1500,11 +1500,35 @@ class WPExecutor:
             parsed_data = row or {}
             col = (column or "").strip()
 
-            # 单元格地址（B5/C12）→ extract_custom_cells
+            # 单元格地址（B5/C12）→ WP 域解析
             if re.match(r"^[A-Z]+\d+$", col, re.IGNORECASE):
                 cell_up = col.upper()
+                # ── Req 21.1: WP 域先试 ACNR full_resolve/runtime 作为寻址真源，
+                #    miss/异常 → 回退 extract_custom_cells（fail-open，永不中断取数）。
+                #    调用点已是 async（await db.execute），可直接 await full_resolve，
+                #    无 sync→async 桥接风险（design §1 option 1）。──
+                resolved_cell = cell_up
+                try:
+                    from app.services.acnr.resolver import full_resolve
+
+                    acnr_result = await full_resolve(
+                        formula_ref=f"WP('{wp_code}','{wp_code}','{cell_up}')",
+                        project_id=str(project_id),
+                        db=db,
+                    )
+                    if acnr_result and acnr_result.found and acnr_result.cell_address:
+                        resolved_cell = acnr_result.cell_address.upper()
+                except Exception as exc:
+                    logger.warning(
+                        "ACNR full_resolve failed for WP cell %s/%s: %s "
+                        "(fallback to extract_custom_cells)",
+                        wp_code,
+                        cell_up,
+                        exc,
+                    )
+                # 值仍从 parsed_data 提取（extract_custom_cells 为兜底真源，保证不破坏既有取数）
                 for rec in extract_custom_cells(parsed_data):
-                    if rec.cell == cell_up:
+                    if rec.cell == resolved_cell:
                         v = rec.value
                         if v is None or v == "":
                             return D("0")

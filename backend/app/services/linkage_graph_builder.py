@@ -32,6 +32,65 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
+# ─── WP URI → addr_id Normalization (ACNR consumer wiring, task 3.1) ──────────
+
+# WP URI 格式: WP:{wp_code}:{sheet_display_name}:{cell_ref}
+_WP_URI_PATTERN = re.compile(r"^WP:([^:]+):([^:]+):(.+)$")
+
+# WP 域 custom/docx 形态: 空 sheet 段 + 非空 suffix。
+# 例: "WP:A10-1::docx:上市实体…" → wp_code="A10-1", suffix="docx:上市实体…"
+# 归一化到 custom_flat addr_id 形态 {wp_code}/{wp_code}/{suffix}（Req 12.2）。
+# 注意 `::` 强制两个连续冒号 + `(.+)` 要求 suffix 非空，因此：
+#   - 良构 4 段 `WP:wp:sheet:cell` 不匹配（sheet 段非空 → 只有单冒号）；
+#   - 退化 2 空段 `WP:{wp_code}::`（suffix 为空）不匹配 → 保持原样返回。
+_WP_CUSTOM_URI_PATTERN = re.compile(r"^WP:([^:]+)::(.+)$")
+
+# Sheet display name → sheet_code 映射（剥离中文前缀）
+# 例: "明细表D2-2" → "D2-2", "审定表D2-1" → "D2-1"
+_SHEET_CODE_PATTERN = re.compile(r"([A-Z]\d+(?:-\d+)?[A-Z]?)")
+
+
+def _normalize_wp_uri_to_addr_id(uri: str) -> str:
+    """将 WP:{wp_code}:{sheet_display}:{cell} 归一化为 addr_id。
+
+    - WP 域（良构 4 段）: "WP:D2:明细表D2-2:E100" → "D2/D2-2/E100"
+    - WP 域（custom/docx，空 sheet 段 + 非空 suffix）:
+      "WP:A10-1::docx:上市实体" → "A10-1/A10-1/docx:上市实体"
+      （custom_flat 形态 {wp_code}/{wp_code}/{suffix}，与 grammar_v1 一致，Req 12.2）
+    - 非 WP 域: 原样返回（REPORT:*, TB:*, NOTE:*, MAPPING:*, ADJ:* etc.）
+    - 退化 WP 域（``WP:{wp_code}::`` 无 suffix）: 原样返回（无有意义的 addr_id，
+      避免误改 _from_docx_placeholders 派生的空占位 URI）
+
+    sheet_code 提取策略:
+    1. 从 sheet_display 中提取 ``[A-Z]\\d+(-\\d+)?[A-Z]?`` 模式
+    2. 如无法提取则使用原始 sheet_display（保留可调试性）
+
+    Args:
+        uri: 待归一化的 URI 字符串。
+
+    Returns:
+        WP 域返回 ``{wp_code}/{sheet_code}/{cell}`` 格式的 addr_id；
+        非 WP 域（不匹配 WP URI 模式）原样返回。
+    """
+    m = _WP_URI_PATTERN.match(uri)
+    if m:
+        wp_code, sheet_display, cell = m.groups()
+
+        # 提取 sheet_code；无匹配时 fallback 到原始 sheet_display
+        code_match = _SHEET_CODE_PATTERN.search(sheet_display)
+        sheet_code = code_match.group(1) if code_match else sheet_display
+
+        return f"{wp_code}/{sheet_code}/{cell}"
+
+    # WP 域 custom/docx 形态（空 sheet 段 + 非空 suffix）→ custom_flat addr_id。
+    m_custom = _WP_CUSTOM_URI_PATTERN.match(uri)
+    if m_custom:
+        wp_code, suffix = m_custom.groups()
+        return f"{wp_code}/{wp_code}/{suffix}"
+
+    return uri  # 非 WP 域 / 退化形态，原样返回
+
+
 class LinkageGraphBuilder:
     """统一依赖图构建器：从 6 个数据源合并构建全局依赖图。"""
 
@@ -119,13 +178,17 @@ class LinkageGraphBuilder:
                 cell_ref = cell.get("cell_ref", "")
                 formula_type = cell.get("formula_type", "")
 
-                # Target node: the cell being filled
-                target_uri = f"WP:{wp_code}:{sheet}:{cell_ref}"
+                # Target node: the cell being filled (WP domain → addr_id)
+                target_uri = _normalize_wp_uri_to_addr_id(
+                    f"WP:{wp_code}:{sheet}:{cell_ref}"
+                )
                 self._ensure_node(target_uri, "WP", wp_code)
 
-                # Parse formula to extract source
+                # Parse formula to extract source; WP-domain sources归一化，
+                # 非 WP 域（TB/ADJ）经 _normalize_wp_uri_to_addr_id 原样返回
                 source_uri = self._parse_prefill_formula(formula, formula_type)
                 if source_uri:
+                    source_uri = _normalize_wp_uri_to_addr_id(source_uri)
                     self._ensure_node(source_uri, *self._parse_uri_parts(source_uri))
                     self._add_edge(source_uri, target_uri, "data_flow", "blocking")
 
@@ -184,7 +247,9 @@ class LinkageGraphBuilder:
             source_cell_label = ref.get("source_cell_label", ref.get("source_cell", ""))
             severity = ref.get("severity", "warning")
 
-            source_uri = f"WP:{source_wp}:{source_sheet}:{source_cell_label}"
+            source_uri = _normalize_wp_uri_to_addr_id(
+                f"WP:{source_wp}:{source_sheet}:{source_cell_label}"
+            )
             self._ensure_node(source_uri, "WP", source_wp)
 
             targets = ref.get("targets", [])
@@ -193,7 +258,9 @@ class LinkageGraphBuilder:
                 target_sheet = target.get("sheet", "")
                 target_cell_label = target.get("cell_label", target.get("cell", ""))
 
-                target_uri = f"WP:{target_wp}:{target_sheet}:{target_cell_label}"
+                target_uri = _normalize_wp_uri_to_addr_id(
+                    f"WP:{target_wp}:{target_sheet}:{target_cell_label}"
+                )
                 self._ensure_node(target_uri, "WP", target_wp)
                 self._add_edge(source_uri, target_uri, "data_flow", severity)
 
@@ -278,8 +345,12 @@ class LinkageGraphBuilder:
             target_sheet = dep.get("target_sheet", "")
             target_cell = dep.get("target_cell", "")
 
-            source_uri = f"WP:{source_wp}:{source_sheet}:{source_cell}"
-            target_uri = f"WP:{source_wp}:{target_sheet}:{target_cell}"
+            source_uri = _normalize_wp_uri_to_addr_id(
+                f"WP:{source_wp}:{source_sheet}:{source_cell}"
+            )
+            target_uri = _normalize_wp_uri_to_addr_id(
+                f"WP:{source_wp}:{target_sheet}:{target_cell}"
+            )
 
             self._ensure_node(source_uri, "WP", source_wp)
             self._ensure_node(target_uri, "WP", source_wp)
@@ -458,6 +529,9 @@ class LinkageGraphBuilder:
             if not uri:
                 continue
 
+            # WP 域 placeholder URI 归一化（非 WP 域原样返回）
+            uri = _normalize_wp_uri_to_addr_id(uri)
+
             # 创建占位符节点
             self._ensure_node(uri, "WP", placeholder)
 
@@ -465,7 +539,7 @@ class LinkageGraphBuilder:
             wp_code_match = re.match(r"([A-Z]\d+(?:-\d+)?)", file_name.split("/")[-1])
             if wp_code_match:
                 wp_code = wp_code_match.group(1)
-                wp_uri = f"WP:{wp_code}::"
+                wp_uri = _normalize_wp_uri_to_addr_id(f"WP:{wp_code}::")
                 self._ensure_node(wp_uri, "WP", wp_code)
                 self._add_edge(wp_uri, uri, "docx_placeholder", "info")
 

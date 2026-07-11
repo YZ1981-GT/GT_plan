@@ -8,8 +8,11 @@
  *
  * Requirements: 31.1-31.5
  */
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted } from 'vue'
 import { resolveD4SheetLabel } from '../../composables/d4SheetLabels'
+import { useAcnrCatalogIndex } from '../../composables/useAcnrCatalogIndex'
+import { parseIndexRef } from '@/utils/parseIndexRef'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -91,14 +94,46 @@ const indexRows = computed<IndexRow[]>(() => {
   ]
 })
 
+// ─── ACNR catalog 名称合并（Req 18.1 / 18.2 / 18.7）───────────────────────────
+// indexRows(上) 为本地配置，仅保留 catalog 不持有的 tabName(intra-bundle 跳转目标)/
+// applicable(per-project 适用性)/group 等元数据，按 code(=sheet_code) keyed（Req 18.2 / 18.5）。
+// 显示名称从 ACNR catalog 取（Req 18.1）；catalog 空/失败 → 回退硬编码 name（Req 18.7）。
+const { catalogIndex, loadCatalogIndex } = useAcnrCatalogIndex()
+
+onMounted(() => {
+  loadCatalogIndex('D')
+})
+
+interface DisplayRow extends IndexRow {
+  addrId?: string
+  order: number
+}
+
+const displayRows = computed<DisplayRow[]>(() =>
+  indexRows.value.map((r) => {
+    const cat = catalogIndex.value.get(r.code)
+    return {
+      ...r,
+      name: cat?.sheet_name || r.name,
+      addrId: cat?.addr_id,
+      order: cat?.order ?? r.seq,
+    }
+  }),
+)
+
+/** code 是否可被索引文法解析为可跳转 chip（Chinese 合成码如 D4-目录/D4-附注上市 不可） */
+function isParseableCode(code: string): boolean {
+  return parseIndexRef(code) != null
+}
+
 // ─── 进度计算 ─────────────────────────────────────────────────────────
 
-const applicableCount = computed(() => indexRows.value.filter(r => r.applicable).length)
+const applicableCount = computed(() => displayRows.value.filter(r => r.applicable).length)
 
 /** 简易进度：有对应 allResponses 数据的视为已编制 */
 const completedCount = computed(() => {
   let count = 0
-  for (const row of indexRows.value) {
+  for (const row of displayRows.value) {
     if (!row.applicable) continue
     // 检查是否有对应的 checklist_responses 数据
     const hasData = props.allResponses.has(`${row.code}-rows`) ||
@@ -137,7 +172,7 @@ function navigateToSheet(row: IndexRow) {
 
     <!-- 目录表 -->
     <el-table
-      :data="indexRows"
+      :data="displayRows"
       border
       size="small"
       :row-class-name="({ row }: { row: IndexRow }) => row.applicable ? '' : 'inapplicable-row'"
@@ -154,8 +189,17 @@ function navigateToSheet(row: IndexRow) {
       <el-table-column prop="group" label="所属分组" width="100" align="center" />
       <el-table-column label="跳转" width="80" align="center">
         <template #default="{ row }">
+          <!-- 标准编码：用 GtIndexChip（Req 18.3），bundle 内 sheet 切换仍走 jumpToSection -->
+          <GtIndexChip
+            v-if="row.applicable && jumpToSection && isParseableCode(row.code)"
+            :label="row.code"
+            :prevent-navigate="true"
+            :validate="false"
+            @click="navigateToSheet(row)"
+          />
+          <!-- 合成码（D4-目录/D4-附注上市 等含中文，索引文法不可解析）保留 → 跳转，避免回归 -->
           <span
-            v-if="row.applicable"
+            v-else-if="row.applicable && jumpToSection"
             class="gt-index-chip"
             :title="`跳转到 ${row.name}`"
             @click="navigateToSheet(row)"

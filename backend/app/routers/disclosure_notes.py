@@ -658,3 +658,72 @@ async def apply_formulas(
         }
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"公式执行失败: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# acnr-consumer-wiring P10 / Req 15.6 — 附注公式列表 + 持久化端点
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{project_id}/{year}/{note_section}/formulas")
+async def list_note_formulas(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """列出附注章节的当前公式集（已保存用户编辑集优先，否则 generator 预览）。
+
+    供 NoteFormulaDialog onOpen 加载（Req 15.1）——替代此前 `formulas = ref([])`
+    从不加载的空态。只读查询，无需 commit。
+
+    返回 ``{"formulas": [...]}``；每条含 target/formula/description/category/source/type。
+    note 不存在或无表格 → 空列表（弹窗不阻断）。
+    """
+    from app.services.note_formula_service import note_formula_service
+
+    formulas = await note_formula_service.list_by_section(
+        db, project_id, year, note_section
+    )
+    return {"formulas": formulas}
+
+
+@router.put("/{project_id}/{year}/{note_section}/formulas")
+async def upsert_note_formulas(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """upsert 附注章节的用户编辑公式集（Req 15.2/15.3）。
+
+    body: ``{"formulas": [{target, formula, description, category, source?}, ...]}``
+    整体替换该章节的 ``_user_formulas`` 集（"这套就是最新集"语义），空行被过滤。
+
+    service 只 flush，router 统一 commit（工程铁律）。
+    """
+    from app.services.note_formula_service import note_formula_service
+
+    formulas = body.get("formulas")
+    if not isinstance(formulas, list):
+        raise HTTPException(status_code=400, detail="formulas 必须是列表")
+
+    try:
+        saved = await note_formula_service.save_many(
+            db, project_id, year, note_section, formulas
+        )
+        await db.commit()
+        return {"formulas": saved, "saved_count": len(saved)}
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=f"公式保存失败: {str(e)}")

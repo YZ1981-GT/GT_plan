@@ -40,7 +40,9 @@ def test_custom_entry_fields_complete(cell: str, label: str):
 
     db = AsyncMock()
     db.execute = AsyncMock(
-        return_value=MagicMock(all=lambda: [(parsed, wp_code, wp_name)])
+        return_value=MagicMock(
+            all=lambda: [("00000000-0000-0000-0000-000000000001", parsed, wp_code, wp_name)]
+        )
     )
     entries = _run(_build_custom_wp_cell_entries(db, str(uuid.uuid4()), 2025))
 

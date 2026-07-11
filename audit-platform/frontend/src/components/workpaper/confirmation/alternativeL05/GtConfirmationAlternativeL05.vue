@@ -45,6 +45,7 @@
       <div class="tabs-actions">
         <el-button size="small" type="primary" :icon="Plus" @click="handleAddCompany">新增公司</el-button>
         <el-button size="small" @click="handleImportFromSummary">从L0-1导入未回函</el-button>
+        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-dropdown v-if="!readonly" trigger="click" @command="handleImportExportCmd">
           <el-button size="small">导入导出▾</el-button>
           <template #dropdown>
@@ -240,19 +241,24 @@
 
     <!-- 隐藏的文件上传 -->
     <input ref="fileInputRef" type="file" accept=".xlsx" style="display:none" @change="handleFileSelected" />
+
+    <!-- 版本历史 drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, watch } from 'vue'
+import { ref, computed, provide, watch, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { useAlternativeL05Data } from '../l0-confirmation/composables/useAlternativeL05Data'
 import { calcReconcileDiff } from '../l0-confirmation/composables/useL0FormulaEngine'
-import { useWorkpaperImportExport } from '../composables/useWorkpaperImportExport'
-import useVersionTrail from '../composables/useVersionTrail'
+import { useWorkpaperImportExport } from '../../composables/useWorkpaperImportExport'
+import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
 import http from '@/utils/http'
+
+const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props / Emits ──────────────────────────────────────────────────────────
 
@@ -542,20 +548,20 @@ selfLoad()
 
 const projectIdRef = computed(() => props.projectId)
 const wpIdRefVt = computed(() => props.wpId)
-const versionTrail = useVersionTrail({
+const versionToolbar = useWorkpaperVersionToolbar({
+  wpId: wpIdRefVt,
   projectId: projectIdRef,
-  workpaperId: wpIdRefVt,
 })
+const { versionTrailRef } = versionToolbar
 
 // autoSnapshot on save
 watch(() => data.isDirty.value, (dirty) => {
   if (!dirty) {
     // just saved → auto snapshot
-    versionTrail.createSnapshot('auto', '自动保存快照')
+    versionToolbar.scheduleAutoSnapshot()
   }
 })
 
-provide('versionTrail', versionTrail)
 provide('openReviewDialog', () => { /* placeholder for review dialog injection */ })
 </script>
 

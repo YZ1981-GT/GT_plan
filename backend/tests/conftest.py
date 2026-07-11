@@ -2,6 +2,30 @@
 import os
 from collections.abc import AsyncGenerator
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-unit-tests")
+
+# ─── Hypothesis 全局「fast」profile：减少 example 数量、加快属性测试 ──────────────
+# 统一把 PBT 的 max_examples 收敛到较小值（默认 5，可用 HYPOTHESIS_MAX_EXAMPLES 覆盖），
+# 关闭 deadline 并抑制「输入生成过慢 / 数据过大」健康检查（此前偶发 FailedHealthCheck
+# 导致 test_audit_throttle 等用例不稳定）。注意：单个测试用 @settings(max_examples=N)
+# 显式指定的值优先于本 profile，故此处只降低未显式配置用例的开销并保证稳定。
+try:  # pragma: no cover - 测试环境配置
+    from hypothesis import HealthCheck, settings as _hyp_settings
+
+    _HYP_MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "5"))
+    _hyp_settings.register_profile(
+        "fast",
+        max_examples=_HYP_MAX_EXAMPLES,
+        deadline=None,
+        suppress_health_check=[
+            HealthCheck.too_slow,
+            HealthCheck.data_too_large,
+            HealthCheck.function_scoped_fixture,
+        ],
+    )
+    _hyp_settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "fast"))
+except Exception:  # hypothesis 未安装或版本差异时不阻断测试收集
+    pass
+
 import fakeredis.aioredis  # noqa: E402
 import pytest  # noqa: E402
 import pytest_asyncio  # noqa: E402

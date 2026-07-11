@@ -1,11 +1,26 @@
 /**
- * parseIndexRef — 跨底稿索引号解析工具函数
+ * parseIndexRef — 跨底稿索引号解析工具函数（display / navigation 层）
  *
  * 11 命名空间路由解析（wp/sheet/cell/Note/TB/Adj/Att/EQCR/Calc/Sample/Confirm）
  * 4 层级跳转语义（cell→1, sheet→2, wp→3, module→4）
  * 9 种边缘 case 处理（中文索引/空格/大小写/多目标/不存在/被裁剪/跨项目/GT_Custom/空 sheet）
  *
- * Validates: Requirements 3.11.8 + 3.11.9 + 3.11.10
+ * ── ACNR 收敛说明（Req 13.3 / task 15.2）────────────────────────────────────
+ * 严格 `<ns>:<target>` 语法的**权威文法**由 ACNR 维护：
+ *   `services/acnr/resolveUri.ts::parseIndexRef`（canonical，大小写敏感，返回 {namespace,target}）。
+ *
+ * 本 utils 解析器是该文法在 UI 导航层的**超集（display-only）**，在 canonical 文法之上额外提供：
+ *   - `layer` 跳转层级分类（GtIndexChip 导航需要）
+ *   - 宽松模式（裸底稿编码 D2 / D2-1 / D2A 识别，ACNR canonical 不含）
+ *   - 大小写不敏感输入 + ns 归一化（note→Note, tb→TB, eqcr→EQCR）
+ *   - GT_Custom 白名单跳过
+ * 因返回形状（ns/layer vs namespace）与大小写策略不同，无法直接内部委托而不破坏
+ * `GtIndexChip.vue` 与广泛的 `ResolvedIndexRef` 类型消费者，故保留本实现为 display 层。
+ *
+ * 两解析器在 11 命名空间上的**分类等价性**由契约测试
+ * `__tests__/parseIndexRef.acnr-parity.test.ts` 守卫，防止文法漂移。
+ *
+ * Validates: Requirements 3.11.8 + 3.11.9 + 3.11.10 + 13.3
  */
 
 // ─── Types ───────────────────────────────────────────────────────────────────

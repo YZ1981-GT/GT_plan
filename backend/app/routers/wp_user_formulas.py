@@ -208,7 +208,7 @@ async def update_user_formulas(
     non_empty_formulas = [f for f in payload.formulas.values() if f]
     if non_empty_formulas:
         from app.models.core import Project
-        from app.services.address_registry import address_registry
+        from app.services.acnr.formula_validation import validate_refs_via_acnr
 
         project = (await db.execute(
             sa.select(Project).where(Project.id == wp.project_id)
@@ -218,7 +218,7 @@ async def update_user_formulas(
             template_type = project.template_type or "soe"
             all_issues: list[dict] = []
             for formula in non_empty_formulas:
-                issues = await address_registry.validate_formula_refs(
+                issues = await validate_refs_via_acnr(
                     db, str(wp.project_id), year, formula, template_type
                 )
                 all_issues.extend(issues)

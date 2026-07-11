@@ -5,8 +5,9 @@
 职责：
 - save：按 (wp_id, sheet_name, target_cell) 维度 upsert（已存在覆盖更新
   expression/category/description，不存在则新建）。save 前先调用
-  ``address_registry.validate_formula_refs`` 校验悬空引用，含 ``not_found``
-  项则不写库，返回 issues 列表供 router 转 422（Req 6.4）。
+  ACNR-backed ``validate_refs_via_acnr`` 校验悬空引用（WP 域走 full_resolve，
+  非 WP 域走 legacy，resolver 故障 fail-open 回退 legacy），含 ``not_found``
+  项则不写库，返回 issues 列表供 router 转 422（Req 6.4 / acnr-consumer-wiring Req 9）。
 - list_by_wp：列出某 wp_id 的全部公式。
 - delete：按 formula_id 删除单条。
 
@@ -26,7 +27,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WpFormula
-from app.services.address_registry import address_registry
+from app.services.acnr.formula_validation import validate_refs_via_acnr
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ class WpFormulaService:
         以 (wp_id, sheet_name, target_cell) 为唯一维度：已存在则覆盖更新
         expression/category/description，不存在则新建。
 
-        保存前调用 ``address_registry.validate_formula_refs`` 校验 expression
+        保存前调用 ACNR-backed ``validate_refs_via_acnr`` 校验 expression
         中引用的地址是否有效；若含悬空引用（``not_found``），**不写库**，返回
         ``(None, issues)`` 供 router 转 422。校验通过返回 ``(WpFormula, [])``。
 
@@ -87,8 +88,10 @@ class WpFormulaService:
         wp_uuid = _as_uuid(wp_id)
         created_by_uuid = _as_uuid(created_by) if created_by is not None else None
 
-        # ── 悬空引用校验（Req 6.4 / P6）：含 not_found 则不写库 ──
-        issues = await address_registry.validate_formula_refs(
+        # ── 悬空引用校验（Req 6.4 / P6 / acnr-consumer-wiring Req 9）：──
+        # 经 ACNR full_resolve 统一校验（WP 域走 full_resolve，非 WP 域走 legacy，
+        # resolver 故障 fail-open 回退 legacy）；含 not_found 则不写库。
+        issues = await validate_refs_via_acnr(
             db, str(project_uuid), year, expression, template_type
         )
         if issues:

@@ -23,7 +23,7 @@ vi.mock('@/services/auditPlatformApi', () => ({
 }))
 
 import { getReport } from '@/services/auditPlatformApi'
-import { useReportCrossCheck } from '../useReportCrossCheck'
+import { useReportCrossCheck, computeCrossCheckResults } from '../useReportCrossCheck'
 
 const mockGetReport = vi.mocked(getReport)
 
@@ -192,6 +192,86 @@ describe('useReportCrossCheck — crossCheckResults (imbalanced data)', () => {
     expect(results[0].leftValue).toBe(1000)
     expect(results[0].rightValue).toBe(900)
     expect(results[0].diff).toBe(100)
+  })
+})
+
+// ─── Task 28.2: ACNR REPORT-domain canonical row_code resolution ──────────────
+
+describe('computeCrossCheckResults — canonical row_code resolution (Task 28.2)', () => {
+  /**
+   * Validates: Requirements 19.2, 19.5, 19.7
+   *
+   * Backward compatibility: when no reportCodeMap is present, behaviour is
+   * byte-identical to the pre-migration exact-then-fuzzy `get`.
+   */
+  it('no reportCodeMap → identical to legacy exact-then-fuzzy behaviour', () => {
+    const bsMap: Record<string, number> = { assets_total: 1000, liabilities_total: 400, equity_total: 600, 货币资金: 200 }
+    const isMap: Record<string, number> = { 'IS-001': 500, 'IS-002': 300, 'IS-017': 200, 'IS-018': 50, 'IS-019': 150 }
+
+    const results = computeCrossCheckResults({ bsMap, isMap })
+    expect(results).toHaveLength(7)
+    // 资产合计 = 负债 + 权益
+    expect(results[0].leftValue).toBe(1000)
+    expect(results[0].rightValue).toBe(1000)
+    expect(results[0].passed).toBe(true)
+  })
+
+  it('canonical reportCodeMap resolves value via exact row_code, not fuzzy name scan', () => {
+    // 值表仅以 canonical row_code 为键（无中文名键）；语义键为中文名。
+    // 若无 registry，get 的中文名精确/模糊匹配都会 miss（返回 0）；
+    // 有 registry 时，中文名 → canonical code → 值表精确取值命中。
+    const bsMap: Record<string, number> = {
+      'BS-031': 1000, // 资产总计
+      'BS-055': 400, // 负债合计
+      'BS-078': 600, // 所有者权益合计
+      'BS-001': 200, // 货币资金
+    }
+    const isMap: Record<string, number> = {
+      'IS-001': 500,
+      'IS-002': 300,
+      'IS-017': 200,
+      'IS-018': 50,
+      'IS-019': 150,
+    }
+    const reportCodeMap: Record<string, string> = {
+      'BS-031': '资产总计',
+      'BS-055': '负债合计',
+      'BS-078': '所有者权益合计',
+      'BS-001': '货币资金',
+      'IS-019': '净利润',
+      'IS-017': '利润总额',
+      'IS-018': '所得税费用',
+      'IS-001': '营业收入',
+      'IS-002': '营业成本',
+    }
+
+    // Without registry: the code aliases (assets_total 等) miss, 中文名也无键 → 资产合计=0
+    const legacy = computeCrossCheckResults({ bsMap, isMap })
+    expect(legacy[0].leftValue).toBeNull() // totalAssets resolved to 0 → null
+
+    // With registry: canonical resolution finds BS-031 → 1000
+    const withRegistry = computeCrossCheckResults({ bsMap, isMap, reportCodeMap })
+    expect(withRegistry[0].leftValue).toBe(1000)
+    expect(withRegistry[0].rightValue).toBe(1000) // 400 + 600
+    expect(withRegistry[0].passed).toBe(true)
+  })
+
+  it('canonical row_code takes precedence but empty registry falls back to fuzzy (Req 19.7)', () => {
+    // 值表以中文名为键（模糊匹配可命中）。
+    const bsMap: Record<string, number> = {
+      资产总计: 1000,
+      负债合计: 400,
+      所有者权益合计: 600,
+      货币资金: 200,
+    }
+    const isMap: Record<string, number> = {
+      营业收入: 500, 营业成本: 300, 利润总额: 200, 所得税费用: 50, 净利润: 150,
+    }
+
+    // 空 registry（undefined）→ 回退模糊匹配，命中中文名
+    const fallback = computeCrossCheckResults({ bsMap, isMap, reportCodeMap: undefined })
+    expect(fallback[0].leftValue).toBe(1000)
+    expect(fallback[0].passed).toBe(true)
   })
 })
 

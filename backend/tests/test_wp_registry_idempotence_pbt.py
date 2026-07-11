@@ -32,7 +32,9 @@ def _run(coro):
 def test_p3_custom_entries_build_idempotent(parsed):
     db = AsyncMock()
     db.execute = AsyncMock(
-        return_value=MagicMock(all=lambda: [(parsed, "C1", "底稿")])
+        return_value=MagicMock(
+            all=lambda: [("00000000-0000-0000-0000-000000000001", parsed, "C1", "底稿")]
+        )
     )
     pid = str(uuid.uuid4())
 
