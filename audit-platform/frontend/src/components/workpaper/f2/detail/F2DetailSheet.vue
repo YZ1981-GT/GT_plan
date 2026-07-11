@@ -46,9 +46,9 @@
       </div>
     </div>
 
-    <el-segmented v-model="detail.activeSegment" :options="segmentOptions" size="small" class="segment-bar" />
+    <el-segmented v-model="detail.activeSegment.value" :options="segmentOptions" size="small" class="segment-bar" />
 
-    <div v-if="detail.useVirtualScroll" class="virtual-toolbar">
+    <div v-if="detail.useVirtualScroll.value" class="virtual-toolbar">
       <el-alert type="info" :closable="false" class="virtual-hint">
         行数较多（{{ detail.filteredRows.value.length }} / {{ detail.rows.value.length }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
       </el-alert>
@@ -58,7 +58,7 @@
     </div>
 
     <el-table-v2
-      v-if="detail.useVirtualScroll && browseMode"
+      v-if="detail.useVirtualScroll.value && browseMode"
       :columns="virtualColumns"
       :data="detail.filteredRows.value"
       :width="tableWidth"
@@ -79,7 +79,7 @@
     >
       <el-table-column prop="itemName" label="品名" width="140" fixed />
 
-      <template v-if="detail.activeSegment === 'opening'">
+      <template v-if="detail.activeSegment.value === 'opening'">
         <el-table-column v-if="config.hasQuantity" label="期初数量" min-width="110">
           <template #default="{ row }">
             <el-input-number v-model="row.openingQty" size="small" :controls="false" :disabled="isReadonly"
@@ -94,7 +94,7 @@
         </el-table-column>
       </template>
 
-      <template v-else-if="detail.activeSegment === 'movement'">
+      <template v-else-if="detail.activeSegment.value === 'movement'">
         <el-table-column v-if="config.hasQuantity" label="增加数量" min-width="110">
           <template #default="{ row }">
             <el-input-number v-model="row.increaseQty" size="small" :controls="false" :disabled="isReadonly"
@@ -127,7 +127,7 @@
         </el-table-column>
       </template>
 
-      <template v-else-if="detail.activeSegment === 'closing'">
+      <template v-else-if="detail.activeSegment.value === 'closing'">
         <el-table-column v-if="config.hasQuantity" label="期末数量" min-width="110" class-name="auto-calc-col">
           <template #default="{ row }">
             <el-tooltip content="公式：期初数量 + 增加 - 减少" placement="top">
@@ -199,12 +199,12 @@
     </el-table>
 
     <div class="totals-row">
-      <span>合计 — 期初: {{ detail.totals.openingAmt.toLocaleString() }}</span>
-      <span>增加: {{ detail.totals.increaseAmt.toLocaleString() }}</span>
-      <span>减少: {{ detail.totals.decreaseAmt.toLocaleString() }}</span>
-      <span>期末: {{ detail.totals.closingAmt.toLocaleString() }}</span>
-      <span v-if="detail.agingMismatch.length" class="aging-warn">
-        {{ detail.agingMismatch.length }} 行库龄合计≠期末金额
+      <span>合计 — 期初: {{ detail.totals.value.openingAmt.toLocaleString() }}</span>
+      <span>增加: {{ detail.totals.value.increaseAmt.toLocaleString() }}</span>
+      <span>减少: {{ detail.totals.value.decreaseAmt.toLocaleString() }}</span>
+      <span>期末: {{ detail.totals.value.closingAmt.toLocaleString() }}</span>
+      <span v-if="detail.agingMismatch.value.length" class="aging-warn">
+        {{ detail.agingMismatch.value.length }} 行库龄合计≠期末金额
       </span>
     </div>
   </div>
