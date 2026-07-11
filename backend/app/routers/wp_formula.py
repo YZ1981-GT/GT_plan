@@ -42,6 +42,20 @@ class FormulaSaveRequest(BaseModel):
     template_type: str = Field("soe", description="模板类型")
     category: str | None = None
     description: str | None = None
+    # ── formula-management-library 三类型（Req 14.5）──
+    formula_type: str = Field(
+        "auto_calc",
+        description="公式类型 auto_calc / logic_check / reasonability",
+    )
+    refs: list | None = Field(
+        None, description="规范化引用列表（addr_id / formula_ref）"
+    )
+    issue_description: str | None = Field(
+        None, description="logic_check 不通过时的问题描述"
+    )
+    hint_text: str | None = Field(
+        None, description="reasonability 触发时的提示文案"
+    )
 
 
 class FormulaItemResponse(BaseModel):
@@ -68,6 +82,13 @@ def _formula_to_dict(f: WpFormula) -> dict:
         "expression": f.expression,
         "category": f.category,
         "description": f.description,
+        "formula_type": f.formula_type,
+        "refs": f.refs,
+        "issue_description": f.issue_description,
+        "hint_text": f.hint_text,
+        "last_computed_at": (
+            f.last_computed_at.isoformat() if f.last_computed_at else None
+        ),
         "created_by": str(f.created_by) if f.created_by else None,
         "created_at": f.created_at.isoformat() if f.created_at else None,
         "updated_at": f.updated_at.isoformat() if f.updated_at else None,
@@ -125,25 +146,16 @@ async def save_formula(
         category=body.category,
         description=body.description,
         created_by=user.id,
+        formula_type=body.formula_type,
+        refs=body.refs,
+        issue_description=body.issue_description,
+        hint_text=body.hint_text,
     )
     if issues:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={"error_code": "FORMULA_REF_NOT_FOUND", "issues": issues},
         )
-
-    evaluated_value, eval_errors = await evaluate_wp_formula_expression(
-        db,
-        project_id=wp.project_id,
-        year=body.year,
-        expression=body.expression,
-    )
-    write_cell_to_parsed_data(
-        wp,
-        sheet_name=body.sheet_name,
-        cell_ref=body.target_cell,
-        value=format_cell_display_value(evaluated_value),
-    )
 
     wp_code: str | None = None
     if wp.wp_index_id:
@@ -154,8 +166,29 @@ async def save_formula(
         ).scalar_one_or_none()
         wp_code = idx
 
+    # 仅 auto_calc 求值回填目标单元（Req 14.3）；logic_check / reasonability
+    # 绝不改值（Req 6.3 / 7.3），不写回单元。跨 sheet 引用经 CrossSheetResolver
+    # 追溯（Req 14.2），传 parsed_data + parent_wp_code 启用。
+    evaluated_value: object | None = None
+    eval_errors: list[str] = []
+    if saved.formula_type == "auto_calc":
+        evaluated_value, eval_errors = await evaluate_wp_formula_expression(
+            db,
+            project_id=wp.project_id,
+            year=body.year,
+            expression=body.expression,
+            parsed_data=wp.parsed_data,
+            parent_wp_code=wp_code,
+        )
+        write_cell_to_parsed_data(
+            wp,
+            sheet_name=body.sheet_name,
+            cell_ref=body.target_cell,
+            value=format_cell_display_value(evaluated_value),
+        )
+
     linkage: dict | None = None
-    if wp_code:
+    if wp_code and saved.formula_type == "auto_calc":
         try:
             from app.services.wp_formula_linkage_service import (
                 propagate_custom_wp_cell_change,
@@ -179,7 +212,8 @@ async def save_formula(
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 
     payload: dict = {"saved": _formula_to_dict(saved)}
-    payload["evaluated_value"] = str(evaluated_value)
+    if saved.formula_type == "auto_calc":
+        payload["evaluated_value"] = str(evaluated_value)
     if eval_errors:
         payload["eval_warnings"] = eval_errors
     if linkage is not None:

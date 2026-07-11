@@ -22,10 +22,18 @@ vi.mock('@/services/auditPlatformApi', () => ({
   getReport: vi.fn(),
 }))
 
+// http 默认无实现 → http.get(...) resolve undefined → 后端消费抛"空结果" →
+// 降级到纯函数（既有测试全部走 fallback 路径，行为与迁移前一致）。
+vi.mock('@/utils/http', () => ({
+  default: { get: vi.fn() },
+}))
+
 import { getReport } from '@/services/auditPlatformApi'
-import { useReportCrossCheck, computeCrossCheckResults } from '../useReportCrossCheck'
+import http from '@/utils/http'
+import { useReportCrossCheck, computeCrossCheckResults, type CrossCheckItem } from '../useReportCrossCheck'
 
 const mockGetReport = vi.mocked(getReport)
+const mockHttpGet = vi.mocked(http.get)
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -353,5 +361,192 @@ describe('useReportCrossCheck — crossCheckResults PBT', () => {
       ),
       { numRuns: 5 },
     )
+  })
+})
+
+// ─── Task 19.1: 前端消费后端 logic_check 端点（收编闭环，Req 23）─────────────────
+
+/**
+ * 后端 logic_check 端点 7 条勾稽的描述（顺序与 computeCrossCheckResults 逐条对齐）。
+ * 与 backend/app/services/formula_management/logic_check.py 的 _CROSS_CHECK_SEEDS 描述一致。
+ */
+const BACKEND_DESCRIPTIONS = [
+  '资产合计 = 负债合计 + 所有者权益合计',
+  '营业收入 − 营业成本 = 毛利',
+  '利润总额 − 所得税 = 净利润',
+  '资产 − 负债 = 权益',
+  '所有者权益变动表期末 = 资产负债表权益',
+  '有效税率 ≈ 25%',
+  '货币资金 ≥ 0（负值异常）',
+]
+
+/**
+ * 从纯函数结果构造"忠实收编"的后端响应（模拟后端 7 条 logic_check 逐条判定与纯函数一致），
+ * 用于验证在线路径与降级路径的逐条判定一致（Req 23.5）。
+ */
+function buildBackendPayloadFrom(pure: CrossCheckItem[]) {
+  const results = pure.map((item, i) => ({
+    formula_id: `report-cross-check-${i + 1}`,
+    description: BACKEND_DESCRIPTIONS[i],
+    expression: `ROW(check-${i + 1})`,
+    passed: item.passed,
+  }))
+  const issue_list = pure
+    .map((item, i) => ({ item, i }))
+    .filter(({ item }) => !item.passed)
+    .map(({ item, i }) => ({
+      formula_id: `report-cross-check-${i + 1}`,
+      addr_id: null,
+      description: BACKEND_DESCRIPTIONS[i],
+      left_value: item.leftValue != null ? String(item.leftValue) : null,
+      right_value: item.rightValue != null ? String(item.rightValue) : null,
+    }))
+  return { results, issue_list, last_computed_at: '2025-01-01T00:00:00+00:00' }
+}
+
+describe('useReportCrossCheck — backend logic_check main path (Req 23.1)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetReport.mockReset()
+    mockHttpGet.mockReset()
+  })
+
+  it('consumes backend Issue_List/results to drive per-check display (source=backend)', async () => {
+    mockGetReport
+      .mockResolvedValueOnce(makeBalancedBsRows() as any)
+      .mockResolvedValueOnce(makeBalancedIsRows() as any)
+
+    // 后端返回：check 3（利润总额−所得税=净利润）不通过，其余通过。
+    const payload = {
+      results: BACKEND_DESCRIPTIONS.map((d, i) => ({
+        formula_id: `report-cross-check-${i + 1}`,
+        description: d,
+        expression: 'x',
+        passed: i !== 2,
+      })),
+      issue_list: [
+        {
+          formula_id: 'report-cross-check-3',
+          addr_id: null,
+          description: BACKEND_DESCRIPTIONS[2],
+          left_value: '150',
+          right_value: '140',
+        },
+      ],
+      last_computed_at: '2025-01-01T00:00:00+00:00',
+    }
+    mockHttpGet.mockResolvedValueOnce({ data: payload } as any)
+
+    const options = createOptions()
+    const { loadCrossCheckData, crossCheckResults, crossCheckSource } = useReportCrossCheck(options)
+    await loadCrossCheckData()
+
+    // 主路径成功：结果来源为后端（消费了 logic_check 端点，Req 23.1）
+    expect(crossCheckSource.value).toBe('backend')
+
+    const results = crossCheckResults.value
+    expect(results).toHaveLength(7)
+    // 逐条 passed 由后端 results 驱动
+    expect(results.map((r) => r.passed)).toEqual([true, true, false, true, true, true, true])
+    expect(results.map((r) => r.description)).toEqual(BACKEND_DESCRIPTIONS)
+    // 不通过项的左右值由后端 issue_list 关联回填，diff 据此计算——
+    // 这些值仅存在于后端 payload（纯函数对同一平衡数据会得 passed=true / rightValue=150），
+    // 故命中即证明结果确由后端 Issue_List 驱动，而非纯函数。
+    expect(results[2].passed).toBe(false)
+    expect(results[2].leftValue).toBe(150)
+    expect(results[2].rightValue).toBe(140)
+    expect(results[2].diff).toBe(10)
+    // 通过项无 Issue → 左右值为 null
+    expect(results[0].leftValue).toBeNull()
+    expect(results[0].rightValue).toBeNull()
+  })
+})
+
+describe('useReportCrossCheck — degrade to pure function when backend unavailable (Req 23.2/23.3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetReport.mockReset()
+    mockHttpGet.mockReset()
+  })
+
+  it('backend 5xx/timeout/network error → try/catch fail-open fallback (source=fallback), not blocking render', async () => {
+    mockGetReport
+      .mockResolvedValueOnce(makeBalancedBsRows() as any)
+      .mockResolvedValueOnce(makeBalancedIsRows() as any)
+    // 模拟后端不可用（网络错/5xx/超时）
+    mockHttpGet.mockRejectedValueOnce(new Error('Network Error'))
+
+    const options = createOptions()
+    const { loadCrossCheckData, crossCheckResults, crossCheckData, crossCheckSource } =
+      useReportCrossCheck(options)
+    await loadCrossCheckData()
+
+    // 降级到纯函数，且报表页面照常有 7 条结果（不阻断渲染）
+    expect(crossCheckSource.value).toBe('fallback')
+    expect(crossCheckResults.value).toHaveLength(7)
+    // 降级结果与纯函数逐条一致
+    const pure = computeCrossCheckResults(crossCheckData.value)
+    expect(crossCheckResults.value).toEqual(pure)
+  })
+
+  it('backend returns empty results → treated as unavailable → fallback', async () => {
+    mockGetReport
+      .mockResolvedValueOnce(makeBalancedBsRows() as any)
+      .mockResolvedValueOnce(makeBalancedIsRows() as any)
+    mockHttpGet.mockResolvedValueOnce({ data: { results: [], issue_list: [] } } as any)
+
+    const options = createOptions()
+    const { loadCrossCheckData, crossCheckResults, crossCheckSource } = useReportCrossCheck(options)
+    await loadCrossCheckData()
+
+    expect(crossCheckSource.value).toBe('fallback')
+    expect(crossCheckResults.value).toHaveLength(7)
+  })
+})
+
+describe('useReportCrossCheck — online vs fallback per-check consistency (Req 23.5)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetReport.mockReset()
+    mockHttpGet.mockReset()
+  })
+
+  it('online (backend) and fallback judgments are consistent for the same imbalanced report data', async () => {
+    // 不平衡数据：check 1（资产 ≠ 负债+权益）不通过
+    const bsRows = [
+      { row_code: 'assets_total', row_name: '资产总计', current_period_amount: '1000', is_total_row: true },
+      { row_code: 'liabilities_total', row_name: '负债合计', current_period_amount: '400', is_total_row: true },
+      { row_code: 'equity_total', row_name: '所有者权益合计', current_period_amount: '500', is_total_row: true },
+      { row_code: 'BS-001', row_name: '货币资金', current_period_amount: '200', is_total_row: false },
+    ]
+    const isRows = makeBalancedIsRows()
+
+    // ① 降级路径（后端不可用）
+    mockGetReport
+      .mockResolvedValueOnce(bsRows as any)
+      .mockResolvedValueOnce(isRows as any)
+    mockHttpGet.mockRejectedValueOnce(new Error('backend down'))
+    const c1 = useReportCrossCheck(createOptions())
+    await c1.loadCrossCheckData()
+    const fallback = c1.crossCheckResults.value
+    expect(c1.crossCheckSource.value).toBe('fallback')
+
+    // ② 在线路径：后端忠实收编（逐条 passed 与纯函数一致）
+    mockGetReport
+      .mockResolvedValueOnce(bsRows as any)
+      .mockResolvedValueOnce(isRows as any)
+    mockHttpGet.mockResolvedValueOnce({ data: buildBackendPayloadFrom(fallback) } as any)
+    const c2 = useReportCrossCheck(createOptions())
+    await c2.loadCrossCheckData()
+    const online = c2.crossCheckResults.value
+    expect(c2.crossCheckSource.value).toBe('backend')
+
+    // 逐条勾稽判定（description + passed）在线路径 == 降级路径（收编不改变语义）
+    expect(online.map((r) => [r.description, r.passed])).toEqual(
+      fallback.map((r) => [r.description, r.passed]),
+    )
+    // check 1 确实不通过（数据不平衡），验证判定非平凡
+    expect(fallback[0].passed).toBe(false)
+    expect(online[0].passed).toBe(false)
   })
 })

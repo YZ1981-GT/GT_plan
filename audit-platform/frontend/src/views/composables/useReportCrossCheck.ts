@@ -1,5 +1,6 @@
 import { ref, computed, watch, type ComputedRef, type Ref } from 'vue'
 import { getReport } from '@/services/auditPlatformApi'
+import http from '@/utils/http'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -10,6 +11,27 @@ export interface CrossCheckItem {
   rightValue: number | null
   diff: number | null
   passed: boolean
+}
+
+/** 勾稽结果来源：`backend`=消费后端 logic_check 端点；`fallback`=纯函数降级（Req 23.2/23.3）。 */
+export type CrossCheckSource = 'backend' | 'fallback'
+
+/** 后端 logic_check 执行端点响应（信封已由 http 拦截器解包为内层 data）。 */
+interface BackendCrossCheckPayload {
+  issue_list?: Array<{
+    formula_id: string
+    addr_id?: string | null
+    description: string
+    left_value?: string | null
+    right_value?: string | null
+  }>
+  results?: Array<{
+    formula_id: string
+    description: string
+    expression?: string
+    passed: boolean
+  }>
+  last_computed_at?: string | null
 }
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
@@ -25,7 +47,49 @@ export interface UseReportCrossCheckReturn {
   crossCheckData: Ref<Record<string, any>>
   crossCheckLoading: Ref<boolean>
   crossCheckResults: ComputedRef<CrossCheckItem[]>
+  /** 当前勾稽结果来源（backend 主路径 / fallback 纯函数降级），供 UI 标注与测试断言。 */
+  crossCheckSource: Ref<CrossCheckSource>
   loadCrossCheckData: () => Promise<void>
+}
+
+// ─── 后端 logic_check 端点消费（Req 23.1）──────────────────────────────────────
+
+/**
+ * 把后端 logic_check 执行端点返回的逐条勾稽结果（results）+ Issue_List 映射为
+ * 前端 `CrossCheckItem[]`（Req 23.1）。
+ *
+ * - 逐条 `passed` + `description` 由后端 `results` 驱动（收编后的 7 条 logic_check 公式）。
+ * - `leftValue` / `rightValue` 尽力从 `issue_list`（不通过项）按 `formula_id` 关联回填，
+ *   `diff` 据此计算；通过项无 Issue → 左右值为 null（与纯函数对通过项展示一致）。
+ *
+ * 收编不改变勾稽语义（Req 23.5）：后端 7 条 logic_check 的 passed 判定逐条移植自
+ * 原 `computeCrossCheckResults`，故逐条判定与纯函数一致。
+ */
+function mapBackendCrossCheck(payload: BackendCrossCheckPayload): CrossCheckItem[] {
+  const results = Array.isArray(payload?.results) ? payload.results : []
+  const issueByFormula = new Map<string, { left: number | null; right: number | null }>()
+  for (const issue of payload?.issue_list ?? []) {
+    if (!issue || !issue.formula_id) continue
+    const left = issue.left_value != null ? Number(issue.left_value) : null
+    const right = issue.right_value != null ? Number(issue.right_value) : null
+    issueByFormula.set(issue.formula_id, {
+      left: left != null && !Number.isNaN(left) ? left : null,
+      right: right != null && !Number.isNaN(right) ? right : null,
+    })
+  }
+  return results.map((r) => {
+    const iss = issueByFormula.get(r.formula_id)
+    const left = iss?.left ?? null
+    const right = iss?.right ?? null
+    const diff = left != null && right != null ? Math.round((left - right) * 100) / 100 : null
+    return {
+      description: r.description,
+      leftValue: left,
+      rightValue: right,
+      diff: diff || null,
+      passed: !!r.passed,
+    }
+  })
 }
 
 // ─── Composable ─────────────────────────────────────────────────────────────
@@ -130,6 +194,10 @@ export function useReportCrossCheck(options: UseReportCrossCheckOptions): UseRep
   // State
   const crossCheckData = ref<Record<string, any>>({})
   const crossCheckLoading = ref(false)
+  // 后端 logic_check 端点返回的逐条勾稽结果（主路径，Req 23.1）；null=未取到/降级。
+  const backendResults = ref<CrossCheckItem[] | null>(null)
+  // 当前结果来源：默认 fallback（纯函数），成功消费后端后置为 backend。
+  const crossCheckSource = ref<CrossCheckSource>('fallback')
 
   // ACNR-backed 地址注册表 store（Req 16 facade）——REPORT 域 canonical row_code→row_name 真源。
   // 在 setup 上下文获取实例；无活跃 Pinia（如纯函数单测环境）时降级为 null → 回退模糊匹配。
@@ -158,6 +226,29 @@ export function useReportCrossCheck(options: UseReportCrossCheckOptions): UseRep
     } catch {
       return undefined
     }
+  }
+
+  /**
+   * 消费后端 logic_check 执行端点获取逐条勾稽判定（Req 23.1）。
+   *
+   * 端点：`GET /api/projects/{projectId}/formula/report-cross-check?year=`（http 拦截器
+   * 自带 Authorization + 信封解包，`resp.data` 已为内层 `{issue_list, results, ...}`）。
+   * 成功且 `results` 非空 → 返回映射后的 `CrossCheckItem[]`；否则抛错交由调用方降级。
+   */
+  async function fetchBackendCrossCheck(): Promise<CrossCheckItem[]> {
+    const resp = await http.get(
+      `/api/projects/${projectId.value}/formula/report-cross-check`,
+      { params: { year: year.value } },
+    )
+    // 信封已解包：resp.data === {issue_list, results, last_computed_at}；
+    // 兼容未解包场景（data?.data??data，防个别环境双层信封）。
+    const raw = resp?.data
+    const payload: BackendCrossCheckPayload = (raw?.results || raw?.issue_list) ? raw : (raw?.data ?? raw)
+    const mapped = mapBackendCrossCheck(payload)
+    if (mapped.length === 0) {
+      throw new Error('backend cross-check returned empty results')
+    }
+    return mapped
   }
 
   async function loadCrossCheckData() {
@@ -204,11 +295,25 @@ export function useReportCrossCheck(options: UseReportCrossCheckOptions): UseRep
         isMap: buildMap(is as any[]),
         reportCodeMap,
       }
+      // 主路径（Req 23.1）：调后端 logic_check 端点获取逐条勾稽判定驱动展示。
+      // 降级（Req 23.2/23.3）：后端不可用（超时/5xx/网络错）→ try/catch 回退纯函数，
+      // 不阻断报表页面渲染（fail-open）——crossCheckData 已就绪，crossCheckResults 会
+      // 落到 computeCrossCheckResults 分支。
+      try {
+        backendResults.value = await fetchBackendCrossCheck()
+        crossCheckSource.value = 'backend'
+      } catch {
+        backendResults.value = null
+        crossCheckSource.value = 'fallback'
+      }
     } catch { /* ignore */ }
     finally { crossCheckLoading.value = false }
   }
 
   const crossCheckResults = computed<CrossCheckItem[]>(() => {
+    // 主路径：后端 logic_check 端点结果优先（Req 23.1）。
+    if (backendResults.value) return backendResults.value
+    // 降级路径：纯函数勾稽（Req 23.2/23.3），语义与在线一致（Req 23.5）。
     return computeCrossCheckResults(crossCheckData.value)
   })
 
@@ -223,6 +328,7 @@ export function useReportCrossCheck(options: UseReportCrossCheckOptions): UseRep
     crossCheckData,
     crossCheckLoading,
     crossCheckResults,
+    crossCheckSource,
     loadCrossCheckData,
   }
 }

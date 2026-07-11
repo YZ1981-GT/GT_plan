@@ -95,13 +95,28 @@
       </div>
     </div>
 
-    <!-- 1.5 高级查询入口按钮 (Req 14 AC 1) -->
+    <!-- 1.5 高级查询入口按钮 (Req 14 AC 1) + 公式预设库入口 (Req 25.1) -->
     <div class="gt-wpd-card gt-wpd-card--actions">
       <TemplateLibraryButton
         :source="templateSource"
         :project-id="props.projectId"
       />
+      <el-button
+        type="primary"
+        size="default"
+        plain
+        @click="presetDialogVisible = true"
+      >
+        🧮 公式预设库
+      </el-button>
     </div>
+
+    <!-- Req 25: 公式预设库弹窗（说明文档 + 预设浏览/编辑） -->
+    <GtFormulaPresetDialog
+      v-model="presetDialogVisible"
+      scope="workpaper"
+      :page-key="`workpaper:${props.wpCode}`"
+    />
 
     <!-- 2. 主文件下载区 -->
     <div class="gt-wpd-card">
@@ -393,6 +408,7 @@ import {
 } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import TemplateLibraryButton from './TemplateLibraryButton.vue'
+import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
 
 interface Props {
   wpCode: string
@@ -491,6 +507,9 @@ const sourceFileCount = computed(() => template.value?.source_file_count ?? 0)
 
 // 高级查询 source URI（Req 14 AC 1）
 const templateSource = computed(() => `workpaper:${props.wpCode}`)
+
+// Req 25.1: 公式预设库弹窗开关
+const presetDialogVisible = ref(false)
 
 // 合并 sheets 列表（从 prefill cells 提取去重 + 标注公式数）
 const mergedSheets = computed<MergedSheetEntry[]>(() => {

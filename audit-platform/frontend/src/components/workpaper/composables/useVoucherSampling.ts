@@ -419,6 +419,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         random_seed: config.value.randomSeed ?? null,
         phase: phase.value,
         workpaper_id: workpaperId.value,
+        year: year.value,
         filters: {
           account_codes: config.value.accountCodes,
           period_range: config.value.periodRange,

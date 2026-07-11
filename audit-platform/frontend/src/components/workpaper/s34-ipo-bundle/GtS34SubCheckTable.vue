@@ -15,6 +15,8 @@
  */
 import { ref, computed, toRef } from 'vue'
 import { useS34ImportExport } from './useS34ImportExport'
+import { getS34FormulaDescriptors } from './useS34FormulaEngine'
+import GtFormulaSourceTooltip from '@/components/formula/GtFormulaSourceTooltip.vue'
 import type { UploadFile } from 'element-plus'
 
 // ─── Props ───
@@ -123,6 +125,22 @@ function onImportFile(uploadFile: UploadFile): void {
   if (!uploadFile.raw) return
   importData(uploadFile.raw)
 }
+
+// ─── 公式单元治理接入（Task 13.2 试点） ───────────────────────────────────────
+//
+// isFormulaCell 为真的单元包一层 GtFormulaSourceTooltip 展示"表达式 + 来源"；
+// 来源地址经 useAcnr 解析（tooltip 内部按 addr_id 懒解析 canonical semantic_label），
+// 禁前端拼坐标（Req 24.3 / 24.5）。未承载公式的子 sheet 返回空数组，无回归（Req 24.6）。
+
+/** 当前子 sheet 的公式单元描述（core 引擎单一来源派生的表达式 + ACNR addr_id） */
+const formulaDescriptors = computed(() =>
+  activeView.value === 'program' ? [] : getS34FormulaDescriptors(activeView.value),
+)
+
+/** 公式单元的可见标签（Excel 风格单元引用，仅标识本表单元，非来源拼接） */
+function cellLabel(col: string, row: number): string {
+  return `${col}${row + 1}`
+}
 </script>
 
 <template>
@@ -181,6 +199,24 @@ function onImportFile(uploadFile: UploadFile): void {
         <span v-else class="sub-table-placeholder__missing">
           （底稿未生成）
         </span>
+      </div>
+
+      <!-- 本表公式单元（isFormulaCell → GtFormulaSourceTooltip 展示表达式+来源，Task 13.2） -->
+      <div v-if="formulaDescriptors.length > 0" class="gt-s34-sub-check-table__formula-cells">
+        <div class="formula-cells-header">
+          <span class="formula-cells-title">本表公式单元</span>
+          <span class="formula-cells-desc">（只读自动计算，悬停查看表达式与来源；来源经 ACNR 解析）</span>
+        </div>
+        <div class="formula-cells-list">
+          <GtFormulaSourceTooltip
+            v-for="fc in formulaDescriptors"
+            :key="fc.cellKey"
+            :expression="fc.expression"
+            :addr-id="fc.addrId"
+          >
+            <span class="formula-cell-ref">{{ cellLabel(fc.col, fc.row) }}</span>
+          </GtFormulaSourceTooltip>
+        </div>
       </div>
 
       <!-- 核查判断列区域（合理性/真实性/合规风险） -->
@@ -295,6 +331,47 @@ export default { components: { Document } }
   margin-left: 4px;
   font-size: 12px;
   color: var(--gt-color-warning, #e6a23c);
+}
+
+/* ─── 本表公式单元样式 ─── */
+
+.gt-s34-sub-check-table__formula-cells {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: var(--gt-color-bg-elevated, #fafafa);
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+  border-radius: var(--gt-radius-sm, 4px);
+}
+
+.formula-cells-header {
+  margin-bottom: 10px;
+}
+
+.formula-cells-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+
+.formula-cells-desc {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+  margin-left: 8px;
+}
+
+.formula-cells-list {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.formula-cell-ref {
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  color: var(--gt-color-primary, #409eff);
+  background: #ecf5ff;
+  padding: 2px 8px;
+  border-radius: 3px;
 }
 
 /* ─── 核查判断列样式 ─── */

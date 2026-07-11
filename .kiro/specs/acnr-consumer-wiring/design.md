@@ -1312,6 +1312,7 @@ async function navigateToWorkpaper(wpCode, projectId, year?) {
 | `formula_engine.py:1484` extract_custom_cells 解析 | WP cell 解析走 legacy | **P15 / Req 21.1** |
 | `wp_structure_bridge.py` build_uri/AddressEntry 产出 | structure→AddressEntry | **P15 / Req 21.2** |
 | `query_builder.py:819` `TB()` ref 语法生成 | 生成 ref 字符串 | **P15 / Req 21.3** |
+| `formula_management/preset_acnr_migration.py`（模板库预设公式归一化） | 经 ACNR grammar/kernel 归一化 formula_ref（`TB_SUM`→`SUM_TB`/`TB_AUX`→`AUX`）；未映射函数(ADJ/LEDGER/LEDGER_DETAIL/COUNT_LEDGER)标待迁移 | **formula-management-library Req 24 / 待迁移 pending**（非 legacy `address_registry.` 消费；CI drift guard = `test_preset_acnr_migration_drift_guard.py`） |
 | `stale_propagation_engine.py` WP:* URI | legacy URI 前缀 | **P2 / Req 4** |
 | `linkage_graph_builder.py` 10 数据源 URI | legacy URI | **P2 / Req 3** |
 | `acnr/events.py` reverse_index 缺失 | 失效链不全 | **P1 / Req 2** |

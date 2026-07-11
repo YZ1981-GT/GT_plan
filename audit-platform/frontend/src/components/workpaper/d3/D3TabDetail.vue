@@ -140,7 +140,15 @@
     </el-table-column>
     <!-- H: 期初审定(自动) -->
     <el-table-column label="期初审定(H)" width="110" align="right">
-      <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.priorAudited) }}</span></template>
+      <template #default="{ row }">
+        <GtFormulaSourceTooltip
+          :expression="D3_DETAIL_FORMULA_CELLS.priorAudited.expression"
+          :addr-id="D3_DETAIL_FORMULA_CELLS.priorAudited.addrId"
+          plain
+        >
+          <span class="auto-calc amt formula-underline">{{ fmtAmount(row.priorAudited) }}</span>
+        </GtFormulaSourceTooltip>
+      </template>
     </el-table-column>
     <!-- 期初账龄（动态） -->
     <el-table-column v-for="band in bands" :key="'prior-' + band.key" :label="`${band.label}(期初)`" width="100" align="right">
@@ -174,7 +182,15 @@
     </el-table-column>
     <!-- O: 期末余额(自动) -->
     <el-table-column label="期末余额(O)" width="110" align="right">
-      <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endBalance) }}</span></template>
+      <template #default="{ row }">
+        <GtFormulaSourceTooltip
+          :expression="D3_DETAIL_FORMULA_CELLS.endBalance.expression"
+          :addr-id="D3_DETAIL_FORMULA_CELLS.endBalance.addrId"
+          plain
+        >
+          <span class="auto-calc amt formula-underline">{{ fmtAmount(row.endBalance) }}</span>
+        </GtFormulaSourceTooltip>
+      </template>
     </el-table-column>
     <!-- P: 重分类调整 -->
     <el-table-column label="重分类(P)" width="100" align="right">
@@ -188,7 +204,15 @@
     </el-table-column>
     <!-- Q: 期末未审(自动) -->
     <el-table-column label="期末未审(Q)" width="110" align="right">
-      <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endUnadjusted) }}</span></template>
+      <template #default="{ row }">
+        <GtFormulaSourceTooltip
+          :expression="D3_DETAIL_FORMULA_CELLS.endUnadjusted.expression"
+          :addr-id="D3_DETAIL_FORMULA_CELLS.endUnadjusted.addrId"
+          plain
+        >
+          <span class="auto-calc amt formula-underline">{{ fmtAmount(row.endUnadjusted) }}</span>
+        </GtFormulaSourceTooltip>
+      </template>
     </el-table-column>
     <!-- R: 期末AJE -->
     <el-table-column label="期末AJE(R)" width="100" align="right">
@@ -212,7 +236,15 @@
     </el-table-column>
     <!-- T: 期末审定(自动) -->
     <el-table-column label="期末审定(T)" width="110" align="right">
-      <template #default="{ row }"><span class="auto-calc amt">{{ fmtAmount(row.endAudited) }}</span></template>
+      <template #default="{ row }">
+        <GtFormulaSourceTooltip
+          :expression="D3_DETAIL_FORMULA_CELLS.endAudited.expression"
+          :addr-id="D3_DETAIL_FORMULA_CELLS.endAudited.addrId"
+          plain
+        >
+          <span class="auto-calc amt formula-underline">{{ fmtAmount(row.endAudited) }}</span>
+        </GtFormulaSourceTooltip>
+      </template>
     </el-table-column>
     <!-- 审定账龄（动态） -->
     <el-table-column v-for="band in bands" :key="'audited-' + band.key" :label="`${band.label}(期末审定)`" width="100" align="right">
@@ -329,7 +361,9 @@ import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD3FormData'
+import { D3_DETAIL_FORMULA_CELLS } from '../composables/useD3FormulaEngine'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import GtFormulaSourceTooltip from '@/components/formula/GtFormulaSourceTooltip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -505,6 +539,8 @@ const { onExportTemplate, onExportData, onImportFile, onImportFromAuxBalance } =
 .subtotal-label { font-weight: 700; }
 .amt { text-align: right; display: inline-block; width: 100%; }
 .auto-calc { background: #f5f7fa; padding: 2px 4px; border-radius: 2px; }
+/* 公式列虚线下划线（tooltip 用 plain 变体，下划线由本类承载，cursor:help 随 formula-cell） */
+.formula-underline { border-bottom: 1px dashed #409eff; }
 .audit-notes-section { margin-top: 20px; }
 .audit-notes-section h4 { font-size: 14px; margin-bottom: 12px; }
 .section-header-row { display: flex; align-items: center; gap: 8px; }

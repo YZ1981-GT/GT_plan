@@ -241,6 +241,85 @@ def require_project_access(min_permission: str = "readonly") -> Callable:
 
 
 # ---------------------------------------------------------------------------
+# require_wp_edit_permission — 底稿编辑权门禁（Module_Refresh 用）
+# ---------------------------------------------------------------------------
+
+
+def require_wp_edit_permission() -> Callable:
+    """底稿编辑权门禁（公式管理库 Req 20，Module_Refresh 用）。
+
+    与 ``require_role`` 是**两条不同门禁**：本门禁按"对目标底稿具编辑权"放行，
+    **不要求合伙人角色**，避免模块/循环级刷新（如 ``audit-sheet-refresh`` 逐底稿刷新）
+    被锁死为合伙人专属；``require_role`` 则按系统角色判定（用于全局一键刷新的合伙人门禁）。
+
+    判定口径（基于既有 ``permission_service.Permission.WORKPAPER_WRITE`` + 项目成员编辑权）：
+
+    1. 角色须具 ``WORKPAPER_WRITE`` 能力（``permission_service`` 角色权限矩阵）——
+       ``qc`` / ``readonly`` 无该能力 → 403。
+    2. ``admin`` / ``partner`` 全局放行（矩阵含全集）。
+    3. 其余角色（``manager`` / ``auditor``）须为目标底稿所属项目成员且具 ``edit`` 权
+       （``project_users.permission_level >= edit``），否则 403（Req 20.2）。
+
+    ``wp_id`` 从路径参数解析（route 形如 ``/{wp_id}/audit-sheet-refresh``）。所有校验在
+    依赖解析阶段完成，**先于任何数据写入**（Req 20.2）。
+    """
+
+    async def dependency(
+        wp_id: UUID,
+        current_user: User = Depends(get_current_user),
+        db: AsyncSession = Depends(get_db),
+    ) -> User:
+        from app.models.workpaper_models import WorkingPaper
+        from app.services.permission_service import Permission, check_permission
+
+        role = current_user.role.value
+
+        # ① 角色级 WORKPAPER_WRITE 能力（qc/readonly 无 → 403）
+        if not check_permission(role, Permission.WORKPAPER_WRITE):
+            raise HTTPException(status_code=403, detail="无底稿编辑权限")
+
+        # ② admin/partner 全局放行
+        if role in ("admin", "partner"):
+            return current_user
+
+        # ③ 解析目标底稿所属项目
+        project_id = (
+            await db.execute(
+                select(WorkingPaper.project_id).where(
+                    WorkingPaper.id == wp_id,
+                    WorkingPaper.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if project_id is None:
+            raise HTTPException(status_code=404, detail="底稿不存在")
+
+        # ④ 项目成员编辑权（project_users edit 级；复用权限缓存）
+        cached_level = await _get_cached_permission(current_user.id, project_id)
+        if cached_level is None:
+            project_user = (
+                await db.execute(
+                    select(ProjectUser).where(
+                        ProjectUser.project_id == project_id,
+                        ProjectUser.user_id == current_user.id,
+                        ProjectUser.is_deleted == False,  # noqa: E712
+                    )
+                )
+            ).scalar_one_or_none()
+            if project_user is None:
+                raise HTTPException(status_code=403, detail="无底稿编辑权限")
+            cached_level = project_user.permission_level.value
+            await _set_cached_permission(current_user.id, project_id, cached_level)
+
+        if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["edit"]:
+            raise HTTPException(status_code=403, detail="无底稿编辑权限")
+
+        return current_user
+
+    return dependency
+
+
+# ---------------------------------------------------------------------------
 # Permission cache helpers (Redis, graceful degradation)
 # ---------------------------------------------------------------------------
 

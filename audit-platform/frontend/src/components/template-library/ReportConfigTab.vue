@@ -43,7 +43,19 @@
         :source="reportSource"
         style="margin-left: auto"
       />
+      <!-- Req 25.1: 公式预设库入口 -->
+      <el-button
+        type="primary"
+        size="default"
+        plain
+        @click="presetDialogVisible = true"
+      >
+        🧮 公式预设库
+      </el-button>
     </div>
+
+    <!-- Req 25: 公式预设库弹窗（说明文档 + 预设浏览/编辑） -->
+    <GtFormulaPresetDialog v-model="presetDialogVisible" scope="report" />
 
     <!-- 准则切换 Tab -->
     <el-tabs
@@ -251,6 +263,7 @@ import { reportConfig as P_rc } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
 import TemplateLibraryButton from './TemplateLibraryButton.vue'
+import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
 
 interface ReportConfigRow {
   id?: string
@@ -310,6 +323,9 @@ const standardCounts = ref<Record<string, number>>({})
 
 // Req 14 AC 1: 高级查询 source URI（报表模板页 → report:balance_sheet 默认）
 const reportSource = computed(() => 'report:balance_sheet')
+
+// Req 25.1: 公式预设库弹窗开关
+const presetDialogVisible = ref(false)
 
 const searchInput = ref('')
 const searchText = ref('')

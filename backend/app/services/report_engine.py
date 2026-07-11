@@ -751,6 +751,11 @@ class ReportEngine:
     def __init__(self, db: AsyncSession, redis: Any = None):
         self.db = db
         self.redis = redis
+        # Req 15.5：最近一次 regenerate_affected 增量重算过程中探测到的悬空
+        # ROW() 引用问题清单（Issue_List）。每项为
+        # {report_type, row_code, ref, addr_id, message}。调用方（事件处理器/
+        # router）可读取此属性汇报，增量重算本身不因悬空中断。
+        self.last_regenerate_issues: list[dict] = []
 
     # ------------------------------------------------------------------
     # Redis 缓存
@@ -887,6 +892,10 @@ class ReportEngine:
         # (e.g. equity statement references IS-019 from income statement)
         global_row_cache: dict[str, Decimal] = {}
 
+        # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化。
+        # 跨报表共享缓存，避免同一引用重复解析。
+        row_ref_cache: dict[str, Any] = {}
+
         # Coverage stats tracking
         coverage_stats: dict[str, dict[str, int]] = {}
         # Debug info tracking
@@ -914,6 +923,7 @@ class ReportEngine:
                 global_row_cache, now,
                 mode=mode,
                 debug=debug,
+                row_ref_cache=row_ref_cache,
             )
             results[report_type.value] = report_rows
             coverage_stats[report_type.value] = type_coverage
@@ -993,6 +1003,57 @@ class ReportEngine:
 
         return results
 
+    async def _resolve_row_refs_via_acnr(
+        self,
+        formula: str | None,
+        project_id: UUID,
+        cache: dict[str, Any],
+    ) -> tuple[list[dict], list[str]]:
+        """经 ACNR full_resolve（resolve_ref，fail-open）规范化公式中的 ROW() 引用。
+
+        Req 16.3：报表公式引用其他报表行时，ROW() 引用经 ACNR full_resolve 解析。
+        值仍由 row_cache 权威提供（报表内自引用），本步做引用身份规范化 + 悬空探测；
+        fail-open：ACNR 基础设施异常不阻断（记 WARNING 后回退，不计入悬空）。
+
+        Returns:
+            (row_refs_meta, dangling_refs)
+            - row_refs_meta: [{ref, addr_id, found}]，供来源公式追溯与 tooltip 展示
+            - dangling_refs: full_resolve 明确 miss（非 fail-open）的 ROW 引用编码
+        """
+        if not formula:
+            return [], []
+        from app.services.formula_management.engine import resolve_ref
+
+        refs: list[str] = []
+        for m in _ROW_PATTERN.finditer(formula):
+            rc = m.group(1)
+            if rc not in refs:
+                refs.append(rc)
+        if not refs:
+            return [], []
+
+        row_refs_meta: list[dict] = []
+        dangling_refs: list[str] = []
+        for rc in refs:
+            cache_key = f"ROW('{rc}')"
+            resolved = cache.get(cache_key)
+            if resolved is None:
+                resolved = await resolve_ref(
+                    formula_ref=cache_key,
+                    project_id=project_id,
+                    db=self.db,
+                )
+                cache[cache_key] = resolved
+            row_refs_meta.append({
+                "ref": rc,
+                "addr_id": resolved.addr_id,
+                "found": resolved.found,
+            })
+            # 仅当 full_resolve 明确 miss（非基础设施 fail-open）时记为悬空
+            if not resolved.found and not resolved.fail_open:
+                dangling_refs.append(rc)
+        return row_refs_meta, dangling_refs
+
     async def _generate_report(
         self,
         project_id: UUID,
@@ -1003,6 +1064,7 @@ class ReportEngine:
         generated_at: datetime,
         mode: str = "audited",
         debug: bool = False,
+        row_ref_cache: dict[str, Any] | None = None,
     ) -> tuple[list[dict], dict[str, int], list[dict] | None]:
         """执行每行公式，生成报表数据并写入 financial_report 表。
 
@@ -1025,6 +1087,9 @@ class ReportEngine:
             parser_current._use_unadjusted = True
             parser_prior._use_unadjusted = True
 
+        if row_ref_cache is None:
+            row_ref_cache = {}
+
         report_rows = []
         # Task 1.6: 覆盖率统计
         total_rows = 0
@@ -1033,6 +1098,8 @@ class ReportEngine:
         debug_rows: list[dict] = [] if debug else []
         # Task 1.5: fallback 警告收集
         warnings: list[dict] = []
+        # Req 16.5: 公式解析失败行收集（标注失败行，不产出空报表）
+        failed_rows: list[dict] = []
 
         for config in sorted(config_rows, key=lambda r: r.row_number):
             total_rows += 1
@@ -1089,6 +1156,18 @@ class ReportEngine:
 
             # Update global row_cache for ROW() references
             global_row_cache[config.row_code] = current_amount
+
+            # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化
+            row_refs_meta, dangling_refs = await self._resolve_row_refs_via_acnr(
+                config.formula, project_id, row_ref_cache,
+            )
+            if dangling_refs:
+                warnings.append({
+                    "row_code": config.row_code,
+                    "row_name": config.row_name,
+                    "type": "dangling_row_ref",
+                    "message": f"ROW() 引用悬空（无法经 ACNR 解析）: {', '.join(dangling_refs)}",
+                })
 
             # Extract source accounts
             source_accounts = parser_current.extract_account_codes(config.formula)
@@ -1153,6 +1232,15 @@ class ReportEngine:
                 )
                 self.db.add(row)
 
+            # Req 16.5: 标注解析失败行（不产出空报表，行仍保留）
+            if formula_error:
+                failed_rows.append({
+                    "row_code": config.row_code,
+                    "row_name": config.row_name,
+                    "formula": config.formula,
+                    "error": formula_error,
+                })
+
             row_dict = {
                 "row_code": config.row_code,
                 "row_name": config.row_name,
@@ -1160,9 +1248,15 @@ class ReportEngine:
                 "prior_period_amount": str(prior_amount),
                 "indent_level": config.indent_level,
                 "is_total_row": config.is_total_row,
+                # Req 16.4: 每单元记来源公式 + 最近计算时间
                 "formula_used": config.formula,
+                "last_computed_at": generated_at.isoformat() if generated_at else None,
                 "source_accounts": source_accounts,
+                # Req 16.3: ROW() 引用经 ACNR 解析后的规范身份（供追溯/tooltip）
+                "row_refs": row_refs_meta,
                 "fallback_applied": fallback_applied,
+                # Req 16.5: 失败标注（None=正常）
+                "formula_error": formula_error,
             }
             report_rows.append(row_dict)
 
@@ -1177,6 +1271,10 @@ class ReportEngine:
         }
         if warnings:
             type_coverage["warnings"] = warnings
+        # Req 16.5: 汇报失败行（报表仍含全部行，不产出空报表）
+        if failed_rows:
+            type_coverage["failed_rows"] = failed_rows
+            type_coverage["failed_count"] = len(failed_rows)
 
         return report_rows, type_coverage, debug_rows if debug else None
 
@@ -1369,21 +1467,38 @@ class ReportEngine:
         report_type: FinancialReportType,
         configs: list[ReportConfig],
         global_row_cache: dict[str, Decimal],
+        row_ref_cache: dict[str, Any] | None = None,
     ) -> list[dict]:
-        """按试算表未审数动态计算单张报表行（含上期，不落库）。"""
+        """按试算表未审数动态计算单张报表行（含上期，不落库）。
+
+        Req 16.2：从四表库未审数（trial_balance.unadjusted_amount）生成未审报表。
+        Req 16.3/16.4/16.5：ROW() 经 resolve_ref 规范化；每行记来源公式 + 最近计算时间；
+        解析失败标注失败行（formula_error）而非产出空报表。
+        """
         parser_current = ReportFormulaParser(self.db, project_id, year)
         parser_prior = ReportFormulaParser(self.db, project_id, year - 1)
         parser_current._use_unadjusted = True
         parser_prior._use_unadjusted = True
 
+        if row_ref_cache is None:
+            row_ref_cache = {}
+
         rows: list[dict] = []
         row_values: dict[str, Decimal] = {}
+        computed_at = datetime.now(timezone.utc)
 
         for cfg in sorted(configs, key=lambda r: r.row_number):
+            formula_error: str | None = None
             try:
                 current_amount = await parser_current.execute(cfg.formula, row_values)
-            except Exception:
+            except Exception as e:
+                # Req 16.5: 记录失败，行仍保留（不产出空报表）
+                formula_error = str(e)
                 current_amount = Decimal("0")
+                logger.warning(
+                    "Unadjusted formula execution failed for %s (%s): %s",
+                    cfg.row_code, cfg.row_name, e,
+                )
             try:
                 prior_amount = await parser_prior.execute(cfg.formula, {})
             except Exception:
@@ -1396,6 +1511,11 @@ class ReportEngine:
             row_values[cfg.row_code] = current_amount
             global_row_cache[cfg.row_code] = current_amount
 
+            # Req 16.3: ROW() 引用经 resolve_ref（ACNR full_resolve，fail-open）规范化
+            row_refs_meta, _dangling = await self._resolve_row_refs_via_acnr(
+                cfg.formula, project_id, row_ref_cache,
+            )
+
             rows.append({
                 "row_code": cfg.row_code,
                 "row_name": cfg.row_name,
@@ -1403,8 +1523,14 @@ class ReportEngine:
                 "prior_period_amount": str(prior_amount),
                 "indent_level": cfg.indent_level,
                 "is_total_row": cfg.is_total_row,
+                # Req 16.4: 来源公式 + 最近计算时间
                 "formula_used": cfg.formula,
+                "last_computed_at": computed_at.isoformat(),
                 "source_accounts": None,
+                # Req 16.3: ROW() 规范身份
+                "row_refs": row_refs_meta,
+                # Req 16.5: 失败标注
+                "formula_error": formula_error,
             })
         return rows
 
@@ -1603,9 +1729,21 @@ class ReportEngine:
     ) -> int:
         """增量更新：根据 formula 识别受影响行，只重算受影响行。
 
+        AJE/RJE 改 ``aje_adjustment`` → ``audited_amount`` 后，按 ``changed_accounts``
+        只重算直接引用变更审定数的报表行 + 经 ROW() 传递闭包连带受影响的行；
+        未受影响的报表行保持不变（Req 15.1/15.2）。受影响单元更新
+        ``generated_at``（即报表单元的最近计算时间 last_computed_at，Req 15.3）。
+        调整撤销/修改后再次调用本方法即依最新审定数重算（Req 15.4）。
+        增量重算过程中若某报表行公式的 ROW() 引用经 ACNR ``resolve_ref`` 探测悬空
+        （found=false 且非 fail-open），记入 Issue_List（``self.last_regenerate_issues``）
+        并**继续重算其余报表单元**（Req 15.5）。
+
         Returns the number of rows regenerated.
-        Validates: Requirements 2.4, 8.2
+        Validates: Requirements 2.4, 8.2, 15.1, 15.2, 15.3, 15.4, 15.5
         """
+        # Req 15.5：重置本次增量重算的悬空引用问题清单。
+        self.last_regenerate_issues = []
+
         if not changed_accounts:
             # If no specific accounts, regenerate all
             await self.generate_all_reports(project_id, year, applicable_standard)
@@ -1613,6 +1751,8 @@ class ReportEngine:
 
         configs = await self._load_report_configs(applicable_standard)
         global_row_cache: dict[str, Decimal] = {}
+        # Req 15.5：跨报表共享的 ACNR ROW() 引用解析缓存（fail-open 由 resolve_ref 保证）。
+        row_ref_cache: dict[str, Any] = {}
         regenerated = 0
         now = datetime.now(timezone.utc)
 
@@ -1653,6 +1793,23 @@ class ReportEngine:
 
             for config in sorted(config_rows, key=lambda r: r.row_number):
                 if config.row_code in affected_codes:
+                    # Req 15.5：先经 ACNR full_resolve 探测本行 ROW() 引用是否悬空，
+                    # 悬空记入 Issue_List 但**不跳过**——仍继续重算本行及其余行。
+                    _, dangling_refs = await self._resolve_row_refs_via_acnr(
+                        config.formula, project_id, row_ref_cache,
+                    )
+                    for rc in dangling_refs:
+                        self.last_regenerate_issues.append({
+                            "report_type": report_type.value,
+                            "row_code": config.row_code,
+                            "ref": rc,
+                            "addr_id": None,
+                            "message": (
+                                f"报表行 {config.row_code} 公式引用 ROW('{rc}') "
+                                f"经 ACNR 解析悬空，已记录并继续重算其余报表单元"
+                            ),
+                        })
+
                     current_amount = await parser_current.execute(
                         config.formula, global_row_cache,
                     )
@@ -1671,6 +1828,8 @@ class ReportEngine:
                     row = existing.scalar_one_or_none()
                     if row:
                         row.current_period_amount = current_amount
+                        # Req 15.3：更新受影响报表单元的最近计算时间
+                        # （FinancialReport 以 generated_at 承载 last_computed_at）。
                         row.generated_at = now
                     regenerated += 1
                 else:
@@ -1989,6 +2148,15 @@ class ReportEngine:
         await self.regenerate_affected(
             payload.project_id, year, payload.account_codes,
         )
+        # Req 15.5：增量重算中探测到的悬空 ROW() 引用汇报（不阻断，已继续重算其余行）。
+        if self.last_regenerate_issues:
+            logger.warning(
+                "on_trial_balance_updated: 增量重算探测到 %d 条悬空引用 (project=%s year=%s): %s",
+                len(self.last_regenerate_issues),
+                payload.project_id,
+                year,
+                self.last_regenerate_issues,
+            )
         await self.db.flush()
 
     async def generate_unadjusted_report(

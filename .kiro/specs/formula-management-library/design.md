@@ -78,17 +78,26 @@ flowchart TD
     NOTE --> DELIV
     WP --> DELIV
 
-    subgraph PARTNER["合伙人一键刷新编排器 Draft_Refresh_Service（Req 1-4）"]
+    subgraph PARTNER["合伙人全局一键刷新（Req 1-4, 19-22）"]
+        DIALOG["Refresh_Scope_Dialog<br/>合伙人勾选范围（Req 19）"]
+        DISC["RefreshScopeDiscovery<br/>动态发现可刷新项（Req 20）"]
+        ORCH["DraftRefreshOrchestrator<br/>按 scope 分派生成器（Req 21）"]
         GATE["① 角色门禁 require_role<br/>partner/signing_partner"]
         PRE["② 前置校验 Precheck<br/>四表库完整度"]
-        DIFF["③ 覆盖团队编辑确认<br/>+ 回滚快照"]
-        RUN["④ 生成初稿 Draft<br/>+ 幂等 + 审计留痕"]
-        GATE --> PRE --> DIFF --> RUN
+        GOV["治理层 refresh_with_presets<br/>③覆盖确认+快照 ④Draft标记<br/>+幂等+审计（affected_count=len units）"]
+        DISC --> DIALOG
+        DIALOG -->|"POST /draft-refresh scopes[]"| GATE
+        GATE --> PRE --> ORCH
+        ORCH -->|"报表 scope"| REPORT
+        ORCH -->|"审定/底稿 scope"| ADJ
+        ORCH -->|"审定/底稿 scope"| WP
+        ORCH -->|"附注 scope"| NOTE
+        REPORT -.->|"RefreshUnit"| GOV
+        ADJ -.->|"RefreshUnit"| GOV
+        WP -.->|"RefreshUnit"| GOV
+        NOTE -.->|"RefreshUnit"| GOV
+        ORCH -->|"page_keys 套预设"| GOV
     end
-    RUN -->|"预填/生成"| ADJ
-    RUN -->|"生成初稿"| REPORT
-    RUN -->|"生成初稿"| NOTE
-    RUN -->|"生成初稿"| WP
 ```
 
 ### 三类型公式的运行位置说明
@@ -146,7 +155,7 @@ class DraftRefreshService:
         """依据某次刷新的 rollback snapshot 恢复刷新前状态（Req 4.5）。"""
 ```
 
-Router 层门禁（Req 1.3 / Req 20，复用 `deps.py:125 require_role`，不新增并行判断）——**分层门禁**是本次核心修订：全局一键刷新（Global_Refresh，`/draft-refresh`）走**合伙人门禁**，模块/循环级局部刷新（Module_Refresh，如 `audit-sheet-refresh`）走**编辑权门禁**（不锁死为合伙人）。
+Router 层门禁（Req 1.3 / Req 22，复用 `deps.py:125 require_role`，不新增并行判断）——**分层门禁**是本次核心修订：全局一键刷新（Global_Refresh，`/draft-refresh`）走**合伙人门禁**，模块/循环级局部刷新（Module_Refresh，如 `audit-sheet-refresh`）走**编辑权门禁**（不锁死为合伙人）。
 
 ```python
 # backend/app/routers/wp_render_config.py
@@ -154,13 +163,13 @@ from app.deps import require_role, require_wp_edit_permission
 
 PARTNER_ROLES = ["partner", "signing_partner"]
 
-# ── Module_Refresh（Req 20）：模块/循环级局部刷新，编辑权门禁（非合伙人）──
+# ── Module_Refresh（Req 22）：模块/循环级局部刷新，编辑权门禁（非合伙人）──
 @router.post("/{wp_id}/audit-sheet-refresh")
 async def refresh_audit_sheet_from_ledger(
     wp_id: UUID,
     body: RefreshRequest,                    # confirm_overwrite: bool
     db: AsyncSession = Depends(get_db),
-    # ← 由裸 get_current_user 换成"对该底稿具编辑权"的门禁（Req 20.1/20.2），
+    # ← 由裸 get_current_user 换成"对该底稿具编辑权"的门禁（Req 22.1/22.2），
     #   而非 require_role(PARTNER_ROLES)，避免模块级刷新被一并锁死
     _user: User = Depends(require_wp_edit_permission),
 ):
@@ -176,9 +185,9 @@ async def one_click_draft_refresh(
     ...
 ```
 
-> `require_wp_edit_permission`（新建，Module_Refresh 门禁）：基于既有 `permission_service.Permission.WORKPAPER_WRITE` 与 `project_assignments`（成员表，列 `staff_id`）判定调用者对目标底稿/模块是否具编辑权；具编辑权即放行（不要求合伙人角色），否则抛 HTTP 403（Req 20.2）。它与 `require_role` 是**两条不同门禁**：前者按项目成员编辑权、后者按角色。
+> `require_wp_edit_permission`（新建，Module_Refresh 门禁）：基于既有 `permission_service.Permission.WORKPAPER_WRITE` 与 `project_assignments`（成员表，列 `staff_id`）判定调用者对目标底稿/模块是否具编辑权；具编辑权即放行（不要求合伙人角色），否则抛 HTTP 403（Req 22.2）。它与 `require_role` 是**两条不同门禁**：前者按项目成员编辑权、后者按角色。
 
-> 安全说明：两类门禁均在依赖解析阶段生效，**先于任何数据写入**，满足"不执行任何数据写入"。`require_role` 对非合伙人抛 `HTTPException(403, "权限不足")`，`/draft-refresh` 在 detail 补充"仅合伙人可触发全局一键刷新"（Req 1.2）。**合伙人门禁仅施加于 Global_Refresh（`/draft-refresh`）入口**（Req 1.5）；`audit-sheet-refresh`、报表模块内刷新、D 类循环刷新等 Module_Refresh 入口一律走编辑权门禁，不受合伙人限制（Req 20）。
+> 安全说明：两类门禁均在依赖解析阶段生效，**先于任何数据写入**，满足"不执行任何数据写入"。`require_role` 对非合伙人抛 `HTTPException(403, "权限不足")`，`/draft-refresh` 在 detail 补充"仅合伙人可触发全局一键刷新"（Req 1.2）。**合伙人门禁仅施加于 Global_Refresh（`/draft-refresh`）入口**（Req 1.5）；`audit-sheet-refresh`、报表模块内刷新、D 类循环刷新等 Module_Refresh 入口一律走编辑权门禁，不受合伙人限制（Req 22）。
 
 **幂等键设计**：`tb_snapshot_hash = sha256(sorted(四表库 (project_id, year) 下所有行的 (code, amount, direction, aux_type) 元组))`。相同快照 + 相同 scope → 幂等短路返回上次结果标识。
 
@@ -577,9 +586,11 @@ PBT **适用性判定**：本 feature 含大量纯逻辑/可量化行为（公�
 
 ---
 
-## Components and Interfaces（深化核验补充 — Req 24-25）
+## Components and Interfaces（深化核验补充 — Req 27-28）
 
-### 7. 前端 per-cycle 公式引擎纳入三类型治理（Req 24）
+> 编号对齐：本组（前端 per-cycle 引擎治理 / 求值内核收口）原按旧编号标 Req 24-25，现按修订后 requirements.md 重挂 **Req 27（前端 per-cycle 公式引擎纳入三类型治理）/ Req 28（求值内核收口 + tooltip 收敛 + recalc 衔接）**。设计内容不变，仅同步 Req 引用编号。
+
+### 7. 前端 per-cycle 公式引擎纳入三类型治理（Req 27）
 
 现状（codegraph 实证）：平台存在一批客户端硬编码公式引擎 composable：
 - `useS34FormulaEngine.ts`：`FormulaCell` / `createSumFormula`（求和）/ `createRatioFormula`（比率）/ `createThresholdFormula`（阈值）/ `computeFormulas` / `isFormulaCell` / `getReadonlyCells`。
@@ -587,139 +598,124 @@ PBT **适用性判定**：本 feature 含大量纯逻辑/可量化行为（公�
 - `useD3CrossSheet.ts` 等跨表聚合；以及各循环 `useXFormulaEngine`（D2/D4/F1/G5/K1... 分散多处）。
 
 设计（增量、不一次性重写）：
-- **清单化（Req 24.1）**：建 `formula-engine-inventory`（前端 `frontend/src/components/workpaper/composables/formulaEngineInventory.ts` 或文档表），登记所有 `useXFormulaEngine`/`useXCrossSheet`，标注三类型映射与"已接入/待接入"。作为无死角可核查真源。
-- **三类型映射（Req 24.2）**：`createSumFormula`/`createRatioFormula`/账面价值 → `auto_calc`；`createThresholdFormula` 等阈值提示 → `reasonability`；勾稽/平衡 → `logic_check`。映射为元数据标注，不改变现有计算数值。
-- **悬停接入（Req 24.3）**：`isFormulaCell` 为真的单元包一层 `GtFormulaSourceTooltip`，展示表达式 + 来源。
-- **引用经 ACNR（Req 24.5）**：跨表/跨底稿引用经 `useAcnr` 解析（协调 acnr-consumer-wiring Req 14），禁止前端拼坐标。
-- **试点（Req 24.4）**：以 `useD3FormulaEngine` + `useS34FormulaEngine` 为试点接入；其余按同模式增量；未接入者保留现状（Req 24.6 无回归）。
+- **清单化（Req 27.1）**：建 `formula-engine-inventory`（前端 `frontend/src/components/workpaper/composables/formulaEngineInventory.ts` 或文档表），登记所有 `useXFormulaEngine`/`useXCrossSheet`，标注三类型映射与"已接入/待接入"。作为无死角可核查真源。
+- **三类型映射（Req 27.2）**：`createSumFormula`/`createRatioFormula`/账面价值 → `auto_calc`；`createThresholdFormula` 等阈值提示 → `reasonability`；勾稽/平衡 → `logic_check`。映射为元数据标注，不改变现有计算数值。
+- **悬停接入（Req 27.3）**：`isFormulaCell` 为真的单元包一层 `GtFormulaSourceTooltip`，展示表达式 + 来源。
+- **引用经 ACNR（Req 27.5）**：跨表/跨底稿引用经 `useAcnr` 解析（协调 acnr-consumer-wiring Req 14），禁止前端拼坐标。
+- **试点（Req 27.4）**：以 `useD3FormulaEngine` + `useS34FormulaEngine` 为试点接入；其余按同模式增量；未接入者保留现状（Req 27.6 无回归）。
 
-### 8. 求值内核收口 + tooltip 收敛 + recalc 衔接（Req 25）
+### 8. 求值内核收口 + tooltip 收敛 + recalc 衔接（Req 28）
 
-- **单一内核（Req 25.1/25.2）**：后端求值单一入口 = `formula_engine.execute`（L1 内核）。`formula_parse_utils.evaluate_formula` / `FormulaEvaluator` 已标 `DeprecationWarning`（实证：18 callers 在 consol_report_service）；迁移调用方到 L1 内核或 `report_engine.evaluate_formula`，新代码禁新增并行求值。
-- **tooltip 收敛（Req 25.3）**：散落的 `.formula-cell { border-bottom:1px dashed; cursor:help } + title="=..."`（实证 `J2TabDetail.vue:120`）收敛到统一 `GtFormulaSourceTooltip`；未收敛前保留现状不回归。
-- **recalc/stale 衔接（Req 25.4/25.5/25.6）**：复用既有 `prefill_stale` 标记 + `/trial-balance/recalc`（实证 `useStaleStatus.recalc`）反映过时；一键刷新生成初稿后触发受影响单元重算/刷新；**明确区分**：`recalc`=团队可触发、仅重算既有公式、不生成初稿不打 Draft 标记；一键刷新=合伙人专属、生成初稿、打 Draft 标记、受角色门禁约束。
+- **单一内核（Req 28.1/28.2）**：后端求值单一入口 = `formula_engine.execute`（L1 内核）。`formula_parse_utils.evaluate_formula` / `FormulaEvaluator` 已标 `DeprecationWarning`（实证：18 callers 在 consol_report_service）；迁移调用方到 L1 内核或 `report_engine.evaluate_formula`，新代码禁新增并行求值。
+- **tooltip 收敛（Req 28.3）**：散落的 `.formula-cell { border-bottom:1px dashed; cursor:help } + title="=..."`（实证 `J2TabDetail.vue:120`）收敛到统一 `GtFormulaSourceTooltip`；未收敛前保留现状不回归。
+- **recalc/stale 衔接（Req 28.4/28.5/28.6）**：复用既有 `prefill_stale` 标记 + `/trial-balance/recalc`（实证 `useStaleStatus.recalc`）反映过时；一键刷新生成初稿后触发受影响单元重算/刷新；**明确区分**：`recalc`=团队可触发、仅重算既有公式、不生成初稿不打 Draft 标记；一键刷新=合伙人专属、生成初稿、打 Draft 标记、受角色门禁约束。
 
-## Correctness Properties（补充 — P19-P21，对应 Req 24-25）
+## Correctness Properties（补充 — P19-P21，对应 Req 27-28）
 
 ### Property 19: 前端引擎三类型映射非破坏计算
 
 *对任意*已接入统一治理的前端 per-cycle 公式引擎，为其计算原语标注三类型语义（auto_calc/reasonability/logic_check）后，该引擎产出的单元数值与接入前逐一相等（标注为元数据，不改变计算结果）。
 
-**Validates: Requirements 24.2, 24.6**
+**Validates: Requirements 27.2, 27.6**
 
 ### Property 20: 求值内核单一性
 
 *对任意*公式表达式，经收口后的后端求值路径最终都委托 `formula_engine.execute`（L1 内核）；不存在绕过内核的并行求值产生不一致结果。
 
-**Validates: Requirements 25.1, 25.2**
+**Validates: Requirements 28.1, 28.2**
 
 ### Property 21: recalc 与一键刷新语义区分
 
 *对任意*触发者与操作，`recalc`（团队可触发）执行后不产生 Draft 标记且不生成初稿单元；一键刷新（合伙人专属）执行后受影响单元带 Draft 标记；两者对既有公式的重算结果对同一数据状态一致。
 
-**Validates: Requirements 25.4, 25.6**
+**Validates: Requirements 28.4, 28.6**
 
-## Error Handling（补充 — Req 24-25）
+## Error Handling（补充 — Req 27-28）
 
 | 场景 | 触发条件 | 处理策略 | 对应需求 |
 |------|----------|----------|----------|
-| 前端引擎未接入治理 | inventory 标"待接入" | 保留现有客户端计算，不强制改造，标注待接入 | 24.6 |
-| 调用废弃 evaluate_formula | 旧调用方未迁移 | `DeprecationWarning` + 仍委托 L1 内核，结果一致；逐步迁移 | 25.1 |
-| 内联 tooltip 未收敛 | 组件仍用 `.formula-cell`+`title=` | 保留现状不回归，逐步替换为 GtFormulaSourceTooltip | 25.3 |
+| 前端引擎未接入治理 | inventory 标"待接入" | 保留现有客户端计算，不强制改造，标注待接入 | 27.6 |
+| 调用废弃 evaluate_formula | 旧调用方未迁移 | `DeprecationWarning` + 仍委托 L1 内核，结果一致；逐步迁移 | 28.1 |
+| 内联 tooltip 未收敛 | 组件仍用 `.formula-cell`+`title=` | 保留现状不回归，逐步替换为 GtFormulaSourceTooltip | 28.3 |
 
 ---
 
-## Components and Interfaces（补充 — Req 19-23，当前需求权威设计）
+## Components and Interfaces（补充 — Req 19-26，当前需求权威设计）
 
-> 本组承接 Req 1/20 的分层门禁修订，补齐全局刷新勾选弹窗、作用域过滤/全局公式页、公式三来源三块设计，对应**当前 requirements.md** 的 Req 19-23。全部**引用而非重写** ACNR（地址解析/选址器/NoteFormulaDialog 修复）与 `acnr-consumer-wiring` 的既有成果。
+> 本组承接 Req 1/22 的分层门禁修订，补齐全局刷新勾选弹窗（Req 19）、范围动态发现（Req 20）、Module_Refresh（Req 22）、作用域过滤/全局公式页（Req 24）、公式三来源（Req 25）、三能力显式化（Req 26）。全部**引用而非重写** ACNR（地址解析/选址器/NoteFormulaDialog 修复）与 `acnr-consumer-wiring` 的既有成果。
+>
+> **编号对齐说明**：本组各节原按旧编号标 Req 19-23，现按修订后 requirements.md 单一序列重挂——§13 保持 **Req 19（勾选弹窗）**、范围发现独立为 **Req 20**（见新增 §19）、§14→**Req 22（Module_Refresh）**、§15→**Req 24（作用域过滤/全局公式页）**、§16→**Req 25（公式三来源）**、§17→**Req 26（三能力显式化）**。全局刷新"按勾选范围编排生成初稿"独立为 **Req 21**（P0·核心，见新增 §18）。
 
 ### 13. 全局刷新勾选弹窗（Refresh_Scope_Dialog，Req 19）
 
-现状：`/draft-refresh`（Global_Refresh，合伙人专属）当前无"选范围"能力，一触发即全量。设计一个页面弹窗让合伙人自选刷新子集。
+现状（P0 缺口，实证）：**无 `GtRefreshScopeDialog.vue`、无任何前端组件调 `/draft-refresh`** → 合伙人 UI 无从触发全局刷新，功能不可达。设计一个页面弹窗让合伙人自选刷新子集。弹窗**消费 Req 20 的 `RefreshScopeDiscovery` 发现产出**渲染可勾选项（不自行拼装清单，见新增 §19）。
 
 ```
-GtRefreshScopeDialog.vue（新建）
-├─ 打开时机：合伙人点击"全局一键刷新"按钮（Req 19.1）
-├─ Refresh_Scope_Item 清单：动态发现（Req 19.2，禁硬编码固定列表）
-│   └─ 发现来源（复用既有注册，不新造）：
-│       ├─ 报表 / 调整分录 / 附注：来自模块注册（固定顶层域）
-│       └─ 底稿（按循环）：从 cycleDialogRegistry（config/cycleDialogRegistry.ts，
-│          字段 cycle=A..N）派生的循环集合 + wp_index 现存 wp_code 循环前缀，
-│          去重得到"底稿:循环{X}"可勾选项（Req 19.4 循环粒度）
-├─ 树形勾选：顶层域可整选/半选，底稿域展开为各循环子项（el-tree show-checkbox）
-├─ 提交校验：勾选为空 → 禁用"确认刷新" + 提示"请至少勾选一项刷新内容"（Req 19.5）
-└─ 确认 → POST /draft-refresh { project_id, year, scopes:[...], confirm_overwrite }
+GtRefreshScopeDialog.vue（新建，Req 19）
+├─ 入口按钮：合伙人可见的"全局一键刷新"入口（Req 19.1）
+│   └─ 前端门禁：仅当 usePermissionMatrix.currentRole ∈ {partner, signing_partner}
+│      渲染入口按钮；非合伙人不可见（Req 19.2 前端不可见 + 后端 Req 1 二次拦截）
+├─ 打开时机：合伙人点击入口按钮 → 弹窗（Req 19.3）
+├─ Refresh_Scope_Item 清单：GET 发现端点（Req 20，禁硬编码固定列表）拉取，
+│   至少含 报表 / 底稿（按循环）/ 调整分录 / 附注（Req 19.3）
+├─ 树形勾选：顶层域可整选/半选，底稿域展开为各循环子项（el-tree show-checkbox）；
+│   底稿类允许按循环（如 D 类）勾选而非只能整选全部底稿（Req 19.4）
+├─ 提交校验：勾选为空 → 禁用"确认刷新" + 提示"请至少勾选一项刷新内容"，
+│   不发起任何请求（Req 19.5）
+└─ 确认 → POST /draft-refresh { project_id, year, scopes:[...], confirm_overwrite }（Req 19.6）
 ```
 
-后端 `/draft-refresh` 请求体与范围执行：
+后端 `/draft-refresh` 请求体已就绪（`OneClickRefreshRequest`：`project_id` / `year` / `scopes: list[str]` / `confirm_overwrite`）。**关键修订（Req 21，见新增 §18）**：`/draft-refresh` 当前直调 `service.refresh()` 且不传 `units` → 零初稿；本次改为调 **`DraftRefreshOrchestrator`** 按勾选 `scopes` 分派生成器产出 `RefreshUnit` 后经 `refresh_with_presets` 编排。`Audit_Trail`（`draft_refresh_audit.detail`）记录本次实际执行的 `scopes` 清单（Req 21.6，复用 Req 4 留痕契约）。
 
-```python
-class OneClickRefreshRequest(BaseModel):
-    project_id: UUID
-    year: int
-    scopes: list[str]            # 勾选的 Refresh_Scope_Item 键，如
-                                 # ["report", "aje", "note", "workpaper:D", "workpaper:E"]
-    confirm_overwrite: bool = False
-
-# 范围发现服务（供弹窗与后端共用，避免硬编码）
-class RefreshScopeDiscovery:
-    async def discover(self, db, *, project_id, year) -> list[RefreshScopeItem]:
-        """从模块注册（报表/调整分录/附注固定域）+ 循环注册（cycleDialogRegistry
-        的 cycle 值 ∪ wp_index 现存 wp_code 循环前缀）派生可刷新项。
-        新增模块/循环无需改弹窗即自动出现（Req 19.2）。"""
-```
-
-`DraftRefreshService.refresh` 的 `scope` 参数由单值升级为 `scopes: list[str]`：仅对被勾选键执行对应生成流程，未勾选域完全不触碰（Req 19.3）；`Audit_Trail`（`draft_refresh_audit.detail`）记录本次实际执行的 `scopes` 清单（Req 19.6，复用 Req 4 留痕契约）。
-
-### 14. 模块/循环级局部刷新（Module_Refresh，Req 20）
+### 14. 模块/循环级局部刷新（Module_Refresh，Req 22）
 
 在 §1 已将 `audit-sheet-refresh` 门禁由裸 `get_current_user` 换为 `require_wp_edit_permission`（编辑权，非合伙人）。本节补齐其初稿语义、范围隔离与留痕粒度：
 
 | 关注点 | Module_Refresh 行为 | 对应需求 |
 |--------|---------------------|----------|
-| 授权 | `require_wp_edit_permission`：具目标底稿/模块编辑权即放行，不要求合伙人；无编辑权 403 且不写 | 20.1, 20.2 |
-| 初稿语义 | 生成单元写 `draft_marker.state='draft'` + `last_computed_at`，与 Global_Refresh 一致 | 20.3 |
-| 留痕粒度 | `draft_refresh_audit` 记 `scope='module:{wp_code/cycle}'`、底稿标识、操作者、受影响数（按模块/循环粒度，非全局） | 20.4 |
-| 范围隔离 | 写入单元集合 ⊆ 被调模块/循环 scope，不触发跨模块全局生成 | 20.5 |
-| 覆盖确认 | 沿用 Req 4 团队编辑区分（未确认不覆盖人工编辑单元），复用 `preview_overwrites` | 20.6 |
+| 授权 | `require_wp_edit_permission`：具目标底稿/模块编辑权即放行，不要求合伙人；无编辑权 403 且不写 | 22.1, 22.2 |
+| 初稿语义 | 生成单元写 `draft_marker.state='draft'` + `last_computed_at`，与 Global_Refresh 一致 | 22.3 |
+| 留痕粒度 | `draft_refresh_audit` 记 `scope='module:{wp_code/cycle}'`、底稿标识、操作者、受影响数（按模块/循环粒度，非全局） | 22.4 |
+| 范围隔离 | 写入单元集合 ⊆ 被调模块/循环 scope，不触发跨模块全局生成 | 22.5 |
+| 覆盖确认 | 沿用 Req 4 团队编辑区分（未确认不覆盖人工编辑单元），复用 `preview_overwrites` | 22.6 |
 
 Module_Refresh 与 Global_Refresh 共用 `DraftRefreshService` 的 precheck/snapshot/draft/audit 编排，仅**门禁**与**scope 范围**不同：Module_Refresh 传入单一模块 scope，Global_Refresh 传入勾选的多 scope。
 
-### 15. 公式作用域过滤与全局公式管理页（Req 21）
+### 15. 公式作用域过滤与全局公式管理页（Req 24）
 
-复用 `FormulaManagerDialog.vue` 既有 `scope` prop（`FormulaManagerScope` 7 类：`note`/`consol_note`/`consol_worksheet`/`consol_report`/`report`/`tb`/`workpaper`，默认 `report`）与树形导航（`selectedNodeKey`/`selectedPath`/`SCOPE_LABEL_MAP` 中文标签），**不新造并行作用域机制**（Req 21.4）。
+复用 `FormulaManagerDialog.vue` 既有 `scope` prop（`FormulaManagerScope` 7 类：`note`/`consol_note`/`consol_worksheet`/`consol_report`/`report`/`tb`/`workpaper`，默认 `report`）与树形导航（`selectedNodeKey`/`selectedPath`/`SCOPE_LABEL_MAP` 中文标签），**不新造并行作用域机制**（Req 24.4）。
 
 ```
 公式弹窗（页面内打开）
 ├─ 传入当前页面对应 scope（如附注页 → scope='note'）
-├─ 仅加载该 scope 的公式（Req 21.1）：后端按 scope 过滤，前端树只展开该域节点
-└─ 不展示/编辑其他 scope 公式（Req 21.2）
+├─ 仅加载该 scope 的公式（Req 24.1）：后端按 scope 过滤，前端树只展开该域节点
+└─ 不展示/编辑其他 scope 公式（Req 24.2）
 
 Global_Formula_Page（全局公式管理页）
-├─ 跨全部 7 类 scope 展示所有公式（Req 21.3）：树形导航含全部域根节点
-└─ 各 scope 公式集互不串扰（Req 21.5）：一个 scope 的编辑仅改该 scope 列表，
+├─ 跨全部 7 类 scope 展示所有公式（Req 24.3）：树形导航含全部域根节点
+└─ 各 scope 公式集互不串扰（Req 24.5）：一个 scope 的编辑仅改该 scope 列表，
    其余 scope 列表逐一不变（按 (scope, addr_id) 键隔离缓存 allRowsMap）
 ```
 
-过滤后展示的来源地址一律用 ACNR `full_resolve` 规范名（Req 21.6，与 Req 10 / P14 一致）。
+过滤后展示的来源地址一律用 ACNR `full_resolve` 规范名（Req 24.6，与 Req 10 / P14 一致）。
 
-### 16. 公式三来源（preset / custom / reference，Req 22）
+### 16. 公式三来源（preset / custom / reference，Req 25）
 
 引入 `Formula_Source ∈ {preset, custom, reference}` 作为公式的**来源方式**维度（与 `formula_type` 的三类型正交）：
 
 | 来源 | 语义 | 复用的既有能力 | 对应需求 |
 |------|------|----------------|----------|
-| `preset` | 从预设公式库一键套用 | `check_presets` / 预设库（`generate_formulas_for_table` 消费 `check_presets`） | 22.2 |
-| `custom` | 用户自定义覆盖预设，标 `is_preset_override=true`，可恢复预设 | `wp_user_formulas.py`：`UserFormulaItem`(cell_key/formula/formula_type/is_preset_override/edited_at) + restore/delete 端点 `/api/workpapers/{wpId}/user-formulas/{cell_key}`（`onRestorePresetFormula`） | 22.3, 22.4 |
-| `reference` | 参照另一条已保存公式的表达式/定义（扩展 Req 9 复用） | 新增 `reference_formula_id` 指向源公式；解析时取源公式 `expression`；失效走 ACNR 失效链 | 22.5, 22.7 |
+| `preset` | 从预设公式库一键套用 | `check_presets` / 预设库（`generate_formulas_for_table` 消费 `check_presets`） | 25.2 |
+| `custom` | 用户自定义覆盖预设，标 `is_preset_override=true`，可恢复预设 | `wp_user_formulas.py`：`UserFormulaItem`(cell_key/formula/formula_type/is_preset_override/edited_at) + restore/delete 端点 `/api/workpapers/{wpId}/user-formulas/{cell_key}`（`onRestorePresetFormula`） | 25.3, 25.4 |
+| `reference` | 参照另一条已保存公式的表达式/定义（扩展 Req 9 复用） | 新增 `reference_formula_id` 指向源公式；解析时取源公式 `expression`；失效走 ACNR 失效链 | 25.5, 25.7 |
 
-- **custom 恢复预设（Req 22.4）**：直接复用 `wp_user_formulas` 的 restore/delete 语义（删除 User_Formula 覆盖 → 回退预设），本 spec 不重写该端点。
-- **reference 失效传播（Req 22.7）**：被参照源公式变更 → 引用方经 **ACNR 失效链**（复用 Req 13/22 失效机制，不自建）标失效并可重算。
-- 每条公式记录 `formula_source`，前端据此区分展示（Req 22.6，见 Data Models V100 扩展）。
+- **custom 恢复预设（Req 25.4）**：直接复用 `wp_user_formulas` 的 restore/delete 语义（删除 User_Formula 覆盖 → 回退预设），本 spec 不重写该端点。
+- **reference 失效传播（Req 25.7）**：被参照源公式变更 → 引用方经 **ACNR 失效链**（复用 Req 13/25 失效机制，不自建）标失效并可重算。
+- 每条公式记录 `formula_source`，前端据此区分展示（Req 25.6，见 Data Models V100 扩展）。
 
-### 17. 公式三能力显式化（Req 23）
+### 17. 公式三能力显式化（Req 26）
 
-Req 23 是**能力聚合约束**，不引入新机制，而是保证每条公式同时具备三能力，全部复用既有设计：
+Req 26 是**能力聚合约束**，不引入新机制，而是保证每条公式同时具备三能力，全部复用既有设计：
 
 | 能力 | 实现 | 复用 |
 |------|------|------|
@@ -727,7 +723,145 @@ Req 23 是**能力聚合约束**，不引入新机制，而是保证每条公式
 | 可编辑保存 | `GtFormulaEditDialog` + 持久化契约 | Req 8 / 9 / P6 |
 | 可运算刷新 | `Formula_Engine` 按类型执行（auto_calc 回填 / logic_check 产 Issue / reasonability 产 Hint），更新 last_computed_at | Req 5/6/7 / P5 / P9 |
 
-三能力在底稿/报表/附注三处一致可用（Req 23.5）：统一组件挂载三处（结构性/示例测试保证）。
+三能力在底稿/报表/附注三处一致可用（Req 26.5）：统一组件挂载三处（结构性/示例测试保证）。
+
+### 18. 全局刷新生成编排层（DraftRefreshOrchestrator，Req 21｜P0·核心）
+
+**缺口（实证）**：`draft_refresh.py` 的 `/draft-refresh` 调 `DraftRefreshService.refresh()` 时**不传 `units`（默认空）、不调 `refresh_with_presets`、不传 `page_keys`、不调用报表引擎/审定表回写/附注生成器** → 合伙人触发全局刷新只写审计、`affected_count=0`、零初稿。`DraftRefreshService` 是**治理编排层**（幂等 / Draft 标记 / 覆盖排除 / 快照 / 审计），等上游"喂 `RefreshUnit`"，但全局入口缺少驱动各生成器产出 `RefreshUnit` 的**生成编排层**。
+
+**设计**：新增 `DraftRefreshOrchestrator`（`backend/app/services/formula_management/draft_refresh_orchestrator.py`），位于 router 与生成器/治理层之间——**按勾选 `scopes` 分派到各上游生成器产出 `RefreshUnit`，再交 `DraftRefreshService.refresh_with_presets` 统一治理**。它不重复生成逻辑（生成归各既有引擎），只做"scope → 生成器"的分派与结果归集。
+
+```python
+# backend/app/services/formula_management/draft_refresh_orchestrator.py（新建）
+class DraftRefreshOrchestrator:
+    """全局刷新生成编排层（Req 21）。按勾选 scopes 分派各上游生成器产出 RefreshUnit，
+    经 DraftRefreshService.refresh_with_presets 统一治理（幂等/Draft/覆盖/快照/审计）。
+    service 只 flush，router commit。"""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.svc = DraftRefreshService()
+
+    async def generate(
+        self, *, project_id: UUID, year: int, operator: User,
+        scopes: Sequence[str],          # 勾选的 Refresh_Scope_Item 键（Req 19.6 提交）
+        confirm_overwrite: bool = False,
+    ) -> tuple[RefreshResult, PresetApplication]:
+        # ① 校验 scopes ⊆ RefreshScopeDiscovery.discover（Req 20 共用发现口径，未知键忽略并告警）
+        valid = {i.key for i in await RefreshScopeDiscovery(self.db).discover(
+            project_id=project_id, year=year)}
+        selected = [s for s in scopes if s in valid]
+
+        # ② 按被勾选 scope 分派对应生成器 → 归集 RefreshUnit + page_keys（未勾选域完全不触碰，Req 21.3）
+        units: list[RefreshUnit] = []
+        page_keys: list[str] = []
+        for scope in selected:
+            gen_units, gen_pages = await self._dispatch(scope, project_id=project_id, year=year)
+            units.extend(gen_units)
+            page_keys.extend(gen_pages)
+
+        # ③ 交治理层：按 page_key 套预设（Req 21.2）+ 合并生成 units → 幂等/Draft/覆盖/快照/审计
+        #    未勾选域无 units/page_keys → 零写入；affected_count = len(refreshed_units)（Req 21.4）
+        return await self.svc.refresh_with_presets(
+            self.db, project_id=project_id, year=year, operator=operator,
+            scope=selected, page_keys=page_keys, extra_units=units,
+            confirm_overwrite=confirm_overwrite,
+        )
+
+    async def _dispatch(self, scope, *, project_id, year) -> tuple[list[RefreshUnit], list[str]]:
+        """scope → 对应生成器（Req 21.1）。仅列关键分派，底稿域按循环细分。"""
+        if scope == "report":
+            # 报表域 → ReportEngine 从四表库未审数生成未审报表
+            rows = await ReportEngine(self.db).generate_unadjusted_report(project_id, year, report_type=...)
+            return [RefreshUnit(unit_scope=f"report:{r['row_code']}",
+                                after_value=r) for r in rows if r.get("row_code")], ["report:*"]
+        if scope in ("adjudication",) or scope.startswith("workpaper"):
+            # 审定/底稿域 → 审定表回写 + 底稿生成（scope='workpaper:D' → 仅该循环底稿）
+            wb = await AdjudicationWritebackService(self.db).writeback_batch(project_id, year, scope=scope)
+            return _to_units(wb, prefix="audit_sheet"), _wp_page_keys(scope)
+        if scope == "note":
+            # 附注域 → execute_note_formulas 逐 section 回填 mode=auto
+            res = await execute_note_formulas(self.db, project_id, year, note_section=...)
+            return _note_units(res), _note_page_keys(res)
+        return [], []            # 未识别 scope → 空（不写）
+```
+
+Router 改造（`draft_refresh.py`）：`/draft-refresh` 由裸调 `service.refresh()` 改为调 `DraftRefreshOrchestrator.generate(...)`，其余（合伙人门禁 `require_role` / precheck 阻断 422 / service flush、router commit）不变。
+
+```python
+# backend/app/routers/draft_refresh.py（改造点）
+orchestrator = DraftRefreshOrchestrator(db)
+result, preset_app = await orchestrator.generate(
+    project_id=body.project_id, year=body.year, operator=_user,
+    scopes=body.scopes, confirm_overwrite=body.confirm_overwrite,
+)
+await db.commit()   # service 只 flush，router commit（工程铁律）
+return {**result.to_dict(), "preset_application": preset_app.to_dict(),
+        "precheck_warnings": [w.to_dict() for w in precheck.warnings]}
+```
+
+**scope→生成器映射（Req 21.1）**：
+
+| Refresh_Scope_Item | 生成器 | 产出 RefreshUnit.unit_scope | page_key |
+|--------------------|--------|-----------------------------|----------|
+| `report` | `ReportEngine.generate_unadjusted_report` / `generate_all_reports(mode="unadjusted")` | `report:{row_code}` | `report:*` |
+| `adjudication` / `workpaper:{cycle}` | `AdjudicationWritebackService.writeback_batch` + 底稿生成 | `audit_sheet:{wp_id}:{cell}` | `workpaper:{wp_code}` |
+| `note` | `execute_note_formulas(note_section=...)` | `note:{section}!{r}:{c}` | `note:{section}` |
+| 未勾选域 | 不分派 | 无 | 无（零写入，Req 21.3） |
+
+- **units 按 scope 过滤**：`_dispatch` 仅对被勾选 scope 产出 units，未勾选域返回空 → 治理层无该域 units → 零 Draft 标记、零快照、零写入（Req 21.3）。
+- **affected_count 反映真实生成量（Req 21.4）**：`refresh_with_presets → refresh` 内 `affected_count = len(refreshed_units)`（既有实现），编排层喂入真实 units 后不再恒为 0。
+- **初稿语义/覆盖/留痕（Req 21.5/21.6）**：完全复用治理层 `refresh` 的 Draft 标记 + `last_computed_at`（经 `trigger_recalc` 复用 `prefill_stale`）+ 覆盖前快照（Req 4）+ 审计 `detail.scopes` 记录本次实际执行范围。
+
+### 19. 全局刷新范围动态发现（RefreshScopeDiscovery，Req 20｜P1）
+
+**缺口（实证）**：当前 `scopes` 仅字符串透传，无发现服务/端点；新增循环/模块不会自动出现在勾选项。
+
+**设计**：新增 `RefreshScopeDiscovery`（`backend/app/services/formula_management/refresh_scope_discovery.py`）+ 发现端点，**供 Refresh_Scope_Dialog（Req 19）与后端编排（Req 21）共用同一口径**（Req 20.6，避免前后端清单漂移）。
+
+```python
+@dataclass
+class RefreshScopeItem:
+    key: str            # 范围键：report / adjudication / note / workpaper:{cycle}
+    label: str          # 中文标签：报表 / 调整分录 / 附注 / 底稿·循环D
+    group: str          # 顶层域：report | adjudication | note | workpaper
+    cycle: str | None = None   # workpaper 域的循环字母（A..N），其余为 None
+
+class RefreshScopeDiscovery:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def discover(self, *, project_id: UUID, year: int) -> list[RefreshScopeItem]:
+        """从三来源动态派生可刷新项并按 key 去重（Req 20.1, 20.4，禁硬编码 Req 20.2）：
+        ① 模块注册：报表 / 调整分录 / 附注等固定顶层域（来自模块注册表）。
+        ② 循环集合：cycleDialogRegistry 的 cycle 值（A..N）。
+        ③ wp_index：现存 wp_code 的循环前缀（`re.match(r'([A-N])', wp_code)`）。
+        ②③ 并集去重 → 每个循环产出一个 'workpaper:{cycle}' 项（Req 20.3 新增即现，20.4 循环粒度+去重）。"""
+```
+
+- **发现端点**：`GET /api/workpapers/refresh-scopes?project_id=&year=` → `{items: [RefreshScopeItem]}`，合伙人门禁（与 `/draft-refresh` 同 `require_role`）。前端 `GtRefreshScopeDialog` 消费其产出渲染可勾选项（Req 20.5，不自行拼装）。
+- **前后端共用（Req 20.6）**：`DraftRefreshOrchestrator.generate` 的 scope 合法性校验（§18 ①）与弹窗渲染均调 `RefreshScopeDiscovery.discover`，单一实现 → 无清单漂移。
+- **禁硬编码（Req 20.2）**：循环项一律从 `cycleDialogRegistry` + `wp_index` 派生，新增循环/模块无需改弹窗代码即自动出现（Req 20.3）。
+
+### 20. 报表勾稽前端消费后端 logic_check（收编闭环，Req 23｜P1）
+
+**缺口（实证）**：后端 `logic_check.py` 已把 7 条勾稽落库为可编辑 logic_check 公式并建了执行端点（Req 6.4 后端半环），但前端 `useReportCrossCheck.ts` 仍是**硬编码纯函数** `computeCrossCheckResults`、从不消费后端、无法在弹窗编辑。本节补齐前端消费闭环。
+
+```
+useReportCrossCheck.ts（改造，Req 23）
+├─ 主路径（Req 23.1）：调后端 logic_check 执行端点获取 Issue_List
+│   └─ 以后端返回的逐条勾稽判定（passed + 问题描述）驱动前端勾稽展示
+├─ 降级路径（Req 23.2/23.3）：保留 computeCrossCheckResults 纯函数；
+│   后端端点不可用（超时/5xx/网络错）→ 回退纯函数，不阻断报表页面渲染
+├─ 语义一致（Req 23.5）：前端消费后端后的逐条勾稽判定 == 原 computeCrossCheckResults
+│   （收编不改变勾稽含义；由后端 P17 model-based + 前端 P32 等价属性双向守护）
+└─ 可编辑（Req 23.4）：7 条勾稽以 logic_check 类型在 GtFormulaEditDialog 查看/编辑，
+    编辑经后端持久化并参与后续勾稽执行（复用 §4 统一弹窗 + §3 logic_check 收编）
+```
+
+- **执行端点复用**：消费 §3 收编 logic_check 时建立的后端执行端点返回的 `Issue_List`（每条含 formula_id / addr_id / description / 判定值）。
+- **降级不阻断（Req 23.3）**：`useReportCrossCheck` 内 try/catch，后端不可用即用本地 `computeCrossCheckResults`，报表页面照常渲染（fail-open）。
+- **编辑闭环（Req 23.4）**：勾稽规则不再前端硬编码——在 `GtFormulaEditDialog` 以 `formula_type='logic_check'` 打开这 7 条，编辑后经 §9 保存契约持久化，下次执行采用新定义。
 
 ---
 
@@ -736,7 +870,7 @@ Req 23 是**能力聚合约束**，不引入新机制，而是保证每条公式
 在 V100 迁移中追加 `formula_source` 与 `reference_formula_id` 列（沿用 `DO $$ ... information_schema` 幂等模式）：
 
 ```sql
--- V100（续）: 公式来源维度 + 参照链（Req 22）
+-- V100（续）: 公式来源维度 + 参照链（Req 25）
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
                  WHERE table_name='wp_formula' AND column_name='formula_source') THEN
@@ -755,24 +889,24 @@ FormulaRecord 逻辑模型新增字段：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `formula_source` | enum | `preset` / `custom` / `reference`（来源方式，与 formula_type 正交，Req 22.6） |
-| `reference_formula_id` | UUID? | reference 来源指向的源公式 id；解析时取源公式 expression（Req 22.5）；源变更经 ACNR 失效链使本条失效（Req 22.7） |
+| `formula_source` | enum | `preset` / `custom` / `reference`（来源方式，与 formula_type 正交，Req 25.6） |
+| `reference_formula_id` | UUID? | reference 来源指向的源公式 id；解析时取源公式 expression（Req 25.5）；源变更经 ACNR 失效链使本条失效（Req 25.7） |
 
 - `custom` 覆盖的恢复预设语义仍由 `wp_user_formulas`（`is_preset_override` / restore 端点）承载，本表 `formula_source='custom'` 与之呼应，不重复存覆盖内容。
-- **模块刷新初稿粒度（Req 20）**：`draft_marker.unit_scope` 已足以承载模块/循环粒度（如 `audit_sheet:{wp_id}:{cell}`）；`draft_refresh_audit.scope` 对 Module_Refresh 写 `module:{wp_code/cycle}`，对 Global_Refresh 写勾选 `scopes` 清单（存 `detail.scopes`），二者共用同一审计表。
+- **模块刷新初稿粒度（Req 22）**：`draft_marker.unit_scope` 已足以承载模块/循环粒度（如 `audit_sheet:{wp_id}:{cell}`）；`draft_refresh_audit.scope` 对 Module_Refresh 写 `module:{wp_code/cycle}`，对 Global_Refresh 写勾选 `scopes` 清单（存 `detail.scopes`），二者共用同一审计表。
 - ORM 侧在 `workpaper_models.py:WpFormula` 同步补 `formula_source` / `reference_formula_id` 的 `Mapped[]` 声明（迁移 + ORM + service 三层一致）。
 
 ---
 
-## Correctness Properties（补充 — P22-P30，对应 Req 19-22）
+## Correctness Properties（补充 — P22-P32，对应 Req 19-25 及 P0/P1 缺口）
 
-> 以下属性经 prework 去冗余归并（见 prework 分析）。Req 23 全部复用 P5/P6/P9/P14 + 示例测试，不新增属性；Req 20.6 复用 P4；Req 21.6 复用 P14。本组属性编号续接前文 P21，从 P22 起连续编号。
+> 以下属性经 prework 去冗余归并（见 prework 分析）。Req 26 全部复用 P5/P6/P9/P14 + 示例测试，不新增属性；Req 22.6 复用 P4；Req 24.6 复用 P14。本组属性编号续接前文 P21，从 P22 起连续编号。P0/P1 缺口新行为的补充属性见后文 P31-P32。
 
 ### Property 22: 勾选范围=执行范围=留痕范围一致
 
 *对任意*非空的 Refresh_Scope_Item 勾选子集（含"底稿:循环{X}"循环粒度项），全局一键刷新仅对被勾选范围执行生成、未勾选域数据快照逐一不变，且审计留痕记录的 scope 集合恰等于勾选集合（勾选 == 执行 == 留痕）。
 
-**Validates: Requirements 19.3, 19.4, 19.6**
+**Validates: Requirements 19.4, 21.3, 21.6**
 
 ### Property 23: 空勾选阻断刷新
 
@@ -782,59 +916,71 @@ FormulaRecord 逻辑模型新增字段：
 
 ### Property 24: 刷新范围项动态发现无遗漏
 
-*对任意*模块/循环注册来源（cycleDialogRegistry 的 cycle 集合 ∪ wp_index 现存循环前缀 ∪ 固定顶层域），Refresh_Scope_Dialog 发现的可刷新项集合覆盖全部注册来源派生项（新增模块/循环即出现，无硬编码遗漏）。
+*对任意*模块/循环注册来源（cycleDialogRegistry 的 cycle 集合 ∪ wp_index 现存循环前缀 ∪ 固定顶层域），Refresh_Scope_Discovery 发现的可刷新项集合覆盖全部注册来源派生项并按范围键去重（新增模块/循环即出现，无硬编码遗漏）。
 
-**Validates: Requirements 19.2**
+**Validates: Requirements 20.1, 20.2, 20.3, 20.4**
 
 ### Property 25: 模块刷新按编辑权而非合伙人门禁
 
 *对任意*调用者与目标模块/底稿，Module_Refresh 入口当且仅当调用者对该模块/底稿具编辑权时放行（与是否为合伙人无关）；无编辑权一律返回 403 且刷新前后数据快照完全不变。
 
-**Validates: Requirements 20.1, 20.2**
+**Validates: Requirements 22.1, 22.2**
 
 ### Property 26: 模块刷新初稿语义与范围隔离
 
 *对任意*模块/循环级刷新，其生成的所有单元均带 Draft 标记（state='draft'）与非空 last_computed_at，写入单元集合完全隶属被调模块/循环 scope（不写模块外单元），且审计留痕含模块/循环粒度字段（目标模块/循环、底稿标识、操作者、受影响数）。
 
-**Validates: Requirements 20.3, 20.4, 20.5**
+**Validates: Requirements 22.3, 22.4, 22.5**
 
 ### Property 27: 公式作用域隔离不串扰
 
 *对任意*跨多个 Formula_Scope 的公式全集与任意目标 scope，页面内以该 scope 打开的公式弹窗加载集合恰等于该 scope 的公式子集（无其他 scope 泄漏）；全局公式页展示集合等于各 scope 并集；对任意两个不同 scope，其一的编辑不改变另一的公式列表（逐一不变）。
 
-**Validates: Requirements 21.1, 21.2, 21.3, 21.5**
+**Validates: Requirements 24.1, 24.2, 24.3, 24.5**
 
 ### Property 28: 公式来源往返保真
 
 *对任意*公式与任意 Formula_Source ∈ {preset, custom, reference}，保存后再读回，其 formula_source 与保存输入相等（前端据此可区分预设/自定义/参照）。
 
-**Validates: Requirements 22.1, 22.6**
+**Validates: Requirements 25.1, 25.6**
 
 ### Property 29: 自定义覆盖—恢复预设往返
 
 *对任意*带预设公式的单元，以 custom 来源覆盖（is_preset_override=true）后再请求恢复预设，该单元回退为原预设公式（表达式与原预设逐一相等）且 User_Formula 覆盖被删除（round-trip：restore(override(preset)) == preset）。
 
-**Validates: Requirements 22.3, 22.4**
+**Validates: Requirements 25.3, 25.4**
 
 ### Property 30: 参照复用与源变更失效传播
 
 *对任意*已保存源公式，以 reference 来源引用后，引用方解析出的表达式等于源公式表达式（复用而非重录）；当源公式变更时，引用方经 ACNR 失效链被标记失效并可重算。
 
-**Validates: Requirements 22.5, 22.7**
+**Validates: Requirements 25.5, 25.7**
+
+### Property 31: 全局刷新按勾选范围生成初稿且范围隔离、affected_count 真实
+
+*对任意*非空的 Refresh_Scope_Item 勾选子集，全局刷新经 `DraftRefreshOrchestrator` 分派生成后：(a) 产出的所有 Draft_Unit 的 `unit_scope` 均落在被勾选 scope 对应的域/循环内；(b) 未被勾选的域零写入（数据快照逐一不变）；(c) `affected_count` 恰等于实际刷新单元数 `len(refreshed_units)`（≥0，且当勾选域有可生成内容时 > 0，不再恒为 0）。
+
+**Validates: Requirements 21.1, 21.3, 21.4**
+
+### Property 32: 前端 logic_check 收编与纯函数降级等价
+
+*对任意*报表数据，前端 `useReportCrossCheck` 消费后端 logic_check 端点返回的 Issue_List 得到的逐条勾稽判定，与纯函数 `computeCrossCheckResults` 的逐条判定完全一致；且当后端端点不可用触发降级时，降级路径的逐条判定与在线路径完全一致（收编与降级均不改变勾稽语义）。
+
+**Validates: Requirements 23.1, 23.3, 23.5**
 
 ---
 
-## Error Handling（补充 — Req 19-22）
+## Error Handling（补充 — Req 19-25）
 
 | 场景 | 触发条件 | 处理策略 | 对应需求 |
 |------|----------|----------|----------|
 | 全局刷新空勾选 | 勾选集合为空 | 弹窗禁用"确认刷新"并提示"请至少勾选一项刷新内容"，不发起 `/draft-refresh` | 19.5 |
-| 勾选含未知/失效 scope | scopes 含非发现列表内的键 | 后端忽略未知键并在响应告警，仅执行合法勾选项 | 19.2, 19.3 |
-| 模块刷新无编辑权 | `require_wp_edit_permission` 判定无编辑权 | HTTP 403，依赖解析阶段拦截，不进入任何写入 | 20.2 |
-| 模块刷新试图跨模块写 | 生成流程越出被调模块 scope | 范围守卫拒绝越界写入，仅写模块内单元 | 20.5 |
-| 页面弹窗越 scope 访问 | 请求加载非当前 scope 公式 | 按 scope 过滤，不返回其他 scope 公式 | 21.1, 21.2 |
-| reference 指向已删除源公式 | reference_formula_id 悬空 | 视为悬空引用：解析记 Issue_List/告警，按既有 fail-open 处理，不静默产错值 | 22.5, 22.7 |
-| 恢复预设但无预设可回退 | 单元无对应预设公式 | 返回描述性错误，保留现有 custom 覆盖不变 | 22.4 |
+| 勾选含未知/失效 scope | scopes 含非发现列表内的键 | 后端忽略未知键并在响应告警，仅执行合法勾选项 | 20.2, 21.3 |
+| 模块刷新无编辑权 | `require_wp_edit_permission` 判定无编辑权 | HTTP 403，依赖解析阶段拦截，不进入任何写入 | 22.2 |
+| 模块刷新试图跨模块写 | 生成流程越出被调模块 scope | 范围守卫拒绝越界写入，仅写模块内单元 | 22.5 |
+| 页面弹窗越 scope 访问 | 请求加载非当前 scope 公式 | 按 scope 过滤，不返回其他 scope 公式 | 24.1, 24.2 |
+| reference 指向已删除源公式 | reference_formula_id 悬空 | 视为悬空引用：解析记 Issue_List/告警，按既有 fail-open 处理，不静默产错值 | 25.5, 25.7 |
+| 恢复预设但无预设可回退 | 单元无对应预设公式 | 返回描述性错误，保留现有 custom 覆盖不变 | 25.4 |
 
 ---
 
@@ -842,7 +988,7 @@ FormulaRecord 逻辑模型新增字段：
 
 ### 后端 PBT（Hypothesis，续接已有覆盖）
 
-- 新增属性测试：P22, P23, P24, P25, P26, P27（后端过滤侧）, P28, P29, P30；已有 P19/P20/P21（Req 24-25）保持。
+- 新增属性测试：P22, P23, P24, P25, P26, P27（后端过滤侧）, P28, P29, P30，及 P0/P1 缺口补充 P31（全局刷新生成非空+范围隔离）, P32（前端 logic_check 收编闭环等价）；已有 P19/P20/P21（Req 27-28）保持。
 - 每条属性 ≥ 100 次迭代，注释标注 `# Feature: formula-management-library, Property {number}: {property_text}`，每属性单一 property-based 测试。
 - 关键生成器：随机 Refresh_Scope_Item 勾选子集（含循环粒度项 + 空集边界）、随机模块/循环注册表（验证发现无遗漏）、随机 (用户编辑权, 角色) 组合、随机多 scope 公式全集 + 目标 scope、随机 (公式, formula_source∈{preset,custom,reference})、随机 preset→custom→restore 序列、随机 source→reference 链。
 - Mock 策略：`require_wp_edit_permission` 注入桩（编辑权真/假分支）；ACNR 失效链注入桩（验证 reference 源变更传播 P30）；DB 用测试事务隔离。
@@ -851,13 +997,16 @@ FormulaRecord 逻辑模型新增字段：
 
 - 示例/快照测试覆盖 UI 契约：
   - `GtRefreshScopeDialog`：弹出且含报表/底稿/调整分录/附注基础项（Req 19.1）、底稿按循环展开（Req 19.4）、空勾选禁用提交（Req 19.5）。
-  - 作用域过滤：公式弹窗按传入 scope 加载、消费 `FormulaManagerDialog` 的 `scope` prop 与 `SCOPE_LABEL_MAP`（Req 21.4）。
-  - 公式三来源：`Formula_Source` 枚举含三值（Req 22.1）、preset 套用表达式（Req 22.2）、三能力在底稿/报表/附注三处挂载一致（Req 23.5）。
+  - 作用域过滤：公式弹窗按传入 scope 加载、消费 `FormulaManagerDialog` 的 `scope` prop 与 `SCOPE_LABEL_MAP`（Req 24.4）。
+  - 公式三来源：`Formula_Source` 枚举含三值（Req 25.1）、preset 套用表达式（Req 25.2）、三能力在底稿/报表/附注三处挂载一致（Req 26.5）。
+  - `GtRefreshScopeDialog` 合伙人门禁前端可见性（合伙人可见入口 / 非合伙人不可见，Req 19.1, 19.2）。
+  - 报表勾稽（Req 23）：`useReportCrossCheck` 消费后端 logic_check Issue_List 驱动展示；7 条勾稽可在 `GtFormulaEditDialog` 以 logic_check 类型查看/编辑并保存持久化（Req 23.4）。
   - P27 前端侧作用域隔离：切换/编辑一个 scope 后另一 scope 列表不变。
 
 ### 集成/契约与结构性测试
 
-- `RefreshScopeDiscovery.discover` 覆盖 cycleDialogRegistry 与 wp_index 循环前缀的契约测试（防新增循环遗漏漂移，Req 19.2）。
-- Module_Refresh 编辑权门禁复用 `permission_service.Permission.WORKPAPER_WRITE` + `project_assignments` 的结构性单测（Req 20.1/20.2）。
-- custom 恢复预设复用 `wp_user_formulas` restore/delete 端点（Req 22.4）：引用其既有测试覆盖，本 spec 不重复。
-- reference 失效传播（Req 22.7）：复用 ACNR 失效链测试，仅新增"reference 边"接入用例。
+- `RefreshScopeDiscovery.discover` 覆盖 cycleDialogRegistry 与 wp_index 循环前缀的契约测试（防新增循环遗漏漂移，Req 20.1/20.2/20.6），并断言弹窗与后端编排（Req 21）共用同一发现服务。
+- Module_Refresh 编辑权门禁复用 `permission_service.Permission.WORKPAPER_WRITE` + `project_assignments` 的结构性单测（Req 22.1/22.2）。
+- 全局刷新编排（Req 21.2）：集成用例断言 `DraftRefreshOrchestrator` 对已预设 page_key 调 `refresh_with_presets` 并把预设 units 纳入初稿。
+- custom 恢复预设复用 `wp_user_formulas` restore/delete 端点（Req 25.4）：引用其既有测试覆盖，本 spec 不重复。
+- reference 失效传播（Req 25.7）：复用 ACNR 失效链测试，仅新增"reference 边"接入用例。

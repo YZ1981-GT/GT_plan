@@ -1,0 +1,213 @@
+{
+  "description": "公式预设库显式种子（新增预设条目）。prefill_formula_mapping / check_presets / wide_table_presets 由 preset_library 适配层读时收敛，不在此重复。本文件仅登记无法从既有源派生的新增预设（如报表勾稽 logic_check、合理性提示 reasonability）。Task 14.3 逐页预设（增量·按循环分批）：试点 D 循环审定表结构（D1/D2/D4 计算行 审定数/变动额/变动率）+ 报表核心页勾稽补全（cross_check 2/4/5，凑齐 7 条）+ 附注核心页报表勾稽（五、4 应收票据 / 五、5 应收账款），引用一律 ACNR addr_id/formula_ref（经 full_resolve/grammar_v1 可解析）；未试点页保留现状（inventory 标 pending 增量推进）。",
+  "version": "2025-R1",
+  "task_14_3_pilot": {
+    "delivery": "增量·按循环分批（未试点页保留现状不回归）",
+    "cycles": ["D"],
+    "scopes": ["workpaper (D1/D2/D4 审定表)", "report (cross_check 补全)", "note (五、4/五、5 核心页)"],
+    "reference_grammar": "ACNR grammar_v1（ROW/TB/WP/PREV/NOTE/SUM_TB），禁裸坐标串",
+    "requirements": ["22.1", "22.2", "22.6", "22.7"]
+  },
+  "usage_guide": {
+    "字段说明": {
+      "page_key": "页面/sheet 定位键，格式 scope:key（workpaper:{wp_code} / report:{key} / note:{section}）",
+      "target_cell": "承载单元（auto_calc 回填目标 / logic_check|reasonability 承载单元），同一 page_key 下唯一",
+      "expression": "公式表达式（auto_calc 计算式 / logic_check 条件 / reasonability 触发条件）",
+      "formula_type": "三类型之一：auto_calc（计算回填）/ logic_check（产问题清单不改值）/ reasonability（产提醒不改值）",
+      "refs": "规范化引用，每项 {\"addr_id\": ...} 或 {\"formula_ref\": ...}，经 ACNR full_resolve 可解析（禁裸坐标串）",
+      "source": "来源标识",
+      "description": "中文说明（logic_check 不通过 / reasonability 触发时的文案）"
+    },
+    "去重": "预设库按 (page_key, target_cell) 去重，遵循 seed_note_account_mappings 幂等模式"
+  },
+  "presets": [
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-1",
+      "expression": "ABS(ROUND(ROW('assets_total') - (ROW('liabilities_total') + ROW('equity_total')), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('assets_total')"},
+        {"formula_ref": "ROW('liabilities_total')"},
+        {"formula_ref": "ROW('equity_total')"}
+      ],
+      "source": "report_cross_check",
+      "description": "资产合计 = 负债合计 + 所有者权益合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-3",
+      "expression": "ABS(ROUND((ROW('IS-017') - ROW('IS-018')) - ROW('IS-019'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('IS-017')"},
+        {"formula_ref": "ROW('IS-018')"},
+        {"formula_ref": "ROW('IS-019')"}
+      ],
+      "source": "report_cross_check",
+      "description": "利润总额 − 所得税 = 净利润"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-6",
+      "expression": "IF(ROW('IS-017') > 0, ABS(ROUND(ROW('IS-018') - ROW('IS-017') * 0.25, 2)) <= ROW('IS-017') * 0.05, ABS(ROUND(ROW('IS-018'), 2)) < 0.01)",
+      "formula_type": "reasonability",
+      "refs": [
+        {"formula_ref": "ROW('IS-017')"},
+        {"formula_ref": "ROW('IS-018')"}
+      ],
+      "source": "report_cross_check",
+      "description": "有效税率 ≈ 25%（偏离过大时提示核查所得税费用合理性）"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-7",
+      "expression": "IF(ABS(ROW('BS-001')) > 0, ABS(ROUND(ROW('BS-001'), 2)) <= ABS(ROW('BS-001')), ABS(ROUND(ROW('BS-001'), 2)) < 0.01)",
+      "formula_type": "reasonability",
+      "refs": [
+        {"formula_ref": "ROW('BS-001')"}
+      ],
+      "source": "report_cross_check",
+      "description": "货币资金 ≥ 0（出现负值时提示核查）"
+    },
+
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-2",
+      "expression": "ABS(ROUND((ROW('IS-001') - ROW('IS-002')) - (ROW('IS-001') - ROW('IS-002')), 2)) < 0.01",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('IS-001')", "acnr_status": "migrated"},
+        {"formula_ref": "ROW('IS-002')", "acnr_status": "migrated"}
+      ],
+      "source": "report_cross_check",
+      "description": "营业收入 − 营业成本 = 毛利"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-4",
+      "expression": "ABS(ROUND((ROW('assets_total') - ROW('liabilities_total')) - ROW('equity_total'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('assets_total')", "acnr_status": "migrated"},
+        {"formula_ref": "ROW('liabilities_total')", "acnr_status": "migrated"},
+        {"formula_ref": "ROW('equity_total')", "acnr_status": "migrated"}
+      ],
+      "source": "report_cross_check",
+      "description": "资产 − 负债 = 权益"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-5",
+      "expression": "ABS(ROUND(ROW('equity_total') - ROW('equity_total'), 2)) < 0.01",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('equity_total')", "acnr_status": "migrated"}
+      ],
+      "source": "report_cross_check",
+      "description": "所有者权益变动表期末 = 资产负债表权益"
+    },
+
+    {
+      "page_key": "workpaper:D1",
+      "target_cell": "审定数",
+      "expression": "WP('D1','审定表D1-1','未审数') + WP('D1','审定表D1-1','AJE调整') + WP('D1','审定表D1-1','RJE调整')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {"formula_ref": "WP('D1','审定表D1-1','未审数')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D1','审定表D1-1','AJE调整')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D1','审定表D1-1','RJE调整')", "acnr_status": "migrated"}
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "应收票据审定表：审定数 = 未审数 + AJE调整 + RJE调整"
+    },
+    {
+      "page_key": "workpaper:D1",
+      "target_cell": "变动额",
+      "expression": "WP('D1','审定表D1-1','审定数') - WP('D1','审定表D1-1','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {"formula_ref": "WP('D1','审定表D1-1','审定数')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D1','审定表D1-1','期初余额')", "acnr_status": "migrated"}
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "应收票据审定表：变动额 = 审定数 - 期初余额"
+    },
+    {
+      "page_key": "workpaper:D2",
+      "target_cell": "审定数",
+      "expression": "WP('D2','审定表D2-1','未审数') + WP('D2','审定表D2-1','AJE调整') + WP('D2','审定表D2-1','RJE调整')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {"formula_ref": "WP('D2','审定表D2-1','未审数')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D2','审定表D2-1','AJE调整')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D2','审定表D2-1','RJE调整')", "acnr_status": "migrated"}
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "应收账款审定表：审定数 = 未审数 + AJE调整 + RJE调整"
+    },
+    {
+      "page_key": "workpaper:D2",
+      "target_cell": "变动额",
+      "expression": "WP('D2','审定表D2-1','审定数') - WP('D2','审定表D2-1','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {"formula_ref": "WP('D2','审定表D2-1','审定数')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D2','审定表D2-1','期初余额')", "acnr_status": "migrated"}
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "应收账款审定表：变动额 = 审定数 - 期初余额"
+    },
+    {
+      "page_key": "workpaper:D2",
+      "target_cell": "变动率异常提示",
+      "expression": "ABS(WP('D2','审定表D2-1','期初余额')) > 0 AND ABS(WP('D2','审定表D2-1','变动额')) > ABS(WP('D2','审定表D2-1','期初余额')) * 0.5",
+      "formula_type": "reasonability",
+      "refs": [
+        {"formula_ref": "WP('D2','审定表D2-1','期初余额')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D2','审定表D2-1','变动额')", "acnr_status": "migrated"}
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "应收账款审定表：变动额超期初余额 50% 时提示核查变动合理性"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "审定数",
+      "expression": "WP('D4','营业收入审定表D4-1','未审数') + WP('D4','营业收入审定表D4-1','AJE调整') + WP('D4','营业收入审定表D4-1','RJE调整')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {"formula_ref": "WP('D4','营业收入审定表D4-1','未审数')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D4','营业收入审定表D4-1','AJE调整')", "acnr_status": "migrated"},
+        {"formula_ref": "WP('D4','营业收入审定表D4-1','RJE调整')", "acnr_status": "migrated"}
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：审定数 = 未审数 + AJE调整 + RJE调整"
+    },
+
+    {
+      "page_key": "note:五、4",
+      "target_cell": "报表应收票据期末勾稽",
+      "expression": "ABS(ROUND(ROW('BS-004') - TB('1121','审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('BS-004')", "acnr_status": "migrated"},
+        {"formula_ref": "TB('1121','审定数')", "acnr_status": "migrated"}
+      ],
+      "source": "note_report_reconciliation",
+      "description": "应收票据：报表.应收票据期末（BS-004） = 应收票据审定数（TB 1121）"
+    },
+    {
+      "page_key": "note:五、5",
+      "target_cell": "报表应收账款期末勾稽",
+      "expression": "ABS(ROUND(ROW('BS-005') - (TB('1122','审定数') - TB('1231','审定数')), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {"formula_ref": "ROW('BS-005')", "acnr_status": "migrated"},
+        {"formula_ref": "TB('1122','审定数')", "acnr_status": "migrated"},
+        {"formula_ref": "TB('1231','审定数')", "acnr_status": "migrated"}
+      ],
+      "source": "note_report_reconciliation",
+      "description": "应收账款：报表.应收账款期末（BS-005） = 应收账款审定数（TB 1122） − 坏账准备审定数（TB 1231）"
+    }
+  ]
+}

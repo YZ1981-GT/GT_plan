@@ -86,7 +86,7 @@
   - D3-7 抽凭回写后 + 截止一键取数回写后分别触发；后端 section 白名单加 voucher-review/cutoff-review
   - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5, 26.6, 26.7, 26.8_
 
-- [-] 12. 集成验证与 Playwright 实测
+- [x] 12. 集成验证与 Playwright 实测
   - D3 vitest 全绿（含新 PBT Property 1~12）；`get_diagnostics` 零错误
   - Playwright 实测 D3-7：打开抽凭弹窗→配置方法学参数→抽样(含高值必选/间隔)→勾选→回填(来源=抽凭)→行级📎OCR确认→录入错报→查看结论建议→回写后 AI 复核弹窗→确认填入审计说明→保存；截止性测试：设基准日±N天→一键取数→回写(跨期标注)→AI复核弹窗；0 console error + postgres 落库校验
   - _Requirements: 1.1, 2.4, 4.2, 7.6, 18.5, 19.1, 25.4, 26.5_

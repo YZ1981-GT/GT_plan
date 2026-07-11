@@ -94,17 +94,85 @@ async def _resolve_sum_tb(
     return total
 
 
+def _resolve_cross_sheet_refs(
+    raw: str,
+    parsed_data: dict | None,
+    *,
+    project_id: str | None = None,
+    parent_wp_code: str | None = None,
+) -> tuple[str, list[str]]:
+    """将 ``=Sheet!Cell`` 跨 sheet 引用经 CrossSheetResolver 追溯解析为值后替换（Req 14.2）。
+
+    复用 ``custom_query.cross_sheet_resolver.CrossSheetResolver``（BFS + 环检测 +
+    ACNR addr_id 解析）追溯每个跨 sheet 引用链，取链首节点（目标单元）的值代入
+    表达式；缺失/无法解析 → 代入 0 并记 warning（单条失败不阻断整体，Req 15.5 语义）。
+
+    Returns:
+        (substituted_expr, errors)。无 parsed_data 或无跨 sheet 引用时原样返回。
+    """
+    errors: list[str] = []
+    if not parsed_data:
+        return raw, errors
+
+    # 延迟导入避免与 custom_query 包的循环依赖。
+    from app.services.custom_query.cross_sheet_resolver import (
+        CrossSheetResolver,
+        _CROSS_SHEET_REF_PATTERN,
+    )
+
+    matches = list(_CROSS_SHEET_REF_PATTERN.finditer(raw))
+    if not matches:
+        return raw, errors
+
+    resolver = CrossSheetResolver(
+        project_id=project_id, parent_wp_code=parent_wp_code
+    )
+    expr = raw
+    for match in matches:
+        ref_text = match.group(0)
+        ref_sheet = match.group(1) or match.group(2)
+        ref_cell = match.group(3).upper()
+        try:
+            chain_resp = resolver.resolve(parsed_data, ref_sheet, ref_cell)
+            node = chain_resp.chain[0] if chain_resp.chain else None
+            raw_val = node.value if node is not None else None
+            if raw_val is None:
+                val = Decimal("0")
+                errors.append(f"{ref_text}: 跨 sheet 引用目标缺失，代入 0")
+            else:
+                try:
+                    val = Decimal(str(raw_val).replace(",", ""))
+                except (InvalidOperation, ValueError):
+                    val = Decimal("0")
+                    errors.append(f"{ref_text}: 跨 sheet 引用值非数值，代入 0")
+        except Exception as e:  # noqa: BLE001 — 单条失败不阻断整体求值
+            logger.warning("跨 sheet 引用求值失败 %s: %s", ref_text, e)
+            val = Decimal("0")
+            errors.append(f"{ref_text}: {e}")
+        expr = expr.replace(ref_text, str(val), 1)
+
+    return expr, errors
+
+
 async def evaluate_wp_formula_expression(
     db: AsyncSession,
     *,
     project_id: UUID,
     year: int,
     expression: str,
+    parsed_data: dict | None = None,
+    parent_wp_code: str | None = None,
 ) -> tuple[Decimal, list[str]]:
     """求值自定义底稿公式表达式。
 
-    支持：字面量、TB/SUM_TB、WP（含单元格地址 B5）、四则运算与内置函数（委托 L1 execute）。
+    支持：字面量、TB/SUM_TB、WP（含单元格地址 B5）、``Sheet!Cell`` 跨 sheet 引用
+    （经 CrossSheetResolver 追溯，Req 14.2）、四则运算与内置函数（委托 L1 execute）。
     失败返回 (Decimal('0'), errors)。
+
+    Args:
+        parsed_data: 底稿 ``working_paper.parsed_data``（含 univer_snapshot），
+            提供时启用 ``Sheet!Cell`` 跨 sheet 引用追溯求值。
+        parent_wp_code: 父底稿码，供 CrossSheetResolver 构造 grammar_v1 3 参 WP。
     """
     errors: list[str] = []
     raw = (expression or "").strip()
@@ -118,6 +186,15 @@ async def evaluate_wp_formula_expression(
         return Decimal(raw.replace(",", "")), errors
     except (InvalidOperation, ValueError):
         pass
+
+    # 跨 sheet 引用（Sheet!Cell）先经 CrossSheetResolver 追溯解析为值代入（Req 14.2）
+    raw, cross_errors = _resolve_cross_sheet_refs(
+        raw,
+        parsed_data,
+        project_id=str(project_id) if project_id is not None else None,
+        parent_wp_code=parent_wp_code,
+    )
+    errors.extend(cross_errors)
 
     expr = raw
     # 三参 WP（D2-3 嵌套寻址）先处理，避免被两参正则截断

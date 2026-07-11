@@ -39,6 +39,9 @@
         <div class="gt-fm-breadcrumb">
           <div style="display: flex; align-items: center; gap: 8px;">
             <el-tag size="small" type="info" effect="plain" style="font-weight: 600;">{{ scopeLabel }}</el-tag>
+            <el-tag size="small" type="success" effect="plain" title="当前作用域已加载的公式数（仅本域，不含他域）">
+              本域公式 {{ scopeFormulas.length }}
+            </el-tag>
             <el-select v-model="fmTemplateType" size="small" style="width: 100px;" @change="onFmTemplateChange">
               <el-option label="国企版" value="soe" />
               <el-option label="上市版" value="listed" />
@@ -48,6 +51,7 @@
           </div>
           <div style="display: flex; gap: 6px; align-items: center;">
             <el-button size="small" @click="showFormulaDashboard = true">📊 公式看板</el-button>
+            <el-button size="small" @click="onOpenGlobalScopeOverview">🌐 全局公式</el-button>
             <SharedTemplatePicker
               config-type="formula_config"
               :project-id="projectId"
@@ -420,6 +424,57 @@
       :year="props.year"
       @imported="onFormulaFileImported"
     />
+
+    <!-- 全局公式总览弹窗（Req 24.3：跨全部 7 类作用域取并集） -->
+    <el-dialog
+      v-model="showGlobalScopeOverview"
+      title="🌐 全局公式管理 — 跨作用域总览"
+      width="88%"
+      top="3vh"
+      append-to-body
+      destroy-on-close
+      class="gt-fm-global-scope"
+    >
+      <div style="margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
+        跨全部作用域（单体附注 / 合并附注 / 合并工作底稿 / 合并报表 / 报表 / 试算平衡表 / 底稿）展示所有公式，共 {{ scopeCatalog.totalCount.value }} 条。各作用域公式集互不串扰。
+      </div>
+      <el-empty v-if="!globalScopeGroups.length" description="暂无公式" />
+      <div v-else style="max-height: 72vh; overflow-y: auto;">
+        <div v-for="group in globalScopeGroups" :key="group.scope" style="margin-bottom: 14px;">
+          <div style="font-weight: 600; font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-text-primary);">
+            {{ group.label }}
+            <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-left: 6px;">{{ group.rows.length }} 条</span>
+          </div>
+          <el-table :data="group.rows" size="small" border style="width: 100%;"
+            :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
+            <el-table-column label="目标单元" prop="targetCell" min-width="150" show-overflow-tooltip>
+              <template #default="{ row }"><span class="gt-fm-mono">{{ row.targetCell }}</span></template>
+            </el-table-column>
+            <el-table-column label="公式" prop="expression" min-width="240" show-overflow-tooltip>
+              <template #default="{ row }"><code class="gt-fm-mono">{{ row.expression || '—' }}</code></template>
+            </el-table-column>
+            <el-table-column label="类型" width="110" align="center">
+              <template #default="{ row }">
+                <el-tag :type="(categoryTagType(row.formulaType)) || undefined" size="small">{{ categoryLabel(row.formulaType) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="来源地址" min-width="180" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.sourceLabel || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="最近计算" width="160" align="center">
+              <template #default="{ row }">
+                <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">{{ row.lastComputedAt || '尚未计算' }}</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="showGlobalScopeOverview = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </el-dialog>
 </template>
 
@@ -438,6 +493,11 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
+import {
+  useFormulaScopeCatalog,
+  SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
+  type FormulaScope,
+} from '@/composables/useFormulaScopeCatalog'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -482,6 +542,41 @@ const prefs = useDisplayPrefsStore()
 // 空/未加载时回退 props.rows（无回归）。WP 域 formula_ref 由 FormulaEditDialog 以 grammar_v1
 // 三形态（2 参语义列 / 3 参 cell / custom_flat）构造。
 const addrStore = useAddressRegistry()
+
+// ── Req 24: 作用域过滤 + 全局公式总览 ──
+// 消费后端 GET /api/formula-scope/{project_id}/formulas（Task 20.2），按传入 scope
+// 只加载本域公式；全局页取并集。缓存以 (scope, addrKey) 隔离，各域互不串扰（Req 24.5）。
+// 来源地址经 ACNR full_resolve 规范化（Req 24.6，与 Req 10/P14 一致）。
+const scopeCatalog = useFormulaScopeCatalog()
+// 当前作用域（本页）公式列表（Req 24.1/24.2：仅本域，不含他域）。
+const scopeFormulas = computed(() => scopeCatalog.getScopeRows(props.scope as FormulaScope))
+// 全局公式总览弹窗开关（Req 24.3：跨全部 7 类 scope 总览）。
+const showGlobalScopeOverview = ref(false)
+// 全局总览：仅展示有公式的作用域分组。
+const globalScopeGroups = computed(() =>
+  (Object.keys(SCOPE_CATALOG_LABEL_MAP) as FormulaScope[])
+    .map((s) => ({ scope: s, label: SCOPE_CATALOG_LABEL_MAP[s], rows: scopeCatalog.globalGrouped.value[s] }))
+    .filter((g) => g.rows.length > 0),
+)
+
+/** 打开时按当前 scope 加载本域公式，并规范化来源地址（Req 24.1/24.6）。 */
+async function loadScopeFormulas() {
+  if (!props.projectId) return
+  const rows = await scopeCatalog.loadScope(props.projectId, props.scope as FormulaScope)
+  await scopeCatalog.resolveSources(rows)
+}
+
+/** 打开全局公式总览：跨全部 7 类 scope 取并集（Req 24.3）。 */
+async function onOpenGlobalScopeOverview() {
+  showGlobalScopeOverview.value = true
+  if (props.projectId) {
+    await scopeCatalog.loadGlobal(props.projectId)
+    // 逐域规范化来源地址（Req 24.6）
+    for (const scope of Object.keys(SCOPE_CATALOG_LABEL_MAP) as FormulaScope[]) {
+      await scopeCatalog.resolveScopeSources(scope)
+    }
+  }
+}
 
 // ── 树形导航数据 ──
 const selectedNodeKey = ref('report_balance_sheet')
@@ -813,6 +908,8 @@ watch(visible, async (v) => {
     try {
       sessionStorage.setItem('gt-formula-scope', props.scope || 'report')
     } catch { /* sessionStorage 不可用时忽略 */ }
+    // Req 24.1: 按当前 scope 加载本域公式（不含他域），来源地址经 ACNR 规范化
+    loadScopeFormulas()
     // 加载动态附注树
     loadNoteTree()
     // 用传入的 rows 作为当前报表的数据

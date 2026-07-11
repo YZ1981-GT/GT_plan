@@ -83,11 +83,22 @@ class NoFormulaItem(BaseModel):
     cycle: str | None = None
 
 
+class PresetScopeCoverage(BaseModel):
+    scope: str
+    presetted_pages: int
+    pending_pages: int
+    total_pages: int
+    coverage_percent: float
+    formula_count: int
+
+
 class FormulaCoverageResponse(BaseModel):
     prefill_coverage: list[CycleCoverage]
     report_formula_coverage: list[ReportTypeCoverage]
     formula_type_distribution: list[FormulaTypeCount]
     no_formula_templates: list[NoFormulaItem]
+    # 公式预设库覆盖度（presetted/pending 分布，Req 22.5）
+    preset_coverage: list[PresetScopeCoverage] = Field(default_factory=list)
     summary: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -170,23 +181,79 @@ def derive_seed_status(record_count: int, expected_count: int | None) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _annotate_prefill_acnr(mappings: list[dict]) -> tuple[list[dict], int, int]:
+    """为每个预填公式单元标注 ACNR 归一化引用与迁移状态（Req 24.1/24.4）。
+
+    不修改原始 JSON 源（只读），返回带 ``formula_ref``（归一化 canonical）+
+    ``acnr_status``（migrated/pending）的浅拷贝。返回 (annotated, migrated, pending)。
+    """
+    from app.services.formula_management.preset_acnr_migration import normalize_ref
+
+    migrated = 0
+    pending = 0
+    annotated: list[dict] = []
+    for m in mappings:
+        cells_out: list[dict] = []
+        for cell in m.get("cells", []) or []:
+            nr = normalize_ref(cell.get("formula"))
+            if nr.migrated:
+                migrated += 1
+            else:
+                pending += 1
+            cells_out.append(
+                {
+                    **cell,
+                    "formula_ref": nr.formula_ref,
+                    "acnr_status": nr.status,
+                    "acnr_reason": nr.reason,
+                }
+            )
+        annotated.append({**m, "cells": cells_out})
+    return annotated, migrated, pending
+
+
 @router.get("/prefill-formulas")
 async def get_prefill_formulas(
     current_user: User = Depends(get_current_user),
 ):
     """返回 prefill_formula_mapping.json 全部映射（数量动态读取）。
 
-    JSON 类只读资源（D13 ADR）。
+    JSON 类只读资源（D13 ADR）。每个公式单元附带 ACNR 归一化引用
+    （``formula_ref`` canonical + ``acnr_status`` migrated/pending，Req 24.1/24.4）。
     """
     mappings = _load_prefill_mappings()
+    annotated, migrated, pending = _annotate_prefill_acnr(mappings)
     return {
-        "mappings": mappings,
-        "total_mappings": len(mappings),
-        "total_cells": sum(len(m.get("cells", []) or []) for m in mappings),
+        "mappings": annotated,
+        "total_mappings": len(annotated),
+        "total_cells": sum(len(m.get("cells", []) or []) for m in annotated),
+        "acnr_migrated_cells": migrated,
+        "acnr_pending_cells": pending,
         "source": "backend/data/prefill_formula_mapping.json",
         "readonly": True,
         "hint": "JSON 源只读，请编辑 backend/data/prefill_formula_mapping.json 后调用 reseed",
     }
+
+
+@router.get("/formula-acnr-migration")
+async def get_formula_acnr_migration(
+    current_user: User = Depends(get_current_user),
+):
+    """模板库预设公式引用 ACNR 迁移 Ledger（Req 24.3/24.4）。
+
+    汇总模板库预设公式（prefill 映射 + 预设库 seed）的 ACNR 归一化覆盖度：
+    已迁移（``migrated``：grammar_v1 可解析）vs 待迁移（``pending``：硬编码旧格式，
+    如 ADJ/LEDGER 无 ACNR 等价）。供模板库管理页展示迁移进度与待迁移清单。
+    """
+    from app.services.formula_management.preset_acnr_migration import (
+        PENDING_FUNCTION_ALLOWLIST,
+        build_migration_ledger,
+    )
+
+    ledger = build_migration_ledger()
+    ledger["pending_function_allowlist"] = sorted(PENDING_FUNCTION_ALLOWLIST)
+    ledger["source"] = "template_library preset (prefill_formula_mapping + formula_presets_seed)"
+    return ledger
 
 
 @router.put("/prefill-formulas/{wp_code}", status_code=405)
@@ -422,6 +489,25 @@ async def get_formula_coverage(
     all_primaries_full = set()
     for primaries in primary_by_cycle.values():
         all_primaries_full.update(primaries)
+    # 7) 公式预设库覆盖度（presetted/pending 分布，Req 22.5）
+    #    workpaper 域 pending = 应承载公式的主编码全集(all_primary) − 已预设主编码
+    preset_coverage: list[PresetScopeCoverage] = []
+    preset_summary: dict[str, Any] = {}
+    try:
+        from app.services.formula_management.preset_library import (
+            compute_preset_coverage,
+        )
+
+        pc = compute_preset_coverage(eligible_workpaper_codes=all_primary)
+        preset_coverage = [PresetScopeCoverage(**row) for row in pc.get("by_scope", [])]
+        preset_summary = {
+            "total_preset_pages": pc.get("total_preset_pages", 0),
+            "total_preset_formulas": pc.get("total_preset_formulas", 0),
+            "preset_status_distribution": pc.get("by_status", {}),
+        }
+    except Exception as exc:  # noqa: BLE001 — 预设库不可用不阻断覆盖度主体
+        logger.warning("preset coverage 计算失败（降级为空）: %s", exc)
+
     summary = {
         "total_primary_templates": len(all_primary),  # 仅含 univer/hybrid（公式分母）
         "total_all_primaries": len(all_primaries_full),  # 全部主编码（含 form/word）
@@ -432,6 +518,7 @@ async def get_formula_coverage(
         "report_coverage_percent": _percent(total_report_with_formula, total_report_rows),
         "total_prefill_mappings": len(prefill_mappings),
         "total_prefill_cells": sum(len(m.get("cells", []) or []) for m in prefill_mappings),
+        **preset_summary,
     }
 
     return FormulaCoverageResponse(
@@ -439,6 +526,7 @@ async def get_formula_coverage(
         report_formula_coverage=report_formula_coverage,
         formula_type_distribution=formula_type_distribution,
         no_formula_templates=no_formula_templates,
+        preset_coverage=preset_coverage,
         summary=summary,
     )
 

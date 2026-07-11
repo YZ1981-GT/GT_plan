@@ -648,6 +648,8 @@ async def render_disclosure_notes(
         report_scope=normalize_report_scope(proj_row if isinstance(proj_row, str) else None),
         sections=body.selected_sections,
         mode=export_mode,
+        # 交付导出（Req 18.1/18.3）：公式解析为静态值兜底守卫
+        flatten_formulas=True,
     )
     file_name = f"disclosure_notes_{body.year}.docx"
     snapshot_refs = await dsvc.capture_snapshot_refs(
@@ -705,6 +707,8 @@ async def render_financial_reports(
         body.year,
         mode=data_mode,
         report_types=body.report_types,
+        # 交付导出（Req 18.2/18.3）：公式解析为静态值，产物不留可重算表达式
+        flatten_formulas=True,
     )
     file_name = (
         f"financial_reports_unadjusted_{body.year}.xlsx"

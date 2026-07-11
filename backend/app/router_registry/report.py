@@ -118,3 +118,19 @@ def register_report_routers(app: FastAPI) -> None:
     # ═══ §99. P2-2: 签发一致性清单 ═══
     from app.routers.signoff_checklist import router as signoff_checklist_router
     app.include_router(signoff_checklist_router, tags=["signoff-checklist"])
+
+    # ═══ §100. formula-management-library：logic_check 报表勾稽执行端点 ═══
+    from app.routers.formula_logic_check import router as formula_logic_check_router
+    app.include_router(formula_logic_check_router, tags=["formula-logic-check"])
+
+    # ═══ §101. formula-management-library：全局一键刷新统一入口（合伙人专属） ═══
+    from app.routers.draft_refresh import router as draft_refresh_router
+    app.include_router(draft_refresh_router, tags=["draft-refresh"])
+
+    # ═══ §102. formula-management-library：公式模块导入导出 + 编报说明单一源 ═══
+    from app.routers.formula_import_export import router as formula_ie_router
+    app.include_router(formula_ie_router, tags=["formula-import-export"])
+
+    # ═══ §103. formula-management-library：全局刷新范围动态发现（合伙人专属，Req 20） ═══
+    from app.routers.refresh_scopes import router as refresh_scopes_router
+    app.include_router(refresh_scopes_router, tags=["refresh-scopes"])

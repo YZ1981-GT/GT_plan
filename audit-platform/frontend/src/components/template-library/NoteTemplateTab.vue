@@ -33,7 +33,20 @@
         :source="noteSource"
         style="margin-left: auto"
       />
+      <!-- Req 25.1: 公式预设库入口 -->
+      <el-button
+        type="primary"
+        size="default"
+        plain
+        class="gt-ntt-formula-btn"
+        @click="presetDialogVisible = true"
+      >
+        🧮 公式预设库
+      </el-button>
     </div>
+
+    <!-- Req 25: 公式预设库弹窗（说明文档 + 预设浏览/编辑） -->
+    <GtFormulaPresetDialog v-model="presetDialogVisible" scope="note" />
 
     <!-- 双栏布局 -->
     <div class="gt-ntt-body">
@@ -241,6 +254,7 @@ import { api } from '@/services/apiProxy'
 import { noteTemplates as P_nt } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import TemplateLibraryButton from './TemplateLibraryButton.vue'
+import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────
 interface NoteTable {
@@ -299,6 +313,9 @@ const onlyWithTable = ref(false)
 const detailVisible = ref(false)
 const selectedSection = ref<NoteSection | null>(null)
 const treeRef = ref<any>(null)
+
+// Req 25.1: 公式预设库弹窗开关
+const presetDialogVisible = ref(false)
 
 // Req 14 AC 1: 高级查询 source URI（附注模板页 → note:{section_id}）
 const noteSource = computed(() => {

@@ -19,6 +19,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import Project, User
+from app.services.formula_management.delivery_export import (
+    content_disposition_attachment,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +74,8 @@ async def export_word(
             report_scope=normalize_report_scope(project.report_scope),
             sections=body.sections,
             skip_empty=body.skip_empty,
+            # 交付导出（Req 18.1/18.3）：公式解析为静态值兜底守卫
+            flatten_formulas=True,
         )
     except Exception as e:
         logger.exception("Word export failed for project %s", project_id)
@@ -79,11 +84,10 @@ async def export_word(
     # Build filename per 致同 naming convention
     company_short = _get_company_short_name(project)
     filename = sanitize_export_filename(f"{company_short}_{body.year}年度财务报表附注.docx")
-    # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
-    from urllib.parse import quote
-    ascii_name = filename.encode("ascii", "ignore").decode() or "note_export.docx"
-    utf8_name = quote(filename, safe="")
-    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+    # 中文文件名 RFC5987 编码（Req 18.5，复用交付导出统一 helper）
+    disposition = content_disposition_attachment(
+        filename, ascii_fallback="note_export.docx"
+    )
 
     return StreamingResponse(
         output,

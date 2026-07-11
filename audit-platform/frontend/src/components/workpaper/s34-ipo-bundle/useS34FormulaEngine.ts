@@ -221,6 +221,60 @@ export function isFormulaCell(
   return formulaDefs.some((def) => def.row === row && def.col === col)
 }
 
+// ─── 公式单元描述（统一治理接入元数据，Task 13.2） ───────────────────────────
+//
+// Spec: .kiro/specs/formula-management-library/ — Task 13.2（试点接入）
+// Requirements: 24.3（isFormulaCell 单元包 GtFormulaSourceTooltip 展示表达式+来源）
+//               24.4（试点 useS34FormulaEngine）
+//               24.5（跨表/跨底稿引用经 useAcnr 解析，禁前端拼坐标）
+//               24.6（未接入者保留现状，无回归）
+//
+// 说明（无死角 / 非破坏）：
+// - 仅登记公式单元元数据（表达式 + ACNR 稳定 addr_id），不改变上方任何 compute 数值
+//   （Property 19：接入前后产出逐一相等）。
+// - `addrId` 在本引擎层**单一来源**派生（`S34/{sheet_code}/{col}{excelRow}`），
+//   消费组件把它原样交给 `useAcnr.resolveAddr` 解析为 canonical semantic_label，
+//   **渲染层绝不拼接坐标串或据此拼出显示文本**（Req 24.5）。
+
+/** S34 公式单元描述：单元键 + 表达式 + ACNR 稳定 addr_id */
+export interface S34FormulaCellDescriptor {
+  /** 单元键 "row:col"（与 computeFormulas 结果键一致） */
+  cellKey: string
+  /** 行索引（0-based） */
+  row: number
+  /** 列标识 */
+  col: string
+  /** 人类可读公式表达式（取自 FormulaCell.formula） */
+  expression: string
+  /** ACNR 稳定 addr_id，供 useAcnr 解析来源地址（引擎层单一派生，非渲染层拼接） */
+  addrId: string
+}
+
+/** 子 sheet 编码 → 公式定义 的映射（试点承载公式的两张子检查表） */
+const S34_SHEET_FORMULA_DEFS: Record<string, FormulaCell[]> = {
+  'S34-16-1': S34_16_1_FORMULAS,
+  'S34-16-2': S34_16_2_FORMULAS,
+}
+
+/**
+ * 获取某子 sheet 的公式单元描述清单（供 GtFormulaSourceTooltip 展示表达式+来源）。
+ *
+ * addr_id 由公式定义的 row/col 在**引擎层单一派生**为 ACNR 稳定标识
+ * `S34/{sheetCode}/{col}{row+1}`（Excel 行号 = row+1）；渲染层只消费 addr_id，
+ * 不参与坐标拼接（Req 24.5）。未承载公式的 sheet 返回空数组（无回归）。
+ */
+export function getS34FormulaDescriptors(sheetCode: string): S34FormulaCellDescriptor[] {
+  const defs = S34_SHEET_FORMULA_DEFS[sheetCode]
+  if (!defs) return []
+  return defs.map((def) => ({
+    cellKey: `${def.row}:${def.col}`,
+    row: def.row,
+    col: def.col,
+    expression: def.formula,
+    addrId: `S34/${sheetCode}/${def.col}${def.row + 1}`,
+  }))
+}
+
 // ─── S34-34-1/2 判断列公式模式（工厂函数） ───
 
 /**

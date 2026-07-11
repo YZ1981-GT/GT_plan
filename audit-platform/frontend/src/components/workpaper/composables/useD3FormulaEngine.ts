@@ -200,3 +200,60 @@ export function aggregateByAging(
   }
   return result
 }
+
+// ─── 公式单元描述（统一治理接入元数据，Task 13.2） ───────────────────────────
+//
+// Spec: .kiro/specs/formula-management-library/ — Task 13.2（试点接入）
+// Requirements: 24.3（isFormulaCell 单元包 GtFormulaSourceTooltip 展示表达式+来源）
+//               24.4（试点 useD3FormulaEngine）
+//               24.5（跨表/跨底稿引用经 useAcnr 解析，禁前端拼坐标）
+//               24.6（未接入者保留现状，无回归）
+//
+// 说明（无死角 / 非破坏）：
+// - 本区块**仅登记公式单元元数据**（表达式 + ACNR 稳定 addr_id），
+//   不改变上方任何计算函数的数值（Property 19：接入前后产出逐一相等）。
+// - `addrId` 为 ACNR 稳定地址标识（{wp_code}/{sheet_code}/{coordinate_key}），
+//   作为**单一来源**在此登记；消费组件把它原样交给 `useAcnr.resolveAddr` 解析为
+//   canonical semantic_label，**绝不在渲染层拼接坐标串或据此拼出显示文本**（Req 24.5）。
+
+/** D3-2 明细表自动计算单元字段键（isFormulaCell 为真的单元） */
+export type D3FormulaField = 'priorAudited' | 'endBalance' | 'endUnadjusted' | 'endAudited'
+
+/** D3 公式单元描述：表达式 + ACNR 稳定 addr_id */
+export interface D3FormulaCellDescriptor {
+  /** DetailRow 字段键（对应 D3-2 明细表的自动计算列） */
+  field: D3FormulaField
+  /** 人类可读公式表达式（供 GtFormulaSourceTooltip 展示） */
+  expression: string
+  /** ACNR 稳定 addr_id，供 useAcnr 解析来源地址（非运行时拼接） */
+  addrId: string
+}
+
+/**
+ * D3-2 明细表公式单元清单（H/O/Q/T 四个自动计算列）。
+ *
+ * 与 `calcPriorAudited` / `calcEndBalance` / `calcEndUnadjusted` / `calcEndAudited`
+ * 一一对应，表达式为其人类可读形式。addr_id 为 ACNR 列级稳定标识。
+ */
+export const D3_DETAIL_FORMULA_CELLS: Record<D3FormulaField, D3FormulaCellDescriptor> = {
+  priorAudited: {
+    field: 'priorAudited',
+    expression: '期初审定(H) = 期初未审(E) + 期初调整(F) + 期初重分类(G)',
+    addrId: 'D3/D3-2/H',
+  },
+  endBalance: {
+    field: 'endBalance',
+    expression: '期末余额(O) = 期初审定(H) + 贷方(N) − 借方(M)',
+    addrId: 'D3/D3-2/O',
+  },
+  endUnadjusted: {
+    field: 'endUnadjusted',
+    expression: '期末未审(Q) = 期末余额(O) + 重分类调整(P)',
+    addrId: 'D3/D3-2/Q',
+  },
+  endAudited: {
+    field: 'endAudited',
+    expression: '期末审定(T) = 期末未审(Q) + 期末AJE(R) + 期末RJE(S)',
+    addrId: 'D3/D3-2/T',
+  },
+}

@@ -28,8 +28,8 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="cutoff.addRow()">新增行</el-button>
       </div>
       <div class="toolbar-right">
-        <el-tag v-if="cutoff.cutoffSummary.errorCount > 0" size="small" type="danger">
-          错误 {{ cutoff.cutoffSummary.errorCount }} 笔 / {{ cutoff.cutoffSummary.errorAmount.toLocaleString() }} 元
+        <el-tag v-if="cutoff.cutoffSummary.value.errorCount > 0" size="small" type="danger">
+          错误 {{ cutoff.cutoffSummary.value.errorCount }} 笔 / {{ cutoff.cutoffSummary.value.errorAmount.toLocaleString() }} 元
         </el-tag>
         <CycleImportExportDropdown
           v-if="wpId"
@@ -40,7 +40,7 @@
           @imported="onImported"
         />
         <span class="chip-wrap"><GtIndexChip :value="'wp:' + config.sheetCode" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ cutoff.cutoffSummary.total }} 笔</el-tag>
+        <el-tag size="small" type="info">共 {{ cutoff.cutoffSummary.value.total }} 笔</el-tag>
       </div>
     </div>
 
@@ -61,7 +61,7 @@
     </div>
 
     <el-table
-      :data="cutoff.rows"
+      :data="cutoff.rows.value"
       border
       size="small"
       max-height="480"
@@ -144,9 +144,9 @@
     </el-table>
 
     <div class="summary-footer">
-      正确 {{ cutoff.cutoffSummary.correctCount }} 笔 /
-      错误 {{ cutoff.cutoffSummary.errorCount }} 笔 /
-      涉及金额 {{ cutoff.cutoffSummary.errorAmount.toLocaleString() }} 元
+      正确 {{ cutoff.cutoffSummary.value.correctCount }} 笔 /
+      错误 {{ cutoff.cutoffSummary.value.errorCount }} 笔 /
+      涉及金额 {{ cutoff.cutoffSummary.value.errorAmount.toLocaleString() }} 元
     </div>
 
     <el-card shadow="never" class="opinion-card conclusion-card">
@@ -160,7 +160,7 @@
           </div>
         </div>
       </template>
-      <el-input v-model="cutoff.cutoffConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+      <el-input v-model="cutoff.cutoffConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="截止测试结论（跨期错报笔数与金额、是否需调整、对存货与营业成本截止的评价等）..." />
     </el-card>
   </div>

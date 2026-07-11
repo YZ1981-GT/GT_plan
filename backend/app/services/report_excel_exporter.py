@@ -139,6 +139,7 @@ class ReportExcelExporter:
         mode: str = "audited",
         report_types: list[str] | None = None,
         include_prior_year: bool = True,
+        flatten_formulas: bool = False,
     ) -> BytesIO:
         """导出报表 Excel
 
@@ -148,6 +149,11 @@ class ReportExcelExporter:
             mode: "audited" 或 "unadjusted"
             report_types: 指定导出哪些报表（默认全部 4 张）
             include_prior_year: 是否包含上年对比列
+            flatten_formulas: 交付导出契约（Req 18.2/18.3）。为 True 时在写出前把
+                工作簿中残留的可重算公式（模板 / 从零生成的 ``=SUM()`` 小计）就地
+                解析为静态数值，使交付产物不含可被下游重新求值的公式表达式；悬空
+                引用以最近计算值降级导出并记入导出日志。默认 False 以保持模板填充
+                路径「不覆盖模板公式」的既有行为不变。
 
         Returns:
             BytesIO containing the xlsx file
@@ -208,7 +214,15 @@ class ReportExcelExporter:
                 parent_row_index=parent_row_index,
             )
 
-        # 6. Write to BytesIO
+        # 6. 交付导出契约（Req 18.2/18.3）：公式解析为静态值，产物不留可重算表达式
+        if flatten_formulas:
+            from app.services.formula_management.delivery_export import (
+                flatten_workbook_formulas,
+            )
+
+            flatten_workbook_formulas(wb, log=logger)
+
+        # 7. Write to BytesIO
         output = BytesIO()
         wb.save(output)
         output.seek(0)

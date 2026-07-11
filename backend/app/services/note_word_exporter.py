@@ -607,6 +607,10 @@ class NoteWordExporter:
         # Sprint 2 Task 2.2: D1 sidecar 渲染选项（export() 时被覆盖）
         self._annotate_formulas: bool = False
         self._annotate_manual: bool = False
+        # Task 10.1 / Req 18.1/18.3: 交付导出时把残留公式串解析为值（附注单元通常
+        # 已由 execute_note_formulas 求值为静态值，此标记作为「产物不留可重算表达式」
+        # 的兜底守卫，拦截任何以 '=' 开头的公式串泄漏到交付 docx）。
+        self._delivery_flatten: bool = False
 
     def _new_document(self) -> Document:
         """优先加载 GTNote 模板 docx；缺失时降级 Document() 兼容（Sprint 2 Task 2.2）."""
@@ -622,6 +626,7 @@ class NoteWordExporter:
         skip_empty: bool = False,
         annotate_formulas: bool = False,
         annotate_manual: bool = False,
+        flatten_formulas: bool = False,
         mode: Literal["template", "programmatic"] = "programmatic",
     ) -> BytesIO:
         """导出附注为 Word 文档（致同标准格式）
@@ -652,6 +657,7 @@ class NoteWordExporter:
                 sections=sections,
                 annotate_formulas=annotate_formulas,
                 annotate_manual=annotate_manual,
+                flatten_formulas=flatten_formulas,
             )
 
         template_type = normalize_template_type(template_type)
@@ -678,6 +684,7 @@ class NoteWordExporter:
         # 渲染选项透传给 _render_table
         self._annotate_formulas = annotate_formulas
         self._annotate_manual = annotate_manual
+        self._delivery_flatten = flatten_formulas
 
         self._setup_page(doc)
         self._add_title(doc, year)
@@ -734,6 +741,7 @@ class NoteWordExporter:
         sections: list[str] | None,
         annotate_formulas: bool = False,
         annotate_manual: bool = False,
+        flatten_formulas: bool = False,
     ) -> BytesIO:
         """基于附注 docx 模板填充导出（design §7 附注模板填充流程）.
 
@@ -765,6 +773,7 @@ class NoteWordExporter:
         # 渲染选项透传给 _render_table
         self._annotate_formulas = annotate_formulas
         self._annotate_manual = annotate_manual
+        self._delivery_flatten = flatten_formulas
 
         # 索引：section_code → index entry（含 legacy_aliases）
         index_sections = _load_section_code_index(variant_key)
@@ -1298,6 +1307,20 @@ class NoteWordExporter:
                     cell_val = val.get("value", val.get("manual_value", 0))
                 else:
                     cell_val = val
+
+                # Task 10.1 / Req 18.1/18.3: 交付导出兜底——附注单元应已由
+                # execute_note_formulas 求值为静态值；若仍有 '=' 开头的公式串泄漏，
+                # 以其携带的最近计算值降级，并记入导出日志（不把可重算表达式写入产物）。
+                if self._delivery_flatten and isinstance(cell_val, str) and cell_val.startswith("="):
+                    last_computed = val.get("value") if isinstance(val, dict) else None
+                    logger.warning(
+                        "附注交付导出悬空/未求值公式：%r（row=%d col=%d），以最近计算值 %r 降级导出",
+                        cell_val,
+                        r_idx,
+                        data_idx,
+                        last_computed,
+                    )
+                    cell_val = last_computed if isinstance(last_computed, (int, float)) else ""
 
                 # Sprint 2 Task 2.2: 使用 fmt_amount_gt（空/零留白）替代 _format_amount（"-"）
                 formatted = fmt_amount_gt(cell_val)

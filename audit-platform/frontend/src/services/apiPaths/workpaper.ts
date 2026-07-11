@@ -219,6 +219,7 @@ export const templateLibraryMgmt = {
   seedStatus: '/api/template-library-mgmt/seed-status',
   seedAll: '/api/template-library-mgmt/seed-all',
   versionInfo: '/api/template-library-mgmt/version-info',
+  formulaAcnrMigration: '/api/template-library-mgmt/formula-acnr-migration',
 } as const
 
 // ─── 自定义模板 ─────────────────────────────────────────────────────────────
