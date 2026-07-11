@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useWorkpaperRegistry, type RegistryEntry } from './useWorkpaperRegistry'
 import { api } from '@/services/apiProxy'
+import { useAcnr } from '@/services/acnr/useAcnr'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ function resolveRoute(
 export function useWorkpaperNavigation() {
   const router = useRouter()
   const registry = useWorkpaperRegistry()
+  const acnr = useAcnr()
 
   /**
    * 解析索引号字符串为可点击链接数组
@@ -138,6 +140,20 @@ export function useWorkpaperNavigation() {
       }
       router.push({ name: 'WorkpaperList', params: { projectId }, query: { highlight: 'A16' } })
       return
+    }
+
+    // ─── ACNR 前置解析（additive pre-step, Req 13.1/13.2） ───
+    // 优先经 ACNR 统一解析：命中且有 jump_route → 直接跳转。
+    // found=false 或任何异常 → 静默回退现有 registry.lookup + index-resolve API 路径（无回归）。
+    // 注意：A16-1~7 虚拟码已在上方处理并 return，不会走到此处（Req 13.4 行为不变）。
+    try {
+      const acnrResult = await acnr.resolveIndex(`wp:${wpCode}`)
+      if (acnrResult.found && acnrResult.jump_route) {
+        router.push(acnrResult.jump_route)
+        return
+      }
+    } catch {
+      // ACNR 不可用/解析异常 → 静默回退到下方现有解析路径
     }
 
     // 确保注册表已加载

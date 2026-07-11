@@ -437,6 +437,7 @@ import FormulaHistoryTab from './FormulaHistoryTab.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useAddressRegistry } from '@/stores/addressRegistry'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -475,6 +476,12 @@ const visible = computed({
 // 路由器(用于外链节点跳转)
 const router = useRouter()
 const prefs = useDisplayPrefsStore()
+
+// R14.6: 本弹窗主要作为壳，托管已迁移至 ACNR 的 FormulaEditDialog（公式构造/选址）；
+// 其自身的候选地址列表（tb_detail 科目明细）改走 Req16 store facade（ACNR-backed）tbAddresses，
+// 空/未加载时回退 props.rows（无回归）。WP 域 formula_ref 由 FormulaEditDialog 以 grammar_v1
+// 三形态（2 参语义列 / 3 参 cell / custom_flat）构造。
+const addrStore = useAddressRegistry()
 
 // ── 树形导航数据 ──
 const selectedNodeKey = ref('report_balance_sheet')
@@ -865,6 +872,18 @@ const currentRows = computed(() => {
   // 试算平衡表节点
   if (selectedNodeKey.value === 'tb_detail') {
     // 科目明细：显示科目→报表行次的映射公式
+    // R14.6: 候选地址源优先走 Req16 store facade（ACNR-backed）tbAddresses，
+    // 空/未加载时回退 props.rows（strangler-fig，无回归）。
+    if (addrStore.loaded && addrStore.tbAddresses.length > 0) {
+      return addrStore.tbAddresses.map((e) => ({
+        row_code: e.account_code || '',
+        row_name: e.label || '',
+        formula: `TB('${e.account_code || ''}','期末余额')`,
+        formula_category: '取数',
+        formula_description: '从余额表取期末余额',
+        _computed_value: undefined,
+      }))
+    }
     return (props.rows || []).map((r: any) => ({
       row_code: r.standard_account_code || '',
       row_name: r.account_name || '',

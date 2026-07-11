@@ -111,8 +111,10 @@ async def update_report_config(
                 if std.startswith("project:"):
                     project_id = std.removeprefix("project:")
             if project_id and year:
-                from app.services.address_registry import address_registry
-                issues = await address_registry.validate_formula_refs(
+                from app.services.acnr.formula_validation import (
+                    validate_refs_via_acnr,
+                )
+                issues = await validate_refs_via_acnr(
                     db, str(project_id), int(year), new_formula, template_type
                 )
                 if issues:

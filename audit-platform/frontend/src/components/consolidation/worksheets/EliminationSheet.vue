@@ -105,6 +105,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import { useConsolSubjectSource } from '../composables/useConsolSubjectSource'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface EntryRow {
@@ -133,94 +134,10 @@ const selectedCustomRows = ref<EntryRow[]>([])
 const n = (v: any) => Number(v) || 0
 const { sum: decSum, sub: decSub } = useDecimalCalc()
 
-// 科目树形选项（父节点 disabled 禁止选中，只能选叶子科目）
-const subjectTree = [
-  { label: '资产', value: '_asset', disabled: true, children: [
-    { label: '流动资产', value: '_current_asset', disabled: true, children: [
-      { label: '货币资金', value: '货币资金' },
-      { label: '应收票据', value: '应收票据' },
-      { label: '应收账款', value: '应收账款' },
-      { label: '预付账款', value: '预付账款' },
-      { label: '其他应收款', value: '其他应收款' },
-      { label: '存货', value: '存货' },
-      { label: '合同资产', value: '合同资产' },
-    ]},
-    { label: '非流动资产', value: '_noncurrent_asset', disabled: true, children: [
-      { label: '长期股权投资', value: '长期股权投资' },
-      { label: '固定资产', value: '固定资产' },
-      { label: '在建工程', value: '在建工程' },
-      { label: '无形资产', value: '无形资产' },
-      { label: '商誉', value: '商誉' },
-      { label: '长期待摊费用', value: '长期待摊费用' },
-      { label: '递延所得税资产', value: '递延所得税资产' },
-    ]},
-    { label: '减值准备', value: '_impairment', disabled: true, children: [
-      { label: '坏账准备', value: '坏账准备' },
-      { label: '存货跌价准备', value: '存货跌价准备' },
-      { label: '固定资产减值准备', value: '固定资产减值准备' },
-      { label: '长期股权投资减值准备', value: '长期股权投资减值准备' },
-    ]},
-  ]},
-  { label: '负债', value: '_liability', disabled: true, children: [
-    { label: '流动负债', value: '_current_liability', disabled: true, children: [
-      { label: '应付票据', value: '应付票据' },
-      { label: '应付账款', value: '应付账款' },
-      { label: '预收账款', value: '预收账款' },
-      { label: '合同负债', value: '合同负债' },
-      { label: '其他应付款', value: '其他应付款' },
-      { label: '应付职工薪酬', value: '应付职工薪酬' },
-      { label: '应交税费', value: '应交税费' },
-    ]},
-    { label: '非流动负债', value: '_noncurrent_liability', disabled: true, children: [
-      { label: '长期借款', value: '长期借款' },
-      { label: '递延所得税负债', value: '递延所得税负债' },
-      { label: '递延收益', value: '递延收益' },
-    ]},
-  ]},
-  { label: '权益', value: '_equity', disabled: true, children: [
-    { label: '实收资本（或股本）', value: '实收资本（或股本）' },
-    { label: '其他权益工具', value: '其他权益工具' },
-    { label: '资本公积', value: '资本公积' },
-    { label: '减：库存股', value: '减：库存股' },
-    { label: '其他综合收益', value: '其他综合收益' },
-    { label: '专项储备', value: '专项储备' },
-    { label: '盈余公积', value: '盈余公积' },
-    { label: '△一般风险准备', value: '△一般风险准备' },
-    { label: '未分配利润', value: '未分配利润' },
-    { label: '少数股东权益', value: '少数股东权益' },
-  ]},
-  { label: '损益', value: '_income', disabled: true, children: [
-    { label: '收入', value: '_revenue', disabled: true, children: [
-      { label: '营业收入', value: '营业收入' },
-      { label: '投资收益', value: '投资收益' },
-      { label: '公允价值变动收益', value: '公允价值变动收益' },
-      { label: '资产处置收益', value: '资产处置收益' },
-      { label: '其他收益', value: '其他收益' },
-    ]},
-    { label: '成本费用', value: '_expense', disabled: true, children: [
-      { label: '营业成本', value: '营业成本' },
-      { label: '管理费用', value: '管理费用' },
-      { label: '销售费用', value: '销售费用' },
-      { label: '财务费用', value: '财务费用' },
-      { label: '研发费用', value: '研发费用' },
-      { label: '信用减值损失', value: '信用减值损失' },
-      { label: '资产减值损失', value: '资产减值损失' },
-    ]},
-    { label: '利润分配', value: '_profit_dist', disabled: true, children: [
-      { label: '年初未分配利润', value: '年初未分配利润' },
-      { label: '少数股权损益', value: '少数股权损益' },
-      { label: '提取盈余公积', value: '提取盈余公积' },
-      { label: '对所有者的分配', value: '对所有者的分配' },
-    ]},
-  ]},
-  { label: '现金流', value: '_cashflow', disabled: true, children: [
-    { label: '销售商品收到的现金', value: '销售商品收到的现金' },
-    { label: '购买商品支付的现金', value: '购买商品支付的现金' },
-    { label: '收回投资收到的现金', value: '收回投资收到的现金' },
-    { label: '投资支付的现金', value: '投资支付的现金' },
-    { label: '分配股利支付的现金', value: '分配股利支付的现金' },
-  ]},
-]
+// 科目树形选项（Req 19.1）：名称真源来自 ACNR-backed TB 域（useConsolSubjectSource）。
+// 保留 disabled 父节点分组骨架 + 叶子科目名；registry 空/不可用时自动回退硬编码（Req 19.5）。
+// 叶子 value === 科目名字符串，subject 值契约不变，buildAutoEntries / Excel 逻辑无需改动（Req 19.7）。
+const { subjectTree } = useConsolSubjectSource()
 
 // ─── 自动拉取的分录（只读） ──────────────────────────────────────────────────
 function buildAutoEntries(): EntryRow[] {

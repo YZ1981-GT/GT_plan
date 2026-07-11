@@ -18,6 +18,28 @@
 -->
 <template>
   <div class="gt-cqt">
+    <!-- Capability_Guidance：两套入口能力差异说明（R11.5） -->
+    <el-alert
+      class="gt-cqt-guidance"
+      type="info"
+      :closable="false"
+      show-icon
+    >
+      <template #title>
+        <span class="gt-cqt-guidance-title">查询入口能力说明</span>
+      </template>
+      <div class="gt-cqt-guidance-body">
+        <p>
+          <el-tag size="small" type="success" effect="plain" round>业务视图查询</el-tag>
+          面向<strong>所有已认证角色</strong>：按单元格级跨模块寻址检索、保存模板、导出 Excel、结果下钻到来源底稿格。
+        </p>
+        <p>
+          <el-tag size="small" type="warning" effect="plain" round>高级构建器</el-tag>
+          仅限 <strong>管理员 / 经理 / 合伙人</strong>：提供白名单数据表的可视化条件、SQL 预览、聚合与关联查询。
+        </p>
+      </div>
+    </el-alert>
+
     <!-- 顶部：项目年度选择 + 模板管理 -->
     <div class="gt-cqt-top">
       <el-form :model="formCtx" inline size="small" class="gt-cqt-ctx-form">
@@ -79,6 +101,26 @@
           <el-icon style="margin-right: 4px"><DocumentAdd /></el-icon>
           保存为模板
         </el-button>
+        <!-- 高级构建器入口：角色不足时禁用（可见不可点）+ 原因提示（R11.6） -->
+        <el-tooltip
+          :disabled="canUseBuilder"
+          :content="builderDisabledReason"
+          placement="top"
+        >
+          <!-- 包一层 span：禁用的 el-button 不触发 hover 事件，tooltip 需挂在可交互容器上 -->
+          <span class="gt-cqt-builder-entry">
+            <el-button
+              size="small"
+              type="warning"
+              plain
+              :disabled="!canUseBuilder"
+              @click="onOpenBuilder"
+            >
+              <el-icon style="margin-right: 4px"><MagicStick /></el-icon>
+              高级构建器
+            </el-button>
+          </span>
+        </el-tooltip>
       </div>
     </div>
 
@@ -174,6 +216,11 @@
           </el-checkbox-group>
         </div>
 
+        <!-- ACNR 选字段树（复用 useAcnr，与公式选址同一棵树） -->
+        <div class="gt-cqt-panel" style="margin-top: 12px">
+          <CustomQueryFieldPicker v-model="acnrFieldIds" />
+        </div>
+
         <div class="gt-cqt-panel-actions">
           <el-button
             type="primary"
@@ -245,15 +292,34 @@
           >
             <el-table-column
               v-for="col in displayColumns"
-              :key="col"
-              :prop="col"
-              :label="col"
+              :key="col.key"
+              :prop="col.key"
+              :label="col.title"
               min-width="140"
-              show-overflow-tooltip
+              :show-overflow-tooltip="!col.drillable"
             >
               <template #default="{ row }">
-                <span :class="{ 'gt-amt': isNumericValue(row[col]) }">
-                  {{ formatCellValue(row[col]) }}
+                <!-- 可下钻列：显示值 + GtIndexChip（value=addr_id，经 resolveIndex 拿 jump_route 下钻，R4.3） -->
+                <span
+                  v-if="col.drillable && cellAddrId(row, col)"
+                  class="gt-cqt-drill-cell"
+                >
+                  <span :class="{ 'gt-amt': isNumericValue(row[col.key]) }">
+                    {{ formatCellValue(row[col.key]) }}
+                  </span>
+                  <GtIndexChip
+                    :value="addrIdToIndexRef(cellAddrId(row, col)) || ''"
+                    :context-project-id="formCtx.project_id"
+                    :validate="false"
+                    prevent-navigate
+                    context="下钻到数据来源底稿格"
+                    class="gt-cqt-drill-chip"
+                    @click="drill(cellAddrId(row, col))"
+                  />
+                </span>
+                <!-- 无 addr_id → 不可下钻普通文本列（R4.5） -->
+                <span v-else :class="{ 'gt-amt': isNumericValue(row[col.key]) }">
+                  {{ formatCellValue(row[col.key]) }}
                 </span>
               </template>
             </el-table-column>
@@ -349,16 +415,39 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 高级构建器弹窗（仅 admin/manager/partner 可打开，R11.6） -->
+    <el-dialog
+      v-model="builderDialogVisible"
+      title="高级查询构建器"
+      width="90%"
+      top="5vh"
+      class="gt-cqt-builder-dialog"
+      destroy-on-close
+    >
+      <AdvancedQueryBuilder embedded />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Search, Plus, Delete, Download, Folder, DocumentAdd } from '@element-plus/icons-vue'
+import { Search, Plus, Delete, Download, Folder, DocumentAdd, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { customQuery as P_cq, projects as P_proj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
+import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import {
+  useAcnrDrill,
+  normalizeColumns,
+  cellAddrId,
+  addrIdToIndexRef,
+  type QueryColumnMeta,
+} from '@/composables/useAcnrDrill'
 
 interface IndicatorChild {
   key: string
@@ -378,7 +467,8 @@ interface QueryCondition {
 }
 interface QueryResult {
   rows: any[]
-  columns: string[]
+  // 后端可能返回 ColumnMeta[]（含 addr_id/drillable）或 legacy string[]，统一由 normalizeColumns 归一
+  columns: Array<string | Record<string, any>>
   total: number
   error?: string
 }
@@ -412,8 +502,25 @@ const formCtx = ref({
 const conditions = ref<QueryCondition[]>([])
 const selectedColumns = ref<string[]>([])
 const availableColumns = ref<string[]>([])
+// ACNR 选字段：选中 cell 节点的 addr_id 列表（R2.4，作查询字段标识）
+const acnrFieldIds = ref<string[]>([])
 const result = ref<QueryResult>({ rows: [], columns: [], total: 0 })
 const executing = ref(false)
+
+// ─── 高级构建器入口权限门禁（R11.5/R11.6，与后端 query_builder.py RBAC 一致） ───
+// 复用统一权限矩阵的 currentRole（已归一 signing_partner→partner / assistant→auditor）
+const { currentRole } = usePermissionMatrix()
+// 白名单构建器可访问角色：admin / manager / partner（partner 为 manager 权限超集）
+const BUILDER_ROLES = ['admin', 'manager', 'partner']
+const canUseBuilder = computed(() => BUILDER_ROLES.includes(currentRole.value))
+const builderDisabledReason = '高级构建器仅限管理员 / 经理 / 合伙人'
+const builderDialogVisible = ref(false)
+
+function onOpenBuilder() {
+  // 双保险：角色不足时即便按钮被绕过也不打开构建器（R11.6）
+  if (!canUseBuilder.value) return
+  builderDialogVisible.value = true
+}
 
 // 模板
 const templates = ref<TemplateItem[]>([])
@@ -441,14 +548,24 @@ const operatorOptions = [
   { label: '不为空 (IS NOT NULL)', value: 'is_not_null' },
 ]
 
-// 当前已展示列（结果优先用 result.columns，回退到用户选择）
-const displayColumns = computed(() => {
-  if (result.value.columns && result.value.columns.length > 0) {
+// 结果列下钻（R4.2/R4.4/R4.6/R4.7）：以当前查询上下文 project_id 解析 jump_route
+const { drill } = useAcnrDrill(() => formCtx.value.project_id)
+
+// 当前已展示列（结果优先用 result.columns，回退到用户选择）——归一为 QueryColumnMeta
+const displayColumns = computed<QueryColumnMeta[]>(() => {
+  const cols = normalizeColumns(result.value.columns)
+  if (cols.length > 0) {
     return selectedColumns.value.length > 0
-      ? result.value.columns.filter((c) => selectedColumns.value.includes(c))
-      : result.value.columns
+      ? cols.filter((c) => selectedColumns.value.includes(c.key))
+      : cols
   }
-  return selectedColumns.value
+  return selectedColumns.value.map((k) => ({
+    key: k,
+    title: k,
+    addrId: null,
+    drillable: false,
+    dtype: 'text',
+  }))
 })
 
 function isNumericValue(v: any): boolean {
@@ -580,6 +697,8 @@ async function onExecute() {
       source: formCtx.value.source,
       filters: buildFilters(),
       columns: selectedColumns.value,
+      // ACNR 选字段：以 addr_id 作为跨模块查询字段标识（R2.4）
+      acnr_targets: acnrFieldIds.value,
       limit: 500,
       offset: 0,
     })
@@ -608,10 +727,10 @@ async function onExportExcel() {
   try {
     const XLSX: any = await import('xlsx')
     const cols = displayColumns.value
-    // 构造 [[header...], [row1...], [row2...]] 二维数组
-    const aoa: any[][] = [cols]
+    // 构造 [[header...], [row1...], [row2...]] 二维数组（表头用列标题，取值用列 key）
+    const aoa: any[][] = [cols.map((c) => c.title)]
     for (const row of result.value.rows) {
-      aoa.push(cols.map((c) => row[c] ?? ''))
+      aoa.push(cols.map((c) => row[c.key] ?? ''))
     }
     const ws = XLSX.utils.aoa_to_sheet(aoa)
     const wb = XLSX.utils.book_new()
@@ -668,6 +787,7 @@ async function onConfirmSaveTemplate() {
         conditions: conditions.value,
         selected_columns: selectedColumns.value,
         available_columns: availableColumns.value,
+        acnr_targets: acnrFieldIds.value,
       },
       scope: saveForm.value.scope,
     })
@@ -696,6 +816,7 @@ function onLoadTemplate(tpl: TemplateItem) {
   if (Array.isArray(cfg.conditions)) {
     conditions.value = cfg.conditions
   }
+  acnrFieldIds.value = Array.isArray(cfg.acnr_targets) ? cfg.acnr_targets : []
   templatesDialogVisible.value = false
   ElMessage.success(`已加载模板：${tpl.name}`)
 }
@@ -752,6 +873,22 @@ onMounted(() => {
 .gt-cqt-ctx-form :deep(.el-form-item) { margin-bottom: 0; margin-right: 12px; }
 .gt-cqt-top-actions { display: flex; gap: 8px; flex-shrink: 0; }
 .gt-cqt-em { color: var(--gt-color-info); font-size: var(--gt-font-size-xs); }
+
+/* Capability_Guidance 能力说明横幅（R11.5） */
+.gt-cqt-guidance { border-radius: 6px; }
+.gt-cqt-guidance-title { font-weight: 600; }
+.gt-cqt-guidance-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: var(--gt-font-size-xs);
+  line-height: 1.6;
+}
+.gt-cqt-guidance-body p { margin: 0; }
+.gt-cqt-guidance-body :deep(.el-tag) { margin-right: 6px; }
+/* 禁用态构建器入口的 span 包裹：让 tooltip 在禁用按钮上仍可悬停触发 */
+.gt-cqt-builder-entry { display: inline-flex; }
 
 .gt-cqt-main {
   flex: 1;
@@ -847,5 +984,14 @@ onMounted(() => {
   font-family: 'Arial Narrow', Arial, sans-serif;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+.gt-cqt-drill-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+.gt-cqt-drill-chip {
+  flex-shrink: 0;
 }
 </style>

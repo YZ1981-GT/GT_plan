@@ -41,7 +41,9 @@ def test_custom_formula_refs_subset_of_full_wp_registry(cell: str, wp_code: str)
     }
     db = AsyncMock()
     db.execute = AsyncMock(
-        return_value=MagicMock(all=lambda: [(parsed, wp_code, f"{wp_code}底稿")])
+        return_value=MagicMock(
+            all=lambda: [("00000000-0000-0000-0000-000000000001", parsed, wp_code, f"{wp_code}底稿")]
+        )
     )
     pid = str(uuid.uuid4())
 

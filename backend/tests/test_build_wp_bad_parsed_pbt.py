@@ -46,7 +46,7 @@ def test_build_custom_wp_cell_entries_never_raises(parsed):
     db = AsyncMock()
     db.execute = AsyncMock(
         return_value=MagicMock(
-            all=lambda: [(parsed, "CUST-99", "中文底稿名")]
+            all=lambda: [("00000000-0000-0000-0000-000000000001", parsed, "CUST-99", "中文底稿名")]
         )
     )
 
@@ -65,7 +65,9 @@ def test_build_workpaper_entries_keeps_standard_subset(parsed):
     async def _inner():
         db = AsyncMock()
         db.execute = AsyncMock(
-            return_value=MagicMock(all=lambda: [(parsed, "X", "测")])
+            return_value=MagicMock(
+                all=lambda: [("00000000-0000-0000-0000-000000000001", parsed, "X", "测")]
+            )
         )
         entries = await build_workpaper_entries(db, str(uuid.uuid4()), 2025)
         return entries

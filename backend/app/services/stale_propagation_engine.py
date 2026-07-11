@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import time
 from collections import deque
 from pathlib import Path
@@ -30,6 +31,34 @@ logger = logging.getLogger(__name__)
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
+# ─── Format Detection + Normalization (ACNR consumer wiring, task 3.5) ────────
+
+# 检测 legacy WP URI 前缀: WP:{wp_code}:{sheet_display}: (至少三段冒号分隔)
+_LEGACY_WP_URI = re.compile(r"^WP:[^:]+:[^:]+:")
+
+
+def _detect_and_normalize(source_uri: str) -> str:
+    """格式检测 + 归一化。
+
+    - 含 ``WP:`` 前缀 + 多 ``:`` (legacy ``WP:{wp_code}:{sheet}:{cell}``) →
+      调用 ``_normalize_wp_uri_to_addr_id`` 归一化为 addr_id。
+    - 含 ``/`` 分隔且无 ``WP:`` 前缀 (addr_id ``{wp_code}/{sheet_code}/{cell}``) →
+      直接使用（原样返回）。
+    - 其他（``REPORT:``、``TB:``、``NOTE:``、``MAPPING:`` 等非 WP 域）→ 原样返回。
+
+    Args:
+        source_uri: 变更源 URI，可能为 legacy WP 格式或 addr_id 格式。
+
+    Returns:
+        归一化后的 addr_id（legacy WP 域）或原始 URI（addr_id / 非 WP 域）。
+    """
+    if _LEGACY_WP_URI.match(source_uri):
+        from app.services.linkage_graph_builder import _normalize_wp_uri_to_addr_id
+
+        return _normalize_wp_uri_to_addr_id(source_uri)
+    return source_uri
+
+
 class StalePropagationEngine:
     """统一 Stale 传播引擎。
 
@@ -42,6 +71,7 @@ class StalePropagationEngine:
     def __init__(self) -> None:
         self._graph: dict[str, list[str]] = {}  # adjacency list (source → targets)
         self._reverse_graph: dict[str, list[str]] = {}  # target → sources
+        self._addr_id_index: dict[str, str] = {}  # addr_id → graph_key 映射 (O(1) lookup)
         self._degraded: bool = False
         self._loaded: bool = False
         self._load_graph()
@@ -70,9 +100,12 @@ class StalePropagationEngine:
                     self._reverse_graph.setdefault(target, []).append(source)
             self._loaded = True
             self._degraded = False
+            # 加载后构建 addr_id → graph_key 索引 (Req 4.4)
+            self._build_addr_id_index()
             logger.info(
-                "StalePropagationEngine: loaded %d edges into adjacency list",
+                "StalePropagationEngine: loaded %d edges into adjacency list, %d addr_id index entries",
                 len(edges),
+                len(self._addr_id_index),
             )
         except (json.JSONDecodeError, OSError, KeyError) as e:
             logger.warning(
@@ -81,10 +114,28 @@ class StalePropagationEngine:
             )
             self._degraded = True
 
+    def _build_addr_id_index(self) -> None:
+        """构建 addr_id → graph_key 的 O(1) 查找索引 (Req 4.4)。
+
+        - graph 每个 key 自映射（key → key），保证 addr_id 格式的输入直通命中。
+        - 对 legacy WP 格式的 key，额外建立其归一化 addr_id → key 的反向映射，
+          使新旧两种格式都能匹配到同一图节点（strangler-fig 过渡兼容）。
+        """
+        self._addr_id_index.clear()
+        for key in self._graph:
+            # 基础自映射
+            self._addr_id_index[key] = key
+            # legacy WP key → 归一化 addr_id 反向映射
+            if _LEGACY_WP_URI.match(key):
+                normalized = _detect_and_normalize(key)
+                if normalized != key:
+                    self._addr_id_index.setdefault(normalized, key)
+
     def reload_graph(self) -> None:
-        """重新加载依赖图（用于图更新后刷新）。"""
+        """重新加载依赖图（用于图更新后刷新）。重建 addr_id 索引 (Req 4.5)。"""
         self._graph.clear()
         self._reverse_graph.clear()
+        self._addr_id_index.clear()
         self._loaded = False
         self._load_graph()
 
@@ -334,7 +385,10 @@ class StalePropagationEngine:
         Parameters
         ----------
         source_uri : str
-            变更源 URI，格式 {module}:{code}:{sheet_name}:{label}
+            变更源 URI。支持两种格式（Req 4.1-4.3）：
+            - legacy WP: ``WP:{wp_code}:{sheet_display}:{cell}`` → 自动归一化为 addr_id
+            - addr_id: ``{wp_code}/{sheet_code}/{cell}`` → 直接使用
+            - 非 WP 域（REPORT:/TB:/NOTE: 等）→ 原样使用
         project_id : UUID | str
             项目 ID
         year : int
@@ -352,8 +406,13 @@ class StalePropagationEngine:
 
         start_time = time.time()
 
+        # 格式检测 + 归一化（legacy WP URI → addr_id；addr_id / 非 WP 域原样）(Req 4.1-4.3)
+        normalized = _detect_and_normalize(source_uri)
+        # 经 addr_id 索引解析到实际图 key（O(1) 查找，兼容新旧格式）(Req 4.4)
+        graph_key = self._addr_id_index.get(normalized, normalized)
+
         # BFS 遍历
-        affected_uris = self._bfs(source_uri, max_depth=5)
+        affected_uris = self._bfs(graph_key, max_depth=5)
 
         if not affected_uris:
             return {"affected": [], "total": 0, "degraded": False}

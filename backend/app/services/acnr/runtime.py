@@ -143,11 +143,37 @@ def _build_formula_ref(wp_code: str, cell_address: str) -> str:
     return f"WP('{wp_code}','{cell_address}')"
 
 
+# ─── custom_flat profile (grammar_v1) ────────────────────────────────────────
+# 供 address_registry._build_custom_wp_cell_entries 使用，使自定义格可经
+# full_resolve(formula_ref=WP('wp','wp','cell')) round-trip 回同一 addr_id。
+
+
+def _build_custom_flat_addr_id(wp_code: str, cell_address: str) -> str:
+    """构造 custom_flat addr_id（grammar_v1 custom_flat profile）。
+
+    格式: {wp_code}/{wp_code}/{cell_address}
+
+    与 catalog._formula_ref_to_addr_id(WP('wp','wp','cell')) 的 fallback 输出一致，
+    使 full_resolve 决策树 Step 6（L3 精确匹配）可命中。
+    """
+    return f"{wp_code}/{wp_code}/{cell_address}"
+
+
+def _build_custom_flat_formula_ref(wp_code: str, cell_address: str) -> str:
+    """构造 3 参 custom_flat WP() 公式引用（grammar_v1）。
+
+    格式: WP('{wp_code}','{wp_code}','{cell_address}')
+    """
+    return f"WP('{wp_code}','{wp_code}','{cell_address}')"
+
+
 async def register_custom(
     db: AsyncSession,
     project_id: str,
     wp_id: str,
     cells: list[dict[str, Any]],
+    *,
+    addr_profile: str = "runtime",
 ) -> list[RuntimeCellEntry]:
     """登记自定义格到 L3 运行时索引（parsed_data 保存后调用）。
 
@@ -164,6 +190,13 @@ async def register_custom(
             - cell_address: str — 单元格 A1 地址（必填）
             - semantic_label: str | None — 语义标签（可选）
             - wp_code: str — 底稿编码（必填）
+        addr_profile: addr_id / formula_ref 生成方案：
+            - "runtime"（默认）: addr_id=runtime/{pid}/{wp_id}/{wp_code}/{cell}，
+              formula_ref=WP('{wp_code}','{cell}')（2 参，向后兼容既有调用/测试）
+            - "custom_flat": addr_id={wp_code}/{wp_code}/{cell}，
+              formula_ref=WP('{wp_code}','{wp_code}','{cell}')（3 参，grammar_v1
+              custom_flat profile，使 full_resolve 可 round-trip 命中，供
+              address_registry 自定义格接入使用）
 
     Returns:
         创建的 RuntimeCellEntry 列表
@@ -193,12 +226,17 @@ async def register_custom(
             continue
 
         semantic_label = (cell.get("semantic_label") or "").strip()
-        addr_id = _build_addr_id(project_id, wp_id, wp_code, cell_address)
+        if addr_profile == "custom_flat":
+            addr_id = _build_custom_flat_addr_id(wp_code, cell_address)
+            formula_ref = _build_custom_flat_formula_ref(wp_code, cell_address)
+        else:
+            addr_id = _build_addr_id(project_id, wp_id, wp_code, cell_address)
+            formula_ref = _build_formula_ref(wp_code, cell_address)
 
         entry = RuntimeCellEntry(
             addr_id=addr_id,
             uri=_build_uri(wp_code, cell_address),
-            formula_ref=_build_formula_ref(wp_code, cell_address),
+            formula_ref=formula_ref,
             project_id=project_id,
             wp_id=wp_id,
             cell_address=cell_address,

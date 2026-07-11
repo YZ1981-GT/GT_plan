@@ -96,6 +96,14 @@
 import { ref, computed } from 'vue'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
+import { useAddressRegistry } from '@/stores/addressRegistry'
+import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+
+// R14.6: 候选地址源统一走 Req16 store facade（ACNR-backed 域 computeds）+ useAcnr（WP 域），
+// 收敛到与 FormulaRefPicker/CellSelector/FormulaEditDialog/NoteFormulaDialog 同一 ACNR 模式；
+// store 未加载/ACNR 空时回退 legacy 端点（strangler-fig，无回归）。
+const addrStore = useAddressRegistry()
+const acnr = useAcnr()
 
 interface CellInfo {
   cell: string
@@ -241,43 +249,13 @@ async function pickSource(fn: string) {
 
   try {
     if (fn === 'TB') {
-      const data = await api.get('/api/trial-balance', {
-        params: { project_id: props.projectId },
-        validateStatus: (s: number) => s < 600,
-      })
-      const rows = data ?? []
-      sourceRows.value = rows.map((r: any) => ({
-        code: r.standard_account_code || r.account_code || '',
-        name: r.account_name || r.standard_account_name || '',
-        _ref: `TB('${r.standard_account_code || r.account_code || ''}','期末余额')`,
-      }))
+      sourceRows.value = await loadTbRows()
     } else if (fn === 'ROW' || fn === 'SUM_ROW' || fn === 'REPORT') {
-      const data = await api.get(P.reportConfig.list, {
-        params: { report_type: 'balance_sheet', project_id: props.projectId },
-        validateStatus: (s: number) => s < 600,
-      })
-      const rows = data ?? []
-      sourceRows.value = rows.map((r: any) => ({
-        code: r.row_code || '',
-        name: r.row_name || '',
-        _ref: fn === 'REPORT' ? `REPORT('${r.row_code}','期末')` : `ROW('${r.row_code}')`,
-      }))
+      sourceRows.value = await loadReportRows(fn)
     } else if (fn === 'NOTE') {
-      const data = await api.get('/api/disclosure-notes/tree', { validateStatus: (s: number) => s < 600 })
-      const items = data ?? []
-      sourceRows.value = items.map((r: any) => ({
-        code: r.note_number || r.section_number || r.note_section || '',
-        name: r.title || r.section_title || '',
-        _ref: `NOTE('${r.title || r.section_title || ''}','合计','期末')`,
-      }))
+      sourceRows.value = await loadNoteRows()
     } else if (fn === 'WP') {
-      const data = await api.get('/api/working-papers', { validateStatus: (s: number) => s < 600 })
-      const items = data ?? []
-      sourceRows.value = items.map((r: any) => ({
-        code: r.wp_code || '',
-        name: r.wp_name || r.name || '',
-        _ref: `WP('${r.wp_code || ''}','审定数')`,
-      }))
+      sourceRows.value = await loadWpRows()
     } else {
       sourceRows.value = []
     }
@@ -286,6 +264,101 @@ async function pickSource(fn: string) {
   } finally {
     sourceLoading.value = false
   }
+}
+
+// ── TB 域：优先 Req16 store facade tbAddresses（ACNR-backed），空则回退 legacy /api/trial-balance ──
+async function loadTbRows(): Promise<any[]> {
+  if (addrStore.loaded && addrStore.tbAddresses.length > 0) {
+    return addrStore.tbAddresses.map((e) => ({
+      code: e.account_code || '',
+      name: e.label || '',
+      _ref: `TB('${e.account_code || ''}','期末余额')`,
+    }))
+  }
+  const data = await api.get('/api/trial-balance', {
+    params: { project_id: props.projectId },
+    validateStatus: (s: number) => s < 600,
+  })
+  const rows = data ?? []
+  return rows.map((r: any) => ({
+    code: r.standard_account_code || r.account_code || '',
+    name: r.account_name || r.standard_account_name || '',
+    _ref: `TB('${r.standard_account_code || r.account_code || ''}','期末余额')`,
+  }))
+}
+
+// ── REPORT/ROW 域：优先 store reportAddresses，空则回退 legacy report_config ──
+async function loadReportRows(fn: string): Promise<any[]> {
+  const toRef = (code: string) => (fn === 'REPORT' ? `REPORT('${code}','期末')` : `ROW('${code}')`)
+  if (addrStore.loaded && addrStore.reportAddresses.length > 0) {
+    return addrStore.reportAddresses.map((e) => ({
+      code: e.row_code || '',
+      name: e.label || '',
+      _ref: toRef(e.row_code || ''),
+    }))
+  }
+  const data = await api.get(P.reportConfig.list, {
+    params: { report_type: 'balance_sheet', project_id: props.projectId },
+    validateStatus: (s: number) => s < 600,
+  })
+  const rows = data ?? []
+  return rows.map((r: any) => ({
+    code: r.row_code || '',
+    name: r.row_name || '',
+    _ref: toRef(r.row_code || ''),
+  }))
+}
+
+// ── NOTE 域：优先 store noteAddresses，空则回退 legacy disclosure-notes/tree ──
+async function loadNoteRows(): Promise<any[]> {
+  if (addrStore.loaded && addrStore.noteAddresses.length > 0) {
+    return addrStore.noteAddresses.map((e) => ({
+      code: e.note_section || '',
+      name: e.label || '',
+      _ref: `NOTE('${e.label || ''}','合计','期末')`,
+    }))
+  }
+  const data = await api.get('/api/disclosure-notes/tree', { validateStatus: (s: number) => s < 600 })
+  const items = data ?? []
+  return items.map((r: any) => ({
+    code: r.note_number || r.section_number || r.note_section || '',
+    name: r.title || r.section_title || '',
+    _ref: `NOTE('${r.title || r.section_title || ''}','合计','期末')`,
+  }))
+}
+
+// ── WP 域：优先 ACNR listSheets（grammar_v1 2 参语义列 WP(code,'审定数')），空则回退 legacy /api/working-papers ──
+async function loadWpRows(): Promise<any[]> {
+  let sheets: AcnrSheetEntry[] = []
+  try {
+    sheets = await acnr.listSheets()
+  } catch {
+    sheets = []
+  }
+  if (sheets.length > 0) {
+    // 以父底稿码去重：同一 wp_code 的多个 sheet 只展示一次「审定数」语义列引用。
+    const seen = new Set<string>()
+    const rows: any[] = []
+    for (const s of sheets) {
+      const code = s.parent_wp_code || ''
+      if (!code || seen.has(code)) continue
+      seen.add(code)
+      rows.push({
+        code,
+        name: s.sheet_name || s.sheet_code || code,
+        _ref: `WP('${code}','审定数')`,
+      })
+    }
+    return rows
+  }
+  // 回退 legacy
+  const data = await api.get('/api/working-papers', { validateStatus: (s: number) => s < 600 })
+  const items = data ?? []
+  return items.map((r: any) => ({
+    code: r.wp_code || '',
+    name: r.wp_name || r.name || '',
+    _ref: `WP('${r.wp_code || ''}','审定数')`,
+  }))
 }
 
 function onSourceRowClick(row: any) {

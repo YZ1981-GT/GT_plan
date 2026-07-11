@@ -442,9 +442,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { consolNoteSections as P_cn } from '@/services/apiPaths'
+import { useAcnr } from '@/services/acnr/useAcnr'
 import { useCellSelection } from '@/composables/useCellSelection'
 import CellContextMenu from '@/components/common/CellContextMenu.vue'
 import CommentTooltip from '@/components/common/CommentTooltip.vue'
@@ -478,6 +480,40 @@ const emit = defineEmits<{
   (e: 'audit-all'): void
   (e: 'load-note-tree', forceRefresh?: boolean): void
 }>()
+
+// ─── ACNR NOTE 域索引解析（Req 20.3/20.4/20.7/20.9） ──────────────────────────
+// 合并附注 note section 引用经 useAcnr().resolveIndex('note:'+sectionId) 解析/跳转，
+// NOTE 域走 full_resolve V1 delegation，无需预登记 L1 catalog（Req 17.4）。
+const router = useRouter()
+const acnr = useAcnr()
+
+/**
+ * 源单体附注 section 的稳定 NOTE 地址标识（Req 20.4 reaggregate 溯源）。
+ * 合并附注按同一 section 汇总各单体附注，故源 section 以 `note:{section}` 标识，
+ * 与整个寻址体系一致，可追溯。仅为标识用途，不参与 reaggregate 计算。
+ */
+function sourceNoteAddr(sectionId?: string): string {
+  return sectionId ? `note:${sectionId}` : ''
+}
+
+/**
+ * 跳转到某合并附注 section（Req 20.3）。
+ * 先经 ACNR resolveIndex('note:'+sectionId) 解析：
+ *   - found=true 且有 jump_route → 直接按 ACNR 返回路由跳转（不自拼路由，R7.3 铁律）；
+ *   - found=false / 无 jump_route / 异常 / 空 → 回退现有 note 导航 onNoteNodeClick（Req 20.7/20.9，无回归）。
+ */
+async function jumpToNoteSection(sectionId?: string, title?: string) {
+  if (!sectionId) return
+  try {
+    const res = await acnr.resolveIndex(sourceNoteAddr(sectionId))
+    if (res.found && res.jump_route) {
+      router.push(res.jump_route)
+      return
+    }
+  } catch { /* ACNR 不可用 → 回退现有导航 */ }
+  // miss / 无 jump_route / 异常 → 回退现有 note 导航（行为不变）
+  onNoteNodeClick({ section_id: sectionId, title })
+}
 
 // ─── 附注状态 ─────────────────────────────────────────────────────────────────
 const selectedNoteSection = ref<any>(null)
@@ -919,10 +955,13 @@ async function refreshNoteByFormula() {
 }
 
 // B.1.13: 重新汇总（从子公司单体附注汇总到合并附注）
+// Req 20.4/20.9：溯源以 NOTE addr（note:{section}）标识源单体附注 section，
+// 与统一寻址体系一致；reaggregate 计算逻辑本身完全不变（仅后端聚合，前端只负责触发+重载）。
 async function handleReaggregate() {
   if (!props.projectId) return
   reaggregating.value = true
   try {
+    // 计算不变：沿用现有 reaggregate 端点，不改任何入参/聚合逻辑（Req 20.9）。
     await api.post(`/api/disclosure-notes/${props.projectId}/${props.year}/reaggregate`)
     ElMessage.success('重新汇总完成')
     // Reload current section
@@ -1336,6 +1375,9 @@ function onNoteNodeClick(data: { section_id: string; title?: string }) {
         parent_section: sec.parent_section,
         headers,
         editRows,
+        // Req 20.4：以 ACNR NOTE 地址标识源单体附注 section（reaggregate 溯源），
+        // 与统一寻址体系一致，可追溯；仅为标识，不参与计算。
+        noteAddr: sourceNoteAddr(sec.section_id),
       }
       // 加载该章节的批注和复核标记
       cellComments.loadComments(sec.section_id)
@@ -1358,7 +1400,9 @@ function onDocClick(e: MouseEvent) {
 function onConsolCatalogSelect(data: ConsolCatalogSelectPayload) {
   if (!data) return
   if (data.type === 'note' && data.sectionId) {
-    onNoteNodeClick({ section_id: data.sectionId, title: data.title })
+    // Req 20.3：note section 引用经 ACNR resolveIndex('note:'+sectionId) 解析/跳转，
+    // miss/异常回退现有 note 导航（jumpToNoteSection 内部处理）。
+    jumpToNoteSection(data.sectionId, data.title)
   }
 }
 

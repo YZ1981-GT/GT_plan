@@ -37,283 +37,20 @@ from sqlalchemy.sql.elements import ColumnElement
 
 from app.core.database import get_db
 from app.deps import get_current_user
-from app.models.audit_platform_models import (
-    AccountChart,
-    Adjustment,
-    Materiality,
-    ReportLineMapping,
-    TbBalance,
-    TbLedger,
-    TrialBalance,
-    UnadjustedMisstatement,
+from app.models.core import User
+# ── 白名单单一真源（Task 6.2）：定义已收敛到 services/custom_query/table_whitelist ──
+# query_builder 从服务层单点导入，不再本地维护副本，保证 param_sql_builder /
+# QueryOrchestrator / 白名单构建器共用同一套白名单与强制门禁。
+from app.services.custom_query.table_whitelist import (
+    AGGREGATE_WHITELIST,
+    JOIN_WHITELIST,
+    OPERATOR_WHITELIST,
+    TABLE_WHITELIST,
 )
-from app.models.core import Project, User
-from app.models.report_models import DisclosureNote, ReportConfig
-from app.models.staff_models import StaffMember, WorkHour
-from app.models.workpaper_models import WorkingPaper, WpIndex
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/query", tags=["query-builder"])
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 表白名单（只读 audit/财务表，绝不暴露 user/role/auth/token 表）
-# ─────────────────────────────────────────────────────────────────────────────
-TABLE_WHITELIST: dict[str, dict[str, Any]] = {
-    "trial_balance": {
-        "model": TrialBalance,
-        "label": "试算表",
-        "fields": [
-            "id", "project_id", "year", "company_code",
-            "standard_account_code", "account_name", "account_category",
-            "unadjusted_amount", "rje_adjustment", "aje_adjustment",
-            "audited_amount", "opening_balance", "currency_code",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "adjustments": {
-        "model": Adjustment,
-        "label": "调整分录（AJE/RJE）",
-        "fields": [
-            "id", "project_id", "year", "company_code", "adjustment_no",
-            "adjustment_type", "description", "account_code", "account_name",
-            "debit_amount", "credit_amount", "review_status",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "unadjusted_misstatements": {
-        "model": UnadjustedMisstatement,
-        "label": "未更正错报",
-        "fields": [
-            "id", "project_id", "year", "misstatement_description",
-            "affected_account_code", "affected_account_name",
-            "misstatement_amount", "misstatement_type",
-            "management_reason", "auditor_evaluation",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "report_line_mapping": {
-        "model": ReportLineMapping,
-        "label": "报表行次映射",
-        "fields": [
-            "id", "project_id", "report_type",
-            "standard_account_code", "report_line_code", "report_line_name",
-            "report_line_level", "parent_line_code", "mapping_type",
-            "is_confirmed", "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "report_config": {
-        "model": ReportConfig,
-        "label": "报表行次配置",
-        "fields": [
-            "id", "report_type", "applicable_standard",
-            "row_code", "row_name", "row_number", "indent_level",
-            "is_total_row", "parent_row_code", "formula",
-            "formula_category", "formula_description", "formula_source",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "working_paper": {
-        "model": WorkingPaper,
-        "label": "底稿文件",
-        "fields": [
-            "id", "project_id", "wp_index_id", "file_path", "source_type",
-            "file_version", "status", "review_status",
-            "assigned_to", "reviewer", "workflow_status",
-            "explanation_status", "consistency_status",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "wp_index": {
-        "model": WpIndex,
-        "label": "底稿索引",
-        "fields": [
-            "id", "project_id", "wp_code", "wp_name", "audit_cycle",
-            "assigned_to", "reviewer", "status",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "tb_balance": {
-        "model": TbBalance,
-        "label": "科目余额表",
-        "fields": [
-            "id", "project_id", "year", "company_code",
-            "account_code", "account_name", "level",
-            "opening_balance", "closing_balance",
-            "debit_amount", "credit_amount", "currency_code",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "tb_ledger": {
-        "model": TbLedger,
-        "label": "序时账（总账明细）",
-        "fields": [
-            "id", "project_id", "year", "company_code",
-            "voucher_date", "voucher_no", "account_code", "account_name",
-            "accounting_period", "voucher_type", "entry_seq",
-            "debit_amount", "credit_amount", "summary",
-            "currency_code", "is_deleted", "created_at",
-        ],
-    },
-    "account_chart": {
-        "model": AccountChart,
-        "label": "科目表",
-        "fields": [
-            "id", "project_id", "account_code", "account_name",
-            "direction", "level", "category", "parent_code",
-            "source", "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "materiality": {
-        "model": Materiality,
-        "label": "重要性水平",
-        "fields": [
-            "id", "project_id", "year", "benchmark_type",
-            "benchmark_amount", "overall_percentage", "overall_materiality",
-            "performance_ratio", "performance_materiality",
-            "trivial_ratio", "trivial_threshold",
-            "is_override", "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    # ── 业务维度扩展（项目 / 单位 / 附注 / 人员 / 工时） ──
-    "projects": {
-        "model": Project,
-        "label": "项目",
-        "fields": [
-            "id", "name", "client_name",
-            "audit_period_start", "audit_period_end",
-            "project_type", "status", "scenario",
-            "manager_id", "partner_id",
-            "company_code", "template_type", "report_scope",
-            "parent_company_name", "parent_company_code",
-            "ultimate_company_name", "ultimate_company_code",
-            "consol_level", "risk_level",
-            "budget_hours", "contract_amount",
-            "archived_at", "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "disclosure_notes": {
-        "model": DisclosureNote,
-        "label": "附注",
-        "fields": [
-            "id", "project_id", "year",
-            "note_section", "section_title", "account_name",
-            "content_type", "source_template", "status",
-            "sort_order", "is_stale",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "staff_members": {
-        "model": StaffMember,
-        "label": "人员",
-        "fields": [
-            "id", "user_id", "name", "employee_no",
-            "department", "title", "partner_name", "partner_id",
-            "specialty", "phone", "email", "join_date",
-            "source", "role_level",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-    "work_hours": {
-        "model": WorkHour,
-        "label": "工时",
-        "fields": [
-            "id", "staff_id", "project_id", "work_date",
-            "hours", "start_time", "end_time",
-            "description", "status", "purpose", "ai_suggested",
-            "is_deleted", "created_at", "updated_at",
-        ],
-    },
-}
-
-
-# S-3 v2：JOIN 白名单（声明式，不接受任意 ON 条件）
-# 格式: {table_name: {target_table: {on: [(left_col, right_col), ...]}, ...}}
-# 仅枚举常用业务关联，新增 JOIN 必须显式登记
-JOIN_WHITELIST: dict[str, dict[str, dict[str, list[tuple[str, str]]]]] = {
-    "trial_balance": {
-        "wp_index": {"on": [("project_id", "project_id")]},
-        "account_chart": {
-            "on": [
-                ("project_id", "project_id"),
-                ("standard_account_code", "account_code"),
-            ]
-        },
-        "report_line_mapping": {
-            "on": [
-                ("project_id", "project_id"),
-                ("standard_account_code", "standard_account_code"),
-            ]
-        },
-    },
-    "adjustments": {
-        "wp_index": {"on": [("project_id", "project_id")]},
-        "trial_balance": {
-            "on": [
-                ("project_id", "project_id"),
-                ("account_code", "standard_account_code"),
-            ]
-        },
-    },
-    "working_paper": {
-        "wp_index": {"on": [("wp_index_id", "id")]},
-    },
-    "wp_index": {
-        "working_paper": {"on": [("id", "wp_index_id")]},
-    },
-    "tb_balance": {
-        "account_chart": {
-            "on": [("project_id", "project_id"), ("account_code", "account_code")]
-        },
-    },
-    "tb_ledger": {
-        "account_chart": {
-            "on": [("project_id", "project_id"), ("account_code", "account_code")]
-        },
-    },
-    "report_line_mapping": {
-        "report_config": {"on": [("report_line_code", "row_code")]},
-    },
-    # ── 业务维度 JOIN ──
-    "projects": {
-        # 项目 → 项目下所有业务对象
-        "trial_balance":     {"on": [("id", "project_id")]},
-        "working_paper":     {"on": [("id", "project_id")]},
-        "wp_index":          {"on": [("id", "project_id")]},
-        "tb_balance":        {"on": [("id", "project_id")]},
-        "tb_ledger":         {"on": [("id", "project_id")]},
-        "adjustments":       {"on": [("id", "project_id")]},
-        "disclosure_notes":  {"on": [("id", "project_id")]},
-        "work_hours":        {"on": [("id", "project_id")]},
-    },
-    "disclosure_notes": {
-        "projects":          {"on": [("project_id", "id")]},
-    },
-    "staff_members": {
-        "work_hours":        {"on": [("id", "staff_id")]},
-    },
-    "work_hours": {
-        "staff_members":     {"on": [("staff_id", "id")]},
-        "projects":          {"on": [("project_id", "id")]},
-    },
-}
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 操作符白名单 — 显式分类，禁止任意 SQL 片段
-# ─────────────────────────────────────────────────────────────────────────────
-OPERATOR_WHITELIST: set[str] = {
-    "eq", "neq",            # = / !=
-    "gt", "gte", "lt", "lte",  # > / >= / < / <=
-    "like", "not_like",     # LIKE / NOT LIKE（自动包裹 %）
-    "in", "not_in",         # IN / NOT IN
-    "is_null", "is_not_null",  # IS NULL / IS NOT NULL
-    "between",              # BETWEEN（[lo, hi]）
-}
-
-
-AGGREGATE_WHITELIST: set[str] = {"count", "sum", "avg", "min", "max"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -324,14 +61,36 @@ def _get_role_value(user: User) -> str:
     return role.value if hasattr(role, "value") else str(role)
 
 
+# 白名单构建器可访问角色（R11.2）：admin / manager；partner 为 manager 权限超集，
+# 平台既有约定纳入（signing partner 亦可用构建器）。auditor / qc / readonly 等
+# 其余已认证角色一律 403 ROLE_FORBIDDEN（R11.3）。
+_QUERY_BUILDER_ROLES = ("admin", "manager", "partner")
+
+
 def _require_admin_or_manager(user: User) -> None:
+    """角色门禁纯函数（保留供内部/测试直接调用）。
+
+    error_code 对齐 design.md Error Handling 表：构建器角色不足 → ``ROLE_FORBIDDEN`` 403。
+    """
     role = _get_role_value(user)
-    if role not in ("admin", "manager", "partner"):
+    if role not in _QUERY_BUILDER_ROLES:
         raise HTTPException(
             status_code=403,
-            detail={"error_code": "QUERY_BUILDER_FORBIDDEN",
+            detail={"error_code": "ROLE_FORBIDDEN",
                     "message": "高级查询构建器仅 admin / manager 可访问"},
         )
+
+
+def require_query_builder_access(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """FastAPI 依赖：白名单构建器统一角色门禁（R11.2 / R11.3）。
+
+    作为 Whitelist_Query_Builder 全部端点的单点准入依赖注入。未认证请求由
+    ``get_current_user`` 先行拦截（R11.4）；已认证但角色不足 → 403 ``ROLE_FORBIDDEN``。
+    """
+    _require_admin_or_manager(current_user)
+    return current_user
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -762,13 +521,12 @@ def _stmt_to_sql(stmt: Select) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 @router.get("/schema")
 async def get_schema(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_query_builder_access),
 ):
     """返回白名单表/字段元信息（前端用于构造可视化选择器）。
 
     S-3 v2：joins 字段列出当前表可关联的目标表 + 关联条件
     """
-    _require_admin_or_manager(current_user)
     return {
         "tables": [
             {
@@ -798,10 +556,9 @@ async def get_schema(
 @router.post("/preview")
 async def preview_query(
     body: QueryDSL,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_query_builder_access),
 ):
     """仅生成 SQL（不执行），用于前端"SQL 预览"。"""
-    _require_admin_or_manager(current_user)
     stmt, column_names = _build_select(body)
     return {
         "sql": _stmt_to_sql(stmt),
@@ -820,6 +577,13 @@ def _derive_formula_refs(table: str, rows: list[dict]) -> list[str | None]:
     与 ``address_registry.formula_ref_to_uri`` 的 ref 语法保持一致，
     前端可直接把 ref 丢给 useAddressRegistry.resolve/validate 或复制进公式编辑器。
     其余表（working_paper/report_config 等）暂无稳定单值定位语义，返回 None。
+
+    Req 21.3（grammar_v1 契约）：此处产出的 ``TB('{code}','审定数')`` /
+    ``TB('{code}','期末')`` 均为 grammar_v1-valid 的 TB 域 ref —— TB 是非 wp 域，
+    经 ``acnr.resolver.full_resolve`` 的 V1 delegation（``_delegate_v1`` →
+    ``address_registry.formula_ref_to_uri`` → ``tb://{code}#{col}``）解析为
+    ``found=True``（非 null），不会产出畸形 ref。两种列名（审定数/期末）都仅作为 URI
+    的 ``#cell`` 段透传，解析恒成立。契约由 task 34.2 的公式构造 grammar_v1 断言测试统一覆盖。
     """
     refs: list[str | None] = []
     if table == "trial_balance":
@@ -840,10 +604,9 @@ async def execute_query(
     body: QueryDSL,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_query_builder_access),
 ):
     """执行查询，返回结构化结果。"""
-    _require_admin_or_manager(current_user)
     stmt, column_names = _build_select(body)
 
     # ─── Redis 短 TTL 缓存（dashboard 卡片高频查询）────────────────────
@@ -907,10 +670,9 @@ _EXPORT_FETCH_SIZE = 2000  # 每批从 DB 拉取的行数，避免全量加载
 async def export_excel(
     body: QueryDSL,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_query_builder_access),
 ):
     """执行查询并以流式/分页方式生成 Excel（write_only 模式避免全量内存峰值）。"""
-    _require_admin_or_manager(current_user)
     stmt, column_names = _build_select(body)
     try:
         result = await db.execute(stmt)

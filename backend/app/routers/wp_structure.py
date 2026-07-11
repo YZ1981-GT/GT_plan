@@ -190,8 +190,8 @@ async def get_addresses(
     wp, idx = await _get_wp_with_index(db, project_id, wp_id)
 
     from app.services.wp_structure_bridge import get_workpaper_addresses
-    addresses = get_workpaper_addresses(
-        wp.file_path, idx.wp_code, str(project_id)
+    addresses = await get_workpaper_addresses(
+        wp.file_path, idx.wp_code, str(project_id), db=db, wp_id=str(wp_id)
     )
     return {"wp_code": idx.wp_code, "addresses": addresses, "count": len(addresses)}
 

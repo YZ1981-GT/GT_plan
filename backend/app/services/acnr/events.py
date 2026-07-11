@@ -24,11 +24,11 @@ async def invalidate(
 ) -> None:
     """ACNR 统一缓存失效（由 WORKPAPER_SAVED 事件驱动）。
 
-    失效策略：
+    失效策略（执行顺序：L3 → L2 → FormulaReverseIndex → Legacy V1）：
     1. 清除 L3 RuntimeIndex 运行时条目（按 project_id 或增量按 wp_id/sheets）
     2. 清除 L2 overlay 缓存（按 project_id）
-    3. 委托旧 address_registry.invalidate_async 失效 WP 域（strangler-fig 过渡）
-    4. 记录可观测日志
+    3. 清除 FormulaReverseIndex 单例（反向联动索引，下次访问时重建）
+    4. 委托旧 address_registry.invalidate_async 失效 WP 域（strangler-fig 过渡）
 
     增量模式（trigger/extra_sheets 非空时）：
     - 仅清除指定 wp_id 或受影响 sheets 对应的 L3 条目
@@ -72,7 +72,17 @@ async def invalidate(
     except Exception as exc:
         logger.warning("acnr.invalidate L2 overlay clear failed: %s", exc)
 
-    # ── Step 3: 委托旧 address_registry 失效 WP 域（strangler-fig 过渡）──
+    # ── Step 3: FormulaReverseIndex 单例失效 ────────────────────────────
+    # 无论 extra_sheets / 增量模式如何，始终执行完整 reverse_index 失效
+    # （反向索引为全局单例，无法按 sheet 增量清理，需整体重建）。
+    try:
+        from app.services.formula_reverse_index import invalidate_reverse_index
+
+        invalidate_reverse_index()
+    except Exception as exc:
+        logger.warning("acnr.invalidate reverse_index clear failed: %s", exc)
+
+    # ── Step 4: 委托旧 address_registry 失效 WP 域（strangler-fig 过渡）──
     try:
         from app.services.address_registry import address_registry
 
@@ -83,6 +93,43 @@ async def invalidate(
         logger.warning(
             "acnr.invalidate address_registry delegate failed: %s", exc
         )
+
+
+async def invalidate_domain(
+    project_id: str,
+    *,
+    domain: str,
+    wp_id: str | None = None,
+) -> None:
+    """按域的统一失效薄封装（Req 11）。
+
+    - domain == "wp" → 汇入 canonical `invalidate()`（含 L3/L2/reverse_index/legacy 全链）。
+    - 其他域（tb/report/note/aux）→ 单一 seam，当前 behavior parity 委托 legacy
+      `address_registry.invalidate_async`；未来可在此按域清 L2/L3 overlay。
+
+    本函数不抛异常 — 失效失败仅 warning，不阻断主流程。
+
+    Args:
+        project_id: 项目 ID（必传）
+        domain: 失效域（wp / tb / report / note / aux）
+        wp_id: 底稿 ID（可选，仅 wp 域增量失效用）
+    """
+    if not project_id:
+        return
+
+    if domain == "wp":
+        await invalidate(
+            str(project_id), wp_id=wp_id, trigger="touch_wp_registry"
+        )
+        return
+
+    # 非 WP 域：单一 seam，当前 behavior parity 委托 legacy
+    try:
+        from app.services.address_registry import address_registry
+
+        await address_registry.invalidate_async(str(project_id), domain=domain)
+    except Exception as exc:
+        logger.warning("acnr.invalidate_domain %s failed: %s", domain, exc)
 
 
 async def on_workpaper_saved(payload: Any) -> None:

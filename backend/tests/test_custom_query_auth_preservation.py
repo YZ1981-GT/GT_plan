@@ -52,6 +52,13 @@ def _mock_db_for_admin(project_id: str):
     mock_exec_result = MagicMock()
     mock_exec_result.all.return_value = [(uuid.UUID(project_id),)]
     db.execute.return_value = mock_exec_result
+    # OwnershipGuard.assert_target_accessible 成功路径会调用 set_rls_context(db, pid)，
+    # 后者读取 db.get_bind().dialect.name。真实 AsyncSession.get_bind() 是同步返回；
+    # AsyncMock 默认会把 get_bind() 变成协程 → set_rls_context 取 .dialect 抛错。
+    # 用同步 MagicMock 提供 sqlite dialect 使 set_rls_context 早返回（跳过 SET LOCAL）。
+    _bind = MagicMock()
+    _bind.dialect.name = "sqlite"
+    db.get_bind = MagicMock(return_value=_bind)
     return db
 
 

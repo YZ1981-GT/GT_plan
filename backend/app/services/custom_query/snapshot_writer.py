@@ -9,18 +9,24 @@ ACNR 集成 (M2, R15.1, R15.2, R15.4):
   - 返回结果附带 addr_id + column_metadata（chip 可下钻到格）
   - resolve 携带 project context（project_id）保证 wp_id 正确解析
 
-Algorithm (design.md 6.2):
+11 步事务算法（design.md §11 WritebackPreview + SnapshotWriter，advanced-query Task 15.3）:
   1. SELECT updated_at, parsed_data FROM working_paper WHERE id = wp_id FOR UPDATE
-  2. IF opened_at < updated_at → raise WritebackConflict(updated_at, last_editor)
-  3. 定位 parsed_data['univer_snapshot']['sheets'][sheet_name]['cellData'][row][col]
-  4. old_value = cellData[row][col].get('v')
-  5. cellData[row][col]['v'] = new_value
-  6. UPDATE working_paper SET parsed_data = :new_pd, updated_at = NOW(), prefill_stale = True
+  2. Belt+suspenders project_id 归属校验
+  3. IF opened_at < updated_at → raise WritebackConflict(updated_at, last_editor)（乐观锁）
+  4. **写回前解析 addr_id 身份**：经 full_resolve（AddressingService，5s 超时）解析目标为
+     canonical `{wp_code}/{sheet_code}/{coordinate_key}`（R3.1）。
+       - 无法解析 → 中止、不改任何数据、`TARGET_UNRESOLVABLE`（R3.4）
+       - resolve 不可用/5s 无响应 → 中止、数据不变、`RESOLVE_UNAVAILABLE`（R3.5）
+  5. 定位 cellData[row][col]，old_value = cellData[row][col].get('v')，写入 new_value
+  6. UPDATE working_paper SET parsed_data = :new_pd（orchestrator 负责 stale/updated_at/version）
   7. 同步更新 xlsx cache（run_in_executor + openpyxl write）
-  8. emit event_bus('cross-ref:updated', {wp_code, sheet, cell_ref, new_value})
-  9. audit_logger.log_action('custom_query.cell_writeback', ...)  # 不节流
-  10. COMMIT
-  11. resolve addr_id via ACNR（带 project context）→ 附加到返回结果
+  8. orchestrator.after_save（file_version++ / prefill_stale / updated_at / WORKPAPER_SAVED 事件）
+  9. 落 advanced_query_writeback（addr_id 身份 + old/new + operator + result，R3.1/R14.3）
+ 10. **无审计不回写**：audit_logger.log_action('custom_query.cell_writeback', ...) 纳入事务成功
+     判定 —— 审计写入失败 → 回滚回写改动、`AUDIT_WRITE_FAILED`（R14.8）
+ 11. 组装 addr_id + column_metadata 返回（R3.2/R3.3，chip 可下钻到格）
+
+任一步失败 → 整事务回滚至开始前状态，不残留部分写入（R3.6/R14.5，"无审计不回写"）。
 """
 
 import asyncio
@@ -30,11 +36,22 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+# ─── 错误码（与 design.md Error Handling 表 / addressing_service 对齐）─────────
+
+# 回写目标无法解析为有效 addr_id → 中止、不改数据（R3.4）
+ERR_CODE_TARGET_UNRESOLVABLE = "TARGET_UNRESOLVABLE"
+# resolve 不可用/5s 无响应 → 中止、数据不变（R3.5）
+ERR_CODE_RESOLVE_UNAVAILABLE = "RESOLVE_UNAVAILABLE"
+# 审计写入失败 → 回滚回写改动（R14.8「无审计不回写」）
+ERR_CODE_AUDIT_WRITE_FAILED = "AUDIT_WRITE_FAILED"
 
 
 # ─── Exceptions ──────────────────────────────────────────────────────────────
@@ -57,6 +74,49 @@ class WritebackPermissionDenied(Exception):
     def __init__(self, reason: str):
         self.reason = reason
         super().__init__(reason)
+
+
+class WritebackTargetUnresolvable(Exception):
+    """回写目标无法被 Resolve_Service 解析为有效 addr_id（R3.4）。
+
+    字段缺失 / 格式非法 / 目标格不存在 → 中止回写、不修改任何数据。
+    携带 `error_code=TARGET_UNRESOLVABLE` 供 router 转 HTTP 400。
+    """
+
+    error_code = ERR_CODE_TARGET_UNRESOLVABLE
+
+    def __init__(self, target_hint: str, message: str | None = None):
+        self.target_hint = target_hint
+        self.message = message or f"回写目标无法解析为有效 addr_id：{target_hint}"
+        super().__init__(self.message)
+
+
+class WritebackResolveUnavailable(Exception):
+    """Resolve_Service 不可用或 5 秒内无响应（R3.5）。
+
+    中止回写、保持数据不变。携带 `error_code=RESOLVE_UNAVAILABLE` 供 router 转 HTTP 503。
+    """
+
+    error_code = ERR_CODE_RESOLVE_UNAVAILABLE
+
+    def __init__(self, target_hint: str, message: str | None = None):
+        self.target_hint = target_hint
+        self.message = message or f"解析服务不可用或超时，回写已中止：{target_hint}"
+        super().__init__(self.message)
+
+
+class AuditWriteFailed(Exception):
+    """回写成功但审计写入失败（R14.8「无审计不回写」）。
+
+    把 `log_action` 纳入回写事务成功判定 —— 审计失败即回滚回写改动。
+    携带 `error_code=AUDIT_WRITE_FAILED` 供 router 转 HTTP 500 并回滚。
+    """
+
+    error_code = ERR_CODE_AUDIT_WRITE_FAILED
+
+    def __init__(self, message: str | None = None):
+        self.message = message or "审计日志写入失败，回写已回滚（无审计不回写）。"
+        super().__init__(self.message)
 
 
 # ─── Cell reference parsing ──────────────────────────────────────────────────
@@ -177,14 +237,18 @@ class SnapshotWriter:
     ) -> dict:
         """写回 workpaper parsed_data['univer_snapshot']。
 
-        Steps:
+        Steps (11 步事务，advanced-query Task 15.3):
           1. SELECT FOR UPDATE
           2. Belt+suspenders project_id validation
           3. 乐观锁比对
-          4. 定位 cellData[row][col]
-          5. 更新 JSONB + prefill_stale
-          6. 同步 xlsx cache (run_in_executor)
-          7. emit cross-ref:updated
+          4. **写回前解析 addr_id 身份**（full_resolve/AddressingService）— 无法解析/不可用即中止，不改数据
+          5. 定位 cellData[row][col] + 写入 new_value
+          6. 更新 JSONB
+          7. 同步 xlsx cache (run_in_executor)
+          8. orchestrator.after_save（version/stale/updated_at/event）
+          9. 落 advanced_query_writeback（addr_id 身份）
+         10. 审计 log_action 纳入事务成功判定（失败 → 回滚 + AUDIT_WRITE_FAILED）
+         11. 组装 addr_id + column_metadata 返回
         """
         # Step 1: SELECT FOR UPDATE
         result = await db.execute(
@@ -208,13 +272,12 @@ class SnapshotWriter:
 
         # Step 2: Belt+suspenders — verify project_id matches
         if project_id and row_project_id:
-            from uuid import UUID
             expected_pid = UUID(project_id) if isinstance(project_id, str) else project_id
             actual_pid = UUID(str(row_project_id)) if not isinstance(row_project_id, UUID) else row_project_id
             if expected_pid != actual_pid:
                 raise WritebackPermissionDenied("Project mismatch")
 
-        # Step 2: 乐观锁比对
+        # Step 3: 乐观锁比对
         # 确保 opened_at 和 current_updated_at 都是 aware 或都是 naive 进行比较
         opened_at_cmp = opened_at.replace(tzinfo=None) if opened_at.tzinfo else opened_at
         updated_at_cmp = current_updated_at.replace(tzinfo=None) if current_updated_at and hasattr(current_updated_at, 'tzinfo') and current_updated_at.tzinfo else current_updated_at
@@ -227,7 +290,22 @@ class SnapshotWriter:
                 latest_editor=last_editor,
             )
 
-        # Step 3: 定位 cellData
+        # Step 4: 写回前解析 addr_id 身份（R3.1/R3.4/R3.5）——必须在任何数据改动之前。
+        # 无法解析 → TARGET_UNRESOLVABLE、不改数据；resolve 不可用/超时 → RESOLVE_UNAVAILABLE、数据不变。
+        resolved = await self._resolve_writeback_identity(
+            db=db,
+            wp_code=wp_code,
+            sheet_name=sheet_name,
+            cell_ref=cell_ref,
+            project_id=project_id or (str(row_project_id) if row_project_id else None),
+        )
+        if resolved.error == "resolve_unavailable":
+            raise WritebackResolveUnavailable(f"{wp_code}/{sheet_name}/{cell_ref}")
+        if not resolved.found or not resolved.addr_id:
+            raise WritebackTargetUnresolvable(f"{wp_code}/{sheet_name}/{cell_ref}")
+        addr_id = resolved.addr_id
+
+        # Step 5: 定位 cellData
         row_idx, col_idx = _parse_cell_ref(cell_ref)
         snapshot = parsed_data.get("univer_snapshot", {})
         sheets = snapshot.get("sheets", {})
@@ -251,7 +329,7 @@ class SnapshotWriter:
         if target_sheet is None:
             raise ValueError(f"Sheet '{sheet_name}' not found in snapshot")
 
-        # Step 4: 获取旧值并写入新值
+        # Step 5: 获取旧值并写入新值
         cell_data = target_sheet.setdefault("cellData", {})
         row_key = str(row_idx)
         col_key = str(col_idx)
@@ -261,7 +339,7 @@ class SnapshotWriter:
         old_value = cell_obj.get("v")
         cell_obj["v"] = new_value
 
-        # Step 5: 更新 JSONB（parsed_data 先写入，orchestrator 负责 prefill_stale/updated_at/version）
+        # Step 6: 更新 JSONB（parsed_data 先写入，orchestrator 负责 prefill_stale/updated_at/version）
         now = datetime.now(timezone.utc)
         await db.execute(
             text("""
@@ -272,7 +350,7 @@ class SnapshotWriter:
             {"new_pd": json.dumps(parsed_data, ensure_ascii=False), "wp_id": wp_id},
         )
 
-        # Step 6: 同步更新 xlsx cache (run_in_executor)
+        # Step 7: 同步更新 xlsx cache (run_in_executor)
         if file_path:
             try:
                 await asyncio.get_event_loop().run_in_executor(
@@ -283,8 +361,8 @@ class SnapshotWriter:
             except Exception as e:
                 logger.warning("xlsx cache update failed (non-fatal): %s", e)
 
-        # Step 7: 统一后处理 — 使用 orchestrator 替代孤立本地 EventBus
-        # orchestrator 负责: file_version++, prefill_stale, updated_at, audit log, event_bus.publish
+        # Step 8: 统一后处理 — 使用 orchestrator 替代孤立本地 EventBus
+        # orchestrator 负责: file_version++, prefill_stale, updated_at, event_bus.publish
         try:
             from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
 
@@ -303,45 +381,59 @@ class SnapshotWriter:
                         "wp_code": wp_code,
                         "sheet_name": sheet_name,
                         "cell_ref": cell_ref,
+                        "addr_id": addr_id,
                     },
                 )
                 now = wp_obj.updated_at  # 使用 orchestrator 设置的 updated_at
         except Exception as exc:
             logger.warning("orchestrator.after_save failed (non-fatal): %s", exc)
 
-        # Step 8: ACNR addr_id 解析（M2, R15.1, R15.2, R15.4）
-        # 回写身份从裸坐标 (wp_id, sheet_name, cell_ref) 升级为 canonical addr_id
-        acnr_result = self._resolve_addr_id(
+        # Step 9: 落 advanced_query_writeback（回写身份 addr_id 存储，R3.1/R14.3）
+        # 以 canonical addr_id 作为回写身份，取代裸 (wp_id, sheet_name, cell_ref)
+        await self._persist_writeback_record(
+            db,
+            project_id=project_id or (str(row_project_id) if row_project_id else None),
+            addr_id=addr_id,
+            wp_id=wp_id,
+            old_value=old_value,
+            new_value=new_value,
+            operator_id=getattr(user, "id", None),
+            result="success",
+        )
+
+        # Step 10: 无审计不回写（R14.8）——审计写入纳入事务成功判定。
+        # 审计失败 → 抛 AuditWriteFailed，由 router 回滚回写改动（数据不变）。
+        await self._audit_writeback(
+            user=user,
+            wp_id=wp_id,
             wp_code=wp_code,
             sheet_name=sheet_name,
             cell_ref=cell_ref,
+            addr_id=addr_id,
+            old_value=old_value,
+            new_value=new_value,
+            project_id=project_id or (str(row_project_id) if row_project_id else None),
+        )
+
+        # Step 11: 组装 addr_id + column_metadata 返回（R3.2/R3.3 + R4/R15.2 下钻）
+        column_metadata = self._build_column_metadata(
+            addr_id=addr_id,
+            cell_ref=cell_ref,
+            resolved=resolved,
+            wp_code=wp_code,
+            sheet_name=sheet_name,
             project_id=project_id,
         )
 
-        result = {
+        return {
             "success": True,
             "updated_at": now.isoformat(),
             "old_value": old_value,
+            "addr_id": addr_id,
+            "column_metadata": column_metadata,
+            # audit 已在事务内记录（R14.8），告知 router 勿重复记审计
+            "audit_logged": True,
         }
-
-        # R15.1: 存储 addr_id 而非裸 (wp_id, sheet_name, cell_ref)
-        # R15.2: 列元数据挂 addr_id，chip 可下钻到格
-        if acnr_result:
-            result["addr_id"] = acnr_result["addr_id"]
-            result["column_metadata"] = acnr_result.get("column_metadata")
-        else:
-            # 降级：ACNR 未命中时仍返回构造的 addr_id（最大努力）
-            fallback_addr_id = f"{wp_code}/{sheet_name}/{cell_ref}" if wp_code else None
-            result["addr_id"] = fallback_addr_id
-            result["column_metadata"] = {
-                "addr_id": fallback_addr_id,
-                "display_label": fallback_addr_id,
-                "cell_address": cell_ref,
-                "sheet_addr_id": f"{wp_code}/{sheet_name}" if wp_code else None,
-                "drilldown_enabled": False,
-            } if fallback_addr_id else None
-
-        return result
 
     # ─── report 模块写回 ─────────────────────────────────────────────────
 
@@ -627,6 +719,169 @@ class SnapshotWriter:
         except Exception as e:
             logger.warning("_sync_update_xlsx_cache error: %s", e)
 
+    # ─── addr_id 身份解析 / 持久化 / 审计（advanced-query Task 15.3）──────
+
+    async def _resolve_writeback_identity(
+        self,
+        db: AsyncSession | None,
+        wp_code: str,
+        sheet_name: str,
+        cell_ref: str,
+        project_id: str | None = None,
+    ):
+        """写回前经 full_resolve（AddressingService）解析 canonical addr_id 身份（R3.1）。
+
+        统一消费 ACNR 单一 resolve 出口（5s 超时、携带 project context），返回
+        ``ResolvedTarget``：
+          - ``found=True`` → ``addr_id`` = ``{wp_code}/{sheet_code}/{coordinate_key}``（R3.1/R3.2）
+          - ``error="resolve_unavailable"`` → resolve 不可用/超时（R3.5）
+          - ``found=False`` → 无法解析（R3.4）
+
+        缺 ``wp_code`` 时无法构成寻址身份，直接归为不可解析。
+        """
+        from app.services.custom_query.addressing_service import (
+            ResolvedTarget,
+            addressing_service,
+        )
+
+        # 无 wp_code → 无法构成 {wp_code}/{sheet_code}/{coordinate_key} 身份（R3.4）
+        if not wp_code:
+            return ResolvedTarget(
+                raw=f"/{sheet_name}/{cell_ref}", found=False, error="unresolvable"
+            )
+
+        # 裸 addr_id 形态交由 AddressingService 归类 → full_resolve（含 sheet 别名匹配）
+        raw = f"{wp_code}/{sheet_name}/{cell_ref}"
+        return await addressing_service.resolve_target(
+            raw, project_id=project_id, db=db
+        )
+
+    async def _persist_writeback_record(
+        self,
+        db: AsyncSession,
+        *,
+        project_id: str | None,
+        addr_id: str,
+        wp_id: str | None,
+        old_value: Any,
+        new_value: Any,
+        operator_id: Any,
+        result: str,
+    ) -> None:
+        """将回写身份 addr_id + 新旧值落 advanced_query_writeback（R3.1/R14.3）。
+
+        本表以 canonical addr_id 作回写身份（与 WP() 公式引用同一身份），供 stale
+        chip 追踪对齐与快照列下钻的结构化索引。属于回写事务的一部分（只 flush 不
+        commit），插入失败 → 传播异常 → router 回滚（不残留部分写入，R3.6）。
+        """
+        from app.models.custom_query_models import AdvancedQueryWriteback
+
+        record = AdvancedQueryWriteback(
+            project_id=_as_uuid(project_id),
+            addr_id=addr_id,
+            wp_id=_as_uuid(wp_id),
+            old_value=_jsonable(old_value),
+            new_value=_jsonable(new_value),
+            operator_id=_as_uuid(operator_id),
+            result=result,
+        )
+        db.add(record)
+        await db.flush()
+
+    async def _audit_writeback(
+        self,
+        *,
+        user: Any,
+        wp_id: str | None,
+        wp_code: str,
+        sheet_name: str,
+        cell_ref: str,
+        addr_id: str,
+        old_value: Any,
+        new_value: Any,
+        project_id: str | None,
+    ) -> None:
+        """把 log_action 纳入回写事务成功判定（R14.8「无审计不回写」）。
+
+        回写与跨 sheet 溯源逐次记录（不节流），记录操作者/UTC 秒级时间戳/操作类型/
+        目标 addr_id/新旧值/结果。审计写入失败（log_action 抛错）→ 抛 ``AuditWriteFailed``，
+        由 router 回滚回写改动（数据不变）。
+        """
+        try:
+            from app.services.audit_logger_enhanced import audit_logger
+
+            await audit_logger.log_action(
+                user_id=getattr(user, "id", None),
+                action="custom_query.cell_writeback",
+                object_type="working_paper",
+                object_id=wp_id,
+                project_id=project_id,
+                details={
+                    "wp_code": wp_code,
+                    "sheet_name": sheet_name,
+                    "cell_ref": cell_ref,
+                    "addr_id": addr_id,
+                    "old_value": old_value,
+                    "new_value": new_value,
+                    "result": "success",
+                },
+            )
+        except Exception as exc:
+            # 无审计不回写：审计失败即视为回写失败，回滚回写改动（R14.8）
+            logger.error(
+                "writeback audit log failed → 回滚回写 (无审计不回写): addr_id=%s err=%s",
+                addr_id, exc,
+            )
+            raise AuditWriteFailed() from exc
+
+    def _build_column_metadata(
+        self,
+        *,
+        addr_id: str,
+        cell_ref: str,
+        resolved: Any,
+        wp_code: str,
+        sheet_name: str,
+        project_id: str | None,
+    ) -> dict:
+        """构造结果列元数据（R3.2/R3.3 + R4/R15.2 下钻）。
+
+        以 full_resolve 解析出的 canonical addr_id 为身份；display_label / drilldown
+        经 catalog 尽力增强（语义标签），失败不阻塞（保留 addr_id 基线可下钻）。
+        """
+        sheet_addr_id = "/".join(addr_id.split("/")[:2]) if addr_id else None
+        entry_type = getattr(resolved, "entry_type", None)
+        jump_route = getattr(resolved, "jump_route", None)
+        drilldown_enabled = bool(jump_route) or entry_type in ("cell", "runtime_cell")
+
+        metadata = {
+            "addr_id": addr_id,
+            "display_label": addr_id,
+            "cell_address": cell_ref,
+            "sheet_addr_id": sheet_addr_id,
+            "drilldown_enabled": drilldown_enabled,
+            "jump_route": jump_route,
+        }
+
+        # 尽力经 catalog 增强语义标签（不改变身份，失败降级保留基线）
+        try:
+            enrich = self._resolve_addr_id(
+                wp_code=wp_code,
+                sheet_name=sheet_name,
+                cell_ref=cell_ref,
+                project_id=project_id,
+            )
+            if enrich and enrich.get("column_metadata"):
+                cm = enrich["column_metadata"]
+                if cm.get("display_label"):
+                    metadata["display_label"] = cm["display_label"]
+                if cm.get("drilldown_enabled"):
+                    metadata["drilldown_enabled"] = True
+        except Exception as exc:  # 增强失败不阻塞（身份已由 full_resolve 确定）
+            logger.debug("column_metadata enrich skipped: %s", exc)
+
+        return metadata
+
     # ─── ACNR addr_id 解析（M2, R15.1, R15.2, R15.4）────────────────────
 
     def _resolve_addr_id(
@@ -756,6 +1011,28 @@ class SnapshotWriter:
             # ACNR 解析失败不阻塞写回主流程（降级策略）
             logger.warning("ACNR addr_id resolve error (non-fatal): %s", e)
             return None
+
+
+# ─── 模块级辅助 ──────────────────────────────────────────────────────────────
+
+
+def _as_uuid(value: Any) -> UUID | None:
+    """尽力将值转为 UUID；None → None；无法转换则原样返回（交由 DB 层处理）。"""
+    if value is None:
+        return None
+    if isinstance(value, UUID):
+        return value
+    try:
+        return UUID(str(value))
+    except (ValueError, TypeError, AttributeError):
+        return value  # type: ignore[return-value]
+
+
+def _jsonable(value: Any) -> Any:
+    """将 cell 值规范为 JSONB 可存形态（标量/列表/字典直存，其余转字符串）。"""
+    if value is None or isinstance(value, (str, int, float, bool, list, dict)):
+        return value
+    return str(value)
 
 
 # 模块级单例

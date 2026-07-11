@@ -34,7 +34,9 @@ async def test_build_custom_wp_cell_entries_formula_ref():
     }
     db = AsyncMock()
     db.execute = AsyncMock(
-        return_value=_FakeRows([(parsed, "CUST-01", "测试自定义底稿")])
+        return_value=_FakeRows(
+            [("00000000-0000-0000-0000-000000000001", parsed, "CUST-01", "测试自定义底稿")]
+        )
     )
 
     entries = await _build_custom_wp_cell_entries(db, str(project_id), 2025)
@@ -51,7 +53,11 @@ async def test_build_custom_wp_cell_entries_formula_ref():
 @pytest.mark.anyio
 async def test_build_custom_wp_cell_entries_skips_bad_wp_code():
     db = AsyncMock()
-    db.execute = AsyncMock(return_value=_FakeRows([(None, "", "无名")]))
+    db.execute = AsyncMock(
+        return_value=_FakeRows(
+            [("00000000-0000-0000-0000-000000000001", None, "", "无名")]
+        )
+    )
     entries = await _build_custom_wp_cell_entries(db, str(uuid.uuid4()), 2025)
     assert entries == []
 

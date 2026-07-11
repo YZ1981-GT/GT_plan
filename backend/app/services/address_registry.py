@@ -563,6 +563,7 @@ async def _build_custom_wp_cell_entries(
         rows = (
             await db.execute(
                 sa.select(
+                    WorkingPaper.id,
                     WorkingPaper.parsed_data,
                     WpIndex.wp_code,
                     WpIndex.wp_name,
@@ -579,9 +580,10 @@ async def _build_custom_wp_cell_entries(
         logger.warning("_build_custom_wp_cell_entries query error: %s", e)
         return entries
 
-    for parsed_data, wp_code, wp_name in rows:
+    for wp_id, parsed_data, wp_code, wp_name in rows:
         if not wp_code:
             continue
+        custom_cells: list[dict] = []
         try:
             for rec in extract_custom_cells(parsed_data):
                 uri = build_uri("wp", wp_code, path=rec.cell)
@@ -604,11 +606,41 @@ async def _build_custom_wp_cell_entries(
                         tags=["底稿", "自定义", rec.row_label] if rec.row_label else ["底稿", "自定义"],
                     )
                 )
+                # 收集 cells 供 ACNR L3 runtime 登记（custom_flat profile）
+                custom_cells.append(
+                    {
+                        "cell_address": rec.cell,
+                        "wp_code": wp_code,
+                        "semantic_label": rec.row_label or "",
+                    }
+                )
         except Exception as e:
             logger.warning(
                 "custom wp cell entries skip wp_code=%s: %s", wp_code, e
             )
             continue
+
+        # ── ACNR L3 runtime 登记（strangler-fig 附加，不删旧路径）──────────
+        # 在 legacy AddressEntry 产出后追加调 register_custom，使自定义格可经
+        # full_resolve(formula_ref=WP('wp','wp','cell')) 命中（Req 12.1-12.4）。
+        # 单 wp 失败仅 warning + continue，绝不影响其余 wp 或已产出的 legacy 条目。
+        if custom_cells and wp_id is not None:
+            try:
+                from app.services.acnr.runtime import (
+                    register_custom as _acnr_register_custom,
+                )
+
+                await _acnr_register_custom(
+                    db,
+                    str(project_id),
+                    str(wp_id),
+                    custom_cells,
+                    addr_profile="custom_flat",
+                )
+            except Exception as e:
+                logger.warning(
+                    "ACNR L3 register_custom skip wp_code=%s: %s", wp_code, e
+                )
 
     return entries
 

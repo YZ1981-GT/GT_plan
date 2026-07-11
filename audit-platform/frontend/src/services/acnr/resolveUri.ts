@@ -147,17 +147,26 @@ export interface ParsedIndexRef {
   target: string
 }
 
-/** 索引命名空间引用正则: ns:target */
-const RE_INDEX_REF = /^(wp|sheet|cell|TB|Note|Adj|Att|EQCR|Calc|Sample|Confirm):(.+)$/
+/** 索引命名空间引用正则: ns:target
+ * NOTE 域额外接受小写 `note`（acnr-consumer-wiring task 22.1/31.2 的
+ * `note:{section}` 形态；后端 full_resolve V1-delegation 接受小写 note:）；
+ * parseIndexRef 归一化为 canonical `Note`，与 utils/parseIndexRef 及 11 命名空间
+ * parity 一致（resolveIndex 转发原始 index_ref 字符串，不受归一化影响）。 */
+const RE_INDEX_REF = /^(wp|sheet|cell|TB|Note|note|Adj|Att|EQCR|Calc|Sample|Confirm):(.+)$/
+
+/** 命名空间归一化：小写 `note` → canonical `Note`（其余原样，保持 11 命名空间集合）。 */
+function _canonicalNamespace(ns: string): string {
+  return ns === 'note' ? 'Note' : ns
+}
 
 /**
- * 解析索引命名空间语法 (如 cell:D2-2!E100, TB:1001)
+ * 解析索引命名空间语法 (如 cell:D2-2!E100, TB:1001, note:五-1)
  */
 export function parseIndexRef(indexRef: string): ParsedIndexRef | null {
   if (!indexRef) return null
   const m = indexRef.match(RE_INDEX_REF)
   if (!m) return null
-  return { namespace: m[1], target: m[2] }
+  return { namespace: _canonicalNamespace(m[1]), target: m[2] }
 }
 
 /**

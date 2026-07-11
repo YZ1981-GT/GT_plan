@@ -261,7 +261,14 @@
             @cell-contextmenu="onReportCellContextMenu">
             <el-table-column prop="row_code" label="行次" width="80" align="center">
               <template #default="{ row }">
-                <span style="white-space:nowrap">{{ row.row_code }}</span>
+                <!-- 报表行 account 引用经 ACNR TB 域可解析 → GtIndexChip（REPORT/TB 域，Req 20.1/20.2）；miss 回退纯文本（Req 20.7/20.9） -->
+                <GtIndexChip
+                  v-if="reportAccountChip(row)"
+                  :value="reportAccountChip(row) as string"
+                  :context-project-id="projectId"
+                  context="经 ACNR TB 域解析跳转到试算表科目"
+                />
+                <span v-else style="white-space:nowrap">{{ row.row_code }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="row_name" label="项目" min-width="300">
@@ -350,6 +357,10 @@
           <el-button size="small" @click="copyDrillDownTable">📋 复制</el-button>
         </el-tooltip>
         <el-button size="small" @click="exportDrillDown">📤 导出</el-button>
+        <!-- consolBreakdown drill：经 ACNR TB 域解析取 jump_route 后跳转到试算表科目（Req 20.1）；miss 时不显示 -->
+        <el-tooltip v-if="drillDownJumpRoute" content="经 ACNR TB 域跳转到该科目试算表" placement="bottom">
+          <el-button size="small" type="primary" @click="onConsolBreakdownJump">🔗 跳转科目</el-button>
+        </el-tooltip>
       </div>
 
       <!-- 正常视图 -->
@@ -503,6 +514,8 @@ import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtInfoBar from '@/components/common/GtInfoBar.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { useConsolReportAddress } from '@/components/consolidation/composables/useConsolReportAddress'
 import ReportEquityTable from '@/components/report/ReportEquityTable.vue'
 import { useReportColumns } from '@/views/composables/useReportColumns'
 import { handleApiError } from '@/utils/errorHandler'
@@ -723,6 +736,9 @@ const showCellDrillDown = ref(false)
 const drillDownLoading = ref(false)
 const drillDownLevel = ref<'direct' | 'leaf'>('direct')
 const drillDownCell = reactive({ itemName: '', colName: '', totalValue: 0 as number | null, sectionId: '', rowIdx: -1, colIdx: -1 })
+// consolBreakdown drill：当前穿透科目的 ACNR TB 域 jump_route（Req 20.1），miss 时为 null
+const drillDownAccountCode = ref('')
+const drillDownJumpRoute = ref<string | null>(null)
 const drillDownDirectRows = ref<any[]>([])
 const drillDownLeafRows = ref<any[]>([])
 const drillDownTransposed = ref(false)
@@ -839,6 +855,9 @@ function openCellDrillDown() {
 }
 
 async function loadDrillDownData() {
+  // 每次穿透先清空 consolBreakdown drill 的 jump_route（避免上次残留，Req 20.1）
+  drillDownJumpRoute.value = null
+  drillDownAccountCode.value = ''
   if (!drillDownCell.itemName || drillDownCell.itemName.startsWith('请')) {
     drillDownDirectRows.value = []
     drillDownLeafRows.value = []
@@ -848,13 +867,20 @@ async function loadDrillDownData() {
   try {
     // 确定当前查看的报表类型和行次
     const reportType = activeTab.value === 'consol_tb' ? consolTbType.value : consolReportType.value
-    const rowCode = selectedCells.value.length ? (() => {
-      const cell = selectedCells.value[0]
-      // 从试算表或报表行中提取 row_code
-      const sourceRows = activeTab.value === 'consol_tb' ? consolTbRows.value : consolReportRows.value
-      return sourceRows[cell.row]?.row_code || ''
-    })() : ''
+    const sourceRows = activeTab.value === 'consol_tb' ? consolTbRows.value : consolReportRows.value
+    const selectedRow = selectedCells.value.length ? sourceRows[selectedCells.value[0].row] : null
+    const rowCode = selectedRow?.row_code || ''
     const colField = drillDownCell.colName?.includes('上期') ? 'prior_period_amount' : 'current_period_amount'
+
+    // consolBreakdown drill：account_code 经 ACNR TB 域解析取 jump_route（Req 20.1）。
+    // 数值穿透仍走既有 P_rc.drillDown（逻辑不变，Req 20.9）；此处仅附加地址跳转能力，miss 回退纯文本。
+    const acctCode = consolReportAddr.accountForRow(selectedRow) || (activeTab.value === 'consol_tb' ? (selectedRow?.standard_account_code || '') : '')
+    drillDownAccountCode.value = acctCode
+    if (acctCode) {
+      consolReportAddr.resolveAccountJump(acctCode).then((r) => {
+        drillDownJumpRoute.value = r.found ? r.jumpRoute : null
+      }).catch(() => { drillDownJumpRoute.value = null })
+    }
 
     // 调用后端真实穿透 API
     const data = await api.post(P_rc.drillDown, {
@@ -908,6 +934,18 @@ async function loadDrillDownData() {
     }
   } catch { drillDownDirectRows.value = []; drillDownLeafRows.value = [] }
   finally { drillDownLoading.value = false }
+}
+
+/**
+ * consolBreakdown drill 跳转：使用 ACNR TB 域解析得到的 jump_route 打开试算表科目（Req 20.1/20.2）。
+ * jump_route 由 `resolveAccountJump` 经 ACNR 统一出口取得（不自行拼底稿路由，R7.3 铁律）；
+ * 含 {project_id} 占位符则替换。miss 时按钮不显示，故此处 route 必非空。
+ */
+function onConsolBreakdownJump() {
+  const route = drillDownJumpRoute.value
+  if (!route) { ElMessage.warning('该科目地址已失效'); return }
+  const finalRoute = route.replace('{project_id}', projectId.value)
+  window.open(finalRoute, '_blank', 'noopener')
 }
 
 function drillDownSummary({ columns, data }: any) {
@@ -1164,6 +1202,16 @@ const currentReportLabel = computed(() => {
   return reportNavItems.find(i => i.key === consolReportType.value)?.label || '合并报表'
 })
 const consolReportRows = ref<any[]>([])
+
+// ─── 合并报表 报表行 / account 引用 → ACNR REPORT/TB 域（Req 20.1/20.2/20.7/20.9）──
+// 报表行地址/坐标名称真源收敛到 ACNR-backed 注册表；account 引用经 TB 域解析取 jump_route。
+// 仅改地址/跳转来源，不改报表数值/生成/balance-check 逻辑（Req 20.9）。
+const consolReportAddr = useConsolReportAddress()
+/** 报表行 行次 单元格：可经 ACNR TB 域解析的 account 引用 → GtIndexChip 索引语法；否则 null 回退纯文本。 */
+function reportAccountChip(row: any): string | null {
+  return consolReportAddr.accountIndexRef(consolReportAddr.accountForRow(row))
+}
+
 const showConsolConversion = ref(false)
 const consolMappingLoading = ref(false)
 const consolMappingRules = ref<any[]>([])

@@ -480,9 +480,12 @@ import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import * as P from '@/services/apiPaths'
 import type { WpFormulaContext } from '@/components/workpaper/GtCustomWpEditor.vue'
-import { filterWpBrowserRows, mapRegistryToPickerRows } from '@/utils/wpFormulaPicker'
+import { filterWpBrowserRows, mapRegistryToPickerRows, mapAcnrCellsToPickerRows } from '@/utils/wpFormulaPicker'
+import { useAcnr } from '@/services/acnr/useAcnr'
 
 const route = useRoute()
+// ACNR 前端 SDK（acnr-consumer-wiring Req 14.3/14.5, task 18.3）
+const acnr = useAcnr()
 
 interface FormulaItem {
   expression: string
@@ -833,18 +836,11 @@ async function loadWorkingPapersFallback() {
   }
 }
 
-// ── 底稿浏览（地址注册表 WP 域，失败则降级） ──
-async function openSourceBrowserForWP() {
-  sourceBrowserTitle.value = '底稿单元格'
-  sourceBrowserSearch.value = ''
-  showSourceBrowser.value = true
-  sourceBrowserLoading.value = true
-  sourceBrowserRefBuilder.value = (r: any) =>
-    r._ref || `WP('${r.row_code || ''}','审定数')`
+// ── 底稿浏览（legacy 地址注册表 WP 域，作为 ACNR 回退） ──
+async function loadWpFromLegacyRegistry() {
   const pid = resolveProjectId()
   if (!pid) {
     await loadWorkingPapersFallback()
-    sourceBrowserLoading.value = false
     return
   }
   try {
@@ -860,6 +856,40 @@ async function openSourceBrowserForWP() {
     }
   } catch {
     await loadWorkingPapersFallback()
+  }
+}
+
+// ── 底稿单元格浏览（ACNR listCells 优先，空/失败则降级 legacy）──
+// acnr-consumer-wiring Req 14.3/14.5：WP 源浏览改用 ACNR listCells，
+// pickerRowsSubsetOfRegistry 语义变为 subset-of-ACNR-listCells。
+async function openSourceBrowserForWP() {
+  sourceBrowserTitle.value = '底稿单元格'
+  sourceBrowserSearch.value = ''
+  showSourceBrowser.value = true
+  sourceBrowserLoading.value = true
+  sourceBrowserRefBuilder.value = (r: any) =>
+    r._ref || `WP('${r.row_code || ''}','审定数')`
+  try {
+    // ACNR catalog：列出所有 WP sheet，逐 sheet 拉坐标锚点后拍平
+    const sheets = await acnr.listSheets()
+    const wpSheets = sheets.filter(
+      (s) => !s.domain || s.domain.toLowerCase() === 'wp',
+    )
+    const cellLists = await Promise.all(
+      wpSheets.map((s) =>
+        acnr.listCells(s.parent_wp_code, s.sheet_code).catch(() => []),
+      ),
+    )
+    const allCells = cellLists.flat()
+    const rows = mapAcnrCellsToPickerRows(allCells)
+    if (rows.length) {
+      sourceBrowserRows.value = rows
+      return
+    }
+    // ACNR 空 → 回退 legacy 地址注册表 / 底稿列表
+    await loadWpFromLegacyRegistry()
+  } catch {
+    await loadWpFromLegacyRegistry()
   } finally {
     sourceBrowserLoading.value = false
   }

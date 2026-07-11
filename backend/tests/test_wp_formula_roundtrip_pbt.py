@@ -97,7 +97,7 @@ class TestP12FormulaRoundtrip:
                 wp_id = uuid.uuid4()
 
                 with patch(
-                    "app.services.wp_formula_service.address_registry.validate_formula_refs",
+                    "app.services.wp_formula_service.validate_refs_via_acnr",
                     new_callable=AsyncMock,
                     return_value=[],
                 ):
@@ -158,7 +158,7 @@ class TestP12FormulaRoundtrip:
                 wp_id = uuid.uuid4()
 
                 with patch(
-                    "app.services.wp_formula_service.address_registry.validate_formula_refs",
+                    "app.services.wp_formula_service.validate_refs_via_acnr",
                     new_callable=AsyncMock,
                     return_value=[],
                 ):

@@ -11,13 +11,14 @@
       <span v-if="samplingInfo" class="sampling-info">
         抽样方法: {{ samplingInfo.method }} | 样本量: {{ samplingInfo.count }}
       </span>
-      <el-button
+      <GtVoucherSamplingEngine
         v-if="!isReadonly && wpId && projectId"
-        size="small"
-        type="primary"
-        :icon="ElIconMagicStick"
-        @click="samplingDialogVisible = true"
-      >使用抽凭引擎</el-button>
+        :project-id="projectId"
+        :account-codes="inventoryAccountCodes"
+        :phase="'final'"
+        dialog-mode
+        @filled="handleSamplingFilled"
+      />
       <el-button size="small" type="primary" :disabled="isReadonly" @click="ic.addRow()">+ 新增</el-button>
       <F2SheetToolbar
         :wp-id="wpId"
@@ -78,31 +79,11 @@
     </el-table>
 
     <footer class="footer"><h4>检查结论</h4><el-input v-model="ic.auditNote.value" type="textarea" :rows="2" :disabled="isReadonly" /></footer>
-
-    <!-- 抽凭引擎 Dialog -->
-    <el-dialog
-      v-model="samplingDialogVisible"
-      title="抽凭引擎 · 材料领用检查（存货科目 1401~1411 贷方发生）"
-      width="900px"
-      destroy-on-close
-      append-to-body
-    >
-      <GtVoucherSamplingEngine
-        :account-code="F2_INVENTORY_ACCOUNT_CODES"
-        phase="final"
-        default-method="random"
-        :workpaper-id="wpId!"
-        :project-id="projectId!"
-        :year="auditYear"
-        @filled="handleSamplingFilled"
-      />
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
-import { MagicStick as ElIconMagicStick } from '@element-plus/icons-vue'
+import { ref, toRef } from 'vue'
 import { useF2MaterialUsageCheck } from '../../composables/useF2InspectionCheck'
 import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
@@ -123,10 +104,8 @@ const ic = useF2MaterialUsageCheck({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const auditYear = computed(() => props.auditYear ?? new Date().getFullYear() - 1)
-
-/** 抽凭引擎 dialog 可见性 */
-const samplingDialogVisible = ref(false)
+/** 材料领用检查科目范围（保留原 F2_INVENTORY_ACCOUNT_CODES 值，拆为多科目数组） */
+const inventoryAccountCodes = F2_INVENTORY_ACCOUNT_CODES.split(',')
 
 /** 抽样参数区展示信息（引擎返回后自动更新） */
 const samplingInfo = ref<{ method: string; count: number } | null>(null)
@@ -147,8 +126,6 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: Fi
     method: METHOD_LABELS[payload.method || 'random'] || payload.method || '随机抽样',
     count: payload.samples.length,
   }
-  // 关闭dialog
-  samplingDialogVisible.value = false
 }
 </script>
 

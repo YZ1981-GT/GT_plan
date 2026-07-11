@@ -3,27 +3,14 @@
     <div class="f5-ma-toolbar">
       <span class="f5-ma-title">F5-8 重大调整核查表</span>
       <div class="f5-ma-actions">
+        <GtVoucherSamplingEngine :project-id="projectId" :account-codes="['6401']" dialog-mode :phase="'final'"
+          @filled="handleSamplingFilled" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
         <CycleImportExportDropdown v-if="ieCtx" :wp-id="wpId" :api-prefix="ieCtx.apiPrefix" :sheet="ieCtx.sheet"
           :disabled="isReadonly" @imported="$emit('imported')" />
         <el-button size="small" @click="openReview">💬 复核</el-button>
       </div>
     </div>
-
-    <!-- 抽凭引擎 -->
-    <el-collapse v-if="wpId && projectId && !isReadonly" class="f5-sampling">
-      <el-collapse-item title="⚡ 自动抽凭（科目 6401 营业成本，选取重大成本调整凭证）" name="sampling">
-        <GtVoucherSamplingEngine
-          account-code="6401"
-          phase="final"
-          default-method="monetary"
-          :workpaper-id="wpId"
-          :project-id="projectId"
-          :year="auditYear"
-          @filled="handleSamplingFilled"
-        />
-      </el-collapse-item>
-    </el-collapse>
 
     <el-table :data="rows" size="small" border stripe :row-class-name="rowClass" max-height="480">
       <el-table-column prop="seq" label="序号" width="56" />
@@ -98,7 +85,7 @@ import { parseNum, calcSubtotal } from '../composables/useF5CosOfFormulaEngine'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
-import type { SampledVoucher } from '../composables/useSamplingAlgorithms'
+import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 defineEmits<{ imported: [] }>()
@@ -114,7 +101,6 @@ const props = defineProps<{
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const STORAGE_KEY = 'F5-8-rows'
 const CONCLUSION_KEY = 'F5-8-conclusion'
-const auditYear = computed(() => props.auditYear ?? new Date().getFullYear())
 
 interface MajorAdjRow {
   rowId: string; seq: number; adjustmentDate: string; adjustmentItem: string
@@ -189,7 +175,8 @@ function persist() {
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
 
 /** 抽凭引擎填充：将样本凭证映射为重大调整行 */
-function handleSamplingFilled(samples: SampledVoucher[]) {
+function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode?: FillMode }) {
+  const samples = payload?.samples
   if (props.isReadonly || !Array.isArray(samples) || !samples.length) return
   const mapped: MajorAdjRow[] = samples.map((s: any, i: number) => ({
     ...emptyRow(rows.value.length + i + 1),
@@ -222,8 +209,7 @@ function openReview() { openReviewDialog('F5-8-conclusion') }
 .f5-major-adj { padding: 12px; font-size: 13px; }
 .f5-ma-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .f5-ma-title { font-weight: 600; }
-.f5-ma-actions { display: flex; gap: 8px; align-items: center; }
-.f5-sampling { margin-bottom: 12px; }
+.f5-ma-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .f5-ma-summary { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; }
 .f5-ma-summary .is-warn { color: #e6a23c; }
 .is-warn { color: #e6a23c; font-weight: 600; }

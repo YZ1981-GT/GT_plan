@@ -93,6 +93,51 @@ async def stale_impact(
     return result
 
 
+@router.get("/impact-by-addr")
+async def stale_impact_by_addr(
+    addr_id: str = Query("", description="ACNR addr_id，如 D2/D2-2/E100"),
+    max_depth: int = Query(3, ge=1, le=10, description="最大 BFS 深度"),
+    project_id: str = Query(..., description="项目 ID"),
+    year: int = Query(0, description="年度（可选）"),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """按 ACNR addr_id 查询下游影响（BFS 传播分析）。
+
+    addr_id 格式直通 StalePropagationEngine.on_change，执行 BFS 传播并返回
+    受影响 addr_id 列表。addr_id 缺失 → 400；引擎降级 → 503。
+    """
+    if not addr_id or not addr_id.strip():
+        raise HTTPException(status_code=400, detail="addr_id is required")
+
+    if stale_engine.is_degraded:
+        raise HTTPException(
+            status_code=503,
+            detail="Stale propagation engine is in degraded mode",
+        )
+
+    result = await stale_engine.on_change(
+        source_uri=addr_id,  # addr_id 格式直通
+        project_id=project_id,
+        year=year,
+    )
+
+    # 格式化响应
+    affected_list = []
+    for i, uri in enumerate(result.get("affected", [])):
+        affected_list.append({
+            "addr_id": uri,
+            "depth": min(i + 1, max_depth),  # 近似深度
+            "via_ref": None,
+            "match_type": "graph_edge",
+        })
+
+    return {
+        "addr_id": addr_id,
+        "total_affected": result.get("total", 0),
+        "affected": affected_list,
+    }
+
+
 @router.get("/graph")
 async def get_unified_graph(
     rebuild: bool = Query(False, description="是否强制重新构建"),

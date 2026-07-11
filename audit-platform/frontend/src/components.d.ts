@@ -170,6 +170,7 @@ declare module 'vue' {
     CustomCodingEditor: typeof import('./components/extension/CustomCodingEditor.vue')['default']
     CustomerInterviewDialog: typeof import('./components/workpaper/CustomerInterviewDialog.vue')['default']
     CustomQueryDialog: typeof import('./components/query/CustomQueryDialog.vue')['default']
+    CustomQueryFieldPicker: typeof import('./components/custom-query/CustomQueryFieldPicker.vue')['default']
     CustomQueryTab: typeof import('./components/template-library/CustomQueryTab.vue')['default']
     CutoffHistoryDrawer: typeof import('./components/workpaper/cutoff/CutoffHistoryDrawer.vue')['default']
     CutoffPreviewDialog: typeof import('./components/workpaper/cutoff/CutoffPreviewDialog.vue')['default']

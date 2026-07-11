@@ -30,23 +30,16 @@
       </el-form-item>
     </el-form>
 
-    <!-- 抽凭引擎折叠区 -->
-    <el-collapse v-if="wpId && projectId && !isReadonly" class="sampling-collapse">
-      <el-collapse-item title="⚡ 自动抽凭（存货科目 1401~1411）" name="sampling">
-        <GtVoucherSamplingEngine
-          account-code="1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411"
-          phase="final"
-          default-method="random"
-          :workpaper-id="wpId"
-          :project-id="projectId"
-          :year="auditYear"
-          @filled="handleSamplingFilled"
-        />
-      </el-collapse-item>
-    </el-collapse>
-
     <!-- 工具栏 -->
     <div class="toolbar">
+      <GtVoucherSamplingEngine
+        v-if="wpId && projectId && !isReadonly"
+        :project-id="projectId"
+        :account-codes="valuationAccountCodes"
+        :phase="'final'"
+        dialog-mode
+        @filled="handleSamplingFilled"
+      />
       <el-button size="small" type="primary" :disabled="isReadonly" @click="$emit('addRow')">+ 新增样本</el-button>
       <F2SheetToolbar
         :wp-id="wpId"
@@ -182,6 +175,9 @@ const activeSegment = ref(props.defaultSegment || (props.segments.length ? props
 // 虚拟滚动: >50行启用更大的maxHeight
 const tableMaxHeight = computed(() => props.displayRows.length > 50 ? 560 : 420)
 
+// 存货计价测试科目范围（保留原 account-code 值 1401~1411，不新增硬编码）
+const valuationAccountCodes = '1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411'.split(',')
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }) {
   emit('samplingFilled', payload)
 }
@@ -209,7 +205,6 @@ defineExpose({ fmt, fmtRate, isExceed, activeSegment })
 <style scoped src="./f2ValSheetStyles.css"></style>
 <style scoped>
 .sampling-form { margin-bottom: 8px; }
-.sampling-collapse { margin-bottom: 8px; }
 .totals { margin: 10px 0; font-size: 12px; color: #606266; }
 .exceed-stat { color: #f56c6c; font-weight: 600; }
 .valuation-table :deep(.formula) {

@@ -617,25 +617,30 @@ def register_event_handlers() -> None:
     logger.debug("F46 rollback downstream stale handler registered")
 
     # ── 地址坐标注册表缓存失效 ──
+    # 非 WP 域（tb/report/note）统一经 acnr.events.invalidate_domain 薄封装（Req 11.1）：
+    # 当前 behavior parity 委托 legacy address_registry.invalidate_async（Req 11.2），
+    # 未来可在 invalidate_domain 内按域清 L2/L3 overlay。invalidate_domain 内部已 try/except
+    # → warning + continue，满足 best-effort 语义（Req 11.3）。
+    from app.services.acnr import events as acnr_events
     from app.services.address_registry import address_registry
 
     async def _invalidate_addr_tb(payload):
         """调整/导入变更 → 失效试算表域缓存"""
         pid = getattr(payload, 'project_id', '')
         if pid:
-            await address_registry.invalidate_async(pid, domain='tb')
+            await acnr_events.invalidate_domain(pid, domain='tb')
 
     async def _invalidate_addr_report(payload):
         """报表更新 → 失效报表域缓存"""
         pid = getattr(payload, 'project_id', '')
         if pid:
-            await address_registry.invalidate_async(pid, domain='report')
+            await acnr_events.invalidate_domain(pid, domain='report')
 
     async def _invalidate_addr_note(payload):
         """附注章节保存 → 失效附注域缓存（NOTE(...) 地址坐标随章节数据刷新）"""
         pid = getattr(payload, 'project_id', '')
         if pid:
-            await address_registry.invalidate_async(pid, domain='note')
+            await acnr_events.invalidate_domain(pid, domain='note')
 
     # NOTE: _invalidate_addr_wp 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
     # ACNR handler 同时负责 L3 runtime + L2 overlay + 旧 address_registry WP 域失效

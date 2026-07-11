@@ -26,12 +26,16 @@ Algorithm (design.md 6.3):
     return chain
 """
 
+import asyncio
 import logging
 import re
 from collections import deque
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from app.services.acnr.resolver import ResolveResult
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +47,13 @@ class RefChainNode(BaseModel):
     """引用链中的单个节点"""
 
     depth: int  # 0..3
-    uri: str  # e.g. "审定表D2-1!A2"
+    uri: str  # 命中时为 ACNR addr_id（如 "D2/D2-1/A2"），否则 "审定表D2-1!A2"
     value: Any = None
     formula: str | None = None
     truncated: bool = False  # 第 3 层后截断
     cycle: bool = False  # 检测到循环
     missing: bool = False  # 引用目标缺失
+    resolve_missed: bool = False  # ACNR full_resolve 未命中（走 snapshot fallback）
 
 
 class RefChainResponse(BaseModel):
@@ -178,11 +183,83 @@ def _cell_ref_to_indices(cell_ref: str) -> tuple[int | None, int | None]:
     return row_idx, col_idx
 
 
+# ─── ACNR sync→async bridge (design §1) ──────────────────────────────────────
+
+
+def _sync_resolve(
+    *,
+    formula_ref: str | None = None,
+    uri: str | None = None,
+    project_id: str | None = None,
+) -> "ResolveResult | None":
+    """同步桥接 ACNR async `full_resolve`，带优雅降级（design §1 风险修复）。
+
+    `full_resolve` 是 async，而 `CrossSheetResolver.resolve` 是同步纯 BFS，且常在
+    FastAPI 请求线程 / 异步 orchestrator 内被调用（已有运行中的 event loop）。此时
+    `asyncio.run()` / `run_until_complete()` 会抛 `RuntimeError: event loop is
+    already running`。策略（design §1）：
+
+      1. 探测当前是否有 running loop：`asyncio.get_running_loop()`。
+      2. **有 running loop** → 无法安全内联桥接 → 返回 None（降级 snapshot fallback）。
+         这保持了 orchestrator/请求线程内「同步纯 BFS 无 IO」的运行时语义，异步 addr_id
+         解析由 orchestrator 的 `AddressingService` 层单独上浮完成。
+      3. **无 running loop**（纯同步上下文，如脚本/测试）→ `asyncio.run(full_resolve(...))`。
+
+    容错第一：任何桥接/解析失败一律返回 None，绝不抛异常中断 BFS（Req 1.6）。
+    """
+    try:
+        from app.services.acnr.resolver import full_resolve
+    except Exception as exc:  # pragma: no cover - import guard
+        logger.warning("ACNR resolver import failed: %s", exc)
+        return None
+
+    # Step 1-2: 探测 running loop，有则降级（不阻塞 BFS）
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        pass  # 无 running loop → 可安全 asyncio.run
+    else:
+        # 已有运行中的 loop：内联桥接不安全 → 降级 snapshot fallback
+        return None
+
+    # Step 3: 纯同步上下文 → 运行协程
+    try:
+        return asyncio.run(
+            full_resolve(
+                formula_ref=formula_ref,
+                uri=uri,
+                project_id=project_id,
+            )
+        )
+    except Exception as exc:
+        logger.warning(
+            "ACNR full_resolve bridge failed (formula_ref=%s uri=%s): %s",
+            formula_ref,
+            uri,
+            exc,
+        )
+        return None
+
+
 # ─── Resolver ────────────────────────────────────────────────────────────────
 
 
 class CrossSheetResolver:
-    """跨 sheet 公式追溯器 — BFS + 环检测"""
+    """跨 sheet 公式追溯器 — BFS + 环检测 + ACNR addr_id 解析"""
+
+    def __init__(
+        self,
+        project_id: str | None = None,
+        parent_wp_code: str | None = None,
+    ) -> None:
+        """
+        Args:
+            project_id: 项目 ID，传递给 ACNR full_resolve 以启用 L2 overlay + wp_id 附加（Req 1.4）
+            parent_wp_code: 父底稿码（可选）。已知时构造 grammar_v1 的 3 参
+                `WP(parent, sheet, cell)`；未知时退化为 URI 形态交给 resolver 匹配。
+        """
+        self._project_id = project_id
+        self._parent_wp_code = parent_wp_code
 
     def resolve(
         self,
@@ -214,7 +291,42 @@ class CrossSheetResolver:
 
         while queue:
             cur_sheet, cur_cell, depth = queue.popleft()
-            uri = f"{cur_sheet}!{cur_cell}"
+
+            # ── ACNR full_resolve 尝试（Req 1.1, 1.2, 1.3, 1.4, 1.6）────────
+            # 命中（found=true）→ 使用 addr_id 作为 node URI；未命中/异常 → 降级
+            # 到 snapshot fallback（uri=sheet!cell）并标记 resolve_missed=True。
+            acnr_result: "ResolveResult | None" = None
+            try:
+                if self._parent_wp_code:
+                    # grammar_v1 3 参形态：WP(parent, sheet, cell)
+                    formula_ref = (
+                        f"WP('{self._parent_wp_code}','{cur_sheet}','{cur_cell}')"
+                    )
+                    acnr_result = _sync_resolve(
+                        formula_ref=formula_ref,
+                        project_id=self._project_id,
+                    )
+                else:
+                    # 无 parent wp_code → 退化 URI 形态，交由 resolver 的
+                    # sheet-alias / custom_flat 分支去匹配
+                    acnr_result = _sync_resolve(
+                        uri=f"wp://{cur_sheet}/{cur_cell}",
+                        project_id=self._project_id,
+                    )
+            except Exception as exc:  # 防御：_sync_resolve 已吞异常，此处再兜底
+                logger.warning(
+                    "ACNR full_resolve failed for %s!%s: %s",
+                    cur_sheet,
+                    cur_cell,
+                    exc,
+                )
+
+            if acnr_result and acnr_result.found and acnr_result.addr_id:
+                uri = acnr_result.addr_id
+                resolve_missed = False
+            else:
+                uri = f"{cur_sheet}!{cur_cell}"
+                resolve_missed = True
 
             # Cycle detection
             if uri in visited:
@@ -223,6 +335,7 @@ class CrossSheetResolver:
                         depth=depth,
                         uri=uri,
                         cycle=True,
+                        resolve_missed=resolve_missed,
                     )
                 )
                 has_cycle = True
@@ -244,6 +357,7 @@ class CrossSheetResolver:
                 value=value,
                 formula=formula,
                 missing=missing,
+                resolve_missed=resolve_missed,
             )
             chain.append(node)
 

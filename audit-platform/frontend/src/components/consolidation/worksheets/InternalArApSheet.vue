@@ -209,6 +209,7 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useExcelIO } from '@/composables/useExcelIO'
 import { useTableToolbar } from '@/composables/useTableToolbar'
+import { useConsolSubjectSource } from '../composables/useConsolSubjectSource'
 
 interface CompanyCol { name: string; code?: string; ratio: number }
 interface AgingSegment { name: string; startMonth: number; endMonth: number; impairmentRate: number }
@@ -239,7 +240,21 @@ const allCompanyOptions = computed(() => [
   { name: '母公司', code: 'parent' },
   ...props.companies.map(c => ({ name: c.name, code: c.code || '' })),
 ])
-const subjectOptions = ['应收账款', '其他应收款', '预付账款', '应收票据', '长期应收款', '应付账款', '其他应付款', '预收账款', '应付票据']
+// 往来科目候选（Req 19.4）：优先取 ACNR-backed TB 域 canonical 科目名（真源），
+// 保留原硬编码 AR/AP 快捷选项作降级兜底 + 无回归（allow-create 仍可自由录入）。
+const HARDCODED_ARAP_SUBJECTS = ['应收账款', '其他应收款', '预付账款', '应收票据', '长期应收款', '应付账款', '其他应付款', '预收账款', '应付票据']
+const { registrySubjectNames } = useConsolSubjectSource()
+const subjectOptions = computed<string[]>(() => {
+  const names = registrySubjectNames.value
+  // Req 19.5 降级：TB 注册表为空 → 硬编码 AR/AP 列表（无空白 picker、无回归）
+  if (!names.size) return [...HARDCODED_ARAP_SUBJECTS]
+  // 注册表可用：先放原 AR/AP 快捷选项（保留常用相关科目，无回归），再补 canonical TB 科目名
+  const ordered: string[] = []
+  const seen = new Set<string>()
+  for (const s of HARDCODED_ARAP_SUBJECTS) { if (!seen.has(s)) { ordered.push(s); seen.add(s) } }
+  for (const s of names) { if (!seen.has(s)) { ordered.push(s); seen.add(s) } }
+  return ordered
+})
 
 // ─── 账龄段 ───────────────────────────────────────────────────────────────────
 const agingPreset = ref<'3year'|'5year'|'custom'>('3year')

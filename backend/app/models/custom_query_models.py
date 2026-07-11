@@ -48,6 +48,13 @@ class CustomQueryTemplate(Base):
     scope: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=sa.text("'private'")
     )
+    # shared_project_ids: 显式分享的项目 id 列表（scope='personal' + 分享场景）
+    # 与 V101 逐列对齐：UUID[] NOT NULL DEFAULT '{}'
+    shared_project_ids: Mapped[list[uuid.UUID]] = mapped_column(
+        ARRAY(PG_UUID(as_uuid=True)),
+        nullable=False,
+        server_default=sa.text("'{}'"),
+    )
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(sa.Text), nullable=False, server_default=sa.text("'{}'")
     )
@@ -87,4 +94,55 @@ class CustomQueryTemplate(Base):
         sa.Index("idx_cqt_scope_updated", "scope", sa.desc("updated_at")),
         sa.Index("idx_cqt_creator_updated", "creator_id", sa.desc("updated_at")),
         sa.Index("idx_cqt_tags", "tags", postgresql_using="gin"),
+        sa.Index(
+            "idx_cqt_shared_projects", "shared_project_ids", postgresql_using="gin"
+        ),
+    )
+
+
+class AdvancedQueryWriteback(Base):
+    """高级查询回写身份 / 审计记录表 [advanced-query-module Task 1.3]
+
+    回写落点为 `working_papers.parsed_data.univer_snapshot`（cell 值原地更新），
+    本表记录回写的 addr_id 身份（与 WP() 公式引用同一身份，R3.2/R3.3），
+    供 stale chip 追踪对齐与快照列下钻的结构化索引。
+
+    字段与 V102 表结构逐列对齐（design Data Models §2）：
+      id/project_id/addr_id/wp_id/old_value/new_value/operator_id/result/created_at
+
+    Validates: Requirements 3.1, 14.3 (advanced-query-module)
+    """
+
+    __tablename__ = "advanced_query_writeback"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default=sa.text("gen_random_uuid()"),
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    # addr_id: {wp_code}/{sheet_code}/{coordinate_key}（R3.1）
+    addr_id: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    # wp_id: resolve_instance 附加（可空）
+    wp_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    old_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    new_value: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    operator_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    # result: success/failed
+    result: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True),
+        server_default=sa.func.now(),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        sa.Index("idx_aqw_addr_id", "addr_id"),
+        sa.Index("idx_aqw_project", "project_id", sa.desc("created_at")),
     )

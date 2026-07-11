@@ -8,11 +8,12 @@
 
  */
 
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted } from 'vue'
 
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { useAcnrCatalogIndex } from '../composables/useAcnrCatalogIndex'
 
 
 
@@ -30,6 +31,16 @@ const props = defineProps<{
 
 
 
+/**
+ * 本地目录配置（Req 18.2 / 18.5）：仅保留 catalog 不持有的路由/状态元数据，
+ * 按 sheet_code(=code) keyed：
+ *   - code       : sheet_code（与 ACNR catalog 合并的主键）
+ *   - name       : 硬编码名称，仅作 catalog 不可用时的回退（Req 18.7）
+ *   - group      : 分组（本地展示元数据）
+ *   - sheetLabel : bundle 内 jumpToSection 目标（纯 sheet 切换，Req 18.3）
+ *   - applicable : 适用性（本地逻辑，Req 18.5）
+ * 显示用的 name/order/addr_id 由 displayRows 从 ACNR catalog 合并覆盖（Req 18.1）。
+ */
 interface IndexRow {
 
   seq: number
@@ -210,7 +221,39 @@ function isSheetComplete(code: string, m: Map<string, any>): boolean {
 
 
 
-const applicableRows = computed(() => indexRows.filter(r => r.applicable))
+// ─── ACNR catalog 名称合并（Req 18.1 / 18.2 / 18.7）───────────────────────────
+// catalog 提供 sheet_name/addr_id/order 真源；按 code(=sheet_code) 合并覆盖显示名称。
+// catalog 空/失败 → 回退本地硬编码 name，保证目录不空白（Req 18.7）。
+const { catalogIndex, loadCatalogIndex } = useAcnrCatalogIndex()
+
+onMounted(() => {
+  // D2 属于 D 循环；catalog 不可用时 map 为空，displayRows 自动回退硬编码。
+  loadCatalogIndex('D')
+})
+
+interface DisplayRow extends IndexRow {
+  /** ACNR catalog addr_id（命中时），供跨底稿一致性/未来 chip 使用 */
+  addrId?: string
+  /** 显示/排序 order：catalog 优先，缺失回退本地 seq */
+  order: number
+}
+
+const displayRows = computed<DisplayRow[]>(() =>
+  indexRows.map((r) => {
+    const cat = catalogIndex.value.get(r.code)
+    return {
+      ...r,
+      // 名称从 catalog 取（Req 18.1）；miss/空 → 回退硬编码（Req 18.7）
+      name: cat?.sheet_name || r.name,
+      addrId: cat?.addr_id,
+      order: cat?.order ?? r.seq,
+    }
+  }),
+)
+
+
+
+const applicableRows = computed(() => displayRows.value.filter(r => r.applicable))
 
 
 
@@ -259,7 +302,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 
 
 
-    <el-table :data="indexRows" size="small" border stripe>
+    <el-table :data="displayRows" size="small" border stripe>
 
       <el-table-column prop="seq" label="序号" width="60" align="center" />
 
@@ -278,6 +321,10 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
             v-if="row.applicable && jumpToSection"
 
             :label="row.code"
+
+            :prevent-navigate="true"
+
+            :validate="false"
 
             class="index-chip"
 

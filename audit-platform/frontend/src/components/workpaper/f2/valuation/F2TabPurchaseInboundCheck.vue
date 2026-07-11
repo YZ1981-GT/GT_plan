@@ -17,13 +17,14 @@
       <span v-if="samplingInfo" class="sampling-info">
         抽样方法: {{ samplingInfo.method }} | 样本量: {{ samplingInfo.count }}
       </span>
-      <el-button
+      <GtVoucherSamplingEngine
         v-if="!isReadonly && wpId && projectId"
-        size="small"
-        type="primary"
-        :icon="ElIconMagicStick"
-        @click="samplingDialogVisible = true"
-      >使用抽凭引擎</el-button>
+        :project-id="projectId"
+        :account-codes="inventoryAccountCodes"
+        :phase="'final'"
+        dialog-mode
+        @filled="handleSamplingFilled"
+      />
       <el-button size="small" type="primary" :disabled="isReadonly" @click="ic.addRow()">+ 新增</el-button>
       <F2SheetToolbar
         :wp-id="wpId"
@@ -113,31 +114,11 @@
       <h4>检查结论</h4>
       <el-input v-model="ic.auditNote.value" type="textarea" :rows="2" :disabled="isReadonly" />
     </footer>
-
-    <!-- 抽凭引擎 Dialog -->
-    <el-dialog
-      v-model="samplingDialogVisible"
-      title="抽凭引擎 · 采购入库检查（存货科目 1401~1411 借方发生）"
-      width="900px"
-      destroy-on-close
-      append-to-body
-    >
-      <GtVoucherSamplingEngine
-        :account-code="F2_INVENTORY_ACCOUNT_CODES"
-        phase="final"
-        default-method="random"
-        :workpaper-id="wpId!"
-        :project-id="projectId!"
-        :year="auditYear"
-        @filled="handleSamplingFilled"
-      />
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, type Ref } from 'vue'
-import { MagicStick as ElIconMagicStick } from '@element-plus/icons-vue'
+import { ref, toRef, type Ref } from 'vue'
 import { useF2PurchaseInboundCheck } from '../../composables/useF2InspectionCheck'
 import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
 import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/useF2InspectionCheckFormulas'
@@ -163,10 +144,8 @@ const { ocrLoadingId, uploadAndMerge } = useF2PurchaseOcr(
   toRef(() => props.wpId || '') as Ref<string>,
 )
 
-const auditYear = computed(() => props.auditYear ?? new Date().getFullYear() - 1)
-
-/** 抽凭引擎 dialog 可见性 */
-const samplingDialogVisible = ref(false)
+/** 采购入库检查科目范围（保留原 F2_INVENTORY_ACCOUNT_CODES 值 1401~1411，拆为多科目数组） */
+const inventoryAccountCodes = F2_INVENTORY_ACCOUNT_CODES.split(',')
 
 /** 抽样参数区展示信息（引擎返回后自动更新） */
 const samplingInfo = ref<{ method: string; count: number } | null>(null)
@@ -187,8 +166,6 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: Fi
     method: METHOD_LABELS[payload.method || 'random'] || payload.method || '随机抽样',
     count: payload.samples.length,
   }
-  // 关闭dialog
-  samplingDialogVisible.value = false
 }
 
 function handleOcrUpload(rowId: string, file?: File) {

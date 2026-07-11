@@ -74,7 +74,7 @@ async def test_wp_formula_crud_roundtrip():
             mock_load.return_value = mock_wp
 
             with patch(
-                "app.services.wp_formula_service.address_registry.validate_formula_refs",
+                "app.services.wp_formula_service.validate_refs_via_acnr",
                 new_callable=AsyncMock,
                 return_value=[],
             ):
@@ -146,7 +146,7 @@ async def test_wp_formula_save_rejects_dangling_ref():
             mock_load.return_value = mock_wp
 
             with patch(
-                "app.services.wp_formula_service.address_registry.validate_formula_refs",
+                "app.services.wp_formula_service.validate_refs_via_acnr",
                 new_callable=AsyncMock,
                 return_value=[{"status": "not_found", "ref": "WP('X','Z99')"}],
             ):

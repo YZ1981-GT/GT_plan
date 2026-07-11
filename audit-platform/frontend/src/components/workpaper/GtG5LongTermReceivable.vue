@@ -7,7 +7,7 @@
       <!-- 双模式切换 -->
       <div class="g5-long-term-receivable-toolbar">
         <el-segmented v-model="viewMode" :options="viewModeOptions" size="small" />
-        <el-button size="small" @click="showVersionHistory">版本历史</el-button>
+        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -120,7 +120,7 @@
 import { ref, computed, onMounted, defineAsyncComponent, provide } from 'vue'
 import { useG5FormData } from './composables/useG5FormData'
 import { useG5DualMode } from './composables/useG5DualMode'
-import { useVersionTrail } from '@/composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 
 // ═══ defineAsyncComponent × 16 lazy load ═══
 // core/
@@ -158,7 +158,6 @@ const props = defineProps<{
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
-const versionTrailRef = ref()
 
 // ═══ sheetName 正则提取编码 ═══
 const currentSheet = computed(() => {
@@ -181,10 +180,11 @@ const formData = useG5FormData({
 const sheetData = computed(() => props.htmlData || formData.data.value)
 
 // ═══ 版本链集成 ═══
-const { autoSnapshot } = useVersionTrail(computed(() => props.wpId))
-function showVersionHistory() {
-  versionTrailRef.value?.open?.()
-}
+const versionToolbar = useWorkpaperVersionToolbar({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const { versionTrailRef } = versionToolbar
 
 // ═══ 复核对话 provide ═══
 function openReviewDialog(sectionId: string): void {
