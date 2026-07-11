@@ -10,9 +10,7 @@
  * 3. wp_code_overrides（H7/H7A/H7-1~H7-17 共19个映射）
  * 4. DEDICATED_COMPONENT_TYPES（整册专属组件列表）
  */
-import { describe, it, expect, beforeAll } from 'vitest'
-import * as fs from 'fs'
-import * as path from 'path'
+import { describe, it, expect } from 'vitest'
 
 import {
   HTML_RENDERER_REGISTRY,
@@ -36,4 +34,14 @@ describe('H7 生产性生物资产 — 注册契约测试', () => {
       expect(entry?.component).toBeDefined()
     })
 
-    it('isHtmlComponentType 识
+    it('isHtmlComponentType 识别 h7-biological-assets 为 true', () => {
+      expect(isHtmlComponentType(COMPONENT_TYPE)).toBe(true)
+    })
+
+    it('getRendererEntry 返回 h7-biological-assets 配置', () => {
+      const entry = getRendererEntry(COMPONENT_TYPE)
+      expect(entry).toBeDefined()
+      expect(entry?.componentType).toBe(COMPONENT_TYPE)
+    })
+  })
+})

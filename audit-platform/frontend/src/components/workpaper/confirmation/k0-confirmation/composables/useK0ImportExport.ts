@@ -13,7 +13,7 @@ import { type Ref } from 'vue'
 import {
   useWorkpaperImportExport,
   type ImportExportResult,
-} from '../../composables/useWorkpaperImportExport'
+} from '../../../composables/useWorkpaperImportExport'
 
 export type K0ImportableSheet = 'K0-5' | 'K0-6'
 

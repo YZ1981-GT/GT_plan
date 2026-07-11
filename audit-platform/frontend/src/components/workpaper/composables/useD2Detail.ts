@@ -22,6 +22,7 @@
  * Requirements: 4.1, 4.2, 4.3, 4.5, 10.2, 10.3, 10.4
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   parseNum,
   getAuditedAmount,
@@ -500,7 +501,6 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
         `/api/projects/${projectId}/ledger/aux-balance-detail?account_code=1122&aux_type=customer`
       )
       if (!response.ok) {
-        const { ElMessage } = await import('element-plus')
         ElMessage.info('辅助余额表无数据或请求失败')
         return { imported: 0, updated: 0, added: 0 }
       }
@@ -510,7 +510,6 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
         result.data || result || []
 
       if (!data.length) {
-        const { ElMessage } = await import('element-plus')
         ElMessage.info('辅助余额表中无1122科目客户维度数据')
         return { imported: 0, updated: 0, added: 0 }
       }
@@ -558,11 +557,9 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
         debounceSave()
       }
 
-      const { ElMessage } = await import('element-plus')
       ElMessage.success(`从余额表导入完成：更新${updated}行，新增${added}行`)
       return { imported, updated, added }
     } catch {
-      const { ElMessage } = await import('element-plus')
       ElMessage.error('从余额表导入失败')
       return { imported: 0, updated: 0, added: 0 }
     }

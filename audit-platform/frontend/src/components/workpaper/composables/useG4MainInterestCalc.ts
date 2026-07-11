@@ -294,7 +294,7 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
   /** 利率差异阈值：实际利率与票面利率差异超过200bp(2%)视为异常 */
   const RATE_DIFF_THRESHOLD = 0.02
 
-  export interface RateWarning {
+  interface RateWarning {
     groupId: string
     projectName: string
     effectiveRate: number
