@@ -87,8 +87,8 @@ inclusion: always
 - **Active spec = 0**（全部归档至 `_archive/05-business-features/`）
 
 ### git
-- 分支 `work/2026-05-30-wp-specs`；最高迁移 V099（以 `migration_status` 为准）
-- 最新已push：`8d54a1a2`(acnr-consumer-wiring spec P1-P15)→`8b282e02`(aging-config+c-control-test功能+D6 ECL+OCR composable, 73文件)；工作区 clean 与 origin 同步
+- 分支 `work/2026-05-30-wp-specs`；最高迁移 **V102**（V100 formula-lib / V101 advanced-query模板共享 / V102 advanced_query_writeback addr_id；以 `migration_status` 为准）
+- 最新已push：`d8b27f2d`(acnr-consumer-wiring P1-P15 全实现 100/100 + advanced-query-module 85/85 + formula-lib V100 groundwork + voucher-check-sampling spec, 171文件 rebase 到 origin b6479009)；工作区 clean 与 origin 同步。rebase 冲突2处已解:D2TabVoucherCheck.vue取remote较全版(含AI/guidance,dialog-mode两侧都有);memory.md union(我方completions+remote voucher行)
 - `origin/HEAD→origin/master` 落后 main 隐患仍在
 
 ### 循环进度表（✅完成 / 🟡部分 / 🔵待开发）
