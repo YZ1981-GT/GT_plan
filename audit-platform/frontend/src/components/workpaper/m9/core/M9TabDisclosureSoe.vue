@@ -326,8 +326,8 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useM9FormData } from '../../../composables/useM9FormData'
-import { calcAfterTaxNet } from '../../../composables/useM9OciEngine'
+import { useM9FormData } from '../../composables/useM9FormData'
+import { calcAfterTaxNet } from '../../composables/useM9OciEngine'
 
 const props = defineProps<{
   wpId: string

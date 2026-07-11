@@ -174,8 +174,8 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useM4FormData } from '../../../composables/useM4FormData'
-import { calcEquityEndBalance } from '../../../composables/useM4FormulaEngine'
+import { useM4FormData } from '../../composables/useM4FormData'
+import { calcEquityEndBalance } from '../../composables/useM4FormulaEngine'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

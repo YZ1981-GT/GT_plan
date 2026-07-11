@@ -140,12 +140,12 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL5FormData } from '../../../composables/useL5FormData'
+import { useL5FormData } from '../../composables/useL5FormData'
 import {
   useL5RelatedParty,
   type L5RelatedPartyRow,
   type L5FairnessLevel,
-} from '../../../composables/useL5RelatedParty'
+} from '../../composables/useL5RelatedParty'
 
 const props = defineProps<{
   wpId: string

@@ -228,8 +228,8 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useM9FormData } from '../../../composables/useM9FormData'
-import { useM9Adjustment, type M9AdjustmentEntry } from '../../../composables/useM9Adjustment'
+import { useM9FormData } from '../../composables/useM9FormData'
+import { useM9Adjustment, type M9AdjustmentEntry } from '../../composables/useM9Adjustment'
 
 const props = defineProps<{
   wpId: string

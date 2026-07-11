@@ -229,13 +229,13 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useL8FormData } from '../../../composables/useL8FormData'
+import { useL8FormData } from '../../composables/useL8FormData'
 import {
   useL8CutoffTest,
   type L8CutoffTestRow,
   type L8CutoffSection,
-} from '../../../composables/useL8CutoffTest'
-import { useL8ImportExport } from '../../../composables/useL8ImportExport'
+} from '../../composables/useL8CutoffTest'
+import { useL8ImportExport } from '../../composables/useL8ImportExport'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{

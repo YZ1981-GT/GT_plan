@@ -307,7 +307,7 @@ import {
   INVEST_TYPE_OPTIONS,
   type M2DetailSegment,
   type M2DetailUnlistedRow,
-} from '../../../composables/useM2Detail'
+} from '../../composables/useM2Detail'
 
 const props = defineProps<{
   wpId: string

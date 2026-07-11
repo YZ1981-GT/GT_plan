@@ -379,8 +379,8 @@ import { computed, inject, onMounted, ref, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { fmtAmount, fmtPercent } from '@/utils/formatters'
-import { useL6FormData } from '../../../composables/useL6FormData'
-import { useL6SpecialCheck, type L6SpecialCheckRow } from '../../../composables/useL6SpecialCheck'
+import { useL6FormData } from '../../composables/useL6FormData'
+import { useL6SpecialCheck, type L6SpecialCheckRow } from '../../composables/useL6SpecialCheck'
 
 const props = defineProps<{
   wpId: string

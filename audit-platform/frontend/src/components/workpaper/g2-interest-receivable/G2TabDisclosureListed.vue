@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { ChecklistResponse } from '../../composables/useF1FormData'
+import type { ChecklistResponse } from '../composables/useF1FormData'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

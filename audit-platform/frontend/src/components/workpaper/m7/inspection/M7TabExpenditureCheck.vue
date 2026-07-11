@@ -407,7 +407,7 @@
  */
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useM7FormData } from '../../../composables/useM7FormData'
+import { useM7FormData } from '../../composables/useM7FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────

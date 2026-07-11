@@ -161,8 +161,8 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL7FormData } from '../../../composables/useL7FormData'
-import { useL7Adjustment, type L7AdjustmentEntry } from '../../../composables/useL7Adjustment'
+import { useL7FormData } from '../../composables/useL7FormData'
+import { useL7Adjustment, type L7AdjustmentEntry } from '../../composables/useL7Adjustment'
 
 const props = defineProps<{
   wpId: string

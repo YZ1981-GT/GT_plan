@@ -392,15 +392,15 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check, Plus, ArrowDown } from '@element-plus/icons-vue'
-import { useM4FormData } from '../../../composables/useM4FormData'
-import { useM4DualMode } from '../../../composables/useM4DualMode'
-import { useM4ImportExport } from '../../../composables/useM4ImportExport'
+import { useM4FormData } from '../../composables/useM4FormData'
+import { useM4DualMode } from '../../composables/useM4DualMode'
+import { useM4ImportExport } from '../../composables/useM4ImportExport'
 import {
   useM4Detail,
   M4_DETAIL_SEGMENTS,
   type M4DetailRow,
   type M4DetailSegment,
-} from '../../../composables/useM4Detail'
+} from '../../composables/useM4Detail'
 import { eventBus } from '@/utils/eventBus'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'

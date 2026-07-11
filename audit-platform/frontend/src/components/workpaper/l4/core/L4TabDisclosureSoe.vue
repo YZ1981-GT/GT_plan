@@ -122,7 +122,7 @@
  */
 import { inject, onMounted, onUnmounted, ref, computed } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL4FormData } from '../../../composables/useL4FormData'
+import { useL4FormData } from '../../composables/useL4FormData'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{

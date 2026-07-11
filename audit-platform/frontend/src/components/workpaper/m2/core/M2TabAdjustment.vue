@@ -218,8 +218,8 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useM2FormData } from '../../../composables/useM2FormData'
-import { useM2Adjustment, type M2AdjustmentEntry } from '../../../composables/useM2Adjustment'
+import { useM2FormData } from '../../composables/useM2FormData'
+import { useM2Adjustment, type M2AdjustmentEntry } from '../../composables/useM2Adjustment'
 
 const props = defineProps<{
   wpId: string

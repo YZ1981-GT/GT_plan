@@ -310,12 +310,12 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useM3FormData } from '../../../composables/useM3FormData'
-import { useM3DualMode } from '../../../composables/useM3DualMode'
+import { useM3FormData } from '../../composables/useM3FormData'
+import { useM3DualMode } from '../../composables/useM3DualMode'
 import {
   useM3Adjudication,
   type M3AdjudicationRow,
-} from '../../../composables/useM3Adjudication'
+} from '../../composables/useM3Adjudication'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

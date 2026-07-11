@@ -130,9 +130,9 @@
 
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
-import { useG2InterestCalc } from '../../composables/useG2InterestCalc'
+import { useG2InterestCalc } from '../composables/useG2InterestCalc'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { ChecklistResponse } from '../../composables/useF1FormData'
+import type { ChecklistResponse } from '../composables/useF1FormData'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

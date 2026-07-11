@@ -182,9 +182,9 @@ import {
   useG2BadDebtDetail,
   STAGE_OPTIONS,
   TRANSFER_DIRECTION_OPTIONS,
-} from '../../composables/useG2BadDebtDetail'
+} from '../composables/useG2BadDebtDetail'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { ChecklistResponse } from '../../composables/useF1FormData'
+import type { ChecklistResponse } from '../composables/useF1FormData'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

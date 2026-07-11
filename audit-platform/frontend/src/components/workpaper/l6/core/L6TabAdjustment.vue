@@ -157,8 +157,8 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL6FormData } from '../../../composables/useL6FormData'
-import { useL6Adjustment, type L6AdjustmentEntry } from '../../../composables/useL6Adjustment'
+import { useL6FormData } from '../../composables/useL6FormData'
+import { useL6Adjustment, type L6AdjustmentEntry } from '../../composables/useL6Adjustment'
 
 const props = defineProps<{
   wpId: string

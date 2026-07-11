@@ -374,9 +374,9 @@
 import { computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useM3FormData } from '../../../composables/useM3FormData'
-import { useM3TreasuryCheck } from '../../../composables/useM3TreasuryCheck'
-import { useM3ImportExport, type M3ImportableSheet } from '../../../composables/useM3ImportExport'
+import { useM3FormData } from '../../composables/useM3FormData'
+import { useM3TreasuryCheck } from '../../composables/useM3TreasuryCheck'
+import { useM3ImportExport, type M3ImportableSheet } from '../../composables/useM3ImportExport'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 

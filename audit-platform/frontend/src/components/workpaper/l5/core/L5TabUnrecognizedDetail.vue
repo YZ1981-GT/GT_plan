@@ -216,12 +216,12 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL5FormData } from '../../../composables/useL5FormData'
+import { useL5FormData } from '../../composables/useL5FormData'
 import {
   useL5UnrecognizedDetail,
   type L5UnrecognizedRow,
   L5_UNRECOGNIZED_SEGMENTS,
-} from '../../../composables/useL5UnrecognizedDetail'
+} from '../../composables/useL5UnrecognizedDetail'
 
 const props = defineProps<{
   wpId: string

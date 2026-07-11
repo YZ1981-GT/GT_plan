@@ -322,8 +322,8 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useK3Adjudication, type K3AdjRow } from '../../../composables/useK3Adjudication'
-import { useK3FormData } from '../../../composables/useK3FormData'
+import { useK3Adjudication, type K3AdjRow } from '../../composables/useK3Adjudication'
+import { useK3FormData } from '../../composables/useK3FormData'
 
 const props = defineProps<{
   wpId: string

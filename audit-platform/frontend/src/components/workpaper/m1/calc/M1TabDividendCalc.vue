@@ -239,9 +239,9 @@ import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Plus, MagicStick, Check, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { useM1FormData } from '../../../composables/useM1FormData'
-import { useM1ImportExport } from '../../../composables/useM1ImportExport'
-import { calcDeclaredDividend, calcDeclareDiff } from '../../../composables/useM1DividendEngine'
+import { useM1FormData } from '../../composables/useM1FormData'
+import { useM1ImportExport } from '../../composables/useM1ImportExport'
+import { calcDeclaredDividend, calcDeclareDiff } from '../../composables/useM1DividendEngine'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

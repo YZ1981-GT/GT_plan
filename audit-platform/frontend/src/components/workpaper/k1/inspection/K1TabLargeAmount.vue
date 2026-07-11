@@ -154,8 +154,8 @@
 import { computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK1LargeAmount, type K1LargeAmountRow } from '../../../composables/useK1LargeAmount'
-import { useK1ImportExport } from '../../../composables/useK1ImportExport'
+import { useK1LargeAmount, type K1LargeAmountRow } from '../../composables/useK1LargeAmount'
+import { useK1ImportExport } from '../../composables/useK1ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

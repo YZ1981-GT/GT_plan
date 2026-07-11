@@ -162,12 +162,12 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL8FormData } from '../../../composables/useL8FormData'
+import { useL8FormData } from '../../composables/useL8FormData'
 import {
   useL8Adjustment,
   type L8AdjustmentType,
   type L8AdjustmentEntry,
-} from '../../../composables/useL8Adjustment'
+} from '../../composables/useL8Adjustment'
 
 const props = defineProps<{
   wpId: string

@@ -352,8 +352,8 @@
  */
 import { computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useM4FormData } from '../../../composables/useM4FormData'
-import { useM4ReserveCheck } from '../../../composables/useM4ReserveCheck'
+import { useM4FormData } from '../../composables/useM4FormData'
+import { useM4ReserveCheck } from '../../composables/useM4ReserveCheck'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 

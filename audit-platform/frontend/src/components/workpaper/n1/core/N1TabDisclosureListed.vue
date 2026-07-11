@@ -315,9 +315,9 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useN1FormData } from '../../../composables/useN1FormData'
-import { useN1CrossSheet } from '../../../composables/useN1CrossSheet'
-import { calcAssetEndBalance } from '../../../composables/useN1FormulaEngine'
+import { useN1FormData } from '../../composables/useN1FormData'
+import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
+import { calcAssetEndBalance } from '../../composables/useN1FormulaEngine'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

@@ -139,7 +139,7 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useM1FormData } from '../../../composables/useM1FormData'
+import { useM1FormData } from '../../composables/useM1FormData'
 
 const props = defineProps<{
   wpId: string

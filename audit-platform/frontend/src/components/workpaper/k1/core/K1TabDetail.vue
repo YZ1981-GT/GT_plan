@@ -263,8 +263,8 @@
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
-import { useK1Detail, type K1DetailRow } from '../../../composables/useK1Detail'
-import { useK1ImportExport } from '../../../composables/useK1ImportExport'
+import { useK1Detail, type K1DetailRow } from '../../composables/useK1Detail'
+import { useK1ImportExport } from '../../composables/useK1ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

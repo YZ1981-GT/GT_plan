@@ -381,12 +381,12 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useM2FormData } from '../../../composables/useM2FormData'
-import { useM2DualMode } from '../../../composables/useM2DualMode'
+import { useM2FormData } from '../../composables/useM2FormData'
+import { useM2DualMode } from '../../composables/useM2DualMode'
 import {
   useM2Adjudication,
   type M2AdjudicationRow,
-} from '../../../composables/useM2Adjudication'
+} from '../../composables/useM2Adjudication'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

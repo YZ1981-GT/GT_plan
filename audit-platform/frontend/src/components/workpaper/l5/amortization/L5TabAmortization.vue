@@ -151,11 +151,11 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check, CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useL5FormData } from '../../../composables/useL5FormData'
+import { useL5FormData } from '../../composables/useL5FormData'
 import {
   useL5Amortization,
   type L5AmortizationItem,
-} from '../../../composables/useL5Amortization'
+} from '../../composables/useL5Amortization'
 
 const props = defineProps<{
   wpId: string

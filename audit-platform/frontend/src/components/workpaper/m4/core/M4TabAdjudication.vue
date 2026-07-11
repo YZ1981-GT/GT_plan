@@ -517,13 +517,13 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useM4FormData } from '../../../composables/useM4FormData'
-import { useM4DualMode } from '../../../composables/useM4DualMode'
+import { useM4FormData } from '../../composables/useM4FormData'
+import { useM4DualMode } from '../../composables/useM4DualMode'
 import {
   useM4Adjudication,
   type M4AdjudicationRow,
   type M4AdjudicationBlock,
-} from '../../../composables/useM4Adjudication'
+} from '../../composables/useM4Adjudication'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

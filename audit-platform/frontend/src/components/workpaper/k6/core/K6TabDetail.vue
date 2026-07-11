@@ -292,8 +292,8 @@
  */
 import { ref, computed, inject } from 'vue'
 import { Plus, ArrowDown, MagicStick, View, Delete, QuestionFilled } from '@element-plus/icons-vue'
-import { useK6Detail } from '../../../composables/useK6Detail'
-import { useK6ImportExport } from '../../../composables/useK6ImportExport'
+import { useK6Detail } from '../../composables/useK6Detail'
+import { useK6ImportExport } from '../../composables/useK6ImportExport'
 
 const props = defineProps<{
   wpId: string

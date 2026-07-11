@@ -249,15 +249,15 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useL8FormData } from '../../../composables/useL8FormData'
+import { useL8FormData } from '../../composables/useL8FormData'
 import {
   useL8Detail,
   L8_DETAIL_SEGMENTS,
   L8_DETAIL_DEFAULT_ITEMS,
   type L8DetailRow,
   type L8DetailSegment,
-} from '../../../composables/useL8Detail'
-import { useL8ImportExport } from '../../../composables/useL8ImportExport'
+} from '../../composables/useL8Detail'
+import { useL8ImportExport } from '../../composables/useL8ImportExport'
 
 const props = defineProps<{
   wpId: string

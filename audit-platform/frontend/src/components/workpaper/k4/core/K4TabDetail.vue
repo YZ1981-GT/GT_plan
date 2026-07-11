@@ -230,8 +230,8 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK4Detail } from '../../../composables/useK4Detail'
-import { useK4ImportExport } from '../../../composables/useK4ImportExport'
+import { useK4Detail } from '../../composables/useK4Detail'
+import { useK4ImportExport } from '../../composables/useK4ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

@@ -245,8 +245,8 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick, CircleCheck, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useK2Adjudication, type K2AdjRow } from '../../../composables/useK2Adjudication'
-import { useK2CrossSheet } from '../../../composables/useK2CrossSheet'
+import { useK2Adjudication, type K2AdjRow } from '../../composables/useK2Adjudication'
+import { useK2CrossSheet } from '../../composables/useK2CrossSheet'
 
 // ─── Props / Emits ────────────────────────────────────────────────────────────
 

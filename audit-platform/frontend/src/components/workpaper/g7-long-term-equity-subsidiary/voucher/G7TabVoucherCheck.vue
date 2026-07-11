@@ -198,7 +198,7 @@ import { ref, computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
-import { isDebitCreditBalanced } from '../../../composables/useG7SubFormulaEngine'
+import { isDebitCreditBalanced } from '../../composables/useG7SubFormulaEngine'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null

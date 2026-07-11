@@ -203,9 +203,9 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Plus, MagicStick, Check, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { useM1FormData } from '../../../composables/useM1FormData'
-import { useM1ImportExport } from '../../../composables/useM1ImportExport'
-import { calcFxConverted, calcFxDiff } from '../../../composables/useM1FxEngine'
+import { useM1FormData } from '../../composables/useM1FormData'
+import { useM1ImportExport } from '../../composables/useM1ImportExport'
+import { calcFxConverted, calcFxDiff } from '../../composables/useM1FxEngine'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

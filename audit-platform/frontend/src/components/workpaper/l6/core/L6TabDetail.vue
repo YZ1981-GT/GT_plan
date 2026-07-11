@@ -302,10 +302,10 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL6FormData } from '../../../composables/useL6FormData'
-import { useL6Detail, type L6DetailRow, L6_DETAIL_SEGMENTS } from '../../../composables/useL6Detail'
-import { useL6ImportExport } from '../../../composables/useL6ImportExport'
-import { useL6CrossSheet } from '../../../composables/useL6CrossSheet'
+import { useL6FormData } from '../../composables/useL6FormData'
+import { useL6Detail, type L6DetailRow, L6_DETAIL_SEGMENTS } from '../../composables/useL6Detail'
+import { useL6ImportExport } from '../../composables/useL6ImportExport'
+import { useL6CrossSheet } from '../../composables/useL6CrossSheet'
 
 const props = defineProps<{
   wpId: string

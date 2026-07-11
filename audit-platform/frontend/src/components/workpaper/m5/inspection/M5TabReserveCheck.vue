@@ -142,7 +142,7 @@
  */
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useM5FormData } from '../../../composables/useM5FormData'
+import { useM5FormData } from '../../composables/useM5FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

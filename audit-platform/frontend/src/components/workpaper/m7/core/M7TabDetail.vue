@@ -329,15 +329,15 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useM7FormData } from '../../../composables/useM7FormData'
+import { useM7FormData } from '../../composables/useM7FormData'
 import {
   useM7Detail,
   type M7DetailRow,
   M7_DETAIL_SEGMENTS,
   M7_DETAIL_DEFAULT_ITEMS,
-} from '../../../composables/useM7Detail'
-import { useM7ImportExport } from '../../../composables/useM7ImportExport'
-import { useM7CrossSheet } from '../../../composables/useM7CrossSheet'
+} from '../../composables/useM7Detail'
+import { useM7ImportExport } from '../../composables/useM7ImportExport'
+import { useM7CrossSheet } from '../../composables/useM7CrossSheet'
 
 const props = defineProps<{
   wpId: string

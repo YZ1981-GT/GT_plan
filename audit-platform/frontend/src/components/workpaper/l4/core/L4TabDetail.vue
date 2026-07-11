@@ -306,8 +306,8 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL4FormData } from '../../../composables/useL4FormData'
-import { useL4Detail, type L4DetailRow, type L4DetailSegment } from '../../../composables/useL4Detail'
+import { useL4FormData } from '../../composables/useL4FormData'
+import { useL4Detail, type L4DetailRow, type L4DetailSegment } from '../../composables/useL4Detail'
 
 const props = defineProps<{
   wpId: string

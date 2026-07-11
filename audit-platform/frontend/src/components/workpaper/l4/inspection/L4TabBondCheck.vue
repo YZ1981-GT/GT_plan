@@ -101,7 +101,7 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL4FormData } from '../../../composables/useL4FormData'
+import { useL4FormData } from '../../composables/useL4FormData'
 
 const props = defineProps<{
   wpId: string

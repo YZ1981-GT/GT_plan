@@ -243,8 +243,8 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useM4FormData } from '../../../composables/useM4FormData'
-import { useM4Adjustment, type M4AdjustmentType } from '../../../composables/useM4Adjustment'
+import { useM4FormData } from '../../composables/useM4FormData'
+import { useM4Adjustment, type M4AdjustmentType } from '../../composables/useM4Adjustment'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

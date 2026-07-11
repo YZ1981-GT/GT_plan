@@ -161,12 +161,12 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL7FormData } from '../../../composables/useL7FormData'
+import { useL7FormData } from '../../composables/useL7FormData'
 import {
   useL7OtherCheck,
   L7_CONCLUSION_OPTIONS,
   type L7CheckSection,
-} from '../../../composables/useL7OtherCheck'
+} from '../../composables/useL7OtherCheck'
 
 const props = defineProps<{
   wpId: string

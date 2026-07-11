@@ -215,7 +215,7 @@
 import { computed, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useI2Analysis } from '../../../composables/useI2Analysis'
+import { useI2Analysis } from '../../composables/useI2Analysis'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 

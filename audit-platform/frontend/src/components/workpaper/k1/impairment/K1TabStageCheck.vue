@@ -199,8 +199,8 @@
 import { computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK1StageCheck, type K1StageRow } from '../../../composables/useK1StageCheck'
-import { useK1ImportExport } from '../../../composables/useK1ImportExport'
+import { useK1StageCheck, type K1StageRow } from '../../composables/useK1StageCheck'
+import { useK1ImportExport } from '../../composables/useK1ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

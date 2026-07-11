@@ -237,8 +237,8 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useL5FormData } from '../../../composables/useL5FormData'
-import { useL5Detail, type L5DetailRow, L5_DETAIL_SEGMENTS } from '../../../composables/useL5Detail'
+import { useL5FormData } from '../../composables/useL5FormData'
+import { useL5Detail, type L5DetailRow, L5_DETAIL_SEGMENTS } from '../../composables/useL5Detail'
 
 const props = defineProps<{
   wpId: string

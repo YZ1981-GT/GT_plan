@@ -151,9 +151,9 @@
 
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
-import { useG2Detail } from '../../composables/useG2Detail'
+import { useG2Detail } from '../composables/useG2Detail'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { ChecklistResponse } from '../../composables/useF1FormData'
+import type { ChecklistResponse } from '../composables/useF1FormData'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

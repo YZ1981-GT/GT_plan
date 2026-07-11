@@ -184,8 +184,8 @@
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useM3FormData } from '../../../composables/useM3FormData'
-import { calcContraEquityEndBalance } from '../../../composables/useM3FormulaEngine'
+import { useM3FormData } from '../../composables/useM3FormData'
+import { calcContraEquityEndBalance } from '../../composables/useM3FormulaEngine'
 
 const props = defineProps<{
   wpId: string

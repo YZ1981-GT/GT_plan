@@ -238,8 +238,8 @@
 import { computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK1BadDebt, type K1BadDebtRow } from '../../../composables/useK1BadDebt'
-import { useK1ImportExport } from '../../../composables/useK1ImportExport'
+import { useK1BadDebt, type K1BadDebtRow } from '../../composables/useK1BadDebt'
+import { useK1ImportExport } from '../../composables/useK1ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

@@ -96,7 +96,7 @@
 import { inject, toRef } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useI2Impairment } from '../../../composables/useI2Impairment'
+import { useI2Impairment } from '../../composables/useI2Impairment'
 
 const props = defineProps<{
   sheetName: string

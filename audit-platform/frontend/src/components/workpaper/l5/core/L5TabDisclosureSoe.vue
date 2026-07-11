@@ -142,8 +142,8 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useL5FormData } from '../../../composables/useL5FormData'
-import { calcNetPayable } from '../../../composables/useL5FormulaEngine'
+import { useL5FormData } from '../../composables/useL5FormData'
+import { calcNetPayable } from '../../composables/useL5FormulaEngine'
 
 const props = defineProps<{
   wpId: string

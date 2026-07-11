@@ -183,8 +183,8 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL4FormData } from '../../../composables/useL4FormData'
-import { useL4InitialMeasure, type L4InitialMeasureRow } from '../../../composables/useL4InitialMeasure'
+import { useL4FormData } from '../../composables/useL4FormData'
+import { useL4InitialMeasure, type L4InitialMeasureRow } from '../../composables/useL4InitialMeasure'
 
 const props = defineProps<{
   wpId: string

@@ -175,8 +175,8 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL4FormData } from '../../../composables/useL4FormData'
-import { useL4EquityLiabCheck, type L4EquityLiabRow } from '../../../composables/useL4EquityLiabCheck'
+import { useL4FormData } from '../../composables/useL4FormData'
+import { useL4EquityLiabCheck, type L4EquityLiabRow } from '../../composables/useL4EquityLiabCheck'
 
 const props = defineProps<{
   wpId: string

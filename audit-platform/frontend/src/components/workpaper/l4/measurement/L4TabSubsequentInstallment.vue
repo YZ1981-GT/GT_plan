@@ -143,8 +143,8 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useL4FormData } from '../../../composables/useL4FormData'
-import { useL4Subsequent, type L4BondBranch, type L4SubsequentBondParams } from '../../../composables/useL4Subsequent'
+import { useL4FormData } from '../../composables/useL4FormData'
+import { useL4Subsequent, type L4BondBranch, type L4SubsequentBondParams } from '../../composables/useL4Subsequent'
 
 const props = defineProps<{
   wpId: string

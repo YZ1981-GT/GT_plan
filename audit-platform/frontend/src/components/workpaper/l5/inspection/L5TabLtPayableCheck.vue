@@ -124,7 +124,7 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL5FormData } from '../../../composables/useL5FormData'
+import { useL5FormData } from '../../composables/useL5FormData'
 
 const props = defineProps<{
   wpId: string

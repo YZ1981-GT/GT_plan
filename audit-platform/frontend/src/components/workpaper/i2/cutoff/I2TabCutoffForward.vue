@@ -96,7 +96,7 @@
 import { inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useI2Cutoff } from '../../../composables/useI2Cutoff'
+import { useI2Cutoff } from '../../composables/useI2Cutoff'
 
 const props = defineProps<{
   sheetName: string

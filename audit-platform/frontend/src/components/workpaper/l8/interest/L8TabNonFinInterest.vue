@@ -261,12 +261,12 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useL8FormData } from '../../../composables/useL8FormData'
+import { useL8FormData } from '../../composables/useL8FormData'
 import {
   useL8NonFinInterest,
   type L8NonFinInterestRow,
-} from '../../../composables/useL8NonFinInterest'
-import { useL8ImportExport } from '../../../composables/useL8ImportExport'
+} from '../../composables/useL8NonFinInterest'
+import { useL8ImportExport } from '../../composables/useL8ImportExport'
 
 const props = defineProps<{
   wpId: string

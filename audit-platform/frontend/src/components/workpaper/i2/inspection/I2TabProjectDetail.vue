@@ -196,7 +196,7 @@
 import { ref, computed, watch, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { calcSubtotal } from '../../../composables/useI2FormulaEngine'
+import { calcSubtotal } from '../../composables/useI2FormulaEngine'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 

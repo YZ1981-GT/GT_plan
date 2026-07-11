@@ -218,8 +218,8 @@
 import { ref, computed, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useI2Adjudication, type AdjudicationRow } from '../../../composables/useI2Adjudication'
-import type { I2TbData } from '../../../composables/useI2FormData'
+import { useI2Adjudication, type AdjudicationRow } from '../../composables/useI2Adjudication'
+import type { I2TbData } from '../../composables/useI2FormData'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 

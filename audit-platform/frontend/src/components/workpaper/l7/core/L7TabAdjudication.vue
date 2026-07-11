@@ -297,12 +297,12 @@
 import { computed, inject, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useL7FormData } from '../../../composables/useL7FormData'
-import { useL7DualMode } from '../../../composables/useL7DualMode'
+import { useL7FormData } from '../../composables/useL7FormData'
+import { useL7DualMode } from '../../composables/useL7DualMode'
 import {
   useL7Adjudication,
   type L7AdjudicationRow,
-} from '../../../composables/useL7Adjudication'
+} from '../../composables/useL7Adjudication'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

@@ -248,8 +248,8 @@ import {
   useK1BadDebtCalc,
   type K1AgingMigrationRow,
   type K1ECLCalcRow,
-} from '../../../composables/useK1BadDebtCalc'
-import { useK1ImportExport } from '../../../composables/useK1ImportExport'
+} from '../../composables/useK1BadDebtCalc'
+import { useK1ImportExport } from '../../composables/useK1ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

@@ -138,9 +138,9 @@ import {
   RECOVERABILITY_OPTIONS,
   RISK_LEVEL_OPTIONS,
   type OverdueCheckRow,
-} from '../../composables/useG2OverdueCheck'
+} from '../composables/useG2OverdueCheck'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { ChecklistResponse } from '../../composables/useF1FormData'
+import type { ChecklistResponse } from '../composables/useF1FormData'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

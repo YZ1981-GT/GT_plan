@@ -222,8 +222,8 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { useM3FormData } from '../../../composables/useM3FormData'
-import { useM3Adjustment, type M3AdjustmentEntry } from '../../../composables/useM3Adjustment'
+import { useM3FormData } from '../../composables/useM3FormData'
+import { useM3Adjustment, type M3AdjustmentEntry } from '../../composables/useM3Adjustment'
 
 const props = defineProps<{
   wpId: string

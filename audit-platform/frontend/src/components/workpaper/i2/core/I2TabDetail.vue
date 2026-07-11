@@ -152,8 +152,8 @@
 import { ref, computed, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useI2Detail } from '../../../composables/useI2Detail'
-import type { ChecklistItem } from '../../../composables/useI2FormData'
+import { useI2Detail } from '../../composables/useI2Detail'
+import type { ChecklistItem } from '../../composables/useI2FormData'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 

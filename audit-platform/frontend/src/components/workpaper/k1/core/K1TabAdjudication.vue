@@ -278,8 +278,8 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useK1Adjudication, type K1AdjRow } from '../../../composables/useK1Adjudication'
-import { useK1FormData } from '../../../composables/useK1FormData'
+import { useK1Adjudication, type K1AdjRow } from '../../composables/useK1Adjudication'
+import { useK1FormData } from '../../composables/useK1FormData'
 
 const props = defineProps<{
   wpId: string

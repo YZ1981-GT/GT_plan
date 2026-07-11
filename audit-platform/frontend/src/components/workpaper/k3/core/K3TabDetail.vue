@@ -324,8 +324,8 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK3Detail, type K3DetailRow } from '../../../composables/useK3Detail'
-import { useK3ImportExport } from '../../../composables/useK3ImportExport'
+import { useK3Detail, type K3DetailRow } from '../../composables/useK3Detail'
+import { useK3ImportExport } from '../../composables/useK3ImportExport'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

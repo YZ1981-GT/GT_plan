@@ -266,13 +266,13 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useL8FormData } from '../../../composables/useL8FormData'
-import { useL8DualMode } from '../../../composables/useL8DualMode'
+import { useL8FormData } from '../../composables/useL8FormData'
+import { useL8DualMode } from '../../composables/useL8DualMode'
 import {
   useL8Adjudication,
   L8_ADJUDICATION_ITEMS,
   type L8AdjudicationRow,
-} from '../../../composables/useL8Adjudication'
+} from '../../composables/useL8Adjudication'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────

@@ -131,15 +131,15 @@ import { ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import M2TabDetailListed from './M2TabDetailListed.vue'
 import M2TabDetailUnlisted from './M2TabDetailUnlisted.vue'
-import { useM2FormData } from '../../../composables/useM2FormData'
+import { useM2FormData } from '../../composables/useM2FormData'
 import {
   useM2Detail,
   type M2DetailBranch,
   type M2DetailListedRow,
   type M2DetailUnlistedRow,
-} from '../../../composables/useM2Detail'
-import { useM2DualMode } from '../../../composables/useM2DualMode'
-import { useM2ImportExport, type M2ImportableSheet } from '../../../composables/useM2ImportExport'
+} from '../../composables/useM2Detail'
+import { useM2DualMode } from '../../composables/useM2DualMode'
+import { useM2ImportExport, type M2ImportableSheet } from '../../composables/useM2ImportExport'
 
 const props = defineProps<{
   wpId: string

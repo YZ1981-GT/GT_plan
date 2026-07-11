@@ -318,14 +318,14 @@
  */
 import { computed, inject, onMounted, reactive, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL5FormData } from '../../../composables/useL5FormData'
-import { useL5DualMode } from '../../../composables/useL5DualMode'
-import { useL5ImportExport } from '../../../composables/useL5ImportExport'
+import { useL5FormData } from '../../composables/useL5FormData'
+import { useL5DualMode } from '../../composables/useL5DualMode'
+import { useL5ImportExport } from '../../composables/useL5ImportExport'
 import {
   useL5Adjudication,
   type L5AdjudicationData,
   type L5AdjudicationRow,
-} from '../../../composables/useL5Adjudication'
+} from '../../composables/useL5Adjudication'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

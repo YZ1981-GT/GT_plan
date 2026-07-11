@@ -178,11 +178,11 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
-import { useM1FormData } from '../../../composables/useM1FormData'
+import { useM1FormData } from '../../composables/useM1FormData'
 import {
   useM1DividendCheck,
   CHECK_STATUS_OPTIONS,
-} from '../../../composables/useM1DividendCheck'
+} from '../../composables/useM1DividendCheck'
 
 const props = defineProps<{
   wpId: string

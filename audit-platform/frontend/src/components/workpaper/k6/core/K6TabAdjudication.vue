@@ -279,7 +279,7 @@
 import { ref, computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, View, Upload, QuestionFilled } from '@element-plus/icons-vue'
-import { useK6Adjudication, type K6AdjRow, type K6AdjSection } from '../../../composables/useK6Adjudication'
+import { useK6Adjudication, type K6AdjRow, type K6AdjSection } from '../../composables/useK6Adjudication'
 
 const props = defineProps<{
   wpId: string

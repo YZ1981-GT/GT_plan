@@ -313,7 +313,7 @@ import {
   M2_LISTED_SEGMENTS,
   SHARE_TYPE_OPTIONS,
   type M2DetailSegment,
-} from '../../../composables/useM2Detail'
+} from '../../composables/useM2Detail'
 
 const props = defineProps<{
   wpId: string

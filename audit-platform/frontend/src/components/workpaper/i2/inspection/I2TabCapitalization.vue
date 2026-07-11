@@ -186,7 +186,7 @@ import {
   CAS6_CONDITION_NAMES,
   type CAS6Condition,
   type CapitalizationResult,
-} from '../../../composables/useI2CapitalizationEngine'
+} from '../../composables/useI2CapitalizationEngine'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 

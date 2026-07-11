@@ -305,7 +305,7 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useM1FormData } from '../../../composables/useM1FormData'
+import { useM1FormData } from '../../composables/useM1FormData'
 import {
   useM1Detail,
   M1_DETAIL_SEGMENTS,
@@ -313,8 +313,8 @@ import {
   PAYMENT_METHOD_OPTIONS,
   type M1DetailRow,
   type M1DetailSegment,
-} from '../../../composables/useM1Detail'
-import { useM1ImportExport } from '../../../composables/useM1ImportExport'
+} from '../../composables/useM1Detail'
+import { useM1ImportExport } from '../../composables/useM1ImportExport'
 
 const props = defineProps<{
   wpId: string

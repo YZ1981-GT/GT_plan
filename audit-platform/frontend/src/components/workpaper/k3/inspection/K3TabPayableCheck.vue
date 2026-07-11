@@ -216,7 +216,7 @@
  */
 import { computed, inject, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK3Checks, type K3CheckItem, type K3CutoffRow, type ComplianceState } from '../../../composables/useK3Checks'
+import { useK3Checks, type K3CheckItem, type K3CutoffRow, type ComplianceState } from '../../composables/useK3Checks'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

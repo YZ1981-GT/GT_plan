@@ -347,12 +347,12 @@
 import { computed, inject, onMounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
-import { useM2FormData } from '../../../composables/useM2FormData'
+import { useM2FormData } from '../../composables/useM2FormData'
 import {
   useM2CapitalCheck,
   CHECK_STATUS_OPTIONS,
   VERIFY_DIFF_THRESHOLD,
-} from '../../../composables/useM2CapitalCheck'
+} from '../../composables/useM2CapitalCheck'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

@@ -245,6 +245,11 @@ jobs:
           python-version: "3.12"
       - name: Check workpaper component ref contract
         run: python backend/scripts/check/check_wp_ref_contract.py --strict
+      # composables 相对导入层级守卫（2026-07-11 K 类底稿 Playwright 实测）
+      # 拦截 {cycle}/{sub}/*.vue 用错 ../ 深度 import composables（Vite transform 500 →
+      # ErrorBoundary 崩溃；vitest/Volar 解析方式不同故漏检，必须浏览器/CI 兜底）。
+      - name: Check workpaper composables import depth
+        run: python backend/scripts/check/fix_wp_composables_import_depth.py --check
 
   hotspot-baseline-check:
     # P2-1.3: 新增裸组件/重复能力/超大文件检查

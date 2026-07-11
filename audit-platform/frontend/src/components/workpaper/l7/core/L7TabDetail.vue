@@ -250,10 +250,10 @@
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useL7FormData } from '../../../composables/useL7FormData'
-import { useL7Detail, type L7DetailRow, L7_DETAIL_SEGMENTS } from '../../../composables/useL7Detail'
-import { useL7ImportExport } from '../../../composables/useL7ImportExport'
-import { useL7CrossSheet } from '../../../composables/useL7CrossSheet'
+import { useL7FormData } from '../../composables/useL7FormData'
+import { useL7Detail, type L7DetailRow, L7_DETAIL_SEGMENTS } from '../../composables/useL7Detail'
+import { useL7ImportExport } from '../../composables/useL7ImportExport'
+import { useL7CrossSheet } from '../../composables/useL7CrossSheet'
 
 const props = defineProps<{
   wpId: string

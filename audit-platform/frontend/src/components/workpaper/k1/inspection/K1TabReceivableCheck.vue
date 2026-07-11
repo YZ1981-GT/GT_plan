@@ -122,7 +122,7 @@
 import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK1Checks, type K1CheckItem, type ComplianceState } from '../../../composables/useK1Checks'
+import { useK1Checks, type K1CheckItem, type ComplianceState } from '../../composables/useK1Checks'
 
 const props = defineProps<{
   wpId: string

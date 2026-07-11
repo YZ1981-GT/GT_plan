@@ -102,7 +102,7 @@
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check, InfoFilled } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { useL6FormData } from '../../../composables/useL6FormData'
+import { useL6FormData } from '../../composables/useL6FormData'
 
 const props = defineProps<{
   wpId: string

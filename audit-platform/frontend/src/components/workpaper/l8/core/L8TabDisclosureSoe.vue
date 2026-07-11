@@ -131,7 +131,7 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL8FormData } from '../../../composables/useL8FormData'
+import { useL8FormData } from '../../composables/useL8FormData'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{

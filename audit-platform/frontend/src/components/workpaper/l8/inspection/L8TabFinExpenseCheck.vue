@@ -162,7 +162,7 @@
 import { inject, onMounted, ref, reactive } from 'vue'
 import { computed } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL8FormData } from '../../../composables/useL8FormData'
+import { useL8FormData } from '../../composables/useL8FormData'
 
 const props = defineProps<{
   wpId: string

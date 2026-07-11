@@ -153,8 +153,8 @@
 import { computed, inject, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK3LargeAmount, type K3LargeAmountRow } from '../../../composables/useK3LargeAmount'
-import { calcSubtotal } from '../../../composables/useK3FormulaEngine'
+import { useK3LargeAmount, type K3LargeAmountRow } from '../../composables/useK3LargeAmount'
+import { calcSubtotal } from '../../composables/useK3FormulaEngine'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

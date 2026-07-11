@@ -226,8 +226,8 @@
 import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useG6EclFormData, type ReversalWriteOffRow } from '../../../composables/useG6EclFormData'
-import { useG6EclImportExport } from '../../../composables/useG6EclImportExport'
+import { useG6EclFormData, type ReversalWriteOffRow } from '../../composables/useG6EclFormData'
+import { useG6EclImportExport } from '../../composables/useG6EclImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 

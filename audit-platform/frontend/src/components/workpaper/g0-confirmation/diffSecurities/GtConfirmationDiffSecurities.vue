@@ -219,7 +219,7 @@ import { ElMessage } from 'element-plus'
 import { useDiffSecuritiesData } from './composables/useDiffSecuritiesData'
 import type { SecuritiesDiffRow } from './diffSecuritiesTypes'
 import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
-import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
+import { useG0ReviewDialogProvide } from '../../composables/useG0ReviewDialogProvide'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
