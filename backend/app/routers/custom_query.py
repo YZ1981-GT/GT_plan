@@ -110,19 +110,24 @@ async def get_indicators(
         "key": "report",
         "label": f"📊 报表（{standard_label}）" if project_id else "📊 报表",
         "icon": "📊",
+        "domain": "report",
         "children": report_children,
     })
     base_tree.append({
-        "key": "trial_balance", "label": "📋 试算表", "icon": "📋",
+        "key": "trial_balance", "label": "📑 试算平衡表", "icon": "📑",
+        "domain": "tb",
         "children": [
             {"key": "tb_detail", "label": "科目明细", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
             {"key": "tb_summary", "label": "试算平衡表", "columns": ["row_code", "row_name", "unadjusted", "aje_dr", "aje_cr", "rcl_dr", "rcl_cr", "audited"]},
+            {"key": "account_balance", "label": "科目余额表", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
+            {"key": "ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"]},
         ],
     })
     base_tree.append({
         "key": "disclosure",
         "label": f"📝 附注（{standard_label}）" if project_id else "📝 附注",
         "icon": "📝",
+        "domain": "note",
         "children": disclosure_children,
     })
     # 合并范围节点：仅合并项目（report_scope=consolidated 且至少 1 家纳入单位）展示
@@ -130,6 +135,7 @@ async def get_indicators(
         base_tree.append(consol_units_node)
     base_tree.append({
         "key": "adjustment", "label": "📐 调整分录", "icon": "📐",
+        "domain": "wp",
         "children": [
             {"key": "adj_aje", "label": "审计调整分录(AJE)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
             {"key": "adj_rcl", "label": "重分类调整(RCL)", "columns": ["entry_number", "account_name", "debit_amount", "credit_amount", "description"]},
@@ -137,6 +143,7 @@ async def get_indicators(
     })
     base_tree.append({
         "key": "worksheet", "label": "📑 工作底稿", "icon": "📑",
+        "domain": "wp",
         "children": [
             {"key": "ws_info", "label": "基本信息表", "columns": ["company_name", "company_code", "holding_type", "non_common_ratio"]},
             {"key": "ws_elimination", "label": "抵消分录", "columns": ["direction", "subject", "amount", "desc"]},
@@ -144,29 +151,20 @@ async def get_indicators(
         ],
     })
     base_tree.append({
-        "key": "workpaper", "label": "📄 底稿列表", "icon": "📄",
+        "key": "workpaper", "label": "📋 底稿", "icon": "📋",
+        "domain": "wp",
         "children": await _build_workpaper_tree(db, project_id),
     })
     base_tree.append({
-        "key": "account_balance", "label": "💰 科目余额", "icon": "💰",
-        "children": [
-            {"key": "account_balance", "label": "科目余额表", "columns": ["account_code", "account_name", "opening_balance", "closing_balance", "debit_amount", "credit_amount"]},
-        ],
-    })
-    base_tree.append({
-        "key": "ledger_entries", "label": "📜 序时账", "icon": "📜",
-        "children": [
-            {"key": "ledger_entries", "label": "序时账明细", "columns": ["voucher_date", "voucher_no", "account_code", "account_name", "debit_amount", "credit_amount", "summary"]},
-        ],
-    })
-    base_tree.append({
         "key": "report_lines", "label": "📈 报表行次", "icon": "📈",
+        "domain": "report",
         "children": [
             {"key": "report_lines", "label": "报表行次配置", "columns": ["row_code", "row_name", "report_type", "applicable_standard", "indent_level", "is_total_row", "formula"]},
         ],
     })
     base_tree.append({
         "key": "workhours", "label": "⏱️ 工时记录", "icon": "⏱️",
+        "domain": "aux",
         "children": [
             {"key": "workhours", "label": "工时记录", "columns": ["work_date", "hours", "description", "status", "staff_id"]},
         ],
