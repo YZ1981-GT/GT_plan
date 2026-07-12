@@ -10,6 +10,7 @@ import { useD2Ecl, type EclSingleRow, type MigrationRateRow, type EclDiscountRow
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2SaveInject } from '../composables/useD2SaveInject'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 import type { ImportableSheet } from '../composables/useD2ImportExport'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
@@ -35,6 +36,10 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
 })
 
 const { saveItems } = useD2SaveInject()
+
+// 账龄段联动
+const { bands: agingConfigBands } = useAgingConfig(toRef(props, 'projectId'), 'D2')
+const agingBandsLabels = computed(() => agingConfigBands.value?.map((b: any) => b.label || b.name || b) || [])
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -82,6 +87,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  agingBands: agingBandsLabels,
 })
 
 function fmtPct(v: number): string {

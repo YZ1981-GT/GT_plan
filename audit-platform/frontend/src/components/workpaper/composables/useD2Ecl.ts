@@ -15,7 +15,7 @@
  *
  * Requirements: 9.1-9.7, 10.1-10.7
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calculateProvision,
@@ -23,6 +23,7 @@ import {
   calculateExpectedLossRate,
 } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -231,8 +232,28 @@ function parseMigrationMatrix(jsonStr: string | null | undefined): MigrationRate
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useD2Ecl(options: UseD2BaseOptions) {
-  const { allResponses, isReadonly } = options
+export function useD2Ecl(options: UseD2BaseOptions & { agingBands?: ComputedRef<string[]> }) {
+  const { allResponses, isReadonly, agingBands: externalBands } = options
+
+  // Fix 3: inject save
+  const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
+
+  // Fix 1: 动态账龄段联动
+  const agingBands = computed(() => {
+    if (externalBands?.value && externalBands.value.length > 0) return externalBands.value
+    const mode = allResponses.value.get('D2-adj-aging-mode')?.remark || '5y'
+    if (mode === '3y') return ['一年以内', '一到二年', '二到三年', '三年以上']
+    if (mode === 'custom') {
+      const json = allResponses.value.get('D2-adj-aging-custom-bands')?.remark
+      if (json) {
+        try {
+          const parsed = JSON.parse(json)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed.map((b: any) => b.label || '未命名')
+        } catch { /* fallback */ }
+      }
+    }
+    return DEFAULT_AGING_BANDS
+  }) = options
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -268,6 +289,38 @@ export function useD2Ecl(options: UseD2BaseOptions) {
     },
     { immediate: true }
   )
+
+  // Fix 1: 账龄段变化时重建迁徙率矩阵（保留已有段数据）
+  watch(agingBands, (newBands) => {
+    const existing = migrationMatrix.value
+    migrationMatrix.value = newBands.map(band => {
+      const found = existing.find(r => r.agingBand === band)
+      return found || {
+        rowId: generateRowId(),
+        agingBand: band,
+        year1Rate: 0, year2Rate: 0, year3Rate: 0,
+        avgRate: 0, expectedLossRate: 0,
+      }
+    })
+    recalcAllMigration()
+  })
+
+  // Fix 2: 从 D2-3 坏账准备合计取得 actualBalance（自动填入）
+  const d3BadDebtTotal = computed(() => {
+    let total = 0
+    for (const key of ['D2-bd-individual-rows', 'D2-bd-aging-rows', 'D2-bd-customer-rows']) {
+      const json = allResponses.value.get(key)?.remark
+      if (!json) continue
+      try {
+        const rows = JSON.parse(json)
+        if (Array.isArray(rows)) {
+          const fixed = rows.find((r: any) => r.isFixed)
+          if (fixed) total += Number(fixed.currentAudited) || 0
+        }
+      } catch { /* silent */ }
+    }
+    return total
+  })
 
   // ─── D2-9 Single ECL Total ─────────────────────────────────────────────
 
@@ -495,10 +548,12 @@ export function useD2Ecl(options: UseD2BaseOptions) {
   }
 
   function dispatchSaveEvent(items: any[]): void {
-    try {
-      window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
-    } catch {
-      // silent
+    if (injectedSave) {
+      void injectedSave(items)
+    } else {
+      try {
+        window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
+      } catch { /* silent */ }
     }
   }
 
@@ -537,6 +592,11 @@ export function useD2Ecl(options: UseD2BaseOptions) {
     removeDiscountRow,
     updateCell,
     updateScenario,
+
+    // Fix 1: 动态账龄段
+    agingBands,
+    // Fix 2: D2-3 坏账准备合计
+    d3BadDebtTotal,
   }
 }
 

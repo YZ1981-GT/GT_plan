@@ -13,9 +13,10 @@
  *
  * Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6
  */
-import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, type ComputedRef } from 'vue'
 import { parseNum, calculatePledgeRatio } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -152,6 +153,7 @@ function parseFactoringRows(jsonStr: string | null | undefined): FactoringRow[] 
 
 export function useD2PledgeCheck(options: UseD2BaseOptions) {
   const { allResponses, isReadonly } = options
+  const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -339,10 +341,12 @@ export function useD2PledgeCheck(options: UseD2BaseOptions) {
   }
 
   function dispatchSaveEvent(items: any[]): void {
-    try {
-      window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
-    } catch {
-      // silent
+    if (injectedSave) {
+      void injectedSave(items)
+    } else {
+      try {
+        window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
+      } catch { /* silent */ }
     }
   }
 

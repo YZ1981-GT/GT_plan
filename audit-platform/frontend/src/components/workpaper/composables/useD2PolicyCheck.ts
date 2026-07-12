@@ -13,9 +13,10 @@
  *
  * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
  */
-import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, inject, type ComputedRef } from 'vue'
 import { calculateExpectedLossRate } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,8 @@ export interface PolicyMigrationDisplayRow extends PolicyMigrationRow {
 const STORAGE_KEY = 'D2-policy-paragraphs'
 const HISTORICAL_MATRIX_KEY = 'D2-policy-historical-matrix'
 const MIGRATION_MATRIX_KEY = 'D2-policy-migration-matrix'
+const CONCLUSION_KEY = 'D2-policy-conclusion'
+const SUMMARY_KEY = 'D2-policy-summary'
 
 const DEFAULT_AGING_BANDS = [
   '1年以内', '1-2年', '2-3年', '3-4年', '4-5年', '5年以上',
@@ -209,14 +212,41 @@ function calcLossRate(loss: number, balance: number): number {
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useD2PolicyCheck(options: UseD2BaseOptions) {
-  const { allResponses, isReadonly } = options
+export function useD2PolicyCheck(options: UseD2BaseOptions & { agingBands?: ComputedRef<string[]> }) {
+  const { allResponses, isReadonly, agingBands: externalBands } = options
+
+  // ─── 改进3: provide/inject 保存 ──────────────────────────────────────────
+  const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
+
+  // ─── 改进1: 动态账龄段（联动 useAgingConfig） ────────────────────────────
+  const agingBands = computed(() => {
+    if (externalBands?.value && externalBands.value.length > 0) {
+      return externalBands.value
+    }
+    // 回退：从 D2-1 审定表的账龄模式读取
+    const mode = allResponses.value.get('D2-adj-aging-mode')?.remark || '5y'
+    if (mode === '3y') return ['一年以内', '一到二年', '二到三年', '三年以上']
+    if (mode === 'custom') {
+      const json = allResponses.value.get('D2-adj-aging-custom-bands')?.remark
+      if (json) {
+        try {
+          const parsed = JSON.parse(json)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.map((b: any) => b.label || '未命名')
+          }
+        } catch { /* fallback */ }
+      }
+    }
+    return DEFAULT_AGING_BANDS
+  }) = options
 
   // ─── State ─────────────────────────────────────────────────────────────
 
   const paragraphs = ref<PolicyParagraph[]>(DEFAULT_PARAGRAPHS.map(p => ({ ...p })))
   const historicalRows = ref<PolicyHistoricalRow[]>(createDefaultHistoricalRows())
   const migrationRows = ref<PolicyMigrationRow[]>(createDefaultMigrationRows())
+  const auditSummary = ref('')
+  const auditConclusion = ref('')
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let matrixDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -227,6 +257,8 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
     paragraphs.value = parseParagraphs(resp?.remark)
     historicalRows.value = parseHistoricalRows(allResponses.value.get(HISTORICAL_MATRIX_KEY)?.remark)
     migrationRows.value = parseMigrationRows(allResponses.value.get(MIGRATION_MATRIX_KEY)?.remark)
+    auditSummary.value = allResponses.value.get(SUMMARY_KEY)?.remark || ''
+    auditConclusion.value = allResponses.value.get(CONCLUSION_KEY)?.remark || ''
   }
 
   watch(
@@ -347,16 +379,17 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
     allResponses.value.set(MIGRATION_MATRIX_KEY, {
       item_id: MIGRATION_MATRIX_KEY, conclusion: null, remark: migJson,
     })
-    try {
-      window.dispatchEvent(new CustomEvent('d2:save-items', {
-        detail: {
-          items: [
-            { item_id: HISTORICAL_MATRIX_KEY, conclusion: null, remark: histJson },
-            { item_id: MIGRATION_MATRIX_KEY, conclusion: null, remark: migJson },
-          ],
-        },
-      }))
-    } catch { /* silent */ }
+    const items = [
+      { item_id: HISTORICAL_MATRIX_KEY, conclusion: null, remark: histJson },
+      { item_id: MIGRATION_MATRIX_KEY, conclusion: null, remark: migJson },
+    ]
+    if (injectedSave) {
+      void injectedSave(items)
+    } else {
+      try {
+        window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
+      } catch { /* silent */ }
+    }
   }
 
   // ─── Serialization & Save ──────────────────────────────────────────────
@@ -388,13 +421,75 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
   }
 
   function dispatchSaveEvent(json: string): void {
-    try {
-      const items = [{ item_id: STORAGE_KEY, conclusion: null, remark: json }]
-      window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
-    } catch {
-      // silent
+    const items = [{ item_id: STORAGE_KEY, conclusion: null, remark: json }]
+    if (injectedSave) {
+      void injectedSave(items)
+    } else {
+      try {
+        window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
+      } catch { /* silent */ }
     }
   }
+
+  // ─── 改进4: 审计说明/结论 ──────────────────────────────────────────────
+
+  function updateSummary(value: string): void {
+    if (isReadonly.value) return
+    auditSummary.value = value
+    const item = { item_id: SUMMARY_KEY, conclusion: null, remark: value }
+    allResponses.value.set(SUMMARY_KEY, item)
+    if (injectedSave) void injectedSave([item])
+    else {
+      try { window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } })) } catch { /* */ }
+    }
+  }
+
+  function updateConclusion(value: string): void {
+    if (isReadonly.value) return
+    auditConclusion.value = value
+    const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: value }
+    allResponses.value.set(CONCLUSION_KEY, item)
+    if (injectedSave) void injectedSave([item])
+    else {
+      try { window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } })) } catch { /* */ }
+    }
+  }
+
+  // ─── 改进1: 账龄段变化时重建矩阵行 ────────────────────────────────────────
+
+  watch(agingBands, (newBands) => {
+    // 重建历史损失率矩阵（保留已有段数据）
+    const existingHist = historicalRows.value
+    historicalRows.value = newBands.map(band => {
+      const found = existingHist.find(r => r.agingBand === band)
+      return found || { rowId: generateRowId(), agingBand: band, balanceY1: 0, balanceY2: 0, balanceY3: 0, lossY1: 0, lossY2: 0, lossY3: 0 }
+    })
+    // 重建迁徙率矩阵
+    const existingMig = migrationRows.value
+    migrationRows.value = newBands.map(band => {
+      const found = existingMig.find(r => r.agingBand === band)
+      return found || { rowId: generateRowId(), agingBand: band, year1Rate: 0, year2Rate: 0, year3Rate: 0 }
+    })
+  })
+
+  // ─── 改进2: 迁徙率与 D2-10 ECL 交叉引用 ───────────────────────────────────
+
+  /** 迁徙率是否与 D2-10 存在差异（供 UI 展示联动警告） */
+  const migrationD10Deviation = computed<string | null>(() => {
+    const d10Rows = allResponses.value.get('D2-ecl10-migration-rows')?.remark
+    if (!d10Rows) return null
+    try {
+      const parsed = JSON.parse(d10Rows)
+      if (!Array.isArray(parsed) || parsed.length === 0) return null
+      // 比较第一段的平均迁徙率
+      const d10Avg = parsed[0]?.avgRate ?? parsed[0]?.expectedLossRate
+      const d8Avg = migrationDisplayRows.value[0]?.avgRate
+      if (d10Avg != null && d8Avg != null && Math.abs(d10Avg - d8Avg) > 0.05) {
+        return `D2-8 首段迁徙率(${(d8Avg * 100).toFixed(1)}%)与 D2-10 首段(${(d10Avg * 100).toFixed(1)}%)偏差超过5%，请核实`
+      }
+    } catch { /* silent */ }
+    return null
+  })
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -423,6 +518,15 @@ export function useD2PolicyCheck(options: UseD2BaseOptions) {
     updateParagraph,
     updateHistoricalCell,
     updateMigrationCell,
+    // 改进1: 动态账龄段
+    agingBands,
+    // 改进2: 迁徙率交叉引用
+    migrationD10Deviation,
+    // 改进4: 审计说明/结论
+    auditSummary,
+    auditConclusion,
+    updateSummary,
+    updateConclusion,
   }
 }
 

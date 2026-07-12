@@ -227,27 +227,27 @@ const GUIDANCE_TEXTS = [
     </div>
 
     <!-- 审计说明 -->
-    <div class="section-subtitle">审计说明</div>
+    <div class="section-subtitle">
+      审计说明
+      <GtReviewTrigger section-id="D2-bizmodel-note" />
+      <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计说明' : 'AI 服务暂不可用'" placement="top">
+        <el-button size="small" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI</el-button>
+      </el-tooltip>
+    </div>
     <div class="note-section">
       <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" placeholder="请输入审计说明..." :disabled="isReadonly" @change="(v: string) => saveAuditNote(v || '')" />
-      <div class="note-actions">
-        <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计说明' : 'AI 服务暂不可用'" placement="top">
-          <el-button size="small" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI</el-button>
-        </el-tooltip>
-        <el-button v-if="openReviewDialog" size="small" @click="onReview('D2-bizmodel-note')">💬 复核</el-button>
-      </div>
     </div>
 
     <!-- 审计结论 -->
-    <div class="section-subtitle">审计结论</div>
+    <div class="section-subtitle">
+      审计结论
+      <GtReviewTrigger section-id="D2-bizmodel-conclusion" />
+      <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计结论' : 'AI 服务暂不可用'" placement="top">
+        <el-button size="small" :loading="aiLoadingConclusion" :disabled="isReadonly || !aiAvailable" @click="generateConclusionAI">🤖 AI</el-button>
+      </el-tooltip>
+    </div>
     <div class="note-section">
       <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditConclusion" placeholder="请输入审计结论..." :disabled="isReadonly" @change="(v: string) => saveAuditConclusion(v || '')" />
-      <div class="note-actions">
-        <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计结论' : 'AI 服务暂不可用'" placement="top">
-          <el-button size="small" :loading="aiLoadingConclusion" :disabled="isReadonly || !aiAvailable" @click="generateConclusionAI">🤖 AI</el-button>
-        </el-tooltip>
-        <el-button v-if="openReviewDialog" size="small" @click="onReview('D2-bizmodel-conclusion')">💬 复核</el-button>
-      </div>
     </div>
 
     <details class="guidance-fold">

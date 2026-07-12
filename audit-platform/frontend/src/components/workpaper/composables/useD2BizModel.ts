@@ -18,8 +18,9 @@
  *
  * Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6
  */
-import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,7 @@ function parseGroups(jsonStr: string | null | undefined): BizModelGroup[] {
 
 export function useD2BizModel(options: UseD2BaseOptions) {
   const { allResponses, isReadonly } = options
+  const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -276,10 +278,12 @@ export function useD2BizModel(options: UseD2BaseOptions) {
   }
 
   function dispatchSaveEvent(items: any[]): void {
-    try {
-      window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
-    } catch {
-      // silent
+    if (injectedSave) {
+      void injectedSave(items)
+    } else {
+      try {
+        window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items } }))
+      } catch { /* silent */ }
     }
   }
 

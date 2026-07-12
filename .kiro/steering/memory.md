@@ -98,7 +98,7 @@ inclusion: always
 
 ### git
 - 分支 `work/2026-05-30-wp-specs`；最高迁移 **V102**（V100 formula-lib / V101 advanced-query模板共享 / V102 advanced_query_writeback addr_id；以 `migration_status` 为准）
-- 本次push：**composables 相对导入层级 bug 全树修复**(rebase 到 origin `282f8d80`)：125文件/244处 `../`深度错误→Vite transform 500崩溃(K类Playwright实测暴露),`fix_wp_composables_import_depth.py --apply`修复+`--check`挂CI(governance wp-ref-contract-check job)。9先前500 tab全转200,K1-1审定表实测0error正常渲染
+- 本次push：**D2模块优化打磨**(commit `ea6282db`，17文件+1199/-176)：provide/inject替代window event(d2InjectionKeys+useD2SaveInject)+selfLoad去`as any`+crossSheet focused key extractors+D2-2列设置(useD2DetailColumnPrefs)+D2-3源模板对齐(其他增加/减少+自定义信用风险组合+列设置)+D2-5分析修复(5年段6段/前十名动态行/各区段导入导出/AI审计过程/账龄联动)+D2-1 AGING_PRESET_5Y修正
 - origin `282f8d80`(我方)：formula-management-library 实现 Req1-32 全链路(P0/P1缺口)+spec三件套修订(components/formula/*+template-library/*+draft_refresh 等)
 - 更早push `4a6c753c`(补齐H~S遗留三项:H7 25tab实现+K10-6抽凭重接+S12-S21持久化useSExpertPersist,59文件)；`10134f81`(H~S 全循环 ref/selfLoad/导航系统性清扫+gold,275文件:selfLoad键名bug H6/H8/H9/K12/K13 _mergeResponses+导航navigate→navigate-sheet L1-L8/M1-M10/N1-N5+H6/H8/H9持久化断路+K4抽凭重接+K12-1 stub+后端render applicable_standard_v2列漂移)；`d8b27f2d`(acnr 100/100+advanced-query 85/85+formula-lib V100+voucher spec)
 - `origin/HEAD→origin/master` 落后 main 隐患仍在
@@ -126,7 +126,7 @@ inclusion: always
 - **✅ 全部完成**：A~N全部循环底稿+函证+D2-refactor+G5 / S全部 / F循环全部 / L循环全部 / 基础设施(版本链/复核/抽凭/截止测试) — **无活跃待办**
 - **✅ C2~C15 弹窗增强已完成**：编制提示琥珀块 + 附件 OCR 作 AI context（c-control-test-popup-enhance 33/33）
 - **✅ ref-unwrap全循环清扫完成(2026-07-11)**：H/I/J/L/M/N/S/A/B/C 全审计;仅H5有真bug(14文件.value)已修,其余全安全(解构到顶层/显式.value范式)。guard exit 0。**🟡 N5TabIndex目录跳转接线遗漏**(emit('navigate')但父GtN5未绑@navigate→点击目录无法切sheet,非ref-unwrap,待修)
-- **🟡 B40** 需重建 spec；**B60** 待 vLLM Phase3；AI 对话流 / 存货监盘 P2 / voucher-attachment P2
+- **🟢 D2-7 凭证检查表增强 d2-7-voucher-check-enhancement(2026-07-12)**：**spec三件套齐**(requirements 12条EARS+design 5composable+17属性P1-P17+tasks 11组20叶子/8波)。双区检查表(本期+期后17列)+源模板五区段+卡片矩阵双视图+行级附件OCR+AI核对确认回填+抽凭引擎方法学AI(联动B15/B50推荐方法+样本量+CAS1314)+测试总体AI生成+特定样本AI筛选+审计说明统计自动化+双区分sheet导出。**待实现**(Wave0起=useD2VoucherCheckEnhanced.ts)
 - **基础设施**：version-trail/audit-review-dialog/全局一致性/voucher-sampling完成✅；cutoff-auto-sampling **未动工**
 - **🔴 科目方向铁律**：资产期末=期初+借-贷；负债/权益=期初+贷-借；**M3 库存股=权益备抵借方**；损益取发生额（H10/I6/K8~K13/L8/N4/N5）
 - **🔴 向导式隐藏子 sheet**：overrides 标 skip + 保留 WHOLE + skip 过滤须头部 `re.match` 提编码

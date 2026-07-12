@@ -3,11 +3,13 @@
  * D2TabPolicyCheck — 政策检查D2-8
  * 段落卡片式布局(非table), 6个政策段落, Y/N/NA radio, 结论=N红色边框
  */
-import { inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useD2PolicyCheck, type PolicyParagraph } from '../composables/useD2PolicyCheck'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 
 const props = defineProps<{
   wpId: string
@@ -22,6 +24,11 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
+// 改进1: 账龄段联动
+const { bands: agingConfigBands } = useAgingConfig(toRef(props, 'projectId'), 'D2')
+const agingBandsLabels = computed(() => agingConfigBands.value?.map((b: any) => b.label || b.name || b) || [])
 
 function openReviewForParagraph(paragraphIdx: number): void {
   if (!openReviewDialog) return
@@ -38,11 +45,18 @@ const {
   updateParagraph,
   updateHistoricalCell,
   updateMigrationCell,
+  agingBands,
+  migrationD10Deviation,
+  auditSummary,
+  auditConclusion,
+  updateSummary,
+  updateConclusion,
 } = useD2PolicyCheck({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  agingBands: agingBandsLabels,
 })
 
 const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
@@ -67,6 +81,24 @@ async function onAiEvaluation(p: PolicyParagraph): Promise<void> {
   if (content) {
     updateParagraph(p.paragraphId, 'auditorEvaluation', content)
   }
+}
+
+async function onAiSummary(): Promise<void> {
+  const content = await generateAndConfirm('policy-summary', auditSummary.value, {
+    completedCount: completedCount.value,
+    totalCount: totalCount.value,
+    hasNonCompliant: hasNonCompliant.value,
+    paragraphs: paragraphs.value.map(p => ({ title: p.title, conclusion: p.conclusion })),
+  }, 'AI 生成审计说明')
+  if (content) updateSummary(content)
+}
+
+async function onAiConclusion(): Promise<void> {
+  const content = await generateAndConfirm('policy-conclusion', auditConclusion.value, {
+    completedCount: completedCount.value,
+    hasNonCompliant: hasNonCompliant.value,
+  }, 'AI 生成审计结论')
+  if (content) updateConclusion(content)
 }
 
 function fmtPct(v: number): string {
@@ -266,6 +298,42 @@ function fmtPct(v: number): string {
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 改进2: D2-10 迁徙率交叉引用警告 -->
+    <el-alert v-if="migrationD10Deviation" type="warning" :closable="false" show-icon class="deviation-alert">
+      {{ migrationD10Deviation }}
+      <GtIndexChip v-if="jumpToSection" value="wp:D2-10" label="D2-10" class="deviation-chip" @click="jumpToSection('预期信用损失的计量测试D2-10')" />
+    </el-alert>
+
+    <!-- 改进4: 审计说明 -->
+    <div class="section-title">
+      <span>审计说明</span>
+      <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiSummary">🤖 AI生成</el-button>
+      <GtReviewTrigger section-id="D2-policy-summary" />
+    </div>
+    <el-input
+      :model-value="auditSummary"
+      type="textarea"
+      :autosize="{ minRows: 5 }"
+      :disabled="isReadonly"
+      placeholder="总结会计政策检查发现的问题、不合规项及其审计影响..."
+      @change="(v: string) => updateSummary(v)"
+    />
+
+    <!-- 改进4: 审计结论 -->
+    <div class="section-title">
+      <span>审计结论</span>
+      <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiConclusion">🤖 AI生成</el-button>
+      <GtReviewTrigger section-id="D2-policy-conclusion" />
+    </div>
+    <el-input
+      :model-value="auditConclusion"
+      type="textarea"
+      :autosize="{ minRows: 5 }"
+      :disabled="isReadonly"
+      placeholder="会计政策检查总体结论..."
+      @change="(v: string) => updateConclusion(v)"
+    />
   </div>
 </template>
 
@@ -291,6 +359,9 @@ function fmtPct(v: number): string {
 .paragraph-card.non-compliant { border: 2px solid #f56c6c; }
 .para-header { display: flex; justify-content: space-between; align-items: center; }
 .para-title { font-weight: 600; font-size: 14px; }
+.deviation-alert { margin: 12px 0; }
+.deviation-chip { margin-left: 8px; vertical-align: middle; }
+.section-title { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 8px; }
 
 .para-body { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
 .field-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
