@@ -4307,6 +4307,1554 @@
       ],
       "source": "imp_preset_generator",
       "description": "资产减值准备合计 = 各项减值准备之和"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-10",
+      "expression": "ABS(ROUND(ROW('BS-002') - NOTE('五、1', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-002')"
+        },
+        {
+          "formula_ref": "NOTE('五、1')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "货币资金：报表 BS-002 = 附注五、1合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-11",
+      "expression": "ABS(ROUND(ROW('BS-005') - NOTE('五、2', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-005')"
+        },
+        {
+          "formula_ref": "NOTE('五、2')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "交易性金融资产：报表 BS-005 = 附注五、2合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-12",
+      "expression": "ABS(ROUND(ROW('BS-007') - NOTE('五、3', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-007')"
+        },
+        {
+          "formula_ref": "NOTE('五、3')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应收票据：报表 BS-007 = 附注五、3合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-13",
+      "expression": "ABS(ROUND(ROW('BS-008') - NOTE('五、4', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-008')"
+        },
+        {
+          "formula_ref": "NOTE('五、4')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应收账款：报表 BS-008 = 附注五、4合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-14",
+      "expression": "ABS(ROUND(ROW('BS-009') - NOTE('五、5', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-009')"
+        },
+        {
+          "formula_ref": "NOTE('五、5')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应收款项融资：报表 BS-009 = 附注五、5合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-15",
+      "expression": "ABS(ROUND(ROW('BS-010') - NOTE('五、6', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-010')"
+        },
+        {
+          "formula_ref": "NOTE('五、6')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "预付款项：报表 BS-010 = 附注五、6合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-16",
+      "expression": "ABS(ROUND(ROW('BS-015') - NOTE('五、7', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-015')"
+        },
+        {
+          "formula_ref": "NOTE('五、7')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他应收款：报表 BS-015 = 附注五、7合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-17",
+      "expression": "ABS(ROUND(ROW('BS-018') - NOTE('五、8', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-018')"
+        },
+        {
+          "formula_ref": "NOTE('五、8')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "存货：报表 BS-018 = 附注五、8合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-18",
+      "expression": "ABS(ROUND(ROW('BS-021') - NOTE('五、9', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-021')"
+        },
+        {
+          "formula_ref": "NOTE('五、9')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "合同资产：报表 BS-021 = 附注五、9合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-19",
+      "expression": "ABS(ROUND(ROW('BS-025') - NOTE('五、10', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-025')"
+        },
+        {
+          "formula_ref": "NOTE('五、10')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "一年内到期的非流动资产：报表 BS-025 = 附注五、10合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-20",
+      "expression": "ABS(ROUND(ROW('BS-026') - NOTE('五、11', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-026')"
+        },
+        {
+          "formula_ref": "NOTE('五、11')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他流动资产：报表 BS-026 = 附注五、11合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-21",
+      "expression": "ABS(ROUND(ROW('BS-032') - NOTE('五、12', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-032')"
+        },
+        {
+          "formula_ref": "NOTE('五、12')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "长期应收款：报表 BS-032 = 附注五、12合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-22",
+      "expression": "ABS(ROUND(ROW('BS-033') - NOTE('五、13', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-033')"
+        },
+        {
+          "formula_ref": "NOTE('五、13')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "长期股权投资：报表 BS-033 = 附注五、13合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-23",
+      "expression": "ABS(ROUND(ROW('BS-034') - NOTE('五、14', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-034')"
+        },
+        {
+          "formula_ref": "NOTE('五、14')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他权益工具投资：报表 BS-034 = 附注五、14合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-24",
+      "expression": "ABS(ROUND(ROW('BS-035') - NOTE('五、15', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-035')"
+        },
+        {
+          "formula_ref": "NOTE('五、15')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他非流动金融资产：报表 BS-035 = 附注五、15合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-25",
+      "expression": "ABS(ROUND(ROW('BS-036') - NOTE('五、16', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-036')"
+        },
+        {
+          "formula_ref": "NOTE('五、16')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "投资性房地产：报表 BS-036 = 附注五、16合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-26",
+      "expression": "ABS(ROUND(ROW('BS-037') - NOTE('五、17', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-037')"
+        },
+        {
+          "formula_ref": "NOTE('五、17')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "固定资产：报表 BS-037 = 附注五、17合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-27",
+      "expression": "ABS(ROUND(ROW('BS-041') - NOTE('五、18', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-041')"
+        },
+        {
+          "formula_ref": "NOTE('五、18')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "在建工程：报表 BS-041 = 附注五、18合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-28",
+      "expression": "ABS(ROUND(ROW('BS-044') - NOTE('五、19', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-044')"
+        },
+        {
+          "formula_ref": "NOTE('五、19')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "使用权资产：报表 BS-044 = 附注五、19合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-29",
+      "expression": "ABS(ROUND(ROW('BS-045') - NOTE('五、20', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-045')"
+        },
+        {
+          "formula_ref": "NOTE('五、20')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "无形资产：报表 BS-045 = 附注五、20合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-30",
+      "expression": "ABS(ROUND(ROW('BS-047') - NOTE('五、21', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-047')"
+        },
+        {
+          "formula_ref": "NOTE('五、21')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "商誉：报表 BS-047 = 附注五、21合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-31",
+      "expression": "ABS(ROUND(ROW('BS-048') - NOTE('五、22', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-048')"
+        },
+        {
+          "formula_ref": "NOTE('五、22')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "长期待摊费用：报表 BS-048 = 附注五、22合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-32",
+      "expression": "ABS(ROUND(ROW('BS-049') - NOTE('五、23', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-049')"
+        },
+        {
+          "formula_ref": "NOTE('五、23')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "递延所得税资产：报表 BS-049 = 附注五、23合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-33",
+      "expression": "ABS(ROUND(ROW('BS-050') - NOTE('五、24', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-050')"
+        },
+        {
+          "formula_ref": "NOTE('五、24')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他非流动资产：报表 BS-050 = 附注五、24合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-34",
+      "expression": "ABS(ROUND(ROW('BS-055') - NOTE('五、25', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-055')"
+        },
+        {
+          "formula_ref": "NOTE('五、25')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "短期借款：报表 BS-055 = 附注五、25合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-35",
+      "expression": "ABS(ROUND(ROW('BS-060') - NOTE('五、26', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-060')"
+        },
+        {
+          "formula_ref": "NOTE('五、26')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应付票据：报表 BS-060 = 附注五、26合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-36",
+      "expression": "ABS(ROUND(ROW('BS-061') - NOTE('五、27', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-061')"
+        },
+        {
+          "formula_ref": "NOTE('五、27')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应付账款：报表 BS-061 = 附注五、27合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-37",
+      "expression": "ABS(ROUND(ROW('BS-063') - NOTE('五、28', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-063')"
+        },
+        {
+          "formula_ref": "NOTE('五、28')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "合同负债：报表 BS-063 = 附注五、28合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-38",
+      "expression": "ABS(ROUND(ROW('BS-069') - NOTE('五、29', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-069')"
+        },
+        {
+          "formula_ref": "NOTE('五、29')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应付职工薪酬：报表 BS-069 = 附注五、29合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-39",
+      "expression": "ABS(ROUND(ROW('BS-073') - NOTE('五、30', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-073')"
+        },
+        {
+          "formula_ref": "NOTE('五、30')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应交税费：报表 BS-073 = 附注五、30合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-40",
+      "expression": "ABS(ROUND(ROW('BS-075') - NOTE('五、31', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-075')"
+        },
+        {
+          "formula_ref": "NOTE('五、31')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他应付款：报表 BS-075 = 附注五、31合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-41",
+      "expression": "ABS(ROUND(ROW('BS-080') - NOTE('五、32', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-080')"
+        },
+        {
+          "formula_ref": "NOTE('五、32')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "一年内到期的非流动负债：报表 BS-080 = 附注五、32合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-42",
+      "expression": "ABS(ROUND(ROW('BS-081') - NOTE('五、33', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-081')"
+        },
+        {
+          "formula_ref": "NOTE('五、33')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他流动负债：报表 BS-081 = 附注五、33合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-43",
+      "expression": "ABS(ROUND(ROW('BS-085') - NOTE('五、34', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-085')"
+        },
+        {
+          "formula_ref": "NOTE('五、34')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "长期借款：报表 BS-085 = 附注五、34合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-44",
+      "expression": "ABS(ROUND(ROW('BS-086') - NOTE('五、35', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-086')"
+        },
+        {
+          "formula_ref": "NOTE('五、35')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "应付债券：报表 BS-086 = 附注五、35合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-45",
+      "expression": "ABS(ROUND(ROW('BS-091') - NOTE('五、36', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-091')"
+        },
+        {
+          "formula_ref": "NOTE('五、36')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "租赁负债：报表 BS-091 = 附注五、36合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-46",
+      "expression": "ABS(ROUND(ROW('BS-092') - NOTE('五、37', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-092')"
+        },
+        {
+          "formula_ref": "NOTE('五、37')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "长期应付款：报表 BS-092 = 附注五、37合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-47",
+      "expression": "ABS(ROUND(ROW('BS-094') - NOTE('五、38', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-094')"
+        },
+        {
+          "formula_ref": "NOTE('五、38')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "预计负债：报表 BS-094 = 附注五、38合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-48",
+      "expression": "ABS(ROUND(ROW('BS-095') - NOTE('五、39', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-095')"
+        },
+        {
+          "formula_ref": "NOTE('五、39')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "递延收益：报表 BS-095 = 附注五、39合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-49",
+      "expression": "ABS(ROUND(ROW('BS-096') - NOTE('五、40', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-096')"
+        },
+        {
+          "formula_ref": "NOTE('五、40')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "递延所得税负债：报表 BS-096 = 附注五、40合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-50",
+      "expression": "ABS(ROUND(ROW('BS-097') - NOTE('五、41', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-097')"
+        },
+        {
+          "formula_ref": "NOTE('五、41')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他非流动负债：报表 BS-097 = 附注五、41合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-51",
+      "expression": "ABS(ROUND(ROW('BS-102') - NOTE('五、42', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-102')"
+        },
+        {
+          "formula_ref": "NOTE('五、42')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "实收资本：报表 BS-102 = 附注五、42合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-52",
+      "expression": "ABS(ROUND(ROW('BS-113') - NOTE('五、43', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-113')"
+        },
+        {
+          "formula_ref": "NOTE('五、43')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "资本公积：报表 BS-113 = 附注五、43合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-53",
+      "expression": "ABS(ROUND(ROW('BS-115') - NOTE('五、44', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-115')"
+        },
+        {
+          "formula_ref": "NOTE('五、44')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他综合收益：报表 BS-115 = 附注五、44合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-54",
+      "expression": "ABS(ROUND(ROW('BS-118') - NOTE('五、45', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-118')"
+        },
+        {
+          "formula_ref": "NOTE('五、45')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "盈余公积：报表 BS-118 = 附注五、45合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-55",
+      "expression": "ABS(ROUND(ROW('BS-125') - NOTE('五、46', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-125')"
+        },
+        {
+          "formula_ref": "NOTE('五、46')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "未分配利润：报表 BS-125 = 附注五、46合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-56",
+      "expression": "ABS(ROUND(ROW('IS-001') - NOTE('五、47', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-001')"
+        },
+        {
+          "formula_ref": "NOTE('五、47')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "营业收入：报表 IS-001 = 附注五、47合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-57",
+      "expression": "ABS(ROUND(ROW('IS-002') - NOTE('五、48', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-002')"
+        },
+        {
+          "formula_ref": "NOTE('五、48')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "营业成本：报表 IS-002 = 附注五、48合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-58",
+      "expression": "ABS(ROUND(ROW('IS-003') - NOTE('五、49', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-003')"
+        },
+        {
+          "formula_ref": "NOTE('五、49')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "税金及附加：报表 IS-003 = 附注五、49合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-59",
+      "expression": "ABS(ROUND(ROW('IS-004') - NOTE('五、50', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-004')"
+        },
+        {
+          "formula_ref": "NOTE('五、50')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "销售费用：报表 IS-004 = 附注五、50合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-60",
+      "expression": "ABS(ROUND(ROW('IS-005') - NOTE('五、51', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-005')"
+        },
+        {
+          "formula_ref": "NOTE('五、51')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "管理费用：报表 IS-005 = 附注五、51合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-61",
+      "expression": "ABS(ROUND(ROW('IS-006') - NOTE('五、52', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-006')"
+        },
+        {
+          "formula_ref": "NOTE('五、52')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "研发费用：报表 IS-006 = 附注五、52合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-62",
+      "expression": "ABS(ROUND(ROW('IS-007') - NOTE('五、53', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-007')"
+        },
+        {
+          "formula_ref": "NOTE('五、53')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "财务费用：报表 IS-007 = 附注五、53合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-63",
+      "expression": "ABS(ROUND(ROW('IS-010') - NOTE('五、54', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-010')"
+        },
+        {
+          "formula_ref": "NOTE('五、54')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "其他收益：报表 IS-010 = 附注五、54合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-64",
+      "expression": "ABS(ROUND(ROW('IS-011') - NOTE('五、55', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-011')"
+        },
+        {
+          "formula_ref": "NOTE('五、55')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "投资收益：报表 IS-011 = 附注五、55合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-65",
+      "expression": "ABS(ROUND(ROW('IS-016') - NOTE('五、56', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-016')"
+        },
+        {
+          "formula_ref": "NOTE('五、56')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "信用减值损失：报表 IS-016 = 附注五、56合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-66",
+      "expression": "ABS(ROUND(ROW('IS-017') - NOTE('五、57', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-017')"
+        },
+        {
+          "formula_ref": "NOTE('五、57')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "资产减值损失：报表 IS-017 = 附注五、57合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-67",
+      "expression": "ABS(ROUND(ROW('IS-018') - NOTE('五、58', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-018')"
+        },
+        {
+          "formula_ref": "NOTE('五、58')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "资产处置收益：报表 IS-018 = 附注五、58合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-68",
+      "expression": "ABS(ROUND(ROW('IS-020') - NOTE('五、59', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-020')"
+        },
+        {
+          "formula_ref": "NOTE('五、59')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "营业外收入：报表 IS-020 = 附注五、59合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-69",
+      "expression": "ABS(ROUND(ROW('IS-021') - NOTE('五、60', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-021')"
+        },
+        {
+          "formula_ref": "NOTE('五、60')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "营业外支出：报表 IS-021 = 附注五、60合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rn-70",
+      "expression": "ABS(ROUND(ROW('IS-023') - NOTE('五、61', '合计'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-023')"
+        },
+        {
+          "formula_ref": "NOTE('五、61')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "note",
+      "description": "所得税费用：报表 IS-023 = 附注五、61合计"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-71",
+      "expression": "ABS(ROUND(ROW('BS-002') - WP('E1', 'E1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-002')"
+        },
+        {
+          "formula_ref": "WP('E1', 'E1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "货币资金：报表 BS-002 = E1 E1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-72",
+      "expression": "ABS(ROUND(ROW('BS-007') - WP('D1', 'D1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-007')"
+        },
+        {
+          "formula_ref": "WP('D1', 'D1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "应收票据：报表 BS-007 = D1 D1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-73",
+      "expression": "ABS(ROUND(ROW('BS-008') - WP('D2', 'D2-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-008')"
+        },
+        {
+          "formula_ref": "WP('D2', 'D2-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "应收账款：报表 BS-008 = D2 D2-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-74",
+      "expression": "ABS(ROUND(ROW('BS-009') - WP('D5', 'D5-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-009')"
+        },
+        {
+          "formula_ref": "WP('D5', 'D5-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "应收款项融资：报表 BS-009 = D5 D5-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-75",
+      "expression": "ABS(ROUND(ROW('BS-010') - WP('D3', 'D3-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-010')"
+        },
+        {
+          "formula_ref": "WP('D3', 'D3-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "预付款项：报表 BS-010 = D3 D3-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-76",
+      "expression": "ABS(ROUND(ROW('BS-015') - WP('D6', 'D6-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-015')"
+        },
+        {
+          "formula_ref": "WP('D6', 'D6-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "其他应收款：报表 BS-015 = D6 D6-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-77",
+      "expression": "ABS(ROUND(ROW('BS-018') - WP('F2', 'F2-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-018')"
+        },
+        {
+          "formula_ref": "WP('F2', 'F2-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "存货：报表 BS-018 = F2 F2-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-78",
+      "expression": "ABS(ROUND(ROW('BS-021') - WP('D7', 'D7-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-021')"
+        },
+        {
+          "formula_ref": "WP('D7', 'D7-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "合同资产：报表 BS-021 = D7 D7-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-79",
+      "expression": "ABS(ROUND(ROW('BS-033') - WP('J1', 'J1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-033')"
+        },
+        {
+          "formula_ref": "WP('J1', 'J1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "长期股权投资：报表 BS-033 = J1 J1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-80",
+      "expression": "ABS(ROUND(ROW('BS-036') - WP('I4', 'I4-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-036')"
+        },
+        {
+          "formula_ref": "WP('I4', 'I4-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "投资性房地产：报表 BS-036 = I4 I4-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-81",
+      "expression": "ABS(ROUND(ROW('BS-037') - WP('H1', 'H1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-037')"
+        },
+        {
+          "formula_ref": "WP('H1', 'H1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "固定资产：报表 BS-037 = H1 H1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-82",
+      "expression": "ABS(ROUND(ROW('BS-041') - WP('H2', 'H2-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-041')"
+        },
+        {
+          "formula_ref": "WP('H2', 'H2-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "在建工程：报表 BS-041 = H2 H2-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-83",
+      "expression": "ABS(ROUND(ROW('BS-045') - WP('I1', 'I1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-045')"
+        },
+        {
+          "formula_ref": "WP('I1', 'I1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "无形资产：报表 BS-045 = I1 I1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-84",
+      "expression": "ABS(ROUND(ROW('BS-047') - WP('I3', 'I3-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-047')"
+        },
+        {
+          "formula_ref": "WP('I3', 'I3-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "商誉：报表 BS-047 = I3 I3-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-85",
+      "expression": "ABS(ROUND(ROW('BS-055') - WP('K1', 'K1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-055')"
+        },
+        {
+          "formula_ref": "WP('K1', 'K1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "短期借款：报表 BS-055 = K1 K1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-86",
+      "expression": "ABS(ROUND(ROW('BS-060') - WP('F1', 'F1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-060')"
+        },
+        {
+          "formula_ref": "WP('F1', 'F1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "应付票据/应付账款：报表 BS-060 = F1 F1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-87",
+      "expression": "ABS(ROUND(ROW('BS-069') - WP('L1', 'L1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-069')"
+        },
+        {
+          "formula_ref": "WP('L1', 'L1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "应付职工薪酬：报表 BS-069 = L1 L1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-88",
+      "expression": "ABS(ROUND(ROW('BS-085') - WP('K2', 'K2-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-085')"
+        },
+        {
+          "formula_ref": "WP('K2', 'K2-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "长期借款：报表 BS-085 = K2 K2-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-89",
+      "expression": "ABS(ROUND(ROW('BS-102') - WP('M1', 'M1-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-102')"
+        },
+        {
+          "formula_ref": "WP('M1', 'M1-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "实收资本：报表 BS-102 = M1 M1-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-90",
+      "expression": "ABS(ROUND(ROW('IS-001') - WP('D4', 'D4-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-001')"
+        },
+        {
+          "formula_ref": "WP('D4', 'D4-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "营业收入：报表 IS-001 = D4 D4-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-91",
+      "expression": "ABS(ROUND(ROW('IS-002') - WP('K8', 'K8-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-002')"
+        },
+        {
+          "formula_ref": "WP('K8', 'K8-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "营业成本：报表 IS-002 = K8 K8-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-92",
+      "expression": "ABS(ROUND(ROW('IS-004') - WP('K9', 'K9-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-004')"
+        },
+        {
+          "formula_ref": "WP('K9', 'K9-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "销售费用：报表 IS-004 = K9 K9-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-93",
+      "expression": "ABS(ROUND(ROW('IS-005') - WP('K10', 'K10-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-005')"
+        },
+        {
+          "formula_ref": "WP('K10', 'K10-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "管理费用：报表 IS-005 = K10 K10-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-94",
+      "expression": "ABS(ROUND(ROW('IS-007') - WP('K11', 'K11-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-007')"
+        },
+        {
+          "formula_ref": "WP('K11', 'K11-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "财务费用：报表 IS-007 = K11 K11-1 审定数"
+    },
+    {
+      "page_key": "report:cross_check",
+      "target_cell": "report-cross-check-rw-95",
+      "expression": "ABS(ROUND(ROW('IS-023') - WP('N5', 'N5-1', '审定数'), 2)) <= 1",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-023')"
+        },
+        {
+          "formula_ref": "WP('N5', 'N5-1', '审定数')"
+        }
+      ],
+      "source": "cross_check_generator",
+      "source_domain": "report",
+      "target_domain": "wp",
+      "description": "所得税费用：报表 IS-023 = N5 N5-1 审定数"
     }
   ]
 }
