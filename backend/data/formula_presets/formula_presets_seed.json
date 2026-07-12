@@ -3,10 +3,21 @@
   "version": "2025-R1",
   "task_14_3_pilot": {
     "delivery": "增量·按循环分批（未试点页保留现状不回归）",
-    "cycles": ["D"],
-    "scopes": ["workpaper (D1/D2/D4 审定表)", "report (cross_check 补全)", "note (五、4/五、5 核心页)"],
+    "cycles": [
+      "D"
+    ],
+    "scopes": [
+      "workpaper (D1/D2/D4 审定表)",
+      "report (cross_check 补全)",
+      "note (五、4/五、5 核心页)"
+    ],
     "reference_grammar": "ACNR grammar_v1（ROW/TB/WP/PREV/NOTE/SUM_TB），禁裸坐标串",
-    "requirements": ["22.1", "22.2", "22.6", "22.7"]
+    "requirements": [
+      "22.1",
+      "22.2",
+      "22.6",
+      "22.7"
+    ]
   },
   "usage_guide": {
     "字段说明": {
@@ -27,9 +38,15 @@
       "expression": "ABS(ROUND(ROW('assets_total') - (ROW('liabilities_total') + ROW('equity_total')), 2)) <= 1",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('assets_total')"},
-        {"formula_ref": "ROW('liabilities_total')"},
-        {"formula_ref": "ROW('equity_total')"}
+        {
+          "formula_ref": "ROW('assets_total')"
+        },
+        {
+          "formula_ref": "ROW('liabilities_total')"
+        },
+        {
+          "formula_ref": "ROW('equity_total')"
+        }
       ],
       "source": "report_cross_check",
       "description": "资产合计 = 负债合计 + 所有者权益合计"
@@ -40,9 +57,15 @@
       "expression": "ABS(ROUND((ROW('IS-017') - ROW('IS-018')) - ROW('IS-019'), 2)) <= 1",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('IS-017')"},
-        {"formula_ref": "ROW('IS-018')"},
-        {"formula_ref": "ROW('IS-019')"}
+        {
+          "formula_ref": "ROW('IS-017')"
+        },
+        {
+          "formula_ref": "ROW('IS-018')"
+        },
+        {
+          "formula_ref": "ROW('IS-019')"
+        }
       ],
       "source": "report_cross_check",
       "description": "利润总额 − 所得税 = 净利润"
@@ -53,8 +76,12 @@
       "expression": "IF(ROW('IS-017') > 0, ABS(ROUND(ROW('IS-018') - ROW('IS-017') * 0.25, 2)) <= ROW('IS-017') * 0.05, ABS(ROUND(ROW('IS-018'), 2)) < 0.01)",
       "formula_type": "reasonability",
       "refs": [
-        {"formula_ref": "ROW('IS-017')"},
-        {"formula_ref": "ROW('IS-018')"}
+        {
+          "formula_ref": "ROW('IS-017')"
+        },
+        {
+          "formula_ref": "ROW('IS-018')"
+        }
       ],
       "source": "report_cross_check",
       "description": "有效税率 ≈ 25%（偏离过大时提示核查所得税费用合理性）"
@@ -65,20 +92,27 @@
       "expression": "IF(ABS(ROW('BS-001')) > 0, ABS(ROUND(ROW('BS-001'), 2)) <= ABS(ROW('BS-001')), ABS(ROUND(ROW('BS-001'), 2)) < 0.01)",
       "formula_type": "reasonability",
       "refs": [
-        {"formula_ref": "ROW('BS-001')"}
+        {
+          "formula_ref": "ROW('BS-001')"
+        }
       ],
       "source": "report_cross_check",
       "description": "货币资金 ≥ 0（出现负值时提示核查）"
     },
-
     {
       "page_key": "report:cross_check",
       "target_cell": "report-cross-check-2",
       "expression": "ABS(ROUND((ROW('IS-001') - ROW('IS-002')) - (ROW('IS-001') - ROW('IS-002')), 2)) < 0.01",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('IS-001')", "acnr_status": "migrated"},
-        {"formula_ref": "ROW('IS-002')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "ROW('IS-001')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "ROW('IS-002')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "report_cross_check",
       "description": "营业收入 − 营业成本 = 毛利"
@@ -89,9 +123,18 @@
       "expression": "ABS(ROUND((ROW('assets_total') - ROW('liabilities_total')) - ROW('equity_total'), 2)) <= 1",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('assets_total')", "acnr_status": "migrated"},
-        {"formula_ref": "ROW('liabilities_total')", "acnr_status": "migrated"},
-        {"formula_ref": "ROW('equity_total')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "ROW('assets_total')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "ROW('liabilities_total')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "ROW('equity_total')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "report_cross_check",
       "description": "资产 − 负债 = 权益"
@@ -102,21 +145,32 @@
       "expression": "ABS(ROUND(ROW('equity_total') - ROW('equity_total'), 2)) < 0.01",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('equity_total')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "ROW('equity_total')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "report_cross_check",
       "description": "所有者权益变动表期末 = 资产负债表权益"
     },
-
     {
       "page_key": "workpaper:D1",
       "target_cell": "审定数",
       "expression": "WP('D1','审定表D1-1','未审数') + WP('D1','审定表D1-1','AJE调整') + WP('D1','审定表D1-1','RJE调整')",
       "formula_type": "auto_calc",
       "refs": [
-        {"formula_ref": "WP('D1','审定表D1-1','未审数')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D1','审定表D1-1','AJE调整')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D1','审定表D1-1','RJE调整')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "WP('D1','审定表D1-1','未审数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D1','审定表D1-1','AJE调整')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D1','审定表D1-1','RJE调整')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "d_cycle_audited_structure",
       "description": "应收票据审定表：审定数 = 未审数 + AJE调整 + RJE调整"
@@ -127,8 +181,14 @@
       "expression": "WP('D1','审定表D1-1','审定数') - WP('D1','审定表D1-1','期初余额')",
       "formula_type": "auto_calc",
       "refs": [
-        {"formula_ref": "WP('D1','审定表D1-1','审定数')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D1','审定表D1-1','期初余额')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "WP('D1','审定表D1-1','审定数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D1','审定表D1-1','期初余额')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "d_cycle_audited_structure",
       "description": "应收票据审定表：变动额 = 审定数 - 期初余额"
@@ -139,9 +199,18 @@
       "expression": "WP('D2','审定表D2-1','未审数') + WP('D2','审定表D2-1','AJE调整') + WP('D2','审定表D2-1','RJE调整')",
       "formula_type": "auto_calc",
       "refs": [
-        {"formula_ref": "WP('D2','审定表D2-1','未审数')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D2','审定表D2-1','AJE调整')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D2','审定表D2-1','RJE调整')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "WP('D2','审定表D2-1','未审数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D2','审定表D2-1','AJE调整')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D2','审定表D2-1','RJE调整')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "d_cycle_audited_structure",
       "description": "应收账款审定表：审定数 = 未审数 + AJE调整 + RJE调整"
@@ -152,8 +221,14 @@
       "expression": "WP('D2','审定表D2-1','审定数') - WP('D2','审定表D2-1','期初余额')",
       "formula_type": "auto_calc",
       "refs": [
-        {"formula_ref": "WP('D2','审定表D2-1','审定数')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D2','审定表D2-1','期初余额')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "WP('D2','审定表D2-1','审定数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D2','审定表D2-1','期初余额')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "d_cycle_audited_structure",
       "description": "应收账款审定表：变动额 = 审定数 - 期初余额"
@@ -164,8 +239,14 @@
       "expression": "ABS(WP('D2','审定表D2-1','期初余额')) > 0 AND ABS(WP('D2','审定表D2-1','变动额')) > ABS(WP('D2','审定表D2-1','期初余额')) * 0.5",
       "formula_type": "reasonability",
       "refs": [
-        {"formula_ref": "WP('D2','审定表D2-1','期初余额')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D2','审定表D2-1','变动额')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "WP('D2','审定表D2-1','期初余额')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D2','审定表D2-1','变动额')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "d_cycle_audited_structure",
       "description": "应收账款审定表：变动额超期初余额 50% 时提示核查变动合理性"
@@ -176,22 +257,36 @@
       "expression": "WP('D4','营业收入审定表D4-1','未审数') + WP('D4','营业收入审定表D4-1','AJE调整') + WP('D4','营业收入审定表D4-1','RJE调整')",
       "formula_type": "auto_calc",
       "refs": [
-        {"formula_ref": "WP('D4','营业收入审定表D4-1','未审数')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D4','营业收入审定表D4-1','AJE调整')", "acnr_status": "migrated"},
-        {"formula_ref": "WP('D4','营业收入审定表D4-1','RJE调整')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','未审数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','AJE调整')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','RJE调整')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "d_cycle_audited_structure",
       "description": "营业收入审定表：审定数 = 未审数 + AJE调整 + RJE调整"
     },
-
     {
       "page_key": "note:五、4",
       "target_cell": "报表应收票据期末勾稽",
       "expression": "ABS(ROUND(ROW('BS-004') - TB('1121','审定数'), 2)) <= 1",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('BS-004')", "acnr_status": "migrated"},
-        {"formula_ref": "TB('1121','审定数')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "ROW('BS-004')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "TB('1121','审定数')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "note_report_reconciliation",
       "description": "应收票据：报表.应收票据期末（BS-004） = 应收票据审定数（TB 1121）"
@@ -202,12 +297,1882 @@
       "expression": "ABS(ROUND(ROW('BS-005') - (TB('1122','审定数') - TB('1231','审定数')), 2)) <= 1",
       "formula_type": "logic_check",
       "refs": [
-        {"formula_ref": "ROW('BS-005')", "acnr_status": "migrated"},
-        {"formula_ref": "TB('1122','审定数')", "acnr_status": "migrated"},
-        {"formula_ref": "TB('1231','审定数')", "acnr_status": "migrated"}
+        {
+          "formula_ref": "ROW('BS-005')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "TB('1122','审定数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "TB('1231','审定数')",
+          "acnr_status": "migrated"
+        }
       ],
       "source": "note_report_reconciliation",
       "description": "应收账款：报表.应收账款期末（BS-005） = 应收账款审定数（TB 1122） − 坏账准备审定数（TB 1231）"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-002",
+      "expression": "TB('1001', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1001')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "货币资金 — 取试算表科目 1001 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-003",
+      "expression": "TB('1011', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1011')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△结算备付金 — 取试算表科目 1011 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-004",
+      "expression": "TB('1021', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1021')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△拆出资金 — 取试算表科目 1021 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-005",
+      "expression": "TB('1101', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1101')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "交易性金融资产 — 取试算表科目 1101 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-006",
+      "expression": "TB('1105', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1105')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "衍生金融资产 — 取试算表科目 1105 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-007",
+      "expression": "TB('1121', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1121')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应收票据 — 取试算表科目 1121 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-008",
+      "expression": "TB('1122', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1122')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应收账款 — 取试算表科目 1122 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-009",
+      "expression": "TB('1124', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1124')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应收款项融资 — 取试算表科目 1124 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-010",
+      "expression": "TB('1123', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1123')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "预付款项 — 取试算表科目 1123 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-011",
+      "expression": "TB('1201', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1201')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "▲应收保费 — 取试算表科目 1201 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-012",
+      "expression": "TB('1211', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1211')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "▲应收分保账款 — 取试算表科目 1211 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-013",
+      "expression": "TB('1212', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1212')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "▲应收分保合同准备金 — 取试算表科目 1212 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-014",
+      "expression": "TB('1221', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1221')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应收资金集中管理款 — 取试算表科目 1221 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-015",
+      "expression": "TB('1231', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1231')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他应收款 — 取试算表科目 1231 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-016",
+      "expression": "TB('1131', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1131')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：应收股利 — 取试算表科目 1131 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-017",
+      "expression": "TB('1202', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1202')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△买入返售金融资产 — 取试算表科目 1202 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-018",
+      "expression": "TB('1401', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1401')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "存货 — 取试算表科目 1401 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-019",
+      "expression": "TB('1403', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1403')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：原材料 — 取试算表科目 1403 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-020",
+      "expression": "TB('1406', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1406')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "库存商品（产成品） — 取试算表科目 1406 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-021",
+      "expression": "TB('1141', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1141')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "合同资产 — 取试算表科目 1141 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-022",
+      "expression": "TB('1301', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1301')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△保险合同资产 — 取试算表科目 1301 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-023",
+      "expression": "TB('1302', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1302')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△分出再保险合同资产 — 取试算表科目 1302 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-024",
+      "expression": "TB('1481', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1481')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "持有待售资产 — 取试算表科目 1481 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-025",
+      "expression": "TB('1305', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1305')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "一年内到期的非流动资产 — 取试算表科目 1305 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-026",
+      "expression": "TB('1499', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1499')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他流动资产 — 取试算表科目 1499 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-027",
+      "expression": "ROW('BS-002') + ROW('BS-003') + ROW('BS-004') + ROW('BS-005') + ROW('BS-006') + ROW('BS-007') + ROW('BS-008') + ROW('BS-009') + ROW('BS-010') + ROW('BS-011') + ROW('BS-012') + ROW('BS-013') + ROW('BS-014') + ROW('BS-015') + ROW('BS-017') + ROW('BS-018') + ROW('BS-021') + ROW('BS-022') + ROW('BS-023') + ROW('BS-024') + ROW('BS-025') + ROW('BS-026')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-002')"
+        },
+        {
+          "formula_ref": "ROW('BS-003')"
+        },
+        {
+          "formula_ref": "ROW('BS-004')"
+        },
+        {
+          "formula_ref": "ROW('BS-005')"
+        },
+        {
+          "formula_ref": "ROW('BS-006')"
+        },
+        {
+          "formula_ref": "ROW('BS-007')"
+        },
+        {
+          "formula_ref": "ROW('BS-008')"
+        },
+        {
+          "formula_ref": "ROW('BS-009')"
+        },
+        {
+          "formula_ref": "ROW('BS-010')"
+        },
+        {
+          "formula_ref": "ROW('BS-011')"
+        },
+        {
+          "formula_ref": "ROW('BS-012')"
+        },
+        {
+          "formula_ref": "ROW('BS-013')"
+        },
+        {
+          "formula_ref": "ROW('BS-014')"
+        },
+        {
+          "formula_ref": "ROW('BS-015')"
+        },
+        {
+          "formula_ref": "ROW('BS-017')"
+        },
+        {
+          "formula_ref": "ROW('BS-018')"
+        },
+        {
+          "formula_ref": "ROW('BS-021')"
+        },
+        {
+          "formula_ref": "ROW('BS-022')"
+        },
+        {
+          "formula_ref": "ROW('BS-023')"
+        },
+        {
+          "formula_ref": "ROW('BS-024')"
+        },
+        {
+          "formula_ref": "ROW('BS-025')"
+        },
+        {
+          "formula_ref": "ROW('BS-026')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "流动资产合计 = 货币资金 + 结算备付金 + … + 其他流动资产"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-029",
+      "expression": "TB('1501', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1501')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△发放贷款和垫款 — 取试算表科目 1501 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-030",
+      "expression": "TB('1503', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1503')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "债权投资 — 取试算表科目 1503 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-031",
+      "expression": "TB('1504', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1504')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他债权投资 — 取试算表科目 1504 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-032",
+      "expression": "TB('1511', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1511')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "长期应收款 — 取试算表科目 1511 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-033",
+      "expression": "TB('1511A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1511A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "长期股权投资 — 取试算表科目 1511A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-034",
+      "expression": "TB('1522', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1522')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他权益工具投资 — 取试算表科目 1522 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-035",
+      "expression": "TB('1524', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1524')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他非流动金融资产 — 取试算表科目 1524 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-036",
+      "expression": "TB('1601', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1601')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "投资性房地产 — 取试算表科目 1601 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-037",
+      "expression": "TB('1601A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1601A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "固定资产 — 取试算表科目 1601A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-038",
+      "expression": "TB('1602', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1602')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：固定资产原价 — 取试算表科目 1602 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-039",
+      "expression": "TB('1603', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1603')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "累计折旧 — 取试算表科目 1603 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-040",
+      "expression": "TB('1604', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1604')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "固定资产减值准备 — 取试算表科目 1604 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-041",
+      "expression": "TB('1604A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1604A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "在建工程 — 取试算表科目 1604A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-042",
+      "expression": "TB('1621', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1621')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "生产性生物资产 — 取试算表科目 1621 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-043",
+      "expression": "TB('1631', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1631')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "油气资产 — 取试算表科目 1631 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-044",
+      "expression": "TB('1701', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1701')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "使用权资产 — 取试算表科目 1701 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-045",
+      "expression": "TB('1702', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1702')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "无形资产 — 取试算表科目 1702 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-046",
+      "expression": "TB('1703', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1703')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "开发支出 — 取试算表科目 1703 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-047",
+      "expression": "TB('1711', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1711')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "商誉 — 取试算表科目 1711 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-048",
+      "expression": "TB('1801', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1801')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "长期待摊费用 — 取试算表科目 1801 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-049",
+      "expression": "TB('1811', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1811')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "递延所得税资产 — 取试算表科目 1811 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-050",
+      "expression": "TB('1901', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1901')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他非流动资产 — 取试算表科目 1901 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-051",
+      "expression": "TB('1902', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1902')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：特准储备物资 — 取试算表科目 1902 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-052",
+      "expression": "ROW('BS-029') + ROW('BS-030') + ROW('BS-031') + ROW('BS-032') + ROW('BS-033') + ROW('BS-034') + ROW('BS-035') + ROW('BS-036') + ROW('BS-037') + ROW('BS-041') + ROW('BS-042') + ROW('BS-043') + ROW('BS-044') + ROW('BS-045') + ROW('BS-046') + ROW('BS-047') + ROW('BS-048') + ROW('BS-049') + ROW('BS-050')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-029')"
+        },
+        {
+          "formula_ref": "ROW('BS-030')"
+        },
+        {
+          "formula_ref": "ROW('BS-031')"
+        },
+        {
+          "formula_ref": "ROW('BS-032')"
+        },
+        {
+          "formula_ref": "ROW('BS-033')"
+        },
+        {
+          "formula_ref": "ROW('BS-034')"
+        },
+        {
+          "formula_ref": "ROW('BS-035')"
+        },
+        {
+          "formula_ref": "ROW('BS-036')"
+        },
+        {
+          "formula_ref": "ROW('BS-037')"
+        },
+        {
+          "formula_ref": "ROW('BS-041')"
+        },
+        {
+          "formula_ref": "ROW('BS-042')"
+        },
+        {
+          "formula_ref": "ROW('BS-043')"
+        },
+        {
+          "formula_ref": "ROW('BS-044')"
+        },
+        {
+          "formula_ref": "ROW('BS-045')"
+        },
+        {
+          "formula_ref": "ROW('BS-046')"
+        },
+        {
+          "formula_ref": "ROW('BS-047')"
+        },
+        {
+          "formula_ref": "ROW('BS-048')"
+        },
+        {
+          "formula_ref": "ROW('BS-049')"
+        },
+        {
+          "formula_ref": "ROW('BS-050')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "非流动资产合计 = 发放贷款和垫款 + 债权投资 + … + 其他非流动资产"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-053",
+      "expression": "ROW('BS-027') + ROW('BS-052')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-027')"
+        },
+        {
+          "formula_ref": "ROW('BS-052')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "资产总计 = 流动资产合计 + 非流动资产合计"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-055",
+      "expression": "TB('2001', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2001')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "短期借款 — 取试算表科目 2001 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-056",
+      "expression": "TB('2011', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2011')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△向中央银行借款 — 取试算表科目 2011 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-057",
+      "expression": "TB('2021', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2021')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△拆入资金 — 取试算表科目 2021 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-058",
+      "expression": "TB('2101', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2101')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "交易性金融负债 — 取试算表科目 2101 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-059",
+      "expression": "TB('2105', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2105')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "衍生金融负债 — 取试算表科目 2105 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-060",
+      "expression": "TB('2201', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2201')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应付票据 — 取试算表科目 2201 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-061",
+      "expression": "TB('2202', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2202')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应付账款 — 取试算表科目 2202 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-062",
+      "expression": "TB('2203', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2203')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "预收款项 — 取试算表科目 2203 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-063",
+      "expression": "TB('2205', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2205')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "合同负债 — 取试算表科目 2205 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-064",
+      "expression": "TB('2211', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2211')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△卖出回购金融资产款 — 取试算表科目 2211 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-065",
+      "expression": "TB('2221', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2221')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△吸收存款及同业存放 — 取试算表科目 2221 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-066",
+      "expression": "TB('2231', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2231')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△代理买卖证券款 — 取试算表科目 2231 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-067",
+      "expression": "TB('2232', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2232')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△代理承销证券款 — 取试算表科目 2232 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-068",
+      "expression": "TB('2241', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2241')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△预收保费 — 取试算表科目 2241 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-069",
+      "expression": "TB('2211A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2211A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应付职工薪酬 — 取试算表科目 2211A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-070",
+      "expression": "TB('2211B', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2211B')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：应付工资 — 取试算表科目 2211B 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-071",
+      "expression": "TB('2211C', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2211C')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应付福利费 — 取试算表科目 2211C 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-072",
+      "expression": "TB('2211D', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2211D')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "#其中：职工奖励及福利基金 — 取试算表科目 2211D 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-073",
+      "expression": "TB('2221A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2221A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应交税费 — 取试算表科目 2221A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-074",
+      "expression": "TB('2221B', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2221B')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：应交税金 — 取试算表科目 2221B 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-075",
+      "expression": "TB('2241A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2241A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他应付款 — 取试算表科目 2241A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-076",
+      "expression": "TB('2241B', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2241B')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：应付股利 — 取试算表科目 2241B 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-077",
+      "expression": "TB('2251', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2251')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "▲应付手续费及佣金 — 取试算表科目 2251 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-078",
+      "expression": "TB('2261', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2261')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "▲应付分保账款 — 取试算表科目 2261 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-079",
+      "expression": "TB('2281', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2281')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "持有待售负债 — 取试算表科目 2281 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-080",
+      "expression": "TB('2501', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2501')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "一年内到期的非流动负债 — 取试算表科目 2501 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-081",
+      "expression": "TB('2299', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2299')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他流动负债 — 取试算表科目 2299 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-082",
+      "expression": "ROW('BS-055') + ROW('BS-056') + ROW('BS-057') + ROW('BS-058') + ROW('BS-059') + ROW('BS-060') + ROW('BS-061') + ROW('BS-062') + ROW('BS-063') + ROW('BS-064') + ROW('BS-065') + ROW('BS-066') + ROW('BS-067') + ROW('BS-068') + ROW('BS-069') + ROW('BS-073') + ROW('BS-075') + ROW('BS-077') + ROW('BS-078') + ROW('BS-079') + ROW('BS-080') + ROW('BS-081')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-055')"
+        },
+        {
+          "formula_ref": "ROW('BS-056')"
+        },
+        {
+          "formula_ref": "ROW('BS-057')"
+        },
+        {
+          "formula_ref": "ROW('BS-058')"
+        },
+        {
+          "formula_ref": "ROW('BS-059')"
+        },
+        {
+          "formula_ref": "ROW('BS-060')"
+        },
+        {
+          "formula_ref": "ROW('BS-061')"
+        },
+        {
+          "formula_ref": "ROW('BS-062')"
+        },
+        {
+          "formula_ref": "ROW('BS-063')"
+        },
+        {
+          "formula_ref": "ROW('BS-064')"
+        },
+        {
+          "formula_ref": "ROW('BS-065')"
+        },
+        {
+          "formula_ref": "ROW('BS-066')"
+        },
+        {
+          "formula_ref": "ROW('BS-067')"
+        },
+        {
+          "formula_ref": "ROW('BS-068')"
+        },
+        {
+          "formula_ref": "ROW('BS-069')"
+        },
+        {
+          "formula_ref": "ROW('BS-073')"
+        },
+        {
+          "formula_ref": "ROW('BS-075')"
+        },
+        {
+          "formula_ref": "ROW('BS-077')"
+        },
+        {
+          "formula_ref": "ROW('BS-078')"
+        },
+        {
+          "formula_ref": "ROW('BS-079')"
+        },
+        {
+          "formula_ref": "ROW('BS-080')"
+        },
+        {
+          "formula_ref": "ROW('BS-081')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "流动负债合计 = 短期借款 + … + 其他流动负债"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-084",
+      "expression": "TB('2601', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2601')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "▲保险合同准备金 — 取试算表科目 2601 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-085",
+      "expression": "TB('2501A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2501A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "长期借款 — 取试算表科目 2501A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-086",
+      "expression": "TB('2601A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2601A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "应付债券 — 取试算表科目 2601A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-087",
+      "expression": "TB('2602', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2602')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：优先股 — 取试算表科目 2602 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-088",
+      "expression": "TB('2603', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2603')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "永续债 — 取试算表科目 2603 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-089",
+      "expression": "TB('2611', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2611')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△保险合同负债 — 取试算表科目 2611 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-090",
+      "expression": "TB('2612', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2612')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△分出再保险合同负债 — 取试算表科目 2612 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-091",
+      "expression": "TB('2701', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2701')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "租赁负债 — 取试算表科目 2701 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-092",
+      "expression": "TB('2801', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2801')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "长期应付款 — 取试算表科目 2801 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-093",
+      "expression": "TB('2802', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2802')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "长期应付职工薪酬 — 取试算表科目 2802 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-094",
+      "expression": "TB('2901', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2901')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "预计负债 — 取试算表科目 2901 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-095",
+      "expression": "TB('2711', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2711')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "递延收益 — 取试算表科目 2711 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-096",
+      "expression": "TB('2911', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2911')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "递延所得税负债 — 取试算表科目 2911 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-097",
+      "expression": "TB('2999', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2999')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他非流动负债 — 取试算表科目 2999 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-098",
+      "expression": "TB('2998', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2998')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：特准储备基金 — 取试算表科目 2998 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-099",
+      "expression": "ROW('BS-084') + ROW('BS-085') + ROW('BS-086') + ROW('BS-089') + ROW('BS-090') + ROW('BS-091') + ROW('BS-092') + ROW('BS-093') + ROW('BS-094') + ROW('BS-095') + ROW('BS-096') + ROW('BS-097')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-084')"
+        },
+        {
+          "formula_ref": "ROW('BS-085')"
+        },
+        {
+          "formula_ref": "ROW('BS-086')"
+        },
+        {
+          "formula_ref": "ROW('BS-089')"
+        },
+        {
+          "formula_ref": "ROW('BS-090')"
+        },
+        {
+          "formula_ref": "ROW('BS-091')"
+        },
+        {
+          "formula_ref": "ROW('BS-092')"
+        },
+        {
+          "formula_ref": "ROW('BS-093')"
+        },
+        {
+          "formula_ref": "ROW('BS-094')"
+        },
+        {
+          "formula_ref": "ROW('BS-095')"
+        },
+        {
+          "formula_ref": "ROW('BS-096')"
+        },
+        {
+          "formula_ref": "ROW('BS-097')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "非流动负债合计 = 保险合同准备金 + 长期借款 + … + 其他非流动负债"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-100",
+      "expression": "ROW('BS-082') + ROW('BS-099')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-082')"
+        },
+        {
+          "formula_ref": "ROW('BS-099')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "负债合计 = 流动负债合计 + 非流动负债合计"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-102",
+      "expression": "TB('4001', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "实收资本 — 取试算表科目 4001 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-103",
+      "expression": "TB('4001A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "国家资本 — 取试算表科目 4001A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-104",
+      "expression": "TB('4001B', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001B')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "国有法人资本 — 取试算表科目 4001B 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-105",
+      "expression": "TB('4001C', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001C')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "集体资本 — 取试算表科目 4001C 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-106",
+      "expression": "TB('4001D', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001D')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "民营资本 — 取试算表科目 4001D 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-107",
+      "expression": "TB('4001E', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001E')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "外商资本 — 取试算表科目 4001E 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-108",
+      "expression": "TB('4001F', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001F')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "#减：已归还投资 — 取试算表科目 4001F 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-109",
+      "expression": "TB('4001G', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001G')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "实收资本净额 — 取试算表科目 4001G 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-110",
+      "expression": "TB('4002', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4002')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他权益工具 — 取试算表科目 4002 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-111",
+      "expression": "TB('4002A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4002A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：优先股 — 取试算表科目 4002A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-112",
+      "expression": "TB('4002B', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4002B')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "永续债 — 取试算表科目 4002B 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-113",
+      "expression": "TB('4101', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4101')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "资本公积 — 取试算表科目 4101 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-114",
+      "expression": "TB('4102', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4102')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "减：库存股 — 取试算表科目 4102 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-115",
+      "expression": "TB('4103', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4103')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其他综合收益 — 取试算表科目 4103 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-116",
+      "expression": "TB('4103A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4103A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：外币报表折算差额 — 取试算表科目 4103A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-117",
+      "expression": "TB('4104', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4104')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "专项储备 — 取试算表科目 4104 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-118",
+      "expression": "TB('4201', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "盈余公积 — 取试算表科目 4201 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-119",
+      "expression": "TB('4201A', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201A')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "其中：法定公积金 — 取试算表科目 4201A 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-120",
+      "expression": "TB('4201B', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201B')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "任意公积金 — 取试算表科目 4201B 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-121",
+      "expression": "TB('4201C', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201C')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "#储备基金 — 取试算表科目 4201C 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-122",
+      "expression": "TB('4201D', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201D')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "#企业发展基金 — 取试算表科目 4201D 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-123",
+      "expression": "TB('4201E', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201E')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "#利润归还投资 — 取试算表科目 4201E 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-124",
+      "expression": "TB('4301', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4301')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "△一般风险准备 — 取试算表科目 4301 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-125",
+      "expression": "TB('4401', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4401')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "未分配利润 — 取试算表科目 4401 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-126",
+      "expression": "ROW('BS-102') + ROW('BS-110') + ROW('BS-113') - ROW('BS-114') + ROW('BS-115') + ROW('BS-117') + ROW('BS-118') + ROW('BS-124') + ROW('BS-125')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-102')"
+        },
+        {
+          "formula_ref": "ROW('BS-110')"
+        },
+        {
+          "formula_ref": "ROW('BS-113')"
+        },
+        {
+          "formula_ref": "ROW('BS-114')"
+        },
+        {
+          "formula_ref": "ROW('BS-115')"
+        },
+        {
+          "formula_ref": "ROW('BS-117')"
+        },
+        {
+          "formula_ref": "ROW('BS-118')"
+        },
+        {
+          "formula_ref": "ROW('BS-124')"
+        },
+        {
+          "formula_ref": "ROW('BS-125')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "归属母公司权益 = 实收资本 + 其他权益工具 + 资本公积 - 库存股 + 其他综合收益 + 专项储备 + 盈余公积 + 一般风险准备 + 未分配利润"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-127",
+      "expression": "TB('4501', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4501')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "*少数股东权益 — 取试算表科目 4501 期末余额"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-128",
+      "expression": "ROW('BS-126') + ROW('BS-127')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-126')"
+        },
+        {
+          "formula_ref": "ROW('BS-127')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "所有者权益合计 = 归属母公司权益 + 少数股东权益"
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "target_cell": "BS-129",
+      "expression": "ROW('BS-100') + ROW('BS-128')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('BS-100')"
+        },
+        {
+          "formula_ref": "ROW('BS-128')"
+        }
+      ],
+      "source": "bs_preset_generator",
+      "description": "负债和所有者权益总计 = 负债合计 + 所有者权益合计"
     }
   ]
 }
