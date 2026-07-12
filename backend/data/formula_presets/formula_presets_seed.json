@@ -3065,6 +3065,507 @@
       ],
       "source": "report_preset_generator",
       "description": "支付其他与经营活动有关的现金 — 取试算表科目 6031C 发生额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-001",
+      "expression": "TB('4001+4002+4101-4102+4103+4104+4201+4301+4401', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001+4002+4101-4102+4103+4104+4201+4301+4401')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "一、上年年末余额 — 上年年末余额 — 取权益类科目上年审定合计"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-002",
+      "expression": "TB('ADJ_POLICY', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('ADJ_POLICY')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "加：会计政策变更 — 会计政策变更 — 追溯调整额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-003",
+      "expression": "TB('ADJ_ERROR', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('ADJ_ERROR')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "前期差错更正 — 前期差错更正 — 更正金额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-004",
+      "expression": "TB('ADJ_OTHER', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('ADJ_OTHER')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "其他 — 其他调整"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-005",
+      "expression": "ROW('EQ-001') + ROW('EQ-002') + ROW('EQ-003') + ROW('EQ-004')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-001')"
+        },
+        {
+          "formula_ref": "ROW('EQ-002')"
+        },
+        {
+          "formula_ref": "ROW('EQ-003')"
+        },
+        {
+          "formula_ref": "ROW('EQ-004')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "本年年初余额 = 上年年末余额 + 会计政策变更 + 前期差错更正 + 其他"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-006",
+      "expression": "ROW('EQ-007') + ROW('EQ-008') + ROW('EQ-013') + ROW('EQ-016') + ROW('EQ-026')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-007')"
+        },
+        {
+          "formula_ref": "ROW('EQ-008')"
+        },
+        {
+          "formula_ref": "ROW('EQ-013')"
+        },
+        {
+          "formula_ref": "ROW('EQ-016')"
+        },
+        {
+          "formula_ref": "ROW('EQ-026')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "本年增减变动金额 = 综合收益总额 + 所有者投入和减少资本 + 专项储备 + 利润分配 + 所有者权益内部结转"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-007",
+      "expression": "ROW('IS-026')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-026')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "综合收益总额 — 取自利润表综合收益总额（IS-026）"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-008",
+      "expression": "ROW('EQ-009') + ROW('EQ-010') + ROW('EQ-011') + ROW('EQ-012')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-009')"
+        },
+        {
+          "formula_ref": "ROW('EQ-010')"
+        },
+        {
+          "formula_ref": "ROW('EQ-011')"
+        },
+        {
+          "formula_ref": "ROW('EQ-012')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "所有者投入和减少资本 = 投入普通股 + 其他权益工具 + 股份支付 + 其他"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-009",
+      "expression": "TB('4001_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "1.所有者投入的普通股 — 所有者投入的普通股 — 实收资本本期增加额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-010",
+      "expression": "TB('4002_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4002_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "2.其他权益工具持有者投入资本 — 其他权益工具持有者投入资本 — 本期变动"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-011",
+      "expression": "TB('4101_SBC', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4101_SBC')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "3.股份支付计入所有者权益的金额 — 股份支付计入所有者权益的金额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-012",
+      "expression": "TB('4001_OTH', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001_OTH')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "4.其他 — 其他投入/减少"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-013",
+      "expression": "ROW('EQ-014') - ROW('EQ-015')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-014')"
+        },
+        {
+          "formula_ref": "ROW('EQ-015')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "专项储备净额 = 提取专项储备 - 使用专项储备"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-014",
+      "expression": "TB('4104_ADD', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4104_ADD')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "1.提取专项储备 — 提取专项储备"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-015",
+      "expression": "TB('4104_USE', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4104_USE')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "2.使用专项储备 — 使用专项储备"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-016",
+      "expression": "ROW('EQ-017') + ROW('EQ-023') + ROW('EQ-024') + ROW('EQ-025')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-017')"
+        },
+        {
+          "formula_ref": "ROW('EQ-023')"
+        },
+        {
+          "formula_ref": "ROW('EQ-024')"
+        },
+        {
+          "formula_ref": "ROW('EQ-025')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "利润分配 = 提取盈余公积 + 提取一般风险准备 + 对所有者分配 + 其他"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-017",
+      "expression": "ROW('EQ-018') + ROW('EQ-019') + ROW('EQ-020') + ROW('EQ-021') + ROW('EQ-022')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-018')"
+        },
+        {
+          "formula_ref": "ROW('EQ-019')"
+        },
+        {
+          "formula_ref": "ROW('EQ-020')"
+        },
+        {
+          "formula_ref": "ROW('EQ-021')"
+        },
+        {
+          "formula_ref": "ROW('EQ-022')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "提取盈余公积 = 法定公积金 + 任意公积金 + 储备基金 + 企业发展基金 + 利润归还投资"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-018",
+      "expression": "TB('4201A_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201A_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "其中：法定公积金 — 法定公积金 — 本期提取额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-019",
+      "expression": "TB('4201B_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201B_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "任意公积金 — 任意公积金 — 本期提取额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-020",
+      "expression": "TB('4201C_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201C_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "#储备基金 — 储备基金 — 本期提取额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-021",
+      "expression": "TB('4201D_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201D_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "#企业发展基金 — 企业发展基金 — 本期提取额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-022",
+      "expression": "TB('4201E_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201E_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "#利润归还投资 — 利润归还投资 — 本期提取额"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-023",
+      "expression": "TB('4301_CHG', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4301_CHG')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "△ 2.提取一般风险准备 — 提取一般风险准备 — 本期变动"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-024",
+      "expression": "TB('4401_DIV', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4401_DIV')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "3.对所有者（或股东）的分配 — 对所有者（或股东）的分配 — 本期分红"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-025",
+      "expression": "TB('4401_OTH', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4401_OTH')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "4.其他 — 其他利润分配"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-026",
+      "expression": "ROW('EQ-027') + ROW('EQ-028') + ROW('EQ-029') + ROW('EQ-030') + ROW('EQ-031') + ROW('EQ-032')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-027')"
+        },
+        {
+          "formula_ref": "ROW('EQ-028')"
+        },
+        {
+          "formula_ref": "ROW('EQ-029')"
+        },
+        {
+          "formula_ref": "ROW('EQ-030')"
+        },
+        {
+          "formula_ref": "ROW('EQ-031')"
+        },
+        {
+          "formula_ref": "ROW('EQ-032')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "所有者权益内部结转 = 资本公积转增 + 盈余公积转增 + 弥补亏损 + 设定受益变动 + 其他综合收益结转 + 其他"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-027",
+      "expression": "TB('4101_TO_4001', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4101_TO_4001')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "1.资本公积转增资本（或股本） — 资本公积转增资本（或股本）"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-028",
+      "expression": "TB('4201_TO_4001', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4201_TO_4001')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "2.盈余公积转增资本（或股本） — 盈余公积转增资本（或股本）"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-029",
+      "expression": "TB('4401_LOSS', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4401_LOSS')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "3.弥补亏损 — 弥补亏损"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-030",
+      "expression": "TB('4103_DB', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4103_DB')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "4. 设定受益计划变动额结转留存收益 — 设定受益计划变动额结转留存收益"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-031",
+      "expression": "TB('4103_OCI', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4103_OCI')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "5.其他综合收益结转留存收益 — 其他综合收益结转留存收益"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-032",
+      "expression": "TB('4001_INTR', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('4001_INTR')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "6.其他 — 其他内部结转"
+    },
+    {
+      "page_key": "report:equity_statement",
+      "target_cell": "EQ-033",
+      "expression": "ROW('EQ-005') + ROW('EQ-006')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('EQ-005')"
+        },
+        {
+          "formula_ref": "ROW('EQ-006')"
+        }
+      ],
+      "source": "eq_preset_generator",
+      "description": "本年年末余额 = 本年年初余额 + 本年增减变动金额"
     }
   ]
 }
