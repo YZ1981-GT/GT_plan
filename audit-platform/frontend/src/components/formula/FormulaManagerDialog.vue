@@ -928,7 +928,18 @@ const CYCLE_LABEL_MAP: Record<string, string> = {
 }
 
 // 报表子类（动态从 report_config API 获取，项目不同可能有不同报表类型）
-const reportTypes = ref<Array<{ type: string; label: string; count: number }>>([])
+// 初始值即为静态降级列表，确保树打开时报表域不为空
+const REPORT_SUBTYPE_LABELS_FALLBACK: Record<string, string> = {
+  balance_sheet: '资产负债表',
+  income_statement: '利润表',
+  cash_flow_statement: '现金流量表',
+  equity_statement: '权益变动表',
+  cash_flow_supplement: '现金流附表',
+  impairment_provision: '资产减值准备表',
+}
+const reportTypes = ref<Array<{ type: string; label: string; count: number }>>(
+  Object.entries(REPORT_SUBTYPE_LABELS_FALLBACK).map(([type, label]) => ({ type, label, count: 0 }))
+)
 const reportTypesLoaded = ref(false)
 
 async function loadReportTypes() {
@@ -954,16 +965,6 @@ async function loadReportTypes() {
     type, label, count: countFormulas(type),
   }))
   reportTypesLoaded.value = true
-}
-
-// 报表类型静态降级标签
-const REPORT_SUBTYPE_LABELS_FALLBACK: Record<string, string> = {
-  balance_sheet: '资产负债表',
-  income_statement: '利润表',
-  cash_flow_statement: '现金流量表',
-  equity_statement: '权益变动表',
-  cash_flow_supplement: '现金流附表',
-  impairment_provision: '资产减值准备表',
 }
 
 // ACNR sheet 列表缓存（从 useAcnr 加载）
