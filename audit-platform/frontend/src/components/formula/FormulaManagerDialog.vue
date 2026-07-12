@@ -2,8 +2,7 @@
   <el-dialog
     v-model="visible"
     title="ƒx 公式管理中心"
-    width="95%"
-    top="2vh"
+    fullscreen
     append-to-body
     destroy-on-close
     class="gt-fm-dialog"
@@ -2329,7 +2328,7 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
 .gt-fm-container {
   display: flex;
   gap: 12px;
-  height: calc(100vh - 180px);
+  height: calc(100vh - 110px);
   min-height: 500px;
 }
 .gt-fm-sidebar {
