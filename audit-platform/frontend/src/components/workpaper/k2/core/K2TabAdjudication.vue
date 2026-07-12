@@ -5,6 +5,18 @@
       <p>K2-1审定表审定其他流动资产(1231借方/资产类)，含合同取得成本/预付款项/待摊费用等。资产类期末=期初+借方-贷方；审定数=未审+AJE+RJE。三角勾稽：期末=期初+借-贷，差额须为0。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">审计目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>记录的其他流动资产在资产负债表日确实存在且已恰当记录；</li>
+        <li><b>完整性：</b>所有应当记录的其他流动资产均已记录，相关披露完整；</li>
+        <li><b>权利和义务：</b>记录的其他流动资产确为被审计单位拥有或控制；</li>
+        <li><b>计价和分摊：</b>其他流动资产以恰当金额包括在报表中，计价调整已恰当记录，披露充分适当；</li>
+        <li><b>列报与披露：</b>已按企业会计准则规定作出恰当列报。</li>
+      </ol>
+    </el-alert>
+
     <!-- Section标题 + AI/复核按钮右对齐 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -383,11 +395,15 @@ function getRowClassName({ row }: { row: K2AdjRow }): string {
   border-left: 4px solid var(--el-color-warning);
   background: #fffbeb;
   padding: 10px 14px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-size: 12px;
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 
 /* 三角勾稽 Banner */
 .reconciliation-banner {
