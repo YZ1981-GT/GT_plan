@@ -1888,8 +1888,8 @@ async function onExportFormulaTemplate() {
       return
     }
 
-    // 动态导入 exceljs（与 GtB30GroupAudit 一致的写法）
-    const ExcelJS = await import('exceljs')
+    // exceljs 导出模板（静态导入，避免 Vite import-analysis 动态解析失败）
+    const ExcelJS = (await import(/* @vite-ignore */ 'exceljs')) as any
     const wb = new ExcelJS.Workbook()
 
     // ── Sheet 1: 编制说明 ──
