@@ -1,114 +1,157 @@
 <!--
-  K1TabRelatedParty.vue — K1-11 关联方及交易检查
+  K1TabRelatedParty.vue — K1-11 关联方及交易检查表
 
-  列表型检查: 合规/不合规/不适用 tri-state + 审计证据 + 不合规红色摘要
-  行级抽凭 📎 + AI辅助 per-section
-
-  Spec: .kiro/specs/k1-other-receivables/ Task 4.6
-  Requirements: 8.3, 8.5, 8.6
+  忠实反映致同源模板 K1-11：关注关联方其他应收款真实性/合理性/合法性/会计处理，
+  考虑未识别关联方。明细表（关联方/关联关系/期初/借贷发生/期末/坏账准备/账面价值/
+  账龄/款项性质/期后收款/索引号/备注）+ 审计说明 + 结论。关联关系分类参考。
 -->
 <template>
-  <div class="k1-tab-related-party">
-    <!-- 方法论上下文（琥珀色） -->
-    <div class="methodology-context">
-      <p>K1-11关联方及交易检查表用于核查其他应收款中涉及关联方的款项。重点关注：
-        ①关联方识别是否完整 ②交易定价是否公允 ③是否按CAS 36充分披露
-        ④大额关联方往来是否有真实业务背景。关联方其他应收款可能涉及资金占用。</p>
-    </div>
-
-    <!-- 标题栏 + 操作 -->
+  <div class="k1-audit-sheet">
     <div class="section-head">
-      <h3 class="sheet-title">K1-11 关联方及交易检查</h3>
+      <h3 class="sheet-title">K1-11 关联方及交易检查表</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate('K1-11')">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-button size="small" :disabled="isReadonly" @click="handleAddItem">＋ 新增</el-button>
-        <el-button size="small" @click="handleReview('K1-11-check')">💬 复核</el-button>
+        <el-button size="small" type="primary" link @click="handleReview">💬 复核</el-button>
+        <el-button v-if="!isReadonly" size="small" @click="addRow('rows'); persist()">＋ 新增</el-button>
       </div>
     </div>
 
-    <!-- 检查表格 -->
-    <el-table :data="sectionItems" border size="small" class="check-table" :row-style="checkRowStyle">
-      <el-table-column type="index" label="#" width="40" align="center" />
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">一、审计目标</span></template>
+      <p class="ao-text">关注对关联方的其他应收款的真实性、合理性、合法性、会计处理是否正确，考虑是否存在未识别的关联方，检查关联交易和余额披露是否正确。</p>
+    </el-alert>
 
-      <el-table-column label="检查项目" min-width="200">
-        <template #default="{ row }">
-          <span>{{ row.label }}</span>
-          <p v-if="row.description" class="item-desc">{{ row.description }}</p>
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">二、关联方及交易明细</span></template>
+      <el-table :data="tables.rows" border size="small" :max-height="400" class="audit-table">
+        <el-table-column label="#" type="index" width="42" align="center" />
+        <el-table-column label="关联方名称" min-width="140" fixed>
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="persist" />
+            <span v-else>{{ row.name || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联关系" min-width="150">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.relation" size="small" filterable allow-create @change="persist">
+              <el-option v-for="opt in relationOptions" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+            <span v-else>{{ row.relation || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="借方发生" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="贷方发生" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.endBalance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.endBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减:坏账准备" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.provision" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.provision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面价值" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="账面价值=期末余额-坏账准备">{{ fmtAmt((Number(row.endBalance)||0) - (Number(row.provision)||0)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账龄" width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.aging" size="small" @change="persist" />
+            <span v-else>{{ row.aging || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="款项性质" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.nature" size="small" @change="persist" />
+            <span v-else>{{ row.nature || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期后收款" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.postCollection" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.postCollection) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.indexNo" size="small" @change="persist" />
+            <span v-else>{{ row.indexNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" />
+            <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow('rows', row.id); persist()">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #append>
+          <div class="table-total">小计　期末余额：{{ fmtAmt(columnSum('rows', 'endBalance')) }}</div>
         </template>
-      </el-table-column>
+      </el-table>
+      <div class="relation-ref">
+        <span class="rr-label">关联关系分类参考：</span>
+        <el-tag v-for="opt in relationOptions" :key="opt" size="small" effect="plain" class="rr-tag">{{ opt }}</el-tag>
+      </div>
+    </el-card>
 
-      <el-table-column label="合规判定" width="130" align="center">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.compliance" size="small"
-            placeholder="请选择" clearable
-            @change="(v: string) => handleComplianceChange(row.id, v)">
-            <el-option label="合规" value="合规" />
-            <el-option label="不合规" value="不合规" />
-            <el-option label="不适用" value="不适用" />
-          </el-select>
-          <el-tag v-else :type="complianceTagType(row.compliance)" size="small">
-            {{ row.compliance || '未判定' }}
-          </el-tag>
-        </template>
-      </el-table-column>
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">三、审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="针对期后收款的凭证检查详见 K1-12；关注是否存在未识别关联方，关联交易及余额披露是否正确" @change="persist" />
+    </el-card>
 
-      <el-table-column label="审计证据" min-width="180">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
-            :model-value="row.evidence" size="small" placeholder="审计证据/说明"
-            @change="(v: string) => handleEvidenceChange(row.id, v)" />
-          <span v-else>{{ row.evidence || '-' }}</span>
-        </template>
-      </el-table-column>
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="card-title">四、审计结论</span></template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select"
+        placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述调整事项外，其余未见异常" value="B" />
+        <el-option label="C、存在重大未调整事项，不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+        placeholder="形成审计结论..." @change="persist" />
+    </el-card>
 
-      <el-table-column label="📎" width="50" align="center">
-        <template #default="{ row }">
-          <el-button size="small" link @click="handleAttach(row.id)">📎</el-button>
-        </template>
-      </el-table-column>
-
-      <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
-        <template #default="{ row }">
-          <el-button size="small" type="danger" link @click="handleRemoveItem(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 不合规红色摘要 -->
-    <div v-if="nonComplianceItems.length > 0" class="non-compliance-summary">
-      <div class="ncs-header">⚠️ 不合规项摘要（{{ nonComplianceItems.length }} 项）</div>
-      <ul class="ncs-list">
-        <li v-for="item in nonComplianceItems" :key="item.id">
-          <b>{{ item.label }}</b>：{{ item.evidence || '未说明' }}
-        </li>
-      </ul>
-    </div>
-
-    <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>关联方识别来源：企业信用报告、股权结构图、管理层声明书、年审花名册</li>
-        <li>公允性判断：与同类非关联方交易对比、市场价格参考</li>
-        <li>CAS 36披露要求：关联方关系+交易类型+金额+定价政策+余额+坏账</li>
-        <li>资金占用嫌疑：大额无息+无明确商业理由+长期不清→报告管理层</li>
+        <li>核对关联方其他应收款的真实性、合理性、合法性及会计处理正确性</li>
+        <li>考虑是否存在未识别的关联方（结合 B19 识别关联方程序）</li>
+        <li>账面价值 = 期末余额 - 坏账准备（自动计算）</li>
+        <li>关联关系分类：实际控制人/控股股东/附属企业/5%以上股东/联营/合营/关键管理人员/其他</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * K1TabRelatedParty.vue — K1-11 关联方及交易检查
- * Spec: .kiro/specs/k1-other-receivables/ | Task: 4.6
- * Requirements: 8.3, 8.5, 8.6
- */
-import { ref, computed, inject, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useK1Checks, type K1CheckItem, type ComplianceState } from '../../composables/useK1Checks'
+/** K1TabRelatedParty.vue — K1-11 关联方及交易检查表 */
+import { computed, inject, onMounted } from 'vue'
+import { useK1AuditRows, K1_CONCLUSION_TEMPLATES } from '../../composables/useK1AuditRows'
 
 const props = defineProps<{
   wpId: string
@@ -116,129 +159,64 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
-
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
-
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+const relationOptions = [
+  '实际控制人', '控股股东', '控股股东、实际控制人的附属企业',
+  '持有5%以上股份的法人或其他组织', '联营企业', '合营企业',
+  '董高监等关键管理人员', '其他关联方',
+]
 
 const allResponsesRef = computed(() => props.allResponses)
-const { sections, loadSections, updateItemCompliance, updateItemEvidence, addItem, removeItem, serializeSection } =
-  useK1Checks({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), allResponses: allResponsesRef as any })
+const ITEM_ID = 'K1-11-related-party'
+const { tables, auditNote, conclusion, conclusionOption, load, addRow, removeRow, columnSum, serialize } =
+  useK1AuditRows({ allResponses: allResponsesRef as any, itemId: ITEM_ID, tableKeys: ['rows'] })
 
-const SECTION_ID = 'K1-11'
+onMounted(() => load())
 
-const sectionItems = computed(() => {
-  const section = sections.value.find(s => s.sectionId === SECTION_ID)
-  return section?.items ?? []
-})
-
-const nonComplianceItems = computed(() =>
-  sectionItems.value.filter(i => i.compliance === '不合规')
-)
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
-
-onMounted(() => {
-  loadSections()
-  if (sectionItems.value.length === 0) initDefaultItems()
-})
-
-function initDefaultItems() {
-  const defaults = [
-    '关联方识别是否完整（含实际控制人及其近亲属）',
-    '关联方交易定价是否公允（与市场价格对比）',
-    '交易是否有真实商业背景和合理商业理由',
-    '是否存在资金占用迹象（大额无息长期挂账）',
-    '关联方往来是否按CAS 36充分披露',
-    '关联方交易审批程序是否完备',
-    '期末关联方余额函证情况',
-  ]
-  for (const label of defaults) { addItem(SECTION_ID, label) }
-  persistSection()
+function persist() {
+  const data = serialize()
+  props.allResponses.set(ITEM_ID, { item_id: ITEM_ID, conclusion: null, remark: data })
+  emit('save', ITEM_ID, { remark: data })
 }
-
-// ─── 操作 ────────────────────────────────────────────────────────────────────
-
-function handleComplianceChange(itemId: string, value: string) {
-  updateItemCompliance(SECTION_ID, itemId, (value || null) as ComplianceState)
-  persistSection()
+function onConclusionOption(val: string) {
+  if (K1_CONCLUSION_TEMPLATES[val] && !conclusion.value) conclusion.value = K1_CONCLUSION_TEMPLATES[val]
+  persist()
 }
-
-function handleEvidenceChange(itemId: string, value: string) {
-  updateItemEvidence(SECTION_ID, itemId, value)
-  persistSection()
+function fmtAmt(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-async function handleAddItem() {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入检查项名称', '新增检查项',
-      { confirmButtonText: '确定', cancelButtonText: '取消' })
-    if (!value?.trim()) { ElMessage.warning('名称不能为空'); return }
-    addItem(SECTION_ID, value.trim())
-    persistSection()
-  } catch { /* cancelled */ }
-}
-
-function handleRemoveItem(id: string) { removeItem(SECTION_ID, id); persistSection() }
-
-function persistSection() {
-  const itemId = `${SECTION_ID}-check-items`
-  const data = serializeSection(SECTION_ID)
-  const payload = { item_id: itemId, conclusion: null, remark: data }
-  props.allResponses.set(itemId, payload)
-  emit('save', itemId, { remark: data })
-}
-
-function handleAttach(itemId: string) { console.log('[K1-11] Attach voucher for:', itemId) }
-
-// ─── UI Helpers ──────────────────────────────────────────────────────────────
-
-function complianceTagType(val: string | null): 'success' | 'danger' | 'info' | 'warning' {
-  if (val === '合规') return 'success'
-  if (val === '不合规') return 'danger'
-  if (val === '不适用') return 'info'
-  return 'warning'
-}
-
-function checkRowStyle({ row }: { row: K1CheckItem }): Record<string, string> {
-  if (row.compliance === '不合规') return { 'background-color': '#fef2f2' }
-  return {}
-}
-
-function handleAiGenerate(section: string) { console.log('[K1-11] AI generate:', section) }
-function handleReview(id: string) { openReviewDialog(id) }
+function handleReview() { openReviewDialog('K1-11-related-party') }
 </script>
 
 <style scoped>
-.k1-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.methodology-context {
-  border-left: 4px solid var(--el-color-warning);
-  background: #fffbeb; padding: 10px 14px; margin-bottom: 16px;
-  font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6;
-}
-
-.section-head {
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
-}
+.k1-audit-sheet { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
-
-.check-table { font-size: var(--wp-font-size, 13px); }
-.item-desc { font-size: 11px; color: var(--el-text-color-secondary); margin: 4px 0 0; }
-
-.non-compliance-summary {
-  margin-top: 16px; padding: 12px; border-radius: 6px;
-  background: #fef2f2; border: 1px solid #fecaca;
-}
-.ncs-header { font-weight: 600; color: var(--el-color-danger); margin-bottom: 8px; }
-.ncs-list { padding-left: 20px; margin: 0; line-height: 1.8; color: var(--el-color-danger-dark-2); }
-
-.compile-hint {
-  margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary);
-}
+.audit-objective { margin-bottom: 10px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-text { margin: 4px 0 0; line-height: 1.6; font-size: 12px; }
+.section-card { margin-bottom: 10px; }
+.section-card :deep(.el-card__header) { padding: 8px 14px; }
+.section-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-title { font-weight: 600; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.amt { width: 100%; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+.relation-ref { margin-top: 10px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.rr-label { font-size: 12px; color: var(--el-text-color-secondary); }
+.rr-tag { margin: 0; }
+.conclusion-card { margin-bottom: 10px; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
+.compile-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.compile-hint ul { padding-left: 18px; margin-top: 8px; line-height: 1.7; }
 </style>

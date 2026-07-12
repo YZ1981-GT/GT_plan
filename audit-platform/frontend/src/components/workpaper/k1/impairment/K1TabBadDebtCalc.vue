@@ -1,257 +1,215 @@
 <!--
   K1TabBadDebtCalc.vue — K1-8 坏账准备测算
 
-  Features:
-  1. 2区段Tab (el-tabs): "账龄迁徙" / "ECL测算"
-  2. 62行虚拟滚动 (el-table max-height)
-  3. 账龄迁徙区段: 账龄区间/期末余额/迁徙率/预期损失率/预期损失(公式)
-  4. ECL测算区段: 往来对象/EAD/PD/LGD/ECL(公式=EAD×PD×LGD)/企业计提/差异(公式)/测算结论
-  5. 差异>重要性水平时红色标记
-  6. 底部合计: 总ECL / 总企业计提 / 总差异
-  7. 导入导出 + AI辅助 + 复核
-  8. 琥珀色方法论上下文 + 编制提示
-  9. Uses: useK1BadDebtCalc composable + useK1ImportExport
-
-  Spec: .kiro/specs/k1-other-receivables/ Task 4.5
-  Requirements: 6.1-6.6
+  忠实反映致同源模板 K1-8：审计目标（计价分摊）
+  （一）单项计提坏账准备（债务人/审定账面余额①/预期信用损失率②/期末应计提③=①×②/
+       期末坏账准备账面余额④/差异⑤=③-④/计提依据/索引号）
+  （二）押金保证金组合（信用期分档）
+  （三）其他组合（账龄分档）
+  差异合计=0 勾稽校验 + 审计说明 + 结论
 -->
 <template>
-  <div class="k1-tab-bad-debt-calc">
-    <!-- 方法论上下文（琥珀色） -->
-    <div class="methodology-context">
-      <p>K1-8坏账准备测算采用预期信用损失法(ECL)独立测算坏账准备充分性。
-        账龄迁徙法：按账龄区间计算历史迁徙率→预期损失率→预期损失。
-        ECL模型：ECL = EAD × PD × LGD。测算差异 = 测算应计提 - 企业计提，
-        差异超过重要性水平时红色标记并提示调整。</p>
-    </div>
-
-    <!-- 标题栏 + 操作 -->
+  <div class="k1-audit-sheet">
     <div class="section-head">
       <h3 class="sheet-title">K1-8 坏账准备测算</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate('K1-8-calc')">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
+        <el-button size="small" type="primary" link @click="handleReview">💬 复核</el-button>
+      </div>
+    </div>
+
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">一、审计目标</span></template>
+      <p class="ao-text">其他应收款、坏账准备以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。</p>
+    </el-alert>
+
+    <!-- 勾稽状态 -->
+    <el-alert :type="totalDiff === 0 ? 'success' : 'warning'" :closable="false" show-icon class="recon-bar">
+      <template #title>
+        测算合计差异（应计提 - 账面）：{{ fmtAmt(totalDiff) }}
+        <span v-if="totalDiff === 0">　✓ 已计提充分</span>
+        <span v-else>　⚠ 存在差异，需分析计提是否充分</span>
+      </template>
+    </el-alert>
+
+    <!-- (一) 单项计提 -->
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">（一）单项计提坏账准备</span>
+          <el-button v-if="!isReadonly" size="small" @click="addRow('single'); persist()">＋ 新增</el-button>
+        </div>
+      </template>
+      <el-table :data="tables.single" border size="small" :max-height="260" class="audit-table">
+        <el-table-column label="债务人名称" min-width="150">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="persist" />
+            <span v-else>{{ row.name || '-' }}</span>
           </template>
-        </el-dropdown>
-        <el-button size="small" @click="handleReview('K1-8-calc')">💬 复核</el-button>
-      </div>
-    </div>
+        </el-table-column>
+        <el-table-column label="审定账面余额①" min-width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.balance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.balance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="预期信用损失率②" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.rate" :controls="false" :min="0" :max="1" :precision="4" size="small" class="amt" @change="persist" />
+            <span v-else>{{ pct(row.rate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末应计提③=①×②" min-width="130" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="③=①×②">{{ fmtAmt(calc(row)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末坏账准备账面④" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.bookProvision" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异⑤=③-④" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" :class="{ 'diff-warn': Math.abs(diff(row)) > 0.01 }" title="⑤=③-④">{{ fmtAmt(diff(row)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="计提依据及文件" min-width="150">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.basis" size="small" @change="persist" />
+            <span v-else>{{ row.basis || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.indexNo" size="small" @change="persist" />
+            <span v-else>{{ row.indexNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow('single', row.id); persist()">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #append>
+          <div class="table-total">小计　应计提③：{{ fmtAmt(sumCalc('single')) }}　账面④：{{ fmtAmt(columnSum('single', 'bookProvision')) }}</div>
+        </template>
+      </el-table>
+    </el-card>
 
-    <!-- 2区段Tab -->
-    <el-tabs v-model="activeTab" type="border-card" class="calc-tabs">
-      <!-- ═══ 账龄迁徙区段 ═══ -->
-      <el-tab-pane label="账龄迁徙" name="aging">
-        <el-table
-          :data="agingRows"
-          border
-          size="small"
-          :max-height="450"
-          class="calc-table"
-          show-summary
-          :summary-method="agingSummaryMethod"
-        >
-          <el-table-column label="账龄区间" min-width="130" fixed>
-            <template #default="{ row }">
-              <span>{{ row.agingBucket }}</span>
-            </template>
-          </el-table-column>
+    <!-- (二) 押金保证金组合 -->
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">（二）押金/保证金组合计提坏账准备（按信用期）</span></template>
+      <el-table :data="tables.deposit" border size="small" class="audit-table">
+        <el-table-column label="信用期" min-width="140" prop="name" />
+        <el-table-column label="审定账面余额①" min-width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.balance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.balance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="预期信用损失率②" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.rate" :controls="false" :min="0" :max="1" :precision="4" size="small" class="amt" @change="persist" />
+            <span v-else>{{ pct(row.rate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末应计提③=①×②" min-width="130" align="right">
+          <template #default="{ row }"><span class="formula-cell" title="③=①×②">{{ fmtAmt(calc(row)) }}</span></template>
+        </el-table-column>
+        <el-table-column label="期末坏账准备账面④" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.bookProvision" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异⑤=③-④" min-width="110" align="right">
+          <template #default="{ row }"><span class="formula-cell" :class="{ 'diff-warn': Math.abs(diff(row)) > 0.01 }">{{ fmtAmt(diff(row)) }}</span></template>
+        </el-table-column>
+        <el-table-column label="计提依据" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.basis" size="small" @change="persist" />
+            <span v-else>{{ row.basis || '-' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
-          <el-table-column label="期末余额" min-width="125" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small"
-                :controls="false" class="amount-input"
-                @change="(v: number) => handleAgingUpdate(row.id, 'endBalance', v ?? 0)" />
-              <span v-else class="amount-cell">{{ fmtAmt(row.endBalance) }}</span>
-            </template>
-          </el-table-column>
+    <!-- (三) 其他组合（账龄） -->
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">（三）其他组合计提坏账准备（按账龄）</span></template>
+      <el-table :data="tables.aging" border size="small" class="audit-table">
+        <el-table-column label="账龄" min-width="160" prop="name" />
+        <el-table-column label="审定账面余额①" min-width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.balance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.balance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="预期信用损失率②" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.rate" :controls="false" :min="0" :max="1" :precision="4" size="small" class="amt" @change="persist" />
+            <span v-else>{{ pct(row.rate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末应计提③=①×②" min-width="130" align="right">
+          <template #default="{ row }"><span class="formula-cell" title="③=①×②">{{ fmtAmt(calc(row)) }}</span></template>
+        </el-table-column>
+        <el-table-column label="期末坏账准备账面④" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.bookProvision" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异⑤=③-④" min-width="110" align="right">
+          <template #default="{ row }"><span class="formula-cell" :class="{ 'diff-warn': Math.abs(diff(row)) > 0.01 }">{{ fmtAmt(diff(row)) }}</span></template>
+        </el-table-column>
+        <el-table-column label="计提依据" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.basis" size="small" @change="persist" />
+            <span v-else>{{ row.basis || '-' }}</span>
+          </template>
+        </el-table-column>
+        <template #append>
+          <div class="table-total">总计　应计提③：{{ fmtAmt(grandCalc) }}　账面④：{{ fmtAmt(grandBook) }}</div>
+        </template>
+      </el-table>
+    </el-card>
 
-          <el-table-column label="迁徙率" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.migrationRate" size="small"
-                :controls="false" :precision="4" :step="0.01" class="amount-input"
-                @change="(v: number) => handleAgingUpdate(row.id, 'migrationRate', v ?? 0)" />
-              <span v-else class="amount-cell">{{ (row.migrationRate * 100).toFixed(2) }}%</span>
-            </template>
-          </el-table-column>
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">三、审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="选取金额大于X且逾期超过Y天账户，与授信部门了解并复核往来函件；预期信用损失率计量参考 D2应收账款示例" @change="persist" />
+    </el-card>
 
-          <el-table-column label="预期损失率" min-width="115" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.expectedLossRate" size="small"
-                :controls="false" :precision="4" :step="0.01" class="amount-input"
-                @change="(v: number) => handleAgingUpdate(row.id, 'expectedLossRate', v ?? 0)" />
-              <span v-else class="amount-cell">{{ (row.expectedLossRate * 100).toFixed(2) }}%</span>
-            </template>
-          </el-table-column>
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="card-title">四、审计结论</span></template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select"
+        placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述调整事项外，其余未见异常" value="B" />
+        <el-option label="C、存在重大未调整事项，不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+        placeholder="形成审计结论..." @change="persist" />
+    </el-card>
 
-          <el-table-column label="预期损失" min-width="125" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell" title="预期损失=期末余额×预期损失率">
-                {{ fmtAmt(row.expectedLoss) }}
-              </span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
-      <!-- ═══ ECL测算区段 ═══ -->
-      <el-tab-pane label="ECL测算" name="ecl">
-        <el-table
-          :data="eclRows"
-          border
-          size="small"
-          :max-height="450"
-          class="calc-table"
-          :row-class-name="eclRowClassName"
-          show-summary
-          :summary-method="eclSummaryMethod"
-        >
-          <el-table-column label="往来对象" min-width="130" fixed>
-            <template #default="{ row }">
-              <span>{{ row.counterparty }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="EAD" min-width="120" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.ead" size="small"
-                :controls="false" class="amount-input"
-                @change="(v: number) => handleEclUpdate(row.id, 'ead', v ?? 0)" />
-              <span v-else class="amount-cell">{{ fmtAmt(row.ead) }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="PD" min-width="100" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.pd" size="small"
-                :controls="false" :precision="4" :step="0.01" class="amount-input"
-                @change="(v: number) => handleEclUpdate(row.id, 'pd', v ?? 0)" />
-              <span v-else class="amount-cell">{{ (row.pd * 100).toFixed(2) }}%</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="LGD" min-width="100" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.lgd" size="small"
-                :controls="false" :precision="4" :step="0.01" class="amount-input"
-                @change="(v: number) => handleEclUpdate(row.id, 'lgd', v ?? 0)" />
-              <span v-else class="amount-cell">{{ (row.lgd * 100).toFixed(2) }}%</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="ECL" min-width="125" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell" title="ECL=EAD×PD×LGD">
-                {{ fmtAmt(row.ecl) }}
-              </span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="企业计提" min-width="120" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.bookedProvision" size="small"
-                :controls="false" class="amount-input"
-                @change="(v: number) => handleEclUpdate(row.id, 'bookedProvision', v ?? 0)" />
-              <span v-else class="amount-cell">{{ fmtAmt(row.bookedProvision) }}</span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="差异" min-width="120" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell" :class="{ 'variance-exceed': isVarianceExceedsMateriality(row) }"
-                title="差异=ECL-企业计提">
-                {{ fmtAmt(row.variance) }}
-              </span>
-            </template>
-          </el-table-column>
-
-          <el-table-column label="测算结论" min-width="140">
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" :model-value="row.conclusion" size="small"
-                placeholder="充分/不足/需调整"
-                @change="(v: string) => handleEclUpdate(row.id, 'conclusion', v)" />
-              <span v-else :class="{ 'conclusion-warn': isVarianceExceedsMateriality(row) }">
-                {{ row.conclusion || '-' }}
-              </span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 底部合计面板 -->
-    <div class="totals-panel">
-      <div class="total-item">
-        <span class="total-label">总ECL</span>
-        <span class="total-value">{{ fmtAmt(totals.totalECL) }}</span>
-      </div>
-      <div class="total-item">
-        <span class="total-label">总企业计提</span>
-        <span class="total-value">{{ fmtAmt(totals.totalBooked) }}</span>
-      </div>
-      <div class="total-item" :class="{ 'total-exceed': Math.abs(totals.totalVariance) > materialityLevel && materialityLevel > 0 }">
-        <span class="total-label">总差异</span>
-        <span class="total-value">{{ fmtAmt(totals.totalVariance) }}</span>
-      </div>
-      <div class="total-item total-materiality">
-        <span class="total-label">重要性水平</span>
-        <el-input-number v-if="!isReadonly" v-model="materialityLevel" size="small"
-          :controls="false" class="materiality-input" placeholder="0"
-          @change="handleMaterialityChange" />
-        <span v-else class="total-value">{{ fmtAmt(materialityLevel) }}</span>
-      </div>
-    </div>
-
-    <!-- 差异警告 -->
-    <div v-if="hasExceedingVariance" class="variance-warning">
-      <el-alert type="error" :closable="false" show-icon>
-        <template #title>存在差异超过重要性水平的测算项，请关注是否需要建议调整</template>
-      </el-alert>
-    </div>
-
-    <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>账龄迁徙法：按账龄区间统计期末余额，结合历史迁徙率计算预期损失率</li>
-        <li>预期损失 = 期末余额 × 预期损失率（公式自动计算）</li>
-        <li>ECL模型：ECL = EAD × PD × LGD（公式自动计算）</li>
-        <li>测算差异 = ECL(测算应计提) - 企业计提（公式自动计算）</li>
-        <li>差异超过重要性水平时红色标记，提示需关注是否建议调整</li>
-        <li>重要性水平可在底部面板设置，默认为0（不启用差异标记）</li>
-        <li>两个区段Tab共享行同步，切换不影响数据</li>
+        <li>期末应计提③ = 审定账面余额① × 预期信用损失率②（自动计算）</li>
+        <li>差异⑤ = 应计提③ - 账面④；合计差异应为 0，否则需分析计提充分性</li>
+        <li>预期信用损失率参考 D2 应收账款-预期信用损失计提示例</li>
+        <li>共同信用风险特征：金融工具类型、信用风险评级、担保物类型、账龄、行业等</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * K1TabBadDebtCalc.vue — K1-8 坏账准备测算
- * Spec: .kiro/specs/k1-other-receivables/ | Task: 4.5
- * Requirements: 6.1-6.6
- *
- * 2区段Tab(账龄迁徙+ECL测算) + 差异标记 + 虚拟滚动 + 合计面板
- */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import {
-  useK1BadDebtCalc,
-  type K1AgingMigrationRow,
-  type K1ECLCalcRow,
-} from '../../composables/useK1BadDebtCalc'
-import { useK1ImportExport } from '../../composables/useK1ImportExport'
-
-// ─── Props / Emits ───────────────────────────────────────────────────────────
+/** K1TabBadDebtCalc.vue — K1-8 坏账准备测算 */
+import { computed, inject, onMounted } from 'vue'
+import { useK1AuditRows, K1_CONCLUSION_TEMPLATES, type AuditRow } from '../../composables/useK1AuditRows'
 
 const props = defineProps<{
   wpId: string
@@ -259,280 +217,89 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
-
-const emit = defineEmits<{
-  (e: 'save', itemId: string, value: any): void
-  (e: 'navigate-sheet', sheetName: string): void
-}>()
-
-// ─── Injections ──────────────────────────────────────────────────────────────
-
+const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const activeTab = ref<'aging' | 'ecl'>('aging')
-
-// ─── Composables ─────────────────────────────────────────────────────────────
-
 const allResponsesRef = computed(() => props.allResponses)
+const ITEM_ID = 'K1-8-bad-debt-calc'
+const { tables, auditNote, conclusion, conclusionOption, load, addRow, removeRow, columnSum, serialize } =
+  useK1AuditRows({ allResponses: allResponsesRef as any, itemId: ITEM_ID, tableKeys: ['single', 'deposit', 'aging'] })
 
-const {
-  agingRows,
-  eclRows,
-  materialityLevel,
-  totals,
-  hasExceedingVariance,
-  loadData,
-  updateAgingRow,
-  updateEclRow,
-  isVarianceExceedsMateriality,
-  serializeData,
-} = useK1BadDebtCalc({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  allResponses: allResponsesRef as any,
-})
-
-const {
-  exportTemplate,
-  exportData,
-  importData,
-} = useK1ImportExport({ wpId: toRef(props, 'wpId') })
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
+const DEPOSIT_ROWS = ['合同期内', '逾期30天以内', '逾期30-90天', '逾期90天以上']
+const AGING_ROWS = ['1年以内/未逾期', '1年-2年/逾期30天以内', '2年-3年/逾期30-90天', '3年-4年/逾期90天-1年', '4年-5年/逾期1年-2年', '5年以上/逾期2年以上']
 
 onMounted(() => {
-  loadData()
+  load()
+  // 预置固定分档行（首次进入）
+  if (tables.value.deposit.length === 0) {
+    DEPOSIT_ROWS.forEach(name => tables.value.deposit.push(mkFixed(name)))
+  }
+  if (tables.value.aging.length === 0) {
+    AGING_ROWS.forEach(name => tables.value.aging.push(mkFixed(name)))
+  }
 })
 
-// ─── 行更新 ──────────────────────────────────────────────────────────────────
-
-function handleAgingUpdate(id: string, field: keyof K1AgingMigrationRow, value: any) {
-  updateAgingRow(id, field, value)
-  persistData()
+function mkFixed(name: string): AuditRow {
+  return { id: `fx-${name}`, name, balance: 0, rate: 0, bookProvision: 0, basis: '', indexNo: '' }
 }
 
-function handleEclUpdate(id: string, field: keyof K1ECLCalcRow, value: any) {
-  updateEclRow(id, field, value)
-  persistData()
+// ─── 公式 ────────────────────────────────────────────────────────────────────
+function calc(row: AuditRow): number { return (Number(row.balance) || 0) * (Number(row.rate) || 0) }
+function diff(row: AuditRow): number { return calc(row) - (Number(row.bookProvision) || 0) }
+function sumCalc(key: string): number { return (tables.value[key] ?? []).reduce((s, r) => s + calc(r), 0) }
+
+const grandCalc = computed(() => sumCalc('single') + sumCalc('deposit') + sumCalc('aging'))
+const grandBook = computed(() =>
+  columnSum('single', 'bookProvision') + columnSum('deposit', 'bookProvision') + columnSum('aging', 'bookProvision')
+)
+const totalDiff = computed(() => Math.round((grandCalc.value - grandBook.value) * 100) / 100)
+
+function persist() {
+  const data = serialize()
+  props.allResponses.set(ITEM_ID, { item_id: ITEM_ID, conclusion: null, remark: data })
+  emit('save', ITEM_ID, { remark: data })
 }
-
-function handleMaterialityChange() {
-  persistData()
+function onConclusionOption(val: string) {
+  if (K1_CONCLUSION_TEMPLATES[val] && !conclusion.value) conclusion.value = K1_CONCLUSION_TEMPLATES[val]
+  persist()
 }
-
-/** 持久化所有数据 */
-function persistData() {
-  const { aging, ecl } = serializeData()
-
-  // 存储账龄行
-  const agingId = 'K1-8-aging-rows'
-  const agingPayload = { item_id: agingId, conclusion: null, remark: aging }
-  props.allResponses.set(agingId, agingPayload)
-  emit('save', agingId, { remark: aging })
-
-  // 存储ECL行
-  const eclId = 'K1-8-ecl-rows'
-  const eclPayload = { item_id: eclId, conclusion: null, remark: ecl }
-  props.allResponses.set(eclId, eclPayload)
-  emit('save', eclId, { remark: ecl })
-
-  // 存储重要性水平
-  const matId = 'K1-8-materiality'
-  const matPayload = { item_id: matId, conclusion: null, remark: String(materialityLevel.value) }
-  props.allResponses.set(matId, matPayload)
-  emit('save', matId, { remark: String(materialityLevel.value) })
+function fmtAmt(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-// ─── 导入导出 ─────────────────────────────────────────────────────────────────
-
-function handleExportTemplate() { exportTemplate('K1-8') }
-function handleExportData() { exportData('K1-8') }
-
-function handleImportData() {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '.xlsx,.xls'
-  input.onchange = async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    if (!file) return
-    const result = await importData('K1-8', file)
-    if (result) { loadData() }
-  }
-  input.click()
+function pct(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return (Number(v) * 100).toFixed(2) + '%'
 }
-
-// ─── 合计行方法 ──────────────────────────────────────────────────────────────
-
-function agingSummaryMethod({ columns, data }: { columns: any[]; data: K1AgingMigrationRow[] }) {
-  const sums: string[] = []
-  columns.forEach((col: any, idx: number) => {
-    if (idx === 0) { sums[idx] = '合计'; return }
-    const prop = col.property
-    if (prop === 'endBalance') {
-      sums[idx] = fmtAmt(data.reduce((acc, r) => acc + (r.endBalance || 0), 0))
-    } else if (prop === 'expectedLoss') {
-      sums[idx] = fmtAmt(data.reduce((acc, r) => acc + (r.expectedLoss || 0), 0))
-    } else {
-      sums[idx] = ''
-    }
-  })
-  return sums
-}
-
-function eclSummaryMethod({ columns, data }: { columns: any[]; data: K1ECLCalcRow[] }) {
-  const sums: string[] = []
-  columns.forEach((col: any, idx: number) => {
-    if (idx === 0) { sums[idx] = '合计'; return }
-    const prop = col.property
-    if (['ead', 'ecl', 'bookedProvision', 'variance'].includes(prop)) {
-      sums[idx] = fmtAmt(data.reduce((acc, r) => acc + ((r as any)[prop] || 0), 0))
-    } else {
-      sums[idx] = ''
-    }
-  })
-  return sums
-}
-
-// ─── ECL行差异>重要性行类名 ──────────────────────────────────────────────────
-
-function eclRowClassName({ row }: { row: K1ECLCalcRow }): string {
-  return isVarianceExceedsMateriality(row) ? 'variance-exceed-row' : ''
-}
-
-// ─── UI Helpers ──────────────────────────────────────────────────────────────
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function handleAiGenerate(section: string) {
-  console.log('[K1-8] AI generate:', section)
-}
-function handleReview(id: string) { openReviewDialog(id) }
+function handleReview() { openReviewDialog('K1-8-bad-debt-calc') }
 </script>
 
 <style scoped>
-.k1-tab-bad-debt-calc {
-  padding: 16px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* 方法论上下文（琥珀色） */
-.methodology-context {
-  border-left: 4px solid var(--el-color-warning);
-  background: #fffbeb;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  font-size: 12px;
-  color: var(--el-text-color-regular);
-  line-height: 1.6;
-}
-
-/* 标题栏 */
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.sheet-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0;
-}
-.head-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* Tabs */
-.calc-tabs {
-  margin-bottom: 16px;
-}
-
-/* 表格 */
-.calc-table {
-  font-size: var(--wp-font-size, 13px);
-}
-.amount-cell {
-  font-variant-numeric: tabular-nums;
-}
-.amount-input {
-  width: 100%;
-}
-.formula-cell {
-  border-bottom: 1px dashed var(--el-border-color);
-  cursor: help;
-  font-variant-numeric: tabular-nums;
-}
-.formula-cell.variance-exceed {
-  color: var(--el-color-danger);
-  font-weight: 600;
-}
-.conclusion-warn {
-  color: var(--el-color-danger);
-  font-weight: 600;
-}
-
-/* ECL差异超标行 */
-:deep(.variance-exceed-row) {
-  background-color: #fef2f2 !important;
-}
-
-/* 合计面板 */
-.totals-panel {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
-  border: 1px solid var(--el-border-color-lighter);
-}
-.total-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.total-label {
-  font-size: 11px;
-  color: var(--el-text-color-secondary);
-}
-.total-value {
-  font-size: 14px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-.total-item.total-exceed .total-value {
-  color: var(--el-color-danger);
-}
-.materiality-input {
-  width: 120px;
-}
-
-/* 差异警告 */
-.variance-warning {
-  margin-top: 12px;
-}
-
-/* 编制提示 */
-.compile-hint {
-  margin-top: 16px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.compile-hint summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.compile-hint ul {
-  padding-left: 20px;
-  margin-top: 8px;
-  line-height: 1.8;
-}
+.k1-audit-sheet { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-text { margin: 4px 0 0; line-height: 1.6; font-size: 12px; }
+.recon-bar { margin-bottom: 10px; }
+.section-card { margin-bottom: 10px; }
+.section-card :deep(.el-card__header) { padding: 8px 14px; }
+.section-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-title { font-weight: 600; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.amt { width: 100%; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
+.diff-warn { color: var(--el-color-danger); font-weight: 600; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+.conclusion-card { margin-bottom: 10px; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
+.compile-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 18px; margin-top: 8px; line-height: 1.7; }
 </style>

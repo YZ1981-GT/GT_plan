@@ -1,114 +1,171 @@
 <!--
-  K1TabOverdueCheck.vue — K1-10 长期未收回款项检查
+  K1TabOverdueCheck.vue — K1-10 长期未收回款项检查表
 
-  列表型检查: 合规/不合规/不适用 tri-state + 审计证据 + 不合规红色摘要
-  行级抽凭 📎 + AI辅助 per-section
-
-  Spec: .kiro/specs/k1-other-receivables/ Task 4.6
-  Requirements: 8.2, 8.5, 8.6
+  忠实反映致同源模板 K1-10：审计目标（存在/计价分摊）+ 长期未收回明细表
+  （债务人/期初/借贷发生/期末/账龄/经济业务/未收回原因/是否诉讼/是否无法收回/
+   处理计划/坏账准备/审定余额/期后收款/备注）+ 审计说明 + 结论
 -->
 <template>
-  <div class="k1-tab-overdue-check">
-    <!-- 方法论上下文（琥珀色） -->
-    <div class="methodology-context">
-      <p>K1-10长期未收回款项检查表用于识别和评估长期挂账的其他应收款项目。重点关注：
-        ①账龄超过1年未收回原因 ②管理层催收措施 ③可回收性评估 ④是否需计提减值或核销。
-        长期未收回款项可能暗示信用风险显著增加。</p>
-    </div>
-
-    <!-- 标题栏 + 操作 -->
+  <div class="k1-audit-sheet">
     <div class="section-head">
-      <h3 class="sheet-title">K1-10 长期未收回款项检查</h3>
+      <h3 class="sheet-title">K1-10 长期未收回款项检查表</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate('K1-10')">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-button size="small" :disabled="isReadonly" @click="handleAddItem">＋ 新增</el-button>
-        <el-button size="small" @click="handleReview('K1-10-check')">💬 复核</el-button>
+        <el-button size="small" type="primary" link @click="handleReview">💬 复核</el-button>
+        <el-button v-if="!isReadonly" size="small" @click="addRow('rows'); persist()">＋ 新增</el-button>
       </div>
     </div>
 
-    <!-- 检查表格 -->
-    <el-table :data="sectionItems" border size="small" class="check-table" :row-style="checkRowStyle">
-      <el-table-column type="index" label="#" width="40" align="center" />
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">一、审计目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>资产负债表中记录的其他应收款、坏账准备是存在的，且已记录于恰当的账户；</li>
+        <li><b>计价和分摊：</b>其他应收款、坏账准备以恰当的金额包括在财务报表中，相关计价或分摊调整已恰当记录，披露已得到恰当计量和描述。</li>
+      </ol>
+    </el-alert>
 
-      <el-table-column label="检查项目" min-width="200">
-        <template #default="{ row }">
-          <span>{{ row.label }}</span>
-          <p v-if="row.description" class="item-desc">{{ row.description }}</p>
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">二、长期未收回款项明细</span></template>
+      <el-table :data="tables.rows" border size="small" :max-height="420" class="audit-table"
+        :row-class-name="riskRowClass">
+        <el-table-column label="#" type="index" width="42" align="center" />
+        <el-table-column label="债务人名称" min-width="140" fixed>
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" />
+            <span v-else>{{ row.debtorName || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期借方" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期贷方" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.endBalance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.endBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账龄" width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.aging" size="small" @change="persist" />
+            <span v-else>{{ row.aging || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="经济业务说明" min-width="150">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.businessDesc" size="small" @change="persist" />
+            <span v-else>{{ row.businessDesc || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="未收回原因" min-width="150">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.reason" size="small" @change="persist" />
+            <span v-else>{{ row.reason || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否诉讼" width="90" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.litigation" size="small" @change="persist">
+              <el-option label="是" value="是" /><el-option label="否" value="否" />
+            </el-select>
+            <span v-else>{{ row.litigation || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否无法收回" width="110" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.unrecoverable" size="small" @change="persist">
+              <el-option label="是" value="是" /><el-option label="否" value="否" />
+            </el-select>
+            <span v-else>{{ row.unrecoverable || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="处理计划" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.plan" size="small" @change="persist" />
+            <span v-else>{{ row.plan || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="坏账准备" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.provision" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.provision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定余额" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.auditedBalance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.auditedBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期后收款" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.postCollection" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.postCollection) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="110">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" />
+            <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow('rows', row.id); persist()">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #append>
+          <div class="table-total">合计　期末余额：{{ fmtAmt(columnSum('rows', 'endBalance')) }}　坏账准备：{{ fmtAmt(columnSum('rows', 'provision')) }}</div>
         </template>
-      </el-table-column>
+      </el-table>
+    </el-card>
 
-      <el-table-column label="合规判定" width="130" align="center">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.compliance" size="small"
-            placeholder="请选择" clearable
-            @change="(v: string) => handleComplianceChange(row.id, v)">
-            <el-option label="合规" value="合规" />
-            <el-option label="不合规" value="不合规" />
-            <el-option label="不适用" value="不适用" />
-          </el-select>
-          <el-tag v-else :type="complianceTagType(row.compliance)" size="small">
-            {{ row.compliance || '未判定' }}
-          </el-tag>
-        </template>
-      </el-table-column>
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">三、审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="针对期后收款的凭证检查详见 K1-12；分析账龄较长原因（纠纷/付款能力等），评估坏账准备计提是否充分" @change="persist" />
+    </el-card>
 
-      <el-table-column label="审计证据" min-width="180">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }"
-            :model-value="row.evidence" size="small" placeholder="审计证据/说明"
-            @change="(v: string) => handleEvidenceChange(row.id, v)" />
-          <span v-else>{{ row.evidence || '-' }}</span>
-        </template>
-      </el-table-column>
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="card-title">四、审计结论</span></template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select"
+        placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述调整事项外，其余未见异常" value="B" />
+        <el-option label="C、存在重大未调整事项，不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+        placeholder="形成审计结论..." @change="persist" />
+    </el-card>
 
-      <el-table-column label="📎" width="50" align="center">
-        <template #default="{ row }">
-          <el-button size="small" link @click="handleAttach(row.id)">📎</el-button>
-        </template>
-      </el-table-column>
-
-      <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
-        <template #default="{ row }">
-          <el-button size="small" type="danger" link @click="handleRemoveItem(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 不合规红色摘要 -->
-    <div v-if="nonComplianceItems.length > 0" class="non-compliance-summary">
-      <div class="ncs-header">⚠️ 不合规项摘要（{{ nonComplianceItems.length }} 项）</div>
-      <ul class="ncs-list">
-        <li v-for="item in nonComplianceItems" :key="item.id">
-          <b>{{ item.label }}</b>：{{ item.evidence || '未说明' }}
-        </li>
-      </ul>
-    </div>
-
-    <!-- 编制提示 -->
     <details class="compile-hint">
-      <summary>编制提示</summary>
+      <summary>编制提示（CSRC 551-9）</summary>
       <ul>
-        <li>关注账龄1年以上的款项，检查是否有合理的商业理由持续挂账</li>
-        <li>核查管理层催收记录（函件/电话/法律措施）</li>
-        <li>评估可回收性时考虑：债务人财务状况、担保物、账龄、行业环境</li>
-        <li>长期未收回→可能信用风险显著增加→ECL Stage升级→K1-7联动</li>
+        <li>账龄较长的其他应收款，判断是否长期挂账推迟正常开支或无需支付，检查原始凭证，必要时函证</li>
+        <li>实施上述程序未见异常后，分析账龄长原因（纠纷/对方付款能力），评估坏账准备计提充分性</li>
+        <li>标红行：判定为"无法收回"或"涉诉"，重点关注减值充分性</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * K1TabOverdueCheck.vue — K1-10 长期未收回款项检查
- * Spec: .kiro/specs/k1-other-receivables/ | Task: 4.6
- * Requirements: 8.2, 8.5, 8.6
- */
-import { ref, computed, inject, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useK1Checks, type K1CheckItem, type ComplianceState } from '../../composables/useK1Checks'
+/** K1TabOverdueCheck.vue — K1-10 长期未收回款项检查表 | Req 8.x */
+import { computed, inject, onMounted } from 'vue'
+import { useK1AuditRows, K1_CONCLUSION_TEMPLATES, type AuditRow } from '../../composables/useK1AuditRows'
 
 const props = defineProps<{
   wpId: string
@@ -116,130 +173,59 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
-
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
-
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ─── Composable ──────────────────────────────────────────────────────────────
-
 const allResponsesRef = computed(() => props.allResponses)
-const { sections, loadSections, updateItemCompliance, updateItemEvidence, addItem, removeItem, serializeSection } =
-  useK1Checks({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), allResponses: allResponsesRef as any })
+const ITEM_ID = 'K1-10-overdue'
+const { tables, auditNote, conclusion, conclusionOption, load, addRow, removeRow, columnSum, serialize } =
+  useK1AuditRows({ allResponses: allResponsesRef as any, itemId: ITEM_ID, tableKeys: ['rows'] })
 
-const SECTION_ID = 'K1-10'
+onMounted(() => load())
 
-const sectionItems = computed(() => {
-  const section = sections.value.find(s => s.sectionId === SECTION_ID)
-  return section?.items ?? []
-})
-
-const nonComplianceItems = computed(() =>
-  sectionItems.value.filter(i => i.compliance === '不合规')
-)
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
-
-onMounted(() => {
-  loadSections()
-  if (sectionItems.value.length === 0) initDefaultItems()
-})
-
-function initDefaultItems() {
-  const defaults = [
-    '长期挂账原因是否合理（业务实质/合同约定）',
-    '管理层是否采取有效催收措施',
-    '催收记录是否完整（函件/电话/法律）',
-    '债务人当前财务状况和偿债能力',
-    '是否存在担保/抵押物并核实现值',
-    '可回收性评估是否充分（减值迹象识别）',
-    '是否需上调ECL阶段（Stage升级）',
-    '相关减值计提是否充分',
-  ]
-  for (const label of defaults) { addItem(SECTION_ID, label) }
-  persistSection()
+function persist() {
+  const data = serialize()
+  props.allResponses.set(ITEM_ID, { item_id: ITEM_ID, conclusion: null, remark: data })
+  emit('save', ITEM_ID, { remark: data })
 }
-
-// ─── 操作 ────────────────────────────────────────────────────────────────────
-
-function handleComplianceChange(itemId: string, value: string) {
-  updateItemCompliance(SECTION_ID, itemId, (value || null) as ComplianceState)
-  persistSection()
+function onConclusionOption(val: string) {
+  if (K1_CONCLUSION_TEMPLATES[val] && !conclusion.value) conclusion.value = K1_CONCLUSION_TEMPLATES[val]
+  persist()
 }
-
-function handleEvidenceChange(itemId: string, value: string) {
-  updateItemEvidence(SECTION_ID, itemId, value)
-  persistSection()
+function riskRowClass({ row }: { row: AuditRow }): string {
+  return row.unrecoverable === '是' || row.litigation === '是' ? 'risk-row' : ''
 }
-
-async function handleAddItem() {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入检查项名称', '新增检查项',
-      { confirmButtonText: '确定', cancelButtonText: '取消' })
-    if (!value?.trim()) { ElMessage.warning('名称不能为空'); return }
-    addItem(SECTION_ID, value.trim())
-    persistSection()
-  } catch { /* cancelled */ }
+function fmtAmt(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-function handleRemoveItem(id: string) { removeItem(SECTION_ID, id); persistSection() }
-
-function persistSection() {
-  const itemId = `${SECTION_ID}-check-items`
-  const data = serializeSection(SECTION_ID)
-  const payload = { item_id: itemId, conclusion: null, remark: data }
-  props.allResponses.set(itemId, payload)
-  emit('save', itemId, { remark: data })
-}
-
-function handleAttach(itemId: string) { console.log('[K1-10] Attach voucher for:', itemId) }
-
-// ─── UI Helpers ──────────────────────────────────────────────────────────────
-
-function complianceTagType(val: string | null): 'success' | 'danger' | 'info' | 'warning' {
-  if (val === '合规') return 'success'
-  if (val === '不合规') return 'danger'
-  if (val === '不适用') return 'info'
-  return 'warning'
-}
-
-function checkRowStyle({ row }: { row: K1CheckItem }): Record<string, string> {
-  if (row.compliance === '不合规') return { 'background-color': '#fef2f2' }
-  return {}
-}
-
-function handleAiGenerate(section: string) { console.log('[K1-10] AI generate:', section) }
-function handleReview(id: string) { openReviewDialog(id) }
+function handleReview() { openReviewDialog('K1-10-overdue') }
 </script>
 
 <style scoped>
-.k1-tab-overdue-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.methodology-context {
-  border-left: 4px solid var(--el-color-warning);
-  background: #fffbeb; padding: 10px 14px; margin-bottom: 16px;
-  font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6;
-}
-
-.section-head {
-  display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;
-}
+.k1-audit-sheet { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
-
-.check-table { font-size: var(--wp-font-size, 13px); }
-.item-desc { font-size: 11px; color: var(--el-text-color-secondary); margin: 4px 0 0; }
-
-.non-compliance-summary {
-  margin-top: 16px; padding: 12px; border-radius: 6px;
-  background: #fef2f2; border: 1px solid #fecaca;
-}
-.ncs-header { font-weight: 600; color: var(--el-color-danger); margin-bottom: 8px; }
-.ncs-list { padding-left: 20px; margin: 0; line-height: 1.8; color: var(--el-color-danger-dark-2); }
-
-.compile-hint {
-  margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary);
-}
+.audit-objective { margin-bottom: 10px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
+.section-card { margin-bottom: 10px; }
+.section-card :deep(.el-card__header) { padding: 8px 14px; }
+.section-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-title { font-weight: 600; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.amt { width: 100%; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+.audit-table :deep(.risk-row td) { background-color: #fff7ed !important; }
+.conclusion-card { margin-bottom: 10px; }
+.section-card + .conclusion-card :deep(.el-card__header),
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
+.compile-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.compile-hint ul { padding-left: 18px; margin-top: 8px; line-height: 1.7; }
 </style>

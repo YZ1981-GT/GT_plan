@@ -1,163 +1,154 @@
-<!-- K1TabLargeAmount.vue — K1-5 大额其他应收款情况分析表 | Task 4.6 | Req 7.1-7.4 -->
-<template>
-  <div class="k1-tab-large-amount">
-    <!-- 方法论上下文（琥珀色） -->
-    <div class="methodology-context">
-      <p>K1-5大额其他应收款情况分析表用于识别金额重大的其他应收款项目，重点关注占比超过10%的款项。
-        核查要素包括：款项性质、形成原因、预计收回时间及可能性。大额款项需逐项分析，确保充分审计关注。</p>
-    </div>
+<!--
+  K1TabLargeAmount.vue — K1-5 大额其他应收款情况分析表
 
-    <!-- 标题栏 + 操作 -->
+  忠实反映致同源模板 K1-5：审计目标（存在/计价分摊）+ 审计过程（选前10名，函证、核对
+  支持性证据、识别未识别关联方）+ 前10名查验汇总表（序号/债务人/期初/借贷发生/期末未审/
+  坏账准备/账面价值/账龄/经济业务/关联方/协议索引/期后收款）+ 审计说明 + 结论
+-->
+<template>
+  <div class="k1-audit-sheet">
     <div class="section-head">
       <h3 class="sheet-title">K1-5 大额其他应收款情况分析表</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate('K1-5-large')">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <el-button size="small" @click="handleReview('K1-5-large')">💬 复核</el-button>
+        <el-button size="small" type="primary" link @click="handleReview">💬 复核</el-button>
+        <el-button v-if="!isReadonly" size="small" @click="addRow('rows'); persist()">＋ 新增</el-button>
       </div>
     </div>
 
-    <!-- 合计统计 -->
-    <div class="summary-bar">
-      <span>合计余额：<b>{{ fmtAmt(totalAmount) }}</b></span>
-      <span>笔数：<b>{{ rows.length }}</b></span>
-      <span>高亮阈值：<b>{{ (highlightThreshold * 100).toFixed(0) }}%</b></span>
-    </div>
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">一、审计目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>资产负债表中记录的其他应收款、坏账准备是存在的，且已记录于恰当的账户；</li>
+        <li><b>计价和分摊：</b>其他应收款、坏账准备以恰当的金额包括在财务报表中，相关计价或分摊调整已恰当记录，披露已得到恰当计量和描述。</li>
+      </ol>
+    </el-alert>
 
-    <!-- 主表格 -->
-    <el-table
-      :data="rows"
-      border
-      size="small"
-      :max-height="520"
-      class="large-amount-table"
-      :row-style="tableRowStyle"
-    >
-      <el-table-column label="往来对象" min-width="140" fixed>
-        <template #default="{ row }">
-          <span class="counterparty-link" @click="navigateToDetail(row)">
-            {{ row.counterparty }}
-          </span>
+    <el-alert type="warning" :closable="false" class="process-hint">
+      <template #title>
+        <span>二、审计过程：选择前 10 名大额其他应收款余额，通过函证、与高管及相关人员核对，检查支持性证据，确定其存在性，识别是否存在未识别的关联方。</span>
+      </template>
+    </el-alert>
+
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">前 10 名查验汇总表（不含合并范围内关联方）</span></template>
+      <el-table :data="tables.rows" border size="small" :max-height="400" class="audit-table">
+        <el-table-column label="序号" type="index" width="52" align="center" />
+        <el-table-column label="债务人名称" min-width="150" fixed>
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" />
+            <span v-else>{{ row.debtorName || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期借方" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期贷方" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末未审余额" min-width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.endUnaudited" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.endUnaudited) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减:坏账准备" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.provision" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.provision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面价值" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="账面价值=期末未审余额-坏账准备">{{ fmtAmt((Number(row.endUnaudited)||0) - (Number(row.provision)||0)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="发生时间及账龄" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.aging" size="small" @change="persist" />
+            <span v-else>{{ row.aging || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="经济业务说明" min-width="150">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.businessDesc" size="small" @change="persist" />
+            <span v-else>{{ row.businessDesc || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联方" width="80" align="center">
+          <template #default="{ row }">
+            <el-checkbox v-if="!isReadonly" v-model="row.isRelated" @change="persist" />
+            <span v-else>{{ row.isRelated ? '√' : '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="协议/合同索引" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.contractIndex" size="small" @change="persist" />
+            <span v-else>{{ row.contractIndex || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期后收款" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.postCollection" :controls="false" size="small" class="amt" @change="persist" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.postCollection) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow('rows', row.id); persist()">删除</el-button>
+          </template>
+        </el-table-column>
+        <template #append>
+          <div class="table-total">合计　期末未审余额：{{ fmtAmt(columnSum('rows', 'endUnaudited')) }}</div>
         </template>
-      </el-table-column>
+      </el-table>
+    </el-card>
 
-      <el-table-column label="期末余额" min-width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small"
-            :controls="false" class="amount-input"
-            @change="(v: number) => handleUpdate(row.id, 'endBalance', v ?? 0)" />
-          <span v-else class="amount-cell">{{ fmtAmt(row.endBalance) }}</span>
-        </template>
-      </el-table-column>
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">三、审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="针对期后收款的凭证检查详见 K1-12；说明大额款项的核查情况与识别的未识别关联方" @change="persist" />
+    </el-card>
 
-      <el-table-column label="占比" min-width="90" align="right">
-        <template #default="{ row }">
-          <span class="formula-cell" title="占比=单项余额/其他应收款合计">
-            {{ row.proportion != null ? (row.proportion * 100).toFixed(2) + '%' : '-' }}
-          </span>
-        </template>
-      </el-table-column>
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="card-title">四、审计结论</span></template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select"
+        placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述调整事项外，其余未见异常" value="B" />
+        <el-option label="C、存在重大未调整事项，不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+        placeholder="形成审计结论..." @change="persist" />
+    </el-card>
 
-      <el-table-column label="性质" min-width="110">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.nature" size="small" clearable
-            placeholder="请选择" @change="(v: string) => handleUpdate(row.id, 'nature', v)">
-            <el-option label="经营性往来" value="经营性往来" />
-            <el-option label="非经营性往来" value="非经营性往来" />
-            <el-option label="保证金/押金" value="保证金/押金" />
-            <el-option label="备用金" value="备用金" />
-            <el-option label="代垫款项" value="代垫款项" />
-            <el-option label="其他" value="其他" />
-          </el-select>
-          <span v-else>{{ row.nature || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="形成原因" min-width="140">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.formReason" size="small"
-            placeholder="形成原因"
-            @change="(v: string) => handleUpdate(row.id, 'formReason', v)" />
-          <span v-else>{{ row.formReason || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="预计收回时间" min-width="120">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.expectedRecovery" size="small"
-            placeholder="如：2026年6月"
-            @change="(v: string) => handleUpdate(row.id, 'expectedRecovery', v)" />
-          <span v-else>{{ row.expectedRecovery || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="收回可能性" min-width="110" align="center">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.recoverability" size="small"
-            placeholder="请选择" @change="(v: string) => handleUpdate(row.id, 'recoverability', v)">
-            <el-option label="很可能" value="很可能" />
-            <el-option label="可能" value="可能" />
-            <el-option label="极小可能" value="极小可能" />
-          </el-select>
-          <el-tag v-else :type="recoveryTagType(row.recoverability)" size="small">
-            {{ row.recoverability || '-' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="后续核查" min-width="130">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.followUp" size="small"
-            placeholder="核查措施"
-            @change="(v: string) => handleUpdate(row.id, 'followUp', v)" />
-          <span v-else>{{ row.followUp || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 操作列 -->
-      <el-table-column v-if="!isReadonly" label="操作" width="60" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" type="danger" link @click="handleRemoveRow(row.id)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>按期末余额降序排列，占比>10%黄色高亮；点击往来对象跳转K1-2</li>
-        <li>收回可能性：很可能(>50%)/可能(≈50%)/极小可能(&lt;5%)</li>
+        <li>选取前 10 名大额其他应收款（不含合并范围内关联方）</li>
+        <li>通过函证、与高管/相关人员核对、检查支持性证据确认存在性</li>
+        <li>关注是否存在未识别的关联方（结合 B19）</li>
+        <li>账面价值 = 期末未审余额 - 坏账准备（自动计算）</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * K1TabLargeAmount.vue — K1-5 大额其他应收款情况分析表
- * Spec: .kiro/specs/k1-other-receivables/ | Task: 4.6
- * Requirements: 7.1-7.4
- */
-import { computed, inject, toRef, onMounted } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useK1LargeAmount, type K1LargeAmountRow } from '../../composables/useK1LargeAmount'
-import { useK1ImportExport } from '../../composables/useK1ImportExport'
-
-// ─── Props / Emits ───────────────────────────────────────────────────────────
+/** K1TabLargeAmount.vue — K1-5 大额其他应收款情况分析表 */
+import { computed, inject, onMounted } from 'vue'
+import { useK1AuditRows, K1_CONCLUSION_TEMPLATES } from '../../composables/useK1AuditRows'
 
 const props = defineProps<{
   wpId: string
@@ -165,129 +156,57 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
-
-const emit = defineEmits<{
-  (e: 'save', itemId: string, value: any): void
-  (e: 'navigate-sheet', sheetName: string): void
-}>()
-
-// ─── Injections ──────────────────────────────────────────────────────────────
-
+const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ─── Composables ─────────────────────────────────────────────────────────────
-
 const allResponsesRef = computed(() => props.allResponses)
+const ITEM_ID = 'K1-5-large-amount'
+const { tables, auditNote, conclusion, conclusionOption, load, addRow, removeRow, columnSum, serialize } =
+  useK1AuditRows({ allResponses: allResponsesRef as any, itemId: ITEM_ID, tableKeys: ['rows'] })
 
-const {
-  rows,
-  totalAmount,
-  highlightThreshold,
-  loadRows,
-  addRow,
-  updateRow,
-  removeRow,
-  isAboveThreshold,
-  serializeRows,
-} = useK1LargeAmount({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  allResponses: allResponsesRef as any,
-})
+onMounted(() => load())
 
-const { exportTemplate, exportData, importData } = useK1ImportExport({ wpId: toRef(props, 'wpId') })
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
-
-onMounted(() => { loadRows() })
-
-// ─── 行操作 ──────────────────────────────────────────────────────────────────
-
-async function handleAddRow() {
-  try {
-    const { value } = await ElMessageBox.prompt(
-      '请输入往来对象名称',
-      '新增大额分析行',
-      { confirmButtonText: '确定', cancelButtonText: '取消', inputPlaceholder: '往来对象名称' }
-    )
-    if (!value?.trim()) { ElMessage.warning('名称不能为空'); return }
-    addRow(value.trim(), 0)
-    persistRows()
-    ElMessage.success(`已新增：${value.trim()}`)
-  } catch { /* cancelled */ }
+function persist() {
+  const data = serialize()
+  props.allResponses.set(ITEM_ID, { item_id: ITEM_ID, conclusion: null, remark: data })
+  emit('save', ITEM_ID, { remark: data })
 }
-
-function handleRemoveRow(id: string) { removeRow(id); persistRows() }
-
-function handleUpdate(id: string, field: keyof K1LargeAmountRow, value: any) {
-  updateRow(id, field, value)
-  persistRows()
+function onConclusionOption(val: string) {
+  if (K1_CONCLUSION_TEMPLATES[val] && !conclusion.value) conclusion.value = K1_CONCLUSION_TEMPLATES[val]
+  persist()
 }
-
-function persistRows() {
-  const itemId = 'K1-5-large-rows'
-  const payload = { item_id: itemId, conclusion: null, remark: serializeRows() }
-  props.allResponses.set(itemId, payload)
-  emit('save', itemId, { remark: serializeRows() })
+function fmtAmt(v: number | null | undefined): string {
+  if (v == null) return '-'
+  return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-function navigateToDetail(row: K1LargeAmountRow) {
-  emit('navigate-sheet', 'K1-2 明细表')
-}
-
-// ─── 导入导出 ─────────────────────────────────────────────────────────────────
-
-function handleExportTemplate() { exportTemplate('K1-5') }
-function handleExportData() { exportData('K1-5') }
-function handleImportData() {
-  const input = document.createElement('input')
-  input.type = 'file'; input.accept = '.xlsx,.xls'
-  input.onchange = async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0]
-    if (!file) return
-    const result = await importData('K1-5', file)
-    if (result) { loadRows() }
-  }
-  input.click()
-}
-
-// ─── UI Helpers ──────────────────────────────────────────────────────────────
-
-function tableRowStyle({ row }: { row: K1LargeAmountRow }): Record<string, string> {
-  if (isAboveThreshold(row)) return { 'background-color': '#fef9c3' }
-  return {}
-}
-
-function recoveryTagType(val: string): 'success' | 'warning' | 'danger' | 'info' {
-  if (val === '很可能') return 'success'
-  if (val === '可能') return 'warning'
-  if (val === '极小可能') return 'danger'
-  return 'info'
-}
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function handleAiGenerate(section: string) { console.log('[K1-5] AI generate:', section) }
-function handleReview(id: string) { openReviewDialog(id) }
+function handleReview() { openReviewDialog('K1-5-large-amount') }
 </script>
 
 <style scoped>
-.k1-tab-large-amount { padding: 16px; font-size: var(--wp-font-size, 13px); }
-.methodology-context { border-left: 4px solid var(--el-color-warning); background: #fffbeb; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6; }
-.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.k1-audit-sheet { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
-.summary-bar { display: flex; gap: 20px; margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-regular); }
-.large-amount-table { font-size: var(--wp-font-size, 13px); }
+.audit-objective { margin-bottom: 8px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
+.process-hint { margin-bottom: 10px; }
+.process-hint :deep(.el-alert__title) { font-size: 12px; line-height: 1.55; }
+.section-card { margin-bottom: 10px; }
+.section-card :deep(.el-card__header) { padding: 8px 14px; }
+.section-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-title { font-weight: 600; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
-.amount-input { width: 100%; }
-.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
-.counterparty-link { color: var(--el-color-primary); cursor: pointer; }
-.counterparty-link:hover { text-decoration: underline; }
-.compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
+.amt { width: 100%; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; font-weight: 600; color: var(--el-text-color-regular); }
+.conclusion-card { margin-bottom: 10px; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
+.compile-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.compile-hint ul { padding-left: 18px; margin-top: 8px; line-height: 1.7; }
 </style>
