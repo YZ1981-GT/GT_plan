@@ -26,6 +26,16 @@
         最终合计须与K1-1审定表坏账准备一致，并与K1-8测算交叉验证差异。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">审计目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>资产负债表中记录的其他应收款坏账准备是存在的；</li>
+        <li><b>完整性：</b>所有应当记录的其他应收款坏账准备均已记录；</li>
+        <li><b>计价和分摊：</b>坏账准备以恰当的金额包括在财务报表中，相关计价调整已恰当记录。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K1-3 坏账准备明细表</h3>
@@ -419,11 +429,15 @@ function fmtAmt(val: number | null | undefined): string {
   border-left: 4px solid var(--el-color-warning);
   background: #fffbeb;
   padding: 10px 14px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-size: 12px;
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 
 /* 标题栏 */
 .section-head {

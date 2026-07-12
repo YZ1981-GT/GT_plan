@@ -5,6 +5,18 @@
       <p>K1-1审定表审定其他应收款(1221借方/资产类)与坏账准备(备抵类)，计算账面净值。资产类期末=期初+借方-贷方；备抵类期末=期初+贷方-借方；净值=应收-坏账。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">审计目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>记录的其他应收款在资产负债表日确实存在且已恰当记录；</li>
+        <li><b>完整性：</b>所有应当记录的其他应收款均已记录，相关披露完整；</li>
+        <li><b>权利和义务：</b>记录的其他应收款确为被审计单位拥有或控制；</li>
+        <li><b>计价和分摊：</b>其他应收款以恰当金额包括在报表中，计价调整已恰当记录，披露充分适当；</li>
+        <li><b>列报与披露：</b>已按企业会计准则规定在财务报表中作出恰当列报。</li>
+      </ol>
+    </el-alert>
+
     <!-- 一、其他应收款（1221） -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -383,11 +395,15 @@ function fmtAmt(val: number | null | undefined): string {
   border-left: 4px solid var(--el-color-warning);
   background: #fffbeb;
   padding: 10px 14px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-size: 12px;
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

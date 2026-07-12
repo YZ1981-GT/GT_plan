@@ -24,6 +24,57 @@
         否则→Stage 1（12个月ECL）。划分结果自动联动K1-2明细表阶段列和K1-8坏账测算。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">审计目标（认定）</span></template>
+      <p class="ao-text">其他应收款、坏账准备以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。其他应收款不适用简化方法，应按预期信用损失模型一般方法按三阶段计提，必须追踪信用风险的变化。</p>
+    </el-alert>
+
+    <!-- 信用风险显著增加判断参考（13项） -->
+    <details class="judge-ref">
+      <summary>信用风险显著增加 / 较低信用风险 / 已发生减值 — 判断参考</summary>
+      <div class="jr-body">
+        <div class="jr-block">
+          <div class="jr-title">一、信用风险是否显著增加（需考虑的信息）</div>
+          <ol class="jr-list">
+            <li>信用风险变化导致的内部价格指标显著变化（信用利差等）</li>
+            <li>金融工具利率或其他条款将发生显著变化</li>
+            <li>类似金融工具信用风险的外部市场指标显著变化</li>
+            <li>外部/内部信用评级下调</li>
+            <li>借款人业务、财务或外部经济状况不利变化</li>
+            <li>借款人经营成果实际或预期显著变化</li>
+            <li>借款人所处监管、经济或技术环境显著不利变化</li>
+            <li>同一借款人其他金融工具信用风险不利变化</li>
+            <li>担保或信用增级质量显著变化</li>
+            <li>借款人还款经济动机显著变化</li>
+            <li>借款合同的预期变更</li>
+            <li>借款人预期表现和还款行为显著变化</li>
+            <li>逾期信息：逾期超过（含）30日通常推定信用风险显著增加</li>
+          </ol>
+        </div>
+        <div class="jr-block">
+          <div class="jr-title">二、是否具有较低信用风险（同时满足）</div>
+          <ol class="jr-list">
+            <li>金融工具的违约风险较低</li>
+            <li>借款人在短期内履行支付合同现金流量义务的能力很强</li>
+            <li>即使长期经济形势不利变化，也不一定降低借款人履约能力</li>
+          </ol>
+        </div>
+        <div class="jr-block">
+          <div class="jr-title">三、已发生信用减值的评估（可观察信息）</div>
+          <ol class="jr-list">
+            <li>发行方或债务人发生重大财务困难</li>
+            <li>债务人违反合同（偿付利息或本金违约、逾期）</li>
+            <li>债权人因债务人财务困难给予让步</li>
+            <li>债务人很可能破产或进行其他财务重组</li>
+            <li>财务困难导致该金融资产的活跃市场消失</li>
+            <li>以大幅折扣购买或源生（反映信用损失事实）</li>
+          </ol>
+          <p class="jr-note">提示：逾期超过（含）90日通常推定已发生违约（进入第三阶段），除非有合理依据表明更长期间更恰当。</p>
+        </div>
+      </div>
+    </details>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K1-7 三阶段划分检查表</h3>
@@ -370,11 +421,27 @@ function handleReview(id: string) { openReviewDialog(id) }
   border-left: 4px solid var(--el-color-warning);
   background: #fffbeb;
   padding: 10px 14px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-size: 12px;
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
+.audit-objective { margin-bottom: 10px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-text { margin: 4px 0 0; line-height: 1.6; font-size: 12px; }
+
+/* 判断参考折叠 */
+.judge-ref {
+  margin-bottom: 14px; font-size: 12px;
+  border: 1px solid var(--el-border-color-lighter); border-radius: 6px; padding: 8px 12px;
+  background: #fafafa;
+}
+.judge-ref summary { cursor: pointer; font-weight: 600; color: var(--el-text-color-regular); }
+.jr-body { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 10px; }
+.jr-title { font-weight: 600; margin-bottom: 4px; color: var(--el-color-primary); }
+.jr-list { padding-left: 16px; margin: 0; line-height: 1.6; }
+.jr-note { margin: 6px 0 0; color: var(--el-text-color-secondary); font-style: italic; }
 
 /* 标题栏 */
 .section-head {
