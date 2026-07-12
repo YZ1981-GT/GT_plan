@@ -13,13 +13,14 @@
  *
  * Requirements: 1.1-1.10, 21.1, 21.2, 21.5, 21.6
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   getAuditedAmount,
   getChangeRate,
   sumif,
 } from './useD2FormulaEngine'
+import { D2_WRITEBACK_KEY } from './d2InjectionKeys'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
 
 const BALANCE_TOLERANCE = 0.01
@@ -109,6 +110,8 @@ export const ADJUDICATION_ROW_CONFIG: Array<{
 
 export function useD2Adjudication(options: UseD2BaseOptions) {
   const { wpId, projectId, allResponses, isReadonly } = options
+
+  const injectedWriteback = inject(D2_WRITEBACK_KEY, undefined)
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -501,16 +504,20 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
    */
   function writebackTrialBalance(auditedAmount: number): void {
     if (!projectId.value) return
-    try {
-      window.dispatchEvent(new CustomEvent('d2:writeback-trial-balance', {
-        detail: {
-          projectId: projectId.value,
-          accountCode: '1122',
-          auditedAmount,
-        },
-      }))
-    } catch {
-      console.warn('[useD2Adjudication] writebackTrialBalance dispatch failed')
+    if (injectedWriteback) {
+      injectedWriteback('1122', auditedAmount)
+    } else {
+      try {
+        window.dispatchEvent(new CustomEvent('d2:writeback-trial-balance', {
+          detail: {
+            projectId: projectId.value,
+            accountCode: '1122',
+            auditedAmount,
+          },
+        }))
+      } catch {
+        console.warn('[useD2Adjudication] writebackTrialBalance dispatch failed')
+      }
     }
   }
 

@@ -9,6 +9,7 @@
 import { inject, ref, toRef, type Ref } from 'vue'
 import { useD2WriteoffCheck } from '../composables/useD2WriteoffCheck'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -25,6 +26,8 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   toRef(props, 'projectId') as Ref<string>,
   'D2-11',
 )
+
+const { saveItems } = useD2SaveInject()
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -59,7 +62,7 @@ loadSectionAnalysis()
 function saveSectionAnalysis(): void {
   const item = { item_id: 'D2-writeoff-section-analysis', conclusion: null, remark: sectionAnalysis.value }
   props.allResponses.set('D2-writeoff-section-analysis', item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  void saveItems([item])
 }
 
 async function onAiSectionAnalysis(): Promise<void> {

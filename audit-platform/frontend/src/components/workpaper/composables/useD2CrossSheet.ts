@@ -4,6 +4,9 @@
  * 通过 allResponses Map 实现跨 sheet 数据流（纯 computed 响应式链，不走 API）。
  * 数据读取模式：allResponses.get('D2-*')?.remark 存 JSON 数组或数值，try/catch 解析。
  *
+ * P1-6 优化：使用 focused key extractors 避免任意 item 变化触发全部 crossSheet 重算。
+ * 每个 crossSheet computed 仅依赖其实际使用的 key 的 remark 值（通过中间 computed 隔离）。
+ *
  * Spec: .kiro/specs/d2-accounts-receivable-refactor/
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
@@ -156,10 +159,20 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
     return allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
   }
 
+  // ─── P1-6: Focused key extractors ─────────────────────────────────────
+  // 每个 computed 仅依赖自己需要的特定 key 的 remark 值。
+  // 当其他 key 变化时（如 D2-adj-* 更新），明细/坏账/ECL 的 computed 不重算。
+  const detailRowsJson = computed(() => getVal('D2-detail-rows').remark)
+  const detailCount = computed(() => getVal('D2-detail-count').remark)
+  const bdIndividualJson = computed(() => getVal('D2-bd-individual-rows').remark)
+  const bdAgingJson = computed(() => getVal('D2-bd-aging-rows').remark)
+  const bdCustomerJson = computed(() => getVal('D2-bd-customer-rows').remark)
+  const ecl9RowsJson = computed(() => getVal('D2-ecl9-rows').remark)
+
   // ─── D2-2 明细行 ───────────────────────────────────────────────────────
 
   const detailRows = computed<DetailRow[]>(() => {
-    const jsonData = getVal('D2-detail-rows').remark
+    const jsonData = detailRowsJson.value
     if (jsonData) {
       try {
         const parsed = JSON.parse(jsonData)
@@ -169,7 +182,7 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
       } catch { /* fall through */ }
     }
 
-    const count = parseNum(getVal('D2-detail-count').remark)
+    const count = parseNum(detailCount.value)
     if (count <= 0) return []
 
     const rows: DetailRow[] = []
@@ -238,12 +251,12 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
       customerType: { prior: 0, current: 0 },
     }
 
-    for (const [cat, key] of [
-      ['individual', 'D2-bd-individual-rows'],
-      ['aging', 'D2-bd-aging-rows'],
-      ['customerType', 'D2-bd-customer-rows'],
+    for (const [cat, jsonRef] of [
+      ['individual', bdIndividualJson],
+      ['aging', bdAgingJson],
+      ['customerType', bdCustomerJson],
     ] as const) {
-      const rows = safeParseRows<BadDebtRowRaw>(getVal(key).remark)
+      const rows = safeParseRows<BadDebtRowRaw>(jsonRef.value)
       const fixedRow = rows.find(r => r.isFixed)
       if (fixedRow) {
         result[cat].prior = parseNum(fixedRow.priorAudited)
@@ -264,7 +277,7 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
   // ─── D2-9 单项 ECL 合计 ────────────────────────────────────────────────
 
   const eclSingleTotal: ComputedRef<number> = computed(() => {
-    const rows = safeParseRows<Ecl9RowRaw>(getVal('D2-ecl9-rows').remark)
+    const rows = safeParseRows<Ecl9RowRaw>(ecl9RowsJson.value)
     return rows.reduce((sum, row) => sum + parseNum(row.shouldProvision), 0)
   })
 

@@ -9,6 +9,7 @@ import { useD2CrossSheet } from '../composables/useD2CrossSheet'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { getChangeRate } from '../composables/useD2FormulaEngine'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
@@ -49,6 +50,8 @@ const crossSheet = useD2CrossSheet({ allResponses: toRef(props, 'allResponses') 
 
 const { generateAndConfirm, aiAvailable } = useD2AiGenerate(toRef(props, 'wpId'))
 
+const { saveItems } = useD2SaveInject()
+
 const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   toRef(props, 'wpId') as Ref<string>,
   toRef(props, 'projectId') as Ref<string>,
@@ -68,9 +71,7 @@ watch(() => props.allResponses, loadAuditTexts, { immediate: true, deep: true })
 function saveAuditField(field: 'note' | 'conclusion', value: string): void {
   const id = field === 'note' ? 'D2-adj-audit-note' : 'D2-adj-audit-conclusion'
   props.allResponses.set(id, { item_id: id, conclusion: null, remark: value })
-  window.dispatchEvent(new CustomEvent('d2:save-items', {
-    detail: { items: [{ item_id: id, conclusion: null, remark: value }] },
-  }))
+  void saveItems([{ item_id: id, conclusion: null, remark: value }])
 }
 
 const loading = computed(() => sumifStatus.value === 'computing')
@@ -308,7 +309,14 @@ const AGING_PRESET_3Y: AgingBandDef[] = [
   { key: 'over3', label: '三年以上', keys: ['y3to4', 'y4to5', 'over5'] },
 ]
 
-const AGING_PRESET_5Y: AgingBandDef[] = BASE_AGING_OPTIONS.map((v) => ({ key: v.key, label: v.label, keys: [v.key] }))
+const AGING_PRESET_5Y: AgingBandDef[] = [
+  { key: 'within1Year', label: '1年以内', keys: ['within1Year'] },
+  { key: 'y1to2', label: '1-2年', keys: ['y1to2'] },
+  { key: 'y2to3', label: '2-3年', keys: ['y2to3'] },
+  { key: 'y3to4', label: '3-4年', keys: ['y3to4'] },
+  { key: 'y4to5', label: '4-5年', keys: ['y4to5'] },
+  { key: 'over5', label: '5年以上', keys: ['over5'] },
+]
 
 const agingMode = ref<AgingMode>('5y')
 const customAgingBands = ref<AgingBandDef[]>([])
@@ -346,14 +354,14 @@ function saveAgingMode(mode: AgingMode): void {
   agingMode.value = mode
   const item = { item_id: 'D2-adj-aging-mode', conclusion: null, remark: mode }
   props.allResponses.set(item.item_id, item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  void saveItems([item])
 }
 
 function saveCustomAgingBands(): void {
   const payload = JSON.stringify(customAgingBands.value)
   const item = { item_id: 'D2-adj-aging-custom-bands', conclusion: null, remark: payload }
   props.allResponses.set(item.item_id, item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  void saveItems([item])
 }
 
 function onCustomLabelChange(index: number, value: string): void {

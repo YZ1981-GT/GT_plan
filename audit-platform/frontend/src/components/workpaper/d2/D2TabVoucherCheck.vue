@@ -8,6 +8,7 @@ import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
 import { useD2VoucherCheck } from '../composables/useD2VoucherCheck'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
@@ -31,6 +32,8 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   toRef(props, 'projectId') as Ref<string>,
   'D2-7',
 )
+
+const { saveItems } = useD2SaveInject()
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -135,7 +138,7 @@ function saveNote(v: string): void {
   auditNote.value = v
   const item = { item_id: NOTE_KEY, conclusion: null, remark: v }
   props.allResponses.set(NOTE_KEY, item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  void saveItems([item])
 }
 
 const { aiAvailable, generateAndConfirm } = useD2AiGenerate(toRef(props, 'wpId'))

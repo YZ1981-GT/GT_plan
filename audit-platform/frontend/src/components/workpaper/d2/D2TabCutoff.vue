@@ -8,6 +8,7 @@
 import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
 import { useD2Cutoff, type CutoffSample } from '../composables/useD2Cutoff'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -27,6 +28,7 @@ const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs'
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const { saveItems } = useD2SaveInject()
 
 function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
   if (!openReviewDialog) return
@@ -76,7 +78,7 @@ function saveConclusion(v: string): void {
   auditConclusion.value = v
   const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: v }
   props.allResponses.set(CONCLUSION_KEY, item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  void saveItems([item])
 }
 
 const wpIdRef = toRef(props, 'wpId')

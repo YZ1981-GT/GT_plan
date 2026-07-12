@@ -9,6 +9,7 @@ import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { useD2Ecl, type EclSingleRow, type MigrationRateRow, type EclDiscountRow } from '../composables/useD2Ecl'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import type { ImportableSheet } from '../composables/useD2ImportExport'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
@@ -32,6 +33,8 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 })
+
+const { saveItems } = useD2SaveInject()
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -104,7 +107,7 @@ function saveNote(v: string): void {
   auditNote.value = v
   const item = { item_id: NOTE_KEY, conclusion: null, remark: v }
   props.allResponses.set(NOTE_KEY, item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  void saveItems([item])
 }
 
 const { aiAvailable, generateAndConfirm } = useD2AiGenerate(toRef(props, 'wpId'))

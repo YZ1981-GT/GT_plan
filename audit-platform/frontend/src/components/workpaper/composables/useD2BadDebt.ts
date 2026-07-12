@@ -27,7 +27,7 @@ import type { UseD2BaseOptions } from './useD2Adjudication'
 
 export interface BadDebtRow {
   rowId: string
-  category: 'individual' | 'aging' | 'customer-type'  // 三分类
+  category: 'individual' | 'aging' | 'customer-type'  // 存储分类（三类）
   label: string               // 债务人/组合名称
   isSubRow: boolean           // 子行(可展开)
   isFixed: boolean            // 分类汇总行不可删
@@ -38,13 +38,13 @@ export interface BadDebtRow {
   priorAudited: number        // = 未审+AJE+RJE
   // 本期增加(2列)
   currentProvision: number    // 计提
-  currentTransferIn: number   // 转入
+  currentOtherIncrease: number // 其他增加（源模板G列）
   // 本期减少(3列)
-  currentRecovery: number     // 收回
   currentReversal: number     // 转回
   currentWriteOff: number     // 核销
+  currentOtherDecrease: number // 其他减少（源模板J列）
   // 期末(4列)
-  currentUnadjusted: number   // = 期初审定+计提+转入-收回-转回-核销
+  currentUnadjusted: number   // = 期初审定+计提+其他增加-转回-核销-其他减少
   currentAje: number
   currentRje: number
   currentAudited: number      // = 期末未审+AJE+RJE
@@ -53,23 +53,23 @@ export interface BadDebtRow {
 /** 需要SUM求和的金额字段列表 */
 const NUMERIC_FIELDS: (keyof BadDebtRow)[] = [
   'priorUnadjusted', 'priorAje', 'priorRje', 'priorAudited',
-  'currentProvision', 'currentTransferIn',
-  'currentRecovery', 'currentReversal', 'currentWriteOff',
+  'currentProvision', 'currentOtherIncrease',
+  'currentReversal', 'currentWriteOff', 'currentOtherDecrease',
   'currentUnadjusted', 'currentAje', 'currentRje', 'currentAudited',
 ]
 
-/** 三分类对应的 allResponses key */
-const CATEGORY_KEYS: Record<BadDebtRow['category'], string> = {
+/** 两大分区对应的 allResponses key */
+const CATEGORY_KEYS: Record<string, string> = {
   'individual': 'D2-bd-individual-rows',
   'aging': 'D2-bd-aging-rows',
   'customer-type': 'D2-bd-customer-rows',
 }
 
-/** 三分类默认固定行标签 */
-const CATEGORY_LABELS: Record<BadDebtRow['category'], string> = {
+/** 分类默认固定行标签 */
+const CATEGORY_LABELS: Record<string, string> = {
   'individual': '按单项计提小计',
-  'aging': '按账龄组合计提小计',
-  'customer-type': '按客户类型组合计提小计',
+  'aging': '账龄组合小计',
+  'customer-type': '客户类型组合小计',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -92,10 +92,10 @@ function createEmptySubRow(category: BadDebtRow['category']): BadDebtRow {
     priorRje: 0,
     priorAudited: 0,
     currentProvision: 0,
-    currentTransferIn: 0,
-    currentRecovery: 0,
+    currentOtherIncrease: 0,
     currentReversal: 0,
     currentWriteOff: 0,
+    currentOtherDecrease: 0,
     currentUnadjusted: 0,
     currentAje: 0,
     currentRje: 0,
@@ -110,7 +110,7 @@ function createFixedRow(category: BadDebtRow['category']): BadDebtRow {
   return {
     rowId: `fixed-${category}`,
     category,
-    label: CATEGORY_LABELS[category],
+    label: CATEGORY_LABELS[category] || '小计',
     isSubRow: false,
     isFixed: true,
     priorUnadjusted: 0,
@@ -118,10 +118,10 @@ function createFixedRow(category: BadDebtRow['category']): BadDebtRow {
     priorRje: 0,
     priorAudited: 0,
     currentProvision: 0,
-    currentTransferIn: 0,
-    currentRecovery: 0,
+    currentOtherIncrease: 0,
     currentReversal: 0,
     currentWriteOff: 0,
+    currentOtherDecrease: 0,
     currentUnadjusted: 0,
     currentAje: 0,
     currentRje: 0,
@@ -132,8 +132,8 @@ function createFixedRow(category: BadDebtRow['category']): BadDebtRow {
 /**
  * 行公式自动计算：
  * - priorAudited = priorUnadjusted + priorAje + priorRje
- * - currentUnadjusted = priorAudited + currentProvision + currentTransferIn
- *                       - currentRecovery - currentReversal - currentWriteOff
+ * - currentUnadjusted = priorAudited + currentProvision + currentOtherIncrease
+ *                       - currentReversal - currentWriteOff - currentOtherDecrease
  * - currentAudited = currentUnadjusted + currentAje + currentRje
  */
 function recalcRow(row: BadDebtRow): BadDebtRow {
@@ -145,10 +145,10 @@ function recalcRow(row: BadDebtRow): BadDebtRow {
   row.currentUnadjusted =
     row.priorAudited
     + parseNum(row.currentProvision)
-    + parseNum(row.currentTransferIn)
-    - parseNum(row.currentRecovery)
+    + parseNum(row.currentOtherIncrease)
     - parseNum(row.currentReversal)
     - parseNum(row.currentWriteOff)
+    - parseNum(row.currentOtherDecrease)
   row.currentAudited = getAuditedAmount(
     row.currentUnadjusted,
     parseNum(row.currentAje),
@@ -181,10 +181,10 @@ function parseRows(jsonStr: string | null | undefined, category: BadDebtRow['cat
         priorRje: parseNum(raw.priorRje),
         priorAudited: parseNum(raw.priorAudited),
         currentProvision: parseNum(raw.currentProvision),
-        currentTransferIn: parseNum(raw.currentTransferIn),
-        currentRecovery: parseNum(raw.currentRecovery),
+        currentOtherIncrease: parseNum(raw.currentOtherIncrease ?? raw.currentTransferIn),
         currentReversal: parseNum(raw.currentReversal),
         currentWriteOff: parseNum(raw.currentWriteOff),
+        currentOtherDecrease: parseNum(raw.currentOtherDecrease),
         currentUnadjusted: parseNum(raw.currentUnadjusted),
         currentAje: parseNum(raw.currentAje),
         currentRje: parseNum(raw.currentRje),
@@ -283,10 +283,10 @@ export function useD2BadDebt(options: UseD2BaseOptions & { eclTestTotal: Ref<num
       priorRje: 0,
       priorAudited: 0,
       currentProvision: 0,
-      currentTransferIn: 0,
-      currentRecovery: 0,
+      currentOtherIncrease: 0,
       currentReversal: 0,
       currentWriteOff: 0,
+      currentOtherDecrease: 0,
       currentUnadjusted: 0,
       currentAje: 0,
       currentRje: 0,

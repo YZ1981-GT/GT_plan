@@ -5,9 +5,10 @@
  * (一) 重要指标分析 (二) 借方发生额与收入核对
  * (三) 贷方发生额分析 (四) 期末前十名分析 (五) 近两年账龄结构分析
  */
-import { computed, inject, ref, watch, toRef, type Ref } from 'vue'
+import { computed, inject, ref, watch, toRef, onBeforeUnmount, type Ref } from 'vue'
 import { useD2Analysis } from '../composables/useD2Analysis'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import type { useD2CrossSheet } from '../composables/useD2CrossSheet'
@@ -24,6 +25,8 @@ const props = defineProps<{
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 })
+
+const { saveItems } = useD2SaveInject()
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
@@ -94,6 +97,19 @@ async function onAiAnalysisNote(): Promise<void> {
     top5Concentration: indicators.value.top5Concentration,
   }, 'AI 生成分析程序备注')
   if (content) updateMetaField('remark', content)
+}
+
+async function onAiProcess(): Promise<void> {
+  const content = await generateAndConfirm('analysis-process', auditProcess.value, {
+    turnoverRate: indicators.value.turnoverRate,
+    turnoverDays: indicators.value.turnoverDays,
+    badDebtRate: indicators.value.badDebtRate,
+    top5Concentration: indicators.value.top5Concentration,
+  }, 'AI 生成审计过程')
+  if (content) {
+    auditProcess.value = content
+    updateMetaField('process', content)
+  }
 }
 
 // ─── (二) 借方发生额与收入核对 ────────────────────────────────────────────
@@ -179,7 +195,19 @@ function createEmptyTop10(): Top10Row {
   return { customerName: '', endBalance: null, beginBalance: null, changeAmount: null, changeRatio: null, aging: '', creditPeriod: '', overdueAmount: null }
 }
 
-const top10Rows = ref<Top10Row[]>(Array.from({ length: 10 }, () => createEmptyTop10()))
+const top10Rows = ref<Top10Row[]>(Array.from({ length: 3 }, () => createEmptyTop10()))
+
+function addTop10Row(): void {
+  if (props.isReadonly) return
+  top10Rows.value.push(createEmptyTop10())
+  onTop10Change()
+}
+
+function removeTop10Row(idx: number): void {
+  if (props.isReadonly || top10Rows.value.length <= 1) return
+  top10Rows.value.splice(idx, 1)
+  onTop10Change()
+}
 
 const top10Total = computed(() => {
   const rows = top10Rows.value
@@ -218,7 +246,16 @@ const AGING_PRESET_5Y = ['一年以内', '一到二年', '二到三年', '三到
 // 从项目设置的账龄配置获取账龄段（与D2-2明细表一致）
 const { segments: agingSegments, bands: agingConfigBands } = useAgingConfig(toRef(props, 'projectId'), 'D2')
 
+// 监听项目级账龄配置变更事件（从 D2-1 审定表或项目设置触发）
+const agingConfigVersion = ref(0)
+function onAgingConfigChanged(): void {
+  agingConfigVersion.value++
+}
+window.addEventListener('aging-config:changed', onAgingConfigChanged)
+
 const agingBands = computed(() => {
+  // 触发依赖（aging-config:changed 事件时强制重算）
+  void agingConfigVersion.value
   // 优先使用项目账龄配置
   if (agingConfigBands.value && agingConfigBands.value.length > 0) {
     return agingConfigBands.value.map((b: any) => b.label || b.name || b)
@@ -334,11 +371,7 @@ function saveTableData(key: string, data: any): void {
   if (props.isReadonly) return
   const jsonStr = JSON.stringify(data)
   props.allResponses.set(key, { item_id: key, conclusion: null, remark: jsonStr })
-  try {
-    window.dispatchEvent(new CustomEvent('d2:save-items', {
-      detail: { items: [{ item_id: key, conclusion: null, remark: jsonStr }] }
-    }))
-  } catch { /* silent */ }
+  void saveItems([{ item_id: key, conclusion: null, remark: jsonStr }])
 }
 
 function onDebitReconChange(): void {
@@ -355,12 +388,130 @@ function onAgingCompareChange(): void {
   saveTableData('D2-analysis-aging-compare', agingCompareRows.value)
 }
 
+// ─── 导入导出：前十名 (四) ────────────────────────────────────────────────
+function exportTop10(): void {
+  const headers = ['客户名称', '期末账面余额', '期初账面余额', '变动金额', '变动比例', '账龄', '信用期', '逾期金额']
+  const rows = top10Rows.value.map(r => [
+    r.customerName, r.endBalance ?? '', r.beginBalance ?? '',
+    r.changeAmount ?? '', r.changeRatio != null ? (r.changeRatio * 100).toFixed(1) + '%' : '',
+    r.aging, r.creditPeriod, r.overdueAmount ?? '',
+  ])
+  _exportXlsx('D2-5-前十名分析', headers, rows)
+}
+
+function importTop10(file: File): boolean {
+  _importXlsx(file, (data) => {
+    const parsed: Top10Row[] = data.map((row: any) => {
+      const r = createEmptyTop10()
+      r.customerName = String(row['客户名称'] ?? row[0] ?? '')
+      r.endBalance = Number(row['期末账面余额'] ?? row[1]) || null
+      r.beginBalance = Number(row['期初账面余额'] ?? row[2]) || null
+      r.aging = String(row['账龄'] ?? row[5] ?? '')
+      r.creditPeriod = String(row['信用期'] ?? row[6] ?? '')
+      r.overdueAmount = Number(row['逾期金额'] ?? row[7]) || null
+      calcTop10Row(r)
+      return r
+    }).filter((r: Top10Row) => r.customerName)
+    if (parsed.length > 0) {
+      top10Rows.value = parsed
+      onTop10Change()
+    }
+  })
+  return false
+}
+
+// ─── 导入导出：账龄结构 (五) ──────────────────────────────────────────────
+function exportAgingCompare(): void {
+  const headers = ['账龄', '期末账面余额', '各账龄占比', '期初账面余额', '各账龄占比', '变动金额', '变动比例', '原因分析']
+  const rows = agingCompareRows.value.map(r => [
+    r.aging, r.endBalance ?? '', r.endRatio != null ? (r.endRatio * 100).toFixed(1) + '%' : '',
+    r.beginBalance ?? '', r.beginRatio != null ? (r.beginRatio * 100).toFixed(1) + '%' : '',
+    r.changeAmount ?? '', r.changeRatio != null ? (r.changeRatio * 100).toFixed(1) + '%' : '',
+    r.reason,
+  ])
+  _exportXlsx('D2-5-账龄结构分析', headers, rows)
+}
+
+function importAgingCompare(file: File): boolean {
+  _importXlsx(file, (data) => {
+    const parsed: AgingCompareRow[] = data.map((row: any) => ({
+      aging: String(row['账龄'] ?? row[0] ?? ''),
+      endBalance: Number(row['期末账面余额'] ?? row[1]) || null,
+      endRatio: null,
+      beginBalance: Number(row['期初账面余额'] ?? row[3]) || null,
+      beginRatio: null,
+      changeAmount: null,
+      changeRatio: null,
+      reason: String(row['原因分析'] ?? row[7] ?? ''),
+    })).filter((r: AgingCompareRow) => r.aging)
+    if (parsed.length > 0) {
+      agingCompareRows.value = parsed
+      recalcAgingRatios()
+      onAgingCompareChange()
+    }
+  })
+  return false
+}
+
+// ─── 通用 xlsx 导出/导入辅助 ──────────────────────────────────────────────
+function _exportXlsx(filename: string, headers: string[], rows: any[][]): void {
+  import('exceljs').then(({ Workbook }) => {
+    const wb = new Workbook()
+    const ws = wb.addWorksheet('数据')
+    ws.addRow(headers)
+    for (const row of rows) ws.addRow(row)
+    // 列宽自适应
+    headers.forEach((_, i) => { ws.getColumn(i + 1).width = 16 })
+    wb.xlsx.writeBuffer().then((buffer) => {
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${filename}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    })
+  })
+}
+
+function _importXlsx(file: File, onParsed: (data: any[]) => void): void {
+  import('exceljs').then(({ Workbook }) => {
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const wb = new Workbook()
+      await wb.xlsx.load(e.target?.result as ArrayBuffer)
+      const ws = wb.worksheets[0]
+      if (!ws) return
+      const headers: string[] = []
+      const data: any[] = []
+      ws.eachRow((row, rowNum) => {
+        if (rowNum === 1) {
+          row.eachCell((cell) => { headers.push(String(cell.value ?? '')) })
+        } else {
+          const obj: any = {}
+          row.eachCell((cell, colNum) => {
+            obj[headers[colNum - 1] || colNum - 1] = cell.value
+            obj[colNum - 1] = cell.value
+          })
+          data.push(obj)
+        }
+      })
+      onParsed(data)
+    }
+    reader.readAsArrayBuffer(file)
+  })
+}
+
 // Initial load
 watch(
   () => props.allResponses.size,
   () => loadTableData(),
   { immediate: true }
 )
+
+onBeforeUnmount(() => {
+  window.removeEventListener('aging-config:changed', onAgingConfigChanged)
+})
 </script>
 
 <template>
@@ -369,6 +520,17 @@ watch(
     <div class="tab-header">
       <h4>应收账款分析程序 D2-5</h4>
       <GtReviewTrigger section-id="D2-analysis-header" />
+    </div>
+
+    <!-- 工具栏（水平一行排列） -->
+    <div class="tab-toolbar">
+      <el-button-group>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile" style="display:inline-block">
+          <el-button size="small">导入数据</el-button>
+        </el-upload>
+      </el-button-group>
     </div>
 
     <!-- ═══════════ 一、审计目标 ═══════════ -->
@@ -380,7 +542,11 @@ watch(
     </el-alert>
 
     <!-- ═══════════ 二、审计过程 ═══════════ -->
-    <div class="section-title">二、审计过程</div>
+    <div class="section-title">
+      <span>二、审计过程</span>
+      <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiProcess">🤖 AI生成</el-button>
+      <GtReviewTrigger section-id="D2-analysis-process" />
+    </div>
     <el-input
       v-model="auditProcess"
       type="textarea"
@@ -439,19 +605,6 @@ watch(
         <div class="card-label">前五大客户余额占总余额比</div>
       </el-card>
 
-      <el-card shadow="hover" class="indicator-card wide">
-        <template #header><span class="card-title">账龄分布</span></template>
-        <el-table :data="displayAging" size="small" border v-if="displayAging.length > 0" class="compact-table">
-          <el-table-column prop="band" label="账龄段" />
-          <el-table-column label="金额" align="right">
-            <template #default="{ row }">{{ displayPrefs.fmtAmount(row.amount) }}</template>
-          </el-table-column>
-          <el-table-column label="占比" width="80" align="right">
-            <template #default="{ row }">{{ (row.ratio * 100).toFixed(1) }}%</template>
-          </el-table-column>
-        </el-table>
-        <el-empty v-else description="暂无账龄分布数据" :image-size="40" />
-      </el-card>
     </div>
 
     <!-- ═══════════ (二) 应收账款借方发生额与收入核对 ═══════════ -->
@@ -589,13 +742,15 @@ watch(
     <!-- ═══════════ (四) 期末应收账款前十名分析 ═══════════ -->
     <div class="section-title subsection">
       <span>(四) 期末应收账款前十名分析</span>
+      <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addTop10Row">+ 添加客户</el-button>
+      <el-button size="small" plain @click="exportTop10">导出</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="importTop10" style="display:inline-block">
+        <el-button size="small" plain>导入</el-button>
+      </el-upload>
       <GtReviewTrigger section-id="D2-analysis-top10" />
     </div>
 
     <el-table :data="top10Rows" border size="small" class="compact-table" show-summary :summary-method="getTop10Summary">
-      <el-table-column label="序号" width="50" align="center">
-        <template #default="{ $index }">{{ $index + 1 }}</template>
-      </el-table-column>
       <el-table-column label="客户名称" min-width="140">
         <template #default="{ row }">
           <el-input v-model="row.customerName" :disabled="isReadonly" size="small" placeholder="客户名称" @change="onTop10Change" />
@@ -636,11 +791,27 @@ watch(
           <el-input-number v-model="row.overdueAmount" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%" @change="onTop10Change" />
         </template>
       </el-table-column>
+      <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+        <template #default="{ $index }">
+          <el-button type="danger" link size="small" @click="removeTop10Row($index)">✕</el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- ═══════════ (五) 近两年账龄结构分析 ═══════════ -->
     <div class="section-title subsection">
       <span>(五) 近两年账龄结构分析</span>
+      <span class="aging-mode-hint">
+        账龄段：
+        <el-tag size="small" type="info" effect="plain">{{ agingBands.join(' / ') }}</el-tag>
+        <el-tooltip content="账龄段跟随 D2-1 审定表「账龄段口径」设置联动，如需修改请在 D2-1 切换" placement="top">
+          <el-button size="small" text @click="jumpToSection && jumpToSection('审定表D2-1')">去修改</el-button>
+        </el-tooltip>
+      </span>
+      <el-button size="small" plain @click="exportAgingCompare">导出</el-button>
+      <el-upload :show-file-list="false" accept=".xlsx" :before-upload="importAgingCompare" style="display:inline-block">
+        <el-button size="small" plain>导入</el-button>
+      </el-upload>
       <GtReviewTrigger section-id="D2-analysis-aging-compare" />
     </div>
 
@@ -716,20 +887,6 @@ watch(
       @change="(v: string) => updateMetaField('dataSource', v)"
     />
 
-    <!-- 工具栏 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-tag type="info" size="small">分析程序</el-tag>
-      </div>
-      <div class="toolbar-right">
-        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
-        <el-button size="small" @click="onExportData">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-          <el-button size="small">导入数据</el-button>
-        </el-upload>
-      </div>
-    </div>
-
     <!-- 编制提示 -->
     <details class="guidance-fold">
       <summary>📋 编制提示</summary>
@@ -749,12 +906,10 @@ function getTop10Summary({ columns, data }: any) {
   const sums: string[] = []
   columns.forEach((_: any, index: number) => {
     if (index === 0) { sums[index] = '合计'; return }
-    if (index === 1) { sums[index] = ''; return }
-    if ([2, 3, 4, 8].includes(index)) {
-      const total = data.reduce((s: number, row: any) => {
-        const key = index === 2 ? 'endBalance' : index === 3 ? 'beginBalance' : index === 4 ? 'changeAmount' : 'overdueAmount'
-        return s + (row[key] || 0)
-      }, 0)
+    // 期末余额(1)/期初余额(2)/变动金额(3)/逾期金额(7) 需要合计
+    if ([1, 2, 3, 7].includes(index)) {
+      const key = index === 1 ? 'endBalance' : index === 2 ? 'beginBalance' : index === 3 ? 'changeAmount' : 'overdueAmount'
+      const total = data.reduce((s: number, row: any) => s + (row[key] || 0), 0)
       sums[index] = total === 0 ? '-' : total.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     } else {
       sums[index] = ''
@@ -785,6 +940,7 @@ function getTop10Summary({ columns, data }: any) {
   padding-left: 4px;
   border-left: 3px solid #409eff;
 }
+.aging-mode-hint { font-size: 12px; color: #909399; font-weight: normal; display: inline-flex; align-items: center; gap: 4px; margin-left: 8px; }
 
 /* Audit objective */
 .audit-objective { margin-bottom: 12px; }

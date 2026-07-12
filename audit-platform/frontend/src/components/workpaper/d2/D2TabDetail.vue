@@ -7,7 +7,9 @@ import { computed, h, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD2Detail, type DetailRow } from '../composables/useD2Detail'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { useD2DetailColumnPrefs, type ColumnGroup } from '../composables/useD2DetailColumnPrefs'
 import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
 import type { AgingBand } from '@/composables/useAgingConfig'
 import GtReviewDot from '../GtReviewDot.vue'
@@ -26,6 +28,8 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   toRef(props, 'projectId') as Ref<string>,
   'D2-2',
 )
+
+const { saveItems } = useD2SaveInject()
 
 const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
   fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
@@ -62,7 +66,35 @@ const {
 })
 
 const browseMode = ref(true)
-const tableWidth = ref(1200)
+const tableWidth = computed(() => {
+  // 动态宽度：每个可见列的宽度之和 + 少量 padding
+  const cols = virtualColumns.value
+  const sum = cols.reduce((s, c) => s + (c.width || 110), 0)
+  return Math.max(sum + 20, 800)
+})
+const columnSettingsVisible = ref(false)
+
+const {
+  allColumns,
+  groups: columnGroups,
+  getGroupColumns,
+  isColumnVisible,
+  toggleColumn,
+  toggleGroup,
+  isGroupVisible,
+  isGroupPartial,
+  visibleCount,
+  totalCount,
+  activePreset,
+  applyPreset,
+  presets,
+  hideEmptyColumns,
+} = useD2DetailColumnPrefs({
+  bands,
+  rows,
+  allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
 
 const virtualColumns = computed<VirtualColumn[]>(() => {
   const fmt = (v: unknown) => displayPrefs.fmtAmount(Number(v) || 0)
@@ -74,15 +106,54 @@ const virtualColumns = computed<VirtualColumn[]>(() => {
     align: 'right',
     cellRenderer: ({ cellData }) => h('span', {}, fmt(cellData)),
   })
-  return [
+
+  // 构建完整列定义，再按 isColumnVisible 过滤
+  const allCols: VirtualColumn[] = [
     { key: 'seq', dataKey: 'seq', title: '序号', width: 60, align: 'center' },
     { key: 'customerName', dataKey: 'customerName', title: '客户名称', width: 160 },
     { key: 'companyCode', dataKey: 'companyCode', title: '公司代码', width: 90 },
     { key: 'relationType', dataKey: 'relationType', title: '关联方类型', width: 120 },
+    numCol('priorUnadjusted', '期初未审', 110),
+    numCol('priorAje', '期初AJE', 100),
+    numCol('priorRje', '期初RJE', 100),
     numCol('priorAudited', '期初审定', 110),
+    // 期初审定账龄（动态）
+    ...bands.value.map((band): VirtualColumn => ({
+      key: `aging-prior-${band.key}`,
+      dataKey: `agingPrior.${band.key}`,
+      title: `初审·${band.label}`,
+      width: 95,
+      align: 'right',
+      cellRenderer: ({ rowData }) => h('span', {}, fmt((rowData as any).agingPrior?.[band.key] ?? 0)),
+    })),
+    numCol('debitOccurrence', '借方发生', 110),
+    numCol('creditOccurrence', '贷方发生', 110),
+    numCol('endBalance', '期末余额', 110),
+    numCol('reclassification', '重分类', 100),
     numCol('currentUnadjusted', '期末未审', 110),
+    // 期末未审账龄（动态）
+    ...bands.value.map((band): VirtualColumn => ({
+      key: `aging-current-${band.key}`,
+      dataKey: `agingCurrent.${band.key}`,
+      title: `未审·${band.label}`,
+      width: 95,
+      align: 'right',
+      cellRenderer: ({ rowData }) => h('span', {}, fmt((rowData as any).agingCurrent?.[band.key] ?? 0)),
+    })),
+    numCol('currentAje', '期末AJE', 100),
+    numCol('currentRje', '期末RJE', 100),
     numCol('currentAudited', '期末审定', 110),
+    // 期末审定账龄（动态）
+    ...bands.value.map((band): VirtualColumn => ({
+      key: `aging-audited-${band.key}`,
+      dataKey: `agingAudited.${band.key}`,
+      title: `审定·${band.label}`,
+      width: 95,
+      align: 'right',
+      cellRenderer: ({ rowData }) => h('span', {}, fmt((rowData as any).agingAudited?.[band.key] ?? 0)),
+    })),
     { key: 'creditRiskClassification', dataKey: 'creditRiskClassification', title: '信用风险组合', width: 130 },
+    { key: 'groupName', dataKey: 'groupName', title: '组合名称', width: 110 },
     {
       key: 'isConfirmation',
       dataKey: 'isConfirmation',
@@ -91,7 +162,12 @@ const virtualColumns = computed<VirtualColumn[]>(() => {
       align: 'center',
       cellRenderer: ({ cellData }) => h('span', {}, cellData ? '是' : '-'),
     },
+    numCol('postPayment', '期后回款', 110),
+    { key: 'remark', dataKey: 'remark', title: '备注', width: 120 },
   ]
+
+  // 按列偏好过滤：只显示用户勾选的列
+  return allCols.filter(col => isColumnVisible(col.key))
 })
 
 const { rowEventHandlers } = useVirtualTable({
@@ -129,9 +205,7 @@ async function handleImportFromAux(): Promise<void> {
 
 function saveDetailNote(): void {
   props.allResponses.set('D2-detail-audit-note', { item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value })
-  window.dispatchEvent(new CustomEvent('d2:save-items', {
-    detail: { items: [{ item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value }] },
-  }))
+  void saveItems([{ item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value }])
 }
 
 async function onAiDetailNote(): Promise<void> {
@@ -185,6 +259,55 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </el-button>
       </div>
       <div class="toolbar-right">
+        <el-popover
+          v-model:visible="columnSettingsVisible"
+          placement="bottom-end"
+          :width="360"
+          trigger="click"
+        >
+          <template #reference>
+            <el-button size="small" plain>
+              ⚙ 列设置 ({{ visibleCount }}/{{ totalCount }})
+            </el-button>
+          </template>
+          <div class="column-prefs-panel">
+            <div class="prefs-header">
+              <span class="prefs-title">显示列配置</span>
+              <el-button size="small" text type="primary" @click="hideEmptyColumns">隐藏空列</el-button>
+            </div>
+            <div class="prefs-presets">
+              <el-radio-group :model-value="activePreset" size="small" @change="(v: any) => applyPreset(v)">
+                <el-radio-button v-for="p in presets" :key="p.name" :value="p.name">
+                  {{ p.label }}
+                </el-radio-button>
+              </el-radio-group>
+            </div>
+            <div class="prefs-groups">
+              <div v-for="group in columnGroups" :key="group" class="prefs-group">
+                <div class="group-header">
+                  <el-checkbox
+                    :model-value="isGroupVisible(group)"
+                    :indeterminate="isGroupPartial(group)"
+                    @change="(v: boolean) => toggleGroup(group, v)"
+                  >
+                    <span class="group-label">{{ group }}</span>
+                  </el-checkbox>
+                </div>
+                <div class="group-cols">
+                  <el-checkbox
+                    v-for="col in getGroupColumns(group)"
+                    :key="col.key"
+                    :model-value="isColumnVisible(col.key)"
+                    size="small"
+                    @change="(v: boolean) => toggleColumn(col.key, v)"
+                  >
+                    {{ col.label }}
+                  </el-checkbox>
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-popover>
         <el-input
           v-model="searchQuery"
           placeholder="搜索客户名称..."
@@ -258,7 +381,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 关联方类型 -->
-      <el-table-column label="关联方类型" width="130">
+      <el-table-column v-if="isColumnVisible('relationType')" label="关联方类型" width="130">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -273,44 +396,44 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 期初 -->
-      <el-table-column label="期初未审" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('priorUnadjusted')" label="期初未审" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</template>
       </el-table-column>
-      <el-table-column label="期初AJE" width="100" align="right">
+      <el-table-column v-if="isColumnVisible('priorAje')" label="期初AJE" width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorAje) }}</template>
       </el-table-column>
-      <el-table-column label="期初RJE" width="100" align="right">
+      <el-table-column v-if="isColumnVisible('priorRje')" label="期初RJE" width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.priorRje) }}</template>
       </el-table-column>
-      <el-table-column label="期初审定" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('priorAudited')" label="期初审定" width="110" align="right">
         <template #default="{ row }">
           <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.priorAudited) }}</span>
         </template>
       </el-table-column>
 
       <!-- 期初审定账龄 -->
-      <el-table-column label="期初审定账龄" align="center">
-        <el-table-column v-for="band in bands" :key="'p-' + band.key" :label="band.label" width="95" align="right">
+      <el-table-column v-if="columnGroups.includes('期初账龄')" label="期初审定账龄" align="center">
+        <el-table-column v-for="band in bands" :key="'p-' + band.key" v-show="isColumnVisible(`aging-prior-${band.key}`)" :label="band.label" width="95" align="right">
           <template #default="{ row }">{{ displayPrefs.fmtAmount(row.agingPrior?.[band.key] ?? 0) }}</template>
         </el-table-column>
       </el-table-column>
 
       <!-- 本期发生 -->
-      <el-table-column label="借方发生" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('debitOccurrence')" label="借方发生" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.debitOccurrence) }}</template>
       </el-table-column>
-      <el-table-column label="贷方发生" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('creditOccurrence')" label="贷方发生" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.creditOccurrence) }}</template>
       </el-table-column>
-      <el-table-column label="期末余额" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('endBalance')" label="期末余额" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.endBalance) }}</template>
       </el-table-column>
-      <el-table-column label="重分类" width="100" align="right">
+      <el-table-column v-if="isColumnVisible('reclassification')" label="重分类" width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.reclassification) }}</template>
       </el-table-column>
 
       <!-- 期末未审 -->
-      <el-table-column label="期末未审" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('currentUnadjusted')" label="期末未审" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentUnadjusted) }}</template>
       </el-table-column>
 
@@ -321,13 +444,13 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </el-table-column>
       </el-table-column>
 
-      <el-table-column label="期末AJE" width="100" align="right">
+      <el-table-column v-if="isColumnVisible('currentAje')" label="期末AJE" width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentAje) }}</template>
       </el-table-column>
-      <el-table-column label="期末RJE" width="100" align="right">
+      <el-table-column v-if="isColumnVisible('currentRje')" label="期末RJE" width="100" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.currentRje) }}</template>
       </el-table-column>
-      <el-table-column label="期末审定" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('currentAudited')" label="期末审定" width="110" align="right">
         <template #default="{ row }">
           <span style="font-weight: 600">{{ displayPrefs.fmtAmount(row.currentAudited) }}</span>
         </template>
@@ -351,7 +474,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 信用风险组合方式 -->
-      <el-table-column label="信用风险组合方式" width="160">
+      <el-table-column v-if="isColumnVisible('creditRiskClassification')" label="信用风险组合方式" width="160">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -365,10 +488,10 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </template>
       </el-table-column>
 
-      <el-table-column label="组合名称" width="110">
+      <el-table-column v-if="isColumnVisible('groupName')" label="组合名称" width="110">
         <template #default="{ row }">{{ row.groupName || '-' }}</template>
       </el-table-column>
-      <el-table-column label="函证" width="60" align="center">
+      <el-table-column v-if="isColumnVisible('isConfirmation')" label="函证" width="60" align="center">
         <template #default="{ row }">
           <el-tag
             v-if="row.isConfirmation"
@@ -381,12 +504,12 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       </el-table-column>
 
       <!-- 期后回款 -->
-      <el-table-column label="期后回款" width="110" align="right">
+      <el-table-column v-if="isColumnVisible('postPayment')" label="期后回款" width="110" align="right">
         <template #default="{ row }">{{ displayPrefs.fmtAmount(row.postPayment) }}</template>
       </el-table-column>
 
       <!-- 备注 -->
-      <el-table-column label="备注" min-width="120">
+      <el-table-column v-if="isColumnVisible('remark')" label="备注" min-width="120">
         <template #default="{ row }">{{ row.remark || '-' }}</template>
       </el-table-column>
 
@@ -450,4 +573,17 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 .confirmation-auto { background: #b7eb8f !important; border-color: #52c41a !important; color: #135200 !important; }
 .audit-note-block { margin-top: 16px; }
 .audit-note-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
+
+/* 列设置面板 */
+.column-prefs-panel { max-height: 420px; overflow-y: auto; }
+.prefs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.prefs-title { font-weight: 600; font-size: 14px; }
+.prefs-presets { margin-bottom: 10px; }
+.prefs-groups { display: flex; flex-direction: column; gap: 8px; }
+.prefs-group { border-bottom: 1px solid #f0f0f0; padding-bottom: 6px; }
+.prefs-group:last-child { border-bottom: none; }
+.group-header { margin-bottom: 4px; }
+.group-label { font-weight: 600; font-size: 13px; color: #303133; }
+.group-cols { display: flex; flex-wrap: wrap; gap: 4px 12px; padding-left: 20px; }
+.group-cols .el-checkbox { font-size: 12px; }
 </style>

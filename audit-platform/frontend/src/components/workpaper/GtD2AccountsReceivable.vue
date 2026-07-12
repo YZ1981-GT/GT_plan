@@ -211,6 +211,7 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
 import { DisplayPrefs_Key } from './composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { D2_SAVE_ITEMS_KEY, D2_WRITEBACK_KEY } from './composables/d2InjectionKeys'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
@@ -348,31 +349,59 @@ const displayPrefs = useDisplayPrefsStore()
 provide(DisplayPrefs_Key, displayPrefs)
 provide('displayPrefs', displayPrefs)
 
-async function handleD2SaveItems(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+// ─── P0-2: provide/inject 替代 window event ──────────────────────────────
+// 子 tab 通过 inject(D2_SAVE_ITEMS_KEY) 保存数据，不再用全局 window.dispatchEvent。
+// 优势：类型安全、组件隔离（同页面多 D2 实例不冲突）、无需生命周期管理。
+async function d2SaveItems(items: ChecklistResponse[]): Promise<void> {
   if (Array.isArray(items) && items.length > 0) {
     await formData.saveItemsFromEvent(items)
     emit('save')
   }
 }
 
-function handleD2Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode != null && d.auditedAmount != null) {
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
+function d2Writeback(accountCode: string, auditedAmount: number): void {
+  if (accountCode != null && auditedAmount != null) {
+    void formData.writebackTrialBalance(accountCode, auditedAmount)
   }
 }
 
+provide(D2_SAVE_ITEMS_KEY, d2SaveItems)
+provide(D2_WRITEBACK_KEY, d2Writeback)
+
+// 向后兼容：保留 window event 监听，过渡期内旧写法仍能工作
+function handleD2SaveItems(e: Event): void {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    void d2SaveItems(items)
+  }
+}
+
+function handleD2Writeback(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
+  if (d?.accountCode != null && d.auditedAmount != null) {
+    d2Writeback(d.accountCode, d.auditedAmount)
+  }
+}
+
+// ─── P0-3 + P1-4/5: selfLoad 严格类型 + merge 策略 ─────────────────────────
 async function selfLoad(): Promise<void> {
-  if (props.htmlData?.responses_snapshot) {
-    const map = new Map<string, any>()
-    for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) {
-      map.set(k, v)
+  const snapshot = props.htmlData?.responses_snapshot
+  // P1-4: 仅当 snapshot 非空对象时才使用（避免部分 htmlData 丢失完整数据）
+  if (snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length > 0) {
+    const map = new Map<string, ChecklistResponse>()
+    for (const [k, v] of Object.entries(snapshot)) {
+      const entry = v as Record<string, unknown>
+      map.set(k, {
+        item_id: String(entry?.item_id ?? k),
+        conclusion: (entry?.conclusion as string | null) ?? null,
+        remark: (entry?.remark as string | null) ?? null,
+      })
     }
-    formData.allResponses.value = map as any
+    formData.allResponses.value = map
     isLoading.value = false
     return
   }
+  // P1-5: 否则从 API 加载完整数据
   try {
     await formData.loadAll()
   } catch (err) {
