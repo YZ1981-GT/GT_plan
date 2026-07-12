@@ -168,6 +168,7 @@ inclusion: always
 - **🔴 formula-lib 开发踩坑(可复用)**：①PG模型在sqlite跑PBT须每文件贴`SQLiteTypeCompiler.visit_JSONB=visit_JSON`+`visit_ARRAY→TEXT`+`visit_UUID=visit_uuid`——应抽公共conftest fixture别复制；②Hypothesis与function-scoped async fixture不兼容→用同步`_run(coro)`包装+每example新建StaticPool内存引擎再dispose隔离；③JSONB字段就地改dict不触发ORM脏标记,必须`obj.detail={**obj.detail,...}`重新赋新对象才落库；④V100给表加列会打破`orm_cols==V052基线`契约测试,断言改`V052∪V100扩展`各列对各自迁移DDL校验；⑤Windows GBK控制台`print("✓")`直接崩→用`[OK]`；⑥并行子代理创建同一新文件会竞态(engine.py被2.2和8.1双写),`[-]/[~]`进行中标记不该解锁下游wave；⑦动手前codegraph核实design假设:"18处evaluate_formula待迁移"其实Phase1已迁完/"预设库DB表"其实V100没建(改文件seed+读时收敛)——至少2个任务前提是错的；⑧四表库只读除定义层guard还需engine执行期兜底(auto_calc目标为四表库→跳过回填不改值);⑨vitest http mock空值须`{data:null}`非`{data:{data:null}}`(composable `data?.data??data`回退会把包装当真值);⑩RFC5987校验勿用`email.get_filename()`(同时有filename=和filename*时返ASCII回退名)→用字节级`unquote_to_bytes→decode`
 - **account_package_registry sheets顺序=目录行顺序**
 - **导入导出composable必须用http(axios)不能用原生fetch**（无Authorization header→401）
+- **🔴 exceljs前端动态import踩坑(2026-07-12)**：package.json声明不等于已安装!`node_modules/exceljs`曾不存在→Vite `Failed to resolve import`(无论`@vite-ignore`还是抽独立文件都无效)。根因=仅commit了package.json声明未跑`npm install`。修复=`npm install exceljs`+重启dev server。铁律:**新增前端依赖后必须验证node_modules/xxx存在**；导出逻辑已抽到独立`exportFormulaTemplate.ts`(避免巨型Vue文件chunk问题)
 - **StreamingResponse中文文件名必须RFC5987编码**
 - **🔴 禁止逐行存储大量数据到checklist_responses**：C24-5异常分录曾逐行存34万×3字段=102万行→selfLoad 14秒。改为JSON打包存1条(`C24-5-anomaly-notes`)。规则：>100行的动态数据必须JSON打包或不存(从源重算)
 - **GtOnlyOfficeSheet健康检查响应解析**：`health.data?.data?.healthy`双层兼容

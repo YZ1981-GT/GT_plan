@@ -1880,9 +1880,14 @@ function onFormulaFileImported() {
  * 逻辑抽到独立文件 exportFormulaTemplate.ts（避免巨型 Vue 文件中动态 import exceljs 被 Vite 拦截）
  */
 async function onExportFormulaTemplate() {
-  const currentRows = allRowsMap.value[selectedNodeKey.value.replace('report_', '')] || []
+  // 获取当前节点数据；如果没有（未选节点或节点无数据），导出通用空白模板
+  const nodeKey = selectedNodeKey.value || ''
+  const currentRows = allRowsMap.value[nodeKey.replace('report_', '')] || []
+
+  // 如果当前节点有数据，导出该节点的公式
+  // 如果没有数据，传空数组——exportFormulaTemplate 内部会生成通用模板骨架
   const { exportFormulaTemplate } = await import('./exportFormulaTemplate')
-  await exportFormulaTemplate(currentRows, selectedNodeKey.value, selectedPath.value)
+  await exportFormulaTemplate(currentRows, nodeKey || '通用模板', selectedPath.value || '公式管理中心')
 }
 
 async function onImportPresetFormulas() {
