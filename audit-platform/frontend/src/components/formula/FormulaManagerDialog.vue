@@ -610,13 +610,21 @@ async function onAutoGenerateReportFormulas() {
       '自动生成报表公式',
       { confirmButtonText: '确认生成', cancelButtonText: '取消', type: 'info' },
     )
-    const { data } = await api.post(`/api/projects/${props.projectId}/formula/auto-generate`)
-    const count = data?.generated_count ?? data?.count ?? 0
+    const data = await api.post(`/api/projects/${props.projectId}/formula/auto-generate`, {}, {
+      _silent: true,
+    } as any)
+    const result = data?.data ?? data
+    const count = result?.generated_count ?? result?.count ?? 0
     ElMessage.success(`已自动生成 ${count} 条报表公式`)
     showGlobalScopeOverview.value = false
     await onOpenGlobalScopeOverview()
   } catch (e: any) {
-    if (e !== 'cancel' && e?.toString() !== 'cancel') {
+    if (e === 'cancel' || e?.toString() === 'cancel') return
+    // 端点尚未实现时给出友好提示
+    const status = e?.response?.status || e?.status
+    if (status === 404) {
+      ElMessage.warning('自动生成公式功能尚未启用，请先使用"从预设库导入"或"手动新增"方式创建公式')
+    } else {
       ElMessage.error('自动生成公式失败：' + (e?.message || '未知错误'))
     }
   }
@@ -926,11 +934,13 @@ const reportTypesLoaded = ref(false)
 async function loadReportTypes() {
   if (reportTypesLoaded.value) return
   try {
-    const { data } = await api.get('/api/report-config/types', {
+    const data = await api.get('/api/report-config/types', {
       params: { project_id: props.projectId },
-    })
-    if (Array.isArray(data) && data.length) {
-      reportTypes.value = data.map((r: any) => ({
+      _silent: true,  // 404 不弹全局错误 toast
+    } as any)
+    const items = Array.isArray(data) ? data : (data?.data ?? [])
+    if (Array.isArray(items) && items.length) {
+      reportTypes.value = items.map((r: any) => ({
         type: r.report_type || r.type,
         label: r.label || REPORT_SUBTYPE_LABELS_FALLBACK[r.report_type || r.type] || r.report_type,
         count: r.formula_count ?? 0,
@@ -1137,8 +1147,10 @@ const crossCheckLoaded = ref(false)
 async function loadCrossCheckItems() {
   if (crossCheckLoaded.value || !props.projectId) return
   try {
-    const { data } = await api.get(`/api/projects/${props.projectId}/formula/report-cross-check`)
-    const rules: any[] = Array.isArray(data) ? data : (data?.rules ?? data?.items ?? [])
+    const data = await api.get(`/api/projects/${props.projectId}/formula/report-cross-check`, {
+      _silent: true,  // 404 不弹全局错误 toast
+    } as any)
+    const rules: any[] = Array.isArray(data) ? data : (data?.data?.rules ?? data?.data?.items ?? data?.rules ?? data?.items ?? [])
     if (rules.length) {
       // 按勾稽类型分组（source_domain ↔ target_domain）
       const grouped: Record<string, any[]> = { report_note: [], report_wp: [], note_wp: [] }
