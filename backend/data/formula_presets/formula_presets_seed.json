@@ -2173,6 +2173,898 @@
       ],
       "source": "bs_preset_generator",
       "description": "负债和所有者权益总计 = 负债合计 + 所有者权益合计"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-001",
+      "expression": "TB('6001', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6001')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "一、营业总收入 — 取试算表科目 6001 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-002",
+      "expression": "TB('6401', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6401')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "其中：营业收入 — 取试算表科目 6401 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-003",
+      "expression": "TB('6403', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6403')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△利息收入 — 取试算表科目 6403 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-004",
+      "expression": "TB('6601', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6601')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△保险服务收入 — 取试算表科目 6601 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-005",
+      "expression": "TB('6602', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6602')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲已赚保费 — 取试算表科目 6602 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-006",
+      "expression": "TB('6603', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6603')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△手续费及佣金收入 — 取试算表科目 6603 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-007",
+      "expression": "TB('6604', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6604')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "二、营业总成本 — 取试算表科目 6604 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-008",
+      "expression": "TB('6604A', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6604A')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "其中：营业成本 — 取试算表科目 6604A 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-009",
+      "expression": "TB('6604B', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6604B')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△利息支出 — 取试算表科目 6604B 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-010",
+      "expression": "TB('6051', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6051')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△手续费及佣金支出 — 取试算表科目 6051 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-011",
+      "expression": "TB('6111', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6111')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△保险服务费用 — 取试算表科目 6111 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-012",
+      "expression": "TB('6111A', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6111A')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△分出保费的分配 — 取试算表科目 6111A 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-013",
+      "expression": "TB('6112', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6112')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△减：摊回保险服务费用 — 取试算表科目 6112 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-014",
+      "expression": "TB('6021', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6021')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△承保财务损失 — 取试算表科目 6021 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-015",
+      "expression": "TB('6031', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6031')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△减：分出再保险财务收益 — 取试算表科目 6031 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-016",
+      "expression": "TB('6711', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6711')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲退保金 — 取试算表科目 6711 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-017",
+      "expression": "TB('6701', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6701')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲赔付支出净额 — 取试算表科目 6701 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-018",
+      "expression": "TB('6115', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6115')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲提取保险责任准备金净额 — 取试算表科目 6115 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-019",
+      "expression": "ROW('IS-001') - ROW('IS-002') - ROW('IS-003') - ROW('IS-004') - ROW('IS-005') - ROW('IS-006') - ROW('IS-007') + ROW('IS-010') + ROW('IS-011') + ROW('IS-014') + ROW('IS-015') - ROW('IS-016') - ROW('IS-017') + ROW('IS-018')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-001')"
+        },
+        {
+          "formula_ref": "ROW('IS-002')"
+        },
+        {
+          "formula_ref": "ROW('IS-003')"
+        },
+        {
+          "formula_ref": "ROW('IS-004')"
+        },
+        {
+          "formula_ref": "ROW('IS-005')"
+        },
+        {
+          "formula_ref": "ROW('IS-006')"
+        },
+        {
+          "formula_ref": "ROW('IS-007')"
+        },
+        {
+          "formula_ref": "ROW('IS-010')"
+        },
+        {
+          "formula_ref": "ROW('IS-011')"
+        },
+        {
+          "formula_ref": "ROW('IS-014')"
+        },
+        {
+          "formula_ref": "ROW('IS-015')"
+        },
+        {
+          "formula_ref": "ROW('IS-016')"
+        },
+        {
+          "formula_ref": "ROW('IS-017')"
+        },
+        {
+          "formula_ref": "ROW('IS-018')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "营业利润 = 营业收入 - 营业成本 - 三项费用 + 其他收益 + 投资收益 + 公允变动 - 减值损失 + 资产处置"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-020",
+      "expression": "TB('6301', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6301')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲分保费用 — 取试算表科目 6301 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-021",
+      "expression": "TB('6302', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6302')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "税金及附加 — 取试算表科目 6302 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-022",
+      "expression": "ROW('IS-019') + ROW('IS-020') - ROW('IS-021')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-019')"
+        },
+        {
+          "formula_ref": "ROW('IS-020')"
+        },
+        {
+          "formula_ref": "ROW('IS-021')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "利润总额 = 营业利润 + 营业外收入 - 营业外支出"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-023",
+      "expression": "TB('6801', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6801')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "管理费用 — 取试算表科目 6801 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-024",
+      "expression": "ROW('IS-022') - ROW('IS-023')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-022')"
+        },
+        {
+          "formula_ref": "ROW('IS-023')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "净利润 = 利润总额 - 所得税费用"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-025",
+      "expression": "TB('6901', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6901')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "财务费用 — 取试算表科目 6901 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-026",
+      "expression": "ROW('IS-024') + ROW('IS-025')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-024')"
+        },
+        {
+          "formula_ref": "ROW('IS-025')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "综合收益总额 = 净利润 + 其他综合收益税后净额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-030",
+      "expression": "TB('6998', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6998')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "加： 其他收益 — 取试算表科目 6998 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-031",
+      "expression": "TB('6999', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6999')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "投资收益（损失以“－”号填列） — 取试算表科目 6999 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-032",
+      "expression": "TB('6801A', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6801A')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "其中：对联营企业和合营企业的投资收益 — 取试算表科目 6801A 发生额"
+    },
+    {
+      "page_key": "report:income_statement",
+      "target_cell": "IS-033",
+      "expression": "TB('6801B', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6801B')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "以摊余成本计量的金融资产终止确认收益 — 取试算表科目 6801B 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-001",
+      "expression": "TB('6001C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6001C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "一、经营活动产生的现金流量： — 取试算表科目 6001C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-002",
+      "expression": "TB('6002C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6002C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "销售商品、提供劳务收到的现金 — 取试算表科目 6002C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-003",
+      "expression": "TB('6003C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6003C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△客户存款和同业存放款项净增加额 — 取试算表科目 6003C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-004",
+      "expression": "ROW('CFS-001') + ROW('CFS-002') + ROW('CFS-003')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFS-001')"
+        },
+        {
+          "formula_ref": "ROW('CFS-002')"
+        },
+        {
+          "formula_ref": "ROW('CFS-003')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "经营活动现金流入小计"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-005",
+      "expression": "TB('6005C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6005C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△向其他金融机构拆入资金净增加额 — 取试算表科目 6005C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-006",
+      "expression": "TB('6006C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6006C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△收到签发保险合同保费取得的现金 — 取试算表科目 6006C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-007",
+      "expression": "TB('6007C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6007C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△收到分入再保险合同的现金净额 — 取试算表科目 6007C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-008",
+      "expression": "TB('6008C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6008C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲收到原保险合同保费取得的现金 — 取试算表科目 6008C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-009",
+      "expression": "ROW('CFS-005') + ROW('CFS-006') + ROW('CFS-007') + ROW('CFS-008')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFS-005')"
+        },
+        {
+          "formula_ref": "ROW('CFS-006')"
+        },
+        {
+          "formula_ref": "ROW('CFS-007')"
+        },
+        {
+          "formula_ref": "ROW('CFS-008')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "经营活动现金流出小计"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-010",
+      "expression": "TB('6010C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6010C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲保户储金及投资款净增加额 — 取试算表科目 6010C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-011",
+      "expression": "TB('6011C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6011C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△处置以公允价值计量且其变动计入当期损益的金融资产净增加额 — 取试算表科目 6011C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-012",
+      "expression": "TB('6012C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6012C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△收取利息、手续费及佣金的现金 — 取试算表科目 6012C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-013",
+      "expression": "TB('6013C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6013C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△拆入资金净增加额 — 取试算表科目 6013C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-014",
+      "expression": "TB('6014C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6014C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△回购业务资金净增加额 — 取试算表科目 6014C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-015",
+      "expression": "ROW('CFS-010') + ROW('CFS-011') + ROW('CFS-012') + ROW('CFS-013') + ROW('CFS-014')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFS-010')"
+        },
+        {
+          "formula_ref": "ROW('CFS-011')"
+        },
+        {
+          "formula_ref": "ROW('CFS-012')"
+        },
+        {
+          "formula_ref": "ROW('CFS-013')"
+        },
+        {
+          "formula_ref": "ROW('CFS-014')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "投资活动现金流入小计"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-016",
+      "expression": "TB('6016C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6016C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "收到的税费返还 — 取试算表科目 6016C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-017",
+      "expression": "TB('6017C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6017C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "收到其他与经营活动有关的现金 — 取试算表科目 6017C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-018",
+      "expression": "TB('6018C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6018C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "经营活动现金流入小计 — 取试算表科目 6018C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-019",
+      "expression": "TB('6019C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6019C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "购买商品、接受劳务支付的现金 — 取试算表科目 6019C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-020",
+      "expression": "ROW('CFS-016') + ROW('CFS-017') + ROW('CFS-018') + ROW('CFS-019')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFS-016')"
+        },
+        {
+          "formula_ref": "ROW('CFS-017')"
+        },
+        {
+          "formula_ref": "ROW('CFS-018')"
+        },
+        {
+          "formula_ref": "ROW('CFS-019')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "投资活动现金流出小计"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-021",
+      "expression": "TB('6021C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6021C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△存放中央银行和同业款项净增加额 — 取试算表科目 6021C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-022",
+      "expression": "TB('6022C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6022C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△支付签发保险合同赔款的现金 — 取试算表科目 6022C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-023",
+      "expression": "TB('6023C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6023C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△支付分出再保险合同的现金净额 — 取试算表科目 6023C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-024",
+      "expression": "TB('6024C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6024C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△保单质押贷款净额增加额 — 取试算表科目 6024C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-025",
+      "expression": "ROW('CFS-021') + ROW('CFS-023') + ROW('CFS-024')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFS-021')"
+        },
+        {
+          "formula_ref": "ROW('CFS-023')"
+        },
+        {
+          "formula_ref": "ROW('CFS-024')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "筹资活动现金流入小计"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-026",
+      "expression": "TB('6026C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6026C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△拆出资金净增加额 — 取试算表科目 6026C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-027",
+      "expression": "TB('6027C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6027C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "△支付利息、手续费及佣金的现金 — 取试算表科目 6027C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-028",
+      "expression": "TB('6028C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6028C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "▲支付保单红利的现金 — 取试算表科目 6028C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-029",
+      "expression": "TB('6029C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6029C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "支付给职工及为职工支付的现金 — 取试算表科目 6029C 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-030",
+      "expression": "ROW('CFS-026') + ROW('CFS-027') + ROW('CFS-029')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFS-026')"
+        },
+        {
+          "formula_ref": "ROW('CFS-027')"
+        },
+        {
+          "formula_ref": "ROW('CFS-029')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "筹资活动现金流出小计"
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "target_cell": "CFS-031",
+      "expression": "TB('6031C', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6031C')"
+        }
+      ],
+      "source": "report_preset_generator",
+      "description": "支付其他与经营活动有关的现金 — 取试算表科目 6031C 发生额"
     }
   ]
 }
