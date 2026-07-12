@@ -20,6 +20,16 @@
       <p>K2-2明细表按项目逐笔列示其他流动资产余额及增减变动。期末余额(公式)=期初+增加-减少，合计行联动审定表K2-1。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在：</b>资产负债表中记录的其他流动资产是存在的，且已记录于恰当的账户；</li>
+        <li><b>完整性：</b>所有应当记录的其他流动资产均已记录，相关披露完整；</li>
+        <li><b>计价和分摊：</b>其他流动资产以恰当金额包括在报表中，计价或分摊调整已恰当记录，披露充分适当。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K2-2 其他流动资产明细表</h3>

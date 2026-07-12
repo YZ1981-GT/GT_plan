@@ -9,6 +9,15 @@
       </p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>计价和分摊：</b>合同取得成本的摊销方法（直线法/进度法）与摊销期恰当，本期摊销额计算准确；</li>
+        <li><b>完整性：</b>所有应摊销的合同取得成本均已按期摊销，摊销后余额与账面核对一致。</li>
+      </ol>
+    </el-alert>
+
     <!-- 区段Tab -->
     <el-card shadow="never">
       <template #header>

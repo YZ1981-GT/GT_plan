@@ -29,6 +29,16 @@
       </p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在：</b>记录的合同取得成本是存在的，且已记录于恰当的账户；</li>
+        <li><b>计价和分摊：</b>合同取得成本的确认和计量符合 CAS14，资本化条件判断恰当，以恰当金额列示；</li>
+        <li><b>列报与披露：</b>合同取得成本已按企业会计准则规定作出恰当列报。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 标题栏 + 操作按钮 ═══ -->
     <div class="section-head">
       <h3 class="sheet-title">K2-4 合同取得成本明细表</h3>
