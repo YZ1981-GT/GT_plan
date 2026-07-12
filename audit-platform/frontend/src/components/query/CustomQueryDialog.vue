@@ -11,6 +11,7 @@
     :width="fullscreen ? '100%' : '92%'"
     :top="fullscreen ? '0' : '3vh'"
     :fullscreen="fullscreen"
+    :show-close="false"
     append-to-body
     destroy-on-close
     class="gt-cq-dialog"
