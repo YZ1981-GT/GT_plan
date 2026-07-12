@@ -1888,9 +1888,9 @@ async function onExportFormulaTemplate() {
       return
     }
 
-    // 动态导入 exceljs
-    const { Workbook } = await import('exceljs')
-    const wb = new Workbook()
+    // 动态导入 exceljs（与 GtB30GroupAudit 一致的写法）
+    const ExcelJS = await import('exceljs')
+    const wb = new ExcelJS.Workbook()
 
     // ── Sheet 1: 编制说明 ──
     const wsGuide = wb.addWorksheet('编制说明')
