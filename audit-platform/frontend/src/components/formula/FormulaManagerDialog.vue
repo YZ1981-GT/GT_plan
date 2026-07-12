@@ -2462,7 +2462,20 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
   letter-spacing: 0.5px;
 }
 .gt-fm-dialog .el-dialog__headerbtn .el-dialog__close {
-  color: rgba(255,255,255,0.7);
+  color: rgba(255,255,255,0.9);
+  font-size: 24px;
+}
+.gt-fm-dialog .el-dialog__headerbtn {
+  top: 12px;
+  right: 16px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  transition: background 0.2s;
+}
+.gt-fm-dialog .el-dialog__headerbtn:hover {
+  background: rgba(255,255,255,0.3);
 }
 .gt-fm-dialog .el-dialog__headerbtn:hover .el-dialog__close {
   color: var(--gt-color-text-inverse);
