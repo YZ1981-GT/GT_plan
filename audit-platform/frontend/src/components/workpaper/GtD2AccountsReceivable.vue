@@ -209,6 +209,8 @@ import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
+import { DisplayPrefs_Key } from './composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
@@ -340,17 +342,11 @@ useWorkpaperEntryInjections({
   reloadFn: () => formData.loadAll(),
 })
 provide('d2CrossSheet', crossSheet)
-provide('displayPrefs', {
-  fmtAmount: (v: number) => {
-    if (v === 0) return '-'
-    const abs = Math.abs(v).toLocaleString('zh-CN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-    return v < 0 ? `(${abs})` : abs
-  },
-  amountClass: (v: number) => (v < 0 ? 'amount-negative' : ''),
-})
+// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
+// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
+const displayPrefs = useDisplayPrefsStore()
+provide(DisplayPrefs_Key, displayPrefs)
+provide('displayPrefs', displayPrefs)
 
 async function handleD2SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items

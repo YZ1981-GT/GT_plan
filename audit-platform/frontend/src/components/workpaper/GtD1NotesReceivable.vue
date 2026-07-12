@@ -443,6 +443,8 @@ import { useD1Review } from './composables/useD1Review'
 
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { DisplayPrefs_Key } from './composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 import { useD1ReviewThreads } from './composables/useD1ReviewThreads'
 
@@ -740,29 +742,11 @@ provide('d1SuppressLocalOo', true)
 
 provide('d1CrossSheet', crossSheet)
 
-provide('displayPrefs', {
-
-  fmtAmount: (v: number) => {
-
-    if (v === 0) return '-'
-
-    const abs = Math.abs(v).toLocaleString('zh-CN', {
-
-      minimumFractionDigits: 2,
-
-      maximumFractionDigits: 2,
-
-    })
-
-    return v < 0 ? `(${abs})` : abs
-
-  },
-
-  fmtPercent: (v: number) => (v * 100).toFixed(2) + '%',
-
-  amountClass: (v: number) => (v < 0 ? 'amount-negative' : ''),
-
-})
+// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
+// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
+const displayPrefs = useDisplayPrefsStore()
+provide(DisplayPrefs_Key, displayPrefs)
+provide('displayPrefs', displayPrefs)
 
 
 

@@ -219,30 +219,30 @@ K/
 - [ ] ~~B~~：D + K（并入 P2 扩展顺序）
 - [ ] ~~C~~：用户勾选任意循环（终局能力，非首期）
 
-### Q2 「全部底稿」的定义
+### Q2 「全部底稿」的定义 ✅ 已确认（→ spec Req 1.1）
 
-- [ ] **A**：仅「本项目已生成的底稿实例」
-- [ ] **B**：含「适用但未生成的底稿」（导入时自动建实例？）
-- [ ] **C**：含不适用/跳过的底稿（manifest 标注 NA）
+- [x] **A**：仅「本项目已生成的底稿实例」（`wp_index ⋈ working_paper` 有 `wp_id`）
+- [ ] ~~B~~：含「适用但未生成的底稿」（导入时自动建实例）→ **首期不做**，未实例化项 manifest 标 `skip_reason`
+- [ ] ~~C~~：含不适用/跳过的底稿 → manifest 标 `skip_reason`（非独立选项，随 A 附带）
 
-### Q3 模板 vs 数据的边界
+### Q3 模板 vs 数据的边界 ✅ 已确认（→ spec Req 1.5 / 2.8 / 3.x）
 
-- [ ] 导出模板时是否 **预填项目基础信息**（被审计单位、截止日、编制人）？
-- [ ] 导入时是否允许 **只导入 ZIP 中的部分文件**（用户删改了 manifest 中的文件）？
-- [ ] 是否支持 **仅导入某一循环** 的子 ZIP？
+- [x] 导出模板 **预填项目基础信息**（被审计单位/年度/编制人写入 manifest + README；首期不强制写入每个 xlsx 单元格）
+- [x] 导入允许 **只导入 ZIP 中的部分文件**（manifest 驱动，缺失文件跳过并在报告标注 `missing`）
+- [x] 支持 **仅导入某一循环**（cycle 过滤）
 
-### Q4 冲突与覆盖策略（导入时库中已有数据）
+### Q4 冲突与覆盖策略 ✅ 已确认（→ spec Req 8）
 
-- [ ] **覆盖**：以 ZIP 为准，全量替换该 `item_id` 行数据
-- [ ] **合并**：按主键（如客户名）更新，新增行追加
-- [ ] **仅填空**：只写入空字段/空行，不覆盖已有编制
-- [ ] **拒绝**：任一冲突则该 sheet 失败，不部分写入
+- [x] **覆盖（默认）**：以 ZIP 为准，全量替换该 `item_id` 行数据
+- [ ] ~~合并（按主键更新）~~ → **延后至后续 Phase**（需稳定主键，复杂度高，首期不做）
+- [x] **仅填空**：只写入空字段/空行，不覆盖已有编制
+- [x] **拒绝**：任一冲突则该 sheet 失败，不部分写入
 
-### Q5 工作流与状态
+### Q5 工作流与状态 ✅ 已确认（→ spec Req 9 / 4.3）
 
-- [ ] 底稿处于 **待复核 / 已通过** 时是否允许批量导入？
-- [ ] 导入后底稿状态是否自动回退为「编制中」？
-- [ ] 是否需要 **导入审批**（项目经理确认后才 apply）？
+- [x] `review_passed`/`archived`/锁定 底稿 **禁止导入**（报告标 `blocked_by_status`）
+- [x] `under_review` 底稿导入前 **回退为编制中** 并记审计日志
+- [ ] ~~独立导入审批门~~ → **首期不设**，依赖快照 + 回滚 + 审计日志
 
 ### Q6 与现有「批量导出（元数据）」的关系
 
@@ -656,13 +656,18 @@ flowchart TD
 |------|--------|------|
 | 2026-07-10 | 用户 | **终局全部底稿**；**首期 D 循环试点**；名称库策略：**全循环骨架 + D 填详情** |
 | 2026-07-10 | 用户 | 地址坐标名称须有成文 **规则**，且支持 **自定义新增底稿**（§8.6） |
-| | | Q2: |
-| | | Q4 冲突策略: |
+| 2026-07-12 | — | **Q2=A**（仅已实例化底稿）；**Q4=覆盖(默认)/仅填空/拒绝**，合并延后；**Q5**=已通过/锁定禁止导入、待复核回退编制中、不设独立审批门；**Q6=并存**。前置 ACNR spec 已完成（Phase 0–3），门禁已放行 |
+| 2026-07-12 | — | 已立 spec `.kiro/specs/workpaper-bulk-tab-import-export/`（requirements-first，三件套齐：9 需求 EARS + design 8 属性 P1–P8 + tasks 4 Phase/9 波）；**待实现** |
 
 ---
 
-**下一步**：
+## 十三、Spec 状态（2026-07-12）
 
-1. 先评审 **第八节准备工作**（底稿地址坐标名称库）与 P-Q1~P-Q5  
-2. 再评审 **第七节 Q1–Q9**（批量 ZIP 业务范围）  
-3. Prep 验收通过后，另立 `.kiro/specs/workpaper-bulk-tab-import-export/` 三件套再开发
+- **✅ 前置 ACNR**：`.kiro/specs/acnr/` 已完成（含 `manifest.list_import_export` D+K/F/G/H、`wp_bulk_tab_export` 清单+拓扑排序，均有单测/PBT）。
+- **✅ 本 bulk 三件套已建**：`.kiro/specs/workpaper-bulk-tab-import-export/`
+  - `requirements.md`：9 条 EARS（导出模板/导入数据/导出数据/导入后行为/权限入口/异步/manifest 契约/冲突策略/工作流门禁）+ Q1–Q9 已拍板决策表。
+  - `design.md`：编排层复用架构（ManifestBuilder 唯一读 ACNR + SingleTabIeAdapter + BulkExport/Import Service + ConflictResolver + SnapshotGuard[version-trail] + WorkflowGate + 路由 + 前端三按钮 + 导入报告），8 条正确性属性 P1–P8。
+  - `tasks.md`：Phase 1 D 试点（Wave 0–6，关键路径，覆盖 MVP 4 场景）+ Phase 2/3/4（扩循环/异步/契约守卫，optional）。
+- **待实现**：Phase 1（ManifestBuilder → adapter → 服务 → 路由 → 前端 → Playwright 往返）。
+
+**下一步**：按 tasks.md Wave 0 起步（`manifest_builder.py`），Phase 1 完成后以 MVP 4 场景 Playwright 验收。
