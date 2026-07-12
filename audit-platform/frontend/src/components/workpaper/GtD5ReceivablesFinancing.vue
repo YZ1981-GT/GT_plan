@@ -118,6 +118,9 @@
       :section-label="d5ReviewSection.label"
     />
     <GtWpReviewDialogHost />
+
+    <!-- 版本链 drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -135,6 +138,7 @@ import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useD5ReviewThreads } from './composables/useD5ReviewThreads'
 import { parseNum } from './composables/useD5FormulaEngine'
 import D5TabIndex from './d5/D5TabIndex.vue'
@@ -146,6 +150,7 @@ const D5TabDetail = defineAsyncComponent(() => import('./d5/D5TabDetail.vue'))
 const D5TabAdjustment = defineAsyncComponent(() => import('./d5/D5TabAdjustment.vue'))
 const D5TabFairValue = defineAsyncComponent(() => import('./d5/D5TabFairValue.vue'))
 const D5TabDisclosure = defineAsyncComponent(() => import('./d5/D5TabDisclosure.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -179,6 +184,16 @@ const {
 
 const crossSheet = useD5CrossSheet({ allResponses })
 
+// ─── 版本链接入 ───────────────────────────────────────────────────────────
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
 const currentSheet = computed(() => resolveD5SheetCode(props.sheetName || 'D5'))
 const d5ReviewSection = computed(() => resolveCycleReviewSection('D5', currentSheet.value))
 
@@ -193,6 +208,8 @@ useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForRe
 const { getThreadDot, getRowDot } = useD5ReviewThreads(wpIdRefForReview)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
+provide('d5VersionTrailRef', versionTrailRef)
+provide('d5OpenVersionHistory', openVersionHistory)
 
 useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
@@ -243,6 +260,7 @@ async function saveImmediateBatch(
     itemId: item.item_id,
     data: { conclusion: item.conclusion, remark: item.remark },
   })))
+  scheduleAutoSnapshot()
 }
 
 const periodEnd = computed(() => {

@@ -181,7 +181,9 @@ const projectIdRef = computed(() => props.projectId)
 const formData = useG12FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+provide('g12VersionTrailRef', versionTrailRef)
+provide('g12OpenVersionHistory', openVersionHistory)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

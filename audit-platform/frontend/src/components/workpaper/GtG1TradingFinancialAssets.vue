@@ -174,7 +174,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
 import { useG1TraFinFormData } from './composables/useG1TraFinFormData'
 import { useG1DualMode } from './composables/useG1DualMode'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
@@ -217,7 +217,10 @@ const wpIdRef = computed(() => props.wpId)
 const isReadonly = computed(() => !!props.readonly)
 
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('g1VersionTrailRef', versionTrailRef)
+provide('g1OpenVersionHistory', openVersionHistory)
 
 // autoSnapshot on save：子组件 debouncedSave → 持久化后触发版本快照（debounce）
 const formData = useG1TraFinFormData({

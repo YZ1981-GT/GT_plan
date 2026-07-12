@@ -280,8 +280,11 @@ const {
 })
 
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
 const saveImmediate = versionToolbar.wrapSaveImmediate(rawSaveImmediate)
+
+provide('f1VersionTrailRef', versionTrailRef)
+provide('f1OpenVersionHistory', openVersionHistory)
 
 // ─── useF1CrossSheet ─────────────────────────────────────────────────────────
 

@@ -140,6 +140,8 @@
     </template>
 
     <GtWpReviewDialogHost />
+
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -168,7 +170,7 @@ import { useL1CrossSheet } from '@/composables/useL1CrossSheet'
 import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
-import useVersionTrail from './composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -192,6 +194,7 @@ const L1TabStLoanCheck = defineAsyncComponent(() => import('./l1/inspection/L1Ta
 
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -281,14 +284,16 @@ useWorkpaperReviewProvide({
   projectId: toRef(props, 'projectId') as any,
 })
 
-// ─── 版本追踪 useVersionTrail (autoSnapshot) ────────────────────────────────
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
 
-const versionTrail = useVersionTrail({
-  projectId: toRef(props, 'projectId') as any,
-  workpaperId: toRef(props, 'wpId') as any,
-})
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed(() => props.projectId)
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 
-provide('versionTrail', versionTrail)
+provide('versionTrail', versionToolbar)
+provide('l1VersionTrailRef', versionTrailRef)
+provide('l1OpenVersionHistory', openVersionHistory)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 

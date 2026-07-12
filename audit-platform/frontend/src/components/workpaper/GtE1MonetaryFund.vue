@@ -98,6 +98,9 @@
         style="height: calc(100vh - 180px)"
       />
     </template>
+
+    <!-- 版本链 -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -111,9 +114,11 @@
  *
  * 科目覆盖：1001 库存现金 / 1002 银行存款 / 1012 其他货币资金
  */
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
+import http from '@/utils/http'
 import { useG1DualMode } from './composables/useG1DualMode'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -137,6 +142,7 @@ const E1TabCutoffTest = defineAsyncComponent(() => import('./e1/E1TabCutoffTest.
 const E1TabLargeCheck = defineAsyncComponent(() => import('./e1/E1TabLargeCheck.vue'))
 const E1TabIpoSpecial = defineAsyncComponent(() => import('./e1/E1TabIpoSpecial.vue'))
 const E1TabDisclosure = defineAsyncComponent(() => import('./e1/E1TabDisclosure.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -163,9 +169,30 @@ const wpIdRef = computed(() => props.wpId)
 const bsDate = ref('')
 const allResponses: Ref<Map<string, any>> = ref(new Map())
 
-// Save functions (passed to children; actual persistence is handled by children)
-function saveImmediate(_items: any[]) { /* noop - children handle persistence */ }
-function debouncedSave(_items: any[]) { /* noop - children handle persistence */ }
+// Save functions (passed to children; children call these for persistence + auto snapshot)
+async function saveImmediate(items: any[]) {
+  if (!items?.length) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
+    scheduleAutoSnapshot()
+  } catch (e) {
+    console.warn('[GtE1MonetaryFund] saveImmediate failed:', e)
+  }
+}
+function debouncedSave(items: any[]) { void saveImmediate(items) }
+
+// ─── 版本链接入 ───────────────────────────────────────────────────────────
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
+provide('e1VersionTrailRef', versionTrailRef)
+provide('e1OpenVersionHistory', openVersionHistory)
 
 // ─── Sheet 分发逻辑 ─────────────────────────────────────────────────────────
 

@@ -256,10 +256,12 @@ provide('openReviewDialog', openReviewDialog)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 
 provide('versionTrail', versionToolbar)
 provide('openVersionHistory', () => versionToolbar.openVersionHistory())
+provide('m5VersionTrailRef', versionTrailRef)
+provide('m5OpenVersionHistory', openVersionHistory)
 
 // ─── 监听 m5:save-items → 保存后自动快照 ────────────────────────────────────
 

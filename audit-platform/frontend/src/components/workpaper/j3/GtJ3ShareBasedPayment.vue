@@ -50,6 +50,8 @@
       <div v-else class="j3-sheet-placeholder">
         <el-empty :description="`J3 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
       </div>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -67,10 +69,12 @@
  * Spec: .kiro/specs/j3-share-based-payment/
  * Requirements: 1.1-1.10
  */
-import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
+import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 
 // defineAsyncComponent 懒加载
+const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
 const J3TabIndex = defineAsyncComponent(() => import('./core/J3TabIndex.vue'))
 const J3TabDetail = defineAsyncComponent(() => import('./core/J3TabDetail.vue'))
 const J3TabCheck = defineAsyncComponent(() => import('./core/J3TabCheck.vue'))
@@ -105,6 +109,12 @@ const currentSheet = computed(() => {
   if (sn.includes('目录') || sn === 'J3') return 'J3'
   return sn
 })
+
+// ─── 版本追踪 useWorkpaperVersionToolbar ─────────────────────────────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+provide('j3VersionTrailRef', versionTrailRef)
+provide('j3OpenVersionHistory', openVersionHistory)
 
 function handleNavigateSheet(sheetName: string) {
   emit('navigate-sheet', sheetName)

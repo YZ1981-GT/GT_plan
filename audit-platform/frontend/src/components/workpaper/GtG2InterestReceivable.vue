@@ -175,7 +175,10 @@ const formData = useG2IntRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('g2VersionTrailRef', versionTrailRef)
+provide('g2OpenVersionHistory', openVersionHistory)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

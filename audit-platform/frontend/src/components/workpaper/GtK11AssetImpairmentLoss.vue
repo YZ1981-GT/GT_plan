@@ -102,6 +102,8 @@
         />
       </template>
     </template>
+
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -121,11 +123,12 @@
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import useVersionTrail from './composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useK11DualMode } from './composables/useK11DualMode'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core
 const K11TabIndex = defineAsyncComponent(() => import('./k11/core/K11TabIndex.vue'))
@@ -277,12 +280,16 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 }
 provide('openReviewDialog', openReviewDialog)
 
-// ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
-const versionTrail = useVersionTrail({
-  projectId: toRef(props, 'projectId') as any,
-  workpaperId: toRef(props, 'wpId') as any,
-})
-provide('versionTrail', versionTrail)
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
+
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed(() => props.projectId)
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+
+provide('versionTrail', versionToolbar)
+provide('k11VersionTrailRef', versionTrailRef)
+provide('k11OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 

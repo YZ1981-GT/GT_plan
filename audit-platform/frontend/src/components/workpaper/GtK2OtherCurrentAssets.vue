@@ -146,6 +146,8 @@
         />
       </template>
     </template>
+
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -164,12 +166,14 @@
  * Spec: .kiro/specs/k2-other-current-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core
 const K2TabIndex = defineAsyncComponent(() => import('./k2/core/K2TabIndex.vue'))
@@ -288,6 +292,7 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
       project_id: props.projectId,
       items: [{ item_id: itemId, conclusion: null, remark: strVal }],
     })
+    scheduleAutoSnapshot()
   } catch {
     // 静默失败，数据保留在本地
   }
@@ -351,6 +356,18 @@ async function selfLoad(): Promise<void> {
 }
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
+
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
+
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed(() => props.projectId)
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+
+provide('versionTrail', versionToolbar)
+provide('k2VersionTrailRef', versionTrailRef)
+provide('k2OpenVersionHistory', openVersionHistory)
+
 onMounted(() => {
   selfLoad()
 })

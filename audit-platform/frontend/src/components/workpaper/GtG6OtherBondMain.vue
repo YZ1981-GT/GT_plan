@@ -254,7 +254,10 @@ const formData = useG6MainFormData({
 
 // ─── 版本历史集成 (autoSnapshot on save) ────────────────────────────────────
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('g6VersionTrailRef', versionTrailRef)
+provide('g6OpenVersionHistory', openVersionHistory)
 
 // ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
 function openReviewDialog(sectionId: string): void {

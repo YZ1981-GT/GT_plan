@@ -212,7 +212,10 @@ const versionToolbar = useWorkpaperVersionToolbar({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
 })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('f2VersionTrailRef', versionTrailRef)
+provide('f2OpenVersionHistory', openVersionHistory)
 
 const dualMode = useF2ValuationDualMode({
   wpId: toRef(props, 'wpId'),

@@ -150,7 +150,9 @@ const projectIdRef = computed(() => props.projectId)
 const formData = useG14FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+provide('g14VersionTrailRef', versionTrailRef)
+provide('g14OpenVersionHistory', openVersionHistory)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

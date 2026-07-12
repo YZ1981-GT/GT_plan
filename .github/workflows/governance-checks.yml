@@ -250,6 +250,11 @@ jobs:
       # ErrorBoundary 崩溃；vitest/Volar 解析方式不同故漏检，必须浏览器/CI 兜底）。
       - name: Check workpaper composables import depth
         run: python backend/scripts/check/fix_wp_composables_import_depth.py --check
+      # 版本链集成守卫（version-trail-full-coverage spec Req 14）
+      # 确保 D~N 循环全部主入口组件已接入 useWorkpaperVersionToolbar + GtWpVersionTrail。
+      # 当前全树已接入，直接 strict 阻断新增违规。
+      - name: Version Trail Integration Guard
+        run: python backend/scripts/check/check_wp_version_trail.py --strict
 
   displayprefs-contract-check:
     # P0-3: DisplayPrefs 契约守卫（STRICT 模式）

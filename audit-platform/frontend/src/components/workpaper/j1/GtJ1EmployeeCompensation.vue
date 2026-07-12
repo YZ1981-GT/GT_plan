@@ -58,6 +58,8 @@
       <div v-else class="j1-sheet-placeholder">
         <el-empty :description="`J1 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
       </div>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -71,10 +73,12 @@
  *
  * 12个子组件全部采用 defineAsyncComponent 实现按需加载。
  */
-import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
+import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
+const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
 const J1TabIndex = defineAsyncComponent(() => import('./core/J1TabIndex.vue'))
 const J1TabAdjudication = defineAsyncComponent(() => import('./core/J1TabAdjudication.vue'))
 const J1TabDetail = defineAsyncComponent(() => import('./core/J1TabDetail.vue'))
@@ -122,6 +126,12 @@ const currentSheet = computed(() => {
   if (sn.includes('目录')) return 'J1-index'
   return sn
 })
+
+// ─── 版本追踪 useWorkpaperVersionToolbar ─────────────────────────────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+provide('j1VersionTrailRef', versionTrailRef)
+provide('j1OpenVersionHistory', openVersionHistory)
 
 onMounted(async () => {
   // 轻量初始化 — selfLoad 由各子组件自行管理

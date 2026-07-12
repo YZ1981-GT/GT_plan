@@ -118,6 +118,9 @@
       :section-label="d4ReviewSection.label"
     />
     <GtWpReviewDialogHost />
+
+    <!-- 版本链 drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -141,6 +144,7 @@ import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
 import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
 import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
@@ -203,6 +207,7 @@ const D4TabOtherMargin = defineAsyncComponent(() => import('./d4/other/D4TabOthe
 const D4TabOtherContract = defineAsyncComponent(() => import('./d4/other/D4TabOtherContract.vue'))
 const D4TabOtherCheck = defineAsyncComponent(() => import('./d4/other/D4TabOtherCheck.vue'))
 const D4TabOtherCutoff = defineAsyncComponent(() => import('./d4/other/D4TabOtherCutoff.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -236,6 +241,16 @@ const allResponses = computed(() => formData.allResponses.value)
 const crossSheet = useD4CrossSheet({
   allResponses: formData.allResponses,
   projectContext: formData.projectContext,
+})
+
+// ─── 版本链接入 ───────────────────────────────────────────────────────────
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
 })
 
 // ─── State ───────────────────────────────────────────────────────────────────
@@ -273,6 +288,8 @@ useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForRe
 const { getThreadDot, getRowDot } = useD4ReviewThreads(wpIdRefForReview)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
+provide('d4VersionTrailRef', versionTrailRef)
+provide('d4OpenVersionHistory', openVersionHistory)
 
 useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
@@ -326,6 +343,7 @@ async function saveImmediateBatch(
     itemId: item.item_id,
     data: { conclusion: item.conclusion, remark: item.remark },
   })))
+  scheduleAutoSnapshot()
 }
 
 

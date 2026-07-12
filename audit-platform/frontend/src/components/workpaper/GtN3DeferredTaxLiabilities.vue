@@ -160,7 +160,10 @@ const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+
+provide('n3VersionTrailRef', versionTrailRef)
+provide('n3OpenVersionHistory', () => versionToolbar.openVersionHistory())
 
 // ─── 双模式 ──────────────────────────────────────────────────────────────────
 const dualMode = {

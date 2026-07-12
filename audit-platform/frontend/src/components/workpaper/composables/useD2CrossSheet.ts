@@ -168,6 +168,7 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
   const bdAgingJson = computed(() => getVal('D2-bd-aging-rows').remark)
   const bdCustomerJson = computed(() => getVal('D2-bd-customer-rows').remark)
   const ecl9RowsJson = computed(() => getVal('D2-ecl9-rows').remark)
+  const tbAmountRemark = computed(() => getVal('D2-adj-tb-amount').remark)
 
   // ─── D2-2 明细行 ───────────────────────────────────────────────────────
 
@@ -337,6 +338,63 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
     }
   })
 
+  // ─── D2-1↔D2-2 勾稽校验 ───────────────────────────────────────────────
+  // 明细表(D2-2)合计 vs 审定表(D2-1)审定额 差异提示
+
+  const detailTotalAudited = computed(() => {
+    return detailRows.value.reduce(
+      (sum, row) => sum + parseNum(row.currentAudited),
+      0,
+    )
+  })
+
+  const adjudicationTotalAudited = computed(() => {
+    const adj = adjudicationForDisclosure.value
+    return adj.total.current
+  })
+
+  /** 明细表合计 vs 审定表合计差异（绝对值 > 0.01 视为不平） */
+  const reconciliationDiff = computed(() => {
+    const diff = detailTotalAudited.value - adjudicationTotalAudited.value
+    return {
+      diff,
+      isBalanced: Math.abs(diff) <= 0.01,
+      detailTotal: detailTotalAudited.value,
+      adjTotal: adjudicationTotalAudited.value,
+    }
+  })
+
+  // ─── D2-10 ECL↔D2-3 坏账准备期末勾稽 ──────────────────────────────────
+
+  const eclVsBadDebtDiff = computed(() => {
+    const eclTotal = eclSingleTotal.value
+    const bdCurrent = badDebtTotal.value.current
+    const diff = eclTotal - bdCurrent
+    return {
+      diff,
+      isBalanced: Math.abs(diff) <= 0.01,
+      eclTotal,
+      badDebtCurrent: bdCurrent,
+    }
+  })
+
+  // ─── D2-2 明细表↔TB 余额核对 ──────────────────────────────────────────
+
+  const detailVsTbDiff = computed(() => {
+    const tbAmount = parseNum(tbAmountRemark.value)
+    const detailTotal = detailTotalAudited.value
+    if (tbAmount === 0 && detailTotal === 0) {
+      return { diff: 0, isBalanced: true, detailTotal: 0, tbAmount: 0 }
+    }
+    const diff = detailTotal - tbAmount
+    return {
+      diff,
+      isBalanced: Math.abs(diff) <= 0.01,
+      detailTotal,
+      tbAmount,
+    }
+  })
+
   return {
     detailRows,
     sumifAggregation,
@@ -345,6 +403,9 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
     eclSingleTotal,
     adjudicationForDisclosure,
     agingFromDetail,
+    reconciliationDiff,
+    eclVsBadDebtDiff,
+    detailVsTbDiff,
     crossSheetStatus,
   }
 }

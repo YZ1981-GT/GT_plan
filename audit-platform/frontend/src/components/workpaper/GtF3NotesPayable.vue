@@ -391,7 +391,10 @@ const versionToolbar = useWorkpaperVersionToolbar({
 
 })
 
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('f3VersionTrailRef', versionTrailRef)
+provide('f3OpenVersionHistory', openVersionHistory)
 
 
 

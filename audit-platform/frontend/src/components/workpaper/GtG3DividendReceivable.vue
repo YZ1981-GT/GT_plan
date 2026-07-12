@@ -153,7 +153,10 @@ const projectIdRef = computed(() => props.projectId)
 const formData = useG3DivRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('g3VersionTrailRef', versionTrailRef)
+provide('g3OpenVersionHistory', openVersionHistory)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

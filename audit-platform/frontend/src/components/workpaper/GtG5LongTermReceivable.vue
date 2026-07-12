@@ -184,7 +184,10 @@ const versionToolbar = useWorkpaperVersionToolbar({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('g5VersionTrailRef', versionTrailRef)
+provide('g5OpenVersionHistory', openVersionHistory)
 
 // ═══ 复核对话 provide ═══
 function openReviewDialog(sectionId: string): void {

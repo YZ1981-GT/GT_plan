@@ -283,10 +283,12 @@ provide('openReviewDialog', openReviewDialog)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 
 provide('versionTrail', versionToolbar)
 provide('openVersionHistory', () => versionToolbar.openVersionHistory())
+provide('n1VersionTrailRef', versionTrailRef)
+provide('n1OpenVersionHistory', openVersionHistory)
 
 // ─── provide scheduleAutoSnapshot → 子组件保存后触发自动快照 ─────────────────
 

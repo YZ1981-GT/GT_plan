@@ -1,6 +1,6 @@
 ﻿<template>
 
-  <div class="d1-notes-receivable" :class="{ 'is-readonly': review.isReadonly.value }" :style="{ '--wp-font-size': displayPrefs.fontConfig.tableFont }">
+  <div class="d1-notes-receivable" :class="{ 'is-readonly': review.isReadonly.value }">
 
     <div v-if="isLoading" class="loading-container">
 
@@ -419,6 +419,8 @@
     />
     <GtWpReviewDialogHost />
 
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+
   </div>
 
 </template>
@@ -440,6 +442,8 @@ import { useD1FormData } from './composables/useD1FormData'
 import { useD1Procedure } from './composables/useD1Procedure'
 
 import { useD1Review } from './composables/useD1Review'
+
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
@@ -502,6 +506,8 @@ const D1TabSamplingVouching = defineAsyncComponent(() => import('./d1/D1TabSampl
 const D1TabWriteoffCheck = defineAsyncComponent(() => import('./d1/D1TabWriteoffCheck.vue'))
 
 const D1TabAdjustment = defineAsyncComponent(() => import('./d1/D1TabAdjustment.vue'))
+
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 
 
@@ -721,6 +727,21 @@ const projectIdRef = toRef(props, 'projectId')
 
 
 
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+})
+
+// 保存成功后触发版本快照
+const saveImmediateWithSnapshot = async (...args: Parameters<typeof saveImmediate>) => {
+  await saveImmediate(...args)
+  scheduleAutoSnapshot()
+}
+
 useWorkpaperReviewProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const { getThreadDot, getRowDot } = useD1ReviewThreads(wpIdRef)
@@ -734,7 +755,7 @@ useWorkpaperEntryInjections({
   reloadFn: () => loadAll(),
 })
 
-provide('d1SaveImmediate', saveImmediate)
+provide('d1SaveImmediate', saveImmediateWithSnapshot)
 
 provide('d1SaveDebouncedText', saveDebouncedText)
 
@@ -742,9 +763,15 @@ provide('d1SuppressLocalOo', true)
 
 provide('d1CrossSheet', crossSheet)
 
-// 显示偏好收敛到单一真源（useDisplayPrefsStore），全部 tab 已迁移至 DisplayPrefs_Key。
+provide('d1VersionTrailRef', versionTrailRef)
+
+provide('d1OpenVersionHistory', openVersionHistory)
+
+// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
+// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
 const displayPrefs = useDisplayPrefsStore()
 provide(DisplayPrefs_Key, displayPrefs)
+provide('displayPrefs', displayPrefs)
 
 
 

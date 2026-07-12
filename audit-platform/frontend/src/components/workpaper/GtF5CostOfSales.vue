@@ -166,7 +166,10 @@ const formData = useF5CosSalFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('f5VersionTrailRef', versionTrailRef)
+provide('f5OpenVersionHistory', openVersionHistory)
 
 /** F5-7 校验区消费的审定营业成本（来自 F5-1 EventBus publish） */
 const adjudicatedCOGS = ref(0)

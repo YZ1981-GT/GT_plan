@@ -160,6 +160,8 @@
           style="height: calc(100vh - 180px)"
         />
       </template>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -179,10 +181,11 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import useVersionTrail from './composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 
 // core
@@ -304,12 +307,11 @@ provide('allResponses', allResponses)
 // TB 取数种子（H4-1 审定表 inject 消费，科目1605 未审数/审定数只读核对）
 provide('h4TbValues', tbValues)
 
-// ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
-const versionTrail = useVersionTrail({
-  projectId: toRef(props, 'projectId') as any,
-  workpaperId: toRef(props, 'wpId') as any,
-})
-provide('versionTrail', versionTrail)
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+provide('h4VersionTrailRef', versionTrailRef)
+provide('h4OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {

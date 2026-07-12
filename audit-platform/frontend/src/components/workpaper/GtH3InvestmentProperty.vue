@@ -281,6 +281,8 @@
           style="height: calc(100vh - 180px)"
         />
       </template>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -303,7 +305,7 @@
  */
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, watch } from 'vue'
 import http from '@/utils/http'
-import useVersionTrail from './composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useH3DualMode } from './composables/useH3DualMode'
 import { useH3FormData } from './composables/useH3FormData'
 import { useH3MeasurementModel } from './composables/useH3MeasurementModel'
@@ -311,6 +313,7 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core — H3TabIndex 非 lazy（底稿目录轻量，首屏必显）— 骨架阶段先 lazy
 const H3TabIndex = defineAsyncComponent(() => import('./h3/core/H3TabIndex.vue'))
@@ -477,16 +480,15 @@ provide('openReviewDialog', openReviewDialog)
 provide('measurementModel', measurementModel)
 provide('allResponses', allResponses)
 
-// ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
-const versionTrail = useVersionTrail({
-  projectId: toRef(props, 'projectId') as any,
-  workpaperId: toRef(props, 'wpId') as any,
-})
-provide('versionTrail', versionTrail)
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+provide('h3VersionTrailRef', versionTrailRef)
+provide('h3OpenVersionHistory', openVersionHistory)
 
 // ─── Watch: measurementModel 切换时 autoSnapshot ──────────────────────────────
-watch(measurementModel, (newVal) => {
-  void versionTrail.createSnapshot?.(`计量模式切换: ${newVal}`)
+watch(measurementModel, () => {
+  scheduleAutoSnapshot()
 })
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

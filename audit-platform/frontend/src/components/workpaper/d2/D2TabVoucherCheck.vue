@@ -1,111 +1,205 @@
 <script setup lang="ts">
 /**
- * D2TabVoucherCheck — 凭证抽查D2-7
- * 抽样参数区 + 凭证明细表(17列) + 进度条 + 底部汇总
- * 集成 GtVoucherSamplingEngine 自动抽凭（Task 11.1）
+ * D2TabVoucherCheck — D2-7 凭证检查表（重构后五区段布局）
+ *
+ * Spec: .kiro/specs/d2-7-voucher-check-enhancement/
+ * Task: 7.1
+ *
+ * 五区段容器布局：
+ *   一、审计目标 el-alert
+ *   二、方法学参数区 MethodologyPanel
+ *   三、测试区（双区 el-tabs + 视图切换 el-segmented）
+ *   四、审计说明 AuditSummaryPanel
+ *   五、审计结论 textarea + AI 辅助按钮
+ *
+ * 集成：
+ *   - useD2VoucherCheckEnhanced（双区数据管理）
+ *   - useD2VcMethodology（方法学参数 + B15/B50 联动）
+ *   - useD2VcAuditSummary（统计自动化）
+ *   - useD2VcImportExport（双区分 sheet 导入导出）
+ *   - GtVoucherSamplingEngine（dialog-mode + @filled → 双区回填）
+ *   - useWorkpaperVersionToolbar（版本工具栏）
+ *   - GtIndexChip（value="wp:D2-7"）
+ *   - PostFillAiReviewDialog（回填后 AI 复核）
+ *
+ * Requirements: 1.1, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.5, 10.4
  */
-import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
-import { useD2VoucherCheck } from '../composables/useD2VoucherCheck'
-import { useD2TabImportExport } from '../composables/useD2TabImportExport'
+import { ref, toRef, computed, provide, onMounted, type Ref } from 'vue'
+import { useD2VoucherCheckEnhanced } from '../composables/useD2VoucherCheckEnhanced'
+import { useD2VcMethodology } from '../composables/useD2VcMethodology'
+import { useD2VcAuditSummary } from '../composables/useD2VcAuditSummary'
+import { useD2VcImportExport } from '../composables/useD2VcImportExport'
+import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
+import { D2_SAVE_ITEMS_KEY } from '../composables/d2InjectionKeys'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
-import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
-import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
-import type { VirtualColumn } from '@/composables/useVirtualTable'
+import http from '@/utils/http'
+
+import MatrixView from './D2VcMatrixView.vue'
+import CardView from './D2VcCardView.vue'
+import MethodologyPanel from './D2VcMethodologyPanel.vue'
+import AuditSummaryPanel from './D2VcAuditSummaryPanel.vue'
 import GtIndexChip from '../GtIndexChip.vue'
-import GtReviewDot from '../GtReviewDot.vue'
-import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
-import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
-import type { VoucherSampleRow } from '../composables/useD2VoucherCheck'
-import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
-import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import PostFillAiReviewDialog from '../voucher-sampling/PostFillAiReviewDialog.vue'
+import GtWpVersionTrail from '../version-trail/GtWpVersionTrail.vue'
+
+import type { SampledVoucher } from '../composables/useD2VoucherCheckEnhanced'
+import type { Phase, FillMode } from '../composables/useSamplingAlgorithms'
+import type { ChecklistResponse } from '../composables/useD2FormData'
+
+// ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  htmlData: any
   isReadonly: boolean
   bsDate: string
+  sheetName: string
 }>()
 
-const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
-  toRef(props, 'wpId') as Ref<string>,
-  toRef(props, 'projectId') as Ref<string>,
-  'D2-7',
-)
+// ─── Ref Wrappers ────────────────────────────────────────────────────────────
 
-const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
+const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, any>>
+const isReadonlyRef = toRef(props, 'isReadonly') as Ref<boolean>
+const bsDateRef = toRef(props, 'bsDate') as Ref<string>
 
-// 复核对话集成 (Task 47.1)
-const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+// ─── Provide: saveItems ──────────────────────────────────────────────────────
 
-function handleCellContextMenu(row: any, column: any, event: MouseEvent): void {
-  if (!openReviewDialog) return
-  event.preventDefault()
-  const field = column?.property || 'unknown'
-  const rowKey = row?.seq ?? row?.index ?? 'unknown'
-  openReviewDialog(`D2-voucher-${rowKey}-${field}`)
+let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+async function saveItems(items: ChecklistResponse[]): Promise<void> {
+  if (!props.wpId) return
+  // Update local map immediately
+  for (const item of items) {
+    allResponsesRef.value.set(item.item_id, item)
+  }
+  // Debounced persist
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer)
+  saveDebounceTimer = setTimeout(async () => {
+    saveDebounceTimer = null
+    try {
+      await http.put(
+        `/api/workpapers/${props.wpId}/checklist-responses`,
+        { items },
+        { _silent: true } as any,
+      )
+      versionToolbar.scheduleAutoSnapshot()
+    } catch (err) {
+      console.warn('[D2TabVoucherCheck] saveItems failed:', err)
+    }
+  }, 2000)
 }
 
-function handleContextMenuReview(row: any): void {
-  if (!openReviewDialog) return
-  openReviewDialog(`D2-voucher-abnormal-${row?.seq ?? 'unknown'}`)
+provide(D2_SAVE_ITEMS_KEY, saveItems)
+
+// ─── Core Composables ────────────────────────────────────────────────────────
+
+// 双区数据管理
+const {
+  currentRows,
+  postRows,
+  activeZone,
+  viewMode,
+  activeRows,
+  switchZone,
+  switchViewMode,
+  addRow,
+  removeRow,
+  updateRow,
+  fillFromSampledVouchers,
+  saveToResponses,
+} = useD2VoucherCheckEnhanced({
+  allResponses: allResponsesRef,
+  isReadonly: isReadonlyRef,
+  bsDate: bsDateRef,
+})
+
+// 方法学参数
+const methodology = useD2VcMethodology({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  allResponses: allResponsesRef,
+  isReadonly: isReadonlyRef,
+})
+
+// 审计说明统计
+const auditSummary = useD2VcAuditSummary({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  currentRows,
+  postRows,
+  allResponses: allResponsesRef,
+  isReadonly: isReadonlyRef,
+})
+
+// 导入导出
+const importExport = useD2VcImportExport({
+  wpId: wpIdRef,
+  currentRows,
+  postRows,
+  saveToResponses,
+})
+
+// 版本工具栏
+const versionToolbar = useWorkpaperVersionToolbar({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+})
+
+// AI 生成
+const { aiAvailable, generateAndConfirm } = useD2AiGenerate(wpIdRef)
+
+// ─── 审计结论（区段五）──────────────────────────────────────────────────────
+
+const CONCLUSION_KEY = 'D2-vc-conclusion'
+const conclusion = ref('')
+const aiLoadingConclusion = ref(false)
+
+function loadConclusion(): void {
+  const resp = allResponsesRef.value.get(CONCLUSION_KEY)
+  if (resp?.remark) {
+    conclusion.value = resp.remark
+  }
 }
 
+function saveConclusion(v: string): void {
+  if (props.isReadonly) return
+  conclusion.value = v
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: v }
+  allResponsesRef.value.set(CONCLUSION_KEY, item)
+  void saveItems([item] as any)
+}
 
-const {
-  params,
-  samples,
-  progress,
-  abnormalCount,
-  abnormalRate,
-  addSample,
-  removeSample,
-  updateCell,
-  updateParams,
-  autoMarkAllCutoff,
-  debounceSave,
-} = useD2VoucherCheck({
-  wpId: toRef(props, 'wpId') as Ref<string>,
-  projectId: toRef(props, 'projectId') as Ref<string>,
-  allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
-  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
-  bsDate: toRef(props, 'bsDate') as Ref<string>,
-})
+async function generateConclusionAI(): Promise<void> {
+  if (props.isReadonly) return
+  aiLoadingConclusion.value = true
+  try {
+    const text = await generateAndConfirm('vc-conclusion', conclusion.value, {
+      sheet: 'D2-7',
+      stats: auditSummary.stats.value,
+      checked: currentRows.value.length + postRows.value.length,
+    }, 'AI · 审计结论')
+    if (text) saveConclusion(text)
+  } finally {
+    aiLoadingConclusion.value = false
+  }
+}
 
-const browseRows = computed(() =>
-  samples.value.map(r => ({
-    voucherNo: r.voucherNo,
-    voucherDate: r.voucherDate,
-    amount: r.amount,
-    counterparty: r.counterparty,
-    abstract: r.abstract,
-  })),
-)
+// ─── 视图切换选项 ────────────────────────────────────────────────────────────
 
-const browseRowCount = computed(() => browseRows.value.length)
+const viewOptions = [
+  { label: '矩阵视图', value: 'matrix' },
+  { label: '卡片视图', value: 'card' },
+]
 
-const virtualColumns = computed<VirtualColumn[]>(() => [
-  virtualTextCol('voucherNo', '凭证号', 100),
-  virtualTextCol('voucherDate', '凭证日期', 100),
-  virtualNumCol('amount', '金额', 110, (v) => displayPrefs.fmtAmount(Number(v) || 0)),
-  virtualTextCol('counterparty', '交易对手', 120),
-  virtualTextCol('abstract', '摘要', 160),
-])
+// ─── 抽凭引擎集成 ────────────────────────────────────────────────────────────
 
-const {
-  browseMode,
-  useVirtualScroll,
-  tableWidth,
-  tableHeight,
-  toggleBrowseMode,
-} = useWorkpaperBrowseMode({
-  rows: browseRows,
-  virtualColumns,
-  tableWidth: 900,
-})
-
-// ─── 年度计算（从bsDate提取，如 "2025-12-31" → 2025）─────────────────────────
+const showPostFillReview = ref(false)
+const lastFilledRows = ref<any[]>([])
 
 const year = computed(() => {
   if (props.bsDate && props.bsDate.length >= 4) {
@@ -114,400 +208,507 @@ const year = computed(() => {
   return new Date().getFullYear() - 1
 })
 
-// ─── 当前审计阶段（默认年审）────────────────────────────────────────────────
-
 const currentPhase = computed<Phase>(() => 'final')
 
-// ─── 核对结果点选选项 ───────────────────────────────────────────────────────
-const YN_OPTIONS = ['是', '否', 'N/A']
-const CONFIRM_OPTIONS = ['相符', '不符', '未回函', '未函证']
+function onSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: string }): void {
+  const { samples, fillMode } = payload
+  fillFromSampledVouchers(samples, fillMode === 'merge' ? 'merge' : 'replace')
+  // Keep refs for PostFill review
+  lastFilledRows.value = samples.map(s => ({
+    voucherNo: s.voucherNo,
+    voucherDate: s.voucherDate,
+    debitAmount: s.debitAmount,
+    creditAmount: s.creditAmount,
+  }))
+  // Trigger PostFillAiReviewDialog
+  showPostFillReview.value = true
+}
 
-// ─── 审计说明（inline 存储）─────────────────────────────────────────────────
-const NOTE_KEY = 'D2-voucher-note'
-const auditNote = ref('')
+/** PostFill AI 复核意见应用到审计说明 */
+function handlePostFillApplied(text: string): void {
+  if (text && auditSummary.summaryText) {
+    const current = auditSummary.summaryText.value || ''
+    auditSummary.summaryText.value = current
+      ? `${current}\n\n【AI 复核意见】${text}`
+      : `【AI 复核意见】${text}`
+    auditSummary.saveToResponses()
+  }
+}
+
+// ─── 行数统计 ────────────────────────────────────────────────────────────────
+
+const currentRowCount = computed(() => currentRows.value.length)
+const postRowCount = computed(() => postRows.value.length)
+const totalRowCount = computed(() => currentRowCount.value + postRowCount.value)
+
+// ─── 导入导出下拉菜单 ────────────────────────────────────────────────────────
+
+function handleImportExportCommand(command: string): void {
+  if (command === 'export-template') {
+    importExport.exportTemplate()
+  } else if (command === 'export-data') {
+    importExport.exportData()
+  } else if (command === 'import-data') {
+    // Trigger file input
+    importFileInput.value?.click()
+  }
+}
+
+const importFileInput = ref<HTMLInputElement | null>(null)
+
+function handleImportFileChange(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) {
+    importExport.importData(file)
+    input.value = '' // Reset for next selection
+  }
+}
+
+// ─── selfLoad 逻辑 ──────────────────────────────────────────────────────────
 
 onMounted(() => {
-  auditNote.value = props.allResponses.get(NOTE_KEY)?.remark || ''
+  methodology.initialize()
+  auditSummary.loadOccurrenceAmount()
+  loadConclusion()
 })
-
-function saveNote(v: string): void {
-  if (props.isReadonly) return
-  auditNote.value = v
-  const item = { item_id: NOTE_KEY, conclusion: null, remark: v }
-  props.allResponses.set(NOTE_KEY, item)
-  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
-}
-
-const { aiAvailable, generateAndConfirm } = useD2AiGenerate(toRef(props, 'wpId'))
-const aiLoadingNote = ref(false)
-
-async function generateNoteAI(): Promise<void> {
-  if (props.isReadonly) return
-  aiLoadingNote.value = true
-  try {
-    const text = await generateAndConfirm('voucher-note', auditNote.value, {
-      sheet: 'D2-7',
-      checked: samples.value.length,
-      abnormalCount: abnormalCount.value,
-      abnormalRate: `${(abnormalRate.value * 100).toFixed(1)}%`,
-    }, 'AI · 应收账款细节测试说明')
-    if (text) saveNote(text)
-  } finally { aiLoadingNote.value = false }
-}
-
-const GUIDANCE_TEXTS = [
-  '细节测试：对抽取的应收账款交易核对原始单据（销售合同、发货单、验收单、发票、回款记录），验证发生额的真实性、准确性与截止。',
-  '核对要点：金额一致（凭证↔单据）、日期一致（入账↔业务实质）、客户函证相符、账龄核实，任一异常应标记并追查。',
-  '异常处理：标记异常的样本应查明原因、评估错报性质与金额，必要时扩大样本或提出调整。',
-  '样本量与方法应与 B50 风险评估及重要性水平匹配，特定项目（大额/关联方/异常）应单独关注。',
-]
-
-// ─── 自动抽凭填充处理 (Task 11.1) ───────────────────────────────────────────
-
-function generateRowId(): string {
-  return `vc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
-}
-
-/**
- * 将 SampledVoucher 映射为 D2-7 VoucherSampleRow
- * 映射规则：
- *   voucherNo → 凭证号
- *   voucherDate → 日期
- *   debitAmount → 借方金额（取较大者作为金额列）
- *   creditAmount → 贷方金额
- *   summary → 摘要
- *   counterpartAccount → 对方科目（交易对手）
- *   accountCode → 科目编码（科目名称）
- * 标记 source: "自动抽凭"
- */
-function mapSampledVoucherToRow(voucher: SampledVoucher, seq: number): VoucherSampleRow {
-  const debit = voucher.debitAmount ? parseFloat(voucher.debitAmount) : 0
-  const credit = voucher.creditAmount ? parseFloat(voucher.creditAmount) : 0
-  const amount = Math.max(debit, credit)
-
-  return {
-    rowId: generateRowId(),
-    seq,
-    voucherNo: voucher.voucherNo || '',
-    voucherDate: voucher.voucherDate || '',
-    amount,
-    counterparty: voucher.counterpartAccount || '',
-    abstract: voucher.summary || '',
-    accountName: voucher.accountCode || '',
-    attachmentCount: 0,
-    hasOriginal: '',
-    amountConsistent: '',
-    dateConsistent: '',
-    revenueDate: '',
-    isCutoff: false,
-    customerConfirm: '',
-    agingVerify: '',
-    abnormalFlag: '',
-    conclusion: '',
-    indexRef: '',
-    source: '自动抽凭',
-  }
-}
-
-/**
- * 处理 GtVoucherSamplingEngine @filled 事件
- * 将抽样结果映射到 D2-7 列结构并合并到 samples
- * 同时回写抽样参数区（总体/样本量/方法/覆盖率）
- */
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
-  const { samples: sampledVouchers, fillMode } = payload
-  const mapped = sampledVouchers.map((v, idx) => mapSampledVoucherToRow(v, idx + 1))
-
-  if (fillMode === 'replace') {
-    // 替换模式：清空后填充
-    samples.value = mapped.map((s, i) => ({ ...s, seq: i + 1 }))
-  } else if (fillMode === 'merge') {
-    // 合并模式：按凭证号去重
-    const existingNos = new Set(samples.value.map(s => s.voucherNo))
-    const newSamples = mapped.filter(s => !existingNos.has(s.voucherNo))
-    const startSeq = samples.value.length + 1
-    newSamples.forEach((s, i) => { s.seq = startSeq + i })
-    samples.value.push(...newSamples)
-  } else {
-    // append 模式（默认）：追加到末尾
-    const startSeq = samples.value.length + 1
-    mapped.forEach((s, i) => { s.seq = startSeq + i })
-    samples.value.push(...mapped)
-  }
-
-  // 回写抽样参数区：样本量 = 填充笔数，总体规模从 payload 推算
-  updateParams('sampleSize', samples.value.length)
-  updateParams('populationSize', params.value.populationSize || samples.value.length)
-
-  // 触发 debounce 2s 自动保存
-  debounceSave()
-}
 </script>
 
 <template>
-  <div class="d2-tab-voucher">
-    <div class="tab-header">
-      <h4>应收账款检查表（细节测试）D2-7</h4>
-      <GtReviewTrigger section-id="D2-voucher-header" />
-    </div>
-
-    <el-alert type="info" :closable="false" show-icon title="审计目标" class="audit-objective">
+  <div class="d2-voucher-check">
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         一、审计目标
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <el-alert
+      title="审计目标"
+      type="info"
+      :closable="false"
+      show-icon
+      class="section-audit-objective"
+    >
       <template #default>
-        <p>通过抽样核对原始单据，验证应收账款发生额的真实性、准确性、截止与计价，识别异常交易。</p>
+        <p class="objective-text">
+          通过对应收账款本期增减变动的凭证抽查及期后收款调整的检查，确认应收账款发生额的真实性、准确性、截止性与计价分摊，
+          识别异常交易并评估错报风险。
+        </p>
       </template>
     </el-alert>
 
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
-        <el-button size="small" @click="onExportData">导出数据</el-button>
-        <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
-          <el-button size="small">导入数据</el-button>
-        </el-upload>
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample">添加样本</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="autoMarkAllCutoff">自动标记跨期</el-button>
+    <!-- 操作引导区 -->
+    <div class="vc-guide-area">
+      <div class="guide-title">📋 编制步骤</div>
+      <div class="guide-steps">
+        <div class="guide-step"><span class="step-num">1</span> 配置方法学参数</div>
+        <div class="guide-step"><span class="step-num">2</span> 运行抽凭引擎</div>
+        <div class="guide-step"><span class="step-num">3</span> 上传附件OCR核对</div>
+        <div class="guide-step"><span class="step-num">4</span> 确认核对结果</div>
+        <div class="guide-step"><span class="step-num">5</span> 查看统计说明</div>
       </div>
     </div>
 
-    <!-- 抽样参数区 -->
-    <el-card shadow="never" class="params-card">
-      <template #header><span style="font-weight:600">抽样参数</span></template>
-      <el-form :model="params" label-width="80px" size="small" inline>
-        <el-form-item label="抽样方法">
-          <el-select :model-value="params.method" :disabled="isReadonly" @change="(v: string) => updateParams('method', v)">
-            <el-option label="随机" value="随机" />
-            <el-option label="分层" value="分层" />
-            <el-option label="特定项目" value="特定项目" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="总体规模">
-          <el-input-number :model-value="params.populationSize" :disabled="isReadonly" :controls="false" @change="(v: number) => updateParams('populationSize', v)" />
-        </el-form-item>
-        <el-form-item label="样本量">
-          <el-input-number :model-value="params.sampleSize" :disabled="isReadonly" :controls="false" @change="(v: number) => updateParams('sampleSize', v)" />
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <!-- 自动抽凭引擎 (Task 11.1) -->
-    <el-collapse class="sampling-engine-collapse">
-      <el-collapse-item title="自动抽凭" name="auto-sampling">
-        <GtVoucherSamplingEngine
-          account-code="1122"
-          :phase="currentPhase"
-          default-method="random"
-          :workpaper-id="wpId"
-          :project-id="projectId"
-          :year="year"
-          @filled="handleSamplingFilled"
-        />
-      </el-collapse-item>
-    </el-collapse>
-
-    <!-- 进度条 -->
-    <div class="progress-bar">
-      <span>抽样进度: {{ progress.current }} / {{ progress.target }}</span>
-      <el-progress :percentage="Math.min(progress.ratio * 100, 100)" :stroke-width="8" style="flex:1; margin-left: 12px" />
+    <!-- 方法论上下文（CAS 1314） -->
+    <div class="vc-methodology-context">
+      <div class="context-title">审计准则要点 · CAS 1314</div>
+      <ul class="context-list">
+        <li>审计抽样应获取关于测试总体的充分适当审计证据，从而合理推断总体特征</li>
+        <li>样本量应足以将抽样风险降至可接受水平，并与可容忍错报/偏差率相适应</li>
+        <li>对于货币单元抽样（MUS），抽样间隔 = 可容忍错报 ÷ 可靠性系数（泊松分布表）</li>
+        <li>异常情况应进一步调查其性质和原因，评估对总体的影响</li>
+      </ul>
     </div>
 
-    <div v-if="useVirtualScroll" class="virtual-toolbar">
-      <el-alert type="info" :closable="false" class="virtual-hint">
-        行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
-      </el-alert>
-      <el-button size="small" @click="toggleBrowseMode">
-        {{ browseMode ? '切换表格编辑' : '切换虚拟速览' }}
-      </el-button>
-    </div>
-    <el-table-v2
-      v-if="useVirtualScroll && browseMode"
-      :columns="virtualColumns"
-      :data="browseRows"
-      :width="tableWidth"
-      :height="tableHeight"
-      :row-height="36"
-      :header-height="40"
-      fixed
-      class="virtual-table"
-    />
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         二、方法学参数区
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <section class="section-methodology">
+      <MethodologyPanel
+        :is-readonly="isReadonly"
+        :methodology="methodology"
+      />
+    </section>
 
-    <!-- 凭证明细表（宽表：凭证基础信息固定左侧，核对结果横向滚动） -->
-    <el-table v-if="!useVirtualScroll || !browseMode" :data="samples" border size="small" :max-height="480" style="width: 100%">
-      <!-- 凭证基础信息 -->
-      <el-table-column label="凭证基础信息" header-align="center">
-        <el-table-column label="序号" width="55" fixed="left">
-          <template #default="{ $index, row }">
-            {{ $index + 1 }}<GtReviewDot row-prefix="D2-voucher" :row-key="String(row.rowId || row.seq)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证号" width="110" fixed="left">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" placeholder="凭证号" @change="(v: string) => updateCell(row.rowId, 'voucherNo', v)" />
-            <span v-else>{{ row.voucherNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证日期" width="130">
-          <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" :model-value="row.voucherDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'voucherDate', v)" />
-            <span v-else>{{ row.voucherDate }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="金额" width="120" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
-            <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="交易对手" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" placeholder="交易对手" @change="(v: string) => updateCell(row.rowId, 'counterparty', v)" />
-            <span v-else>{{ row.counterparty || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="摘要" min-width="140">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.abstract" size="small" placeholder="摘要" @change="(v: string) => updateCell(row.rowId, 'abstract', v)" />
-            <span v-else>{{ row.abstract || '-' }}</span>
-          </template>
-        </el-table-column>
-      </el-table-column>
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         三、测试区（双区 el-tabs + 视图切换 el-segmented）
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <section class="section-test-zone">
+      <!-- 工具栏 -->
+      <div class="zone-toolbar">
+        <div class="toolbar-left">
+          <el-segmented
+            :model-value="viewMode"
+            :options="viewOptions"
+            size="small"
+            @change="(v: any) => switchViewMode(v.value ?? v)"
+          />
+          <el-tag type="info" size="small" effect="plain" class="row-count-tag">
+            共 {{ totalRowCount }} 行
+          </el-tag>
+        </div>
+        <div class="toolbar-right">
+          <!-- 抽凭引擎 -->
+          <GtVoucherSamplingEngine
+            v-if="wpId && projectId && !isReadonly"
+            account-code="1122"
+            :phase="currentPhase"
+            default-method="random"
+            :workpaper-id="wpId"
+            :project-id="projectId"
+            :year="year"
+            dialog-mode
+            @filled="onSamplingFilled"
+          />
+          <!-- 导入导出 -->
+          <el-dropdown
+            trigger="click"
+            :disabled="isReadonly"
+            @command="handleImportExportCommand"
+          >
+            <el-button size="small" :disabled="isReadonly">
+              导入导出 <el-icon class="el-icon--right"><i class="el-icon-arrow-down" /></el-icon>
+            </el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+                <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+                <el-dropdown-item command="import-data" :disabled="isReadonly">导入数据</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <input
+            ref="importFileInput"
+            type="file"
+            accept=".xlsx,.xls"
+            style="display:none"
+            @change="handleImportFileChange"
+          />
+          <!-- GtIndexChip -->
+          <GtIndexChip value="wp:D2-7" :context-project-id="projectId" />
+          <!-- 版本历史 -->
+          <el-button size="small" text @click="versionToolbar.openVersionHistory()">📋 版本</el-button>
+        </div>
+      </div>
 
-      <!-- 核对结果 -->
-      <el-table-column label="核对结果" header-align="center">
-        <el-table-column label="原始单据" width="100" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.hasOriginal" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'hasOriginal', v || '')">
-              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.hasOriginal || '-' }}</span>
+      <!-- 双区 Tabs -->
+      <el-tabs
+        :model-value="activeZone"
+        type="border-card"
+        class="zone-tabs"
+        @tab-change="(name: any) => switchZone(name as 'current' | 'post')"
+      >
+        <el-tab-pane name="current">
+          <template #label>
+            <span>(1) 本期增减变动检查</span>
+            <el-badge :value="currentRowCount" :max="999" type="info" class="tab-badge" />
           </template>
-        </el-table-column>
-        <el-table-column label="金额一致" width="100" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.amountConsistent" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'amountConsistent', v || '')">
-              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.amountConsistent || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="日期一致" width="100" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.dateConsistent" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'dateConsistent', v || '')">
-              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.dateConsistent || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="收入日期" width="130">
-          <template #default="{ row }">
-            <el-date-picker v-if="!isReadonly" :model-value="row.revenueDate" type="date" value-format="YYYY-MM-DD" size="small" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'revenueDate', v)" />
-            <span v-else>{{ row.revenueDate || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="跨期" width="60" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.isCutoff" type="danger" size="small">是</el-tag>
-            <span v-else>否</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="客户函证" width="110" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.customerConfirm" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'customerConfirm', v || '')">
-              <el-option v-for="o in CONFIRM_OPTIONS" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.customerConfirm || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="账龄核实" width="100" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.agingVerify" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'agingVerify', v || '')">
-              <el-option v-for="o in YN_OPTIONS" :key="o" :label="o" :value="o" />
-            </el-select>
-            <span v-else>{{ row.agingVerify || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="异常" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.abnormalFlag" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'abnormalFlag', v || '')">
-              <el-option label="正常" value="" />
-              <el-option label="异常" value="Y" />
-            </el-select>
-            <el-tag v-else-if="row.abnormalFlag === 'Y'" type="danger" size="small">异常</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-      </el-table-column>
+          <MatrixView
+            v-if="viewMode === 'matrix'"
+            :rows="currentRows"
+            :is-readonly="isReadonly"
+            :wp-id="wpId"
+            :project-id="projectId"
+            @update-row="updateRow"
+            @add-row="addRow"
+            @remove-row="removeRow"
+          />
+          <CardView
+            v-else
+            :rows="currentRows"
+            :is-readonly="isReadonly"
+            :wp-id="wpId"
+            :project-id="projectId"
+            @update-row="updateRow"
+          />
+        </el-tab-pane>
 
-      <!-- 结论 -->
-      <el-table-column label="结论" min-width="140">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.conclusion" size="small" placeholder="结论" @change="(v: string) => updateCell(row.rowId, 'conclusion', v)" />
-          <span v-else>{{ row.conclusion || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="索引号" width="140">
-        <template #default="{ row }">
-          <div class="index-cell">
-            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" placeholder="索引号" @change="(v: string) => updateCell(row.rowId, 'indexRef', v)" />
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
+        <el-tab-pane name="post">
+          <template #label>
+            <span>(2) 期后收款调整检查</span>
+            <el-badge :value="postRowCount" :max="999" type="info" class="tab-badge" />
+          </template>
+          <MatrixView
+            v-if="viewMode === 'matrix'"
+            :rows="postRows"
+            :is-readonly="isReadonly"
+            :wp-id="wpId"
+            :project-id="projectId"
+            @update-row="updateRow"
+            @add-row="addRow"
+            @remove-row="removeRow"
+          />
+          <CardView
+            v-else
+            :rows="postRows"
+            :is-readonly="isReadonly"
+            :wp-id="wpId"
+            :project-id="projectId"
+            @update-row="updateRow"
+          />
+        </el-tab-pane>
+      </el-tabs>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         四、审计说明
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <section class="section-audit-summary">
+      <AuditSummaryPanel
+        :is-readonly="isReadonly"
+        :audit-summary="auditSummary"
+      />
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         五、审计结论
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <section class="section-conclusion">
+      <el-card shadow="never" class="conclusion-card">
+        <template #header>
+          <div class="conclusion-header">
+            <span class="conclusion-title">审计结论</span>
+            <el-tooltip :content="aiAvailable ? 'AI 辅助生成审计结论' : 'AI 服务暂不可用'" placement="top">
+              <el-button
+                size="small"
+                text
+                type="primary"
+                :loading="aiLoadingConclusion"
+                :disabled="isReadonly || !aiAvailable"
+                @click="generateConclusionAI"
+              >
+                🤖 AI 辅助
+              </el-button>
+            </el-tooltip>
           </div>
         </template>
-      </el-table-column>
-      <el-table-column v-if="!isReadonly" label="" width="50" fixed="right">
-        <template #default="{ row }">
-          <el-popconfirm title="确定删除该行？" confirm-button-text="删除" cancel-button-text="取消" @confirm="removeSample(row.rowId)">
-            <template #reference><el-button type="danger" link size="small">✕</el-button></template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-      <template #empty>暂无抽样凭证，点击"添加样本"或使用"自动抽凭"</template>
-    </el-table>
+        <el-input
+          type="textarea"
+          :autosize="{ minRows: 5 }"
+          :model-value="conclusion"
+          placeholder="根据凭证抽查结果，对应收账款本期增减变动及期后收款调整的真实性、准确性和截止性作出审计结论..."
+          :disabled="isReadonly"
+          @change="saveConclusion"
+        />
+      </el-card>
+    </section>
 
-    <!-- 底部汇总 -->
-    <div class="summary-bar">
-      <span>已检查: {{ samples.length }}笔</span>
-      <span>异常笔数: <b style="color:#f56c6c">{{ abnormalCount }}</b></span>
-      <span>异常率: {{ (abnormalRate * 100).toFixed(1) }}%</span>
-    </div>
-
-    <!-- 审计说明 -->
-    <div class="section-subtitle">
-      审计说明
-      <GtReviewTrigger section-id="D2-voucher-note" />
-      <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
-        <el-button size="small" text type="primary" :loading="aiLoadingNote" :disabled="isReadonly || !aiAvailable" @click="generateNoteAI">🤖 AI 生成</el-button>
-      </el-tooltip>
-    </div>
-    <el-input type="textarea" :autosize="{ minRows: 5 }" :model-value="auditNote" placeholder="记录细节测试的样本选取、核对结果、异常处理及总体结论..." :disabled="isReadonly" @change="saveNote" />
-
-    <details class="guidance-fold">
-      <summary>📋 编制提示</summary>
-      <p v-for="(t, i) in GUIDANCE_TEXTS" :key="'g-' + i">{{ t }}</p>
+    <!-- 编制提示 -->
+    <details class="vc-compile-hints">
+      <summary>编制提示</summary>
+      <div class="hints-content">
+        <p><strong>操作说明：</strong></p>
+        <ul>
+          <li><strong>方法学参数配置</strong>：系统将自动联动 B15（重要性水平）和 B50（风险评估）数据，推荐抽样方法和样本量。用户可覆盖 AI 推荐值。</li>
+          <li><strong>抽凭引擎</strong>：点击工具栏"抽凭"按钮，配置科目和抽样参数后执行抽样。抽样结果自动按凭证日期分配到本期/期后区块。</li>
+          <li><strong>OCR 核对</strong>：在矩阵视图中点击📎按钮上传发票/合同等证据文件，系统自动 OCR 识别并与凭证数据比对，确认后回填核对内容1~5。</li>
+          <li><strong>异常标记</strong>：在"是否异常"列可选择或自定义异常类型。异常标记会自动纳入审计说明统计。</li>
+          <li><strong>审计说明</strong>：统计指标（覆盖比例、异常率等）自动计算，2 秒内刷新。可点击 AI 按钮生成审计说明文字。</li>
+          <li><strong>导入导出</strong>：支持双区分 sheet 导入导出，按凭证编号合并（已有行保留核对结果不覆盖）。</li>
+        </ul>
+        <p><strong>审计准则依据：</strong> CAS 1314《审计抽样》、CAS 1231《针对评估的重大错报风险采取的应对措施》</p>
+      </div>
     </details>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         PostFillAiReviewDialog — 回填后 AI 复核
+         ═══════════════════════════════════════════════════════════════════════ -->
+    <PostFillAiReviewDialog
+      v-model="showPostFillReview"
+      :wp-id="wpId"
+      :rows="lastFilledRows"
+      section="voucher-review"
+      :ai-available="aiAvailable"
+      @applied="handlePostFillApplied"
+    />
+
+    <!-- GtWpVersionTrail Drawer -->
+    <GtWpVersionTrail
+      :ref="(el: any) => { versionToolbar.versionTrailRef.value = el }"
+      :workpaper-id="wpId"
+      :project-id="projectId"
+    />
   </div>
 </template>
 
 <style scoped>
-.d2-tab-voucher { padding: 12px; }
-.tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.tab-header h4 { margin: 0; font-size: 15px; }
-.audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.toolbar-left { display: flex; gap: 8px; }
-.index-cell { display: flex; align-items: center; gap: 6px; }
-.index-cell .el-input { flex: 1; }
-.section-subtitle { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
-.guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-fold p { margin: 6px 0; line-height: 1.6; }
-.params-card { margin-bottom: 12px; }
-.sampling-engine-collapse { margin-bottom: 12px; }
-.progress-bar { display: flex; align-items: center; margin-bottom: 12px; font-size: var(--wp-font-size, 13px); }
-.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.virtual-hint { flex: 1; min-width: 200px; margin: 0; }
-.virtual-table { margin-bottom: 12px; }
-.summary-bar {
-  display: flex; gap: 24px; padding: 8px 12px; margin-top: 10px;
-  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: var(--wp-font-size, 13px);
+.d2-voucher-check {
+  padding: 16px;
+  font-size: 13px;
+}
+
+/* ─── 一、审计目标 ──────────────────────────────────────────────────────── */
+.section-audit-objective {
+  margin-bottom: 16px;
+}
+.objective-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #606266;
+}
+
+/* ─── 二、方法学参数区 ──────────────────────────────────────────────────── */
+.section-methodology {
+  margin-bottom: 16px;
+}
+
+/* ─── 操作引导区 ──────────────────────────────────────────────────────── */
+.vc-guide-area {
+  background: linear-gradient(135deg, #e8f4fd 0%, #d6ecfa 100%);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.guide-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a73e8;
+  margin-bottom: 10px;
+}
+.guide-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+}
+.guide-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #303133;
+}
+.step-num {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #409eff;
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ─── 方法论上下文（CAS 1314）──────────────────────────────────────────── */
+.vc-methodology-context {
+  border-left: 4px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 16px;
+}
+.context-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e6a23c;
+  margin-bottom: 8px;
+}
+.context-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.context-list li {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+/* ─── 编制提示 ────────────────────────────────────────────────────────── */
+.vc-compile-hints {
+  margin-top: 16px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.vc-compile-hints summary {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  cursor: pointer;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.vc-compile-hints summary:hover {
+  background: #f5f7fa;
+}
+.hints-content {
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #606266;
+}
+.hints-content ul {
+  margin: 6px 0;
+  padding-left: 20px;
+}
+.hints-content li {
+  margin-bottom: 6px;
+}
+.hints-content p {
+  margin: 8px 0;
+}
+
+/* ─── 三、测试区 ────────────────────────────────────────────────────────── */
+.section-test-zone {
+  margin-bottom: 16px;
+}
+
+.zone-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.row-count-tag {
+  font-size: 12px;
+}
+
+.zone-tabs {
+  --el-tabs-header-height: 40px;
+}
+.zone-tabs :deep(.el-tabs__content) {
+  padding: 12px;
+}
+
+.tab-badge {
+  margin-left: 6px;
+}
+
+/* ─── 四、审计说明 ──────────────────────────────────────────────────────── */
+.section-audit-summary {
+  margin-bottom: 16px;
+}
+
+/* ─── 五、审计结论 ──────────────────────────────────────────────────────── */
+.section-conclusion {
+  margin-bottom: 16px;
+}
+.conclusion-card {
+  border: 1px solid #ebeef5;
+}
+.conclusion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.conclusion-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
 }
 </style>

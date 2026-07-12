@@ -272,6 +272,8 @@
           style="height: calc(100vh - 180px)"
         />
       </template>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -290,11 +292,12 @@
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import useVersionTrail from './composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core — H1TabIndex 非 lazy（底稿目录轻量，首屏必显）
 import H1TabIndex from './h1/core/H1TabIndex.vue'
@@ -429,12 +432,11 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 }
 provide('openReviewDialog', openReviewDialog)
 
-// ─── 版本追踪 useVersionTrail (autoSnapshot on save) ─────────────────────────
-const versionTrail = useVersionTrail({
-  projectId: toRef(props, 'projectId') as any,
-  workpaperId: toRef(props, 'wpId') as any,
-})
-provide('versionTrail', versionTrail)
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+provide('h1VersionTrailRef', versionTrailRef)
+provide('h1OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 let c6EventSource: EventSource | null = null

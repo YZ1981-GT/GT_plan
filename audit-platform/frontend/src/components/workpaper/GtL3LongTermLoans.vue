@@ -132,6 +132,8 @@
       :current-user="currentUser"
       :related-data="{ wpCode: 'L3', projectId: props.projectId }"
     />
+
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -155,7 +157,7 @@
 import { ref, computed, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
 import { useAuthStore } from '@/stores/auth'
-import useVersionTrail from './composables/useVersionTrail'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -180,6 +182,7 @@ const L3TabLtLoanCheck = defineAsyncComponent(() => import('./l3/inspection/L3Ta
 // Shared
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -261,14 +264,16 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 
 provide('openReviewDialog', openReviewDialog)
 
-// ─── 版本追踪 useVersionTrail (autoSnapshot) ────────────────────────────────
+// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
 
-const versionTrail = useVersionTrail({
-  projectId: toRef(props, 'projectId') as any,
-  workpaperId: toRef(props, 'wpId') as any,
-})
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed(() => props.projectId)
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 
-provide('versionTrail', versionTrail)
+provide('versionTrail', versionToolbar)
+provide('l3VersionTrailRef', versionTrailRef)
+provide('l3OpenVersionHistory', openVersionHistory)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 

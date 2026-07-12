@@ -150,6 +150,9 @@
       :section-label="d7ReviewSection.label"
     />
     <GtWpReviewDialogHost />
+
+    <!-- 版本链 drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -167,6 +170,7 @@ import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useD7ReviewThreads } from './composables/useD7ReviewThreads'
 import D7TabIndex from './d7/D7TabIndex.vue'
 import D7TabProcedure from './d7/D7TabProcedure.vue'
@@ -180,6 +184,7 @@ const D7TabLongTerm = defineAsyncComponent(() => import('./d7/D7TabLongTerm.vue'
 const D7TabRelatedParty = defineAsyncComponent(() => import('./d7/D7TabRelatedParty.vue'))
 const D7TabVoucherCheck = defineAsyncComponent(() => import('./d7/D7TabVoucherCheck.vue'))
 const D7TabDisclosure = defineAsyncComponent(() => import('./d7/D7TabDisclosure.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -214,6 +219,16 @@ const {
 
 const crossSheet = useD7CrossSheet({ allResponses })
 
+// ─── 版本链接入 ───────────────────────────────────────────────────────────
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
 const currentSheet = computed(() => resolveD7SheetCode(props.sheetName || 'D7'))
 const d7ReviewSection = computed(() => resolveCycleReviewSection('D7', currentSheet.value))
 
@@ -228,6 +243,8 @@ useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForRe
 const { getThreadDot, getRowDot } = useD7ReviewThreads(wpIdRefForReview)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
+provide('d7VersionTrailRef', versionTrailRef)
+provide('d7OpenVersionHistory', openVersionHistory)
 
 useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
@@ -279,6 +296,7 @@ async function saveImmediateBatch(
     itemId: item.item_id,
     data: { conclusion: item.conclusion, remark: item.remark },
   })))
+  scheduleAutoSnapshot()
 }
 
 onMounted(async () => {

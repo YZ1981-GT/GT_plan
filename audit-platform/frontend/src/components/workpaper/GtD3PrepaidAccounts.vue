@@ -148,6 +148,9 @@
       :section-label="d3ReviewSection.label"
     />
     <GtWpReviewDialogHost />
+
+    <!-- 版本链 drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -167,6 +170,7 @@ import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useD3ReviewThreads } from './composables/useD3ReviewThreads'
 import { DisplayPrefs_Key } from './composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -185,6 +189,7 @@ const D3TabRelatedParty = defineAsyncComponent(() => import('./d3/D3TabRelatedPa
 const D3TabVoucherCheck = defineAsyncComponent(() => import('./d3/D3TabVoucherCheck.vue'))
 const D3TabDisclosureListed = defineAsyncComponent(() => import('./d3/D3TabDisclosureListed.vue'))
 const D3TabDisclosureSoe = defineAsyncComponent(() => import('./d3/D3TabDisclosureSoe.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -223,6 +228,16 @@ const {
 const crossSheet = useD3CrossSheet({ allResponses })
 useD3EventBus(allResponses, debouncedSave)
 
+// ─── 版本链接入 ───────────────────────────────────────────────────────────
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
 const wpIdRefForReview = toRef(props, 'wpId')
 const projectIdRefForReview = toRef(props, 'projectId')
 useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
@@ -238,6 +253,8 @@ useWorkpaperEntryInjections({
   reloadFn: () => loadAll(),
 })
 provide('d3CrossSheet', crossSheet)
+provide('d3VersionTrailRef', versionTrailRef)
+provide('d3OpenVersionHistory', openVersionHistory)
 
 const currentSheet = computed(() => resolveD3SheetCode(props.sheetName || 'D3'))
 const d3ReviewSection = computed(() => resolveCycleReviewSection('D3', currentSheet.value))
@@ -290,6 +307,7 @@ async function saveImmediateBatch(
     itemId: item.item_id,
     data: { conclusion: item.conclusion, remark: item.remark },
   })))
+  scheduleAutoSnapshot()
 }
 
 // 显示偏好收敛到单一真源（useDisplayPrefsStore），全部 tab 已迁移至 DisplayPrefs_Key。

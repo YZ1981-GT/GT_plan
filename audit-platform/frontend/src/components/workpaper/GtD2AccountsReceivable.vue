@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="d2-accounts-receivable" :style="fontStyle">
+  <div class="d2-accounts-receivable">
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
     </div>
@@ -14,6 +14,34 @@
         />
         <el-tag v-if="saving" type="info" size="small">保存中…</el-tag>
       </div>
+
+      <!-- 勾稽差异提示 -->
+      <el-alert
+        v-if="!crossSheet.reconciliationDiff.value.isBalanced"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 8px"
+      >
+        <template #title>
+          D2-1审定表合计({{ fmtAmt(crossSheet.reconciliationDiff.value.adjTotal) }})
+          与D2-2明细表合计({{ fmtAmt(crossSheet.reconciliationDiff.value.detailTotal) }})
+          差异 {{ fmtAmt(crossSheet.reconciliationDiff.value.diff) }} 元，请核实
+        </template>
+      </el-alert>
+      <el-alert
+        v-if="crossSheet.detailVsTbDiff.value && !crossSheet.detailVsTbDiff.value.isBalanced"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 8px"
+      >
+        <template #title>
+          D2-2明细表合计({{ fmtAmt(crossSheet.detailVsTbDiff.value.detailTotal) }})
+          与TB科目1122审定额({{ fmtAmt(crossSheet.detailVsTbDiff.value.tbAmount) }})
+          差异 {{ fmtAmt(crossSheet.detailVsTbDiff.value.diff) }} 元，请核实
+        </template>
+      </el-alert>
 
       <!-- OnlyOffice 在线编辑 -->
       <GtOnlyOfficeSheet
@@ -192,25 +220,30 @@
       :section-label="d2ReviewSection.label"
     />
     <GtWpReviewDialogHost />
+
+    <!-- 版本链 drawer -->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
  * GtD2AccountsReceivable.vue — D2 应收账款底稿主入口
- *
- * 使用 useWorkpaperScaffold 统一注入全局能力（displayPrefs/agingConfig/版本链/复核/AI/jumpToSection/reload）
- * Requirements: 2.2
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
 import { useD2EntryDualMode, type D2RenderMode } from './composables/useD2EntryDualMode'
-import { useWorkpaperScaffold } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
+import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
+import { DisplayPrefs_Key } from './composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { D2_SAVE_ITEMS_KEY, D2_WRITEBACK_KEY } from './composables/d2InjectionKeys'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
@@ -229,6 +262,7 @@ const D2TabWriteoffCheck = defineAsyncComponent(() => import('./d2/D2TabWriteoff
 const D2TabPledgeCheck = defineAsyncComponent(() => import('./d2/D2TabPledgeCheck.vue'))
 const D2TabBizModel = defineAsyncComponent(() => import('./d2/D2TabBizModel.vue'))
 const D2TabCutoff = defineAsyncComponent(() => import('./d2/D2TabCutoff.vue'))
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -254,12 +288,28 @@ const saving = formData.saving
 
 const crossSheet = useD2CrossSheet({ allResponses })
 
+// ─── 版本链接入 ───────────────────────────────────────────────────────────
+const {
+  versionTrailRef,
+  openVersionHistory,
+  scheduleAutoSnapshot,
+} = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+
 const bsDate = computed(() => {
   const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext
   if (ctx?.bs_date) return ctx.bs_date
   if (props.year) return `${props.year}-12-31`
   return ''
 })
+
+/** 金额格式化(千分位 + 2位小数) */
+function fmtAmt(v: number): string {
+  if (v == null || Number.isNaN(v)) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 const relatedParties = computed<string[]>(() => {
   const raw = props.htmlData?.project_context?.related_parties
@@ -327,55 +377,83 @@ const useOnlyOfficeFallback = computed(() => {
   return props.sheetName != null && !KNOWN_HTML_SHEETS.has(currentSheet.value)
 })
 
-// ── useWorkpaperScaffold 统一注入全局能力 ────────────────────────────────────
-// 一次调用完成 displayPrefs/agingConfig/版本链/复核/AI/jumpToSection/reload 全部 provide
 const wpIdRef = toRef(props, 'wpId')
 const projectIdRef = toRef(props, 'projectId')
+useWorkpaperReviewProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
-const { fontStyle } = useWorkpaperScaffold({
-  wpCode: props.wpCode || 'D2',
-  wpId: wpIdRef,
-  projectId: projectIdRef,
-  year: toRef(props, 'year'),
-  agingSubject: 'D2',
-  readonly: toRef(props, 'readonly'),
-  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
-  reloadFn: () => formData.loadAll(),
-})
-
-// ── D2 专属 provide（scaffold 不处理）───────────────────────────────────────
 const { getThreadDot, getRowDot } = useD2ReviewThreads(wpIdRef)
 provide('d2GetThreadDot', getThreadDot)
 provide('d2GetRowDot', getRowDot)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
-provide('d2CrossSheet', crossSheet)
 
-async function handleD2SaveItems(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+useWorkpaperEntryInjections({
+  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
+  reloadFn: () => formData.loadAll(),
+})
+provide('d2CrossSheet', crossSheet)
+provide('d2VersionTrailRef', versionTrailRef)
+provide('d2OpenVersionHistory', openVersionHistory)
+// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
+// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
+const displayPrefs = useDisplayPrefsStore()
+provide(DisplayPrefs_Key, displayPrefs)
+provide('displayPrefs', displayPrefs)
+
+// ─── P0-2: provide/inject 替代 window event ──────────────────────────────
+// 子 tab 通过 inject(D2_SAVE_ITEMS_KEY) 保存数据，不再用全局 window.dispatchEvent。
+// 优势：类型安全、组件隔离（同页面多 D2 实例不冲突）、无需生命周期管理。
+async function d2SaveItems(items: ChecklistResponse[]): Promise<void> {
   if (Array.isArray(items) && items.length > 0) {
     await formData.saveItemsFromEvent(items)
+    scheduleAutoSnapshot()
     emit('save')
+  }
+}
+
+function d2Writeback(accountCode: string, auditedAmount: number): void {
+  if (accountCode != null && auditedAmount != null) {
+    void formData.writebackTrialBalance(accountCode, auditedAmount)
+  }
+}
+
+provide(D2_SAVE_ITEMS_KEY, d2SaveItems)
+provide(D2_WRITEBACK_KEY, d2Writeback)
+
+// 向后兼容：保留 window event 监听，过渡期内旧写法仍能工作
+function handleD2SaveItems(e: Event): void {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    void d2SaveItems(items)
   }
 }
 
 function handleD2Writeback(e: Event): void {
   const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
   if (d?.accountCode != null && d.auditedAmount != null) {
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
+    d2Writeback(d.accountCode, d.auditedAmount)
   }
 }
 
+// ─── P0-3 + P1-4/5: selfLoad 严格类型 + merge 策略 ─────────────────────────
 async function selfLoad(): Promise<void> {
-  if (props.htmlData?.responses_snapshot) {
-    const map = new Map<string, any>()
-    for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) {
-      map.set(k, v)
+  const snapshot = props.htmlData?.responses_snapshot
+  // P1-4: 仅当 snapshot 非空对象时才使用（避免部分 htmlData 丢失完整数据）
+  if (snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length > 0) {
+    const map = new Map<string, ChecklistResponse>()
+    for (const [k, v] of Object.entries(snapshot)) {
+      const entry = v as Record<string, unknown>
+      map.set(k, {
+        item_id: String(entry?.item_id ?? k),
+        conclusion: (entry?.conclusion as string | null) ?? null,
+        remark: (entry?.remark as string | null) ?? null,
+      })
     }
-    formData.allResponses.value = map as any
+    formData.allResponses.value = map
     isLoading.value = false
     return
   }
+  // P1-5: 否则从 API 加载完整数据
   try {
     await formData.loadAll()
   } catch (err) {

@@ -209,7 +209,10 @@ const dualMode = useG4MainDualMode({
 
 // ─── 版本历史集成 ───────────────────────────────────────────────────────────
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+
+provide('g4VersionTrailRef', versionTrailRef)
+provide('g4OpenVersionHistory', openVersionHistory)
 
 // ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
 function openReviewDialog(sectionId: string): void {

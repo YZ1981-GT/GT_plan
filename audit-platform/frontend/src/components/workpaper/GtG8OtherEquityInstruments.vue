@@ -178,7 +178,9 @@ const wpIdRef = computed(() => props.wpId)
 const formData = useG8FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const { versionTrailRef } = versionToolbar
+const { versionTrailRef, openVersionHistory } = versionToolbar
+provide('g8VersionTrailRef', versionTrailRef)
+provide('g8OpenVersionHistory', openVersionHistory)
 const reviewProvide = useWorkpaperReviewProvide({ wpId: wpIdRef })
 provide('openReviewDialog', reviewProvide.openReviewDialog)
 

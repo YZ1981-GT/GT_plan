@@ -75,6 +75,8 @@
       <div v-else class="j2-sheet-placeholder">
         <el-empty :description="`J2 未识别的 sheet: ${currentSheet}`" />
       </div>
+
+      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -89,11 +91,13 @@
  * J2 包含：底稿目录 + 审定表(设定受益/其他长期/辞退) + 明细表 + 调整分录 +
  *          计提检查(精算假设+ISA620) + 附注(双版本)
  */
-import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
 import { useJ2FormData } from '@/composables/workpaper/j2/useJ2FormData'
+import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 
 // ── defineAsyncComponent lazy loading ───────────────────────────────────────
+const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
 const J2TabIndex = defineAsyncComponent(() => import('./J2TabIndex.vue'))
 const J2TabAdjudication = defineAsyncComponent(() => import('./J2TabAdjudication.vue'))
 const J2TabDetail = defineAsyncComponent(() => import('./J2TabDetail.vue'))
@@ -147,7 +151,14 @@ const currentSheet = computed(() => {
   return m ? m[1] : sn
 })
 
+// ─── 版本追踪 useWorkpaperVersionToolbar ─────────────────────────────────────
+const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+provide('j2VersionTrailRef', versionTrailRef)
+provide('j2OpenVersionHistory', openVersionHistory)
+
 function onSave() {
+  scheduleAutoSnapshot()
   emit('save')
 }
 
