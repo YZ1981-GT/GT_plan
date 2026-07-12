@@ -601,28 +601,6 @@ async function onOpenGlobalScopeOverview() {
   }
 }
 
-/** 从预设库导入公式（空态引导按钮） */
-async function onImportPresetFormulas() {
-  if (!props.projectId) return
-  try {
-    await ElMessageBox.confirm(
-      '将从致同标准预设库导入公式模板到当前项目（已有公式不会被覆盖）。确认导入？',
-      '从预设库导入公式',
-      { confirmButtonText: '确认导入', cancelButtonText: '取消', type: 'info' },
-    )
-    const { data } = await http.post(`/api/projects/${props.projectId}/formula/import-presets`)
-    const count = data?.imported_count ?? data?.count ?? 0
-    ElMessage.success(`已成功导入 ${count} 条预设公式`)
-    // 刷新全局视图
-    showGlobalScopeOverview.value = false
-    await onOpenGlobalScopeOverview()
-  } catch (e: any) {
-    if (e !== 'cancel' && e?.toString() !== 'cancel') {
-      ElMessage.error('导入预设公式失败：' + (e?.message || '未知错误'))
-    }
-  }
-}
-
 /** 自动生成报表公式（空态引导按钮） */
 async function onAutoGenerateReportFormulas() {
   if (!props.projectId) return
@@ -632,7 +610,7 @@ async function onAutoGenerateReportFormulas() {
       '自动生成报表公式',
       { confirmButtonText: '确认生成', cancelButtonText: '取消', type: 'info' },
     )
-    const { data } = await http.post(`/api/projects/${props.projectId}/formula/auto-generate`)
+    const { data } = await api.post(`/api/projects/${props.projectId}/formula/auto-generate`)
     const count = data?.generated_count ?? data?.count ?? 0
     ElMessage.success(`已自动生成 ${count} 条报表公式`)
     showGlobalScopeOverview.value = false
@@ -948,7 +926,7 @@ const reportTypesLoaded = ref(false)
 async function loadReportTypes() {
   if (reportTypesLoaded.value) return
   try {
-    const { data } = await http.get('/api/report-config/types', {
+    const { data } = await api.get('/api/report-config/types', {
       params: { project_id: props.projectId },
     })
     if (Array.isArray(data) && data.length) {
@@ -1159,7 +1137,7 @@ const crossCheckLoaded = ref(false)
 async function loadCrossCheckItems() {
   if (crossCheckLoaded.value || !props.projectId) return
   try {
-    const { data } = await http.get(`/api/projects/${props.projectId}/formula/report-cross-check`)
+    const { data } = await api.get(`/api/projects/${props.projectId}/formula/report-cross-check`)
     const rules: any[] = Array.isArray(data) ? data : (data?.rules ?? data?.items ?? [])
     if (rules.length) {
       // 按勾稽类型分组（source_domain ↔ target_domain）
