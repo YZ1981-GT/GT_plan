@@ -195,6 +195,7 @@ inclusion: always
 - **🔴 D~N tab组件 props ref解包陷阱（D3全崩血泪，2026-07-10）**：子tab组件把 `allResponses`/`wpId`/`projectId` 声明为 `Ref<Map>`/`Ref<string>` 并访问 `.value`，但父级(GtD3PrepaidAccounts等)经**模板绑定** `:all-responses="allResponses"` 会**自动解包 ref**→子组件实际收到的是解包后的 Map/string→`props.xxx.value` 为 undefined→`.value.get` 崩溃(ErrorBoundary)。**D3 全部9个内容tab因此在浏览器全崩**，但单测传真ref故全绿=典型假绿。**修复(对齐D2可用模式)**：子组件 props 声明为**解包类型**(`Map`/`string`)，再用 `const xxxRef = toRef(props,'xxx') as Ref<...>` 重新包成ref喂给composable；直接 `props.allResponses.value.get`→`allResponsesRef.value.get`。**必 Playwright 实测每个tab(diagnostics/单测查不出)**。D3还修了披露tab `applicableStandards` 父级未传(归一化 computed 防崩+父级补传)
 - **D3打磨(参照D2)**：9内容tab补 审计目标el-alert + 编制提示details(CAS依据) + D3-7异常列自由文本→`el-select filterable allow-create`点选(跨期疑点/金额异常等6项,保留自定义+auto-mark) + D3-5/6行级GtReviewDot。实测9tab全0错误+异常标记"跨期疑点"落库
 - **底稿编码→实际内容必须查源模板**：不能凭编码猜内容
+- **🔴 底稿列表名称清洗规则(2026-07-12)**：`cleanWpName(raw)`去掉"审定表/明细表/审定表及明细表/及明细表"后缀只保留科目名（如"应收账款审定表"→"应收账款"）。`WorkpaperWorkbenchView`(列表+卡片)和`WorkpaperEditor`(编辑器标题)都用此规则。不改DB数据(wp_index.wp_name不变)只改前端显示
 - **🔴 computed传prop的深层响应陷阱**：`computed(() => state.value.arr[idx])` 只追踪数组元素引用不追踪属性变化→子组件收到prop不更新→"点击没反应"。**修复：`return { ...s }` 展开读取所有属性建立依赖**（C15-2偏差评价决策树踩坑）
 - **专属组件跨sheet跳转标准模式**：子组件emit('navigate-sheet', sheetName)→GtWpRenderer.onChildNavigateSheet按sheet_name模糊匹配切换activeSheetName。已注册全局通道，所有专属组件可复用
 - **C24四表联动端点**：`GET /ledger/entries-all?year=&page=&page_size=` 全量序时账查询(不限科目,max 5000/页)，供C24细节测试一键拉取分录自动分析

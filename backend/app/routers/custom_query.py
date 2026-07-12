@@ -567,6 +567,7 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
                 "wp_code": code,
                 "disabled": primary_disabled,
                 "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
+                "columns_source": "metadata",
             })
             for s_name in sheets:
                 sheet_aux = _is_aux_sheet(s_name)
@@ -577,7 +578,8 @@ async def _build_workpaper_tree(db: AsyncSession, project_id: str | None) -> lis
                     "sheet_name": s_name,
                     "disabled": primary_disabled or sheet_aux,
                     "disabled_reason": "辅助 sheet" if sheet_aux and not primary_disabled else None,
-                    "columns": ["wp_code", "wp_name", "audit_cycle", "status", "review_status"],
+                    "columns": None,
+                    "columns_source": "dynamic_from_data",
                 })
             primary_nodes.append({
                 "key": f"wp_primary_{code}",
