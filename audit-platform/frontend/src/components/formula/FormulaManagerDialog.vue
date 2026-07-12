@@ -309,10 +309,11 @@
     <el-dialog
       v-model="showFormulaDashboard"
       title="📊 公式看板 — 全局审核公式总览"
-      width="90%"
-      top="3vh"
+      width="95%"
+      top="2vh"
       append-to-body
       destroy-on-close
+      class="gt-fm-dashboard-dialog"
     >
       <div style="margin-bottom: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
         <el-input v-model="dashboardSearch" size="small" placeholder="搜索公式/行次/说明..." clearable style="width: 240px;" />
@@ -333,7 +334,7 @@
       </div>
 
       <!-- 分组展示 -->
-      <div v-if="dashboardGroupBy !== 'flat'" style="max-height: 65vh; overflow-y: auto;">
+      <div v-if="dashboardGroupBy !== 'flat'" style="max-height: 80vh; overflow-y: auto;">
         <div v-for="group in dashboardGroupedData" :key="group.key" style="margin-bottom: 12px;">
           <div class="gt-fm-dash-group-title" @click="group._open = !group._open">
             {{ group._open ? '▼' : '▶' }} {{ group.label }}
@@ -377,7 +378,7 @@
       </div>
 
       <!-- 平铺展示 -->
-      <el-table v-else :data="dashboardFilteredRows" size="small" border max-height="65vh" style="width: 100%;"
+      <el-table v-else :data="dashboardFilteredRows" size="small" border max-height="80vh" style="width: 100%;"
         :header-cell-style="{ background: '#edf3f9', fontSize: '11px', whiteSpace: 'nowrap' }">
         <el-table-column prop="row_code" label="行次" width="90" />
         <el-table-column prop="row_name" label="项目" min-width="150" show-overflow-tooltip />
@@ -2383,6 +2384,12 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
 /* 表头行蓝色系 */
 .gt-fm-dialog :deep(.el-table th.el-table__cell) {
   background: var(--gt-bg-info) !important;
+}
+/* 公式看板弹窗：最大化内容区 */
+.gt-fm-dashboard-dialog .el-dialog__body {
+  padding: 12px 16px !important;
+  max-height: calc(96vh - 120px);
+  overflow-y: auto;
 }
 </style>
 
