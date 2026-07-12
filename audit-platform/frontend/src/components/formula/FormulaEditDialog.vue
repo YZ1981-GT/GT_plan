@@ -103,79 +103,50 @@
         </div>
       </div>
 
-      <!-- 中栏：数据源一览 -->
+      <!-- 中栏：数据源一览（ACNR 五域动态） -->
       <div class="gt-fe-sources">
         <div class="gt-fe-section-title">📋 数据源一览</div>
         <div class="gt-fe-ref-panel">
+          <!-- 报表域 -->
           <div class="gt-fe-ref-group">
             <div class="gt-fe-ref-group-title" @click="toggleRefGroup('report')">
               <span>{{ refGroupOpen.report ? '▼' : '▶' }} 📊 报表</span>
-              <span class="gt-fe-ref-count">6</span>
+              <span class="gt-fe-ref-count">{{ sourceReportItems.length }}</span>
             </div>
             <div v-show="refGroupOpen.report" class="gt-fe-ref-list">
-              <div class="gt-fe-ref-row" @click="jumpToSource('report', 'balance_sheet')"><span class="gt-fe-ref-code">BS</span>资产负债表</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('report', 'income_statement')"><span class="gt-fe-ref-code">IS</span>利润表</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('report', 'cash_flow_statement')"><span class="gt-fe-ref-code">CFS</span>现金流量表</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('report', 'equity_statement')"><span class="gt-fe-ref-code">EQ</span>权益变动表</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('report', 'cash_flow_supplement')"><span class="gt-fe-ref-code">CFSS</span>现金流附表</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('report', 'impairment_provision')"><span class="gt-fe-ref-code">IMP</span>资产减值准备表</div>
+              <div v-for="item in sourceReportItems" :key="item.key" class="gt-fe-ref-row" @click="jumpToSource('report', item.key)">
+                <span class="gt-fe-ref-code">{{ item.code }}</span>{{ item.label }}
+              </div>
             </div>
           </div>
+          <!-- 附注域 -->
           <div class="gt-fe-ref-group">
             <div class="gt-fe-ref-group-title" @click="toggleRefGroup('note')">
               <span>{{ refGroupOpen.note ? '▼' : '▶' }} 📝 附注</span>
-              <span class="gt-fe-ref-count">22</span>
+              <span class="gt-fe-ref-count">{{ sourceNoteItems.length }}</span>
             </div>
             <div v-show="refGroupOpen.note" class="gt-fe-ref-list">
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '货币资金')"><span class="gt-fe-ref-code">E</span>货币资金</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '应收票据')"><span class="gt-fe-ref-code">D</span>应收票据</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '应收账款')"><span class="gt-fe-ref-code">D</span>应收账款</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '预付款项')"><span class="gt-fe-ref-code">F</span>预付款项</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '其他应收款')"><span class="gt-fe-ref-code">D</span>其他应收款</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '存货')"><span class="gt-fe-ref-code">G</span>存货</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '合同资产')"><span class="gt-fe-ref-code">D</span>合同资产</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '固定资产')"><span class="gt-fe-ref-code">H</span>固定资产</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '在建工程')"><span class="gt-fe-ref-code">H</span>在建工程</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '无形资产')"><span class="gt-fe-ref-code">I</span>无形资产</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '长期股权投资')"><span class="gt-fe-ref-code">J</span>长期股权投资</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '短期借款')"><span class="gt-fe-ref-code">K</span>短期借款</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '应付账款')"><span class="gt-fe-ref-code">F</span>应付账款</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '合同负债')"><span class="gt-fe-ref-code">D</span>合同负债</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '应付职工薪酬')"><span class="gt-fe-ref-code">L</span>应付职工薪酬</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '应交税费')"><span class="gt-fe-ref-code">N</span>应交税费</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '长期借款')"><span class="gt-fe-ref-code">K</span>长期借款</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '营业收入')"><span class="gt-fe-ref-code">D</span>营业收入</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '营业成本')"><span class="gt-fe-ref-code">D</span>营业成本</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '管理费用')"><span class="gt-fe-ref-code">N</span>管理费用</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '财务费用')"><span class="gt-fe-ref-code">N</span>财务费用</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('note', '所得税费用')"><span class="gt-fe-ref-code">N</span>所得税费用</div>
+              <div v-for="item in sourceNoteItems" :key="item.key" class="gt-fe-ref-row" @click="jumpToSource('note', item.key)">
+                <span class="gt-fe-ref-code">{{ item.code }}</span>{{ item.label }}
+              </div>
             </div>
           </div>
+          <!-- 底稿域 -->
           <div class="gt-fe-ref-group">
             <div class="gt-fe-ref-group-title" @click="toggleRefGroup('wp')">
               <span>{{ refGroupOpen.wp ? '▼' : '▶' }} 📋 底稿</span>
-              <span class="gt-fe-ref-count">14</span>
+              <span class="gt-fe-ref-count">{{ sourceWpItems.length }}</span>
             </div>
             <div v-show="refGroupOpen.wp" class="gt-fe-ref-list">
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'E1')"><span class="gt-fe-ref-code">E1</span>货币资金（E1-1审定/E1-2现金/E1-3银行）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'D2')"><span class="gt-fe-ref-code">D2</span>应收账款（D2-1审定/D2-2明细/D2-3坏账）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'D1')"><span class="gt-fe-ref-code">D1</span>应收票据（D1-1审定/D1-2明细）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'F1')"><span class="gt-fe-ref-code">F1</span>应付账款（F1-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'F2')"><span class="gt-fe-ref-code">F2</span>预付款项（F2-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'G1')"><span class="gt-fe-ref-code">G1</span>存货（G1-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'H1')"><span class="gt-fe-ref-code">H1</span>固定资产（H1-1审定/H1-12折旧）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'H2')"><span class="gt-fe-ref-code">H2</span>在建工程（H2-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'I1')"><span class="gt-fe-ref-code">I1</span>无形资产（I1-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'J1')"><span class="gt-fe-ref-code">J1</span>长期股权投资（J1-1审定/J1-2明细）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'K1')"><span class="gt-fe-ref-code">K1</span>短期借款（K1-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'K2')"><span class="gt-fe-ref-code">K2</span>长期借款（K2-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'L1')"><span class="gt-fe-ref-code">L1</span>应付职工薪酬（L1-1审定）</div>
-              <div class="gt-fe-ref-row" @click="jumpToSource('wp', 'M1')"><span class="gt-fe-ref-code">M1</span>所有者权益（M1-1审定）</div>
+              <div v-for="item in sourceWpItems" :key="item.key" class="gt-fe-ref-row" @click="jumpToSource('wp', item.key)">
+                <span class="gt-fe-ref-code">{{ item.code }}</span>{{ item.label }}
+              </div>
             </div>
           </div>
+          <!-- 试算表域 -->
           <div class="gt-fe-ref-group">
             <div class="gt-fe-ref-group-title" @click="toggleRefGroup('tb')">
-              <span>{{ refGroupOpen.tb ? '▼' : '▶' }} 📈 试算表</span>
+              <span>{{ refGroupOpen.tb ? '▼' : '▶' }} 📑 试算表</span>
               <span class="gt-fe-ref-count">1</span>
             </div>
             <div v-show="refGroupOpen.tb" class="gt-fe-ref-list">
@@ -473,7 +444,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, shallowRef, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
@@ -519,6 +490,8 @@ const formulas = ref<FormulaItem[]>([])
 
 watch(visible, (v) => {
   if (v && props.row) {
+    // 加载 ACNR 数据源一览（项目级动态）
+    loadAcnrSources()
     if (props.row.formula) {
       // 多条公式用换行分隔存储，加载时拆分
       const lines = props.row.formula.split('\n').filter((l: string) => l.trim())
@@ -928,6 +901,90 @@ const refGroupOpen = ref<Record<string, boolean>>({ report: false, note: false, 
 function toggleRefGroup(key: string) {
   refGroupOpen.value[key] = !refGroupOpen.value[key]
 }
+
+// ── 数据源一览（ACNR 五域动态，项目级） ──
+import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+
+const acnrSourceSheets = shallowRef<AcnrSheetEntry[]>([])
+const acnrSourceLoaded = ref(false)
+
+async function loadAcnrSources() {
+  if (acnrSourceLoaded.value) return
+  try {
+    const acnr = useAcnr()
+    acnrSourceSheets.value = await acnr.listSheets()
+    acnrSourceLoaded.value = true
+  } catch { /* 降级用静态 */ }
+}
+
+// 报表域数据源（动态 + 静态降级）
+const REPORT_ITEMS_FALLBACK = [
+  { key: 'balance_sheet', code: 'BS', label: '资产负债表' },
+  { key: 'income_statement', code: 'IS', label: '利润表' },
+  { key: 'cash_flow_statement', code: 'CFS', label: '现金流量表' },
+  { key: 'equity_statement', code: 'EQ', label: '权益变动表' },
+  { key: 'cash_flow_supplement', code: 'CFSS', label: '现金流附表' },
+  { key: 'impairment_provision', code: 'IMP', label: '资产减值准备表' },
+]
+const sourceReportItems = computed(() => REPORT_ITEMS_FALLBACK)
+
+// 附注域数据源（从 ACNR note 域 sheet 动态取，降级到项目附注 API）
+const sourceNoteItems = computed(() => {
+  // 从 props.noteRows 或 ACNR 附注域动态构建
+  if (props.noteRows?.length) {
+    return props.noteRows.map((n: any) => ({
+      key: n.note_section || n.section_title || n.label,
+      code: (n.note_section || '').charAt(0) || '五',
+      label: n.section_title || n.label || n.note_section,
+    }))
+  }
+  // 降级：从 ACNR sheets 中筛 note 域
+  const noteSheets = acnrSourceSheets.value.filter(s => s.domain === 'note')
+  if (noteSheets.length) {
+    return noteSheets.map(s => ({ key: s.sheet_name || s.sheet_code, code: s.cycle || 'N', label: s.sheet_name || s.sheet_code }))
+  }
+  // 最终降级：静态常用附注
+  return [
+    { key: '货币资金', code: 'E', label: '货币资金' },
+    { key: '应收账款', code: 'D', label: '应收账款' },
+    { key: '存货', code: 'G', label: '存货' },
+    { key: '固定资产', code: 'H', label: '固定资产' },
+    { key: '无形资产', code: 'I', label: '无形资产' },
+    { key: '营业收入', code: 'D', label: '营业收入' },
+  ]
+})
+
+// 底稿域数据源（从 ACNR wp 域动态取，按 parent_wp_code 去重）
+const sourceWpItems = computed(() => {
+  const wpSheets = acnrSourceSheets.value.filter(s => s.domain === 'wp')
+  if (wpSheets.length) {
+    // 按 parent_wp_code 去重，每个 parent 显示一条
+    const seen = new Set<string>()
+    const items: Array<{ key: string; code: string; label: string }> = []
+    for (const s of wpSheets) {
+      const p = s.parent_wp_code
+      if (!p || seen.has(p)) continue
+      seen.add(p)
+      items.push({ key: p, code: p, label: `${p}（${s.sheet_name || s.sheet_code || ''}）` })
+    }
+    return items.sort((a, b) => a.code.localeCompare(b.code))
+  }
+  // 降级：静态常用底稿
+  return [
+    { key: 'E1', code: 'E1', label: '货币资金（E1-1审定）' },
+    { key: 'D2', code: 'D2', label: '应收账款（D2-1审定）' },
+    { key: 'D1', code: 'D1', label: '应收票据（D1-1审定）' },
+    { key: 'F1', code: 'F1', label: '应付账款（F1-1审定）' },
+    { key: 'F2', code: 'F2', label: '预付款项（F2-1审定）' },
+    { key: 'G1', code: 'G1', label: '存货（G1-1审定）' },
+    { key: 'H1', code: 'H1', label: '固定资产（H1-1审定）' },
+    { key: 'I1', code: 'I1', label: '无形资产（I1-1审定）' },
+    { key: 'J1', code: 'J1', label: '长期股权投资（J1-1审定）' },
+    { key: 'K1', code: 'K1', label: '短期借款（K1-1审定）' },
+    { key: 'L1', code: 'L1', label: '应付职工薪酬（L1-1审定）' },
+    { key: 'M1', code: 'M1', label: '所有者权益（M1-1审定）' },
+  ]
+})
 
 // ── 源表浏览弹窗 ──
 const activeFormulaIdx = ref(0)
