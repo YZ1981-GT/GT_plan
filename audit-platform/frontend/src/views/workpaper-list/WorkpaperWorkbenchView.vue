@@ -391,6 +391,21 @@ import GtRowActions from '@/components/common/GtRowActions.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
 import { cycleColor } from '@/constants/cyclePalette'
 
+/**
+ * 清洗底稿名称：去掉"审定表""明细表"等 sheet 级后缀，只保留科目主体。
+ * 统一显示逻辑（与 WorkpaperEditor.displayWpName 一致）。
+ */
+function cleanWpName(raw: string): string {
+  if (!raw) return ''
+  const cleaned = raw
+    .replace(/审定表及明细表$/, '')
+    .replace(/及明细表$/, '')
+    .replace(/审定表$/, '')
+    .replace(/明细表$/, '')
+    .trim()
+  return cleaned || raw
+}
+
 defineOptions({ name: 'WorkpaperWorkbenchView' })
 
 const props = defineProps<WpChildProps>()
@@ -505,7 +520,7 @@ const workbenchTableData = computed(() => {
       const cycleKey = code[0] || '?'
       const statusInfo = STATUS_LABELS[w.status] || { label: w.status, type: 'info' }
       return {
-        id: w.id, wp_code: code, wp_name: idx?.wp_name || '',
+        id: w.id, wp_code: code, wp_name: cleanWpName(idx?.wp_name || ''),
         cycle_name: cycleNameMap[cycleKey] || cycleKey,
         status: w.status, status_label: statusInfo.label, status_type: statusInfo.type,
         assignee_name: (w as any).assignee_name || '',
@@ -951,7 +966,7 @@ const guideCycleDetails = computed(() => {
   return guideOverviewData.value.map(cycle => {
     const wps = ctx.wpIndex.value
       .filter((w: WpIndexItem) => w.wp_code?.startsWith(cycle.code))
-      .map((w: WpIndexItem) => ({ code: w.wp_code, name: w.wp_name }))
+      .map((w: WpIndexItem) => ({ code: w.wp_code, name: cleanWpName(w.wp_name || '') }))
       .sort((a, b) => (a.code || '').localeCompare(b.code || ''))
     return { ...cycle, wps }
   })
