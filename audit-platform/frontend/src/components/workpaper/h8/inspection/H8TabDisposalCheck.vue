@@ -253,7 +253,7 @@ function getCalcSummary({ columns }: { columns: any[] }) {
 </script>
 
 <style scoped>
-.h8-tab-disposal-check { padding: 16px; font-size: 13px; }
+.h8-tab-disposal-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -266,7 +266,7 @@ function getCalcSummary({ columns }: { columns: any[] }) {
 .title-actions { display: flex; gap: 6px; }
 
 .table-card { margin-bottom: 12px; }
-.formula-table { font-size: 13px; }
+.formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #fefce8; }
 .formula-value { border-bottom: 1px dashed #d97706; cursor: help; }
 .gain { color: #16a34a; }

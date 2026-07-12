@@ -107,15 +107,15 @@ const reconcileDiff = () => {
 }
 .toolbar-hint { font-size: 12px; color: #909399; margin-left: auto; }
 .formula-drawer-content { padding: 0 4px; }
-.formula-desc { font-size: 13px; color: #606266; margin-bottom: 12px; }
+.formula-desc { font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 12px; }
 .formula-code {
   font-size: 11px; background: #f5f7fa; padding: 2px 4px;
   border-radius: 2px; color: #409eff; word-break: break-all;
 }
-.formula-manual-list { font-size: 13px; color: #606266; padding-left: 20px; margin-top: 12px; }
+.formula-manual-list { font-size: var(--wp-font-size, 13px); color: #606266; padding-left: 20px; margin-top: 12px; }
 .reconcile-card :deep(.el-card__header) { padding: 10px 16px; background: #fafafa; }
 .section-header-row { display: flex; justify-content: space-between; align-items: center; }
-.section-title { font-size: 13px; font-weight: 600; color: #303133; }
+.section-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
 .reconcile-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .reconcile-item { padding: 10px 12px; background: #f5f7fa; border-radius: 4px; text-align: center; }
 .reconcile-label { display: block; font-size: 12px; color: #909399; margin-bottom: 4px; }

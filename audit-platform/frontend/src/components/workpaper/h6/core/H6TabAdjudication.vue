@@ -644,7 +644,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h6-tab-adjudication { padding: 16px; font-size: 13px; }
+.h6-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid #d97706;
@@ -664,7 +664,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
 
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .amt-input { width: 100%; }
 .amt-cell { display: block; text-align: right; }
 

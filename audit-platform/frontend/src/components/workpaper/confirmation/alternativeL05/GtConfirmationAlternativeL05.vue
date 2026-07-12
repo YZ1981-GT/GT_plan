@@ -568,10 +568,10 @@ provide('openReviewDialog', () => { /* placeholder for review dialog injection *
 <style scoped>
 .gt-confirmation-alternative-l05 {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .summary-card { margin-bottom: 16px; }
-.summary-table { font-size: 13px; }
+.summary-table { font-size: var(--wp-font-size, 13px); }
 .company-tabs-wrapper {
   display: flex;
   align-items: center;
@@ -587,11 +587,11 @@ provide('openReviewDialog', () => { /* placeholder for review dialog injection *
   align-items: center;
   justify-content: space-between;
 }
-.block-card .block-table { font-size: 13px; }
+.block-card .block-table { font-size: var(--wp-font-size, 13px); }
 .block-total {
   padding: 8px 12px;
   background: #f5f7fa;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   border-top: 1px solid #ebeef5;
 }

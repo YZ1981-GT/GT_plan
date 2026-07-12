@@ -624,7 +624,7 @@ defineExpose({ reload: selfLoad })
 <style scoped>
 .gt-c25-internal-audit {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .loading-container {
@@ -676,7 +676,7 @@ defineExpose({ reload: selfLoad })
 }
 
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
@@ -691,7 +691,7 @@ defineExpose({ reload: selfLoad })
 
 .methodology-content p {
   margin: 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -720,7 +720,7 @@ defineExpose({ reload: selfLoad })
 
 /* 表格 */
 .evaluation-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .step-seq {
@@ -853,7 +853,7 @@ defineExpose({ reload: selfLoad })
   cursor: pointer;
   font-weight: 500;
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .tips-content {

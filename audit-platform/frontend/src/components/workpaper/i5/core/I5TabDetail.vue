@@ -331,7 +331,7 @@ function fmtAmount(value: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i5-tab-detail { padding: 16px; font-size: 13px; }
+.i5-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {
@@ -357,7 +357,7 @@ function fmtAmount(value: number | null | undefined): string {
 .row-count { font-size: 12px; color: var(--el-text-color-secondary); }
 
 /* 表格 */
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .detail-table :deep(.el-table__body-wrapper) {
   overflow-y: auto;
 }
@@ -375,7 +375,7 @@ function fmtAmount(value: number | null | undefined): string {
 .subtotals-bar {
   display: flex; align-items: center; gap: 16px;
   padding: 10px 12px; margin-top: 12px;
-  background: #f0f9ff; border-radius: 6px; font-size: 13px;
+  background: #f0f9ff; border-radius: 6px; font-size: var(--wp-font-size, 13px);
   flex-wrap: wrap;
 }
 .subtotal-label { font-weight: 600; color: #303133; }

@@ -508,11 +508,10 @@ const result = ref<QueryResult>({ rows: [], columns: [], total: 0 })
 const executing = ref(false)
 
 // ─── 高级构建器入口权限门禁（R11.5/R11.6，与后端 query_builder.py RBAC 一致） ───
-// 复用统一权限矩阵的 currentRole（已归一 signing_partner→partner / assistant→auditor）
-const { currentRole } = usePermissionMatrix()
-// 白名单构建器可访问角色：admin / manager / partner（partner 为 manager 权限超集）
-const BUILDER_ROLES = ['admin', 'manager', 'partner']
-const canUseBuilder = computed(() => BUILDER_ROLES.includes(currentRole.value))
+// 复用统一权限矩阵 canDo（P2 Req7：替换分散的 BUILDER_ROLES 判断）
+const { currentRole, canDo } = usePermissionMatrix()
+// 构建器需要对 project_settings 有 edit 权限（assistant/qc_partner/eqcr 无此权限）
+const canUseBuilder = computed(() => canDo('edit', 'project_settings'))
 const builderDisabledReason = '高级构建器仅限管理员 / 经理 / 合伙人'
 const builderDialogVisible = ref(false)
 

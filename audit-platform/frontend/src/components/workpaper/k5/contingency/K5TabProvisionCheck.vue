@@ -229,18 +229,18 @@ function handleAiGenerate() { emit('save', 'K5-7-ai-trigger', { remark: 'provisi
 </script>
 
 <style scoped>
-.k5-tab-provision-check { padding: 12px; font-size: 13px; }
+.k5-tab-provision-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; }
 .non-compliance-banner { margin-bottom: 12px; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .check-desc { font-size: 12px; color: #606266; line-height: 1.5; }
 .text-danger { color: #f56c6c; font-weight: 500; }
-.summary-bar { display: flex; align-items: center; gap: 16px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266; }
-:deep(.el-table) { font-size: 13px; }
+.summary-bar { display: flex; align-items: center; gap: 16px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.el-radio-button__inner) { padding: 5px 10px; font-size: 12px; }
-.k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

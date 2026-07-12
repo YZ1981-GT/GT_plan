@@ -545,7 +545,7 @@ function fmtRate(v: number | null | undefined): string {
 <style scoped>
 .g4-tab-interest-calc {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -598,7 +598,7 @@ function fmtRate(v: number | null | undefined): string {
 /* ─── Section子标题 ─── */
 .section-sub-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin: 10px 0 6px;
   padding-left: 4px;
@@ -614,7 +614,7 @@ function fmtRate(v: number | null | undefined): string {
 .initial-table,
 .periods-table {
   width: 100%;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 公式单元格 ─── */
@@ -638,7 +638,7 @@ function fmtRate(v: number | null | undefined): string {
   padding: 10px 16px;
   background: #f0f9eb;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   border: 1px solid #e1f3d8;
 }
 
@@ -680,7 +680,7 @@ function fmtRate(v: number | null | undefined): string {
 
 .g4-guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   font-weight: 600;
 }

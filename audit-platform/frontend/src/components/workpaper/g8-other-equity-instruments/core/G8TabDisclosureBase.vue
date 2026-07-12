@@ -87,7 +87,7 @@ function fmt(n: number): string {
 </script>
 
 <style scoped>
-.g8-disc { font-size: 13px; }
+.g8-disc { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; }

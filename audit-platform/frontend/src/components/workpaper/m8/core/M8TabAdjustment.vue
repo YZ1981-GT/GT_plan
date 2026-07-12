@@ -470,7 +470,7 @@ function _restoreEntries(): void {
 </script>
 
 <style scoped>
-.m8-tab-adjustment { padding: 12px; font-size: 13px; }
+.m8-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── Header ─── */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
@@ -486,13 +486,13 @@ function _restoreEntries(): void {
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* ─── Type switch ─── */
 .type-switch { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 
 /* ─── Table ─── */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 /* ─── Footer ─── */
 .adjustment-footer {
@@ -532,7 +532,7 @@ function _restoreEntries(): void {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .m8-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }

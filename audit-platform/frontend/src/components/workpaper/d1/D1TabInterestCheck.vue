@@ -32,6 +32,8 @@ import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -45,10 +47,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话（Task 19 预留）：仅当 provider 存在时展示 💬 按钮
 const openReviewDialog = inject<any>('openReviewDialog', null)
@@ -435,7 +434,7 @@ const GUIDANCE_TEXTS = [
 }
 
 .audit-process {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
   margin-bottom: 12px;
@@ -548,7 +547,7 @@ const GUIDANCE_TEXTS = [
   background: #ecf5ff;
   padding: 10px 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

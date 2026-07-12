@@ -263,7 +263,7 @@ onMounted(async () => {
 <style scoped>
 .l4-tab-initial-measure {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -285,7 +285,7 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
@@ -293,11 +293,11 @@ onMounted(async () => {
 
 .eir-cell { display: flex; align-items: center; gap: 4px; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 .summary-bar {
   display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px;
-  background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266;
+  background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266;
 }
 
 .audit-note-card { margin-top: 16px; }
@@ -305,7 +305,7 @@ onMounted(async () => {
 
 .l4-details-tip {
   margin-top: 16px; padding: 12px 16px; background: #fafafa;
-  border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266;
+  border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266;
 }
 .l4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }

@@ -134,11 +134,11 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.gt-ch7 { font-size: 13px; display: flex; flex-direction: column; gap: 12px; }
+.gt-ch7 { font-size: var(--wp-font-size, 13px); display: flex; flex-direction: column; gap: 12px; }
 .gt-ch7__card { margin-top: 4px; }
 .gt-ch7__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .gt-ch7__card-actions { display: flex; align-items: center; gap: 8px; }
-.gt-ch7__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
+.gt-ch7__card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #6b21a8; }
 .gt-ch7__textarea-wrap { position: relative; }
 .gt-ch7__ai-btn { position: absolute; top: 4px; right: 4px; z-index: 5; opacity: 0.7; }
 .gt-ch7__ai-btn:hover { opacity: 1; }

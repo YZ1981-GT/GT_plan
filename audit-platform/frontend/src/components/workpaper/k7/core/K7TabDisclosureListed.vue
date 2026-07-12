@@ -395,19 +395,19 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k7-tab-disclosure-listed { padding: 12px; font-size: 13px; }
+.k7-tab-disclosure-listed { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .disclosure-card { margin-bottom: 14px; }
 .disclosure-card :deep(.el-card__header) { padding: 10px 16px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .formula-cell { text-decoration: underline dashed; cursor: help; color: #409eff; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.el-table__footer-wrapper td) { font-weight: 600; }
-.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k7-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k7-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

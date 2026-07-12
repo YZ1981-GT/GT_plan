@@ -138,7 +138,7 @@ onBeforeUnmount(() => { if (saveTimer) { clearTimeout(saveTimer); doSave() } })
 .gt-do-computed { color: var(--gt-primary, #4b2d77); }
 .gt-do-formula { font-size: 11px; color: #999; }
 .gt-do-summary { margin-top: 16px; background: #fafafa; border: 1px solid #eee; border-radius: 6px; padding: 12px 16px; }
-.gt-do-summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.gt-do-summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: var(--wp-font-size, 13px); }
 .gt-do-total { border-top: 1px solid #ddd; padding-top: 8px; margin-top: 4px; }
 .gt-do-total strong { font-size: 15px; }
 .gt-do-negative { color: #e6323e; }

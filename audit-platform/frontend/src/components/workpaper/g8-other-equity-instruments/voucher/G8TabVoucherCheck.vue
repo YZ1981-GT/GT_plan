@@ -335,7 +335,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.g8-voucher { font-size: 13px; }
+.g8-voucher { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

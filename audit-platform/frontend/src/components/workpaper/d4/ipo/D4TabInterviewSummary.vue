@@ -193,7 +193,7 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 </template>
 
 <style scoped>
-.d4-interview-summary{padding:16px 20px;font-size:13px}
+.d4-interview-summary{padding:16px 20px;font-size: var(--wp-font-size, 13px)}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .stats-dashboard{display:flex;gap:12px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,#f8f9fe 0%,#f0f4ff 100%);border-radius:10px;border:1px solid #e4e7ed}.stat-card{padding:8px 14px;min-width:100px;border-radius:8px;background:#fff;border:1px solid #ebeef5;box-shadow:0 1px 3px rgba(0,0,0,.04)}.stat-card.stat-primary{border-left:3px solid #409eff}.stat-value{font-size:18px;font-weight:700;color:#303133}.stat-unit{font-size:12px;color:#909399;margin-left:2px}.stat-label{font-size:12px;color:#909399;margin-top:2px}
 .customer-tabs{display:flex;align-items:center;gap:8px;margin-bottom:12px}.customer-tabs :deep(.el-tabs){flex:1}.customer-tabs :deep(.el-tabs__header){margin-bottom:0}
@@ -201,9 +201,9 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 .card-content{border:1px solid #ebeef5;border-radius:8px;padding:16px;background:#fafbfc}.card-header{margin-bottom:12px}.customer-name-input{max-width:280px}.customer-name-input :deep(.el-input__inner){font-size:15px;font-weight:600}
 .field-row{display:flex;align-items:center;gap:12px;margin-bottom:8px}.field-row label{min-width:140px;font-size:12px;color:#606266;flex-shrink:0}.field-row :deep(.el-input){flex:1}
 .add-dimension-bar{margin-top:12px;padding-top:8px;border-top:1px dashed #e4e7ed}
-.matrix-table{font-size:13px;margin-bottom:20px}.matrix-table :deep(.el-table__cell){padding:5px 6px;font-size:13px}
+.matrix-table{font-size: var(--wp-font-size, 13px);margin-bottom:20px}.matrix-table :deep(.el-table__cell){padding:5px 6px;font-size: var(--wp-font-size, 13px)}
 :deep(.el-empty){padding:32px 0}
 .audit-opinion-card{margin-top:20px;margin-bottom:16px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
-.tips-collapse{margin-bottom:16px;border-radius:6px;border:1px solid #fde2e2;border-left:3px solid #f56c6c;background:#fef0f0}.tips-summary{cursor:pointer;padding:10px 14px;font-size:13px;font-weight:500;color:#f56c6c}.tips-body{padding:8px 14px 14px;font-size:12px;color:#606266;line-height:1.9}.tips-intro{margin-bottom:6px;font-weight:500}.tips-list{margin:0;padding-left:18px}.tips-list li{margin-bottom:3px}
+.tips-collapse{margin-bottom:16px;border-radius:6px;border:1px solid #fde2e2;border-left:3px solid #f56c6c;background:#fef0f0}.tips-summary{cursor:pointer;padding:10px 14px;font-size: var(--wp-font-size, 13px);font-weight:500;color:#f56c6c}.tips-body{padding:8px 14px 14px;font-size:12px;color:#606266;line-height:1.9}.tips-intro{margin-bottom:6px;font-weight:500}.tips-list{margin:0;padding-left:18px}.tips-list li{margin-bottom:3px}
 .oo-container{min-height:600px;height:calc(100vh - 280px);border-radius:8px;overflow:hidden}
 </style>

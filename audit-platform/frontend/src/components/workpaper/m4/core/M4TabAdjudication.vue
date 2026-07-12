@@ -827,7 +827,7 @@ function _restoreRows(): M4AdjudicationRow[] {
 <style scoped>
 .m4-tab-adjudication {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -865,7 +865,7 @@ function _restoreRows(): M4AdjudicationRow[] {
 }
 
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -878,7 +878,7 @@ function _restoreRows(): M4AdjudicationRow[] {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -923,7 +923,7 @@ function _restoreRows(): M4AdjudicationRow[] {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.subtotal-row) {
@@ -963,7 +963,7 @@ function _restoreRows(): M4AdjudicationRow[] {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

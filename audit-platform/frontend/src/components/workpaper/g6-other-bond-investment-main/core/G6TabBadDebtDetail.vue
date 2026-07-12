@@ -734,7 +734,7 @@ onMounted(() => {
   padding: 10px 14px;
   margin-bottom: 14px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .methodology-context strong {
   color: #e6a23c;
@@ -765,7 +765,7 @@ onMounted(() => {
   gap: 8px;
 }
 .bad-debt-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .bad-debt-table :deep(.row-subtotal) {
   background-color: #f0f9eb;

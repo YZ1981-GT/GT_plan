@@ -451,7 +451,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 </script>
 
 <style scoped>
-.gt-a177 { padding: 16px; font-size: 13px; }
+.gt-a177 { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .gt-a177__toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .gt-a177__save-status { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; }
 
@@ -487,16 +487,16 @@ defineExpose({ reload: () => loadData(props.wpId) })
 
 /* Period */
 .gt-a177__period-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.gt-a177__period-item label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.gt-a177__period-item label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 .gt-a177__date-range { display: flex; align-items: center; gap: 8px; }
-.gt-a177__date-range span { font-size: 13px; color: #909399; }
+.gt-a177__date-range span { font-size: var(--wp-font-size, 13px); color: #909399; }
 
 /* Commitments */
 .gt-a177__commitments { display: flex; flex-direction: column; gap: 12px; }
 .gt-a177__commit-item { padding: 12px 16px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafafa; }
 .gt-a177__commit-header { display: flex; gap: 8px; margin-bottom: 8px; }
 .gt-a177__commit-index { font-weight: 600; color: #409eff; min-width: 20px; }
-.gt-a177__commit-label { font-size: 13px; color: #303133; line-height: 1.5; }
+.gt-a177__commit-label { font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.5; }
 .gt-a177__commit-actions { margin-bottom: 4px; }
 .gt-a177__commit-explain { margin-top: 8px; }
 
@@ -512,8 +512,8 @@ defineExpose({ reload: () => loadData(props.wpId) })
 /* Partner */
 .gt-a177__partner { display: flex; flex-direction: column; gap: 16px; }
 .gt-a177__partner-confirm { display: flex; align-items: center; gap: 12px; }
-.gt-a177__partner-confirm label { font-size: 13px; color: #606266; }
-.gt-a177__partner-explain label { display: block; font-size: 13px; color: #606266; margin-bottom: 6px; }
+.gt-a177__partner-confirm label { font-size: var(--wp-font-size, 13px); color: #606266; }
+.gt-a177__partner-explain label { display: block; font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 6px; }
 .gt-a177__partner-table { width: 100%; }
 .gt-a177__signed-info { display: flex; flex-direction: column; gap: 2px; }
 .gt-a177__signed-date { font-size: 11px; color: #909399; }

@@ -824,7 +824,7 @@ watch(() => props.schema, () => { initData() }, { deep: true })
 .gt-cnt__toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
 .gt-cnt__toolbar-title { font-size: var(--gt-font-size-base, 14px); font-weight: 600; color: var(--gt-color-primary); }
 .gt-cnt__toolbar-actions { display: flex; align-items: center; gap: 8px; }
-.gt-cnt__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: 13px; }
+.gt-cnt__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .gt-cnt__header-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .gt-cnt__entity { font-weight: 600; color: var(--el-text-color-primary); }
 .gt-cnt__period, .gt-cnt__section, .gt-cnt__index { color: var(--el-text-color-regular); font-size: 12px; }
@@ -846,7 +846,7 @@ watch(() => props.schema, () => { initData() }, { deep: true })
 .gt-cnt__sub-toggle { margin-left: auto; margin-right: 8px; color: var(--el-color-warning); }
 .gt-cnt__sub-desc { margin: 0 0 10px 0; padding: 6px 10px; background: var(--el-color-info-light-9); border-left: 3px solid var(--el-color-info-light-3); border-radius: 0 4px 4px 0; color: var(--el-text-color-regular); font-size: 12px; line-height: 1.5; }
 .gt-cnt__refs { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 14px; background: var(--el-color-info-light-9); }
-.gt-cnt__refs-title { margin: 0 0 8px 0; font-size: 13px; font-weight: 600; color: var(--el-text-color-regular); }
+.gt-cnt__refs-title { margin: 0 0 8px 0; font-size: var(--wp-font-size, 13px); font-weight: 600; color: var(--el-text-color-regular); }
 .gt-cnt__refs-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
 .gt-cnt__ref-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--el-text-color-regular); flex-wrap: wrap; }
 .gt-cnt__ref-desc { flex: 1; }

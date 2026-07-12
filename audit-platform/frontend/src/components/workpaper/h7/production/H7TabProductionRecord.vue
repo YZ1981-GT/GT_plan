@@ -193,14 +193,14 @@ function fmtRate(v: number): string { return `${v.toFixed(2)}%` }
 </script>
 
 <style scoped>
-.h7-tab-production-record { padding: 16px; font-size: 13px; }
+.h7-tab-production-record { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .row-tag { margin-left: 8px; }
 .methodology-block { padding: 10px 14px; background: #fffbe6; border-left: 3px solid #e6a23c; border-radius: 4px; margin-bottom: 16px; font-size: 12px; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .calc-cell { font-variant-numeric: tabular-nums; background: var(--el-fill-color-light); border-bottom: 1px dashed var(--el-border-color); cursor: help; display: inline-block; width: 100%; text-align: right; }
 .calc-cell.has-warn { color: var(--el-color-warning); font-weight: 600; }

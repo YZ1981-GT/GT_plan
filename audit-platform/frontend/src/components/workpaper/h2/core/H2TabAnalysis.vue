@@ -194,15 +194,15 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-analysis { padding: 16px; font-size: 13px; }
+.h2-tab-analysis { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
-  padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 13px;
+  padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);
 }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.analysis-table { font-size: 13px; }
+.analysis-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .warning-value { color: var(--el-color-warning); font-weight: 600; }

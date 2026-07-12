@@ -110,7 +110,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-stocktake-summary { padding: 16px; font-size: 13px; }
+.h1-tab-stocktake-summary { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .dashboard-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

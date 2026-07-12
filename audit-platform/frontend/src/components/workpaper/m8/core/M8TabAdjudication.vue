@@ -586,7 +586,7 @@ function _defaultRows(): M8AdjudicationRow[] {
 </script>
 
 <style scoped>
-.m8-tab-adjudication { padding: 12px; font-size: 13px; }
+.m8-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── Header ─── */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -603,7 +603,7 @@ function _defaultRows(): M8AdjudicationRow[] {
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* ─── 区块 ─── */
 .block-section { margin-bottom: 24px; }
@@ -620,7 +620,7 @@ function _defaultRows(): M8AdjudicationRow[] {
 .total-row-label { font-weight: 700; color: #303133; }
 .diff-row-label { font-weight: 600; color: #f56c6c; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.total-row) { background: #ecf5ff !important; font-weight: 700; }
 :deep(.total-row td) { border-top: 2px solid #409eff; }
 :deep(.prior-row) { background: #f5f7fa !important; color: #909399; }
@@ -651,7 +651,7 @@ function _defaultRows(): M8AdjudicationRow[] {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .m8-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }

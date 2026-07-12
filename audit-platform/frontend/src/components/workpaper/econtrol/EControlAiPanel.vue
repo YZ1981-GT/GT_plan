@@ -108,7 +108,7 @@ defineExpose({
   margin-bottom: 8px;
 }
 .gt-e__ai-panel-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-color-primary);
 }
@@ -118,7 +118,7 @@ defineExpose({
   background: var(--gt-color-bg-white, #fff);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;

@@ -212,7 +212,7 @@ onMounted(() => { void loadOwn() })
 </script>
 
 <style scoped>
-.h7-tab-analysis { padding: 16px; font-size: 13px; }
+.h7-tab-analysis { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .obj-alert { margin-bottom: 12px; }
 .tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .chip-wrap { display: inline-flex; }
@@ -220,7 +220,7 @@ onMounted(() => { void loadOwn() })
 .summary-item .label { color: var(--el-text-color-secondary); margin-right: 6px; }
 .summary-item .value { font-weight: 600; font-variant-numeric: tabular-nums; }
 .warn-alert { margin-bottom: 12px; }
-.analysis-table { font-size: 13px; }
+.analysis-table { font-size: var(--wp-font-size, 13px); }
 .analysis-table :deep(.auto-calc-col) { background: var(--el-fill-color-lighter); }
 .amt-input { width: 100%; }
 .amount-cell { font-variant-numeric: tabular-nums; }

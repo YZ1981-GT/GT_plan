@@ -317,7 +317,7 @@ defineExpose({ reload: loadData })
 }
 
 .gt-a117__subtitle {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin: 0 0 12px;
 }
@@ -386,7 +386,7 @@ defineExpose({ reload: loadData })
   background: #7c3aed;
   color: #fff;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 

@@ -409,7 +409,7 @@ const exampleTradeItems = [
 </template>
 
 <style scoped>
-.d4-interview-detail { padding: 16px 20px; font-size: 13px; }
+.d4-interview-detail { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; }
@@ -433,13 +433,13 @@ const exampleTradeItems = [
 .field-hint { font-size: 12px; color: #909399; margin-bottom: 10px; }
 
 .question-card { margin-bottom: 14px; padding: 12px 16px; border: 1px solid #ebeef5; border-radius: 6px; background: #fff; }
-.q-label { font-size: 13px; font-weight: 500; color: #303133; margin-bottom: 8px; }
+.q-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; margin-bottom: 8px; }
 .sub-question { margin: 8px 0 8px 16px; }
 .sub-label { display: block; font-size: 12px; color: #606266; margin-bottom: 4px; }
 .condition-expand { margin-left: 32px; padding: 8px 12px; background: #fdf6ec; border-radius: 4px; border-left: 2px solid #e6a23c; }
 
 .commitment-box { margin-top: 16px; padding: 14px 16px; border: 1px solid #e1f3d8; border-radius: 6px; background: #f0f9eb; }
-.commitment-text { font-size: 13px; color: #303133; font-style: italic; margin-bottom: 8px; }
+.commitment-text { font-size: var(--wp-font-size, 13px); color: #303133; font-style: italic; margin-bottom: 8px; }
 .commitment-hint { font-size: 12px; color: #e6a23c; }
 
 .attachment-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
@@ -447,7 +447,7 @@ const exampleTradeItems = [
 .att-label { font-size: 12px; color: #606266; }
 
 .tips-collapse { margin-top: 16px; border-radius: 6px; border: 1px solid #fde2e2; border-left: 3px solid #f56c6c; background: #fef0f0; }
-.tips-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #f56c6c; }
+.tips-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #f56c6c; }
 .tips-list { margin: 8px 14px 12px; padding-left: 18px; font-size: 12px; color: #606266; line-height: 2; }
 
 .oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
@@ -458,8 +458,8 @@ const exampleTradeItems = [
 .example-section:last-child { border-bottom: none; }
 .example-title { font-size: 14px; font-weight: 600; color: #303133; margin: 0 0 4px; }
 .example-hint { font-size: 12px; color: #e6a23c; margin-bottom: 8px; font-style: italic; }
-.example-text { font-size: 13px; color: #606266; line-height: 1.8; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; border-left: 3px solid #409eff; }
+.example-text { font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.8; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; border-left: 3px solid #409eff; }
 .example-text p { margin: 4px 0; }
-.example-table { margin-top: 8px; font-size: 13px; }
-.example-table :deep(.el-table__cell) { padding: 6px 8px; font-size: 13px; }
+.example-table { margin-top: 8px; font-size: var(--wp-font-size, 13px); }
+.example-table :deep(.el-table__cell) { padding: 6px 8px; font-size: var(--wp-font-size, 13px); }
 </style>

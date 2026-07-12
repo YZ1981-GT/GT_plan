@@ -166,19 +166,19 @@ function handleNavigate(row: SheetEntry) {
 </script>
 
 <style scoped>
-.h5-tab-index { padding: 16px; font-size: 13px; }
+.h5-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .guide-area {
   background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%);
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
 .completion-bar { margin-bottom: 12px; }
 .index-card { margin-bottom: 16px; }
-.index-table { font-size: 13px; }
+.index-table { font-size: var(--wp-font-size, 13px); }
 .preparer-cell, .reviewer-cell { font-size: 12px; color: var(--el-text-color-regular); }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }

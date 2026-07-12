@@ -1,5 +1,5 @@
 ﻿<template>
-  <div class="d3-prepaid-accounts">
+  <div class="d3-prepaid-accounts" :style="{ '--wp-font-size': displayPrefs.fontConfig.tableFont }">
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
     </div>
@@ -292,11 +292,9 @@ async function saveImmediateBatch(
   })))
 }
 
-// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
-// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
+// 显示偏好收敛到单一真源（useDisplayPrefsStore），全部 tab 已迁移至 DisplayPrefs_Key。
 const displayPrefs = useDisplayPrefsStore()
 provide(DisplayPrefs_Key, displayPrefs)
-provide('displayPrefs', displayPrefs)
 
 async function selfLoad(): Promise<void> {
   if (props.htmlData?.responses_snapshot) {

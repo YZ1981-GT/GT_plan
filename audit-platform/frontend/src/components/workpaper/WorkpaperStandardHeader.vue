@@ -57,7 +57,7 @@ defineProps<{
   width: 100%;
   border-collapse: collapse;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .wp-std-header td {

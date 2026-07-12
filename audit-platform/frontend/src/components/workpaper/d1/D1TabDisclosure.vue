@@ -1477,7 +1477,7 @@ function handleReview(sectionKey: string): void {
 </template>
 
 <style scoped>
-.d1-disclosure { padding: 16px; font-size: 13px }
+.d1-disclosure { padding: 16px; font-size: var(--wp-font-size, 13px) }
 .d1-disclosure :deep(.el-table th),
 .d1-disclosure :deep(.el-table td),
 .d1-disclosure :deep(.el-input__inner),
@@ -1485,7 +1485,7 @@ function handleReview(sectionKey: string): void {
 .d1-disclosure :deep(.el-button),
 .d1-disclosure :deep(.el-tag),
 .d1-disclosure :deep(.el-form-item__label) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .d1-disclosure__header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap }
 .d1-disclosure__toolbar { margin-left: auto }
@@ -1495,11 +1495,11 @@ function handleReview(sectionKey: string): void {
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums }
 .amount-negative { color: #f56c6c }
 .auto-fetch-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px }
-.guidance-fold { margin: 12px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266 }
+.guidance-fold { margin: 12px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266 }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff }
 .guidance-fold p { margin: 6px 0; line-height: 1.6 }
 .section-note { margin-top: 12px; padding: 10px 0 }
-.section-note label { font-size: 13px; font-weight: 500; color: #606266; display: block; margin-bottom: 6px }
+.section-note label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; display: block; margin-bottom: 6px }
 .note-actions { margin-top: 6px; display: flex; gap: 8px }
 .excel-tip {
   color: #2f54eb;

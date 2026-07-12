@@ -285,16 +285,16 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-adjudication { padding: 16px; font-size: 13px; }
+.h2-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
-.tb-compare { font-size: 13px; padding: 8px 0; }
+.tb-compare { font-size: var(--wp-font-size, 13px); padding: 8px 0; }
 .add-row-bar { margin-top: 12px; }
 .audit-note-card { margin-bottom: 12px; }
 .action-bar { margin-top: 16px; text-align: right; }

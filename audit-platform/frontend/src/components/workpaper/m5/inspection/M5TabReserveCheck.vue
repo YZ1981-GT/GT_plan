@@ -271,7 +271,7 @@ onMounted(async () => {
 <style scoped>
 .m5-tab-reserve-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -316,7 +316,7 @@ onMounted(async () => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -398,7 +398,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

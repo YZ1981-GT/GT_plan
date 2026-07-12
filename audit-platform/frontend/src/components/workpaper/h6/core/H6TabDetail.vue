@@ -482,7 +482,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h6-tab-detail { padding: 16px; font-size: 13px; }
+.h6-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
 .methodology-context {
@@ -531,7 +531,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .subtotal-item { display: flex; align-items: center; }
 .st-label { font-size: 12px; color: #606266; white-space: nowrap; }
-.st-value { font-weight: 600; font-size: 13px; color: #303133; margin-left: 4px; }
+.st-value { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; margin-left: 4px; }
 
 .action-bar { margin-top: 12px; display: flex; align-items: center; }
 

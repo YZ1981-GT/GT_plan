@@ -144,7 +144,7 @@ function goToB15() {
 }
 .materiality-indicator__link {
   margin-left: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .materiality-indicator__desc {
   font-size: 12px;

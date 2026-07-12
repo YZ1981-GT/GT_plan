@@ -373,11 +373,11 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h5-tab-adjudication { padding: 16px; font-size: 13px; }
+.h5-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .amount-input { width: 100%; }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .tb-auto { color: var(--el-text-color-secondary); font-style: italic; }

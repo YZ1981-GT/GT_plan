@@ -346,7 +346,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i1-tab-detail {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -417,13 +417,13 @@ function fmtAmount(value: number | null | undefined): string {
   background: #f8fafc;
 }
 .segment-tabs :deep(.el-tabs__item) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
 /* 明细表格 */
 .detail-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .detail-table :deep(.el-table__header th) {
   font-size: 12px;
@@ -477,7 +477,7 @@ function fmtAmount(value: number | null | undefined): string {
   margin-top: 8px;
 }
 .summary-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .summary-table :deep(.el-table__header) {
   display: none;

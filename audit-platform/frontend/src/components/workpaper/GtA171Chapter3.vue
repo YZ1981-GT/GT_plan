@@ -239,20 +239,20 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.gt-ch3 { font-size: 13px; display: flex; flex-direction: column; gap: 12px; }
+.gt-ch3 { font-size: var(--wp-font-size, 13px); display: flex; flex-direction: column; gap: 12px; }
 .gt-ch3__toggle { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f4f0fa; border-radius: 6px; }
-.gt-ch3__toggle-label { font-size: 13px; font-weight: 500; }
-.gt-ch3__toggle :deep(.el-switch__label) { font-size: 13px; }
+.gt-ch3__toggle-label { font-size: var(--wp-font-size, 13px); font-weight: 500; }
+.gt-ch3__toggle :deep(.el-switch__label) { font-size: var(--wp-font-size, 13px); }
 .gt-ch3__no-mod { margin-top: 4px; }
-.gt-ch3__no-mod :deep(.el-alert__title) { font-size: 13px; }
+.gt-ch3__no-mod :deep(.el-alert__title) { font-size: var(--wp-font-size, 13px); }
 .gt-ch3__card { margin-top: 4px; }
 .gt-ch3__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .gt-ch3__card-actions { display: flex; align-items: center; gap: 8px; }
-.gt-ch3__card-actions :deep(.el-switch__label) { font-size: 13px; }
-.gt-ch3__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
-.gt-ch3__hint { font-size: 13px; color: #909399; margin: 0 0 8px; }
-.gt-ch3__table { font-size: 13px; }
-.gt-ch3__table :deep(.el-table__cell) { font-size: 13px; vertical-align: top; }
-.gt-ch3__table :deep(.el-textarea__inner) { font-size: 13px; line-height: 1.5; }
-.gt-ch3__table :deep(.el-input__inner) { font-size: 13px; text-align: right; }
+.gt-ch3__card-actions :deep(.el-switch__label) { font-size: var(--wp-font-size, 13px); }
+.gt-ch3__card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #6b21a8; }
+.gt-ch3__hint { font-size: var(--wp-font-size, 13px); color: #909399; margin: 0 0 8px; }
+.gt-ch3__table { font-size: var(--wp-font-size, 13px); }
+.gt-ch3__table :deep(.el-table__cell) { font-size: var(--wp-font-size, 13px); vertical-align: top; }
+.gt-ch3__table :deep(.el-textarea__inner) { font-size: var(--wp-font-size, 13px); line-height: 1.5; }
+.gt-ch3__table :deep(.el-input__inner) { font-size: var(--wp-font-size, 13px); text-align: right; }
 </style>

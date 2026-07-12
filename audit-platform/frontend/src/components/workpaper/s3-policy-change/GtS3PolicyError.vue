@@ -268,7 +268,7 @@ function handleReview() {
 }
 .methodology-context .context-content p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

@@ -417,7 +417,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 <style scoped>
 .k1-tab-bad-debt-calc {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色） */
@@ -456,7 +456,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 
 /* 表格 */
 .calc-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .amount-cell {
   font-variant-numeric: tabular-nums;

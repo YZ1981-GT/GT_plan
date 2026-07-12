@@ -493,7 +493,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 </script>
 
 <style scoped>
-.gt-a171 { padding: 16px; font-size: 13px; }
+.gt-a171 { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .gt-a171__toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .gt-a171__save-status { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; }
 
@@ -546,8 +546,8 @@ defineExpose({ reload: () => flushPendingSaves() })
 .gt-a171__signature-card { border-radius: 8px; }
 .gt-a171__card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .gt-a171__sig-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.gt-a171__sig-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafafa; font-size: 13px; }
-.gt-a171__sig-role { font-size: 13px; font-weight: 500; color: #606266; min-width: 110px; white-space: nowrap; flex-shrink: 0; }
+.gt-a171__sig-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafafa; font-size: var(--wp-font-size, 13px); }
+.gt-a171__sig-role { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; min-width: 110px; white-space: nowrap; flex-shrink: 0; }
 
 /* Chapters */
 .gt-a171__chapters { border: none; }

@@ -349,7 +349,7 @@ export default { components: { InfoFilled } }
 }
 
 .gt-cutoff-auto-sampling :deep(.el-form-item__label) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .date-range-hint {

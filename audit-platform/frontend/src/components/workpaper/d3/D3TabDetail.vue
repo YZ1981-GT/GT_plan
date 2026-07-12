@@ -545,7 +545,7 @@ const { onExportTemplate, onExportData, onImportFile, onImportFromAuxBalance } =
 .audit-notes-section h4 { font-size: 14px; margin-bottom: 12px; }
 .section-header-row { display: flex; align-items: center; gap: 8px; }
 .note-block { margin-bottom: 12px; }
-.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; color: #606266; }
+.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .conclusion-actions { margin-top: 8px; }
 :deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
 :deep(.verification-row) { background-color: #fff8e1 !important; }

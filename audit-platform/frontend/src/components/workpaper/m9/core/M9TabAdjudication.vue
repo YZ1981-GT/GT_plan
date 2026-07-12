@@ -782,7 +782,7 @@ function _restoreRows(): M9AdjudicationRow[] {
 </script>
 
 <style scoped>
-.m9-tab-adjudication { padding: 12px; font-size: 13px; }
+.m9-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── Header ─── */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -815,7 +815,7 @@ function _restoreRows(): M9AdjudicationRow[] {
 }
 .step-item { display: flex; align-items: flex-start; gap: 6px; }
 .step-num { font-weight: 700; color: #1a73e8; min-width: 18px; }
-.step-text { font-size: 13px; color: #333; line-height: 1.5; }
+.step-text { font-size: var(--wp-font-size, 13px); color: #333; line-height: 1.5; }
 
 /* ─── 方法论上下文（琥珀色） ─── */
 .methodology-context {
@@ -825,7 +825,7 @@ function _restoreRows(): M9AdjudicationRow[] {
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* ─── 区块 ─── */
 .block-section { margin-bottom: 24px; }
@@ -844,10 +844,10 @@ function _restoreRows(): M9AdjudicationRow[] {
 
 /* ─── 行样式 ─── */
 .total-row-label { font-weight: 700; color: #303133; }
-.grand-total-label { font-weight: 700; color: #303133; font-size: 13px; }
+.grand-total-label { font-weight: 700; color: #303133; font-size: var(--wp-font-size, 13px); }
 .high-change { color: #e6a23c; font-weight: 600; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.subtotal-row) { background: #f0f9eb !important; font-weight: 600; }
 :deep(.subtotal-row td) { border-top: 2px solid #67c23a; }
 
@@ -883,7 +883,7 @@ function _restoreRows(): M9AdjudicationRow[] {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .m9-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }

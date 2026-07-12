@@ -417,7 +417,7 @@ function getProgressColor(percent: number): string {
 <style scoped>
 .k2-tab-index {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 进度统计区 ─── */
@@ -433,7 +433,7 @@ function getProgressColor(percent: number): string {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -464,7 +464,7 @@ function getProgressColor(percent: number): string {
   font-weight: 500;
   color: #1a73e8;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .k2-guide-steps {
@@ -477,7 +477,7 @@ function getProgressColor(percent: number): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
 }
 
@@ -496,7 +496,7 @@ function getProgressColor(percent: number): string {
 }
 
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 分组卡片 ─── */
@@ -563,7 +563,7 @@ function getProgressColor(percent: number): string {
 .sheet-name-link {
   color: #1a73e8;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .sheet-name-link:hover {
@@ -587,7 +587,7 @@ function getProgressColor(percent: number): string {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table .el-table__row) {
@@ -605,7 +605,7 @@ function getProgressColor(percent: number): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

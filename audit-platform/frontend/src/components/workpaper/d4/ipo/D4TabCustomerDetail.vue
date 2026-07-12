@@ -164,7 +164,7 @@ const fieldsByGroup = computed(() => FIELD_GROUPS.map(g => ({ ...g, fields: CUST
 </template>
 
 <style scoped>
-.d4-customer-detail { padding: 16px 20px; font-size: 13px; }
+.d4-customer-detail { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -193,7 +193,7 @@ const fieldsByGroup = computed(() => FIELD_GROUPS.map(g => ({ ...g, fields: CUST
 .customer-name-input { max-width: 300px; }
 .customer-name-input :deep(.el-input__inner) { font-size: 15px; font-weight: 600; }
 .field-group { border-left: 3px solid #e4e7ed; padding: 12px 16px; margin-bottom: 12px; border-radius: 0 6px 6px 0; background: #fff; }
-.group-title { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 10px; }
+.group-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; margin-bottom: 10px; }
 .fields-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 20px; }
 .field-item { display: flex; flex-direction: column; gap: 3px; }
 .field-item label { font-size: 12px; color: #909399; }
@@ -201,8 +201,8 @@ const fieldsByGroup = computed(() => FIELD_GROUPS.map(g => ({ ...g, fields: CUST
 :deep(.el-empty__description) { margin-top: 8px; }
 
 /* 矩阵视图 */
-.matrix-table { font-size: 13px; margin-bottom: 24px; }
-.matrix-table :deep(.el-table__cell) { padding: 4px 6px; font-size: 13px; }
+.matrix-table { font-size: var(--wp-font-size, 13px); margin-bottom: 24px; }
+.matrix-table :deep(.el-table__cell) { padding: 4px 6px; font-size: var(--wp-font-size, 13px); }
 .risk-yes { color: #f56c6c; font-weight: 600; }
 .empty-matrix { padding: 40px 0; }
 
@@ -216,7 +216,7 @@ const fieldsByGroup = computed(() => FIELD_GROUPS.map(g => ({ ...g, fields: CUST
 
 /* CAS18舞弊提示折叠 */
 .fraud-tips-collapse { margin-bottom: 16px; border-radius: 6px; border: 1px solid #fde2e2; border-left: 3px solid #f56c6c; background: #fef0f0; }
-.fraud-tips-summary { cursor: pointer; padding: 10px 14px; font-size: 13px; font-weight: 500; color: #f56c6c; }
+.fraud-tips-summary { cursor: pointer; padding: 10px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #f56c6c; }
 .fraud-tips-body { padding: 8px 14px 14px; font-size: 12px; color: #606266; line-height: 1.9; }
 .fraud-tips-intro { margin-bottom: 8px; font-weight: 500; }
 .fraud-tips-list { margin: 0; padding-left: 18px; }

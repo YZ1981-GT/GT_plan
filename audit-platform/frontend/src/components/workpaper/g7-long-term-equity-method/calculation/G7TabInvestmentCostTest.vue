@@ -526,7 +526,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.g7-tab-investment-cost-test { padding: 12px; font-size: 13px; }
+.g7-tab-investment-cost-test { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {
@@ -535,7 +535,7 @@ onMounted(() => {
   background: #fffbeb;
   border-left: 4px solid #f59e0b;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
 }
 .methodology-title { margin: 0 0 6px; font-weight: 600; color: #92400e; }
@@ -551,7 +551,7 @@ onMounted(() => {
 .segment-bar { margin-bottom: 12px; }
 
 /* 表格 */
-.cost-test-table { font-size: 13px; }
+.cost-test-table { font-size: var(--wp-font-size, 13px); }
 .compact-num { width: 100%; }
 .investee-name { font-weight: 500; color: #303133; }
 .multiline-cell { white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.4; }

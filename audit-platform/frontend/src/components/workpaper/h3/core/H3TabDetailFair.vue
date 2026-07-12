@@ -160,10 +160,10 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-detail-fair { padding: 16px; font-size: 13px; }
+.h3-tab-detail-fair { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .segment-bar { margin-bottom: 12px; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.audit-table { font-size: 13px; margin-bottom: 12px; }
+.audit-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .formula-value { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .conclusion-card { margin-top: 16px; }

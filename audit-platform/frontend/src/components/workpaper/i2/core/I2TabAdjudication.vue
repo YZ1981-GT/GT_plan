@@ -353,7 +353,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i2-adjudication {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 .section-header {
@@ -388,7 +388,7 @@ function fmtAmount(value: number | null | undefined): string {
   margin-bottom: 14px;
 }
 .adjudication-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 12px;
 }
 .formula-col-header {

@@ -370,7 +370,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 </script>
 
 <style scoped>
-.k3-tab-adjustment { padding: 12px; font-size: 13px; }
+.k3-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
@@ -378,7 +378,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 .entry-count { font-size: 12px; color: #909399; }
 
 /* 合计行 */
-.k3-adj-footer { display: flex; align-items: center; gap: 16px; margin-top: 8px; padding: 10px 16px; background: #f0f9eb; border-radius: 4px; font-weight: 600; font-size: 13px; }
+.k3-adj-footer { display: flex; align-items: center; gap: 16px; margin-top: 8px; padding: 10px 16px; background: #f0f9eb; border-radius: 4px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .k3-adj-footer.balance-fail { background: #fef0f0; border: 1px solid #f56c6c; }
 .footer-label { color: #606266; }
 .footer-debit, .footer-credit { color: #303133; }

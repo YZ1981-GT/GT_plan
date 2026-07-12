@@ -334,7 +334,7 @@ function fmtPercent(value: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i4-tab-detail { padding: 16px; font-size: 13px; }
+.i4-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {
@@ -360,7 +360,7 @@ function fmtPercent(value: number | null | undefined): string {
 .row-count { font-size: 12px; color: var(--el-text-color-secondary); }
 
 /* 表格 */
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .formula-col-header {
   border-bottom: 1px dashed #909399;
   cursor: help; padding-bottom: 2px;
@@ -375,7 +375,7 @@ function fmtPercent(value: number | null | undefined): string {
 .subtotals-bar {
   display: flex; align-items: center; gap: 16px;
   padding: 10px 12px; margin-top: 12px;
-  background: #f0f9ff; border-radius: 6px; font-size: 13px;
+  background: #f0f9ff; border-radius: 6px; font-size: var(--wp-font-size, 13px);
 }
 .subtotal-label { font-weight: 600; color: #303133; }
 .subtotal-item { color: #606266; }

@@ -125,12 +125,12 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-adjustment { padding: 16px; font-size: 13px; }
+.h1-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
-.balance-bar { display: flex; align-items: center; gap: 16px; padding: 10px 12px; margin-top: 12px; border-radius: 4px; font-size: 13px; }
+.balance-bar { display: flex; align-items: center; gap: 16px; padding: 10px 12px; margin-top: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); }
 .balance-ok { background: var(--el-color-success-light-9); }
 .balance-err { background: var(--el-color-danger-light-9); }
 .note-card { margin-top: 12px; }

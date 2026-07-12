@@ -149,7 +149,7 @@ function fmtPctPoint(r: number) { return (r * 100).toFixed(2) + 'pp' }
 </script>
 
 <style scoped>
-.g11-return-rate { font-size: 13px; }
+.g11-return-rate { font-size: var(--wp-font-size, 13px); }
 .methodology-panel { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 10px 12px; margin-bottom: 10px; font-size: 12px; }
 .methodology-panel p { margin: 4px 0; }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }

@@ -436,7 +436,7 @@ function handleAiConclusion(): void {
 </script>
 
 <style scoped>
-.k10-tab-adjudication { padding: 12px; font-size: 13px; }
+.k10-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .k10-guide {
   margin-bottom: 14px;
@@ -457,7 +457,7 @@ function handleAiConclusion(): void {
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b;
   padding: 10px 14px; margin-bottom: 12px;
-  border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6;
+  border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6;
 }
 .methodology-context p { margin: 0; }
 
@@ -497,7 +497,7 @@ function handleAiConclusion(): void {
   padding-bottom: 1px;
 }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.total-row) { background-color: #f5f7fa !important; font-weight: 600; }
 
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }

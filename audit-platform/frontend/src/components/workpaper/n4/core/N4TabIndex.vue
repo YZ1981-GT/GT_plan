@@ -412,12 +412,12 @@ function fmtYoy(val: number): string {
 </script>
 
 <style scoped>
-.n4-tab-index { padding: 12px; font-size: 13px; }
+.n4-tab-index { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .n4-header-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 10px 16px; margin-bottom: 16px;
-  background: #f5f7fa; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 13px;
+  background: #f5f7fa; border: 1px solid #dcdfe6; border-radius: 6px; font-size: var(--wp-font-size, 13px);
 }
 .header-code { font-weight: 600; color: #303133; }
 .header-sep { color: #c0c4cc; }
@@ -429,7 +429,7 @@ function fmtYoy(val: number): string {
   padding: 10px 16px; margin-bottom: 16px;
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
   border: 1px solid #ffcc80; border-left: 4px solid #f57c00;
-  border-radius: 6px; font-size: 13px; font-weight: 500; color: #e65100;
+  border-radius: 6px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #e65100;
 }
 .n4-expense-badge .el-icon { font-size: 16px; color: #f57c00; flex-shrink: 0; }
 
@@ -437,9 +437,9 @@ function fmtYoy(val: number): string {
   background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
   border: 1px solid #b3d9f2; border-radius: 8px; padding: 14px 20px; margin-bottom: 16px;
 }
-.n4-guide-header { display: flex; align-items: center; gap: 6px; font-weight: 500; color: #1a73e8; margin-bottom: 10px; font-size: 13px; }
+.n4-guide-header { display: flex; align-items: center; gap: 6px; font-weight: 500; color: #1a73e8; margin-bottom: 10px; font-size: var(--wp-font-size, 13px); }
 .n4-guide-steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px; }
-.step-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
+.step-item { display: flex; align-items: center; gap: 8px; font-size: var(--wp-font-size, 13px); color: #374151; }
 .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1a73e8; color: #fff; font-size: 11px; font-weight: 600; flex-shrink: 0; }
 
 /* ═══ 仪表板 ═══ */
@@ -472,7 +472,7 @@ function fmtYoy(val: number): string {
 
 /* ═══ 联动面板 ═══ */
 .n4-linkage-panel { margin-bottom: 16px; padding: 14px 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
-.linkage-title { font-size: 13px; font-weight: 500; color: #0369a1; margin-bottom: 10px; }
+.linkage-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #0369a1; margin-bottom: 10px; }
 .linkage-items { display: flex; flex-wrap: wrap; gap: 10px; }
 .linkage-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
 .linkage-desc { color: #606266; }
@@ -483,21 +483,21 @@ function fmtYoy(val: number): string {
 
 /* ═══ 进度条 ═══ */
 .n4-progress-section { margin-bottom: 16px; padding: 12px 16px; background: #f5f7fa; border-radius: 6px; }
-.progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: #606266; }
+.progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .progress-text { font-weight: 600; color: #303133; }
 
 /* ═══ 目录卡片 ═══ */
 .n4-index-card { margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
-.sheet-name-link { color: #1a73e8; cursor: pointer; font-size: 13px; }
+.sheet-name-link { color: #1a73e8; cursor: pointer; font-size: var(--wp-font-size, 13px); }
 .sheet-name-link:hover { text-decoration: underline; }
-.sheet-name-skip { color: #c0c4cc; font-size: 13px; text-decoration: line-through; }
+.sheet-name-skip { color: #c0c4cc; font-size: var(--wp-font-size, 13px); text-decoration: line-through; }
 .no-index { color: #c0c4cc; }
 .core-tag, .skip-tag { margin-left: 8px; font-size: 11px; vertical-align: middle; }
 .progress-label { display: inline-block; margin-left: 8px; font-size: 12px; color: #909399; width: 32px; }
 .skip-label { font-size: 12px; color: #c0c4cc; font-style: italic; }
 
-.linkage-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 13px; font-weight: 600; }
+.linkage-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: var(--wp-font-size, 13px); font-weight: 600; }
 .linkage-ok { background: #e8f5e9; color: #43a047; border: 1px solid #a5d6a7; }
 .linkage-warn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
 .linkage-na { background: #f5f5f5; color: #bdbdbd; border: 1px solid #e0e0e0; }
@@ -513,12 +513,12 @@ function fmtYoy(val: number): string {
 :deep(.skip-row) { background-color: #f9f9f9 !important; opacity: 0.6; }
 :deep(.skip-row:hover) { cursor: not-allowed !important; }
 :deep(.completed-row) { background-color: #f0f9eb !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.el-table .el-table__row) { cursor: pointer; }
 :deep(.el-table .el-table__row:hover) { background-color: #ecf5ff !important; }
 
 /* ═══ 编制提示 ═══ */
-.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .n4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
 .n4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

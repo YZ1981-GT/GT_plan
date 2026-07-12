@@ -215,7 +215,7 @@ const basisFilled = computed(() =>
 }
 
 .card-section-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
   margin-bottom: 10px;
@@ -224,7 +224,7 @@ const basisFilled = computed(() =>
 }
 
 .basis-form :deep(.el-form-item__label) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -260,7 +260,7 @@ const basisFilled = computed(() =>
 
 .qa-question {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.6;
 }
@@ -289,7 +289,7 @@ const basisFilled = computed(() =>
 }
 
 .result-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }

@@ -609,7 +609,7 @@ watch(() => props.htmlData, (newData) => {
 </script>
 
 <style scoped>
-.g7-tab-control-judgment { padding: 12px; font-size: 13px; }
+.g7-tab-control-judgment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ */
 .methodology-context {
@@ -661,7 +661,7 @@ watch(() => props.htmlData, (newData) => {
   border-radius: 12px; font-size: 11px; font-weight: 600;
 }
 .step-desc {
-  font-size: 13px; color: #1e40af; font-weight: 500;
+  font-size: var(--wp-font-size, 13px); color: #1e40af; font-weight: 500;
 }
 
 /* ═══ Section ═══ */
@@ -689,7 +689,7 @@ watch(() => props.htmlData, (newData) => {
 }
 
 /* ═══ 表格 ═══ */
-.judgment-table { font-size: 13px; }
+.judgment-table { font-size: var(--wp-font-size, 13px); }
 .dimension-text { font-weight: 500; color: #334155; }
 .criterion-text { font-size: 12px; color: #64748b; line-height: 1.5; }
 .multiline-cell { white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.4; }

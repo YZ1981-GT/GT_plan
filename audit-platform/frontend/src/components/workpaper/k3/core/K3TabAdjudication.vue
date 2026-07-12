@@ -458,7 +458,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .k3-tab-adjudication {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文 */
@@ -490,7 +490,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 表格 */
 .adj-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .amount-cell {

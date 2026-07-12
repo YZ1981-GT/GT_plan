@@ -482,7 +482,7 @@ watch(priorYear, () => { if (!hydrating) save(PY_ID, { ...priorYear }) }, { deep
   margin-bottom: 12px;
 }
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 .period-comparison-header {
@@ -492,7 +492,7 @@ watch(priorYear, () => { if (!hydrating) save(PY_ID, { ...priorYear }) }, { deep
   margin-bottom: 12px;
 }
 .comparison-hint {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .data-source-hint {
@@ -507,7 +507,7 @@ watch(priorYear, () => { if (!hydrating) save(PY_ID, { ...priorYear }) }, { deep
   gap: 16px;
 }
 .period-card {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .section-header {
   font-weight: 600;

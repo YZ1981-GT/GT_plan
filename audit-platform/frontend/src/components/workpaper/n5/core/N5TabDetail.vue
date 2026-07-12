@@ -255,28 +255,28 @@ function fmtAmount(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.n5-tab-detail { padding: 12px; font-size: 13px; }
+.n5-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 8px; }
 .detail-table { margin-bottom: 16px; }
-:deep(.detail-table .el-table) { font-size: 13px; }
+:deep(.detail-table .el-table) { font-size: var(--wp-font-size, 13px); }
 .subtotal-name { font-weight: 700; color: #409eff; }
 .cell-input { width: 100%; }
-:deep(.cell-input .el-input__inner) { text-align: right; font-size: 13px; }
-.cell-value { font-size: 13px; color: #606266; }
+:deep(.cell-input .el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
+.cell-value { font-size: var(--wp-font-size, 13px); color: #606266; }
 .formula-header { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; font-weight: 500; color: #303133; padding-bottom: 1px; }
 .negative { color: #f56c6c !important; }
 .row-actions { margin-bottom: 16px; }
 .cross-check { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; padding: 10px 16px; background: #fafbfc; border: 1px solid #ebeef5; border-radius: 6px; }
-.cross-label { font-size: 13px; color: #606266; }
-.cross-status { font-weight: 600; font-size: 13px; }
+.cross-label { font-size: var(--wp-font-size, 13px); color: #606266; }
+.cross-status { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .cross-ok { color: #43a047; }
 .cross-err { color: #f56c6c; }
 .audit-notes-card { margin-bottom: 16px; }
 .notes-title { font-size: 14px; font-weight: 500; }
 .notes-field { margin-bottom: 12px; }
 .notes-field:last-child { margin-bottom: 0; }
-.field-label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.field-label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 </style>

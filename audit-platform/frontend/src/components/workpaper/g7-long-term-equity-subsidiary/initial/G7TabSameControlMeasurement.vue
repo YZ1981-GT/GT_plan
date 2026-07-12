@@ -603,7 +603,7 @@ onMounted(() => {
 <style scoped>
 .g7-tab-same-control {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ═══ Section标题栏 ═══ */
@@ -655,7 +655,7 @@ onMounted(() => {
   flex-shrink: 0;
 }
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1e40af;
 }
 
@@ -666,7 +666,7 @@ onMounted(() => {
   background: #fffbeb;
   border-left: 4px solid #f59e0b;
   border-radius: 0 6px 6px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #92400e;
 }
@@ -680,7 +680,7 @@ onMounted(() => {
 }
 .same-control-table :deep(.el-table__header th) {
   background: #f8fafc;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .investee-name {
@@ -754,7 +754,7 @@ onMounted(() => {
 }
 .guidance-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b7280;
   font-weight: 500;
 }

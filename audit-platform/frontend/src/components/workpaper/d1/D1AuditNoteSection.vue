@@ -131,7 +131,7 @@ function onReview(suffix: string) {
   background: #ecf5ff;
   padding: 10px 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

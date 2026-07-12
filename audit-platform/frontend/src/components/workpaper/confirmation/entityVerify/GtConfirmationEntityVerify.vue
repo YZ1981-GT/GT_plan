@@ -678,7 +678,7 @@ defineExpose({
 }
 
 .gt-confirmation-entity-verify__fraud-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
   display: flex;

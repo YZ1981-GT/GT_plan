@@ -411,7 +411,7 @@ function conclusionTagType(status: string): string {
   margin-bottom: 8px;
   background: var(--el-color-info-light-9);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-regular);
 }
 
@@ -455,7 +455,7 @@ function conclusionTagType(status: string): string {
 
 .reliability-grid__tooltip-content {
   max-width: 340px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 

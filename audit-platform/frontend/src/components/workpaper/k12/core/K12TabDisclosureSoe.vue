@@ -331,7 +331,7 @@ onUnmounted(() => {
   background: #fdf6ec;
   padding: 12px 16px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
 }
 
@@ -357,7 +357,7 @@ onUnmounted(() => {
 }
 
 .disclosure-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .amount-zero {

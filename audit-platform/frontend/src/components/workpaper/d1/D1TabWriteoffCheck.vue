@@ -18,6 +18,8 @@
  */
 import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import {
   useD1WriteoffCheck,
   RECOVERY_METHODS,
@@ -48,10 +50,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const injectedDisplayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const injectedDisplayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
@@ -985,14 +984,14 @@ const GUIDANCE_TEXTS = [
 .methodology-summary {
   cursor: pointer;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #b88230;
 }
 
 .methodology-body {
   padding: 8px 14px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.8;
 }
@@ -1003,7 +1002,7 @@ const GUIDANCE_TEXTS = [
 
 .objective-static {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.8;
 }
@@ -1042,7 +1041,7 @@ const GUIDANCE_TEXTS = [
 
 /* 统计标签 */
 .section-stat {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin-bottom: 8px;
 }
@@ -1063,7 +1062,7 @@ const GUIDANCE_TEXTS = [
 ::deep(.writeoff-table .el-table__cell),
 ::deep(.writeoff-table .el-input__inner),
 ::deep(.writeoff-table .el-textarea__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.writeoff-table .el-textarea__inner) {
@@ -1087,13 +1086,13 @@ const GUIDANCE_TEXTS = [
 }
 
 .sum-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }
 
 .sum-item {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -1106,7 +1105,7 @@ const GUIDANCE_TEXTS = [
 .recon-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 12px;
 }
 
@@ -1137,7 +1136,7 @@ const GUIDANCE_TEXTS = [
 /* 跨Spec数据未加载警告 */
 .cross-spec-warn {
   color: #e6a23c;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 必填星号 */
@@ -1172,7 +1171,7 @@ const GUIDANCE_TEXTS = [
   padding: 8px 12px;
   border-radius: 4px;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 索引号单元格 */
@@ -1211,7 +1210,7 @@ const GUIDANCE_TEXTS = [
   background: #ecf5ff;
   padding: 10px 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

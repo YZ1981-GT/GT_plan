@@ -119,7 +119,7 @@ function navigateToConfirmation() {
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-evidence-card__metric-label {
@@ -138,7 +138,7 @@ function navigateToConfirmation() {
 
 .gt-evidence-card__link a {
   color: var(--gt-color-primary, #4b2d77);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   text-decoration: none;
 }
 
@@ -156,6 +156,6 @@ function navigateToConfirmation() {
   text-align: center;
   color: var(--gt-color-text-secondary, #6e6e73);
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

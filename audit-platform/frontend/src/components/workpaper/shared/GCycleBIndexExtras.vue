@@ -110,7 +110,7 @@ function onCycleCardClick(wp: CycleWorkpaper) {
 <style scoped>
 .g-cycle-b-index-extras {
   padding: 0 12px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .g-cycle-b-index-extras__navigation {
@@ -194,7 +194,7 @@ function onCycleCardClick(wp: CycleWorkpaper) {
 }
 
 .g-cycle-b-index-extras__cycle-code {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 700;
   color: var(--gt-color-primary, #4b2d77);
 }
@@ -204,7 +204,7 @@ function onCycleCardClick(wp: CycleWorkpaper) {
 }
 
 .g-cycle-b-index-extras__cycle-name {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.4;
   color: var(--gt-color-text-primary, #303133);
   overflow: hidden;

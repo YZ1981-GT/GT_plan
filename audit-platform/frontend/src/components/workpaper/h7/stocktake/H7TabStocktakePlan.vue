@@ -188,7 +188,7 @@ function fmtAmt(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h7-tab-stocktake-plan { padding: 16px; font-size: 13px; }
+.h7-tab-stocktake-plan { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

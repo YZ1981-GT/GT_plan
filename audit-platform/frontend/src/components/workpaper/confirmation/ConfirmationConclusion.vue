@@ -165,6 +165,6 @@ const conclusionPlaceholder = computed(() => {
 }
 
 .confirmation-conclusion__detail :deep(.el-textarea__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

@@ -244,11 +244,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m1-tab-dividend-check { padding: 12px; font-size: 13px; }
+.m1-tab-dividend-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* 完成度进度条 */
 .completion-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 16px; background: linear-gradient(135deg, #f8f9fe, #f0f4ff); border-radius: 6px; border: 1px solid #e4e7ed; }
-.completion-label { font-size: 13px; font-weight: 500; color: #303133; white-space: nowrap; }
+.completion-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; white-space: nowrap; }
 
 /* Section Cards */
 .check-section-card { margin-bottom: 16px; }
@@ -261,7 +261,7 @@ onMounted(async () => {
 .check-item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
 .check-item:last-child { border-bottom: none; }
 .check-item-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-.check-item-title { font-size: 13px; color: #303133; line-height: 1.5; flex: 1; }
+.check-item-title { font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.5; flex: 1; }
 .check-item-controls { flex-shrink: 0; }
 .check-item-remark { padding-left: 0; }
 
@@ -269,12 +269,12 @@ onMounted(async () => {
 .conclusion-card { margin-bottom: 16px; border: 1px solid #d9ecff; }
 .conclusion-fields { display: flex; flex-direction: column; gap: 16px; }
 .field-group { display: flex; flex-direction: column; gap: 6px; }
-.field-label { font-size: 13px; font-weight: 500; color: #606266; }
+.field-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; }
 
 /* 编制提示 */
-.m1-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m1-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m1-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m1-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 </style>

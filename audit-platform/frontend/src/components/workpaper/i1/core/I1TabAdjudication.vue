@@ -713,7 +713,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i1-adjudication {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -803,7 +803,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 /* 表格 */
 .adjudication-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .adjudication-table :deep(.el-table__header th) {
   font-size: 12px;
@@ -815,7 +815,7 @@ function fmtAmount(value: number | null | undefined): string {
 }
 .adjudication-table :deep(.el-input-number .el-input__inner) {
   text-align: right;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 小计行 */
@@ -900,7 +900,7 @@ function fmtAmount(value: number | null | undefined): string {
   font-size: 14px;
 }
 .audit-note-card :deep(.el-textarea__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 跨底稿联动栏 */

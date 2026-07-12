@@ -471,7 +471,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m7-tab-accrual-test { padding: 12px; font-size: 13px; }
+.m7-tab-accrual-test { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
@@ -481,12 +481,12 @@ onMounted(async () => {
 .guide-zone { background: linear-gradient(135deg, #ecf5ff 0%, #d9ecff 100%); border-radius: 8px; padding: 14px 20px; margin-bottom: 16px; }
 .guide-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .guide-step { display: flex; align-items: center; gap: 10px; }
-.guide-num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #409eff; color: #fff; font-weight: 700; font-size: 13px; flex-shrink: 0; }
-.guide-text { font-size: 13px; color: #303133; font-weight: 500; }
+.guide-num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #409eff; color: #fff; font-weight: 700; font-size: var(--wp-font-size, 13px); flex-shrink: 0; }
+.guide-text { font-size: var(--wp-font-size, 13px); color: #303133; font-weight: 500; }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* 公式列虚线下划线+cursor:help */
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
@@ -517,13 +517,13 @@ onMounted(async () => {
 .audit-note-card { margin-top: 16px; }
 
 /* 编制提示 */
-.m7-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m7-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m7-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }
 .m7-details-tip ul { margin: 8px 0 0; padding-left: 20px; }
 .m7-details-tip li { margin-bottom: 4px; line-height: 1.5; }
 
 /* 表格 */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.summary-table .el-table__row:last-child) { background: #f0f9eb !important; font-weight: 600; }
 :deep(.summary-table .el-table__row:last-child td) { border-top: 2px solid #67c23a; }
 :deep(.tier-table .el-input-number) { width: 100%; }

@@ -463,7 +463,7 @@ function fmtPercent(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k7-tab-adjudication { padding: 12px; font-size: 13px; }
+.k7-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* Section header */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -472,14 +472,14 @@ function fmtPercent(v: number | null | undefined): string {
 .header-actions { display: flex; gap: 8px; }
 
 /* 方法论上下文 */
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 
 /* 三角勾稽警告 */
 .reconciliation-alert { margin-bottom: 12px; }
 
 /* 分组区域 */
 .group-section { margin-bottom: 16px; }
-.group-label { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 6px; padding: 6px 10px; border-radius: 4px; }
+.group-label { display: flex; align-items: center; justify-content: space-between; font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; margin-bottom: 6px; padding: 6px 10px; border-radius: 4px; }
 .group-label-asset { background: #ecf5ff; color: #1d4ed8; border-left: 3px solid #409eff; }
 .group-label-income { background: #f0f9eb; color: #166534; border-left: 3px solid #67c23a; }
 
@@ -494,14 +494,14 @@ function fmtPercent(v: number | null | undefined): string {
 .rate-warning { color: #f56c6c; font-weight: 600; }
 
 /* 合计汇总栏 */
-.grand-total-bar { display: flex; align-items: center; gap: 16px; margin: 12px 0; padding: 10px 14px; background: #ecf5ff; border-radius: 6px; font-size: 13px; font-weight: 600; border-top: 2px solid #409eff; }
+.grand-total-bar { display: flex; align-items: center; gap: 16px; margin: 12px 0; padding: 10px 14px; background: #ecf5ff; border-radius: 6px; font-size: var(--wp-font-size, 13px); font-weight: 600; border-top: 2px solid #409eff; }
 .grand-total-bar.total-unbalanced { background: #fef0f0; border-top-color: #f56c6c; }
 .total-label { font-weight: 700; color: #303133; font-size: 14px; }
 .total-audited { color: #409eff; font-weight: 700; }
 
 /* TB回写栏 */
 .tb-writeback-bar { display: flex; align-items: center; gap: 12px; margin: 12px 0; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
-.match-indicator, .mismatch-indicator { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.match-indicator, .mismatch-indicator { display: flex; align-items: center; gap: 4px; font-size: var(--wp-font-size, 13px); }
 .match-indicator { color: #67c23a; }
 .mismatch-indicator { color: #f56c6c; cursor: help; }
 
@@ -509,10 +509,10 @@ function fmtPercent(v: number | null | undefined): string {
 .conclusion-card { margin-top: 16px; }
 
 /* 表格字体 */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 /* 编制提示 */
-.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k7-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k7-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

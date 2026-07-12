@@ -88,7 +88,7 @@ onMounted(() => { if (props.htmlData) initFromHtmlData(props.htmlData) })
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .text-danger { color: #f56c6c; font-weight: 600; }
 .linkage-summary { margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap; }

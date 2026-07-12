@@ -326,7 +326,7 @@ defineExpose({ openDrawer, drawerVisible })
 }
 
 .vt-compare-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
 }
@@ -368,12 +368,12 @@ defineExpose({ openDrawer, drawerVisible })
 }
 
 .vt-operator {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
 .vt-desc {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   font-weight: 500;
 }

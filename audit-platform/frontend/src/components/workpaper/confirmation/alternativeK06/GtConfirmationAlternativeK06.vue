@@ -842,7 +842,7 @@ defineExpose({
 <style scoped>
 .gt-confirmation-alternative-k06 {
   padding: 8px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-confirmation-alternative-k06__toolbar {
@@ -889,7 +889,7 @@ defineExpose({
 }
 
 .detail-section__header {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   margin-bottom: 8px;
   padding: 4px 8px;
@@ -941,7 +941,7 @@ defineExpose({
 }
 
 .balance-card__value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 

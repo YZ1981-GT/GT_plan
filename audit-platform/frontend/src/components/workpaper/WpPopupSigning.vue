@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
 }
 
 .role-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #4b2d77;
 }

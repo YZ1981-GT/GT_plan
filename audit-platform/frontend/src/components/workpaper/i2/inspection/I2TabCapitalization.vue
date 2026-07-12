@@ -408,7 +408,7 @@ function handleReview() {
 
 <style scoped>
 .i2-capitalization {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 .section-header {
@@ -589,7 +589,7 @@ function handleReview() {
   border: 1px solid #e5e7eb;
 }
 .date-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #374151;
   margin-right: 12px;

@@ -305,7 +305,7 @@ function loadDisclosureData() {
 <style scoped>
 .l3-tab-disclosure-listed {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 头部 ─── */
@@ -342,7 +342,7 @@ function loadDisclosureData() {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -368,7 +368,7 @@ function loadDisclosureData() {
 
 .section-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
@@ -387,7 +387,7 @@ function loadDisclosureData() {
 
 /* ─── 表格统一13px字体 ─── */
 :deep(.el-textarea__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -398,7 +398,7 @@ function loadDisclosureData() {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

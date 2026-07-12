@@ -124,7 +124,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-dep-multi { padding: 16px; font-size: 13px; }
+.h1-tab-dep-multi { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .branch-selector { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .branch-hint { font-size: 12px; color: var(--el-text-color-secondary); }
 .methodology-context { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; }
@@ -135,7 +135,7 @@ function fmtAmt(val: number | null | undefined): string {
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
 .impairment-timeline { margin-top: 16px; padding: 12px; background: var(--el-fill-color-lighter); border-radius: 6px; }
-.impairment-timeline h4 { font-size: 13px; margin-bottom: 12px; }
+.impairment-timeline h4 { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .timeline-card { font-size: 12px; }
 .totals-bar { display: flex; gap: 24px; padding: 10px 12px; margin-top: 12px; background: var(--el-fill-color-light); border-radius: 4px; }
 .note-card { margin-top: 12px; }

@@ -690,11 +690,11 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .sec-actions { display: flex; gap: 8px; align-items: center; }
 .objective-list { padding: 10px 14px; background: #f5f7fa; border-radius: 6px; }
-.objective-item { margin: 0; font-size: 13px; color: #303133; line-height: 1.7; }
+.objective-item { margin: 0; font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.7; }
 
 /* 月度毛利表 */
 .monthly-table-wrap { overflow-x: auto; }
-.monthly-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+.monthly-table { width: 100%; border-collapse: collapse; font-size: var(--wp-font-size, 13px); white-space: nowrap; }
 .monthly-table th, .monthly-table td { border: 1px solid #dcdfe6; padding: 4px 6px; text-align: center; }
 .monthly-table th { background: #f5f7fa; font-weight: 600; }
 .col-label { min-width: 100px; text-align: left; }
@@ -704,18 +704,18 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .col-change { min-width: 80px; }
 .row-label { text-align: left; font-weight: 500; white-space: nowrap; padding-left: 8px; }
 .cell-input { padding: 2px; }
-.cell-computed { background: #fafafa; font-size: 13px; text-align: right; padding-right: 6px; }
+.cell-computed { background: #fafafa; font-size: var(--wp-font-size, 13px); text-align: right; padding-right: 6px; }
 .row-auto td { background: #f9fafb; }
 .num-cell { width: 100%; }
-.num-cell :deep(.el-input__inner) { text-align: right; font-size: 13px; padding: 0 4px; }
+.num-cell :deep(.el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); padding: 0 4px; }
 .has-formula { border-bottom: 1px dashed #909399; cursor: help; }
 .val-exceed { color: #f56c6c; font-weight: 600; }
 
 /* 产品表 */
 .product-table-wrap { margin-top: 8px; }
-.product-table { font-size: 13px; }
-.product-table :deep(.el-table__cell) { font-size: 13px; padding: 4px 0; }
-.totals-row { display: flex; gap: 16px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; margin-top: 8px; font-size: 13px; flex-wrap: wrap; }
+.product-table { font-size: var(--wp-font-size, 13px); }
+.product-table :deep(.el-table__cell) { font-size: var(--wp-font-size, 13px); padding: 4px 0; }
+.totals-row { display: flex; gap: 16px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; margin-top: 8px; font-size: var(--wp-font-size, 13px); flex-wrap: wrap; }
 .totals-label { font-weight: 600; }
 .totals-item { color: #606266; }
 
@@ -724,7 +724,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 
 /* 编制提示折叠 */
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #f0f7ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { font-size: 13px; font-weight: 500; cursor: pointer; color: #409eff; }
+.guidance-details summary { font-size: var(--wp-font-size, 13px); font-weight: 500; cursor: pointer; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.8; }
 .guidance-content p { margin: 0 0 4px; }
 

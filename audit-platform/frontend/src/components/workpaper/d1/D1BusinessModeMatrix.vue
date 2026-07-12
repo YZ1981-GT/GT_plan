@@ -219,7 +219,7 @@ function isEmptyResults(results: string[]): boolean {
 .basis-table :deep(.el-table td),
 .basis-table :deep(.el-input__inner),
 .basis-table :deep(.el-textarea__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .combo-name-cell {
@@ -244,14 +244,14 @@ function isEmptyResults(results: string[]): boolean {
 
 .qa-intro {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
 .qa-matrix {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .qa-matrix th,

@@ -357,7 +357,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i1-tab-recoverable-test { padding: 16px; font-size: 13px; }
+.i1-tab-recoverable-test { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论上下文 */
 .methodology-block {
@@ -401,7 +401,7 @@ function fmtAmt(val: number | null | undefined): string {
 .param-value { font-weight: 500; font-variant-numeric: tabular-nums; }
 
 /* 现金流表格 */
-.cf-table { font-size: 13px; margin-bottom: 12px; }
+.cf-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 
 /* DCF 结果网格 */
 .dcf-result-grid {

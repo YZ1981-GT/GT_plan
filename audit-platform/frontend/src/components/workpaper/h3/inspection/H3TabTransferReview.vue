@@ -278,14 +278,14 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-transfer-review { padding: 16px; font-size: 13px; }
+.h3-tab-transfer-review { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .method-context { margin-bottom: 16px; }
 .context-bar { border-left: 3px solid #d97706; background: #fffbe6; padding: 10px 14px; border-radius: 4px; font-size: 12px; line-height: 1.6; }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .action-btns { display: flex; align-items: center; gap: 8px; }
 .nav-chip { cursor: pointer; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .formula-value { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .text-danger { color: var(--el-color-danger); }

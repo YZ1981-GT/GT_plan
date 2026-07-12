@@ -204,7 +204,7 @@ function fmt(n: number): string {
 
 <style scoped>
 
-.g9-disc { font-size: 13px; }
+.g9-disc { font-size: var(--wp-font-size, 13px); }
 
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 

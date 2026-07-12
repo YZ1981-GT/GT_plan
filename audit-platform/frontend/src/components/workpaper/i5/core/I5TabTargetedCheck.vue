@@ -452,7 +452,7 @@ function handleReview(): void {
 </script>
 
 <style scoped>
-.i5-tab-targeted-check { padding: 16px; font-size: 13px; }
+.i5-tab-targeted-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-area {
@@ -460,7 +460,7 @@ function handleReview(): void {
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
 /* Section卡片 */
@@ -493,7 +493,7 @@ function handleReview(): void {
   border-bottom: 1px dashed var(--el-border-color-lighter);
 }
 .check-item:last-child { border-bottom: none; }
-.check-label { font-size: 13px; color: var(--el-text-color-regular); flex: 1; }
+.check-label { font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); flex: 1; }
 
 /* 逐项结论 */
 .section-conclusion {

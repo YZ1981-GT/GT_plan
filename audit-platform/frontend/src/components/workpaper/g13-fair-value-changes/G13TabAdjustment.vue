@@ -165,7 +165,7 @@ function fmtAmount(val: number): string {
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
 .compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 .adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
-.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
+.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: var(--wp-font-size, 13px); font-weight: 500; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; font-weight: 600; }
 </style>

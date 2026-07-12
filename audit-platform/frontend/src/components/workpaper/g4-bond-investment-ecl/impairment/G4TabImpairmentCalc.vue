@@ -493,7 +493,7 @@ defineExpose({
 <style scoped>
 .g4-impairment-calc {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -517,7 +517,7 @@ defineExpose({
 
 /* 表格 */
 .impairment-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .compact-num {

@@ -748,7 +748,7 @@ onUnmounted(() => {
 <style scoped>
 .m9-tab-oci-reconcile {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Section Header ─── */
@@ -800,7 +800,7 @@ onUnmounted(() => {
   font-weight: 500;
   color: #1a73e8;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .m9-guide-steps {
@@ -813,7 +813,7 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
 }
 
@@ -832,7 +832,7 @@ onUnmounted(() => {
 }
 
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
 }
 
@@ -846,7 +846,7 @@ onUnmounted(() => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #78350f;
   line-height: 1.7;
 }
@@ -861,7 +861,7 @@ onUnmounted(() => {
   background: #fef3cd;
   border: 1px solid #ffc107;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #856404;
 }
 
@@ -917,7 +917,7 @@ onUnmounted(() => {
 .grand-total-label {
   font-weight: 700;
   color: #303133;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.subtotal-row) {
@@ -1014,7 +1014,7 @@ onUnmounted(() => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -1033,11 +1033,11 @@ onUnmounted(() => {
 
 /* ─── 表格全局 ─── */
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table .el-table__header th) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 </style>

@@ -816,7 +816,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wp
 .conclusion-actions { display: flex; align-items: center; gap: 8px; }
 .ai-hint { margin-top: 6px; font-size: 12px; color: #e6a23c; }
 .sampling-target-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.sampling-target-label { font-size: 13px; color: #606266; }
+.sampling-target-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 .anomaly-trace-row { margin-top: 4px; }
 .coverage-card { margin-top: 16px; }
 .coverage-title { font-size: 14px; font-weight: 600; }
@@ -830,6 +830,6 @@ const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wp
 .anomaly-trace-summary { margin-top: 16px; padding-top: 12px; border-top: 1px dashed #ebeef5; display: flex; flex-direction: column; gap: 10px; }
 .trace-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .trace-line--types { align-items: flex-start; }
-.trace-label { font-size: 13px; color: #606266; min-width: 168px; }
+.trace-label { font-size: var(--wp-font-size, 13px); color: #606266; min-width: 168px; }
 .trace-hint { font-size: 12px; color: #909399; }
 </style>

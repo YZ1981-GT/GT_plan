@@ -516,7 +516,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i1-tab-addition-check { padding: 16px; font-size: 13px; }
+.i1-tab-addition-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .guidance-area {
   background: linear-gradient(135deg, #e8f4fd 0%, #d6ecfa 100%);
@@ -584,7 +584,7 @@ function fmtAmt(val: number | null | undefined): string {
 .sampling-card { margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .title-actions { display: flex; gap: 8px; align-items: center; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
 .formula-link {
   text-decoration: underline dashed;

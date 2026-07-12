@@ -92,7 +92,7 @@ onBeforeUnmount(() => {
 
 .confirmation-context-menu__item {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   cursor: pointer;
   color: var(--el-text-color-regular);
   transition: background-color 0.15s;

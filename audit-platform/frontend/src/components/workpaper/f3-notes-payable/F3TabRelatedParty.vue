@@ -130,11 +130,11 @@ const fairnessOptions = ['公允', '基本公允', '不公允', '无法判断']
   padding: 12px;
 }
 .f3-tab-related :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .f3-tab-related :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -150,7 +150,7 @@ const fairnessOptions = ['公允', '基本公允', '不公允', '无法判断']
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

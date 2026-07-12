@@ -620,7 +620,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.g7-adjudication { padding: 12px; font-size: 13px; }
+.g7-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
 
 /* Section 标题栏 */
@@ -632,7 +632,7 @@ onMounted(() => {
 .tb-info-bar {
   display: flex; gap: 16px; align-items: center;
   padding: 8px 12px; background: #f0f9eb; border: 1px solid #e1f3d8;
-  border-radius: 4px; margin-bottom: 12px; font-size: 13px;
+  border-radius: 4px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px);
 }
 .tb-label { font-weight: 500; color: #606266; }
 .tb-amount { font-weight: 600; color: #303133; }
@@ -656,7 +656,7 @@ onMounted(() => {
 .group-header.net-value-header {
   background: #f0f9eb; border-color: #e1f3d8; cursor: default;
 }
-.group-name { font-weight: 600; font-size: 13px; color: #303133; }
+.group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; }
 .group-count { font-size: 12px; color: #909399; margin-left: 4px; }
 .formula-tag {
   margin-left: auto; font-size: 11px; color: #67c23a;

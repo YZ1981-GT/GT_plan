@@ -354,24 +354,24 @@ function getProgressColor(p: number): string {
 </script>
 
 <style scoped>
-.k9-tab-index { padding: 12px; font-size: 13px; }
+.k9-tab-index { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── 进度区 ─── */
 .k9-progress-section { margin-bottom: 16px; padding: 14px 16px; background: #f5f7fa; border-radius: 8px; }
-.progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; color: #606266; }
+.progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .progress-text { font-weight: 600; color: #303133; }
 .progress-stats { display: flex; gap: 8px; margin-top: 10px; }
 
 /* ─── 引导区 ─── */
 .k9-guide { background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%); border: 1px solid #b3d9f2; border-radius: 8px; padding: 14px 20px; margin-bottom: 16px; }
-.k9-guide-header { display: flex; align-items: center; gap: 6px; font-weight: 500; color: #1a73e8; margin-bottom: 10px; font-size: 13px; }
+.k9-guide-header { display: flex; align-items: center; gap: 6px; font-weight: 500; color: #1a73e8; margin-bottom: 10px; font-size: var(--wp-font-size, 13px); }
 .k9-guide-steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px; }
-.step-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; }
+.step-item { display: flex; align-items: center; gap: 8px; font-size: var(--wp-font-size, 13px); color: #374151; }
 .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1a73e8; color: #fff; font-size: 11px; font-weight: 600; flex-shrink: 0; }
 
 /* ─── 跨底稿引用 ─── */
 .k9-cross-refs { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
-.cross-refs-label { font-size: 13px; color: #909399; }
+.cross-refs-label { font-size: var(--wp-font-size, 13px); color: #909399; }
 
 /* ─── 分组卡片 ─── */
 .k9-group-card { margin-bottom: 14px; }
@@ -383,17 +383,17 @@ function getProgressColor(p: number): string {
 .group-disclosure :deep(.el-card__header) { background: linear-gradient(90deg, #fefce8 0%, #fefdf5 100%); }
 
 /* ─── 表格 ─── */
-.sheet-name-link { color: #1a73e8; cursor: pointer; font-size: 13px; }
+.sheet-name-link { color: #1a73e8; cursor: pointer; font-size: var(--wp-font-size, 13px); }
 .sheet-name-link:hover { text-decoration: underline; }
 .progress-label { display: inline-block; margin-left: 8px; font-size: 12px; color: #909399; width: 36px; }
 :deep(.completed-row) { background-color: #f0f9eb !important; }
 :deep(.in-progress-row) { background-color: #fdf6ec !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.el-table .el-table__row) { cursor: pointer; }
 :deep(.el-table .el-table__row:hover) { background-color: #ecf5ff !important; }
 
 /* ─── 编制提示 ─── */
-.k9-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k9-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k9-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
 .k9-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

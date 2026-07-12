@@ -294,7 +294,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i5-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+.i5-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-area {
@@ -302,7 +302,7 @@ function fmtAmt(val: number | null | undefined): string {
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
 /* 琥珀色方法论块 */

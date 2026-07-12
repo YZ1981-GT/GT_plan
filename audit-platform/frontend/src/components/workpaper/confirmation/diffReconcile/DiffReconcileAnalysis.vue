@@ -150,17 +150,17 @@ function formatAmount(val?: number): string {
   white-space: normal;
   word-break: break-all;
   line-height: 1.3;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .diff-reconcile-analysis__table :deep(.el-table__body td .cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 合计行不折行 */
 .diff-reconcile-analysis__table :deep(.el-table__footer td .cell) {
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 

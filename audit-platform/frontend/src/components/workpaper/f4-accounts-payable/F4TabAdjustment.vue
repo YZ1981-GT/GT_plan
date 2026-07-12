@@ -255,16 +255,16 @@ function fmtAmount(v: number): string {
 </template>
 
 <style scoped>
-.f4-tab-adjustment { font-size: 13px; }
+.f4-tab-adjustment { font-size: var(--wp-font-size, 13px); }
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: 13px; }
-.guidance-details .guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: var(--wp-font-size, 13px); }
+.guidance-details .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-details .guidance-content p { margin: 2px 0; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
-.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-weight: 600; font-size: 13px; }
+.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .subtotal-bar.balance-fail { background: #fef0f0; }
 .balance-ok { color: #67c23a; margin-left: 12px; }
 .balance-err { color: #f56c6c; margin-left: 12px; }

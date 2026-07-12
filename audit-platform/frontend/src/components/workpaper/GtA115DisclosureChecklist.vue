@@ -705,7 +705,7 @@ defineExpose({
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
@@ -931,7 +931,7 @@ defineExpose({
 
 /* ─── Header Item (section divider, no interactive buttons) ─── */
 .gt-a115-disclosure-checklist__item-header {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #606266;
   padding: 8px 12px;
@@ -989,7 +989,7 @@ defineExpose({
 
 /* Card content */
 .gt-a115-disclosure-checklist__card-content {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.6;
   margin-bottom: 10px;

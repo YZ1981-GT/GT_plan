@@ -152,7 +152,7 @@ function fmtNum(v: number): string { return v == null || isNaN(v) ? '—' : v.to
 </script>
 
 <style scoped>
-.i2-recoverable { font-size: 13px; padding: 16px; }
+.i2-recoverable { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
 .section-actions { display: flex; align-items: center; gap: 4px; }

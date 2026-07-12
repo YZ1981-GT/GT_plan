@@ -364,7 +364,7 @@ function optionShort(opt: ComplianceOption): string {
 </script>
 
 <style scoped>
-.h6-tab-check { padding: 16px; font-size: 13px; }
+.h6-tab-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
 .methodology-context {
@@ -394,7 +394,7 @@ function optionShort(opt: ComplianceOption): string {
 }
 .summary-total { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
 
-.check-table { font-size: 13px; margin-bottom: 12px; }
+.check-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 
 .project-name-cell { display: flex; align-items: center; gap: 4px; }
 .chip-jump { font-size: 11px; padding: 0 4px; white-space: nowrap; }

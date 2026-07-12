@@ -447,7 +447,7 @@ onMounted(() => {
 
 <style scoped>
 .gt-s35-detail {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 工具栏 */
@@ -473,11 +473,11 @@ onMounted(() => {
 
 /* 表格 */
 .gt-s35-detail__table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-s35-detail__table :deep(.el-table__header th) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   background: var(--gt-color-bg-elevated, #fafafa);
 }
 

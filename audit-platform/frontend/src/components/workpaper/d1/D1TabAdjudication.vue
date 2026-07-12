@@ -22,6 +22,8 @@ import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -35,9 +37,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const openReviewDialog = inject<((params: { sectionId: string; sectionLabel: string; relatedData?: Record<string, unknown> }) => void) | null>('openReviewDialog', null)
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
@@ -464,7 +464,7 @@ async function handleAiConclusion() {
   align-items: center;
   gap: 12px;
   padding: 6px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .tb-label {
@@ -488,7 +488,7 @@ async function handleAiConclusion() {
 }
 
 .auto-description {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin: 0 0 8px 0;
 }
@@ -496,7 +496,7 @@ async function handleAiConclusion() {
 .red-label {
   color: #f56c6c;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .note-area {

@@ -18,6 +18,8 @@ import { ref, inject, toRef, computed, onMounted, watch, onBeforeUnmount, type R
 import type { UseE1BaseOptions, ChecklistItem, ChecklistResponse } from '../composables/useE1Adjudication'
 import { parseNum, calcCashBalance, calcFxConvert, sumField } from '../composables/useE1FormulaEngine'
 import GtIndexChip from '../GtIndexChip.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -55,10 +57,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -386,11 +385,11 @@ function onConclusionChange(val: string): void {
 <style scoped>
 .e1-tab-digital-currency { padding: 12px 0; }
 .e1-tab-digital-currency :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .e1-tab-digital-currency :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -406,7 +405,7 @@ function onConclusionChange(val: string): void {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -429,7 +428,7 @@ function onConclusionChange(val: string): void {
 .total-row {
   display: flex; gap: 16px; padding: 10px 12px; margin-top: 8px;
   background: #f5f7fa; border: 1px solid #ebeef5; border-radius: 4px;
-  font-weight: 700; font-size: 13px; flex-wrap: wrap;
+  font-weight: 700; font-size: var(--wp-font-size, 13px); flex-wrap: wrap;
 }
 .total-label { color: #303133; min-width: 40px; }
 .opinion-card {

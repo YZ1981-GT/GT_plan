@@ -796,7 +796,7 @@ defineExpose({
   align-items: center;
   gap: 20px;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-a112-dual-checklist__stat {
@@ -922,7 +922,7 @@ defineExpose({
 }
 
 .gt-a112-dual-checklist__card-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
   color: #374151;
 }

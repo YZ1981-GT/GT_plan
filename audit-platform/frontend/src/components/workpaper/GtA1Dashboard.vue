@@ -1014,7 +1014,7 @@ function debounceSave() {
 }
 .program-card__top { display: flex; align-items: flex-start; gap: 8px; }
 .program-card__desc {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.5;
 }
@@ -1072,7 +1072,7 @@ function debounceSave() {
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #6750A4;
   cursor: pointer;
@@ -1122,7 +1122,7 @@ function debounceSave() {
   color: #6750A4;
 }
 .gt-a1-dashboard__top-tabs :deep(.el-tabs__item) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 0 16px;
   height: 38px;
   line-height: 38px;
@@ -1157,7 +1157,7 @@ function debounceSave() {
 
 .gt-a1-switch-popper .el-dropdown-menu__item {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   display: flex;
   align-items: center;
   gap: 8px;

@@ -804,7 +804,7 @@ function _initDefaultRows(): void {
 </script>
 
 <style scoped>
-.m9-tab-detail { padding: 12px; font-size: 13px; }
+.m9-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── Header ─── */
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
@@ -823,7 +823,7 @@ function _initDefaultRows(): void {
 }
 .m9-guide-header {
   display: flex; align-items: center; gap: 6px;
-  font-weight: 600; font-size: 13px; color: #1a73e8;
+  font-weight: 600; font-size: var(--wp-font-size, 13px); color: #1a73e8;
   margin-bottom: 8px;
 }
 .m9-guide-steps {
@@ -864,7 +864,7 @@ function _initDefaultRows(): void {
 .block-desc { font-size: 12px; color: #909399; }
 
 /* ─── 表格 ─── */
-.m9-tab-detail :deep(.el-table) { font-size: 13px; }
+.m9-tab-detail :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .m9-tab-detail :deep(.el-table .subtotal-row) {
   background: #f5f7fa;
   font-weight: 600;

@@ -383,21 +383,21 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m3-tab-fx-invest { padding: 12px; font-size: 13px; }
+.m3-tab-fx-invest { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .batch-name { font-weight: 500; color: #303133; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .diff-warning { color: #f56c6c !important; font-weight: 600; }
-:deep(.el-table) { font-size: 13px; }
-.total-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; border-radius: 6px; background: #f0f9eb; font-size: 13px; align-items: center; flex-wrap: wrap; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.total-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; border-radius: 6px; background: #f0f9eb; font-size: var(--wp-font-size, 13px); align-items: center; flex-wrap: wrap; }
 .threshold-hint { font-size: 12px; color: #909399; }
-.m3-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m3-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m3-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m3-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

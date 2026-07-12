@@ -155,7 +155,7 @@ function fmtCell(v: unknown): string {
 </script>
 
 <style scoped>
-.g1-detail { padding: 12px; font-size: 13px; }
+.g1-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .sheet-title { margin: 0 0 12px; }
 .toolbar { margin-bottom: 8px; }
 .segment-bar { margin-bottom: 12px; }

@@ -119,7 +119,7 @@ function saveRows(): void {
   margin-bottom: 12px;
 }
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 .section-header {

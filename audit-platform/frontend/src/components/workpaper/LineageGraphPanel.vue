@@ -255,7 +255,7 @@ function handleAttachmentClick(att: AttachmentRef) {
 
 .node-label {
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .node-sheet {

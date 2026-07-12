@@ -55,7 +55,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 </script>
 
 <style scoped>
-.g8-dir { font-size: 13px; }
+.g8-dir { font-size: var(--wp-font-size, 13px); }
 .index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .title { margin: 0; }
 .progress-wrap { flex: 1; min-width: 200px; }

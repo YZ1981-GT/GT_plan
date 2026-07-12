@@ -139,7 +139,7 @@ const { rows, auditConclusion, stats, updateRow, addRow, removeRow } = useG1Fair
 </script>
 
 <style scoped>
-.g1-fv-test { padding: 12px; font-size: 13px; }
+.g1-fv-test { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

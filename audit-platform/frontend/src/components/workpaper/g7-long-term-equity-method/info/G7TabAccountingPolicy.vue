@@ -381,7 +381,7 @@ onMounted(() => {
 <style scoped>
 .g7-tab-accounting-policy {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* Section 标题栏 */
@@ -440,7 +440,7 @@ onMounted(() => {
 }
 .conclusion-card :deep(.el-card__header) {
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .conclusion-text {

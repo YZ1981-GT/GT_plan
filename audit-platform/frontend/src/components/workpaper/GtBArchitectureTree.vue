@@ -366,7 +366,7 @@ function onNodeClick(node: ArchNode) {
 }
 
 .gt-b-arch__name {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.4;
   color: var(--gt-color-text-primary, #303133);
   display: -webkit-box;

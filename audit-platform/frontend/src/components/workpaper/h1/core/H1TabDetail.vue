@@ -307,7 +307,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-detail { padding: 16px; font-size: 13px; }
+.h1-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .guide-area {
   background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%);
   border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;
@@ -319,7 +319,7 @@ function fmtAmt(val: number | null | undefined): string {
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .row-count { font-size: 12px; color: var(--el-text-color-secondary); margin-left: auto; }
 .segment-panel { margin-bottom: 12px; }
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .summary-section { margin: 12px 0; }

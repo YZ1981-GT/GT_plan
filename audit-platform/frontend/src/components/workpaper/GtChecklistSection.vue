@@ -592,7 +592,7 @@ function activateCell(itemId: string, field: string) {
 .gt-checklist-table__custom-hint {
   margin: 0 0 12px;
   color: var(--gt-color-text-tertiary, #999);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Editable custom item content ─── */
@@ -703,7 +703,7 @@ function activateCell(itemId: string, field: string) {
 }
 
 .conclusion-card__text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.8;
   color: var(--gt-color-text, #303133);
   margin: 0 0 16px;
@@ -722,7 +722,7 @@ function activateCell(itemId: string, field: string) {
 }
 
 .conclusion-card__sign-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--gt-color-text, #303133);
   white-space: nowrap;

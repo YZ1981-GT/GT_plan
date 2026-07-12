@@ -131,11 +131,11 @@ const riskOptions = ['低', '中', '高', '极高']
   padding: 12px;
 }
 .f3-tab-overdue :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .f3-tab-overdue :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -151,7 +151,7 @@ const riskOptions = ['低', '中', '高', '极高']
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

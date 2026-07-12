@@ -351,7 +351,7 @@ function fmtPercent(val: number): string {
 </script>
 
 <style scoped>
-.m2-detail-unlisted { font-size: 13px; }
+.m2-detail-unlisted { font-size: var(--wp-font-size, 13px); }
 .detail-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .row-count { font-size: 12px; color: #909399; margin-left: auto; }
 .segment-switcher { margin-bottom: 12px; }
@@ -359,6 +359,6 @@ function fmtPercent(val: number): string {
 .formula-value { color: #409eff; font-weight: 500; }
 .formula-value--primary { color: #67c23a; font-weight: 600; }
 .warn-value { color: #e6a23c; font-weight: 600; }
-:deep(.el-table) { font-size: 13px; }
-.summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266; flex-wrap: wrap; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; flex-wrap: wrap; }
 </style>

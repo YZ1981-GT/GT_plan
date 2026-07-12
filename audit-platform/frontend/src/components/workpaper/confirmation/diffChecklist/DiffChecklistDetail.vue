@@ -286,7 +286,7 @@ function statusLabel(status?: string): string {
   min-height: 100px;
   padding: 16px;
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .diff-checklist-detail__title {
@@ -337,7 +337,7 @@ function statusLabel(status?: string): string {
 }
 
 .diff-checklist-detail__section-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-text-color-secondary);
   margin-bottom: 8px;
@@ -361,7 +361,7 @@ function statusLabel(status?: string): string {
 }
 
 .diff-checklist-detail__label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-primary);
   display: flex;
   align-items: center;

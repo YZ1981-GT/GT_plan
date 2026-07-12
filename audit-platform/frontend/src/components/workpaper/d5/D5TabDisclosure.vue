@@ -348,11 +348,11 @@ function fmtAmount(val: number | null | undefined): string {
   padding: 12px;
 }
 .d5-disclosure :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d5-disclosure :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 顶部编制提示 */
@@ -370,7 +370,7 @@ function fmtAmount(val: number | null | undefined): string {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -425,7 +425,7 @@ function fmtAmount(val: number | null | undefined): string {
   background: #fafafa;
   border-radius: 4px;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -434,7 +434,7 @@ function fmtAmount(val: number | null | undefined): string {
 }
 
 .note-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin-bottom: 6px;
 }
@@ -449,7 +449,7 @@ function fmtAmount(val: number | null | undefined): string {
 .guidance-hint summary {
   padding: 8px 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #409eff;
 }
 

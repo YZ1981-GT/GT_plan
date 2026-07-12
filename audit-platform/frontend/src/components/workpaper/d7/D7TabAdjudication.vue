@@ -432,11 +432,11 @@ function openReview(sectionId: string) {
 <style scoped>
 .d7-adjudication { padding: 12px; }
 .d7-adjudication :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d7-adjudication :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -454,7 +454,7 @@ function openReview(sectionId: string) {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -499,7 +499,7 @@ function openReview(sectionId: string) {
   background: #f5f7fa;
   border-radius: 4px;
   margin: 16px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .tb-label { color: #909399; }
 .diff-tag { margin-left: 8px; }

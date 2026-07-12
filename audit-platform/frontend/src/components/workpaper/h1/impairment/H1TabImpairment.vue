@@ -171,7 +171,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-impairment { padding: 16px; font-size: 13px; }
+.h1-tab-impairment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; }
 .indication-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }

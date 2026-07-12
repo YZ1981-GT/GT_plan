@@ -212,7 +212,7 @@ function fmtRate(rate: number | null): string {
 </script>
 
 <style scoped>
-.g13-adjudication { padding: 12px; font-size: 13px; }
+.g13-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g13-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .g13-actions { display: flex; gap: 8px; align-items: center; }
 .g13-title { margin: 0; font-size: 15px; font-weight: 600; }

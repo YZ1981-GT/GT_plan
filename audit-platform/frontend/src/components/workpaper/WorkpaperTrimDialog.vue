@@ -163,7 +163,7 @@ onMounted(() => {
 
 .wp-trim-dialog__count {
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #909399;
 }
 </style>

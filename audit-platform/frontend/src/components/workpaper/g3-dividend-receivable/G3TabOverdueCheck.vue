@@ -291,7 +291,7 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
 <style scoped>
 .g3-overdue-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -342,7 +342,7 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   flex-wrap: wrap;
 }
@@ -384,7 +384,7 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

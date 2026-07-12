@@ -102,7 +102,7 @@ function fmt(v: number): string {
 </script>
 
 <style scoped>
-.g5-adjustment { font-size: 13px; }
+.g5-adjustment { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

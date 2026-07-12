@@ -508,7 +508,7 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
 
 <style scoped>
 .cct-summary-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-view-header {
@@ -538,7 +538,7 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
   background: #fffbeb;
   padding: 12px 16px;
   margin: 8px 0 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   border-radius: 0 6px 6px 0;
 }
 
@@ -554,7 +554,7 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
   font-weight: 500;
   color: #92400e;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-methodology-table {
@@ -573,7 +573,7 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
 
 /* ─── 表格 13px 铁律 ─── */
 .cct-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-table :deep(.el-table__header th) {
@@ -583,12 +583,12 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
 }
 
 .cct-table :deep(.el-table__body td) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-table :deep(.el-input__inner),
 .cct-table :deep(.el-textarea__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-table :deep(.el-select) {
@@ -647,7 +647,7 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
 
 .cct-compilation-tips summary {
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #6b7280;
   background: #f9fafb;

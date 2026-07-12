@@ -291,11 +291,11 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 .gt-s35-bundle__objective :deep(.el-alert__title) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .gt-s35-bundle__objective .objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -308,7 +308,7 @@ onMounted(async () => {
 }
 .gt-s35-bundle__prep summary {
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: var(--gt-color-text-secondary, #606266);
   cursor: pointer;
@@ -316,7 +316,7 @@ onMounted(async () => {
 }
 .gt-s35-bundle__prep .prep-content {
   padding: 4px 12px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: var(--gt-color-text-secondary, #606266);
 }
@@ -328,7 +328,7 @@ onMounted(async () => {
   background: var(--gt-color-bg-elevated, #fafafa);
   border-radius: var(--gt-radius-sm, 4px);
   border: 1px solid var(--gt-color-border-light, #ebeef5);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .dashboard-stats {

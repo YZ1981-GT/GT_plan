@@ -334,7 +334,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i4-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+.i4-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-area {
@@ -342,7 +342,7 @@ function fmtAmt(val: number | null | undefined): string {
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
 /* 琥珀色方法论块 */
@@ -388,7 +388,7 @@ function fmtAmt(val: number | null | undefined): string {
 /* 净值摘要 */
 .net-value-summary { padding: 12px; }
 .net-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.net-label { font-size: 13px; color: var(--el-text-color-regular); }
+.net-label { font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); }
 .net-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
 .net-result { padding-top: 8px; border-top: 1px solid var(--el-border-color-lighter); }
 .net-result .net-amount { color: var(--el-color-primary); font-size: 16px; }

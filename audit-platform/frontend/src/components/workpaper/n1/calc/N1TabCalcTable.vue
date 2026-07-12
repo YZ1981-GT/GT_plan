@@ -775,7 +775,7 @@ function handleAI(section: string) {
 <style scoped>
 .n1-tab-calc-table {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 双模式切换 ─── */
@@ -802,7 +802,7 @@ function handleAI(section: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1565c0;
 }
 
@@ -824,7 +824,7 @@ function handleAI(section: string) {
   border: 1px solid #fde68a;
   border-left: 4px solid #d97706;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   line-height: 1.7;
 }
@@ -848,7 +848,7 @@ function handleAI(section: string) {
   border: 1px solid #81c784;
   border-left: 4px solid #43a047;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #1b5e20;
 }
@@ -909,7 +909,7 @@ function handleAI(section: string) {
   padding: 8px 14px;
   margin: 12px 0 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
@@ -948,7 +948,7 @@ function handleAI(section: string) {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-input-number) {
@@ -957,7 +957,7 @@ function handleAI(section: string) {
 
 :deep(.el-input-number .el-input__inner) {
   text-align: right;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cell-input {
@@ -970,7 +970,7 @@ function handleAI(section: string) {
 }
 
 .cell-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -1076,7 +1076,7 @@ function handleAI(section: string) {
 }
 
 .cv-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
   margin-bottom: 10px;
@@ -1136,7 +1136,7 @@ function handleAI(section: string) {
 }
 
 .confirm-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
   margin-bottom: 10px;
@@ -1198,7 +1198,7 @@ function handleAI(section: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #0369a1;
   margin-bottom: 10px;
@@ -1239,7 +1239,7 @@ function handleAI(section: string) {
 
 .field-label {
   display: block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   margin-bottom: 6px;
@@ -1252,7 +1252,7 @@ function handleAI(section: string) {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

@@ -197,13 +197,13 @@ const conclusionCounts = computed(() => {
 
 <style scoped>
 .d4-walkthrough-matrix,
-.matrix-table { font-size: 13px; }
+.matrix-table { font-size: var(--wp-font-size, 13px); }
 .index-cell { font-weight: 500; color: #606266; font-size: 12px; }
 .dim-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .dim-tag { font-size: 12px; }
 .dim-amount { font-size: 11px; color: #606266; font-variant-numeric: tabular-nums; }
 .warn-icon { font-size: 12px; cursor: help; }
-.score-cell { font-weight: 600; font-size: 13px; }
+.score-cell { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .empty-cell { color: #c0c4cc; }
 .matrix-summary {
   display: flex; align-items: center; gap: 24px;
@@ -211,12 +211,12 @@ const conclusionCounts = computed(() => {
   border: 1px solid #ebeef5; border-top: none; border-radius: 0 0 8px 8px;
 }
 .summary-item { display: flex; align-items: center; gap: 8px; }
-.summary-label { color: #909399; font-size: 13px; }
-.summary-value { font-weight: 600; color: #303133; font-size: 13px; }
+.summary-label { color: #909399; font-size: var(--wp-font-size, 13px); }
+.summary-value { font-weight: 600; color: #303133; font-size: var(--wp-font-size, 13px); }
 .summary-value.warn { color: #e6a23c; }
 .summary-value.danger { color: #f56c6c; }
 .summary-tags { display: flex; gap: 6px; }
 :deep(.el-table) { --el-table-border-color: #ebeef5; }
-:deep(.el-table th) { font-size: 13px; font-weight: 500; }
-:deep(.el-table td) { font-size: 13px; padding: 8px 6px; }
+:deep(.el-table th) { font-size: var(--wp-font-size, 13px); font-weight: 500; }
+:deep(.el-table td) { font-size: var(--wp-font-size, 13px); padding: 8px 6px; }
 </style>

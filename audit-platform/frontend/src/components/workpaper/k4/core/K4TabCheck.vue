@@ -310,7 +310,7 @@ function openReview(id: string): void {
 </script>
 
 <style scoped>
-.k4-tab-check { padding: 16px; font-size: 13px; }
+.k4-tab-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

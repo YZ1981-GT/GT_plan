@@ -670,7 +670,7 @@ onMounted(async () => {
   background: var(--gt-color-primary); color: #fff; font-size: 12px; font-weight: 700; flex-shrink: 0;
 }
 .gt-wp-lc-nav-info { flex: 1; min-width: 0; }
-.gt-wp-lc-nav-name { font-size: 13px; font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 4px; }
+.gt-wp-lc-nav-name { font-size: var(--wp-font-size, 13px); font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 4px; }
 .gt-wp-lc-nav-progress { display: flex; align-items: center; gap: 8px; }
 .gt-wp-lc-nav-pct { font-size: 11px; color: var(--gt-color-text-tertiary); white-space: nowrap; }
 
@@ -694,7 +694,7 @@ onMounted(async () => {
 .gt-wp-lc-content-header { display: flex; align-items: center; gap: 12px; }
 .gt-wp-lc-h3 { margin: 0; font-size: 18px; color: var(--gt-color-primary); font-weight: 700; }
 .gt-wp-lc-h4 { margin: 0 0 8px; font-size: 14px; color: var(--gt-color-text-primary); font-weight: 600; }
-.gt-wp-lc-desc { font-size: 13px; color: var(--gt-color-text-secondary); line-height: 1.6; margin: 0; }
+.gt-wp-lc-desc { font-size: var(--wp-font-size, 13px); color: var(--gt-color-text-secondary); line-height: 1.6; margin: 0; }
 .gt-wp-lc-action-row { display: flex; gap: 8px; }
 
 /* 裁剪/委派统计网格 */
@@ -715,7 +715,7 @@ onMounted(async () => {
   border-radius: 10px; padding: 16px;
 }
 .gt-wp-lc-rec-list { list-style: none; padding: 0; margin: 0; }
-.gt-wp-lc-rec-list li { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 13px; }
+.gt-wp-lc-rec-list li { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: var(--wp-font-size, 13px); }
 .gt-wp-lc-rec-name { color: var(--gt-color-text-primary); }
 .gt-wp-lc-filter-row { margin-bottom: 12px; }
 
@@ -727,15 +727,15 @@ onMounted(async () => {
   transition: background 0.15s;
 }
 .gt-wp-lc-list-item:hover { background: var(--gt-color-primary-bg, #f8f5ff); }
-.gt-wp-lc-li-code { font-weight: 600; color: var(--gt-color-primary); min-width: 50px; font-size: 13px; }
-.gt-wp-lc-li-name { flex: 1; color: var(--gt-color-text-primary); font-size: 13px; }
-.gt-wp-lc-empty { text-align: center; color: var(--gt-color-text-tertiary); font-size: 13px; padding: 24px; }
+.gt-wp-lc-li-code { font-weight: 600; color: var(--gt-color-primary); min-width: 50px; font-size: var(--wp-font-size, 13px); }
+.gt-wp-lc-li-name { flex: 1; color: var(--gt-color-text-primary); font-size: var(--wp-font-size, 13px); }
+.gt-wp-lc-empty { text-align: center; color: var(--gt-color-text-tertiary); font-size: var(--wp-font-size, 13px); padding: 24px; }
 
 /* 归档门禁 */
 .gt-wp-lc-gate-list-wrap { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .gt-wp-lc-gate-item {
   display: flex; align-items: center; gap: 10px; padding: 8px 12px;
-  border-radius: 6px; background: var(--gt-color-bg, #fafafa); font-size: 13px;
+  border-radius: 6px; background: var(--gt-color-bg, #fafafa); font-size: var(--wp-font-size, 13px);
 }
 .gt-wp-lc-gate-icon {
   width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
@@ -755,7 +755,7 @@ onMounted(async () => {
   display: flex; align-items: center; justify-content: center; padding: 24px;
   background: var(--gt-color-bg, #fafafa); border-color: var(--gt-color-border-light, #f0f0f0);
 }
-.gt-wp-lc-todo-panel__empty-text { font-size: 13px; color: var(--gt-color-text-tertiary); }
+.gt-wp-lc-todo-panel__empty-text { font-size: var(--wp-font-size, 13px); color: var(--gt-color-text-tertiary); }
 .gt-wp-lc-todo-panel__header {
   display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
   padding-bottom: 10px; border-bottom: 1px solid rgba(103, 80, 164, 0.1);
@@ -769,7 +769,7 @@ onMounted(async () => {
 }
 .gt-wp-lc-todo-panel__item:hover { background: #fff; border-color: var(--gt-color-primary); box-shadow: 0 2px 8px rgba(103, 80, 164, 0.1); }
 .gt-wp-lc-todo-panel__code { font-size: 12px; font-weight: 700; color: var(--gt-color-primary); min-width: 40px; }
-.gt-wp-lc-todo-panel__name { flex: 1; font-size: 13px; color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gt-wp-lc-todo-panel__name { flex: 1; font-size: var(--wp-font-size, 13px); color: var(--gt-color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 无待办占位区 */
 .gt-wp-lc-todo-empty-placeholder {
@@ -788,7 +788,7 @@ onMounted(async () => {
   border: 1px solid #ffe082; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
 }
 .gt-wp-lc-overdue-bar__icon { font-size: 16px; }
-.gt-wp-lc-overdue-bar__text { font-size: 13px; font-weight: 600; color: #e65100; }
+.gt-wp-lc-overdue-bar__text { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #e65100; }
 .gt-wp-lc-overdue-bar__items { display: flex; gap: 6px; flex-wrap: wrap; }
 .gt-wp-lc-overdue-bar__tag {
   padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;

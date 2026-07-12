@@ -526,7 +526,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .i1-tab-amort-alloc {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文 — 琥珀色左边线 + 浅黄背景 */
@@ -562,7 +562,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 表格 */
 .alloc-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 16px;
 }
 .alloc-table :deep(.el-table__header th) {

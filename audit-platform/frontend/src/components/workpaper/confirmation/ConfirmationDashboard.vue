@@ -103,7 +103,7 @@ function rateColor(pct: number, threshold: number): string {
   gap: 8px;
 }
 .confirmation-dashboard__rate-item span {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   white-space: nowrap;
 }
 </style>

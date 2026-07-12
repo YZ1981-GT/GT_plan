@@ -251,6 +251,113 @@ jobs:
       - name: Check workpaper composables import depth
         run: python backend/scripts/check/fix_wp_composables_import_depth.py --check
 
+  displayprefs-contract-check:
+    # P0-3: DisplayPrefs 契约守卫（STRICT 模式）
+    # 拦截反模式 A（inject 硬编码闭包）和 B（font-size 字面量硬编码）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check displayprefs contract (strict mode)
+        run: |
+          python backend/scripts/check/check_displayprefs_contract.py --strict
+
+  utf8-integrity-check:
+    # P0-3: UTF-8 完整性检查（REPORT 模式）
+    # 检测 U+FFFD 替换字符，拦截 PowerShell 文本替换破坏
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check UTF-8 integrity (report mode)
+        run: |
+          python backend/scripts/check/check_utf8_integrity.py || true
+
+  vite-transform-smoke:
+    # P0-3: Vite 全树 transform 冒烟（REPORT 模式）
+    # 对每个 .vue/.ts 调 transformRequest，收集 500 崩溃文件
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run Vite transform smoke (report mode)
+        run: |
+          node backend/scripts/check/vite_transform_smoke.mjs || true
+
+  coverage-drift-check:
+    # P0-3: Coverage Ledger 漂移守卫（STRICT 模式）
+    # 检测底稿能力接线覆盖率漂移
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check coverage ledger drift (strict mode)
+        run: |
+          # 脚本尚未创建时优雅跳过
+          if [ -f "backend/scripts/check/check_coverage_ledger.py" ]; then
+            python backend/scripts/check/check_coverage_ledger.py --strict
+          else
+            echo "::warning::check_coverage_ledger.py 尚未创建，跳过"
+          fi
+
+  render-smoke:
+    # P0-3: Playwright render 冒烟测试（BLOCKING 模式）
+    # 验证底稿渲染无 console error + 关键选择器存在
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        working-directory: audit-platform/frontend
+      - name: Run render smoke tests (blocking mode)
+        run: |
+          # render 冒烟需要前后端服务运行；CI 环境服务不可用时优雅跳过
+          if [ -z "$RENDER_SMOKE_BACKEND_URL" ]; then
+            echo "::warning::render-smoke 需要后端服务（RENDER_SMOKE_BACKEND_URL 未设置），跳过"
+            exit 0
+          fi
+          npx playwright test tests/render-smoke/ --reporter=list
+        working-directory: audit-platform/frontend
+
+  file-size-guard:
+    # P2-6.4: CI size guard — 拆分后文件行数上限（REPORT 模式）
+    # Feature: platform-global-hardening
+    # 对拆分后 orchestrator/facade 设置精确行数上限，防退化回膨胀
+    # 同时对 workpaper/ .vue 和 backend/app/ .py 设 2000 行 soft limit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run file size guard (report mode)
+        run: |
+          python backend/scripts/check/check_file_size_guard.py --check || true
+
   hotspot-baseline-check:
     # P2-1.3: 新增裸组件/重复能力/超大文件检查
     # 对比 baseline，只有新增超标文件才触发（历史债务不阻塞）

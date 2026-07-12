@@ -461,7 +461,7 @@ function isHighChangeRate(rate: number | null | undefined): boolean {
 
 <style scoped>
 .i5-adjudication {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -492,7 +492,7 @@ function isHighChangeRate(rate: number | null | undefined): boolean {
 .block-title { font-size: 14px; }
 
 /* 审定表 */
-.adjudication-table { font-size: 13px; }
+.adjudication-table { font-size: var(--wp-font-size, 13px); }
 
 /* 公式列虚线下划线 + cursor:help */
 .formula-col-header {
@@ -521,7 +521,7 @@ function isHighChangeRate(rate: number | null | undefined): boolean {
 
 /* TB差异 */
 .tb-section { margin-bottom: 20px; margin-top: 24px; }
-.tb-table { font-size: 13px; }
+.tb-table { font-size: var(--wp-font-size, 13px); }
 .difference-warning { color: #dc2626; font-weight: 600; }
 
 /* 跨底稿联动 */
@@ -529,7 +529,7 @@ function isHighChangeRate(rate: number | null | undefined): boolean {
   display: flex; align-items: center; gap: 8px;
   padding: 12px 0; margin-bottom: 16px; flex-wrap: wrap;
 }
-.cross-ref-label { color: #606266; font-size: 13px; }
+.cross-ref-label { color: #606266; font-size: var(--wp-font-size, 13px); }
 
 /* 审计说明/结论 el-card */
 .audit-note-card { margin-bottom: 16px; }

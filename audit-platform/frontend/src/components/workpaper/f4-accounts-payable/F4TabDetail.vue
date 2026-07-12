@@ -392,7 +392,7 @@ function fmtAmount(v: number): string {
 
 <style scoped>
 .f4-tab-detail {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -405,11 +405,11 @@ function fmtAmount(v: number): string {
   cursor: pointer;
   font-weight: 500;
   color: #409eff;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .guidance-details .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -466,6 +466,6 @@ function fmtAmount(v: number): string {
   background: #f5f7fa;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

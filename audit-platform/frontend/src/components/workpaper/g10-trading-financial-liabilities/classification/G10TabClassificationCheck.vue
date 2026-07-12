@@ -99,7 +99,7 @@ const expandedSections = ref<string[]>([])
 </script>
 
 <style scoped>
-.g10-classification { font-size: 13px; padding: 4px; }
+.g10-classification { font-size: var(--wp-font-size, 13px); padding: 4px; }
 .methodology { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; margin-bottom: 10px; font-size: 12px; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .toolbar h3 { margin: 0; font-size: 15px; flex: 1; }

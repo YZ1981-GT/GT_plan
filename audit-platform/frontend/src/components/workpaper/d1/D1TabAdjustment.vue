@@ -418,7 +418,7 @@ function saveAuditMeta() {
   padding: 8px 12px;
 }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.7; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.7; }
 .guidance-content p { margin: 4px 0; }
 .tab-toolbar {
   display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
@@ -426,17 +426,17 @@ function saveAuditMeta() {
 .toolbar-left, .toolbar-right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .balance-indicator {
   display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
-  margin-bottom: 12px; padding: 8px 12px; background: #fafafa; border-radius: 4px; font-size: 13px;
+  margin-bottom: 12px; padding: 8px 12px; background: #fafafa; border-radius: 4px; font-size: var(--wp-font-size, 13px);
 }
 .cell-amount-input { width: 100%; }
-.empty-hint { text-align: center; color: #909399; padding: 24px; font-size: 13px; }
+.empty-hint { text-align: center; color: #909399; padding: 24px; font-size: var(--wp-font-size, 13px); }
 .opinion-card { margin-top: 16px; border: 1px solid #ebeef5; }
 .opinion-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .opinion-title { font-weight: 600; font-size: 14px; }
 .opinion-chips { display: flex; gap: 8px; }
 .opinion-section { margin-bottom: 16px; }
 .opinion-section:last-child { margin-bottom: 0; }
-.opinion-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: 500; font-size: 13px; }
+.opinion-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-weight: 500; font-size: var(--wp-font-size, 13px); }
 .col-header-ellipsis {
   display: inline-block;
   max-width: 100%;

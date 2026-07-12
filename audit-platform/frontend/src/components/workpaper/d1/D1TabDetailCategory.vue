@@ -18,6 +18,8 @@ import { useD1TabImportExport } from '../composables/useD1TabImportExport'
 import { useD1VirtualBrowse } from '../composables/useD1VirtualBrowse'
 import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -31,9 +33,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const openReviewDialog = inject<((params: { sectionId: string }) => void) | null>('openReviewDialog', null)
 
@@ -581,21 +581,21 @@ function onReview(sectionId: string) {
 .methodology-summary {
   cursor: pointer;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #b88230;
 }
 
 .methodology-body {
   padding: 8px 14px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.8;
 }
 
 .method-title {
   margin: 8px 0 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .method-title-row {

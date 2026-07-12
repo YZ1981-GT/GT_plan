@@ -381,7 +381,7 @@ async function onConfirm() {
 
 .section-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 10px;
   color: #303133;
 }
@@ -412,7 +412,7 @@ async function onConfirm() {
 }
 
 .override-subject {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -437,7 +437,7 @@ async function onConfirm() {
 }
 
 .segment-tag {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 可编辑段列表 */

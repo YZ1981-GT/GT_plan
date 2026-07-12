@@ -642,7 +642,7 @@ const BIZ_CATEGORIES = [
 }
 
 .a111-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   white-space: nowrap;
@@ -662,7 +662,7 @@ const BIZ_CATEGORIES = [
   border-bottom: 1px solid #dcdfe6;
   padding: 8px 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -694,7 +694,7 @@ const BIZ_CATEGORIES = [
 
 .a111-sign-col--date {
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ═══ Progress Bar ═══ */
@@ -706,7 +706,7 @@ const BIZ_CATEGORIES = [
 }
 
 .a111-progress-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   white-space: nowrap;
@@ -735,14 +735,14 @@ const BIZ_CATEGORIES = [
 
 .a111-amendment-reason {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .a111-amendment-signs {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .a111-amendment-sign-item {
@@ -761,7 +761,7 @@ const BIZ_CATEGORIES = [
 
 /* ═══ Note Section ═══ */
 .a111-note-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.8;
 }
@@ -909,7 +909,7 @@ const BIZ_CATEGORIES = [
   }
 
   .a111-section-title {
-    font-size: 13px;
+    font-size: var(--wp-font-size, 13px);
     border-bottom: 1px solid #333;
   }
 

@@ -202,15 +202,15 @@ async function handleOcrUpload(type: 'rental' | 'consult', rowId: string, file: 
 </template>
 
 <style scoped>
-.d4-other-contract{padding:16px 20px;font-size:13px}
+.d4-other-contract{padding:16px 20px;font-size: var(--wp-font-size, 13px)}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 :deep(.dropdown-group-label) { font-size: 12px; color: #909399; cursor: default; }
 .block-section{margin-bottom:20px;border:1px solid #ebeef5;border-radius:8px;padding:14px 16px}
-.methodology-collapse{margin-bottom:16px;border-radius:6px;border:1px solid #faecd8;border-left:3px solid #e6a23c;background:#fffbf0}.methodology-summary{cursor:pointer;padding:8px 14px;font-size:13px;font-weight:500;color:#b88230}.methodology-body{padding:8px 14px 12px;font-size:12px;color:#606266;line-height:1.8}.method-title{margin-bottom:4px;font-size:13px}.method-objectives{margin:4px 0 10px 16px;padding:0}.method-objectives li{margin-bottom:3px}.method-hint{margin-bottom:4px;color:#909399;font-style:italic}
+.methodology-collapse{margin-bottom:16px;border-radius:6px;border:1px solid #faecd8;border-left:3px solid #e6a23c;background:#fffbf0}.methodology-summary{cursor:pointer;padding:8px 14px;font-size: var(--wp-font-size, 13px);font-weight:500;color:#b88230}.methodology-body{padding:8px 14px 12px;font-size:12px;color:#606266;line-height:1.8}.method-title{margin-bottom:4px;font-size: var(--wp-font-size, 13px)}.method-objectives{margin:4px 0 10px 16px;padding:0}.method-objectives li{margin-bottom:3px}.method-hint{margin-bottom:4px;color:#909399;font-style:italic}
 .rental-block{border-left:3px solid #67c23a}
 .consult-block{border-left:3px solid #409eff}
 .block-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}.block-title{font-size:14px;font-weight:600;color:#303133}.block-hint{font-size:12px;color:#909399}
-.contract-table{font-size:13px}.contract-table :deep(.el-table__cell){padding:5px 4px}.contract-table :deep(.row-diff td){background-color:#fdf6ec !important}
+.contract-table{font-size: var(--wp-font-size, 13px)}.contract-table :deep(.el-table__cell){padding:5px 4px}.contract-table :deep(.row-diff td){background-color:#fdf6ec !important}
 .auto-calc{color:#909399;font-style:italic;border-bottom:1px dashed #c0c4cc;cursor:help}.diff-warn{color:#e6a23c;font-weight:600;font-style:normal}
 .audit-opinion-card{margin-bottom:16px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
 .oo-container{min-height:600px;height:calc(100vh - 280px);border-radius:8px;overflow:hidden}

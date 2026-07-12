@@ -160,7 +160,7 @@ function onImported() { emit('imported') }
 </script>
 
 <style scoped>
-.g9-l3 { font-size: 13px; }
+.g9-l3 { font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .methodology { flex: 1; border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; }

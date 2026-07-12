@@ -445,7 +445,7 @@ const isReadonly = computed(() => props.isReadonly)
 </script>
 
 <style scoped>
-.g4-adjudication { padding: 12px; font-size: 13px; }
+.g4-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* Section 标题栏 */
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
@@ -469,7 +469,7 @@ const isReadonly = computed(() => props.isReadonly)
 .group-header:hover { background: #d9ecff; }
 .group-header.static { cursor: default; }
 .group-header.static:hover { background: #ecf5ff; }
-.group-name { font-weight: 600; font-size: 13px; color: #303133; }
+.group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; }
 .collapse-icon { transition: transform 0.2s; font-size: 14px; }
 .collapse-icon.is-collapsed { transform: rotate(-90deg); }
 
@@ -500,7 +500,7 @@ const isReadonly = computed(() => props.isReadonly)
 .one-year-maturity-section { margin-top: 8px; }
 
 /* 试算表差异行 */
-.tb-diff-row { display: flex; gap: 16px; margin: 16px 0; align-items: center; font-size: 13px; }
+.tb-diff-row { display: flex; gap: 16px; margin: 16px 0; align-items: center; font-size: var(--wp-font-size, 13px); }
 .tb-label { font-weight: 500; color: #606266; }
 .tb-amount { font-weight: 600; }
 .diff-value { font-weight: 600; }

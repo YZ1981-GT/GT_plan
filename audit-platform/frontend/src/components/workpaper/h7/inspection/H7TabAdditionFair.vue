@@ -213,14 +213,14 @@ function fmtAmt(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h7-tab-addition-fair { padding: 16px; font-size: 13px; }
+.h7-tab-addition-fair { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .row-tag { margin-left: 8px; }
 .methodology-block { padding: 10px 14px; background: #fffbe6; border-left: 3px solid #e6a23c; border-radius: 4px; margin-bottom: 16px; font-size: 12px; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .action-bar { margin: 12px 0; }
 .note-card { margin-bottom: 16px; }

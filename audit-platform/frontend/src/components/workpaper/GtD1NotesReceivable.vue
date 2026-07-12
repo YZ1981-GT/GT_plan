@@ -1,6 +1,6 @@
 ﻿<template>
 
-  <div class="d1-notes-receivable" :class="{ 'is-readonly': review.isReadonly.value }">
+  <div class="d1-notes-receivable" :class="{ 'is-readonly': review.isReadonly.value }" :style="{ '--wp-font-size': displayPrefs.fontConfig.tableFont }">
 
     <div v-if="isLoading" class="loading-container">
 
@@ -742,11 +742,9 @@ provide('d1SuppressLocalOo', true)
 
 provide('d1CrossSheet', crossSheet)
 
-// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
-// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
+// 显示偏好收敛到单一真源（useDisplayPrefsStore），全部 tab 已迁移至 DisplayPrefs_Key。
 const displayPrefs = useDisplayPrefsStore()
 provide(DisplayPrefs_Key, displayPrefs)
-provide('displayPrefs', displayPrefs)
 
 
 

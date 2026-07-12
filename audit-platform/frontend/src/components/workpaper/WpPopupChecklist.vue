@@ -283,7 +283,7 @@ onBeforeUnmount(() => {
 }
 
 .header-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

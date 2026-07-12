@@ -891,7 +891,7 @@ function onOpenFormula(payload: { sheetName: string }) {
 .gt-wp-renderer__sheet-tabs-inner :deep(.el-tabs__item) {
   height: 36px;
   line-height: 36px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-wp-renderer__tab-label {
@@ -949,7 +949,7 @@ function onOpenFormula(payload: { sheetName: string }) {
   background: #f0f9ff;
   border: 1px solid #bae0ff;
   color: #0958d9;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-variant-numeric: tabular-nums;
   cursor: help;
   transition: all 0.2s;

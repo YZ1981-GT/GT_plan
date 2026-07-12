@@ -264,13 +264,13 @@ watch(() => props.visible, (v) => { if (v) loadComments() }, { immediate: true }
 </script>
 
 <style scoped>
-.gt-review-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; box-shadow: -4px 0 16px rgba(0,0,0,0.1); display: flex; flex-direction: column; font-size: 13px; }
+.gt-review-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 2000; background: #fff; box-shadow: -4px 0 16px rgba(0,0,0,0.1); display: flex; flex-direction: column; font-size: var(--wp-font-size, 13px); }
 .gt-review-panel__resize { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; cursor: col-resize; }
 .gt-review-panel__resize:hover { background: var(--gt-color-primary, #6b21a8); opacity: 0.3; }
 .gt-review-panel__header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #ebeef5; }
 .gt-review-panel__title { font-size: 14px; font-weight: 600; color: var(--gt-color-primary, #6b21a8); }
 .gt-review-panel__subheader { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: #fafafa; }
-.gt-review-panel__chapter { font-size: 13px; font-weight: 500; color: #303133; }
+.gt-review-panel__chapter { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 .gt-review-panel__io { display: flex; gap: 4px; }
 .gt-review-panel__list { flex: 1; overflow-y: auto; padding: 12px 16px; }
 .gt-review-panel__empty { color: #909399; text-align: center; padding: 24px 0; }
@@ -284,13 +284,13 @@ watch(() => props.visible, (v) => { if (v) loadComments() }, { immediate: true }
 .gt-review-panel__reply { margin-bottom: 6px; }
 .gt-review-panel__reply-author { font-size: 12px; font-weight: 500; color: #606266; }
 .gt-review-panel__reply-time { font-size: 11px; color: #c0c4cc; margin-left: 6px; }
-.gt-review-panel__reply-content { font-size: 13px; color: #303133; margin-top: 2px; }
+.gt-review-panel__reply-content { font-size: var(--wp-font-size, 13px); color: #303133; margin-top: 2px; }
 .gt-review-panel__actions { display: flex; gap: 8px; margin-top: 8px; }
 .gt-review-panel__reply-input { margin-top: 8px; }
 .gt-review-panel__reply-btns { display: flex; gap: 6px; margin-top: 6px; justify-content: flex-end; }
 .gt-review-panel__new { padding: 12px 16px; border-top: 1px solid #ebeef5; }
 .gt-review-panel__new-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.gt-review-panel__new-label { font-size: 13px; color: #606266; white-space: nowrap; }
+.gt-review-panel__new-label { font-size: var(--wp-font-size, 13px); color: #606266; white-space: nowrap; }
 .gt-review-panel__new-btns { display: flex; gap: 8px; margin-top: 8px; }
 .gt-slide-right-enter-active, .gt-slide-right-leave-active { transition: transform 0.25s ease; }
 .gt-slide-right-enter-from, .gt-slide-right-leave-to { transform: translateX(100%); }

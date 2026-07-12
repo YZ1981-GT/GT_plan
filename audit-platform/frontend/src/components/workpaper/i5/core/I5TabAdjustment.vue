@@ -466,7 +466,7 @@ function fmtAmount(value: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i5-tab-adjustment { padding: 16px; font-size: 13px; }
+.i5-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论（琥珀色） */
 .methodology-block {
@@ -495,7 +495,7 @@ function fmtAmount(value: number | null | undefined): string {
 .balance-warning { margin-bottom: 12px; }
 
 /* 表格 */
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .adj-table :deep(.el-table__footer td) { font-weight: 600; background: #f0f9ff; }
 
 /* 操作栏 */

@@ -360,7 +360,7 @@ function handleAiConclusion() {
 }
 
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -372,7 +372,7 @@ function handleAiConclusion() {
 }
 
 .domain-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
   white-space: nowrap;
@@ -409,7 +409,7 @@ function handleAiConclusion() {
 
 .conclusion-text {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #303133;
 }

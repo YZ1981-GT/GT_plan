@@ -338,7 +338,7 @@ function isCoverageSufficient(entry: ExtractionLogEntry): boolean {
 }
 
 .entry-user {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: var(--el-text-color-primary, #303133);
 }
@@ -354,7 +354,7 @@ function isCoverageSufficient(entry: ExtractionLogEntry): boolean {
 .entry-row {
   display: flex;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 22px;
 }
 

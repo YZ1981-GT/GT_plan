@@ -156,7 +156,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
   border-left: 3px solid #409eff;
   background: #ecf5ff;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }

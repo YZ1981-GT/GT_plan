@@ -478,16 +478,16 @@ function _restoreRows(): M5AdjudicationRow[] {
 </script>
 
 <style scoped>
-.m5-tab-adjudication { padding: 12px; font-size: 13px; }
+.m5-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .equity-badge { font-weight: 600; }
 .audit-objective-alert { margin-bottom: 16px; }
-.audit-objective-text { font-size: 13px; line-height: 1.6; }
+.audit-objective-text { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .block-section { margin-bottom: 24px; }
 .block-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .block-title { margin: 0; font-size: 14px; font-weight: 600; color: #303133; }
@@ -496,13 +496,13 @@ function _restoreRows(): M5AdjudicationRow[] {
 .formula-value { color: #409eff; font-weight: 500; }
 .total-row-label { font-weight: 700; color: #303133; }
 .high-change { color: #e6a23c; font-weight: 600; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.subtotal-row) { background: #f0f9eb !important; font-weight: 600; }
 :deep(.subtotal-row td) { border-top: 2px solid #67c23a; }
 .adjudication-footer { margin-top: 8px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; background: #f5f7fa; border-radius: 6px; }
 .audit-note-card { margin-top: 16px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
-.m5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m5-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }
 .m5-details-tip ul { margin: 8px 0 0; padding-left: 20px; }
 .m5-details-tip li { margin-bottom: 4px; line-height: 1.5; }

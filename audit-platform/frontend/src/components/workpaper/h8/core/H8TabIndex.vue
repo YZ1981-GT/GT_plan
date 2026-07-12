@@ -152,11 +152,11 @@ function handleNavigate(row: SheetEntry) {
 </script>
 
 <style scoped>
-.h8-tab-index { padding: 16px; font-size: 13px; }
+.h8-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .h9-linkage-indicator {
   display: flex; align-items: center; padding: 10px 16px;
-  font-size: 13px; font-weight: 600; border-radius: 6px; margin-bottom: 16px;
+  font-size: var(--wp-font-size, 13px); font-weight: 600; border-radius: 6px; margin-bottom: 16px;
 }
 .h9-linkage-indicator.status-green { background: #f0f9eb; color: #67c23a; border: 1px solid #c2e7b0; }
 .h9-linkage-indicator.status-red { background: #fef0f0; color: #f56c6c; border: 1px solid #fbc4c4; }
@@ -167,14 +167,14 @@ function handleNavigate(row: SheetEntry) {
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
 .completion-bar { margin-bottom: 12px; }
 .index-card { margin-bottom: 16px; }
-.index-table { font-size: 13px; cursor: pointer; }
+.index-table { font-size: var(--wp-font-size, 13px); cursor: pointer; }
 .sheet-link { color: var(--el-color-primary); }
 .sheet-link:hover { text-decoration: underline; }
 

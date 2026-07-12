@@ -13,6 +13,8 @@ import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import type { ExtractedVoucher, FillMode } from '../composables/useCutoffAutoSampling'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -22,9 +24,7 @@ const props = defineProps<{
   bsDate: string
 }>()
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -336,20 +336,20 @@ function handleReviewApplied(text: string): void {
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .section-subtitle { font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
 .note-section { margin-bottom: 8px; }
 .note-actions { margin-top: 6px; display: flex; gap: 8px; }
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .auto-extract-section { margin-bottom: 12px; }
-.auto-extract-section :deep(.el-collapse-item__header) { font-size: 13px; font-weight: 500; }
+.auto-extract-section :deep(.el-collapse-item__header) { font-size: var(--wp-font-size, 13px); font-weight: 500; }
 .cutoff-alert { margin-bottom: 12px; }
 .summary-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 10px;
-  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: var(--wp-font-size, 13px);
 }
 </style>

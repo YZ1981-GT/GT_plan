@@ -1028,6 +1028,10 @@ import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
 import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDisplay'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+// Domain-split composables (platform-global-hardening Req 6.1/6.3)
+import { useLedgerImport } from '@/views/composables/useLedgerImport'
+import { useLedgerBalance, resolveDir as _resolveDir, balanceTip as _balanceTip } from '@/views/composables/useLedgerBalance'
+import { useLedgerNavigation } from '@/views/composables/useLedgerNavigation'
 
 import { handleApiError } from '@/utils/errorHandler'
 import { logger } from '@/utils/logger'

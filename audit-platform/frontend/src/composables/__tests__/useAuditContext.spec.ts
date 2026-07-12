@@ -38,6 +38,15 @@ vi.mock('@/stores/roleContext', () => ({
   useRoleContextStore: () => mockRoleContext,
 }))
 
+// ─── Mock usePermissionMatrix (P2 Req7: canDo drives canEdit) ───
+const mockCanDo = vi.fn((_action: string, _resource: string) => true)
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({
+    canDo: mockCanDo,
+    currentRole: { value: 'auditor' },
+  }),
+}))
+
 // ─── Mock services（避免真实 API 调用） ───
 vi.mock('@/services/auditPlatformApi', () => ({
   getProject: vi.fn().mockResolvedValue({ id: 'proj-001', client_name: '测试客户' }),
@@ -77,6 +86,8 @@ describe('useAuditContext — Req 5 审计上下文 composable', () => {
     mockRoute.params.projectId = 'proj-001'
     mockRoute.query.year = '2024'
     mockRoleContext.canEditInProject = true
+    // 重置 canDo mock（P2 Req7: Permission_Matrix 驱动 canEdit）
+    mockCanDo.mockImplementation(() => true)
   })
 
   afterEach(() => {
@@ -177,7 +188,7 @@ describe('useAuditContext — Req 5 审计上下文 composable', () => {
 
   describe('canEdit 派生状态', () => {
     it('非归档 + 有编辑权限 → canEdit = true', () => {
-      mockRoleContext.canEditInProject = true
+      mockCanDo.mockImplementation(() => true)
       const store = useProjectStore()
       store.projectStatus = 'execution'
 
@@ -187,7 +198,7 @@ describe('useAuditContext — Req 5 审计上下文 composable', () => {
     })
 
     it('归档项目 → canEdit = false（即使有编辑权限）', () => {
-      mockRoleContext.canEditInProject = true
+      mockCanDo.mockImplementation(() => true)
       const store = useProjectStore()
       store.projectStatus = 'archived'
 
@@ -197,7 +208,7 @@ describe('useAuditContext — Req 5 审计上下文 composable', () => {
     })
 
     it('非归档但无编辑权限 → canEdit = false', () => {
-      mockRoleContext.canEditInProject = false
+      mockCanDo.mockImplementation(() => false)
       const store = useProjectStore()
       store.projectStatus = 'execution'
 

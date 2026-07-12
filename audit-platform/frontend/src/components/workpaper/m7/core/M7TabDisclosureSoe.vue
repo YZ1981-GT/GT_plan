@@ -228,7 +228,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.m7-tab-disclosure-soe { padding: 12px; font-size: 13px; }
+.m7-tab-disclosure-soe { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
@@ -242,14 +242,14 @@ onUnmounted(() => {
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 .disclosure-card { margin-bottom: 16px; }
 .card-header-row { display: flex; align-items: center; justify-content: space-between; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .audit-note-card { margin-top: 16px; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 .m7-details-tip {
   margin-top: 16px;
@@ -257,7 +257,7 @@ onUnmounted(() => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .m7-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }

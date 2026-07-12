@@ -263,7 +263,7 @@ function formatNumber(val: any): string {
   cursor: pointer;
   user-select: none;
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .check-block__arrow {

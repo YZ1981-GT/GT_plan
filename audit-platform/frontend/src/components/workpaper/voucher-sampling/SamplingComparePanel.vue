@@ -195,7 +195,7 @@ function handleClose() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .tab-label--added {

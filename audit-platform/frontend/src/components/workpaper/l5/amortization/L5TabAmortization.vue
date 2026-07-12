@@ -241,33 +241,33 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.l5-tab-amortization { padding: 12px; font-size: 13px; }
+.l5-tab-amortization { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .item-selector { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.selector-label { font-size: 13px; color: #606266; white-space: nowrap; }
+.selector-label { font-size: var(--wp-font-size, 13px); color: #606266; white-space: nowrap; }
 .params-area { margin-bottom: 12px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .text-danger { color: #f56c6c !important; }
 .text-primary { color: #409eff; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.current-period-row) { background: #ecf5ff !important; }
 :deep(.invalid-row) { background: #fef0f0 !important; }
 .validation-area { margin-top: 16px; }
 .sub-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #303133; }
 .validation-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-.validation-item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: 13px; }
+.validation-item { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .validation-item.valid { background: #f0f9eb; color: #67c23a; }
 .validation-item.invalid { background: #fef0f0; color: #f56c6c; }
 .validation-label { font-weight: 500; }
 .validation-diff { font-size: 12px; color: #909399; }
-.summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266; }
-.l5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+.l5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

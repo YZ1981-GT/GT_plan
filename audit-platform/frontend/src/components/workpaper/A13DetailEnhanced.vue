@@ -100,7 +100,7 @@ const enhancedRows = computed<EnhancedRow[]>(() => {
 .a13-detail-enhanced__extra::before {
   content: '错报属性标注';
   display: block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: var(--el-text-color-secondary);
   margin-bottom: 8px;

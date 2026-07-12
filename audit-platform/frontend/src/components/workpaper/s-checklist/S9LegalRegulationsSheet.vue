@@ -142,7 +142,7 @@ function toggleExpanded() {
   padding: 12px 16px;
   border-left: 4px solid #e6a23c;
   background-color: #fdf6ec;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.8;
   color: #606266;
 }

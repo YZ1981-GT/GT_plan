@@ -257,7 +257,7 @@ function removeRow(index: number) {
   margin-bottom: 12px;
 }
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -267,7 +267,7 @@ function removeRow(index: number) {
   background: #fdf6ec;
   padding: 10px 14px;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

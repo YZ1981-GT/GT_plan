@@ -483,7 +483,7 @@ onMounted(async () => {
 <style scoped>
 .l5-tab-adjudication {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -521,7 +521,7 @@ onMounted(async () => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -548,7 +548,7 @@ onMounted(async () => {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .net-section {
@@ -575,7 +575,7 @@ onMounted(async () => {
 
 .net-label {
   color: #606266;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .net-value {
@@ -618,7 +618,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

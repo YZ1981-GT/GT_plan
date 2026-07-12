@@ -104,10 +104,10 @@ function fmtAmt(val: number | null | undefined): string { return val == null ? '
 </script>
 
 <style scoped>
-.h5-tab-related-party { padding: 16px; font-size: 13px; }
+.h5-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; } .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; } .summary-row { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; padding: 6px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
-.rp-table { font-size: 13px; } .amount-cell { font-variant-numeric: tabular-nums; }
+.rp-table { font-size: var(--wp-font-size, 13px); } .amount-cell { font-variant-numeric: tabular-nums; }
 .formula-cell { font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .formula-cell.abnormal-rate { color: var(--el-color-danger); font-weight: 600; background: var(--el-color-danger-light-9); }
 .action-bar { margin: 12px 0; } .note-card { margin-bottom: 16px; }

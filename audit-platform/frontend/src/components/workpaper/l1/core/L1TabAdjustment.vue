@@ -350,7 +350,7 @@ function fmtAmount(val: number | null | undefined): string {
 <style scoped>
 .l1-tab-adjustment {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 头部 ─── */
@@ -387,7 +387,7 @@ function fmtAmount(val: number | null | undefined): string {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -426,7 +426,7 @@ function fmtAmount(val: number | null | undefined): string {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .balance-label {
@@ -461,7 +461,7 @@ function fmtAmount(val: number | null | undefined): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 2;
 }
 
@@ -482,11 +482,11 @@ function fmtAmount(val: number | null | undefined): string {
 
 /* ─── 表格统一13px字体 ─── */
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table th .cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -497,7 +497,7 @@ function fmtAmount(val: number | null | undefined): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

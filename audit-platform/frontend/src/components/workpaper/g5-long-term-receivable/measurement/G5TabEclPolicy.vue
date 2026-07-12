@@ -86,7 +86,7 @@ const policy = useG5EclPolicy()
 </script>
 
 <style scoped>
-.g5-ecl-policy { font-size: 13px; padding: 4px; }
+.g5-ecl-policy { font-size: var(--wp-font-size, 13px); padding: 4px; }
 .section-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }

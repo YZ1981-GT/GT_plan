@@ -126,11 +126,11 @@ function handleReview() { openReviewDialog('I2-11-委外研发检查') }
 </script>
 
 <style scoped>
-.i2-outsource-check { font-size: 13px; padding: 16px; }
+.i2-outsource-check { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
 .section-actions { display: flex; align-items: center; gap: 4px; }
 .methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
 </style>

@@ -264,14 +264,14 @@ defineExpose({ stage, opinion, startReview, applyOpinion, close, buildContext, b
 
 <style scoped>
 .pfar-alert { margin-bottom: 12px; }
-.pfar-summary { font-size: 13px; color: #606266; line-height: 1.6; padding: 4px 0; }
+.pfar-summary { font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; padding: 4px 0; }
 .pfar-summary-label { font-weight: 600; color: #303133; }
 .pfar-summary-text { color: #606266; }
-.pfar-loading { min-height: 80px; display: flex; align-items: center; justify-content: center; color: #909399; font-size: 13px; }
+.pfar-loading { min-height: 80px; display: flex; align-items: center; justify-content: center; color: #909399; font-size: var(--wp-font-size, 13px); }
 .pfar-opinion-card { margin-bottom: 8px; }
 .pfar-opinion-header { display: flex; align-items: center; }
-.pfar-opinion-title { font-size: 13px; font-weight: 600; color: #303133; }
-.pfar-opinion-body { font-size: 13px; line-height: 1.7; color: #303133; white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
+.pfar-opinion-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
+.pfar-opinion-body { font-size: var(--wp-font-size, 13px); line-height: 1.7; color: #303133; white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
 .pfar-confirm-hint { font-size: 12px; color: #e6a23c; margin-top: 4px; }
 .pfar-footer { display: flex; justify-content: flex-end; gap: 8px; }
 </style>

@@ -842,7 +842,7 @@ onMounted(() => {
   gap: 8px;
 }
 .detail-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .detail-table :deep(.row-total) {
   background-color: #fafafa;

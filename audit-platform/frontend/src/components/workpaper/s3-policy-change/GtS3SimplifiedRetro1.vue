@@ -279,7 +279,7 @@ function handleReview() {
   min-width: 20px;
 }
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.5;
 }

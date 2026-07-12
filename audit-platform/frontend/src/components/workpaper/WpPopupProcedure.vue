@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
 }
 
 .step-content {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #303133;
   margin-bottom: 10px;

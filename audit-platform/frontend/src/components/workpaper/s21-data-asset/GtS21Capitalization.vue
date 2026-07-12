@@ -416,7 +416,7 @@ watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusi
 }
 
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -444,7 +444,7 @@ watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusi
   font-size: 16px;
 }
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
@@ -454,7 +454,7 @@ watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusi
   background: #fdf6ec;
   padding: 10px 14px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -488,7 +488,7 @@ watch(auditConclusion, () => { if (!hydrating) save(CONCLUSION_ID, auditConclusi
 .cap-grid-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   white-space: nowrap;
 }
 .cap-grid-table th,

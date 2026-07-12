@@ -8,6 +8,8 @@ import { computed, inject, toRef, type Ref } from 'vue'
 import { useD2Disclosure, type DisclosureVersion } from '../composables/useD2Disclosure'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -16,9 +18,7 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
@@ -172,7 +172,7 @@ const tableType = computed({
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .calc-cell { color: #909399; font-variant-numeric: tabular-nums; }

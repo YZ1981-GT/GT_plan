@@ -298,11 +298,11 @@ const {
 <style scoped>
 .d7-longterm { padding: 12px; }
 .d7-longterm :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d7-longterm :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -320,7 +320,7 @@ const {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -352,7 +352,7 @@ const {
   border-radius: 6px;
   display: flex;
   gap: 24px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 审计意见卡片 */

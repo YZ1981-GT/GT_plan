@@ -615,7 +615,7 @@ defineExpose({
 <style scoped>
 .g6-impairment-calc {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
@@ -624,7 +624,7 @@ defineExpose({
   background: #fdf6ec;
   padding: 10px 14px;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
   border-radius: 0 4px 4px 0;
@@ -654,7 +654,7 @@ defineExpose({
 
 /* 表格 */
 .impairment-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .compact-num {

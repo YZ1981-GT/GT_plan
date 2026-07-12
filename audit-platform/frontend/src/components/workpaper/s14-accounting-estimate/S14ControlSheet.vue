@@ -318,7 +318,7 @@ function handleAiConclusion() {
 }
 
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -342,7 +342,7 @@ function handleAiConclusion() {
   padding: 12px 16px;
   border-left: 4px solid #e6a23c;
   background-color: #fdf6ec;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #606266;
 }
@@ -354,7 +354,7 @@ function handleAiConclusion() {
 
 .wrap-text {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .conclusion-card {
@@ -363,7 +363,7 @@ function handleAiConclusion() {
 
 .conclusion-text {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #303133;
 }

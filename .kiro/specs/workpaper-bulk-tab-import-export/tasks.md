@@ -39,79 +39,79 @@
 
 ### Phase 1 · D 试点（Wave 0–6，关键路径，覆盖 MVP）
 
-- [ ] 1. ManifestBuilder（唯一读 ACNR）
-  - [ ] 1.1 实现 `backend/app/services/bulk_tab/manifest_builder.py`
+- [x] 1. ManifestBuilder（唯一读 ACNR）
+  - [x] 1.1 实现 `backend/app/services/bulk_tab/manifest_builder.py`
     - `build_manifest(db, project_id, cycles, mode)`：逐 cycle 调 `wp_bulk_tab_export.list_export_sheets` 汇总 entries → 生成 §8.6.6 字段的 `BulkManifest`（addr_id/wp_code/parent_wp_code/sheet_code/sheet_name/origin/api_prefix/item_id/storage_field/wp_id/import_order/depends_on_sheets/zip_path/sha256）+ 头部 exported_at/exported_by/platform_version/mode/cycles
     - `zip_path` = `{cycle}/{parent_wp_code}/{sheet_code}_{short_label}_{模板|数据}.xlsx`；`short_label` = sheet_name 去 sheet_code 后缀并 slug 化
     - `skip_reason`/`wp_id=None` 条目写入 `skipped[]`，不产 xlsx
     - _Requirements: 1.4, 1.5, 1.6, 1.8, 7.1, 7.2, 7.3_
-  - [ ] 1.2 ACNR 加载失败降级
+  - [x] 1.2 ACNR 加载失败降级
     - catalog 不可用时抛明确异常，不静默退回分散 JSON
     - _Requirements: 7.4_
 
-- [ ] 2. SingleTabIeAdapter（屏蔽执行层差异，D 循环）
-  - [ ] 2.1 实现 `backend/app/services/bulk_tab/single_tab_adapter.py`
+- [x] 2. SingleTabIeAdapter（屏蔽执行层差异，D 循环）
+  - [x] 2.1 实现 `backend/app/services/bulk_tab/single_tab_adapter.py`
     - `export_tab(db, wp_id, api_prefix, sheet_code, mode) -> bytes`：直调各循环 `_{cycle}_import_export.py` 的 workbook 构建纯函数（template/data）
     - `import_tab(db, wp_id, api_prefix, sheet_code, xlsx_bytes, strategy) -> TabImportResult`：解析 xlsx → 经 ConflictResolver 写库；返回行数/错误/超限告警
     - `IE_ADAPTER_REGISTRY[api_prefix]` 注册 d1~d7；未注册 → 调用方标 `skip_reason=no_adapter`
     - _Requirements: 1.3, 2.1, 2.7_
-  - [ ] 2.2 D 循环 adapter 接线（d1~d7）
+  - [x] 2.2 D 循环 adapter 接线（d1~d7）
     - 逐 prefix 映射到既有单表 I/E 底层函数（复用，不重写列格式）
     - _Requirements: 1.3, 2.1_
 
-- [ ] 3. ConflictResolver + SnapshotGuard + WorkflowGate
-  - [ ] 3.1 实现 `ConflictResolver`（`overwrite`/`fill-empty`/`reject`）
+- [x] 3. ConflictResolver + SnapshotGuard + WorkflowGate
+  - [x] 3.1 实现 `ConflictResolver`（`overwrite`/`fill-empty`/`reject`）
     - overwrite=全量替换 item_id 行；fill-empty=仅写空位不覆盖非空；reject=目标非空则该 sheet 不写并抛 ConflictRejected
     - _Requirements: 8.1, 8.2, 8.3, 8.4_
-  - [ ] 3.2 实现 `SnapshotGuard`（复用 version-trail）
+  - [x] 3.2 实现 `SnapshotGuard`（复用 version-trail）
     - `snapshot(db, wp_ids)` 调 version-trail 服务层建 pre-import 快照记 snapshot_id；`rollback(db, snapshots)` 恢复；默认 per-sheet + all-or-nothing 开关
     - _Requirements: 2.4, 6.2_
-  - [ ] 3.3 实现 `WorkflowGate`
+  - [x] 3.3 实现 `WorkflowGate`
     - `classify(plan)`：review_passed/archived/锁定→blocked；under_review→revert_needed；其余→writable
     - `revert_if_under_review`：有编制权回退编制中+审计日志；无编制权不改状态不写
     - _Requirements: 4.3, 4.4, 9.1, 9.2, 9.3_
 
-- [ ] 4. BulkExport_Service + BulkImport_Service
-  - [ ] 4.1 实现 `bulk_export_service.export(...)`
+- [x] 4. BulkExport_Service + BulkImport_Service
+  - [x] 4.1 实现 `bulk_export_service.export(...)`
     - 遍历 manifest.exportable() → export_tab → ZipAssembler.write(zip_path)；mode=data 且 only_with_data 时空表标 skipped(no_data)；写 manifest.json + README.txt（逐 Tab 链编制提示）
     - _Requirements: 1.1, 1.2, 1.7, 3.1, 3.2, 3.3, 6.3_
-  - [ ] 4.2 实现 `ZipAssembler` / `ZipReader`
+  - [x] 4.2 实现 `ZipAssembler` / `ZipReader`
     - 组装/解析 ZIP；ZipReader 校验 manifest 完整性、单文件+总大小上限、sha256；中文文件名 RFC5987
     - _Requirements: 1.4, 6.3, 6.5_
-  - [ ] 4.3 实现 `bulk_import_service.dry_run(...)`
+  - [x] 4.3 实现 `bulk_import_service.dry_run(...)`
     - 校验 manifest/完整性/表头/工作流状态门禁，不写库，返回逐文件预检报告
     - _Requirements: 2.3_
-  - [ ] 4.4 实现 `bulk_import_service.run(...)`
+  - [x] 4.4 实现 `bulk_import_service.run(...)`
     - align(manifest, list_import_sheets) 标 missing/unlisted → WorkflowGate 分类 → SnapshotGuard 快照 → 按拓扑顺序逐 sheet import_tab → 汇总 ImportReport → 审计日志；失败按策略回滚；成功 sheet 由单表 import 内部 WORKPAPER_SAVED 触发联动重算
     - _Requirements: 2.1, 2.2, 2.5, 2.6, 2.7, 2.8, 2.9, 4.1, 4.2_
 
 - [ ] 5. 路由 + 权限门禁
-  - [ ] 5.1 实现 `backend/app/routers/wp_bulk_router.py` 导出端点
+  - [-] 5.1 实现 `backend/app/routers/wp_bulk_router.py` 导出端点
     - `POST /export-templates`、`POST /export-data`（≥只读）；循环多选；返回 ZIP 或 task_id
     - 经 `router_registry` 注册
     - _Requirements: 1.1, 1.2, 3.1, 5.1, 5.2_
-  - [ ] 5.2 实现导入 + 回滚端点
+  - [-] 5.2 实现导入 + 回滚端点
     - `POST /import`（multipart ZIP，dryRun?、strategy；`require_wp_edit_permission`）；`POST /import/rollback`（项目经理）；只读/锁定项目拒绝导入
     - _Requirements: 2.3, 5.3, 5.4, 5.5_
-  - [ ] 5.3 SSE 进度端点
+  - [-] 5.3 SSE 进度端点
     - `GET /progress/{task_id}`（复用现有 SSE 模式）
     - _Requirements: 6.1_
 
 - [ ] 6. 前端三按钮 + 导入报告
-  - [ ] 6.1 实现 `WpBulkDialog.vue`
+  - [-] 6.1 实现 `WpBulkDialog.vue`
     - 三按钮（导出全部模板/导入全部数据/导出全部数据）+ 循环多选 + 冲突策略 radio + only_with_data 勾选 + DryRun 开关；与 `WpBatchExportDialog` 并列
     - _Requirements: 5.1_
-  - [ ] 6.2 实现 `WpBulkImportReport.vue`
+  - [~] 6.2 实现 `WpBulkImportReport.vue`
     - 逐 sheet 表格（success/partial/failed/missing/unlisted/blocked_by_status/conflict_rejected + 行数 + 错误）；DryRun 与正式共用
     - _Requirements: 2.5, 8.4_
-  - [ ] 6.3 接入 SSE 进度条（复用现有组件）
+  - [~] 6.3 接入 SSE 进度条（复用现有组件）
     - _Requirements: 6.1_
-  - [ ] 6.4 导入导出 API composable
+  - [-] 6.4 导入导出 API composable
     - `useBulkTabImportExport.ts`：走 http(axios) 带 Authorization；ZIP 下载/上传（multipart）
     - _Requirements: 5.1, 5.2, 5.3_
   - [ ]* 6.5 前端 vitest（组件挂载 + 报告状态渲染）
     - _Requirements: 5.1, 2.5_
-  - [ ] 6.6 Playwright D 循环往返实测（MVP 场景 1/2/3）
+  - [~] 6.6 Playwright D 循环往返实测（MVP 场景 1/2/3）
     - admin/admin123 → 导出 D 模板 ZIP → 填 3 张代表表 → 导入 → 数据一致 + D2-1↔D2-2 SUMIF 联动 + 回滚一致；0 console error
     - _Requirements: 2.1, 2.2, 4.1_
 

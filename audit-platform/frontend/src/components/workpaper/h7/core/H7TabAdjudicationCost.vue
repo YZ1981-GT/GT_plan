@@ -354,14 +354,14 @@ void getNum
 </script>
 
 <style scoped>
-.h7-tab-adjudication-cost { padding: 16px; font-size: 13px; }
+.h7-tab-adjudication-cost { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .obj-alert { margin-bottom: 12px; }
 .tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .adj-table :deep(.auto-calc-col) { background: var(--el-fill-color-lighter); }
 .amt-input { width: 100%; }
 .amount-cell { font-variant-numeric: tabular-nums; }

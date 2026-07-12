@@ -540,7 +540,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .i1-tab-adjustment {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文 - 琥珀色左边线 */
@@ -575,7 +575,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 表格 */
 .adj-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .adj-table :deep(.el-table__footer) {
   font-weight: 600;
@@ -592,7 +592,7 @@ function fmtAmt(val: number | null | undefined): string {
   padding: 10px 14px;
   margin-top: 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .balance-ok {
   background: var(--el-color-success-light-9, #f0f9eb);

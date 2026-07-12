@@ -209,7 +209,7 @@ function handleAiConclusion(): void {
 </script>
 
 <style scoped>
-.k9-tab-substantive-analysis { font-size: 13px; padding: 16px; }
+.k9-tab-substantive-analysis { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 4px; }
@@ -226,12 +226,12 @@ function handleAiConclusion(): void {
 .abnormal-rate { color: #dc2626 !important; font-weight: 600; }
 .required-field :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 .missing-reason { color: #f56c6c; font-weight: 500; }
-.analysis-table { font-size: 13px; }
+.analysis-table { font-size: var(--wp-font-size, 13px); }
 .conclusion-card { margin-top: 16px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; }
 :deep(.abnormal-row) { background-color: #fef2f2 !important; }
 :deep(.abnormal-row:hover > td) { background-color: #fee2e2 !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; }
 .compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

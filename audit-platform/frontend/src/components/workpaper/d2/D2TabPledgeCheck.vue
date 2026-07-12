@@ -16,6 +16,8 @@ import GtIndexChip from '../GtIndexChip.vue'
 import D2ReferenceBlock from './D2ReferenceBlock.vue'
 import D2DerecognitionOverview from './D2DerecognitionOverview.vue'
 import { FACTORING_REFERENCE_SECTIONS, FACTORING_REFERENCE_SOURCE } from '../composables/d2ReferenceExamples'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -30,9 +32,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   'D2-12',
 )
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
@@ -402,7 +402,7 @@ const GUIDANCE_TEXTS = [
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; align-items: center; margin-bottom: 12px; gap: 12px; }
 .pledge-alert { margin-bottom: 12px; }
 .section-block { margin-bottom: 22px; }
@@ -411,7 +411,7 @@ const GUIDANCE_TEXTS = [
 .section-subtitle { font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
 .index-cell { display: flex; align-items: center; gap: 6px; }
 .index-cell .el-input { flex: 1; }
-.recon-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.recon-table { width: 100%; border-collapse: collapse; font-size: var(--wp-font-size, 13px); margin-top: 8px; }
 .recon-table th, .recon-table td { border: 1px solid #ebeef5; padding: 8px 10px; }
 .recon-table th { background: #f5f7fa; font-weight: 600; color: #303133; text-align: center; }
 .recon-num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -420,7 +420,7 @@ const GUIDANCE_TEXTS = [
 .cas-hint { margin-top: 8px; font-size: 12px; }
 .note-section { margin-bottom: 8px; }
 .note-actions { margin-top: 6px; display: flex; gap: 8px; }
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 </style>

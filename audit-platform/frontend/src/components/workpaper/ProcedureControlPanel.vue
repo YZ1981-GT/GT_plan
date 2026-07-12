@@ -248,7 +248,7 @@ function onWpRefClick(ref: string) {
   text-align: center;
   padding: 30px;
   color: var(--gt-color-text-tertiary, #909399);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-proc-panel-assertion-tag {
   margin-right: 2px;

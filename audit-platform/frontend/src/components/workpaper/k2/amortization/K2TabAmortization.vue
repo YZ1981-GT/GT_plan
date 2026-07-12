@@ -559,7 +559,7 @@ watch(() => rows.value.length, () => {
   background: #fef9e7;
   padding: 8px 12px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -600,7 +600,7 @@ watch(() => rows.value.length, () => {
 }
 
 .amort-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .amort-table :deep(.cell-input) {
@@ -610,7 +610,7 @@ watch(() => rows.value.length, () => {
 .amort-table :deep(.cell-input .el-input__inner),
 .amort-table :deep(.cell-input .el-input-number__decrease),
 .amort-table :deep(.cell-input .el-input-number__increase) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .method-segmented {
@@ -667,7 +667,7 @@ watch(() => rows.value.length, () => {
   margin-top: 8px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .subtotal-label {

@@ -166,7 +166,7 @@ function fmtAmount(v: number | null | undefined): string { if (v == null || Math
 </script>
 
 <style scoped>
-.i6-tab-adjustment { padding: 16px; font-size: 13px; }
+.i6-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-block { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6; }
 .methodology-block p { margin: 0 0 4px; }
 .methodology-block ul { margin: 0; padding-left: 16px; }
@@ -175,7 +175,7 @@ function fmtAmount(v: number | null | undefined): string { if (v == null || Math
 .section-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .title-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .balance-warning { margin-bottom: 12px; }
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .adj-table :deep(.el-table__footer td) { font-weight: 600; background: #f0f9ff; }
 .action-bar { display: flex; align-items: center; gap: 12px; padding: 12px 0; margin-top: 12px; flex-wrap: wrap; }
 .cross-ref-bar { display: flex; align-items: center; gap: 6px; margin-left: auto; }

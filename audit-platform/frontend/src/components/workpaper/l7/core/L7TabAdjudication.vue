@@ -491,7 +491,7 @@ onUnmounted(() => {
 <style scoped>
 .l7-tab-adjudication {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -529,7 +529,7 @@ onUnmounted(() => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -565,7 +565,7 @@ onUnmounted(() => {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.total-row) {
@@ -599,7 +599,7 @@ onUnmounted(() => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

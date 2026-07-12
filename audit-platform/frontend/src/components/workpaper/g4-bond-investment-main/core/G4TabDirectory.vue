@@ -130,7 +130,7 @@ const directoryRows = ref<DirectoryRow[]>([
 </script>
 
 <style scoped>
-.g4-directory { padding: 12px; font-size: 13px; }
+.g4-directory { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .sheet-title { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
 
 .directory-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
@@ -142,7 +142,7 @@ const directoryRows = ref<DirectoryRow[]>([
 .methodology-context { position: relative; padding: 12px 12px 12px 16px; background: #fffbe6; border-radius: 4px; }
 .methodology-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #d48806; border-radius: 4px 0 0 4px; }
 .methodology-content { font-size: 12px; color: #614700; }
-.methodology-content strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.methodology-content strong { display: block; margin-bottom: 4px; font-size: var(--wp-font-size, 13px); }
 .methodology-content p { margin: 0; line-height: 1.6; }
 
 .directory-table { overflow: auto; }

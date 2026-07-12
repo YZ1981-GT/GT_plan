@@ -602,10 +602,10 @@ watch(
 
 <style scoped>
 .audit-objective { margin-bottom: 16px; }
-.audit-objective :deep(.el-alert__description) { font-size: 13px; line-height: 1.6; }
+.audit-objective :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .n3-adjudication {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景） ─── */
@@ -616,7 +616,7 @@ watch(
   border: 1px solid #fde68a;
   border-left: 4px solid #d97706;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   line-height: 1.7;
 }
@@ -667,7 +667,7 @@ watch(
   border: 1px solid #f48fb1;
   border-left: 4px solid #e91e63;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #880e4f;
 }
@@ -684,7 +684,7 @@ watch(
 }
 
 :deep(.adjudication-table .el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .category-cell {
@@ -698,11 +698,11 @@ watch(
 
 :deep(.cell-input .el-input__inner) {
   text-align: right;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cell-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -753,7 +753,7 @@ watch(
 }
 
 .cv-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
   margin-bottom: 10px;
@@ -824,7 +824,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #0369a1;
   margin-bottom: 10px;
@@ -867,7 +867,7 @@ watch(
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .n5-label {
@@ -917,7 +917,7 @@ watch(
 
 .field-label {
   display: block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   margin-bottom: 6px;
@@ -930,7 +930,7 @@ watch(
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

@@ -500,7 +500,7 @@ defineExpose({ loadTree, tree })
 .gt-bad-debt-sheet {
   --gbds-purple: var(--gt-color-primary, #4b2d77);
   --gbds-purple-bg: var(--gt-color-primary-bg, #f4f0fa);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gbds-toolbar {
   display: flex;
@@ -607,7 +607,7 @@ defineExpose({ loadTree, tree })
 }
 .gbds-parent td {
   padding: 8px 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gbds-child td {
   padding: 5px 8px;

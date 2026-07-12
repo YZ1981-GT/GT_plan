@@ -182,14 +182,14 @@ function openReview(id: string) {
 </script>
 
 <style scoped>
-.h2-tab-stocktake-plan { padding: 16px; font-size: 13px; }
+.h2-tab-stocktake-plan { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 .form-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 .form-item { display: flex; flex-direction: column; gap: 6px; }
 .form-label { font-weight: 500; color: var(--el-text-color-secondary); }
-.plan-table { font-size: 13px; }
+.plan-table { font-size: var(--wp-font-size, 13px); }
 .add-row-bar { margin-top: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }

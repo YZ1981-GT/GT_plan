@@ -402,7 +402,7 @@ function _handleTbUpdated(e: Event) {
   display: flex;
   align-items: center;
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   border-radius: 4px;
   margin: 8px 16px;

@@ -679,7 +679,7 @@ function _restoreReasons(): void {
 </script>
 
 <style scoped>
-.m10-tab-adjudication { padding: 12px; font-size: 13px; }
+.m10-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
@@ -694,7 +694,7 @@ function _restoreReasons(): void {
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* 交叉验证指示器 */
 .cross-validation-bar { margin-bottom: 12px; }
@@ -714,7 +714,7 @@ function _restoreReasons(): void {
 .high-change { color: #e6a23c; font-weight: 600; }
 
 /* 表格全局字体 */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.subtotal-row) { background: #f0f9eb !important; font-weight: 600; }
 :deep(.subtotal-row td) { border-top: 2px solid #67c23a; }
 
@@ -742,7 +742,7 @@ function _restoreReasons(): void {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .m10-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }

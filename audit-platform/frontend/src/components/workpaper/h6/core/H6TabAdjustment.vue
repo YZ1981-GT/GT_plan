@@ -290,7 +290,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h6-tab-adjustment { padding: 16px; font-size: 13px; }
+.h6-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid #d97706;
@@ -309,7 +309,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
 
-.adj-table { font-size: 13px; margin-bottom: 12px; }
+.adj-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .amt-input { width: 100%; }
 .amt-cell { display: block; text-align: right; }
 
@@ -322,7 +322,7 @@ function fmtAmt(val: number | null | undefined): string {
 .balance-row { display: flex; align-items: center; gap: 6px; }
 .balance-label { color: var(--el-text-color-secondary); font-size: 12px; }
 .balance-value { font-weight: 600; font-variant-numeric: tabular-nums; }
-.balance-status { font-weight: 600; font-size: 13px; margin-left: auto; }
+.balance-status { font-weight: 600; font-size: var(--wp-font-size, 13px); margin-left: auto; }
 .balance-status.balanced { color: #67c23a; }
 .balance-status.unbalanced { color: #f56c6c; }
 

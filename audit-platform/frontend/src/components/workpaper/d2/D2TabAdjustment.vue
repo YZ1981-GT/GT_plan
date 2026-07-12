@@ -9,6 +9,8 @@ import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -23,9 +25,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   'D2-4',
 )
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -206,7 +206,7 @@ function handlePushToA13() {
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .index-cell { display: flex; align-items: center; gap: 6px; }
@@ -214,7 +214,7 @@ function handlePushToA13() {
 .balance-bar {
   display: flex; gap: 24px; align-items: center;
   padding: 10px 12px; margin-top: 10px;
-  border-radius: 4px; font-size: 13px; font-weight: 600;
+  border-radius: 4px; font-size: var(--wp-font-size, 13px); font-weight: 600;
 }
 .balance-bar.balanced { background: #f0f9eb; border: 1px solid #e1f3d8; }
 .balance-bar.unbalanced { background: #fef0f0; border: 1px solid #fde2e2; }

@@ -248,5 +248,5 @@ function isRateHigh(rate: number | '' | 'N/A'): boolean {
 .diff-red { color: #f56c6c; font-weight: 600; }
 .rate-exceed { color: #f56c6c; font-weight: 600; }
 .note-block { margin-top: 8px; }
-.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; color: #606266; }
+.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 </style>

@@ -214,7 +214,7 @@ function focusSearch(): void {
   margin-bottom: 12px;
 }
 .ref-table :deep(.cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
 }
 .guidance-details {
@@ -222,7 +222,7 @@ function focusSearch(): void {
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .guidance-details summary {

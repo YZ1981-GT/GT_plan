@@ -292,7 +292,7 @@ function handleAiConclusion() {
 
 .methodology-title {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #e6a23c;
 }
@@ -372,7 +372,7 @@ function handleAiConclusion() {
 
 .conclusion-text {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #303133;
 }

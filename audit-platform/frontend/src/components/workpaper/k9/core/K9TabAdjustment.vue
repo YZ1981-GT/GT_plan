@@ -274,14 +274,14 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 </script>
 
 <style scoped>
-.k9-tab-adjustment { padding: 12px; font-size: 13px; }
+.k9-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .adj-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .entry-count { font-size: 12px; color: #909399; }
-.adj-footer { display: flex; align-items: center; gap: 20px; margin-top: 10px; padding: 10px 14px; background: #f5f7fa; border-radius: 6px; font-size: 13px; }
+.adj-footer { display: flex; align-items: center; gap: 20px; margin-top: 10px; padding: 10px 14px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .adj-footer.balance-fail { background: #fef0f0; border: 1px solid #fbc4c4; }
 .footer-label { font-weight: 600; color: #303133; }
 .footer-debit { color: #606266; }
@@ -289,7 +289,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 .footer-status.ok { color: #67c23a; font-weight: 600; }
 .footer-status.err { color: #f56c6c; font-weight: 600; }
 :deep(.rje-row) { background-color: #fdf6ec !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; }
 .compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

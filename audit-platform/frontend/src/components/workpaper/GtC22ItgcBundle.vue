@@ -699,7 +699,7 @@ onMounted(async () => {
 <style scoped>
 .c22-itgc-bundle {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 顶层分组页签 */
@@ -736,7 +736,7 @@ onMounted(async () => {
   line-height: 1.2;
 }
 .c22-tab-id {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .c22-tab-dot {
@@ -764,7 +764,7 @@ onMounted(async () => {
   font-size: 15px;
 }
 .c22-methodology-context__title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c22-methodology-context__body {
   padding: 2px 12px 10px;
@@ -838,7 +838,7 @@ onMounted(async () => {
 .c22-matrix-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c22-matrix-table th,
 .c22-matrix-table td {

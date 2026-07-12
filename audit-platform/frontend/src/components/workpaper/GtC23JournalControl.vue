@@ -817,7 +817,7 @@ defineExpose({ reload: selfLoad })
 <style scoped>
 .gt-c23-journal-control {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .loading-container {
   padding: 24px;
@@ -860,7 +860,7 @@ defineExpose({ reload: selfLoad })
   font-size: 14px;
 }
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
@@ -871,7 +871,7 @@ defineExpose({ reload: selfLoad })
 .c23-grid-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c23-grid-table th,
 .c23-grid-table td {
@@ -918,7 +918,7 @@ defineExpose({ reload: selfLoad })
 .c23-edit-hint-head {
   padding: 8px 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   background: #fef3c7;
   border-bottom: 1px solid #fde68a;
@@ -938,13 +938,13 @@ defineExpose({ reload: selfLoad })
 }
 .c23-subitems-head {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 6px;
   color: #1e40af;
 }
 .c23-subitem {
   padding: 3px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c23-subitem-num {
   font-weight: 700;

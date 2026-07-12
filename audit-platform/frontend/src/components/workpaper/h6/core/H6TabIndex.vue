@@ -139,13 +139,13 @@ function handleNavigate(row: SheetEntry) {
 </script>
 
 <style scoped>
-.h6-tab-index { padding: 16px; font-size: 13px; }
+.h6-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .transit-status-indicator {
   display: flex;
   align-items: center;
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   border-radius: 6px;
   margin-bottom: 16px;
@@ -166,14 +166,14 @@ function handleNavigate(row: SheetEntry) {
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
 .completion-bar { margin-bottom: 12px; }
 .index-card { margin-bottom: 16px; }
-.index-table { font-size: 13px; cursor: pointer; }
+.index-table { font-size: var(--wp-font-size, 13px); cursor: pointer; }
 .sheet-link { color: var(--el-color-primary); }
 .sheet-link:hover { text-decoration: underline; }
 

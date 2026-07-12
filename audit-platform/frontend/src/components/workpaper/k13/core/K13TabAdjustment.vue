@@ -416,7 +416,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.k13-tab-adjustment { padding: 12px; font-size: 13px; }
+.k13-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -457,7 +457,7 @@ onMounted(async () => {
 .balance-indicator.unbalanced { background: #fef0f0; border: 1px solid #f5c4c4; }
 .balance-amounts { display: flex; align-items: center; gap: 8px; }
 .balance-label { color: #606266; font-size: 12px; }
-.balance-value { font-weight: 600; font-size: 13px; color: #303133; }
+.balance-value { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; }
 .balance-separator { color: #dcdfe6; }
 
 /* 新增按钮 */

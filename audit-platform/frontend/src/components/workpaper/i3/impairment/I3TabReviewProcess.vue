@@ -738,7 +738,7 @@ function handleReview() {
 
 <style scoped>
 .i3-review-process {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -881,7 +881,7 @@ function handleReview() {
 }
 
 .check-item-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #374151;
 }

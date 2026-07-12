@@ -309,7 +309,7 @@ function getRowClassName({ row, rowIndex }: { row: ReconciliationItem; rowIndex:
 </script>
 
 <style scoped>
-.g4-tab-inventory-reconciliation { font-size: 13px; }
+.g4-tab-inventory-reconciliation { font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; gap: 6px; align-items: center; }
@@ -342,7 +342,7 @@ function getRowClassName({ row, rowIndex }: { row: ReconciliationItem; rowIndex:
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .summary-label { font-weight: 600; color: #303133; }
 .summary-item { color: #606266; }
@@ -356,7 +356,7 @@ function getRowClassName({ row, rowIndex }: { row: ReconciliationItem; rowIndex:
 .conclusion-card { margin: 12px 0; }
 .conclusion-card :deep(.el-card__header) {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 

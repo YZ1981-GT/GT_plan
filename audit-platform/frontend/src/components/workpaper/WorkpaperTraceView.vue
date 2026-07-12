@@ -155,7 +155,7 @@ function onNavigate(code: string) {
 
 .wp-trace-view__empty {
   color: #c0c4cc;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   text-align: center;
   padding: 16px;
 }

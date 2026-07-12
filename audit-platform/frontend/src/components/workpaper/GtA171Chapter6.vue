@@ -282,17 +282,17 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.gt-ch6 { font-size: 13px; display: flex; flex-direction: column; gap: 12px; }
+.gt-ch6 { font-size: var(--wp-font-size, 13px); display: flex; flex-direction: column; gap: 12px; }
 .gt-ch6__card { margin-top: 4px; }
 .gt-ch6__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .gt-ch6__card-actions { display: flex; align-items: center; gap: 8px; }
-.gt-ch6__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
+.gt-ch6__card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #6b21a8; }
 .gt-ch6__table { font-size: 12px; }
 .gt-ch6__table :deep(.el-table__cell) { vertical-align: top; }
 .gt-ch6__sub-items { display: flex; flex-direction: column; gap: 14px; }
 .gt-ch6__sub-item { border-left: 3px solid #e4e7ed; padding-left: 12px; }
 .gt-ch6__sub-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.gt-ch6__sub-label { font-size: 13px; font-weight: 500; color: #303133; }
+.gt-ch6__sub-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 
 .gt-ch6__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
 .gt-ch6__guidance--compact { margin-bottom: 6px; }

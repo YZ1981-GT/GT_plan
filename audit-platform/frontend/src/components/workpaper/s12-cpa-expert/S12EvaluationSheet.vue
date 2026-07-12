@@ -321,7 +321,7 @@ function handleAiConclusion() {
 }
 
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -356,7 +356,7 @@ function handleAiConclusion() {
 
 .conclusion-text {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #303133;
 }

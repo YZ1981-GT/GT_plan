@@ -305,14 +305,14 @@ export default {
   gap: 8px;
   padding: 24px 0;
   color: var(--gt-primary, #4b2d77);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-guidance-panel__empty {
   padding: 24px 0;
   text-align: center;
   color: #999;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* Error boundary */

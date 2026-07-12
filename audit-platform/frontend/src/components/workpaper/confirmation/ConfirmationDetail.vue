@@ -289,7 +289,7 @@ function getDictOptions(dictKey: string): string[] {
   margin: 8px 0;
 }
 .confirmation-detail__empty-hint {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #909399;
 }
 

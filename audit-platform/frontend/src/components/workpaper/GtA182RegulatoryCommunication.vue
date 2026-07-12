@@ -224,14 +224,14 @@ defineExpose({ reload: () => loadData(props.wpId) })
 .gt-a182__recipient { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .gt-a182__prefix { font-size: 14px; font-weight: 500; color: #303133; }
 .gt-a182__readonly-text { font-size: 14px; color: #303133; line-height: 1.8; margin: 0 0 12px; }
-.gt-a182__readonly-text--muted { color: #909399; font-size: 13px; font-style: italic; }
+.gt-a182__readonly-text--muted { color: #909399; font-size: var(--wp-font-size, 13px); font-style: italic; }
 .gt-a182__matter { display: flex; flex-direction: column; gap: 12px; }
 .gt-a182__matter-applicability { display: flex; align-items: center; gap: 8px; }
-.gt-a182__label { font-size: 13px; color: #606266; white-space: nowrap; }
+.gt-a182__label { font-size: var(--wp-font-size, 13px); color: #606266; white-space: nowrap; }
 .gt-a182__issuance { display: flex; gap: 16px; flex-wrap: wrap; }
 .gt-a182__field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }
 .gt-a182__field label { font-size: 12px; color: #909399; }
-.gt-a182__guidance-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.gt-a182__guidance-table { width: 100%; border-collapse: collapse; font-size: var(--wp-font-size, 13px); }
 .gt-a182__guidance-table th,
 .gt-a182__guidance-table td { border: 1px solid #ebeef5; padding: 8px 12px; text-align: left; }
 .gt-a182__guidance-table th { background: #f5f7fa; font-weight: 500; color: #606266; }

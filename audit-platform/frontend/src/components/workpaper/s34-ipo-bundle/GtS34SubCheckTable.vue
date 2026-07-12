@@ -317,7 +317,7 @@ export default { components: { Document } }
   background: var(--gt-color-bg-elevated, #fafafa);
   border: 1px dashed var(--gt-color-border, #dcdfe6);
   border-radius: var(--gt-radius-sm, 4px);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-text-secondary, #606266);
 }
 
@@ -348,7 +348,7 @@ export default { components: { Document } }
 }
 
 .formula-cells-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--gt-color-text-primary, #303133);
 }
@@ -389,7 +389,7 @@ export default { components: { Document } }
 }
 
 .judgment-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--gt-color-text-primary, #303133);
 }

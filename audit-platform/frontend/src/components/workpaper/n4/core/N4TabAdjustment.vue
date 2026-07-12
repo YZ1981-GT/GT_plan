@@ -378,7 +378,7 @@ function fmtAmount(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.n4-tab-adjustment { padding: 12px; font-size: 13px; }
+.n4-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 10px; }
@@ -390,9 +390,9 @@ function fmtAmount(val: number | null | undefined): string {
 .cross-refs-label { font-size: 12px; color: #909399; }
 
 .methodology-context { margin-bottom: 16px; padding: 10px 16px; border-left: 3px solid #e6a23c; background: #fdf6ec; border-radius: 0 6px 6px 0; }
-.methodology-text { font-size: 13px; color: #606266; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 
-.balance-check { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin-bottom: 16px; border-radius: 6px; font-size: 13px; }
+.balance-check { display: flex; align-items: center; gap: 12px; padding: 10px 16px; margin-bottom: 16px; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .balanced { background: #e8f5e9; border: 1px solid #a5d6a7; }
 .unbalanced { background: #fef0f0; border: 1px solid #fab6b6; }
 .balance-label { font-weight: 500; color: #303133; }
@@ -405,17 +405,17 @@ function fmtAmount(val: number | null | undefined): string {
 
 .entry-card { margin-bottom: 16px; }
 .entry-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
-.entry-table { font-size: 13px; }
+.entry-table { font-size: var(--wp-font-size, 13px); }
 .cell-input { width: 100%; }
-:deep(.cell-input .el-input__inner) { text-align: right; font-size: 13px; }
+:deep(.cell-input .el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
 
 .audit-notes-card { margin-bottom: 16px; }
 .notes-title { font-size: 14px; font-weight: 500; }
 .notes-field { margin-bottom: 12px; }
 .notes-field:last-child { margin-bottom: 0; }
-.field-label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.field-label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 
-.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .n4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
 .n4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

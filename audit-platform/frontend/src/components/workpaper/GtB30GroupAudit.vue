@@ -877,11 +877,11 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
     .dashboard-card { padding: 12px; border: 1px solid #f0f0f0; border-radius: 4px; background: #fafafa; }
     .card-title { font-weight: 500; margin-bottom: 8px; color: #333; }
     .distribution-row { display: flex; flex-wrap: wrap; gap: 8px; }
-    .dist-item { font-weight: 500; font-size: 13px; }
+    .dist-item { font-weight: 500; font-size: var(--wp-font-size, 13px); }
     .coverage-bars { display: flex; flex-direction: column; gap: 6px; }
     .bar-row { display: flex; align-items: center; gap: 8px; }
     .bar-label { width: 60px; font-size: 12px; color: #666; flex-shrink: 0; }
-    .status-items { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+    .status-items { display: flex; flex-direction: column; gap: 4px; font-size: var(--wp-font-size, 13px); }
   }
 
   // ─── Tree ───
@@ -935,10 +935,10 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
   // ─── Heatmap ───
   .heatmap-section {
     .heatmap-warnings { margin-bottom: 12px; }
-    .heatmap-warning-item { color: #ff4d4f; font-size: 13px; margin-bottom: 4px; }
+    .heatmap-warning-item { color: #ff4d4f; font-size: var(--wp-font-size, 13px); margin-bottom: 4px; }
     .heatmap-table-wrapper { overflow-x: auto; }
     .heatmap-table {
-      width: 100%; border-collapse: collapse; font-size: 13px;
+      width: 100%; border-collapse: collapse; font-size: var(--wp-font-size, 13px);
       th, td { border: 1px solid #e8e8e8; padding: 8px 12px; text-align: center; }
       th { background: #fafafa; font-weight: 500; }
       .heatmap-cell { min-width: 80px; transition: background-color 0.2s; }
@@ -951,7 +951,7 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
     .linkage-grid { display: flex; flex-direction: column; gap: 8px; }
     .linkage-item { display: flex; align-items: center; gap: 8px; }
     .linkage-label { font-weight: 500; color: #333; }
-    .chain-summary { font-size: 13px; color: #666; }
+    .chain-summary { font-size: var(--wp-font-size, 13px); color: #666; }
     .ref-chip { margin-right: 4px; }
   }
 
@@ -960,7 +960,7 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
     .pending-list { margin-bottom: 12px; }
     .pending-title { font-weight: 500; margin-bottom: 4px; }
     ul { margin: 0; padding-left: 20px; }
-    li { font-size: 13px; color: #666; margin-bottom: 2px; }
+    li { font-size: var(--wp-font-size, 13px); color: #666; margin-bottom: 2px; }
   }
 
   // ─── Toolbar ───

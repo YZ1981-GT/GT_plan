@@ -463,7 +463,7 @@ defineExpose({
 <style scoped>
 .g6-tab-business-model {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
@@ -507,7 +507,7 @@ defineExpose({
 
 /* ─── 表格 ─── */
 .bm-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .bm-table :deep(.el-table__cell) {
@@ -543,14 +543,14 @@ defineExpose({
 }
 
 .conclusion-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }
 
 .no-data {
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .derived-hint {
@@ -569,7 +569,7 @@ defineExpose({
 
 .readonly-analysis {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #303133;
   background: #f5f7fa;
@@ -585,7 +585,7 @@ defineExpose({
 
 .guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   font-weight: 600;
 }

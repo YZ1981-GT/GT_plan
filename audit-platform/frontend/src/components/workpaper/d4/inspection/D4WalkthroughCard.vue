@@ -305,12 +305,12 @@ const conclusionOptions = [
 </template>
 
 <style scoped>
-.walkthrough-card { padding: 8px 0; font-size: 13px; }
+.walkthrough-card { padding: 8px 0; font-size: var(--wp-font-size, 13px); }
 .dim-collapse :deep(.el-collapse-item__header) { height: 40px; line-height: 40px; padding: 0 12px; }
 .dim-header { display: flex; justify-content: space-between; align-items: center; width: 100%; padding-right: 8px; }
 .dim-header-left { display: flex; align-items: center; gap: 8px; }
 .dim-header-right { display: flex; align-items: center; }
-.dim-title { font-size: 13px; font-weight: 600; color: #303133; }
+.dim-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
 .dim-indicator { font-size: 11px; padding: 0 4px; }
 
 /* ─── 多列网格布局 ─── */
@@ -349,5 +349,5 @@ const conclusionOptions = [
 .mismatch-dims { font-size: 11px; color: #f56c6c; }
 .conclusion-section { margin-top: 16px; padding: 12px; background: #fafbfc; border-radius: 6px; border: 1px solid #ebeef5; }
 .conclusion-row { display: flex; align-items: center; gap: 12px; }
-.conclusion-label { font-size: 13px; font-weight: 500; color: #303133; }
+.conclusion-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 </style>

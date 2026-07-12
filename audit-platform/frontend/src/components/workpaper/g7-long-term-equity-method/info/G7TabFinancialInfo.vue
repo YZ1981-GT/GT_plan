@@ -537,7 +537,7 @@ onMounted(() => {
 <style scoped>
 .g7-tab-financial-info {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* Section 标题栏 */
@@ -603,7 +603,7 @@ onMounted(() => {
 }
 .group-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .group-count {

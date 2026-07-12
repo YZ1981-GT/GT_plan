@@ -410,7 +410,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i3-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+.i3-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
@@ -449,7 +449,7 @@ function fmtAmt(val: number | null | undefined): string {
 .net-value { font-weight: 700; font-size: 16px; color: var(--el-color-primary); }
 
 /* 矩阵表 */
-.matrix-table { font-size: 13px; }
+.matrix-table { font-size: var(--wp-font-size, 13px); }
 
 /* 编制提示 */
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

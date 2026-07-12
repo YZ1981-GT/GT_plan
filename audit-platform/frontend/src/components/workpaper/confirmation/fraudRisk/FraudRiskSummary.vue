@@ -173,14 +173,14 @@ function handleAiFill() {
 
 .fraud-risk-summary__label {
   display: block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   margin-bottom: 4px;
   color: var(--el-text-color-primary);
 }
 
 .fraud-risk-summary__text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: var(--el-text-color-regular);
   margin: 0;

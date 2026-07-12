@@ -58,7 +58,7 @@ const defaultDescription =
   flex-direction: column;
   gap: 6px;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-text-regular, #606266);
 }
 

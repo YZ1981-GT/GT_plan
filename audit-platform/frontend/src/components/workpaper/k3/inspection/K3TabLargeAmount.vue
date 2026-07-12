@@ -300,13 +300,13 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.k3-tab-large-amount { padding: 16px; font-size: 13px; }
+.k3-tab-large-amount { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context { border-left: 4px solid var(--el-color-warning); background: #fffbeb; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .summary-bar { display: flex; gap: 20px; align-items: center; margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-regular); flex-wrap: wrap; }
-.large-amount-table { font-size: 13px; }
+.large-amount-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .amount-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; }

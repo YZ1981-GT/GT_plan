@@ -83,7 +83,7 @@ defineEmits<{
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: var(--gt-color-text-primary, #1d1d1f);
   margin-bottom: 6px;
@@ -107,7 +107,7 @@ defineEmits<{
   padding: 6px 10px;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   transition: background 0.2s;
 }
 
@@ -132,6 +132,6 @@ defineEmits<{
   text-align: center;
   color: var(--gt-color-text-secondary, #6e6e73);
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

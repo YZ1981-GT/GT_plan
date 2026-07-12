@@ -27,6 +27,8 @@
  */
 import { ref, inject, toRef, computed, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useD1SamplingVouching } from '../composables/useD1SamplingVouching'
 import {
   NOTE_TYPE_OPTIONS,
@@ -61,10 +63,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const injectedDisplayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const injectedDisplayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
@@ -1102,7 +1101,7 @@ const SAMPLING_METHOD_TEXTS = [
 
 .audit-objective p {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -1117,7 +1116,7 @@ const SAMPLING_METHOD_TEXTS = [
 .methodology-summary {
   cursor: pointer;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #b88230;
 }
@@ -1179,7 +1178,7 @@ const SAMPLING_METHOD_TEXTS = [
 }
 
 .population-field label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   white-space: nowrap;
@@ -1291,7 +1290,7 @@ const SAMPLING_METHOD_TEXTS = [
 }
 
 .summary-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }
@@ -1319,7 +1318,7 @@ const SAMPLING_METHOD_TEXTS = [
 .recon-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 16px;
 }
 
@@ -1355,7 +1354,7 @@ const SAMPLING_METHOD_TEXTS = [
 /* 例外超标预警标签 */
 .exception-warning-tag {
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 可容忍误差率 ─── */
@@ -1364,7 +1363,7 @@ const SAMPLING_METHOD_TEXTS = [
   align-items: center;
   gap: 8px;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -1427,7 +1426,7 @@ const SAMPLING_METHOD_TEXTS = [
   background: #ecf5ff;
   padding: 10px 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

@@ -504,7 +504,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i3-tab-impairment-test { padding: 16px; font-size: 13px; }
+.i3-tab-impairment-test { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guidance-block {
@@ -523,7 +523,7 @@ function fmtAmt(val: number | null | undefined): string {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1a5276;
   line-height: 1.5;
 }
@@ -558,7 +558,7 @@ function fmtAmt(val: number | null | undefined): string {
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 
 /* 主表格 */
-.impairment-table { font-size: 13px; }
+.impairment-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 
@@ -610,7 +610,7 @@ function fmtAmt(val: number | null | undefined): string {
 /* 合计行 */
 .summary-row {
   padding: 12px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   border-top: 2px solid var(--el-border-color);
   margin-top: 12px;
   display: flex;

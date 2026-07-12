@@ -287,7 +287,7 @@ onMounted(() => {
 <style scoped>
 .l2-tab-interest-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色） ─── */
@@ -297,7 +297,7 @@ onMounted(() => {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -319,7 +319,7 @@ onMounted(() => {
 }
 
 .cross-wp-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   white-space: nowrap;
@@ -404,7 +404,7 @@ onMounted(() => {
 
 .check-title {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.5;
 }
@@ -489,7 +489,7 @@ onMounted(() => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

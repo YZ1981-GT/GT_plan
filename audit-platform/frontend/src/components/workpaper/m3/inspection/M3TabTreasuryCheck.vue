@@ -525,28 +525,28 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m3-tab-treasury-check { padding: 12px; font-size: 13px; }
+.m3-tab-treasury-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .check-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .card-header-right { display: flex; align-items: center; gap: 8px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .diff-warning { color: #f56c6c !important; font-weight: 600; }
-:deep(.el-table) { font-size: 13px; }
-.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-size: var(--wp-font-size, 13px); }
 .checklist-section { margin-bottom: 16px; }
 .checklist-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid #f2f6fc; }
 .checklist-index { font-weight: 600; color: #303133; min-width: 20px; }
 .checklist-text { flex: 1; color: #606266; }
 .conclusion-section { margin-top: 12px; }
 .conclusion-label { font-weight: 500; color: #303133; margin-bottom: 8px; }
-.m3-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m3-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m3-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m3-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

@@ -381,7 +381,7 @@ onMounted(async () => {
 <style scoped>
 .l4-tab-detail {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -419,7 +419,7 @@ onMounted(async () => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -443,7 +443,7 @@ onMounted(async () => {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .summary-bar {
@@ -453,7 +453,7 @@ onMounted(async () => {
   margin-top: 12px;
   background: #f5f7fa;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -463,7 +463,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

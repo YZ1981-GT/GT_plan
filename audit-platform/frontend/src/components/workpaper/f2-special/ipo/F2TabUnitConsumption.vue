@@ -458,7 +458,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .f2-unit-consumption {
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   background: linear-gradient(180deg, #f8fafc 0%, #fff 120px);
   border-radius: 8px;
 }
@@ -493,7 +493,7 @@ onBeforeUnmount(() => {
 /* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 
@@ -508,8 +508,8 @@ onBeforeUnmount(() => {
 .chip-wrap { display: inline-flex; align-items: center; }
 .search { width: 200px; }
 
-.f2-unit-consumption :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.f2-unit-consumption :deep(.el-table .cell) { font-size: 13px !important; }
+.f2-unit-consumption :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f2-unit-consumption :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 
 .focus-layout {
@@ -562,7 +562,7 @@ onBeforeUnmount(() => {
 .banner-stats { margin-left: 12px; font-size: 12px; color: #606266; }
 .segment-bar { margin-bottom: 10px; }
 
-.group-view :deep(.el-collapse-item__header) { font-size: 13px; }
+.group-view :deep(.el-collapse-item__header) { font-size: var(--wp-font-size, 13px); }
 .group-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .group-name { font-weight: 600; }
 .group-impact { font-size: 12px; color: #909399; margin-left: auto; }

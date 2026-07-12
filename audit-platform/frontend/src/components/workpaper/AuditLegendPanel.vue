@@ -170,7 +170,7 @@ onMounted(loadCustom)
   margin-bottom: 8px;
 }
 .gt-audit-legend__title { margin: 0; font-size: 18px; font-weight: 700; }
-.gt-audit-legend__desc { color: var(--gt-color-text-secondary); font-size: 13px; margin-bottom: 20px; }
+.gt-audit-legend__desc { color: var(--gt-color-text-secondary); font-size: var(--wp-font-size, 13px); margin-bottom: 20px; }
 
 /* 标识行 */
 .gt-audit-legend__table { display: flex; flex-direction: column; gap: 6px; margin-bottom: 24px; }
@@ -226,7 +226,7 @@ onMounted(loadCustom)
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 10px; font-size: 14px; font-weight: 600;
 }
-.gt-audit-legend__custom-empty { color: var(--gt-color-text-tertiary); font-size: 13px; padding: 12px 0; }
+.gt-audit-legend__custom-empty { color: var(--gt-color-text-tertiary); font-size: var(--wp-font-size, 13px); padding: 12px 0; }
 .gt-audit-legend__row--custom { gap: 8px; }
 
 /* Footer */

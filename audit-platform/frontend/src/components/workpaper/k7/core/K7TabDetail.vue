@@ -566,7 +566,7 @@ function fmtNum(val: number | null | undefined): string {
 <style scoped>
 .k7-tab-detail {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
@@ -610,11 +610,11 @@ function fmtNum(val: number | null | undefined): string {
 
 /* 表格 */
 .detail-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   width: 100%;
 }
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .amount-input {
   width: 100%;
@@ -659,7 +659,7 @@ function fmtNum(val: number | null | undefined): string {
   padding: 12px 16px;
   border-top: 2px solid var(--el-border-color, #dcdfe6);
   background: var(--el-bg-color, #fff);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .total-label {

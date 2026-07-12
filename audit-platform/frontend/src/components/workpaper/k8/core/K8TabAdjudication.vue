@@ -392,7 +392,7 @@ function fmtRate(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k8-tab-adjudication { padding: 12px; font-size: 13px; }
+.k8-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── Section header ─── */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -401,14 +401,14 @@ function fmtRate(v: number | null | undefined): string {
 .header-actions { display: flex; gap: 8px; }
 
 /* ─── 方法论上下文 ─── */
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 
 /* ─── 勾稽 ─── */
 .reconciliation-alert { margin-bottom: 12px; }
 
 /* ─── 表格 ─── */
-:deep(.el-table) { font-size: 13px; }
-.project-name { font-size: 13px; color: #303133; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.project-name { font-size: var(--wp-font-size, 13px); color: #303133; }
 .subtotal-label { font-weight: 600; }
 .formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
 .formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
@@ -421,7 +421,7 @@ function fmtRate(v: number | null | undefined): string {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   margin: 12px 0; padding: 10px 14px;
   background: linear-gradient(90deg, #f0f9eb 0%, #f8fdf8 100%);
-  border: 1px solid #e1f3d8; border-radius: 6px; font-size: 13px;
+  border: 1px solid #e1f3d8; border-radius: 6px; font-size: var(--wp-font-size, 13px);
 }
 .total-label { font-weight: 700; color: #303133; min-width: 50px; }
 .total-item { color: #606266; }
@@ -429,7 +429,7 @@ function fmtRate(v: number | null | undefined): string {
 
 /* ─── TB回写栏 ─── */
 .tb-writeback-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 12px 0; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
-.match-indicator, .mismatch-indicator { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.match-indicator, .mismatch-indicator { display: flex; align-items: center; gap: 4px; font-size: var(--wp-font-size, 13px); }
 .match-indicator { color: #67c23a; }
 .mismatch-indicator { color: #f56c6c; }
 .tb-value { margin-left: auto; font-size: 12px; color: #909399; font-family: 'JetBrains Mono', monospace; }
@@ -438,7 +438,7 @@ function fmtRate(v: number | null | undefined): string {
 .conclusion-card { margin-top: 16px; }
 
 /* ─── 编制提示 ─── */
-.k8-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k8-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k8-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k8-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

@@ -98,7 +98,7 @@ function tagType(v: string) {
 </script>
 
 <style scoped>
-.h10-check { font-size: 13px; }
+.h10-check { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .sheet-title { margin: 0; font-size: 15px; }

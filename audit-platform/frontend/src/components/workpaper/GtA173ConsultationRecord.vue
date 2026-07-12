@@ -518,7 +518,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 }
 
 .gt-a173__label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
 }

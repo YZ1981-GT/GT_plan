@@ -370,27 +370,27 @@ function _restoreRows() {
 </script>
 
 <style scoped>
-.l8-tab-non-fin-interest { padding: 12px; font-size: 13px; }
+.l8-tab-non-fin-interest { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .excess-alert { margin-bottom: 12px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .excess-highlight { color: #e6a23c !important; font-weight: 700; background: #fef0e6; padding: 2px 4px; border-radius: 3px; }
 .negative-value { color: #f56c6c; }
 .positive-diff { color: #e6a23c; }
-:deep(.el-table) { font-size: 13px; }
-.summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266; flex-wrap: wrap; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; flex-wrap: wrap; }
 .excess-summary.has-excess { color: #e6a23c; font-weight: 600; }
 .diff-card { margin-top: 16px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .diff-content { display: flex; flex-direction: column; gap: 12px; }
 .diff-row { display: flex; align-items: center; gap: 12px; }
-.l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l8-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l8-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

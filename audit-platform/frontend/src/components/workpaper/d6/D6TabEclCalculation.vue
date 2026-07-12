@@ -345,11 +345,11 @@ function fmtPct(rate: number): string {
 <style scoped>
 .d6-tab-ecl-calculation { padding: 16px; }
 .d6-tab-ecl-calculation :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d6-tab-ecl-calculation :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -367,7 +367,7 @@ function fmtPct(rate: number): string {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -401,8 +401,8 @@ function fmtPct(rate: number): string {
 .block-title { font-size: 14px; font-weight: 600; margin: 0; color: #303133; }
 .aging-group { margin-bottom: 16px; padding: 12px; border: 1px solid #ebeef5; border-radius: 6px; }
 .group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.group-name { font-weight: 600; font-size: 13px; }
-.subtotal-line { margin-top: 8px; font-size: 13px; color: #606266; }
+.group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); }
+.subtotal-line { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .grand-total {
   padding: 12px;
   background: #fafafa;
@@ -411,7 +411,7 @@ function fmtPct(rate: number): string {
   flex-wrap: wrap;
   gap: 20px;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 自动计算列灰底 */

@@ -82,7 +82,7 @@ function fmtAmt(val: number | null | undefined): string { return val == null ? '
 </script>
 
 <style scoped>
-.h5-tab-stocktake-summary { padding: 16px; font-size: 13px; }
+.h5-tab-stocktake-summary { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

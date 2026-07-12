@@ -759,7 +759,7 @@ onUnmounted(() => {
 <style scoped>
 .m4-tab-detail {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -801,7 +801,7 @@ onUnmounted(() => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -857,7 +857,7 @@ onUnmounted(() => {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.subtotal-row) {

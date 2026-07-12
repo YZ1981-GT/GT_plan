@@ -440,11 +440,11 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
   padding: 12px;
 }
 .d5-fair-value :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d5-fair-value :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -462,7 +462,7 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -501,7 +501,7 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
   gap: 6px;
 }
 .rate-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .rate-pct {
@@ -531,7 +531,7 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
   background: #f5f7fa;
   border-radius: 4px;
   margin: 12px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .fv-total {

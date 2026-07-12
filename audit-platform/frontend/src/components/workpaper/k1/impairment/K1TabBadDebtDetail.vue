@@ -411,7 +411,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .k1-tab-bad-debt-detail {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色） */
@@ -445,7 +445,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 表格 */
 .bad-debt-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .amount-cell {
   font-variant-numeric: tabular-nums;
@@ -481,7 +481,7 @@ function fmtAmt(val: number | null | undefined): string {
 .matrix-card .card-header {
   padding: 6px 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #fff;
 }
 .matrix-card.stage-1 .card-header { background: var(--el-color-success); }

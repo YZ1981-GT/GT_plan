@@ -21,6 +21,8 @@ import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -37,10 +39,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
@@ -559,7 +558,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
             </div>
             <div class="diff-item diff-item-wide">
               <span class="diff-label">是否超重要性</span>
-              <div v-if="materialityThreshold <= 0" style="color:#e6a23c;font-size:13px">
+              <div v-if="materialityThreshold <= 0" style="color:#e6a23c;font-size: var(--wp-font-size, 13px)">
                 ⚠️ 重要性水平尚未设置
               </div>
               <div v-else-if="exceedsMateriality" class="exceed-warning">
@@ -659,21 +658,21 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
 .methodology-summary {
   cursor: pointer;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #b88230;
 }
 
 .methodology-body {
   padding: 8px 14px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.8;
 }
 
 .method-title {
   margin: 8px 0 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .method-title-row {
@@ -703,7 +702,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
 .ecl-table :deep(.el-textarea__inner),
 .ecl-table :deep(.el-input__wrapper),
 .ecl-table :deep(.el-textarea__wrapper) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .sum-row {
@@ -715,7 +714,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
   display: flex;
   gap: 16px;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .grand-total-row {
@@ -728,7 +727,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
   display: flex;
   gap: 16px;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .sum-label {
@@ -777,7 +776,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
   color: #f56c6c;
   padding: 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .within-ok {
@@ -785,7 +784,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
   color: #67c23a;
   padding: 8px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cell-readonly {
@@ -851,7 +850,7 @@ const guidanceContent = `1. D=B×C 含义：应计提坏账准备 = 审定应收
 
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   white-space: pre-wrap;
   line-height: 1.6;

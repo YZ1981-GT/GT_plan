@@ -1702,7 +1702,7 @@ defineExpose({ reload: selfLoad })
 <style scoped>
 .gt-c24-journal-detail {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c24-toolbar {
   display: flex;
@@ -1757,7 +1757,7 @@ defineExpose({ reload: selfLoad })
   font-size: 14px;
 }
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
@@ -1768,7 +1768,7 @@ defineExpose({ reload: selfLoad })
 .c24-grid-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c24-grid-table th,
 .c24-grid-table td {
@@ -1813,7 +1813,7 @@ defineExpose({ reload: selfLoad })
   line-height: 1.5;
 }
 .c24-step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c24-cell-empty {
   color: #c0c4cc;
@@ -1832,7 +1832,7 @@ defineExpose({ reload: selfLoad })
 }
 .c24-edit-hint-head {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin-bottom: 4px;
 }
@@ -1986,7 +1986,7 @@ defineExpose({ reload: selfLoad })
 .dot-todo { background: #dcdfe6; }
 .test-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .test-desc {
@@ -1994,7 +1994,7 @@ defineExpose({ reload: selfLoad })
   color: #909399;
 }
 .test-metric {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #4b2d77;
   font-weight: 600;
   margin-top: 2px;
@@ -2015,7 +2015,7 @@ defineExpose({ reload: selfLoad })
 }
 .collapse-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 

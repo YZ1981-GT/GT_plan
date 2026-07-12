@@ -165,12 +165,12 @@ function conclusionTag(c: InterviewConclusion | ''): '' | 'success' | 'warning' 
 </script>
 
 <style scoped>
-.f2-interview-summary { padding: 12px 16px; font-size: 13px; background: linear-gradient(180deg, #f8fafc 0%, #fff 100px); border-radius: 8px; }
-.f2-interview-summary :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.f2-interview-summary :deep(.el-table .cell) { font-size: 13px !important; }
+.f2-interview-summary { padding: 12px 16px; font-size: var(--wp-font-size, 13px); background: linear-gradient(180deg, #f8fafc 0%, #fff 100px); border-radius: 8px; }
+.f2-interview-summary :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f2-interview-summary :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }

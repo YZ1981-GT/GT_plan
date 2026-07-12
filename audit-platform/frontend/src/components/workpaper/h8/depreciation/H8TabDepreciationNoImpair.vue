@@ -206,7 +206,7 @@ function getDepSummary({ columns }: { columns: any[] }) {
 </script>
 
 <style scoped>
-.h8-tab-depreciation-no-impair { padding: 16px; font-size: 13px; }
+.h8-tab-depreciation-no-impair { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -221,7 +221,7 @@ function getDepSummary({ columns }: { columns: any[] }) {
 .formula-icon { font-size: 28px; }
 .formula-content { flex: 1; }
 .formula-title { font-weight: 700; font-size: 14px; color: #1e40af; margin-bottom: 4px; }
-.formula-text { font-size: 13px; color: #1d4ed8; }
+.formula-text { font-size: var(--wp-font-size, 13px); color: #1d4ed8; }
 
 .h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 
@@ -229,7 +229,7 @@ function getDepSummary({ columns }: { columns: any[] }) {
 .title-actions { display: flex; gap: 6px; }
 
 .params-card { margin-bottom: 16px; }
-.formula-table { font-size: 13px; }
+.formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 

@@ -61,7 +61,7 @@ const projectId = computed(() => props.projectId || '')
 <style scoped>
 .cycle-standalone-procedure {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cycle-standalone-procedure__toolbar {

@@ -402,11 +402,11 @@ const {
 <style scoped>
 .d7-voucher-check { padding: 12px; }
 .d7-voucher-check :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d7-voucher-check :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -424,7 +424,7 @@ const {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -452,7 +452,7 @@ const {
 .params-grid { display: flex; flex-wrap: wrap; gap: 16px; }
 .param-item { display: flex; flex-direction: column; gap: 4px; }
 .param-item label { font-size: 12px; color: #909399; }
-.progress-bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; }
+.progress-bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: var(--wp-font-size, 13px); }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .virtual-hint { flex: 1; min-width: 200px; margin: 0; }
 .virtual-table { margin-bottom: 12px; }
@@ -468,7 +468,7 @@ const {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 审计意见卡片 */

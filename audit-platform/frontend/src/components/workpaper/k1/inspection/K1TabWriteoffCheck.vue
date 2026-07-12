@@ -214,7 +214,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.k1-tab-writeoff-check { padding: 16px; font-size: 13px; }
+.k1-tab-writeoff-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid var(--el-color-warning);
@@ -228,7 +228,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .item-desc { font-size: 11px; color: var(--el-text-color-secondary); margin: 4px 0 0; }
 
 .non-compliance-summary {

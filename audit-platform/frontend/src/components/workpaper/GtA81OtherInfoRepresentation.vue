@@ -301,7 +301,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 .gt-a81__intro p { font-size: 14px; color: #909399; font-style: italic; line-height: 1.8; margin: 0; }
 .gt-a81__card { border-radius: 8px; }
 .gt-a81__card-header { display: flex; align-items: center; gap: 8px; }
-.gt-a81__card-num { width: 24px; height: 24px; background: #409EFF; color: #fff; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.gt-a81__card-num { width: 24px; height: 24px; background: #409EFF; color: #fff; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: var(--wp-font-size, 13px); font-weight: 600; flex-shrink: 0; }
 .gt-a81__card-title { font-size: 14px; font-weight: 500; color: #303133; flex: 1; }
 .gt-a81__ai-btn { margin-left: auto; }
 .gt-a81__file-list { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }

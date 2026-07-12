@@ -391,7 +391,7 @@ function fmtNum(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k11-tab-detail { padding: 12px; font-size: 13px; }
+.k11-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── Section header ─── */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -399,7 +399,7 @@ function fmtNum(v: number | null | undefined): string {
 .header-actions { display: flex; gap: 8px; }
 
 /* ─── 方法论上下文（琥珀色块） ─── */
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 
 /* ─── Tab栏 ─── */
 .tab-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -407,8 +407,8 @@ function fmtNum(v: number | null | undefined): string {
 .row-count { font-size: 12px; color: #909399; }
 
 /* ─── 表格 ─── */
-:deep(.el-table) { font-size: 13px; }
-.asset-category { font-size: 13px; color: #303133; font-weight: 500; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.asset-category { font-size: var(--wp-font-size, 13px); color: #303133; font-weight: 500; }
 .no-reversal-tag { margin-left: 4px; font-size: 10px; }
 .formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
 .formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
@@ -427,7 +427,7 @@ function fmtNum(v: number | null | undefined): string {
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   margin: 12px 0; padding: 10px 14px;
   background: linear-gradient(90deg, #eef6ff 0%, #f5faff 100%);
-  border: 1px solid #d6e4f0; border-radius: 6px; font-size: 13px;
+  border: 1px solid #d6e4f0; border-radius: 6px; font-size: var(--wp-font-size, 13px);
 }
 .total-label { font-weight: 700; color: #303133; min-width: 50px; }
 .total-item { color: #606266; }
@@ -436,7 +436,7 @@ function fmtNum(v: number | null | undefined): string {
 .variance-highlight strong { color: #f56c6c !important; }
 
 /* ─── 编制提示（折叠底部） ─── */
-.k11-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k11-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k11-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k11-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

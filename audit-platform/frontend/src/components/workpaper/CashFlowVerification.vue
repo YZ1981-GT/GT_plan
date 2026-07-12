@@ -180,7 +180,7 @@ onMounted(() => loadSubWpIds())
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #6750A4;
   cursor: pointer;

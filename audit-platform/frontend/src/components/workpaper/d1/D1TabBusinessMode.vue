@@ -565,7 +565,7 @@ function onCardUpdateQA(rowId: string, questionIdx: number, answer: 'Y' | 'N' | 
 
 .overview-desc {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -592,21 +592,21 @@ function onCardUpdateQA(rowId: string, questionIdx: number, answer: 'Y' | 'N' | 
 .business-reference-summary {
   cursor: pointer;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #337ecc;
 }
 
 .business-reference-body {
   padding: 8px 14px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.75;
 }
 
 .business-reference-heading {
   margin: 0 0 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .business-reference-list {
@@ -633,21 +633,21 @@ function onCardUpdateQA(rowId: string, questionIdx: number, answer: 'Y' | 'N' | 
 .methodology-summary {
   cursor: pointer;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #b88230;
 }
 
 .methodology-body {
   padding: 8px 14px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.8;
 }
 
 .method-title {
   margin: 8px 0 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .method-title-row {
@@ -703,7 +703,7 @@ function onCardUpdateQA(rowId: string, questionIdx: number, answer: 'Y' | 'N' | 
 .guidance-reference-summary {
   cursor: pointer;
   padding: 8px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
 }
@@ -715,13 +715,13 @@ function onCardUpdateQA(rowId: string, questionIdx: number, answer: 'Y' | 'N' | 
 .guidance-block-title {
   margin: 0 0 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
 .guidance-paragraph {
   margin: 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: #606266;
 }
@@ -760,7 +760,7 @@ function onCardUpdateQA(rowId: string, questionIdx: number, answer: 'Y' | 'N' | 
   display: block;
   margin-bottom: 6px;
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .note-actions {

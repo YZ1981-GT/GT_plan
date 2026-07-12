@@ -431,7 +431,7 @@ function loadFromHtmlData(data: any): void {
 <style scoped>
 .g7-disclosure-listed {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .audit-objective {

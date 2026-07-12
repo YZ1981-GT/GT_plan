@@ -365,7 +365,7 @@ watch(() => props.allResponses, () => {
 </script>
 
 <style scoped>
-.i1-tab-useful-life-check { padding: 16px; font-size: 13px; }
+.i1-tab-useful-life-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 3px solid var(--el-color-warning);
@@ -404,7 +404,7 @@ watch(() => props.allResponses, () => {
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; align-items: center; }
 
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 
 .formula-cell {
   border-bottom: 1px dashed var(--el-border-color);

@@ -244,7 +244,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-review-record { padding: 16px; font-size: 13px; }
+.h2-tab-review-record { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .filter-bar { margin-bottom: 16px; }
 .review-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

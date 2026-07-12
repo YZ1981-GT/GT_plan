@@ -134,7 +134,7 @@ function fmtAmount(v: number | null | undefined): string { if (v == null || Math
 </script>
 
 <style scoped>
-.i6-cutoff-forward { font-size: 13px; padding: 16px; }
+.i6-cutoff-forward { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; align-items: center; gap: 4px; }
@@ -144,7 +144,7 @@ function fmtAmount(v: number | null | undefined): string { if (v == null || Math
 .stat-label { font-size: 12px; color: #6b7280; }
 .stat-value { font-size: 18px; font-weight: 700; color: #1f2937; }
 .stat-danger { color: #dc2626; }
-.cutoff-table { font-size: 13px; }
+.cutoff-table { font-size: var(--wp-font-size, 13px); }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
 .summary-card { margin-top: 16px; }
 :deep(.cross-period-row) { background-color: #fef2f2 !important; }

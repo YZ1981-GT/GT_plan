@@ -736,7 +736,7 @@ defineExpose({ scrollToStep })
 
 <style scoped>
 .cct-decision-tree {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-view-header {
@@ -768,7 +768,7 @@ defineExpose({ scrollToStep })
 }
 
 .cct-dev-selector-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b7280;
 }
 
@@ -830,7 +830,7 @@ defineExpose({ scrollToStep })
 }
 
 .cct-step-question {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #1f2937;
 }
@@ -886,7 +886,7 @@ defineExpose({ scrollToStep })
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
 }
 
@@ -926,14 +926,14 @@ defineExpose({ scrollToStep })
 }
 
 .cct-conclusion-badge {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-conclusion-action {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b7280;
   margin-top: 8px;
   padding-top: 8px;
@@ -958,7 +958,7 @@ defineExpose({ scrollToStep })
 
 .cct-compilation-tips summary {
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #6b7280;
   background: #f9fafb;
@@ -1002,7 +1002,7 @@ defineExpose({ scrollToStep })
 }
 
 .cct-exception-desc-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #374151;
 }
@@ -1069,7 +1069,7 @@ defineExpose({ scrollToStep })
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-conclusion-row .cct-conclusion-label {
@@ -1112,7 +1112,7 @@ defineExpose({ scrollToStep })
 }
 
 .cct-example-step {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
   line-height: 1.6;
   padding: 6px 10px;

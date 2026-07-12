@@ -148,7 +148,7 @@ const emit = defineEmits<{
 /* 审计目标导航项（可点击） */
 .gt-checklist-table__nav-item.is-objective-header {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-primary, #409eff);
   padding: 8px 16px;
   border-bottom: 1px solid var(--gt-color-border-light);

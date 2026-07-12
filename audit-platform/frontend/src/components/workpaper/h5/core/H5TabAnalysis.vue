@@ -116,7 +116,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h5-tab-analysis { padding: 16px; font-size: 13px; }
+.h5-tab-analysis { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
@@ -124,7 +124,7 @@ function fmtAmt(val: number | null | undefined): string {
 .summary-item .label { color: var(--el-text-color-secondary); margin-right: 6px; }
 .summary-item .value { font-weight: 600; font-variant-numeric: tabular-nums; }
 .warn-alert { margin-bottom: 12px; }
-.analysis-table { font-size: 13px; }
+.analysis-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .formula-cell { font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .formula-cell.abnormal { color: var(--el-color-warning); font-weight: 600; }

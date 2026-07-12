@@ -448,7 +448,7 @@ const progressRate = computed(() => Math.round((filledCount.value / totalIndicat
 </template>
 
 <style scoped>
-.d4-key-indicator { padding: 16px 20px; font-size: 13px; }
+.d4-key-indicator { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -466,7 +466,7 @@ const progressRate = computed(() => Math.round((filledCount.value / totalIndicat
 .stat-label { font-size: 12px; color: #909399; margin-top: 2px; }
 
 .methodology-collapse { margin-bottom: 14px; border-radius: 6px; border: 1px solid #faecd8; border-left: 3px solid #e6a23c; background: #fffbf0; }
-.methodology-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #b88230; }
+.methodology-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #b88230; }
 .methodology-body { padding: 8px 14px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 .method-objectives { margin: 4px 0 8px 16px; padding: 0; }
 .method-objectives li { margin-bottom: 2px; }
@@ -486,7 +486,7 @@ const progressRate = computed(() => Math.round((filledCount.value / totalIndicat
 .peer-management { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; padding: 8px 14px; background: #faf5ff; border-radius: 6px; border: 1px solid #e8d5f5; }
 .peer-label { font-size: 12px; color: #9b59b6; font-weight: 500; }
 
-.indicator-table { font-size: 13px; margin-bottom: 24px; }
+.indicator-table { font-size: var(--wp-font-size, 13px); margin-bottom: 24px; }
 .indicator-table :deep(.el-table__cell) { padding: 6px 4px; }
 .indicator-table :deep(.col-current .el-table__cell) { background-color: #f0f9eb !important; }
 .indicator-table :deep(.col-prior .el-table__cell) { background-color: #fdf6ec !important; }
@@ -510,7 +510,7 @@ const progressRate = computed(() => Math.round((filledCount.value / totalIndicat
 .opinion-field label { display: block; font-size: 12px; color: #909399; margin-bottom: 4px; font-weight: 500; }
 
 .tips-collapse { margin-bottom: 16px; border-radius: 6px; border: 1px solid #fde2e2; border-left: 3px solid #f56c6c; }
-.tips-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #f56c6c; }
+.tips-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #f56c6c; }
 .tips-list { margin: 8px 14px 12px; padding-left: 18px; font-size: 12px; color: #606266; line-height: 2; }
 
 .oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }

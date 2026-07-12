@@ -94,12 +94,12 @@ function fmtAmt(val: number | null | undefined): string { return val == null ? '
 </script>
 
 <style scoped>
-.h5-tab-depletion-alloc { padding: 16px; font-size: 13px; }
+.h5-tab-depletion-alloc { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.balance-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; font-size: 13px; }
-.alloc-table { font-size: 13px; }
+.balance-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px); }
+.alloc-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .action-bar { margin: 12px 0; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

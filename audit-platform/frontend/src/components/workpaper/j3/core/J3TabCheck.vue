@@ -206,7 +206,7 @@ formData.loadData()
 .chip-wrap { display: inline-flex; align-items: center; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .guide-banner {
   display: grid;
@@ -217,7 +217,7 @@ formData.loadData()
   background: linear-gradient(135deg, #e8f4fd 0%, #d4ecf7 100%);
   border-radius: 8px;
 }
-.guide-step { font-size: 13px; color: #303133; }
+.guide-step { font-size: var(--wp-font-size, 13px); color: #303133; }
 .step-num { font-weight: 700; color: #409eff; margin-right: 4px; }
 .section-header {
   display: flex;
@@ -235,14 +235,14 @@ formData.loadData()
   align-items: center;
   gap: 8px;
 }
-.param-label { font-size: 13px; min-width: 80px; color: #606266; }
+.param-label { font-size: var(--wp-font-size, 13px); min-width: 80px; color: #606266; }
 .bs-result {
   margin-top: 12px;
   padding: 8px 12px;
   background: #f0f9eb;
   border-radius: 4px;
 }
-.bs-result-label { font-size: 13px; color: #606266; }
+.bs-result-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 .bs-result-value { font-weight: 700; color: #67c23a; font-size: 15px; }
 .methodology-context {
   padding: 8px 12px;
@@ -257,12 +257,12 @@ formData.loadData()
   padding: 8px 0;
   border-bottom: 1px solid #ebeef5;
 }
-.item-label { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
+.item-label { font-size: var(--wp-font-size, 13px); font-weight: 500; margin-bottom: 4px; }
 .item-controls { display: flex; align-items: flex-start; gap: 8px; }
 .ipo-panel { margin-top: 16px; }
 .ipo-highlights {
   padding-left: 20px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 2;
 }
 .conclusion-card { margin-top: 16px; }

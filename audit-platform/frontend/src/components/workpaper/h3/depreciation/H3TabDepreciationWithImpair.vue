@@ -172,10 +172,10 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-depreciation-with-impair { padding: 16px; font-size: 13px; }
+.h3-tab-depreciation-with-impair { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .mode-alert { margin-bottom: 16px; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .audit-table :deep(.row-warn) { background-color: #fef9e7 !important; }
 .formula-value { border-bottom: 1px dashed var(--el-border-color); cursor: help; }

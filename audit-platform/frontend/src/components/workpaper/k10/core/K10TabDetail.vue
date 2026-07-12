@@ -397,7 +397,7 @@ function handleAiAssist(): void {
 </script>
 
 <style scoped>
-.k10-tab-detail { padding: 12px; font-size: 13px; }
+.k10-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -410,7 +410,7 @@ function handleAiAssist(): void {
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b;
   padding: 10px 14px; margin-bottom: 12px;
-  border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6;
+  border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6;
 }
 .methodology-context p { margin: 0; }
 
@@ -434,13 +434,13 @@ function handleAiAssist(): void {
   padding-bottom: 1px;
 }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 .subtotal-bar {
   display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
   margin-top: 10px; padding: 8px 14px;
   background: #f5f7fa; border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .subtotal-label { font-weight: 700; color: #303133; min-width: 48px; }
 .subtotal-item { color: #606266; }

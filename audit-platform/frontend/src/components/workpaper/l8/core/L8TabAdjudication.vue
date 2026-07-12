@@ -502,13 +502,13 @@ function _restoreFromResponses() {
 </script>
 
 <style scoped>
-.l8-tab-adjudication { padding: 12px; font-size: 13px; }
+.l8-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .block-section { margin-bottom: 24px; }
 .block-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: #303133; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
@@ -517,7 +517,7 @@ function _restoreFromResponses() {
 .abnormal-rate { color: #e6a23c; font-weight: 700; }
 .total-row-label { font-weight: 700; color: #303133; }
 .sign-minus { color: #909399; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.total-row) { background: #f0f9ff !important; font-weight: 600; }
 :deep(.total-row td) { border-top: 2px solid #409eff; }
 :deep(.tb-check-row) { background: #f5f7fa !important; font-style: italic; color: #909399; }
@@ -529,7 +529,7 @@ function _restoreFromResponses() {
 .cross-wp-links { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #d9ecff; border-radius: 6px; flex-wrap: wrap; }
 .cross-wp-label { font-size: 12px; color: #409eff; font-weight: 500; }
 .cross-wp-desc { font-size: 12px; color: #909399; }
-.l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l8-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l8-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

@@ -199,7 +199,7 @@ function handleParamChange(field: keyof H8MeasurementParams, value: any) {
 </script>
 
 <style scoped>
-.h8-tab-measurement-monthly { padding: 16px; font-size: 13px; }
+.h8-tab-measurement-monthly { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .formula-banner {
   display: flex; gap: 12px; align-items: flex-start;
@@ -209,7 +209,7 @@ function handleParamChange(field: keyof H8MeasurementParams, value: any) {
 .formula-icon { font-size: 28px; }
 .formula-content { flex: 1; }
 .formula-title { font-weight: 700; font-size: 14px; color: #1e40af; margin-bottom: 4px; }
-.formula-text { font-size: 13px; color: #1d4ed8; }
+.formula-text { font-size: var(--wp-font-size, 13px); color: #1d4ed8; }
 .formula-note { font-size: 12px; color: #3b82f6; margin-top: 2px; }
 .formula-result { font-size: 12px; color: #2563eb; margin-top: 4px; }
 

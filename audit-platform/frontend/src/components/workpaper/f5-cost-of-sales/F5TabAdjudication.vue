@@ -266,13 +266,13 @@ function openReview() {
 
 <style scoped>
 .f5-adjudication { padding: 12px; }
-.f5-adjudication :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.f5-adjudication :deep(.el-table .cell) { font-size: 13px !important; }
+.f5-adjudication :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f5-adjudication :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
 /* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 
@@ -280,7 +280,7 @@ function openReview() {
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
-.toolbar-hint { font-size: 13px; color: #909399; }
+.toolbar-hint { font-size: var(--wp-font-size, 13px); color: #909399; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
 /* 表格 */
@@ -292,7 +292,7 @@ function openReview() {
 :deep(.f5-row-subtotal) { background: #f5f7fa; font-weight: 700; }
 
 /* 核对行 */
-.tb-check-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; margin: 12px 0; font-size: 13px; flex-wrap: wrap; }
+.tb-check-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; margin: 12px 0; font-size: var(--wp-font-size, 13px); flex-wrap: wrap; }
 .tb-label { color: #909399; }
 
 /* 审计意见卡片 */

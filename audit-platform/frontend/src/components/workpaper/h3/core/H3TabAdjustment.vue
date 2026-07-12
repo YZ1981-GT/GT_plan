@@ -124,9 +124,9 @@ function fmtNum(v: number): string {
 </script>
 
 <style scoped>
-.h3-tab-adjustment { padding: 16px; font-size: 13px; }
+.h3-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .balance-row { display: flex; align-items: center; gap: 16px; margin-top: 12px; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
 .export-dropdown { margin-left: auto; }
 </style>

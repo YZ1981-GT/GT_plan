@@ -387,29 +387,29 @@ function _restoreData() {
 </script>
 
 <style scoped>
-.l8-tab-cutoff-test { padding: 12px; font-size: 13px; }
+.l8-tab-cutoff-test { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .param-bar { display: flex; align-items: center; gap: 24px; margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; flex-wrap: wrap; }
 .param-item { display: flex; align-items: center; gap: 6px; }
-.param-label { font-size: 13px; color: #606266; }
+.param-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 .segment-switcher { margin-bottom: 12px; }
 .cutoff-summary { display: flex; gap: 32px; margin-bottom: 16px; padding: 12px 16px; background: #fafafa; border-radius: 6px; flex-wrap: wrap; }
 :deep(.el-statistic) { text-align: center; }
 :deep(.el-statistic__head) { font-size: 12px; color: #909399; }
 :deep(.el-statistic__content) { font-size: 18px; font-weight: 600; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.cross-period-row) { background: #fef0f0 !important; }
 :deep(.cross-period-row td) { color: #f56c6c; }
 .pass-mark { color: #67c23a; font-weight: 600; }
 .cross-period-amount { color: #f56c6c; font-weight: 600; }
 .audit-note-card { margin-top: 16px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
-.l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l8-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l8-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

@@ -316,11 +316,11 @@ function isRateExceed(rate: number | '' | 'N/A'): boolean {
 <style scoped>
 .d7-analysis { padding: 12px; }
 .d7-analysis :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d7-analysis :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -338,7 +338,7 @@ function isRateExceed(rate: number | '' | 'N/A'): boolean {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -359,7 +359,7 @@ function isRateExceed(rate: number | '' | 'N/A'): boolean {
 .analysis-card { margin-bottom: 20px; padding: 16px; border: 1px solid #ebeef5; border-radius: 8px; }
 .card-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #303133; }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
-.diff-line { display: flex; gap: 12px; align-items: center; font-size: 13px; }
+.diff-line { display: flex; gap: 12px; align-items: center; font-size: var(--wp-font-size, 13px); }
 .diff-red { color: #f56c6c; font-weight: 600; }
 .rate-exceed { color: #f56c6c; font-weight: 600; }
 

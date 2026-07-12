@@ -449,7 +449,7 @@ function requestAiConclusion(): void {
 <style scoped>
 .g6-tab-stage-classification {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
@@ -505,7 +505,7 @@ function requestAiConclusion(): void {
 /* ─── 主表格 ─── */
 .stage-main-table {
   width: 100%;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 不一致行红色高亮 */
@@ -568,7 +568,7 @@ function requestAiConclusion(): void {
 
 .check-section-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   margin-bottom: 8px;
   padding-left: 8px;
@@ -627,7 +627,7 @@ function requestAiConclusion(): void {
 
 .guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   font-weight: 600;
 }

@@ -88,7 +88,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.h5-tab-recoverable { padding: 16px; font-size: 13px; }
+.h5-tab-recoverable { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

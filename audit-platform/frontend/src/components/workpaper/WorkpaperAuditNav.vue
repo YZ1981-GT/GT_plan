@@ -489,7 +489,7 @@ onMounted(() => {
   color: white;
 }
 .gt-audit-nav-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -636,7 +636,7 @@ onMounted(() => {
 }
 .gt-deliverable-link {
   display: inline-block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-primary, #4b2d77);
   text-decoration: none;
   padding: 4px 0;

@@ -326,7 +326,7 @@ function colStyle(c: number): Record<string, string> {
 }
 .gt-grid-sheet__table {
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   background: #fff;
   table-layout: fixed;
   width: 100%;

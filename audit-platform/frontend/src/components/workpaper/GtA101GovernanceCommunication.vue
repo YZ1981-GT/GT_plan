@@ -337,7 +337,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* Fee table */
 .gt-a101__fee-section { margin-top: 16px; }
-.gt-a101__fee-title { font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 8px; }
+.gt-a101__fee-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 8px; }
 .gt-a101__fee-table { width: 100%; }
 .gt-a101__fee-total { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 8px; font-size: 14px; font-weight: 600; }
 .gt-a101__fee-total-amount { color: #e6a23c; font-size: 16px; }
@@ -349,7 +349,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* Guidance */
 .gt-a101__guidance { border: none; }
-.gt-a101__guidance-text { font-size: 13px; color: #909399; line-height: 1.8; }
+.gt-a101__guidance-text { font-size: var(--wp-font-size, 13px); color: #909399; line-height: 1.8; }
 
 /* OO */
 .gt-a101__oo { height: calc(100vh - 200px); min-height: 500px; }

@@ -403,7 +403,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k6-tab-detail { padding: 12px; font-size: 13px; }
+.k6-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── 方法论上下文 ─── */
 .methodology-context {
@@ -412,7 +412,7 @@ function fmtAmt(val: number | null | undefined): string {
   padding: 10px 14px;
   margin-bottom: 16px;
   border-radius: 0 6px 6px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   line-height: 1.6;
 }
@@ -429,11 +429,11 @@ function fmtAmt(val: number | null | undefined): string {
 .toolbar-right { display: flex; gap: 4px; }
 
 /* ─── 表格样式 ─── */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.formula-col) { background-color: #fafff8; }
 :deep(.anomaly-row) { background-color: #fef0f0 !important; }
 .detail-input { width: 100%; }
-.detail-input :deep(.el-input__inner) { text-align: right; font-size: 13px; }
+.detail-input :deep(.el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
 .asset-name { font-weight: 500; color: #303133; }
 
 /* ─── 公式列样式 ─── */
@@ -455,8 +455,8 @@ function fmtAmt(val: number | null | undefined): string {
   border-radius: 6px;
 }
 .stat-item { display: flex; align-items: center; gap: 4px; }
-.stat-label { font-size: 13px; color: #909399; }
-.stat-value { font-size: 13px; font-weight: 600; color: #303133; }
+.stat-label { font-size: var(--wp-font-size, 13px); color: #909399; }
+.stat-value { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
 
 /* ─── 编制提示 ─── */
 .k6-details-tip {
@@ -465,7 +465,7 @@ function fmtAmt(val: number | null | undefined): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .k6-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }

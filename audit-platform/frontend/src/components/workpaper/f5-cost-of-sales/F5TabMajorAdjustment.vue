@@ -209,7 +209,7 @@ function openReview() { openReviewDialog('F5-8-conclusion') }
 </script>
 
 <style scoped>
-.f5-major-adj { padding: 12px; font-size: 13px; }
+.f5-major-adj { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .f5-ma-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .f5-ma-title { font-weight: 600; }
 .f5-ma-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }

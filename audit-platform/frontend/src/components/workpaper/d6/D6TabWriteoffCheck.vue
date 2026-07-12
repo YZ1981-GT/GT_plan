@@ -356,11 +356,11 @@ const {
 <style scoped>
 .d6-tab-writeoff-check { padding: 16px; }
 .d6-tab-writeoff-check :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d6-tab-writeoff-check :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -378,7 +378,7 @@ const {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -413,7 +413,7 @@ const {
 .section-block { margin-bottom: 24px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-title { font-size: 14px; font-weight: 600; margin: 0; color: #303133; }
-.total-line { margin-top: 8px; font-size: 13px; font-weight: 600; color: #606266; }
+.total-line { margin-top: 8px; font-size: var(--wp-font-size, 13px); font-weight: 600; color: #606266; }
 :deep(.related-party-row) { background-color: #fdf6ec !important; }
 
 /* 审计意见卡片 */

@@ -1183,7 +1183,7 @@ watch(saving, (isSaving, wasSaving) => {
 .high-risk-warning {
   color: #DC2626;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ═══ Tab 3 矩阵 (Task 3.5/3.6) ═══ */
@@ -1202,7 +1202,7 @@ watch(saving, (isSaving, wasSaving) => {
   display: flex;
   gap: 16px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   padding: 8px 12px;
   background: #F9FAFB;
@@ -1257,7 +1257,7 @@ watch(saving, (isSaving, wasSaving) => {
   z-index: 1;
   background: #FFFFFF;
   padding: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   border-bottom: 1px solid #E5E7EB;
   border-right: 1px solid #E5E7EB;
@@ -1332,7 +1332,7 @@ watch(saving, (isSaving, wasSaving) => {
 
 .cell-level {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cell-empty {
@@ -1354,7 +1354,7 @@ watch(saving, (isSaving, wasSaving) => {
 
 .edit-row label {
   width: 100px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
@@ -1506,7 +1506,7 @@ watch(saving, (isSaving, wasSaving) => {
 .pending-items ul {
   margin: 0;
   padding-left: 20px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6B7280;
 }
 
@@ -1518,7 +1518,7 @@ watch(saving, (isSaving, wasSaving) => {
 /* ═══ 弹窗 ═══ */
 .fraud-rebuttal-form,
 .amendment-form {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .fraud-rebuttal-form p,

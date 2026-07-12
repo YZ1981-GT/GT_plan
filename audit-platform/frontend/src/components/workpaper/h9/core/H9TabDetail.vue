@@ -417,7 +417,7 @@ function getSummaryAdjustment({ columns }: any) {
 </script>
 
 <style scoped>
-.h9-tab-detail { padding: 16px; font-size: 13px; }
+.h9-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
 .methodology-context {
@@ -431,7 +431,7 @@ function getSummaryAdjustment({ columns }: any) {
 }
 .bar-actions { display: flex; gap: 6px; align-items: center; }
 
-.detail-table { font-size: 13px; margin-bottom: 12px; }
+.detail-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .detail-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 

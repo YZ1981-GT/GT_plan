@@ -37,6 +37,8 @@ import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD1AiGenerate } from '../composables/useD1AiGenerate'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -50,10 +52,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话
 const openReviewDialog = inject<any>('openReviewDialog', null)
@@ -711,7 +710,7 @@ const GUIDANCE_TEXTS = [
 
 .audit-objective p {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -753,7 +752,7 @@ const GUIDANCE_TEXTS = [
 }
 
 .summary-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }
@@ -776,7 +775,7 @@ const GUIDANCE_TEXTS = [
 .recon-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 16px;
 }
 
@@ -806,7 +805,7 @@ const GUIDANCE_TEXTS = [
 
 .book-balance-warn {
   color: #e6a23c;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 索引号单元格 */
@@ -844,7 +843,7 @@ const GUIDANCE_TEXTS = [
   background: #ecf5ff;
   padding: 10px 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

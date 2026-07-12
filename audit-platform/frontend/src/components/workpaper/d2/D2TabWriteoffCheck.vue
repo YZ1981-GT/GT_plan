@@ -9,10 +9,11 @@
 import { inject, ref, toRef, type Ref } from 'vue'
 import { useD2WriteoffCheck } from '../composables/useD2WriteoffCheck'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
-import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -27,11 +28,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   'D2-11',
 )
 
-const { saveItems } = useD2SaveInject()
-
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const {
   reversalRows,
@@ -62,7 +59,7 @@ loadSectionAnalysis()
 function saveSectionAnalysis(): void {
   const item = { item_id: 'D2-writeoff-section-analysis', conclusion: null, remark: sectionAnalysis.value }
   props.allResponses.set('D2-writeoff-section-analysis', item)
-  void saveItems([item])
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
 }
 
 async function onAiSectionAnalysis(): Promise<void> {
@@ -283,16 +280,16 @@ const GUIDANCE_TEXTS = [
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; align-items: center; margin-bottom: 12px; gap: 12px; }
 .consistency-alert { margin-bottom: 12px; }
 .section-block { margin-bottom: 20px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .section-title { font-weight: 600; font-size: 14px; color: #303133; }
-.total-line { text-align: right; font-size: 13px; font-weight: 600; margin-top: 6px; padding: 4px 8px; background: #fafafa; border-radius: 4px; }
+.total-line { text-align: right; font-size: var(--wp-font-size, 13px); font-weight: 600; margin-top: 6px; padding: 4px 8px; background: #fafafa; border-radius: 4px; }
 .comment-cell { display: flex; align-items: center; gap: 4px; }
 .section-subtitle { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 </style>

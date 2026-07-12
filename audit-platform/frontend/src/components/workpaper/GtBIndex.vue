@@ -275,7 +275,7 @@ onBeforeUnmount(() => {
 }
 .gt-b-index__preparation-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-primary, #4b2d77);
 }
 .gt-b-index__preparation-summary {
@@ -398,7 +398,7 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .gt-b-index__cycle-code {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 700;
   color: var(--gt-color-primary, #4b2d77);
 }
@@ -414,7 +414,7 @@ onBeforeUnmount(() => {
   color: var(--gt-color-primary, #4b2d77) !important;
 }
 .gt-b-index__cycle-name {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.4;
   color: var(--gt-color-text-primary, #303133);
   display: -webkit-box;

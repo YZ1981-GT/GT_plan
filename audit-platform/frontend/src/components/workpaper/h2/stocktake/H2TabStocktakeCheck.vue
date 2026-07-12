@@ -216,11 +216,11 @@ function openReview(id: string) {
 </script>
 
 <style scoped>
-.h2-tab-stocktake-check { padding: 16px; font-size: 13px; }
+.h2-tab-stocktake-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .amt-input { width: 100%; }
 .add-row-bar { margin-top: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

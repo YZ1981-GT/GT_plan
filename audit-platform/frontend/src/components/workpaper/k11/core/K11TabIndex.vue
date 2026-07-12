@@ -335,7 +335,7 @@ function fmtAmt(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k11-tab-index { padding: 12px; font-size: 13px; }
+.k11-tab-index { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .k11-progress-section {
   margin-bottom: 16px;

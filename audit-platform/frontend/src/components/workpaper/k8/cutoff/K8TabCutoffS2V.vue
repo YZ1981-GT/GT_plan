@@ -265,7 +265,7 @@ function handleVoucherFilled(payload: any): void {
 </script>
 
 <style scoped>
-.k8-cutoff-s2v { font-size: 13px; padding: 16px; }
+.k8-cutoff-s2v { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 4px; }
@@ -276,12 +276,12 @@ function handleVoucherFilled(payload: any): void {
 .stat-value { font-size: 18px; font-weight: 700; color: #1f2937; }
 .stat-danger { color: #dc2626; }
 .stat-success { color: #16a34a; }
-.cutoff-table { font-size: 13px; }
+.cutoff-table { font-size: var(--wp-font-size, 13px); }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
 .summary-card { margin-top: 16px; }
 :deep(.cross-period-row) { background-color: #fef2f2 !important; }
 :deep(.cross-period-row:hover > td) { background-color: #fee2e2 !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; }
 .compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

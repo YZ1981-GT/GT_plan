@@ -282,7 +282,7 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
 <style scoped>
 .gt-confirmation-diff-securities {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-confirmation-diff-securities__objective {
   margin-bottom: 12px;
@@ -303,7 +303,7 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
   gap: 8px;
 }
 .gt-confirmation-diff-securities__section-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -319,7 +319,7 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   margin-bottom: 8px;
   color: var(--el-text-color-primary);

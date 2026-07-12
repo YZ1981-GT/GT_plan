@@ -165,13 +165,13 @@ function fmtAmount(val: number): string {
 </script>
 
 <style scoped>
-.g14-adjustment { padding: 16px; font-size: 13px; }
+.g14-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
 .audit-objective { margin-bottom: 12px; }
-.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
+.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: var(--wp-font-size, 13px); font-weight: 500; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; font-weight: 600; }
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
-.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
+.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: var(--wp-font-size, 13px); color: #409eff; }
 .hint-content { padding: 0 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 </style>

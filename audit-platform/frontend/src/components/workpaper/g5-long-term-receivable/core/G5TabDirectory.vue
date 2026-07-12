@@ -44,6 +44,6 @@ const rows = ref([
 </script>
 
 <style scoped>
-.g5-directory { padding: 12px; font-size: 13px; }
+.g5-directory { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .sheet-title { margin: 0 0 12px; font-size: 15px; }
 </style>

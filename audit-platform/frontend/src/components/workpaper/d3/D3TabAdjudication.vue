@@ -319,14 +319,14 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
 .subtotal-row { font-weight: 700; }
 .rate-exceed { color: #f56c6c; font-weight: 600; }
 .diff-red { color: #f56c6c; font-weight: 600; }
-.tb-diff-row { display: flex; gap: 24px; padding: 8px 12px; background: #fafafa; border-radius: 4px; margin: 12px 0; font-size: 13px; }
+.tb-diff-row { display: flex; gap: 24px; padding: 8px 12px; background: #fafafa; border-radius: 4px; margin: 12px 0; font-size: var(--wp-font-size, 13px); }
 .audit-notes-section, .audit-conclusion-section { margin-top: 20px; }
 .audit-notes-section h4, .audit-conclusion-section h4 { font-size: 14px; margin-bottom: 12px; }
 .section-header-row { display: flex; align-items: center; gap: 8px; }
 .note-block { margin-bottom: 16px; }
-.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 13px; color: #606266; }
+.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .conclusion-actions { display: flex; gap: 8px; margin-top: 8px; }
 .cas14-hint { margin-top: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
-.cas14-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
+.cas14-hint summary { padding: 8px 12px; cursor: pointer; font-size: var(--wp-font-size, 13px); color: #409eff; }
 .cas14-hint .hint-content { padding: 8px 12px 12px; font-size: 12px; color: #606266; line-height: 1.6; }
 </style>

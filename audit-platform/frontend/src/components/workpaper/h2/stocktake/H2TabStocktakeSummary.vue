@@ -200,15 +200,15 @@ function openReview(id: string) {
 </script>
 
 <style scoped>
-.h2-tab-stocktake-summary { padding: 16px; font-size: 13px; }
+.h2-tab-stocktake-summary { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 .stats-bar { display: flex; gap: 8px; margin-top: 12px; }
-.anomaly-table { font-size: 13px; }
+.anomaly-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .sign-area { padding: 16px 0; }
-.sign-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.sign-row { display: flex; align-items: center; gap: 8px; font-size: var(--wp-font-size, 13px); }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }
 .edit-tips ul { padding-left: 20px; margin-top: 8px; }

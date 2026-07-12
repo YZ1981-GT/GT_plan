@@ -937,7 +937,7 @@ watch(deficiencyList, () => {
   padding: 10px 16px;
   margin-bottom: 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1073,7 +1073,7 @@ watch(deficiencyList, () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .it-hint {
@@ -1108,7 +1108,7 @@ watch(deficiencyList, () => {
 
 .tab-note-section label,
 .tab-score-section label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #374151;
 }
@@ -1124,7 +1124,7 @@ watch(deficiencyList, () => {
   padding: 4px 12px;
   border-radius: 4px;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .override-badge {
@@ -1152,7 +1152,7 @@ watch(deficiencyList, () => {
 .matrix-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .matrix-table th,
@@ -1241,7 +1241,7 @@ watch(deficiencyList, () => {
 }
 
 .overall-note label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #374151;
 }
@@ -1273,7 +1273,7 @@ watch(deficiencyList, () => {
 .pending-items ul {
   margin: 0;
   padding-left: 20px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6B7280;
 }
 
@@ -1285,7 +1285,7 @@ watch(deficiencyList, () => {
 /* ═══ 对话框 (Task 3.7 / 3.9) ═══ */
 .override-form,
 .amendment-form {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .override-form p,

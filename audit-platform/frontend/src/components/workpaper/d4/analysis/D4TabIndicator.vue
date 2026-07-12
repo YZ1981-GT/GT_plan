@@ -469,17 +469,17 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .sec-actions { display: flex; gap: 8px; }
 .objective-list { padding: 10px 14px; background: #f5f7fa; border-radius: 6px; }
-.objective-item { margin: 0 0 4px; font-size: 13px; color: #303133; line-height: 1.7; }
+.objective-item { margin: 0 0 4px; font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.7; }
 .objective-item:last-child { margin-bottom: 0; }
-.indicator-table { font-size: 13px; }
-.indicator-table :deep(.el-table__cell) { font-size: 13px; padding: 6px 0; }
+.indicator-table { font-size: var(--wp-font-size, 13px); }
+.indicator-table :deep(.el-table__cell) { font-size: var(--wp-font-size, 13px); padding: 6px 0; }
 .table-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .toolbar-left { display: flex; gap: 8px; }
 .toolbar-right { display: flex; gap: 8px; }
 .num-input { width: 100%; }
-.num-input :deep(.el-input__inner) { text-align: right; font-size: 13px; }
+.num-input :deep(.el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
 .has-formula { border-bottom: 1px dashed #909399; cursor: help; }
-.computed-val { font-size: 13px; }
+.computed-val { font-size: var(--wp-font-size, 13px); }
 .val-exceed { color: #f56c6c; font-weight: 600; }
 
 .mode-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }

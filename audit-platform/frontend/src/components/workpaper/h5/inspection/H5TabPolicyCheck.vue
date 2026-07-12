@@ -78,7 +78,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.h5-tab-policy-check { padding: 16px; font-size: 13px; }
+.h5-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
@@ -87,7 +87,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 .policy-item { padding: 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; }
 .policy-item.non-compliant { border-color: var(--el-color-danger-light-5); background: var(--el-color-danger-light-9); }
 .clause-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.clause-desc { font-size: 13px; }
+.clause-desc { font-size: var(--wp-font-size, 13px); }
 .clause-body { display: flex; align-items: center; gap: 12px; }
 .evidence-input { flex: 1; }
 .note-card { margin-bottom: 16px; }

@@ -207,12 +207,12 @@ function fmtAmt(v: number | null | undefined): string { return v == null ? '-' :
 </script>
 
 <style scoped>
-.h7-tab-stocktake-check { padding: 16px; font-size: 13px; }
+.h7-tab-stocktake-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .row-tag { margin-left: 8px; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
 .calc-cell { font-variant-numeric: tabular-nums; background: var(--el-fill-color-light); border-bottom: 1px dashed var(--el-border-color); cursor: help; display: inline-block; width: 100%; text-align: right; }
 .calc-cell.has-diff { color: var(--el-color-danger); font-weight: 600; }

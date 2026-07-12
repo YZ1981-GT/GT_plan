@@ -454,7 +454,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i4-adjudication {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -485,7 +485,7 @@ function fmtAmount(value: number | null | undefined): string {
 .block-title { font-size: 14px; }
 
 /* 审定表 */
-.adjudication-table { font-size: 13px; }
+.adjudication-table { font-size: var(--wp-font-size, 13px); }
 .adjudication-table :deep(.el-table__footer td) {
   font-weight: 600; background: #f0f9ff;
 }
@@ -508,7 +508,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 /* TB差异 */
 .tb-section { margin-bottom: 20px; margin-top: 24px; }
-.tb-table { font-size: 13px; }
+.tb-table { font-size: var(--wp-font-size, 13px); }
 .difference-warning { color: #dc2626; font-weight: 600; }
 
 /* 跨底稿联动 */
@@ -516,7 +516,7 @@ function fmtAmount(value: number | null | undefined): string {
   display: flex; align-items: center; gap: 8px;
   padding: 12px 0; margin-bottom: 16px; flex-wrap: wrap;
 }
-.cross-ref-label { color: #606266; font-size: 13px; }
+.cross-ref-label { color: #606266; font-size: var(--wp-font-size, 13px); }
 
 /* 审计说明/结论 el-card */
 .audit-note-card { margin-bottom: 16px; }

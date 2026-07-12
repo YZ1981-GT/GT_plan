@@ -248,11 +248,11 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-rental-income { padding: 16px; font-size: 13px; }
+.h3-tab-rental-income { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .action-btns { display: flex; gap: 4px; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .audit-table :deep(.row-warn) { background-color: #fef9e7 !important; }
 .audit-table :deep(.row-expiry) { background-color: #fff3e0 !important; }

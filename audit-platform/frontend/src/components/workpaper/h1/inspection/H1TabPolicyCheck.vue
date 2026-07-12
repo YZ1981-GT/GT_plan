@@ -201,7 +201,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.h1-tab-policy-check { padding: 16px; font-size: 13px; }
+.h1-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; }

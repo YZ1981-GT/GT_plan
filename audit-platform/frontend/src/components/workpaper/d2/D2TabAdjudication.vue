@@ -12,6 +12,8 @@ import { getChangeRate } from '../composables/useD2FormulaEngine'
 import { useD2SaveInject } from '../composables/useD2SaveInject'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -23,10 +25,7 @@ const props = defineProps<{
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string; amountClass?: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-  amountClass: () => '',
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const baseOpts = {
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -760,12 +759,12 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 }
 .tab-header h4 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .toolbar-right { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective :deep(p) { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective :deep(p) { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tb-alert { margin-bottom: 12px; }
 .cross-alert { margin-bottom: 12px; }
 .warn-chip { margin-left: 8px; vertical-align: middle; }
@@ -811,7 +810,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
   padding: 6px 8px;
   border-right: 1px solid #ebeef5;
   border-bottom: 1px solid #ebeef5;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .meta-cell:nth-child(4n) {
   border-right: none;
@@ -829,7 +828,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 .section-aging {
   border-left: 3px solid #dcdfe6;
 }
-.section-title { font-weight: 600; font-size: 13px; margin-bottom: 10px; color: #303133; }
+.section-title { font-weight: 600; font-size: var(--wp-font-size, 13px); margin-bottom: 10px; color: #303133; }
 .section-title-row {
   display: flex;
   justify-content: space-between;
@@ -842,7 +841,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
   align-items: center;
   gap: 8px;
 }
-.aging-mode-label { color: #606266; font-size: 13px; }
+.aging-mode-label { color: #606266; font-size: var(--wp-font-size, 13px); }
 .aging-usage-hint { margin: 8px 0 12px; }
 .custom-aging-editor {
   border: 1px dashed #dcdfe6;
@@ -860,15 +859,15 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 .sumif-cell { background: #eef6ff; padding: 2px 6px; border-radius: 4px; color: #225b9c; }
 .rate-warning { color: #f56c6c; font-weight: 600; }
 .audited-cell { font-weight: 600; }
-.aging-total { margin-top: 8px; font-size: 13px; font-weight: 600; text-align: right; padding-right: 12px; color: #606266; }
-.tb-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; margin-bottom: 16px; }
+.aging-total { margin-top: 8px; font-size: var(--wp-font-size, 13px); font-weight: 600; text-align: right; padding-right: 12px; color: #606266; }
+.tb-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); margin-bottom: 16px; }
 .audit-footer { margin-top: 16px; }
-.audit-block-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: 13px; }
+.audit-block-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
 
 :deep(.el-table th.el-table__cell) {
   background: #f7f8fa;
   color: #303133;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 :deep(.d2-main-grid thead tr:first-child th.el-table__cell) {
   background: #eceff5;
@@ -904,7 +903,7 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 :deep(.el-table td.el-table__cell) {
   padding-top: 6px;
   padding-bottom: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 :deep(.el-input__wrapper),
 :deep(.el-input__inner),
@@ -912,6 +911,6 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
 :deep(.el-button),
 :deep(.el-alert__content),
 :deep(.el-alert__title) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

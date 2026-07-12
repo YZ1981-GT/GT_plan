@@ -187,7 +187,7 @@ defineExpose({ refresh: loadKanban })
   border-top: 4px solid var(--gt-color-info); border-radius: 12px 12px 0 0;
   background: var(--gt-color-bg, #fafafa);
 }
-.column-title { font-size: 13px; font-weight: 700; color: var(--gt-color-text); }
+.column-title { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-text); }
 .column-count {
   font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
   background: var(--gt-color-bg-white); color: var(--gt-color-text-secondary);
@@ -215,12 +215,12 @@ defineExpose({ refresh: loadKanban })
 }
 
 .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.card-code { font-weight: 700; font-size: 13px; color: var(--gt-color-primary); }
+.card-code { font-weight: 700; font-size: var(--wp-font-size, 13px); color: var(--gt-color-primary); }
 .card-cycle-badge {
   font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
   background: var(--gt-color-primary-bg, #f0e6ff); color: var(--gt-color-primary);
 }
-.card-name { font-size: 13px; color: var(--gt-color-text); line-height: 1.4; }
+.card-name { font-size: var(--wp-font-size, 13px); color: var(--gt-color-text); line-height: 1.4; }
 .card-progress { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
 .card-progress__text { font-size: 10px; color: var(--gt-color-text-tertiary); white-space: nowrap; }
 .card-footer { display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 12px; color: var(--gt-color-text-tertiary); }

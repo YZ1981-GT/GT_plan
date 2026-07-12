@@ -168,13 +168,13 @@ function fmtAmount(val: number | null | undefined): string {
 
 <style scoped>
 .d3-adjustment { padding: 16px; }
-.d3-adjustment :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.d3-adjustment :deep(.el-table .cell) { font-size: 13px !important; }
+.d3-adjustment :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.d3-adjustment :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
 /* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 
 /* 工具栏 */
@@ -184,6 +184,6 @@ function fmtAmount(val: number | null | undefined): string {
 .chip-wrap { display: inline-flex; align-items: center; }
 
 /* 平衡核对行 */
-.tb-check-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #f5f7fa; border-radius: 4px; margin-top: 12px; font-size: 13px; }
+.tb-check-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: #f5f7fa; border-radius: 4px; margin-top: 12px; font-size: var(--wp-font-size, 13px); }
 .tb-label { color: #909399; }
 </style>

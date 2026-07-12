@@ -105,12 +105,12 @@ function fmtAmt(val: number | null | undefined): string { return val == null ? '
 </script>
 
 <style scoped>
-.h5-tab-stocktake-plan { padding: 16px; font-size: 13px; }
+.h5-tab-stocktake-plan { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .progress-bar { margin-bottom: 12px; }
-.plan-table { font-size: 13px; }
+.plan-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .action-bar { margin: 12px 0; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

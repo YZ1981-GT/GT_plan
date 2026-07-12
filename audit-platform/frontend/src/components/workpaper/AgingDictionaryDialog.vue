@@ -205,7 +205,7 @@ async function onConfirm() {
 .aging-presets-label,
 .aging-segments-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 8px;
   color: #333;
 }

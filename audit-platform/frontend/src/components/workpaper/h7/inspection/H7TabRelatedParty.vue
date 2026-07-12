@@ -212,7 +212,7 @@ function fmtRate(v: number): string { return `${v.toFixed(2)}%` }
 </script>
 
 <style scoped>
-.h7-tab-related-party { padding: 16px; font-size: 13px; }
+.h7-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
@@ -221,7 +221,7 @@ function fmtRate(v: number): string { return `${v.toFixed(2)}%` }
 .summary-row { display: flex; gap: 24px; margin-bottom: 12px; padding: 6px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
 .text-danger { color: var(--el-color-danger); }
 .text-warn { color: var(--el-color-warning); }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .calc-cell { font-variant-numeric: tabular-nums; background: var(--el-fill-color-light); border-bottom: 1px dashed var(--el-border-color); cursor: help; display: inline-block; width: 100%; text-align: right; }
 .calc-cell.has-warn { color: var(--el-color-danger); font-weight: 600; }

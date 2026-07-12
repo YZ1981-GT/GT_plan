@@ -340,17 +340,17 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.k3-tab-payable-check { padding: 16px; font-size: 13px; }
+.k3-tab-payable-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context { border-left: 4px solid var(--el-color-warning); background: #fffbeb; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--el-text-color-regular); line-height: 1.6; }
 .block-section { }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .check-label { font-weight: 500; }
 .check-desc { font-size: 11px; color: var(--el-text-color-secondary); margin: 4px 0 0; }
 .cutoff-desc { font-size: 12px; color: var(--el-text-color-regular); margin-bottom: 12px; line-height: 1.6; }
-.cutoff-table { font-size: 13px; }
+.cutoff-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .amount-input { width: 100%; }
 .ncs-list { padding-left: 16px; margin: 8px 0 0; line-height: 1.8; font-size: 12px; }

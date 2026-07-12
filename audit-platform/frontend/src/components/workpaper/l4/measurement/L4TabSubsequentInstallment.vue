@@ -205,7 +205,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.l4-tab-subsequent-installment { padding: 12px; font-size: 13px; }
+.l4-tab-subsequent-installment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
@@ -216,16 +216,16 @@ onMounted(async () => {
   border-left: 4px solid #e6a23c; background: #fdf6ec;
   padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 .bond-selector { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.selector-label { font-size: 13px; color: #606266; }
+.selector-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .text-danger { color: #f56c6c !important; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.last-period-row) { background-color: #f0f9eb !important; }
 :deep(.error-row) { background-color: #fef0f0 !important; }
 
@@ -233,12 +233,12 @@ onMounted(async () => {
 
 .summary-bar {
   display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px;
-  background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266;
+  background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266;
 }
 
 .l4-details-tip {
   margin-top: 16px; padding: 12px 16px; background: #fafafa;
-  border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266;
+  border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266;
 }
 .l4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }

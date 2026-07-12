@@ -365,7 +365,7 @@ function handleImportData() {
 <style scoped>
 .g3-calc-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -444,7 +444,7 @@ function handleImportData() {
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   flex-wrap: wrap;
 }
@@ -486,7 +486,7 @@ function handleImportData() {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

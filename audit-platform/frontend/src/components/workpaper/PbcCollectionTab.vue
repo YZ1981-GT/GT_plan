@@ -148,7 +148,7 @@ onMounted(fetchItems)
 }
 .gt-pbc-item__name {
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-pbc-item__meta {
   font-size: 12px;

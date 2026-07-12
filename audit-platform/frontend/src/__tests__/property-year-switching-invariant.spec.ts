@@ -47,6 +47,14 @@ vi.mock('@/stores/roleContext', () => ({
   useRoleContextStore: () => mockRoleContext,
 }))
 
+// ─── Mock usePermissionMatrix（P2 Req7: canDo drives canEdit in useAuditContext） ───
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({
+    canDo: () => true,
+    currentRole: { value: 'auditor' },
+  }),
+}))
+
 // ─── Mock 远程 service（避免真实 API 调用） ─────────────────────────────────
 vi.mock('@/services/auditPlatformApi', () => ({
   getProject: vi.fn().mockResolvedValue({ id: 'proj-001', client_name: '测试客户' }),

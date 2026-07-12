@@ -313,7 +313,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h4-tab-related-party { padding: 16px; font-size: 13px; }
+.h4-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid #d97706;
@@ -332,7 +332,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
 
-.check-table { font-size: 13px; margin-bottom: 12px; }
+.check-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .amt-input { width: 100%; }
 .amt-cell { display: block; text-align: right; font-variant-numeric: tabular-nums; }
 
@@ -350,7 +350,7 @@ function fmtAmt(val: number | null | undefined): string {
   padding: 10px 14px; margin-bottom: 12px;
   background: var(--el-fill-color-lighter);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .stats-item { color: var(--el-text-color-secondary); }
 .stats-item strong { color: var(--el-text-color-primary); font-variant-numeric: tabular-nums; }

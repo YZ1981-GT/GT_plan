@@ -407,16 +407,16 @@ function fmtNum(v: unknown): string {
 </script>
 
 <style scoped>
-.g4-detail { padding: 12px; font-size: 13px; }
+.g4-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; }
 .balance-date-bar { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-.date-label { font-size: 13px; color: #606266; }
+.date-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 .segment-bar { margin-bottom: 12px; }
 .category-group { margin-bottom: 16px; }
-.category-title { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 8px; padding: 4px 8px; background: #f5f7fa; border-left: 3px solid #409eff; }
-.detail-table { font-size: 13px; }
+.category-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; margin-bottom: 8px; padding: 4px 8px; background: #f5f7fa; border-left: 3px solid #409eff; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; display: inline-block; min-width: 40px; text-align: right; }
 .totals { margin-top: 12px; font-size: 12px; color: #606266; }
 .subtotal-line { padding: 2px 0; }

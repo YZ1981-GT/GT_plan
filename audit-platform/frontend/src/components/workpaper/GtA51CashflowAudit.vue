@@ -348,30 +348,30 @@ onBeforeUnmount(() => { flushPendingSave() })
 
 /* Tab 1: 程序表 */
 .gt-a51__objectives { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.gt-a51__obj-card { background: #ecf5ff; border-radius: 6px; padding: 10px 14px; font-size: 13px; color: #303133; }
-.gt-a51__progress { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 13px; color: #606266; }
+.gt-a51__obj-card { background: #ecf5ff; border-radius: 6px; padding: 10px 14px; font-size: var(--wp-font-size, 13px); color: #303133; }
+.gt-a51__progress { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .gt-a51__progress .el-progress { flex: 1; max-width: 300px; }
 .gt-a51__steps { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
 .gt-a51__step { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid #ebeef5; border-radius: 4px; flex-wrap: wrap; }
 .gt-a51__step-id { font-weight: 600; font-size: 12px; color: #409eff; min-width: 32px; }
-.gt-a51__step-title { font-size: 13px; color: #303133; flex: 1; min-width: 180px; }
+.gt-a51__step-title { font-size: var(--wp-font-size, 13px); color: #303133; flex: 1; min-width: 180px; }
 .gt-a51__step-ctrls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .gt-a51__input-xs { width: 80px; }
 .gt-a51__input-sm { width: 120px; }
 .gt-a51__input-md { width: 160px; }
-.gt-a51__approval { display: flex; align-items: center; gap: 8px; padding: 12px; background: #fafafa; border-radius: 6px; font-size: 13px; }
+.gt-a51__approval { display: flex; align-items: center; gap: 8px; padding: 12px; background: #fafafa; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 
 /* Tab 2: 审定表 */
 .gt-a51__audit-table :deep(tr) { &:nth-child(6), &:nth-child(8) { background-color: #f5f7fa; } }
 .gt-a51__auto { color: #909399; font-style: italic; }
 .gt-a51__audit-note { margin-top: 12px; }
-.gt-a51__label { font-size: 13px; color: #606266; margin-bottom: 4px; display: block; }
+.gt-a51__label { font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 4px; display: block; }
 
 /* Tab 3: 勾稽核对 */
 .gt-a51__reconcile-card { border: 1px solid #ebeef5; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
 .gt-a51__card-title { margin: 0 0 12px; font-size: 14px; color: #303133; }
 .gt-a51__reconcile-summary { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-.gt-a51__reconcile-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; font-size: 13px; }
+.gt-a51__reconcile-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; font-size: var(--wp-font-size, 13px); }
 .gt-a51__amt { font-family: 'Menlo', monospace; text-align: right; }
 .gt-a51__amt-input { width: 130px; }
 .gt-a51__amt-input :deep(.el-input__inner) { text-align: right; }
@@ -385,10 +385,10 @@ onBeforeUnmount(() => { flushPendingSave() })
 /* Tab 6: 其他现金流量 */
 .gt-a51__other-card { border: 1px solid #ebeef5; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .gt-a51__other-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.gt-a51__other-side h5 { font-size: 13px; color: #606266; margin: 0 0 8px; }
+.gt-a51__other-side h5 { font-size: var(--wp-font-size, 13px); color: #606266; margin: 0 0 8px; }
 .gt-a51__other-row { display: flex; gap: 8px; margin-bottom: 4px; }
 .gt-a51__other-name { flex: 1; }
-.gt-a51__other-total { display: flex; justify-content: space-between; padding: 6px 8px; background: #f5f7fa; border-radius: 4px; margin-top: 6px; font-size: 13px; font-weight: 600; }
+.gt-a51__other-total { display: flex; justify-content: space-between; padding: 6px 8px; background: #f5f7fa; border-radius: 4px; margin-top: 6px; font-size: var(--wp-font-size, 13px); font-weight: 600; }
 
 /* Collapse & Notes */
 .gt-a51__collapse { margin-top: 16px; }
@@ -397,7 +397,7 @@ onBeforeUnmount(() => { flushPendingSave() })
 /* Drawer tips */
 .gt-a51__tip-section { margin-bottom: 20px; }
 .gt-a51__tip-section h4 { font-size: 14px; color: #303133; margin: 0 0 8px; }
-.gt-a51__tip-line { font-size: 13px; color: #606266; line-height: 1.7; margin: 4px 0; }
+.gt-a51__tip-line { font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.7; margin: 4px 0; }
 
 /* OO */
 .gt-a51__oo { height: calc(100vh - 200px); min-height: 500px; }

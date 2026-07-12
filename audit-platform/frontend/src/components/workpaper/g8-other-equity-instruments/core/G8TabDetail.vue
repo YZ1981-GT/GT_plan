@@ -239,7 +239,7 @@ function fmt(n: number) {
 </script>
 
 <style scoped>
-.g8-detail { font-size: 13px; }
+.g8-detail { font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
 .head-actions { display: flex; gap: 8px; }
 .formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }

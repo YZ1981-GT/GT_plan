@@ -312,10 +312,10 @@ function rowClassName({ row }: { row: { isAbnormal: boolean } }): string {
 </script>
 
 <style scoped>
-.g12-vc { padding: 12px; font-size: 13px; }
+.g12-vc { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .audit-objective { margin-bottom: 8px; }
-.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .stats { font-size: 12px; margin-bottom: 8px; color: #606266; }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }

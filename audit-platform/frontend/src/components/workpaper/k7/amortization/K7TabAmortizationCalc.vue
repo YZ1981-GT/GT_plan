@@ -459,7 +459,7 @@ function fmtNum(v: number | null | undefined): string {
 <style scoped>
 .k7-tab-amort-calc {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ═══ 蓝色渐变引导区 ═══ */
@@ -480,7 +480,7 @@ function fmtNum(v: number | null | undefined): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1d3557;
   font-weight: 500;
 }
@@ -526,7 +526,7 @@ function fmtNum(v: number | null | undefined): string {
   padding: 10px 14px;
   margin-bottom: 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #78350f;
   line-height: 1.6;
 }
@@ -554,7 +554,7 @@ function fmtNum(v: number | null | undefined): string {
 
 /* ═══ 表格 ═══ */
 .amort-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .amount-cell {
@@ -601,7 +601,7 @@ function fmtNum(v: number | null | undefined): string {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ═══ 合计行 ═══ */
@@ -615,7 +615,7 @@ function fmtNum(v: number | null | undefined): string {
   border-top: 2px solid #dcdfe6;
   background: #f5f7fa;
   border-radius: 0 0 6px 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
@@ -651,7 +651,7 @@ function fmtNum(v: number | null | undefined): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

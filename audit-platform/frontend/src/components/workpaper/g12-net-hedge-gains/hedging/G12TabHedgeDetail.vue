@@ -231,10 +231,10 @@ function rowClassName({ row }: { row: { hedgeRelationId: string } }): string {
 </script>
 
 <style scoped>
-.g12-hedge { padding: 12px; font-size: 13px; }
+.g12-hedge { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .audit-objective { margin-bottom: 8px; }
-.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .cross-alert { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }

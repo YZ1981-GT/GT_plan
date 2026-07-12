@@ -268,7 +268,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 
 .gt-a111__timing-alert { border-radius: 8px; }
 .gt-a111__purpose { margin-bottom: 0; }
-.gt-a111__muted-text { font-size: 13px; color: #909399; line-height: 1.8; margin: 0; }
+.gt-a111__muted-text { font-size: var(--wp-font-size, 13px); color: #909399; line-height: 1.8; margin: 0; }
 
 .gt-a111__card { border-radius: 8px; }
 .gt-a111__card-title { font-size: 15px; font-weight: 600; color: #303133; }

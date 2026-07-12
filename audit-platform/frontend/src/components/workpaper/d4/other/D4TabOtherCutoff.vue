@@ -204,19 +204,19 @@ function rowClass({ row }: { row: CutoffRow }) { return row.isCrossing === '×' 
 </template>
 
 <style scoped>
-.d4-other-cutoff{padding:16px 20px;font-size:13px}
+.d4-other-cutoff{padding:16px 20px;font-size: var(--wp-font-size, 13px)}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px}.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 :deep(.dropdown-group-label) { font-size: 12px; color: #909399; cursor: default; }
-.cutoff-config{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px 14px;background:#fdf6ec;border-radius:6px;border:1px solid #faecd8}.config-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.config-label{font-size:13px;font-weight:500;color:#e6a23c;min-width:70px}.config-text{font-size:12px;color:#606266}.config-hint{font-size:11px;color:#909399;margin-top:2px}
-.stats-bar{display:flex;gap:20px;margin-bottom:16px;padding:8px 14px;background:linear-gradient(135deg,#f8f9fe,#f0f4ff);border-radius:6px;border:1px solid #e4e7ed;font-size:13px;color:#606266}.stat-item strong{color:#303133;margin-left:4px}.stat-item.warn{color:#f56c6c}.stat-item.warn strong{color:#f56c6c}
+.cutoff-config{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px 14px;background:#fdf6ec;border-radius:6px;border:1px solid #faecd8}.config-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.config-label{font-size: var(--wp-font-size, 13px);font-weight:500;color:#e6a23c;min-width:70px}.config-text{font-size:12px;color:#606266}.config-hint{font-size:11px;color:#909399;margin-top:2px}
+.stats-bar{display:flex;gap:20px;margin-bottom:16px;padding:8px 14px;background:linear-gradient(135deg,#f8f9fe,#f0f4ff);border-radius:6px;border:1px solid #e4e7ed;font-size: var(--wp-font-size, 13px);color:#606266}.stat-item strong{color:#303133;margin-left:4px}.stat-item.warn{color:#f56c6c}.stat-item.warn strong{color:#f56c6c}
 .block-section{margin-bottom:20px;border:1px solid #ebeef5;border-radius:8px;padding:14px 16px}
 .forward-block{border-left:3px solid #409eff}
 .backward-block{border-left:3px solid #67c23a}
 .block-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}.block-title{font-size:14px;font-weight:600;color:#303133}.block-hint{font-size:12px;color:#909399}
-.cutoff-table{font-size:13px}.cutoff-table :deep(.el-table__cell){padding:5px 4px}.cutoff-table :deep(.col-voucher .el-table__cell){background-color:#f0f5ff !important}.cutoff-table :deep(.col-doc .el-table__cell){background-color:#f0faf0 !important}.cutoff-table :deep(.row-crossing td){background-color:#fef0f0 !important}
+.cutoff-table{font-size: var(--wp-font-size, 13px)}.cutoff-table :deep(.el-table__cell){padding:5px 4px}.cutoff-table :deep(.col-voucher .el-table__cell){background-color:#f0f5ff !important}.cutoff-table :deep(.col-doc .el-table__cell){background-color:#f0faf0 !important}.cutoff-table :deep(.row-crossing td){background-color:#fef0f0 !important}
 .cutoff-date-line{margin-top:8px;text-align:center;font-size:12px;color:#909399;padding:4px;border-top:1px dashed #e4e7ed}
 .crossing-badge{font-weight:700;font-size:14px}.crossing-ok{color:#67c23a}.crossing-bad{color:#f56c6c}
-.tips-collapse{margin-bottom:16px;border-radius:6px;border:1px solid #fde2e2;border-left:3px solid #f56c6c;background:#fef0f0}.tips-summary{cursor:pointer;padding:8px 14px;font-size:13px;font-weight:500;color:#f56c6c}.tips-list{margin:8px 14px 12px;padding-left:18px;font-size:12px;color:#606266;line-height:2}
+.tips-collapse{margin-bottom:16px;border-radius:6px;border:1px solid #fde2e2;border-left:3px solid #f56c6c;background:#fef0f0}.tips-summary{cursor:pointer;padding:8px 14px;font-size: var(--wp-font-size, 13px);font-weight:500;color:#f56c6c}.tips-list{margin:8px 14px 12px;padding-left:18px;font-size:12px;color:#606266;line-height:2}
 .audit-opinion-card{margin-bottom:16px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
 .oo-container{min-height:600px;height:calc(100vh - 280px);border-radius:8px;overflow:hidden}
 </style>

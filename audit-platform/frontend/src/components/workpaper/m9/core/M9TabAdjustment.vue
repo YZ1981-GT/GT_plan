@@ -292,22 +292,22 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m9-tab-adjustment { padding: 12px; font-size: 13px; }
+.m9-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .type-switcher { margin-bottom: 12px; }
-:deep(.el-table) { font-size: 13px; }
-.balance-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; border-radius: 6px; font-size: 13px; align-items: center; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.balance-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; border-radius: 6px; font-size: var(--wp-font-size, 13px); align-items: center; }
 .balance-bar.balanced { background: #f0f9eb; color: #67c23a; }
 .balance-bar.unbalanced { background: #fef0f0; color: #f56c6c; }
 .diff-warning { font-weight: 600; }
 .balanced-text { font-weight: 600; }
 .impact-area { margin-top: 12px; }
-.m9-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m9-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m9-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m9-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

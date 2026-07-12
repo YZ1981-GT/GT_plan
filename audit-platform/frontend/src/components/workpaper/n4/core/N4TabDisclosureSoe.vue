@@ -470,7 +470,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.n4-disclosure-soe { font-size: 13px; padding: 8px 0; }
+.n4-disclosure-soe { font-size: var(--wp-font-size, 13px); padding: 8px 0; }
 .methodology-context {
   margin-bottom: 12px;
   padding: 8px 12px;

@@ -532,7 +532,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 .gt-b14__card-title { font-size: 15px; font-weight: 600; color: #303133; }
 .gt-b14__sig-grid { display: flex; flex-direction: column; gap: 12px; }
 .gt-b14__sig-row { display: flex; align-items: center; gap: 12px; }
-.gt-b14__sig-label { width: 80px; font-size: 13px; color: #606266; flex-shrink: 0; }
+.gt-b14__sig-label { width: 80px; font-size: var(--wp-font-size, 13px); color: #606266; flex-shrink: 0; }
 
 /* OO */
 .gt-b14__oo { height: calc(100vh - 200px); min-height: 500px; }

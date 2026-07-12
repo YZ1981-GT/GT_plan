@@ -202,7 +202,7 @@ function handleUpdate(recordId: string, field: string, value: any) { updateField
 </script>
 
 <style scoped>
-.h8-tab-lease-term { padding: 16px; font-size: 13px; }
+.h8-tab-lease-term { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -233,10 +233,10 @@ function handleUpdate(recordId: string, field: string, value: any) { updateField
   padding: 10px 12px; margin-bottom: 12px;
 }
 .option-header { margin-bottom: 8px; }
-.option-title { font-weight: 600; font-size: 13px; }
+.option-title { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 
 .calc-result {
   background: #f0f9ff; border-radius: 6px; padding: 10px 14px; margin-bottom: 12px;
 }
-.formula-display { font-size: 13px; color: var(--el-color-primary); }
+.formula-display { font-size: var(--wp-font-size, 13px); color: var(--el-color-primary); }
 </style>

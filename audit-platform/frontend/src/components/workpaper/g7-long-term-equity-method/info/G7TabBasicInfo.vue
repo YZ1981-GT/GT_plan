@@ -507,13 +507,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.g7-tab-basic-info { padding: 12px; font-size: 13px; }
+.g7-tab-basic-info { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .segment-bar { margin-bottom: 12px; }
-.basic-info-table { font-size: 13px; }
+.basic-info-table { font-size: var(--wp-font-size, 13px); }
 .compact-num { width: 100%; }
 .investee-name { font-weight: 500; color: #303133; }
 .multiline-cell { white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.4; }

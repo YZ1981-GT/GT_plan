@@ -454,7 +454,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 }
 
 .gt-a1731__reference-content {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -480,7 +480,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 }
 
 .gt-a1731__label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
 }
@@ -501,5 +501,5 @@ defineExpose({ reload: () => loadData(props.wpId) })
 /* Sub-sections (三的子区块) */
 .gt-a1731__sub-section { margin-bottom: 14px; padding-left: 12px; border-left: 3px solid #e4e7ed; }
 .gt-a1731__sub-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
-.gt-a1731__sub-label { font-size: 13px; font-weight: 500; color: #303133; }
+.gt-a1731__sub-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 </style>

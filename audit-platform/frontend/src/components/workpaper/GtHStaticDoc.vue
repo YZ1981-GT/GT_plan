@@ -295,7 +295,7 @@ const renderedHtml = computed<string>(() => {
   background: var(--gt-color-bg-page, #f5f5f5);
   border-radius: 3px;
   font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-h-static-doc__content :deep(pre) {

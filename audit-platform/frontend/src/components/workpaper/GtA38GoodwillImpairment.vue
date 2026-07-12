@@ -345,7 +345,7 @@ defineExpose({ activeMode, reload: load, flushSave })
 .gt-a38__table { width: 100%; }
 .gt-a38__calc { font-variant-numeric: tabular-nums; color: #2c5282; }
 .gt-a38__calc--warn { color: #c0392b; font-weight: 600; }
-.gt-a38__totals { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 14px; margin-top: 8px; background: #f7f9fc; border-radius: 8px; font-size: 13px; }
+.gt-a38__totals { display: flex; gap: 16px; flex-wrap: wrap; padding: 10px 14px; margin-top: 8px; background: #f7f9fc; border-radius: 8px; font-size: var(--wp-font-size, 13px); }
 .gt-a38__totals-impair { color: #c0392b; font-weight: 600; }
 .gt-a38__xref-note { font-size: 12px; color: #606266; margin: 8px 0 0; }
 .gt-a38__alloc-loss { margin-bottom: 8px; }
@@ -355,7 +355,7 @@ defineExpose({ activeMode, reload: load, flushSave })
 .gt-a38__rr-value { font-size: 18px; font-weight: 700; color: #2c5282; font-variant-numeric: tabular-nums; }
 .gt-a38__wacc-result { padding: 12px 16px; background: #f7f9fc; border-radius: 8px; line-height: 2; }
 .gt-a38__guidance { margin-top: 8px; }
-.gt-a38__g-block { margin-bottom: 12px; font-size: 13px; line-height: 1.7; }
+.gt-a38__g-block { margin-bottom: 12px; font-size: var(--wp-font-size, 13px); line-height: 1.7; }
 .gt-a38__g-block ol, .gt-a38__g-block ul { margin: 4px 0 0; padding-left: 20px; }
 .gt-a38__docx { min-height: calc(100vh - 240px); }
 </style>

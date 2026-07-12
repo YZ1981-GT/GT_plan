@@ -439,7 +439,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.k10-tab-other-income-check { padding: 12px; font-size: 13px; }
+.k10-tab-other-income-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -469,7 +469,7 @@ onMounted(() => {
 .coverage-label { font-size: 12px; color: #606266; white-space: nowrap; }
 .coverage-text { font-size: 12px; color: #909399; }
 
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .check-table :deep(.non-compliant-row) { background: #fef0f0 !important; }
 .project-name { font-weight: 500; }
 

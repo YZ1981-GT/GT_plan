@@ -139,13 +139,13 @@ function rowClassName({ row }: { row: FlowRow }) { return row.hasAnomaly === 'æ˜
 </template>
 
 <style scoped>
-.d4-fund-flow{padding:16px 20px;font-size:13px}
+.d4-fund-flow{padding:16px 20px;font-size: var(--wp-font-size, 13px)}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .stats-dashboard{display:flex;gap:12px;margin-bottom:16px;padding:12px 16px;background:linear-gradient(135deg,#f8f9fe 0%,#f0f4ff 100%);border-radius:10px;border:1px solid #e4e7ed}.stat-card{padding:8px 14px;min-width:100px;border-radius:8px;background:#fff;border:1px solid #ebeef5;box-shadow:0 1px 3px rgba(0,0,0,.04)}.stat-card.stat-primary{border-left:3px solid #409eff}.stat-card.stat-warn{border-left:3px solid #f56c6c}.stat-card.stat-ok{border-left:3px solid #67c23a}.stat-value{font-size:18px;font-weight:700;color:#303133}.stat-unit{font-size:12px;color:#909399;margin-left:2px}.stat-label{font-size:12px;color:#909399;margin-top:2px}
-.methodology-collapse{margin-bottom:14px;border-radius:6px;border:1px solid #faecd8;border-left:3px solid #e6a23c;background:#fffbf0}.methodology-summary{cursor:pointer;padding:8px 14px;font-size:13px;font-weight:500;color:#b88230}.methodology-body{padding:8px 14px 12px;font-size:12px;color:#606266;line-height:1.8}.method-step{margin-bottom:6px}.step-num{display:inline-block;background:#e6a23c;color:#fff;border-radius:3px;padding:1px 6px;font-size:11px;margin-right:6px}
+.methodology-collapse{margin-bottom:14px;border-radius:6px;border:1px solid #faecd8;border-left:3px solid #e6a23c;background:#fffbf0}.methodology-summary{cursor:pointer;padding:8px 14px;font-size: var(--wp-font-size, 13px);font-weight:500;color:#b88230}.methodology-body{padding:8px 14px 12px;font-size:12px;color:#606266;line-height:1.8}.method-step{margin-bottom:6px}.step-num{display:inline-block;background:#e6a23c;color:#fff;border-radius:3px;padding:1px 6px;font-size:11px;margin-right:6px}
 .group-section{margin-bottom:16px;border-left:3px solid #e4e7ed;padding-left:12px;border-radius:0 6px 6px 0}
-.group-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.group-title{font-size:13px;font-weight:600;color:#303133}
-.flow-table{font-size:13px}.flow-table :deep(.el-table__cell){padding:4px 3px}.flow-table :deep(.row-anomaly td){background-color:#fef0f0 !important}
+.group-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.group-title{font-size: var(--wp-font-size, 13px);font-weight:600;color:#303133}
+.flow-table{font-size: var(--wp-font-size, 13px)}.flow-table :deep(.el-table__cell){padding:4px 3px}.flow-table :deep(.row-anomaly td){background-color:#fef0f0 !important}
 .group-empty{padding:12px;text-align:center;font-size:12px;color:#c0c4cc;background:#fafbfc;border-radius:4px;border:1px dashed #e4e7ed}
 .audit-opinion-card{margin-top:20px;margin-bottom:16px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}
 .oo-container{min-height:600px;height:calc(100vh - 280px);border-radius:8px;overflow:hidden}

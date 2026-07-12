@@ -327,7 +327,7 @@ onMounted(loadData)
   justify-content: space-between;
   align-items: center;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-gi-result-row strong {
   color: var(--gt-primary, #4b2d77);

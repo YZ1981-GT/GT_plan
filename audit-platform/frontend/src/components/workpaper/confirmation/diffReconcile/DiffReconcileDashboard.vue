@@ -177,7 +177,7 @@ function formatAmount(val?: number): string {
 }
 
 .diff-reconcile-dashboard__card-sub {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 400;
   color: var(--el-text-color-secondary);
 }

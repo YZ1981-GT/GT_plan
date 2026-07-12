@@ -148,7 +148,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 .gt-a181__prefix { font-size: 14px; font-weight: 500; color: #303133; }
 .gt-a181__suffix { font-size: 14px; color: #606266; }
 .gt-a181__readonly-text { font-size: 14px; color: #303133; line-height: 1.8; margin: 0 0 12px; }
-.gt-a181__readonly-text--muted { color: #909399; font-size: 13px; font-style: italic; }
+.gt-a181__readonly-text--muted { color: #909399; font-size: var(--wp-font-size, 13px); font-style: italic; }
 .gt-a181__body-fields { display: flex; gap: 16px; flex-wrap: wrap; }
 .gt-a181__issuance { display: flex; gap: 16px; flex-wrap: wrap; }
 .gt-a181__field { display: flex; flex-direction: column; gap: 4px; min-width: 180px; }

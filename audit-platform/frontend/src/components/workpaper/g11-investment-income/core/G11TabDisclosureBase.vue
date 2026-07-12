@@ -73,7 +73,7 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 </script>
 
 <style scoped>
-.g11-disclosure { font-size: 13px; }
+.g11-disclosure { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .sync-hint { margin-bottom: 8px; }

@@ -223,7 +223,7 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 </script>
 
 <style scoped>
-.g11-voucher-check { font-size: 13px; }
+.g11-voucher-check { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

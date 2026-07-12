@@ -112,14 +112,14 @@ function fmt(v: number): string {
 </script>
 
 <style scoped>
-.g12-disc { padding: 12px; font-size: 13px; }
+.g12-disc { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .sync-hint { margin-bottom: 12px; }
 .audit-objective { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; background: #fafafa; cursor: help; }
-.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .note-card { margin-top: 12px; }
 :deep(.g12-row-total) { font-weight: 700; background: #f5f7fa; }

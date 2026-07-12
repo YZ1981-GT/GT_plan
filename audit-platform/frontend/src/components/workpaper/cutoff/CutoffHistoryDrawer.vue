@@ -209,7 +209,7 @@ function formatCriteria(criteria: unknown): string {
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .entry-user {
@@ -228,7 +228,7 @@ function formatCriteria(criteria: unknown): string {
 }
 
 .entry-stats {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

@@ -283,7 +283,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h9-tab-related-party { padding: 16px; font-size: 13px; }
+.h9-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid #d97706;
@@ -314,7 +314,7 @@ function fmtAmt(val: number | null | undefined): string {
 .abnormal-label { color: #dc2626; }
 .abnormal-value { color: #dc2626; }
 
-.formula-table { font-size: 13px; margin-bottom: 12px; }
+.formula-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .formula-table :deep(.formula-col) { background: #fefce8; }
 .formula-table :deep(.abnormal-row) { background: #fef2f2 !important; }
 .formula-value {

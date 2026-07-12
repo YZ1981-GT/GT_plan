@@ -267,7 +267,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i2-adjustment {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 .section-header {
@@ -299,7 +299,7 @@ function fmtAmount(value: number | null | undefined): string {
 .methodology-context p { margin: 0; }
 .methodology-context strong { color: #78350f; }
 .adjustment-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 12px;
 }
 .table-actions {
@@ -313,7 +313,7 @@ function fmtAmount(value: number | null | undefined): string {
 .balance-row {
   display: flex;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .balance-label {
   color: #606266;

@@ -173,7 +173,7 @@ function handleParamChange() {
 </script>
 
 <style scoped>
-.h8-tab-recoverable { padding: 16px; font-size: 13px; }
+.h8-tab-recoverable { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

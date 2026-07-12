@@ -211,18 +211,18 @@ function handleAiAssist(): void {
 </script>
 
 <style scoped>
-.k9-contract-check { padding: 12px; font-size: 13px; }
+.k9-contract-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .non-compliance-list { margin: 4px 0 0; padding-left: 16px; font-size: 12px; }
 .non-comply { color: #f56c6c; font-weight: 600; }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
 .conclusion-card { margin-top: 16px; }
 :deep(.non-compliance-row) { background-color: #fef2f2 !important; }
 :deep(.non-compliance-row:hover > td) { background-color: #fee2e2 !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; }
 .compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

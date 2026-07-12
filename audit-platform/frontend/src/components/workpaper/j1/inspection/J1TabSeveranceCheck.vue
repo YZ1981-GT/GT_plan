@@ -99,12 +99,12 @@ onMounted(() => { if (props.htmlData) initFromHtmlData(props.htmlData) })
 .cas9-conditions { padding: 12px; border: 1px solid #ebeef5; border-radius: 6px; background: #fafafa; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .methodology-context { margin-bottom: 10px; padding: 8px 12px; border-left: 3px solid #e6a23c; background: #fdf6ec; border-radius: 0 4px 4px 0; }
-.methodology-label { font-size: 13px; color: #e6a23c; font-weight: 600; }
-.condition-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.methodology-label { font-size: var(--wp-font-size, 13px); color: #e6a23c; font-weight: 600; }
+.condition-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: var(--wp-font-size, 13px); }
 .condition-label { color: #303133; }
 .overall-tag { margin-top: 10px; }
-.total-summary { margin-top: 12px; font-size: 13px; color: #606266; padding: 8px; background: #f5f7fa; border-radius: 4px; }
+.total-summary { margin-top: 12px; font-size: var(--wp-font-size, 13px); color: #606266; padding: 8px; background: #f5f7fa; border-radius: 4px; }
 </style>

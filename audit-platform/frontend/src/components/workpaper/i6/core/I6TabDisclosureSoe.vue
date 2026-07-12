@@ -127,10 +127,10 @@ function fmtPct(current: number, prior: number): string { if (!prior) return '-'
 </script>
 
 <style scoped>
-.i6-disclosure-soe { padding: 16px; font-size: 13px; }
+.i6-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 .methodology-block { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.7; }
 .methodology-title { font-weight: 600; color: #78350f; margin-bottom: 4px; }

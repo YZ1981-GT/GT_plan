@@ -437,7 +437,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 <style scoped>
 .g6-tab-adjustment {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -481,7 +481,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
   background: #f0f9eb;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .g6-adj-footer.balance-fail {
@@ -526,7 +526,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 
 .g6-guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

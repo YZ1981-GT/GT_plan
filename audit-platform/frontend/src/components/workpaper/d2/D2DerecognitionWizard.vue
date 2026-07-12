@@ -231,28 +231,28 @@ function onSaveApply(): void {
 </template>
 
 <style scoped>
-.derec-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 13px; }
+.derec-progress { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px); }
 .derec-body { display: flex; gap: 16px; max-height: 62vh; }
 .derec-steps { width: 300px; flex-shrink: 0; overflow-y: auto; padding-right: 8px; }
-.derec-steps :deep(.el-step__title) { font-size: 13px; line-height: 1.3; cursor: pointer; }
+.derec-steps :deep(.el-step__title) { font-size: var(--wp-font-size, 13px); line-height: 1.3; cursor: pointer; }
 .derec-content { flex: 1; overflow-y: auto; padding: 0 8px 0 16px; border-left: 1px solid #ebeef5; }
 .step-title { margin: 0 0 8px; font-size: 15px; color: #303133; }
 .step-note {
-  font-size: 13px; color: #96631b; background: #fdf6ec; border-left: 3px solid #e6a23c;
+  font-size: var(--wp-font-size, 13px); color: #96631b; background: #fdf6ec; border-left: 3px solid #e6a23c;
   padding: 8px 12px; border-radius: 0 4px 4px 0; margin-bottom: 14px; line-height: 1.6;
 }
 .block { margin-bottom: 16px; }
-.block-label { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.block-label { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .att-name { font-size: 12px; color: #67c23a; font-weight: 400; }
 .ref-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ai-block { background: #f5f7fa; border-radius: 6px; padding: 10px 12px; }
-.ai-result { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.ai-result { display: flex; align-items: flex-start; gap: 8px; flex-wrap: wrap; font-size: var(--wp-font-size, 13px); }
 .ai-reason { flex: 1; min-width: 200px; color: #606266; line-height: 1.6; }
 .ai-hint { font-size: 12px; color: #909399; }
 .user-block { border-top: 1px dashed #dcdfe6; padding-top: 12px; }
 .step-nav { display: flex; justify-content: space-between; margin-top: 14px; }
 .derec-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
 .concl-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.concl-label { font-size: 13px; font-weight: 600; }
+.concl-label { font-size: var(--wp-font-size, 13px); font-weight: 600; }
 .footer-actions { display: flex; gap: 8px; }
 </style>

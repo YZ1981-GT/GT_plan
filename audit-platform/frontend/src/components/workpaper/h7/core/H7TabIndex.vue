@@ -142,6 +142,6 @@ const visibleCount = computed(() => sheetList.value.filter((s) => s.visible).len
   align-items: center;
 }
 .h7-index-table :deep(.el-table__cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

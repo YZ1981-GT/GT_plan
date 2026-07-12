@@ -297,7 +297,7 @@ async function handleAi(section: string): Promise<void> {
 </script>
 
 <style scoped>
-.g7-tab-voucher-check { padding: 12px; font-size: 13px; }
+.g7-tab-voucher-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
 .prep-hint { margin-top: 12px; font-size: 12px; color: #606266; }
 .prep-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
@@ -313,7 +313,7 @@ async function handleAi(section: string): Promise<void> {
   margin-bottom: 8px;
   background: #f0f9eb;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .balance-summary.is-unbalanced {
   background: #fef0f0;

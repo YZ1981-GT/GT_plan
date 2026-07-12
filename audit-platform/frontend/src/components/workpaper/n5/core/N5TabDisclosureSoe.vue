@@ -224,7 +224,7 @@ function fmtPercent(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.n5-disclosure-soe { padding: 12px; font-size: 13px; }
+.n5-disclosure-soe { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 8px; }
@@ -232,20 +232,20 @@ function fmtPercent(val: number | null | undefined): string {
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .card-header-with-ai { display: flex; align-items: center; justify-content: space-between; }
 .disclosure-table { margin-bottom: 0; }
-:deep(.disclosure-table .el-table) { font-size: 13px; }
+:deep(.disclosure-table .el-table) { font-size: var(--wp-font-size, 13px); }
 .formula-header { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; font-weight: 500; color: #303133; padding-bottom: 1px; }
 .cell-input { width: 100%; }
-:deep(.cell-input .el-input__inner) { text-align: right; font-size: 13px; }
+:deep(.cell-input .el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
 
-.etr-analysis { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-bottom: 16px; background: #f0f9eb; border: 1px solid #c2e7b0; border-radius: 6px; font-size: 13px; }
+.etr-analysis { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-bottom: 16px; background: #f0f9eb; border: 1px solid #c2e7b0; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .etr-title { font-weight: 500; color: #303133; }
 .etr-value { font-size: 16px; font-weight: 700; color: #303133; }
 .etr-desc { color: #909399; font-size: 12px; }
 
 .supplement-field { margin-bottom: 12px; }
 .supplement-field:last-child { margin-bottom: 0; }
-.field-label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.field-label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 
 .audit-notes-card { margin-bottom: 16px; }
 .notes-title { font-size: 14px; font-weight: 500; }

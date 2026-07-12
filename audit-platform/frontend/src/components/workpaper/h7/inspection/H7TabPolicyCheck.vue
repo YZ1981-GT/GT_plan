@@ -170,7 +170,7 @@ function handleReview(id: string): void { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.h7-tab-policy-check { padding: 16px; font-size: 13px; }
+.h7-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
@@ -178,7 +178,7 @@ function handleReview(id: string): void { openReviewDialog(id) }
 .row-tag { margin-left: 8px; }
 .summary-row { display: flex; gap: 24px; margin-bottom: 12px; padding: 6px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
 .text-warn { color: var(--el-color-warning); }
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .na-row { color: var(--el-text-color-secondary); }
 .note-card { margin-bottom: 16px; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

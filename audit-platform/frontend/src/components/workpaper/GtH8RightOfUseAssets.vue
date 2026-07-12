@@ -542,7 +542,7 @@ onBeforeUnmount(() => {
   padding: 8px 16px;
   border-radius: 4px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 

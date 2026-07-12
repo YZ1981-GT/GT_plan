@@ -804,7 +804,7 @@ onMounted(() => {
 <style scoped>
 .g7-tab-equity-method-calc {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* Section 标题栏 */
@@ -929,7 +929,7 @@ onMounted(() => {
 }
 .group-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .group-count {
@@ -956,7 +956,7 @@ onMounted(() => {
 /* 表格 */
 .equity-calc-table {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 公式列样式（虚线下划线+cursor:help） */

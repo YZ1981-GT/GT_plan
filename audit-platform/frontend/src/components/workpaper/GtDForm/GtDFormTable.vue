@@ -819,7 +819,7 @@ defineExpose({ scrollToRow })
   padding: 10px 14px;
   background: var(--gt-color-bg-soft, #f5f7fa);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-dft__header-meta {
   display: flex;

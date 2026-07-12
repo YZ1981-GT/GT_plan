@@ -317,11 +317,11 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .sec-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .sec-actions { display: flex; gap: 8px; align-items: center; }
 .objective-list { padding: 10px 14px; background: #f5f7fa; border-radius: 6px; }
-.objective-item { margin: 0; font-size: 13px; color: #303133; line-height: 1.7; }
-.price-table { font-size: 13px; }
-.price-table :deep(.el-table__cell) { font-size: 13px; padding: 4px 0; }
+.objective-item { margin: 0; font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.7; }
+.price-table { font-size: var(--wp-font-size, 13px); }
+.price-table :deep(.el-table__cell) { font-size: var(--wp-font-size, 13px); padding: 4px 0; }
 .num-cell { width: 100%; }
-.num-cell :deep(.el-input__inner) { text-align: right; font-size: 13px; }
+.num-cell :deep(.el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
 .has-formula { border-bottom: 1px dashed #909399; cursor: help; }
 .val-exceed { color: #f56c6c; font-weight: 600; }
 

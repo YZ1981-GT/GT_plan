@@ -378,7 +378,7 @@ defineExpose({ reload: () => loadData(props.wpId) })
 .gt-a176__guidance-banner summary {
   cursor: pointer;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #e6a23c;
   font-weight: 500;
   user-select: none;

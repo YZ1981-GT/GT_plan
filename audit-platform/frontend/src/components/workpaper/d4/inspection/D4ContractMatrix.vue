@@ -174,11 +174,11 @@ function getColumnHeader(c: ContractInspectionItem): string {
 
 <style scoped>
 .d4-matrix {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .matrix-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.group-header-row) {
@@ -191,13 +191,13 @@ function getColumnHeader(c: ContractInspectionItem): string {
 .group-header-text {
   font-weight: 600;
   color: #7c5cff;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .field-label {
   font-weight: 500;
   color: #303133;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.field-label-col) {
@@ -240,13 +240,13 @@ function getColumnHeader(c: ContractInspectionItem): string {
 
 .summary-label {
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .summary-value {
   font-weight: 600;
   color: #303133;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .summary-value.warn {
@@ -263,12 +263,12 @@ function getColumnHeader(c: ContractInspectionItem): string {
 }
 
 :deep(.el-table th) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
 :deep(.el-table td) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 12px;
 }
 </style>

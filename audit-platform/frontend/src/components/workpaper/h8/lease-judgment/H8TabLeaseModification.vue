@@ -184,7 +184,7 @@ function handleDelete(rowId: string) { deleteRow(rowId) }
 </script>
 
 <style scoped>
-.h8-tab-lease-modification { padding: 16px; font-size: 13px; }
+.h8-tab-lease-modification { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -204,7 +204,7 @@ function handleDelete(rowId: string) { deleteRow(rowId) }
 .section-title-text { font-weight: 600; font-size: 14px; }
 .title-actions { display: flex; gap: 6px; }
 
-.mod-table { font-size: 13px; margin-bottom: 12px; }
+.mod-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .mod-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 

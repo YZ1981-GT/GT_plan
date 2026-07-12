@@ -331,7 +331,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i1-tab-impairment-test { padding: 16px; font-size: 13px; }
+.i1-tab-impairment-test { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论上下文 */
 .methodology-block {
@@ -350,7 +350,7 @@ function fmtAmt(val: number | null | undefined): string {
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 
 /* 表格 */
-.impairment-table { font-size: 13px; }
+.impairment-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 
@@ -384,7 +384,7 @@ function fmtAmt(val: number | null | undefined): string {
 /* 合计行 */
 .summary-row {
   padding: 12px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   border-top: 2px solid var(--el-border-color);
   margin-top: 12px;
   display: flex;

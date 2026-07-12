@@ -462,7 +462,7 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
 <style scoped>
 .g7-tab-adjustment {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .audit-objective {
@@ -493,7 +493,7 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
   margin-bottom: 8px;
   padding: 6px 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -531,7 +531,7 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
   background: #f0f9eb;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .g7-adj-footer.balance-fail {
@@ -577,7 +577,7 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
 
 .g7-guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

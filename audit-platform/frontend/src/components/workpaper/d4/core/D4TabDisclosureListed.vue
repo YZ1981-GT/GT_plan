@@ -373,31 +373,31 @@ const formulaMap = [
 </template>
 
 <style scoped>
-.d4-disclosure-listed { padding: 12px; font-size: 13px; }
-.d4-disclosure-listed :deep(*) { font-size: 13px; }
+.d4-disclosure-listed { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.d4-disclosure-listed :deep(*) { font-size: var(--wp-font-size, 13px); }
 .disclosure-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
 .toolbar-hint { font-size: 12px; color: #909399; margin-left: auto; }
 .formula-drawer-content { padding: 0 4px; }
-.formula-desc { font-size: 13px; color: #606266; margin-bottom: 12px; }
+.formula-desc { font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 12px; }
 .formula-code { font-size: 11px; background: #f5f7fa; padding: 2px 4px; border-radius: 2px; color: #409eff; word-break: break-all; }
-.formula-manual-list { font-size: 13px; color: #606266; padding-left: 20px; }
+.formula-manual-list { font-size: var(--wp-font-size, 13px); color: #606266; padding-left: 20px; }
 .formula-manual-list li { margin-bottom: 6px; }
 .section-card { margin-bottom: 16px; }
 .section-card :deep(.el-card__header) { padding: 10px 16px; background: #fafafa; }
-.section-title { font-size: 13px; font-weight: 600; color: #303133; }
+.section-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
 .section-header-row { display: flex; justify-content: space-between; align-items: center; }
 .header-actions { display: flex; gap: 6px; align-items: center; }
-.disclosure-table { font-size: 13px; }
-.disclosure-table :deep(th) { font-size: 13px; background: #f5f7fa !important; }
+.disclosure-table { font-size: var(--wp-font-size, 13px); }
+.disclosure-table :deep(th) { font-size: var(--wp-font-size, 13px); background: #f5f7fa !important; }
 .cross-sheet-cell { background-color: #e6f7ff; padding: 2px 6px; border-radius: 2px; border-bottom: 1px dashed #91caff; cursor: help; }
 .method-context { margin-bottom: 12px; padding: 8px 12px; border-left: 3px solid #e6a23c; background: #fdf6ec; border-radius: 0 4px 4px 0; font-size: 12px; color: #865c0a; line-height: 1.6; }
 .method-context p { margin: 0 0 4px; }
 .method-context p:last-child { margin-bottom: 0; }
 .placeholder-cell { color: #c0c4cc; font-style: italic; }
 .font-bold { font-weight: 600; }
-.subtotal-row { margin-top: 8px; padding: 6px 12px; background: #f5f7fa; border-radius: 4px; font-size: 13px; color: #606266; }
+.subtotal-row { margin-top: 8px; padding: 6px 12px; background: #f5f7fa; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .note-area { margin-top: 12px; }
-.refresh-hint { font-size: 13px; color: #909399; margin-bottom: 8px; padding: 4px 8px; background: #f0f9ff; border-radius: 3px; }
+.refresh-hint { font-size: var(--wp-font-size, 13px); color: #909399; margin-bottom: 8px; padding: 4px 8px; background: #f0f9ff; border-radius: 3px; }
 .reconcile-card :deep(.el-card__header) { background: #f0f9eb; }
 .reconcile-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 8px 0; }
 .reconcile-item { display: flex; flex-direction: column; align-items: center; padding: 8px; background: #fafafa; border-radius: 4px; }

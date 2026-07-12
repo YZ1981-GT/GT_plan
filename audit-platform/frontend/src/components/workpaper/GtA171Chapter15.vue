@@ -316,14 +316,14 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.gt-ch15 { font-size: 13px; display: flex; flex-direction: column; gap: 12px; }
+.gt-ch15 { font-size: var(--wp-font-size, 13px); display: flex; flex-direction: column; gap: 12px; }
 .gt-ch15__tip { margin-bottom: 4px; }
 .gt-ch15__card { margin-top: 4px; }
 .gt-ch15__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-.gt-ch15__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
+.gt-ch15__card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #6b21a8; }
 .gt-ch15__sub-items { display: flex; flex-direction: column; gap: 12px; }
 .gt-ch15__sub-item { display: flex; flex-direction: column; gap: 4px; }
-.gt-ch15__sub-label { font-size: 13px; font-weight: 500; color: #303133; }
+.gt-ch15__sub-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 
 .gt-ch15__guidance { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 0; }
 .gt-ch15__guidance summary { cursor: pointer; padding: 6px 10px; font-size: 12px; color: #409eff; font-weight: 500; user-select: none; }

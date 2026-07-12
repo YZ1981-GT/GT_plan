@@ -169,11 +169,11 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
   padding: 12px;
 }
 .f3-tab-voucher :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .f3-tab-voucher :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -189,7 +189,7 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

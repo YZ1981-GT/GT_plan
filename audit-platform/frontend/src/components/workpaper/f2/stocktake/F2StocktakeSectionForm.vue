@@ -115,7 +115,7 @@ const aiContext = computed(() => {
 </script>
 
 <style scoped>
-.f2-stocktake-section { padding: 12px; font-size: 13px; }
+.f2-stocktake-section { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .f2-stocktake-section.compact { padding: 0 0 12px; }
 .title { margin: 0 0 8px; }
 .toolbar { margin-bottom: 8px; }
@@ -126,9 +126,9 @@ const aiContext = computed(() => {
   margin-bottom: 12px;
 }
 .fields.stack { grid-template-columns: 1fr; }
-.section-head { grid-column: 1 / -1; margin: 12px 0 4px; font-size: 13px; color: #303133; font-weight: 600; }
+.section-head { grid-column: 1 / -1; margin: 12px 0 4px; font-size: var(--wp-font-size, 13px); color: #303133; font-weight: 600; }
 .field { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .field.full-width { grid-column: 1 / -1; }
 .field.indent span { padding-left: 12px; color: #606266; }
-h4 { margin: 12px 0 6px; font-size: 13px; }
+h4 { margin: 12px 0 6px; font-size: var(--wp-font-size, 13px); }
 </style>

@@ -1,0 +1,1015 @@
+{
+  "generatedAt": "2026-07-13T00:00:00Z",
+  "capabilities": [
+    "displayPrefs",
+    "agingConfig",
+    "version",
+    "review",
+    "ai",
+    "importExport",
+    "acnr"
+  ],
+  "entries": {
+    "A1": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "仪表板/报表型底稿，无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A10": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A11": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A12": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A14": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A15": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A16": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A17": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "仪表板/报表型底稿（Bundle），无金额表格渲染",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A2": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "调整分录控制台，金额格式由专属组件内部处理，非标准 displayPrefs 消费场景",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "A3": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "合并报表控制台，金额格式由专属子组件内部处理，非标准 displayPrefs 消费场景",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B13": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B19": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B2": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B22": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B23": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B30": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B50": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿（风险评估汇总），非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "B51": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "计划/评估底稿，非结构化金额底稿",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "C1": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "控制测试底稿（向导式），程序表无金额列",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "C22": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "控制测试底稿，程序表无金额列",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "C23": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "控制测试底稿，程序表无金额列",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "C24": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "控制测试底稿（细节测试/异常分录），金额格式由专属组件内部处理",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "C25": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "控制测试底稿，程序表无金额列",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "C26": {
+      "shellWrapped": false,
+      "detected": {
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "控制测试底稿，程序表无金额列",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "D1": {
+      "shellWrapped": false,
+      "detected": {
+        "displayPrefs": true,
+        "review": true
+      }
+    },
+    "D2": {
+      "shellWrapped": true,
+      "detected": {}
+    },
+    "D3": {
+      "shellWrapped": false,
+      "detected": {
+        "displayPrefs": true,
+        "review": true
+      }
+    },
+    "D4": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "D5": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "D6": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "D7": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "E1": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "F1": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "F2": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "F3": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "F4": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "F5": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G1": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G10": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "G11": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "G12": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "G13": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "G14": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G2": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G3": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G4": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "G5": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G6": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G7": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "G8": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "G9": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H1": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H10": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H2": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true,
+        "importExport": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H3": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H4": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H5": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H6": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H7": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true,
+        "ai": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H8": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "H9": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "I1": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "I2": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true,
+        "acnr": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "I3": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "I4": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "I5": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "I6": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K1": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K10": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K11": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K12": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K13": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K2": {
+      "shellWrapped": false,
+      "detected": {},
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K3": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K4": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K5": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K6": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K7": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K8": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "K9": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "L1": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "L2": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "L3": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "L4": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "L5": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "L6": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "L7": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "L8": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "M1": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "M10": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "M2": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "M3": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "M4": {
+      "shellWrapped": false,
+      "detected": {
+        "review": true
+      }
+    },
+    "M5": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "M6": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "M7": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "M8": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "M9": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "N1": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "N2": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "N3": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      },
+      "exemption": {
+        "reason": "displayPrefs 经 useWorkpaperScaffold provide 链注入，主入口正则未覆盖",
+        "approvedBy": "manager",
+        "at": "2026-07-13"
+      }
+    },
+    "N4": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    },
+    "N5": {
+      "shellWrapped": false,
+      "detected": {
+        "version": true,
+        "review": true
+      }
+    }
+  }
+}

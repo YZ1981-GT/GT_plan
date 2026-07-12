@@ -218,13 +218,13 @@ const filledCount = computed(() => {
   align-items: center;
   gap: 8px;
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .uploaded-file {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .file-name {
   color: #303133;
@@ -251,7 +251,7 @@ const filledCount = computed(() => {
   padding: 12px;
 }
 .group-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #7c5cff;
   margin-bottom: 10px;
@@ -268,7 +268,7 @@ const filledCount = computed(() => {
 .field-label {
   width: 200px;
   flex-shrink: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 32px;
 }

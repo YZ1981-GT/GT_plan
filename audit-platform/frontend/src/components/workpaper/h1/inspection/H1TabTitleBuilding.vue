@@ -153,12 +153,12 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-title-building { padding: 16px; font-size: 13px; }
+.h1-tab-title-building { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .obj-alert { margin-bottom: 12px; }
 .methodology-context { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.title-table { font-size: 13px; }
+.title-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .error-amount { color: var(--el-color-danger); }

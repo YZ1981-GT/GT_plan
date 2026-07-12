@@ -416,7 +416,7 @@ onBeforeUnmount(() => {
   padding: 8px 16px;
   border-radius: 4px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   display: flex;
   align-items: center;
   gap: 8px;

@@ -111,7 +111,7 @@ const passedItems = computed(() =>
 }
 
 .wp-validation-report__count-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
 }
 

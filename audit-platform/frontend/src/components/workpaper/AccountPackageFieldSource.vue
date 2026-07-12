@@ -102,7 +102,7 @@ function handleSourceClick(sheetName: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-field-source__label {

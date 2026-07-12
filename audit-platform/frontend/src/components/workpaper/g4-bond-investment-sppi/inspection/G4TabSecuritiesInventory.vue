@@ -282,7 +282,7 @@ function getSummary({ columns }: { columns: any[]; data: any[] }) {
 </script>
 
 <style scoped>
-.g4-tab-securities-inventory { font-size: 13px; }
+.g4-tab-securities-inventory { font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; gap: 6px; align-items: center; }
@@ -306,7 +306,7 @@ function getSummary({ columns }: { columns: any[]; data: any[] }) {
 .conclusion-card { margin: 12px 0; }
 .conclusion-card :deep(.el-card__header) {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 

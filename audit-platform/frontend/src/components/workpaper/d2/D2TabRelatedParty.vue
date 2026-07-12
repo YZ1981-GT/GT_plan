@@ -15,6 +15,8 @@ import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -29,9 +31,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   'D2-6',
 )
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 function onReview(sectionId: string): void {
@@ -340,7 +340,7 @@ const GUIDANCE_TEXTS = [
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; align-items: center; margin-bottom: 12px; gap: 12px; flex-wrap: wrap; }
 .row-count-tag { margin-left: auto; }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -348,7 +348,7 @@ const GUIDANCE_TEXTS = [
 .virtual-table { margin-bottom: 12px; }
 
 /* ─── 表格 13px + 紧凑 ─── */
-.rp-table { font-size: 13px; }
+.rp-table { font-size: var(--wp-font-size, 13px); }
 .rp-table :deep(.el-table__cell) { padding: 4px 3px; }
 
 /* ─── 公式列：灰底 + 虚线下划线 + help 光标 ─── */
@@ -363,7 +363,7 @@ const GUIDANCE_TEXTS = [
 /* ─── 合计栏 ─── */
 .total-bar {
   display: flex; gap: 12px; align-items: center; padding: 8px 12px; margin-top: 8px;
-  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px; font-weight: 600;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: var(--wp-font-size, 13px); font-weight: 600;
 }
 .total-label { font-weight: 700; margin-right: 4px; }
 
@@ -375,7 +375,7 @@ const GUIDANCE_TEXTS = [
 .opinion-actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* ─── 编制提示 ─── */
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 </style>

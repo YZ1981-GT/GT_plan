@@ -234,11 +234,11 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .d7-disclosure { padding: 12px; }
 .d7-disclosure :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d7-disclosure :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -256,7 +256,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -281,7 +281,7 @@ function fmtAmt(val: number | null | undefined): string {
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; cursor: help; }
 
 .note-block { margin-top: 12px; }
-.note-label { font-size: 13px; color: #606266; margin-bottom: 6px; }
+.note-label { font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 6px; }
 
 .guidance-hint {
   margin-top: 12px;

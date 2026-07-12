@@ -376,7 +376,7 @@ onMounted(() => {
 
 .compile-hint {
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .compile-hint summary {
@@ -390,7 +390,7 @@ onMounted(() => {
   padding: 10px 14px;
   border-left: 4px solid #e6a23c;
   background-color: #fdf6ec;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: #606266;
 }
@@ -418,6 +418,6 @@ onMounted(() => {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

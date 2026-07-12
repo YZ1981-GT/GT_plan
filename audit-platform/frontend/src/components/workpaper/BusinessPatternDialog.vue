@@ -225,7 +225,7 @@ function onClose() {
 .gt-bp-suggestion-text {
   margin: 0;
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: var(--el-text-color-regular);
   font-family: inherit;

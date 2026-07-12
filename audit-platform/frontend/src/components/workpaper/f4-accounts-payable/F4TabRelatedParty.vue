@@ -248,10 +248,10 @@ function fmtAmount(v: number): string {
 </template>
 
 <style scoped>
-.f4-tab-related-party { font-size: 13px; }
+.f4-tab-related-party { font-size: var(--wp-font-size, 13px); }
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: 13px; }
-.guidance-details .guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: var(--wp-font-size, 13px); }
+.guidance-details .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-details .guidance-content p { margin: 2px 0; }
 .audit-objective { margin-bottom: 12px; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -262,7 +262,7 @@ function fmtAmount(v: number): string {
 .high-concentration { color: #e6a23c; font-weight: 600; }
 :deep(.concentration-warn td) { background: #fef3e6 !important; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-weight: 600; font-size: 13px; }
+.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .opinion-card { margin-top: 16px; border-radius: 8px; }
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }

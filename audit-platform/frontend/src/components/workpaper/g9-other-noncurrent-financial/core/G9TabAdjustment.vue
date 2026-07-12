@@ -160,7 +160,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.g9-adj { font-size: 13px; }
+.g9-adj { font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .balance-alert { margin-bottom: 8px; }

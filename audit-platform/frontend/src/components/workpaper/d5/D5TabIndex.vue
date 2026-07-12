@@ -112,7 +112,7 @@ function navigateToSheet(row: { applicable: boolean; sheetLabel: string }) {
 .index-header { margin-bottom: 16px; }
 .index-header h3 { margin: 0 0 12px; font-size: 16px; }
 .progress-wrap { padding: 12px 16px; background: #f5f7fa; border-radius: 6px; }
-.progress-label { display: block; margin-bottom: 8px; font-size: 13px; color: #606266; }
+.progress-label { display: block; margin-bottom: 8px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .gt-index-chip {
   display: inline-block;
   padding: 2px 8px;

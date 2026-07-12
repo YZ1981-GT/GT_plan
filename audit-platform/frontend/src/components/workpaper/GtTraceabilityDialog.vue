@@ -349,7 +349,7 @@ watch(
   background: var(--gt-color-bg-page, #f5f5f5);
   border-radius: 4px;
   font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-trace-dialog__project {
@@ -415,7 +415,7 @@ watch(
 .gt-trace-dialog__item-value {
   margin-left: auto;
   font-family: 'JetBrains Mono', Consolas, monospace;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-primary, #6750a4);
 }
 </style>

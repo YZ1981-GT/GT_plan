@@ -1207,7 +1207,7 @@ function debounceSave() {
   background: #f3eef8;
   color: #4b2d77;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 0 !important;
   height: 38px !important;
 }
@@ -1220,7 +1220,7 @@ function debounceSave() {
 .gt-a-program-console__table :deep(.cell) {
   padding: 4px 10px !important;
   line-height: 1.5 !important;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 序号列居中 */
@@ -1269,7 +1269,7 @@ function debounceSave() {
 
 .gt-a-program-console__sub-steps h4 {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-regular);
 }
 
@@ -1280,7 +1280,7 @@ function debounceSave() {
 }
 
 .gt-a-program-console__sub-item {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.8;
   color: var(--el-text-color-regular);
   padding: 2px 0;
@@ -1293,13 +1293,13 @@ function debounceSave() {
 
 .gt-a-program-console__expand-content h4 {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-primary);
 }
 
 .gt-a-program-console__expand-content p {
   margin: 0 0 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: var(--el-text-color-regular);
   white-space: pre-wrap;

@@ -385,7 +385,7 @@ function getUnearnedSummary({ columns }: { columns: any[]; data: H9AdjudicationR
 </script>
 
 <style scoped>
-.h9-tab-adjudication { padding: 16px; font-size: 13px; }
+.h9-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -396,7 +396,7 @@ function getUnearnedSummary({ columns }: { columns: any[]; data: H9AdjudicationR
 .title-actions { display: flex; gap: 6px; }
 
 .block-card { margin-bottom: 16px; }
-.formula-table { font-size: 13px; }
+.formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 

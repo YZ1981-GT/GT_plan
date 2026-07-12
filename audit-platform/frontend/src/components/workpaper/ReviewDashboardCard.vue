@@ -131,7 +131,7 @@ function progressPct(level: LevelStatus): number {
 }
 .review-dashboard-card__empty {
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   text-align: center;
   padding: 20px 0;
 }
@@ -165,7 +165,7 @@ function progressPct(level: LevelStatus): number {
   gap: 8px;
 }
 .level-card__label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }

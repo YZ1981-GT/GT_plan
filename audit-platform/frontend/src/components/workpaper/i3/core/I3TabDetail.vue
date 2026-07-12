@@ -404,7 +404,7 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
 
 <style scoped>
 .i3-tab-detail {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -471,7 +471,7 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
 
 /* 明细表格 */
 .detail-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .detail-table :deep(.el-table__header th) {
   font-size: 12px;
@@ -528,7 +528,7 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
   z-index: 5;
 }
 .summary-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .summary-table :deep(.el-table__header) {
   display: none;

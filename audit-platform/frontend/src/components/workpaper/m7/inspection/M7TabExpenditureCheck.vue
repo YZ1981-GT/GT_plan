@@ -658,7 +658,7 @@ onMounted(async () => {
 <style scoped>
 .m7-tab-expenditure-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Header ──── */
@@ -723,7 +723,7 @@ onMounted(async () => {
 
 .guide-text {
   color: #1a4f7a;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色） ──── */
@@ -736,7 +736,7 @@ onMounted(async () => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -848,7 +848,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

@@ -82,7 +82,7 @@ const emit = defineEmits<{ (e: 'apply'): void }>()
   background: #fdf6ec;
   border-radius: 0 6px 6px 0;
   padding: 8px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5c4b28;
 }
 .d2-ref-block summary {
@@ -101,7 +101,7 @@ const emit = defineEmits<{ (e: 'apply'): void }>()
 .ref-apply { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
 .ref-apply-hint { font-size: 12px; color: #a0864f; }
 .ref-section { margin-bottom: 14px; }
-.ref-heading { margin: 6px 0; font-size: 13px; font-weight: 700; color: #96631b; }
+.ref-heading { margin: 6px 0; font-size: var(--wp-font-size, 13px); font-weight: 700; color: #96631b; }
 .ref-para { margin: 4px 0; line-height: 1.6; }
 .ref-steps { margin: 4px 0 4px 18px; padding: 0; }
 .ref-steps li { margin: 4px 0; line-height: 1.55; }

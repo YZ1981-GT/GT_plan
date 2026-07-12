@@ -424,7 +424,7 @@ onMounted(() => {
 
 <style scoped>
 .m10-classification-check {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px;
 }
 
@@ -467,7 +467,7 @@ onMounted(() => {
   font-weight: 600;
 }
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .step-arrow {
@@ -545,7 +545,7 @@ onMounted(() => {
 }
 .dimension-label {
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .dimension-body {
@@ -588,7 +588,7 @@ onMounted(() => {
 }
 .split-title {
   margin: 0 0 8px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .split-grid {
@@ -665,7 +665,7 @@ onMounted(() => {
   color: #303133;
 }
 .summary-amount {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

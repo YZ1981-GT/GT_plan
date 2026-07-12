@@ -350,22 +350,22 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.m5-tab-disclosure-soe { padding: 12px; font-size: 13px; }
+.m5-tab-disclosure-soe { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .disclosure-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .total-row-label { font-weight: 700; color: #303133; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.total-row) { background: #f0f9eb !important; font-weight: 600; }
 :deep(.total-row td) { border-top: 2px solid #67c23a; }
-.m5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

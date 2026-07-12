@@ -367,7 +367,7 @@ onMounted(async () => {
 <style scoped>
 .n2-tab-policy-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Header ─── */
@@ -401,7 +401,7 @@ onMounted(async () => {
   border: 1px solid #fab6b6;
   border-left: 4px solid #f56c6c;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #c45656;
   font-weight: 500;
 }
@@ -424,7 +424,7 @@ onMounted(async () => {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -476,7 +476,7 @@ onMounted(async () => {
 }
 
 .check-item-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.5;
 }
@@ -496,7 +496,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

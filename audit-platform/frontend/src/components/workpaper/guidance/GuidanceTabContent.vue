@@ -293,7 +293,7 @@ const customGuidance = computed(() => {
 
 <style scoped>
 .gt-guidance-tab {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
 }
 
@@ -360,7 +360,7 @@ const customGuidance = computed(() => {
 }
 
 .gt-guidance-tab__collapse :deep(.el-collapse-item__header) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--gt-primary, #4b2d77);
   border-bottom: none;
@@ -395,7 +395,7 @@ const customGuidance = computed(() => {
   color: #333;
   line-height: 1.8;
   word-break: break-word;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-guidance-section__item--more {
@@ -411,7 +411,7 @@ const customGuidance = computed(() => {
   word-break: break-word;
   color: #333;
   line-height: 1.8;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 0;
 }
 
@@ -475,7 +475,7 @@ const customGuidance = computed(() => {
 
 .gt-guidance-tab__low-hint {
   color: #333;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 12px;
   line-height: 1.6;
 }

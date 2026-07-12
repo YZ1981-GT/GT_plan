@@ -577,7 +577,7 @@ defineExpose({ reload: () => flushPendingSaves() })
   gap: 4px;
 }
 .gt-a1721__kam-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
 }
@@ -585,7 +585,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 /* Notes */
 .gt-a1721__notes-empty {
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 0;
 }
 .gt-a1721__note-item {
@@ -595,7 +595,7 @@ defineExpose({ reload: () => flushPendingSaves() })
   margin-bottom: 12px;
 }
 .gt-a1721__note-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
 }

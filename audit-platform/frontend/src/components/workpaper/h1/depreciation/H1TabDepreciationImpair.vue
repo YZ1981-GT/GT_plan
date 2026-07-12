@@ -110,7 +110,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-dep-impair { padding: 16px; font-size: 13px; }
+.h1-tab-dep-impair { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .branch-selector { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .branch-hint { font-size: 12px; color: var(--el-text-color-secondary); }
 .methodology-context { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; }

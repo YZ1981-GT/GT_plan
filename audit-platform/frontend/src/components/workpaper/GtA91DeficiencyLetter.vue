@@ -529,7 +529,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 .gt-a91__addressee-text { font-size: 14px; color: #303133; font-weight: 500; }
 
 /* Section 2: Intro */
-.gt-a91__muted-text { font-size: 13px; color: #909399; line-height: 1.8; margin: 0 0 12px; }
+.gt-a91__muted-text { font-size: var(--wp-font-size, 13px); color: #909399; line-height: 1.8; margin: 0 0 12px; }
 .gt-a91__muted-text:last-child { margin-bottom: 0; }
 
 /* Section 3: Independence */
@@ -552,12 +552,12 @@ defineExpose({ reload: () => flushPendingSaves() })
   background: #fafbfc;
 }
 .gt-a91__deficiency-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.gt-a91__deficiency-index { font-size: 13px; font-weight: 600; color: #409eff; }
+.gt-a91__deficiency-index { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #409eff; }
 .gt-a91__deficiency-fields { display: flex; flex-direction: column; gap: 12px; }
 .gt-a91__recommendation-row { display: flex; gap: 8px; align-items: flex-start; }
 .gt-a91__recommendation-row .el-textarea { flex: 1; }
 .gt-a91__ai-btn { margin-top: 4px; }
-.gt-a91__empty-hint { font-size: 13px; color: #c0c4cc; text-align: center; padding: 12px 0; }
+.gt-a91__empty-hint { font-size: var(--wp-font-size, 13px); color: #c0c4cc; text-align: center; padding: 12px 0; }
 
 /* Section 5: Committee */
 .gt-a91__committee { display: flex; flex-direction: column; gap: 12px; }

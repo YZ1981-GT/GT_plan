@@ -317,12 +317,12 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-detail { padding: 16px; font-size: 13px; }
+.h2-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .segment-bar { margin-bottom: 16px; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }

@@ -275,17 +275,17 @@ function fmtAmount(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i6-tab-detail { padding: 16px; font-size: 13px; }
+.i6-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.8; }
 .methodology-context p { margin: 0; }
 .methodology-context strong { color: #78350f; }
 .chart-details { margin-bottom: 16px; }
-.chart-details summary { cursor: pointer; font-weight: 500; font-size: 13px; color: var(--el-text-color-regular); }
+.chart-details summary { cursor: pointer; font-weight: 500; font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); }
 .trend-chart { width: 100%; height: 220px; margin-top: 8px; }
 .toolbar-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .toolbar-right { display: flex; align-items: center; gap: 8px; }
 .row-count { font-size: 12px; color: var(--el-text-color-secondary); }
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; padding-bottom: 2px; }
 .formula-value { border-bottom: 1px dashed #c0c4cc; cursor: help; padding-bottom: 1px; color: #303133; font-weight: 500; }
 .subtotal-text { font-weight: 600; }

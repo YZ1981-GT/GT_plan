@@ -306,7 +306,7 @@ function onAttachmentClick(value: any) {
 
 <style scoped>
 .gt-d-form-conf { display: flex; flex-direction: column; gap: 16px; padding: 16px; }
-.gt-dfc__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: 13px; }
+.gt-dfc__header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 10px 14px; background: var(--gt-color-bg-soft, #f5f7fa); border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .gt-dfc__header-meta { display: flex; align-items: center; gap: 16px; }
 .gt-dfc__header-right { display: flex; align-items: center; gap: 10px; }
 .gt-dfc__entity { font-weight: 600; color: var(--el-text-color-primary); }
@@ -320,7 +320,7 @@ function onAttachmentClick(value: any) {
 .gt-dfc__workflow { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 16px; background: var(--gt-color-bg-white, #fff); }
 .gt-dfc__stepper { margin-bottom: 16px; cursor: pointer; }
 .gt-dfc__stepper :deep(.el-step__head) { cursor: pointer; }
-.gt-dfc__stepper :deep(.el-step__title) { cursor: pointer; font-size: 13px; }
+.gt-dfc__stepper :deep(.el-step__title) { cursor: pointer; font-size: var(--wp-font-size, 13px); }
 .gt-dfc__stage-panel { padding: 12px; border-radius: 4px; background: var(--el-color-primary-light-9); }
 .gt-dfc__stage-header { margin-bottom: 12px; }
 .gt-dfc__stage-title { margin: 0 0 4px 0; font-size: 14px; font-weight: 600; color: var(--el-color-primary); }

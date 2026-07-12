@@ -280,7 +280,7 @@ function loadFromHtmlData(): void {
 </script>
 
 <style scoped>
-.g4-disclosure-listed { padding: 12px; font-size: 13px; }
+.g4-disclosure-listed { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px; }
 .section-head:first-child { margin-top: 0; }
 .section-title { margin: 0; font-size: 14px; font-weight: 600; }

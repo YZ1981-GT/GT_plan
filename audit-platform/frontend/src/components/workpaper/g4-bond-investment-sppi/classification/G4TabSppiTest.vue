@@ -429,7 +429,7 @@ function handleBondUpdate(id: string, patch: Partial<BondSppiItem>): void {
 </script>
 
 <style scoped>
-.g4-tab-sppi-test { font-size: 13px; }
+.g4-tab-sppi-test { font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; gap: 6px; align-items: center; }
@@ -463,7 +463,7 @@ function handleBondUpdate(id: string, patch: Partial<BondSppiItem>): void {
 .conclusion-card { margin: 12px 0; }
 .conclusion-card :deep(.el-card__header) {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 

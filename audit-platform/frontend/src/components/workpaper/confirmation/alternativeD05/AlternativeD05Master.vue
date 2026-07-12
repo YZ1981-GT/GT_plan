@@ -178,7 +178,7 @@ function formatRatio(val: number | null): string {
 }
 
 .alternative-master__table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 表头折行 */
@@ -186,11 +186,11 @@ function formatRatio(val: number | null): string {
   white-space: normal;
   word-break: break-all;
   line-height: 1.3;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .alternative-master__table :deep(.el-table__body td .cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .alternative-master__empty {

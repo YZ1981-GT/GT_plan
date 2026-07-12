@@ -535,7 +535,7 @@ onBeforeUnmount(() => {
 }
 
 .objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #606266;
   padding: 10px 12px;
@@ -594,7 +594,7 @@ onBeforeUnmount(() => {
 }
 
 .step-content {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
   color: #303133;
   flex: 1;
@@ -603,7 +603,7 @@ onBeforeUnmount(() => {
 .step-status {
   color: #4b2d77;
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .step-controls {

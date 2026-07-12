@@ -345,7 +345,7 @@ function getConclusionTagType(conclusion: string): 'success' | 'danger' | 'info'
 </script>
 
 <style scoped>
-.i1-tab-policy-check { padding: 16px; font-size: 13px; }
+.i1-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── 蓝色渐变引导区 ─── */
 .guide-area {

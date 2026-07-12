@@ -296,7 +296,7 @@ function barWidth(ratio: number): string {
 </script>
 
 <style scoped>
-.c24-benford { font-size: 13px; }
+.c24-benford { font-size: var(--wp-font-size, 13px); }
 
 /* 顶部蓝色渐变引导区 */
 .c24-guide-area {
@@ -329,7 +329,7 @@ function barWidth(ratio: number): string {
   font-weight: 600;
 }
 .guide-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   line-height: 1.5;
 }
@@ -337,7 +337,7 @@ function barWidth(ratio: number): string {
 /* 方法论上下文 */
 .methodology-context { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; margin-bottom: 16px; background: #fffbf0; border-radius: 4px; border-left: 3px solid #e6a23c; }
 .methodology-bar { display: none; }
-.methodology-content p { margin: 0 0 2px; font-size: 13px; color: #606266; line-height: 1.6; }
+.methodology-content p { margin: 0 0 2px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .methodology-content b { color: #303133; }
 
 /* 编制提示 */
@@ -351,7 +351,7 @@ function barWidth(ratio: number): string {
   padding: 10px 14px;
   background: #fafafa;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
   user-select: none;
@@ -359,7 +359,7 @@ function barWidth(ratio: number): string {
 .c24-compile-hint summary:hover { background: #f5f7fa; }
 .hint-body {
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.7;
 }
@@ -371,7 +371,7 @@ function barWidth(ratio: number): string {
 .c24-section { margin-bottom: 20px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
 .section-title { font-weight: 600; font-size: 14px; color: #303133; }
-.c24-table { font-size: 13px; }
+.c24-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; color: #409eff; }
 .text-danger { color: #f56c6c !important; }
 
@@ -395,7 +395,7 @@ function barWidth(ratio: number): string {
 .deviation-title {
   margin: 0 0 8px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #f56c6c;
 }
 .deviation-item {

@@ -114,7 +114,7 @@ const { isLoading, programData } = useCycleProcedureConsole({
 
   padding: 12px;
 
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 
 }
 

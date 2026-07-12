@@ -395,11 +395,11 @@ const {
 <style scoped>
 .d6-tab-impairment-detail { padding: 16px; }
 .d6-tab-impairment-detail :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d6-tab-impairment-detail :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -417,7 +417,7 @@ const {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -473,7 +473,7 @@ const {
   display: flex;
   flex-wrap: wrap;
   gap: 20px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 审计意见卡片 */

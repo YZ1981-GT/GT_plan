@@ -219,7 +219,7 @@ function getProgressColor(p: number): string {
 </script>
 
 <style scoped>
-.k10-tab-index { padding: 12px; font-size: 13px; }
+.k10-tab-index { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .k10-progress-section {
   margin-bottom: 16px;

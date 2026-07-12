@@ -174,7 +174,7 @@ function getSummary({ columns }: any) {
 </script>
 
 <style scoped>
-.h8-tab-adjustment { padding: 16px; font-size: 13px; }
+.h8-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -195,13 +195,13 @@ function getSummary({ columns }: any) {
 
 .balance-indicator {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 13px;
+  padding: 8px 14px; border-radius: 6px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px);
 }
 .balance-indicator.balanced { background: #f0f9eb; color: #67c23a; border: 1px solid #c2e7b0; }
 .balance-indicator.unbalanced { background: #fef0f0; color: #f56c6c; border: 1px solid #fbc4c4; }
 .balance-amounts { font-size: 12px; opacity: 0.8; }
 
-.adj-table { font-size: 13px; margin-bottom: 12px; }
+.adj-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 
 .publish-area { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .publish-hint { font-size: 12px; color: var(--el-text-color-secondary); }

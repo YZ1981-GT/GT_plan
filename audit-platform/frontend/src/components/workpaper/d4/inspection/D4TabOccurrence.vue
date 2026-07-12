@@ -659,7 +659,7 @@ ensureActiveTab()
 </template>
 
 <style scoped>
-.d4-occurrence { padding: 16px 20px; font-size: 13px; }
+.d4-occurrence { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── 工具条 ─── */
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
@@ -705,7 +705,7 @@ ensureActiveTab()
   background: #fffbf0;
 }
 .methodology-summary {
-  cursor: pointer; padding: 8px 14px; font-size: 13px;
+  cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px);
   font-weight: 500; color: #b88230; user-select: none;
 }
 .methodology-summary:hover { color: #866736; }
@@ -754,7 +754,7 @@ ensureActiveTab()
 .opinion-chips { display: flex; gap: 6px; }
 .opinion-actions { display: flex; gap: 8px; margin-left: auto; }
 .opinion-body { display: flex; flex-direction: column; gap: 16px; padding-top: 4px; }
-.opinion-field label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.opinion-field label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 
 /* ─── 编制提示（折叠收纳） ─── */
 .tips-collapse {
@@ -762,16 +762,16 @@ ensureActiveTab()
   background: #fafbfc; border-radius: 8px;
   border: 1px solid #e4e7ed; border-left: 3px solid #f56c6c;
 }
-.tips-summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #606266; user-select: none; }
+.tips-summary { cursor: pointer; font-size: var(--wp-font-size, 13px); font-weight: 600; color: #606266; user-select: none; }
 .tips-summary:hover { color: #303133; }
 .tips-body { margin-top: 14px; display: flex; flex-direction: column; gap: 16px; }
 .tips-group { padding: 12px 14px; background: #fff; border-radius: 6px; border: 1px solid #ebeef5; }
 .tips-group-warn { background: #fef0f0; border-color: #fde2e2; }
-.tips-group-title { font-size: 13px; font-weight: 600; color: #303133; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #ebeef5; }
+.tips-group-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid #ebeef5; }
 .tips-group-warn .tips-group-title { color: #c45656; border-color: #fde2e2; }
 .tips-list { margin: 0; padding-left: 20px; }
-.tips-list li { font-size: 13px; color: #606266; line-height: 1.8; margin-bottom: 2px; }
-.tips-warn-content { font-size: 13px; color: #606266; line-height: 1.7; }
+.tips-list li { font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.8; margin-bottom: 2px; }
+.tips-warn-content { font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.7; }
 .tips-warn-content p { margin: 0 0 10px; }
 .tips-scenarios { display: flex; flex-direction: column; gap: 8px; padding-left: 4px; }
 .tips-scenario { display: flex; gap: 6px; align-items: flex-start; }

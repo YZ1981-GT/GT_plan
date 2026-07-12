@@ -536,7 +536,7 @@ defineExpose({
 
 <style scoped>
 .c21-findings {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 4px 2px 24px;
 }
 
@@ -572,7 +572,7 @@ defineExpose({
 }
 .c21f-card-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-text, #303133);
 }
 
@@ -663,6 +663,6 @@ defineExpose({
 }
 
 .c21f-carryover-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

@@ -246,7 +246,7 @@ function getRowClassName({ row }: { row: RelatedPartyRow }) {
 </script>
 
 <style scoped>
-.h8-tab-related-party { padding: 16px; font-size: 13px; }
+.h8-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -259,7 +259,7 @@ function getRowClassName({ row }: { row: RelatedPartyRow }) {
 .title-actions { display: flex; gap: 6px; }
 
 .table-card { margin-bottom: 16px; }
-.formula-table { font-size: 13px; }
+.formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #fefce8; }
 .formula-table :deep(.abnormal-row) { background: #fef2f2 !important; }
 .formula-value { border-bottom: 1px dashed #d97706; cursor: help; color: #d97706; }

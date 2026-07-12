@@ -455,7 +455,7 @@ defineExpose({ handleSave, handleExportTemplate, handleExportData, handleImport:
 </script>
 
 <style scoped>
-.gt-confirmation-alternative-k05 { padding: 8px 0; font-size: 13px; }
+.gt-confirmation-alternative-k05 { padding: 8px 0; font-size: var(--wp-font-size, 13px); }
 .gt-confirmation-alternative-k05__toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .gt-confirmation-alternative-k05__title { font-size: 15px; font-weight: 600; }
 .gt-confirmation-alternative-k05__toolbar-right { display: flex; align-items: center; gap: 8px; }
@@ -465,7 +465,7 @@ defineExpose({ handleSave, handleExportTemplate, handleExportData, handleImport:
 .gt-confirmation-alternative-k05__summary-card { margin-bottom: 16px; }
 .gt-confirmation-alternative-k05__detail { margin-top: 12px; }
 .detail-section { margin-bottom: 16px; }
-.detail-section__header { font-size: 13px; font-weight: 600; margin-bottom: 8px; padding: 4px 8px; background: var(--el-fill-color-light); border-radius: 3px; display: flex; align-items: center; }
+.detail-section__header { font-size: var(--wp-font-size, 13px); font-weight: 600; margin-bottom: 8px; padding: 4px 8px; background: var(--el-fill-color-light); border-radius: 3px; display: flex; align-items: center; }
 .conclusion-card { margin-top: 8px; }
 
 /* 公式列：虚线下划线 + cursor:help */

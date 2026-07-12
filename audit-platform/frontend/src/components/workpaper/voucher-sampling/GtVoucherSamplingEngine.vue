@@ -780,7 +780,7 @@ async function handleResample() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .reconcile-label {
@@ -882,11 +882,11 @@ async function handleResample() {
 
 /* ── 主体表格 ── */
 .sampling-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .sampling-table :deep(.el-table__row) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 预审行在年审阶段 disabled 样式 */

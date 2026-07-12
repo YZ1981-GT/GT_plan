@@ -92,7 +92,7 @@ function handleNavigate(item: NavItem) {
   padding: 6px 12px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cross-workpaper-nav__label {

@@ -155,7 +155,7 @@ function handleCopy() {
 
 .followup-memo-preview__text {
   line-height: 1.8;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   white-space: pre-wrap;
 }

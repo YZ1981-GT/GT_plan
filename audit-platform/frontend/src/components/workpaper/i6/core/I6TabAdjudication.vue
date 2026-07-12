@@ -427,7 +427,7 @@ function fmtRate(rate: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i6-adjudication { font-size: 13px; padding: 16px; }
+.i6-adjudication { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .methodology-context { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.8; }
 .methodology-context p { margin: 0; }
 .methodology-context strong { color: #78350f; }
@@ -436,7 +436,7 @@ function fmtRate(rate: number | null | undefined): string {
 .block-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-weight: 600; font-size: 14px; }
 .block-actions { display: flex; align-items: center; gap: 4px; }
 .block-title { font-size: 14px; }
-.adjudication-table { font-size: 13px; }
+.adjudication-table { font-size: var(--wp-font-size, 13px); }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; padding-bottom: 2px; }
 .formula-value { border-bottom: 1px dashed #c0c4cc; cursor: help; padding-bottom: 1px; color: #303133; font-weight: 500; }
 .adjudication-table :deep(.row-subtotal td) { font-weight: 600; background: #f0f9ff !important; }
@@ -445,7 +445,7 @@ function fmtRate(rate: number | null | undefined): string {
 .linkage-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 .cross-ref-bar { display: flex; align-items: center; gap: 8px; padding: 12px 0; flex-wrap: wrap; }
-.cross-ref-label { color: #606266; font-size: 13px; }
+.cross-ref-label { color: #606266; font-size: var(--wp-font-size, 13px); }
 .audit-note-card { margin-bottom: 16px; }
 .audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .conclusion-select { width: 100%; }

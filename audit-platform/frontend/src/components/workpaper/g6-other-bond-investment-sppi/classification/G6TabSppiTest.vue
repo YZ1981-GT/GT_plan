@@ -390,7 +390,7 @@ watch(
 
 <style scoped>
 .g6-tab-sppi-test {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 0;
 }
 
@@ -403,7 +403,7 @@ watch(
   border-radius: 4px;
 }
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #8b6914;
 }
@@ -470,7 +470,7 @@ watch(
   background: #f5f7fa;
 }
 .sppi-table :deep(.el-table__body td) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cell-text {

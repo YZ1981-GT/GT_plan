@@ -182,7 +182,7 @@ onMounted(() => {
 }
 .gt-trimming-summary-title {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-text-color-primary, #303133);
 }

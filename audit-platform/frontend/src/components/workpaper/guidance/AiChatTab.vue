@@ -358,7 +358,7 @@ watch(() => props.wpId, () => {
   max-width: 85%;
   padding: 8px 12px;
   border-radius: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
   word-break: break-word;
   white-space: pre-wrap;
@@ -485,7 +485,7 @@ watch(() => props.wpId, () => {
   border-radius: 8px;
   min-height: 32px !important;
   max-height: 80px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 6px 12px;
 }
 

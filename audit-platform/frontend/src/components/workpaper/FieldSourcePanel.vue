@@ -112,7 +112,7 @@ const stalePolicyLabel = computed(() => {
   border: 1px solid var(--gt-color-border-purple, #e8e4f0);
   border-radius: 6px;
   background: var(--gt-color-primary-bg, #f4f0fa);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -164,7 +164,7 @@ const stalePolicyLabel = computed(() => {
 }
 
 .gt-field-source-panel__unknown-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* el-tag default type scoped purple override (GT brand) */

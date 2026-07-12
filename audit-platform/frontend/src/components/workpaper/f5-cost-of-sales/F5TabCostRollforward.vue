@@ -210,7 +210,7 @@ function openReview() { openReviewDialog('F5-7-conclusion') }
 </script>
 
 <style scoped>
-.f5-rollforward { padding: 12px; font-size: 13px; }
+.f5-rollforward { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .f5-guide { background: linear-gradient(135deg, #409eff, #66b1ff); color: #fff; padding: 12px 16px; border-radius: 6px; margin-bottom: 12px; }
 .f5-guide-title { font-weight: 700; margin-bottom: 6px; }
 .f5-guide-steps { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -240,7 +240,7 @@ function openReview() { openReviewDialog('F5-7-conclusion') }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
-.toolbar-hint { font-size: 13px; color: #909399; }
+.toolbar-hint { font-size: var(--wp-font-size, 13px); color: #909399; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
 /* 审计意见卡片 */
@@ -253,6 +253,6 @@ function openReview() { openReviewDialog('F5-7-conclusion') }
 /* 编制提示 */
 .guidance-details { margin-top: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 </style>

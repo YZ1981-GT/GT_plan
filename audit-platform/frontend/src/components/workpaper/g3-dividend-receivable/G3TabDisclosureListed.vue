@@ -246,7 +246,7 @@ function fmtNum(v: unknown): string {
 <style scoped>
 .g3-disclosure-listed {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -320,7 +320,7 @@ function fmtNum(v: unknown): string {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }

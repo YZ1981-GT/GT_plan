@@ -153,12 +153,12 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-recoverable { padding: 16px; font-size: 13px; }
+.h3-tab-recoverable { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .assumptions-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .assumption-item label { display: block; font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 4px; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .formula-value { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .dcf-result { display: flex; align-items: center; gap: 24px; margin-top: 12px; padding: 10px 14px; background: var(--el-fill-color-lighter); border-radius: 4px; font-weight: 500; }

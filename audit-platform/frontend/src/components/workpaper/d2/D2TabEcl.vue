@@ -17,6 +17,8 @@ import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import D2ReferenceBlock from './D2ReferenceBlock.vue'
 import { ECL_REFERENCE_SECTIONS, ECL_REFERENCE_SOURCE } from '../composables/d2ReferenceExamples'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -31,9 +33,7 @@ const props = withDefaults(defineProps<{
 
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const { saveItems } = useD2SaveInject()
 
@@ -350,18 +350,18 @@ const GUIDANCE_TEXTS = [
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .calc-cell { color: #909399; font-variant-numeric: tabular-nums; }
 .section-subtitle { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .section-actions { margin-bottom: 10px; display: flex; gap: 8px; }
 .total-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 8px;
-  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px; font-weight: 600;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: var(--wp-font-size, 13px); font-weight: 600;
 }
 .total-label { font-weight: 700; }
 .migration-alert { margin-bottom: 12px; }
@@ -372,5 +372,5 @@ const GUIDANCE_TEXTS = [
 .scenario-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 8px; }
 .scenario-item { display: flex; flex-direction: column; gap: 2px; font-size: 12px; padding: 6px; background: #f5f7fa; border-radius: 4px; }
 .scenario-name { font-weight: 600; }
-.discount-result { font-size: 13px; padding: 6px 0; }
+.discount-result { font-size: var(--wp-font-size, 13px); padding: 6px 0; }
 </style>

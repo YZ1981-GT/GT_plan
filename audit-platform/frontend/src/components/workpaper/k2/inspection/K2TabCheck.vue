@@ -275,7 +275,7 @@ function openReview(): void {
 </script>
 
 <style scoped>
-.k2-tab-check { padding: 16px; font-size: 13px; }
+.k2-tab-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
@@ -320,7 +320,7 @@ function openReview(): void {
 .remark-input { margin-top: 4px; }
 
 /* 汇总 */
-.check-summary { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: 13px; }
+.check-summary { display: flex; align-items: center; gap: 10px; padding: 10px 0; font-size: var(--wp-font-size, 13px); }
 
 /* 编制提示 */
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

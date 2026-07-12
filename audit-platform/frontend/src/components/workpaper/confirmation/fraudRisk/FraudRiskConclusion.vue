@@ -152,18 +152,18 @@ function handleAiFill() {
 
 .fraud-risk-conclusion__label {
   display: block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   margin-bottom: 6px;
   color: var(--el-text-color-primary);
 }
 
 .fraud-risk-conclusion__value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .fraud-risk-conclusion__text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: var(--el-text-color-regular);
   margin: 0;

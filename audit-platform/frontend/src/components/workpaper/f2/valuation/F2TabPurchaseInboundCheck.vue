@@ -176,8 +176,8 @@ function handleOcrUpload(rowId: string, file?: File) {
 
 <style scoped src="./f2ValSheetStyles.css"></style>
 <style scoped>
-.meta-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-size: 13px; }
-.coverage { font-size: 13px; font-weight: 600; }
+.meta-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; font-size: var(--wp-font-size, 13px); }
+.coverage { font-size: var(--wp-font-size, 13px); font-weight: 600; }
 .coverage.warn { color: #e6a23c; }
 .sampling-info { font-size: 12px; color: var(--el-text-color-secondary); background: var(--el-fill-color-light); padding: 2px 8px; border-radius: 4px; }
 </style>

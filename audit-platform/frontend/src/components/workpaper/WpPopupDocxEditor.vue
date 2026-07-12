@@ -285,7 +285,7 @@ onMounted(() => {
 .guidance-content ol {
   margin: 8px 0 0;
   padding-left: 20px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: var(--el-text-color-regular);
 }
@@ -309,7 +309,7 @@ onMounted(() => {
   gap: 8px;
 }
 .sign-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
 }
 .wp-popup-docx-editor__summary-preview {

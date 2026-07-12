@@ -206,13 +206,13 @@ onMounted(() => { void loadOwn() })
 </script>
 
 <style scoped>
-.h7-tab-depreciation-alloc { padding: 16px; font-size: 13px; }
+.h7-tab-depreciation-alloc { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .obj-alert { margin-bottom: 12px; }
 .tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .chip-wrap { display: inline-flex; }
 .total-row { margin-bottom: 12px; font-weight: 500; display: flex; align-items: center; gap: 8px; }
 .total-input { width: 180px; }
-.alloc-table { font-size: 13px; }
+.alloc-table { font-size: var(--wp-font-size, 13px); }
 .alloc-table :deep(.auto-calc-col) { background: var(--el-fill-color-lighter); }
 .amt-input { width: 100%; }
 .amount-cell { font-variant-numeric: tabular-nums; }

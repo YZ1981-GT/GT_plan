@@ -95,7 +95,7 @@ defineEmits<{
 }
 .import-stats {
   text-align: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 0;
 }
 .stat-matched {

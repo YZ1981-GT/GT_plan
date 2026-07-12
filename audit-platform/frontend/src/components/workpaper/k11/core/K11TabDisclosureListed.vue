@@ -336,7 +336,7 @@ async function handleAiSection(section: string): Promise<void> {
 </script>
 
 <style scoped>
-.k11-disclosure-listed { padding: 12px; font-size: 13px; }
+.k11-disclosure-listed { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex;
@@ -366,7 +366,7 @@ async function handleAiSection(section: string): Promise<void> {
   align-items: center;
   justify-content: space-between;
 }
-.card-title { font-weight: 600; font-size: 13px; }
+.card-title { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 
 .formula-cell {
   border-bottom: 1px dashed #c0c4cc;

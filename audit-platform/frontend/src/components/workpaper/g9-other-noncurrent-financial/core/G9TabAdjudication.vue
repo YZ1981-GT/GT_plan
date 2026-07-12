@@ -294,7 +294,7 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
 </script>
 
 <style scoped>
-.g9-adjudication { font-size: 13px; }
+.g9-adjudication { font-size: var(--wp-font-size, 13px); }
 .g9-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .g9-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .g9-title { margin: 0; font-size: 15px; }

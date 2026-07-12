@@ -324,7 +324,7 @@ function fmtNum(v: number): string {
 </script>
 
 <style scoped>
-.k5-tab-detail { padding: 12px; font-size: 13px; }
+.k5-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; }
@@ -339,9 +339,9 @@ function fmtNum(v: number): string {
 .formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
 .formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
 .text-muted { color: #c0c4cc; font-size: 12px; }
-.summary-bar { display: flex; gap: 24px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266; }
-:deep(.el-table) { font-size: 13px; }
-.k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.summary-bar { display: flex; gap: 24px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

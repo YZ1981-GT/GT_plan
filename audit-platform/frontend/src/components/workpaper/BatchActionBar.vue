@@ -58,7 +58,7 @@ const canComplete = computed(() => can('adjustment:review'))
 }
 
 .gt-batch-bar-count {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #4b2d77;
 }

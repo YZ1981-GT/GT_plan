@@ -217,7 +217,7 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
 </script>
 
 <style scoped>
-.g10-adjudication { font-size: 13px; }
+.g10-adjudication { font-size: var(--wp-font-size, 13px); }
 .g10-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .g10-title { margin: 0; font-size: 15px; }
 .g10-actions { display: flex; gap: 8px; }

@@ -175,7 +175,7 @@ function formatAmount(val?: number): string {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: var(--el-text-color-primary);
 }
@@ -188,7 +188,7 @@ function formatAmount(val?: number): string {
 }
 
 .checklist-audit-note__text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-regular);
   white-space: pre-wrap;
 }

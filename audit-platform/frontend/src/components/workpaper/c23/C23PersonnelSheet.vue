@@ -370,7 +370,7 @@ function aiParsePerson() {
 
 <style scoped>
 .c23-personnel-sheet {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 编制提示 */
@@ -384,7 +384,7 @@ function aiParsePerson() {
 .c23-edit-hint-summary {
   padding: 8px 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1e40af;
   cursor: pointer;
   background: #dbeafe;
@@ -424,7 +424,7 @@ function aiParsePerson() {
 }
 .methodology-context p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -440,9 +440,9 @@ function aiParsePerson() {
   font-size: 14px;
   color: #303133;
 }
-.c23-table { font-size: 13px; }
-.c23-table :deep(.el-table__header th) { font-size: 13px; background: #f5f7fa; }
-.c23-table :deep(.el-table__body td) { font-size: 13px; }
+.c23-table { font-size: var(--wp-font-size, 13px); }
+.c23-table :deep(.el-table__header th) { font-size: var(--wp-font-size, 13px); background: #f5f7fa; }
+.c23-table :deep(.el-table__body td) { font-size: var(--wp-font-size, 13px); }
 
 /* 新增人员 Dialog */
 .c23-add-person-hint {

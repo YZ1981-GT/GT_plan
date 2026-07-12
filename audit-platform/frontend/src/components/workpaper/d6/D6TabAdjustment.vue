@@ -246,11 +246,11 @@ function fmtAmount(val: number | null | undefined): string {
 <style scoped>
 .d6-tab-adjustment { padding: 16px; }
 .d6-tab-adjustment :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d6-tab-adjustment :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -268,7 +268,7 @@ function fmtAmount(val: number | null | undefined): string {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -302,7 +302,7 @@ function fmtAmount(val: number | null | undefined): string {
   background: #f5f7fa;
   border-radius: 4px;
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .balance-item { color: #606266; }
 .balance-item strong { color: #303133; }

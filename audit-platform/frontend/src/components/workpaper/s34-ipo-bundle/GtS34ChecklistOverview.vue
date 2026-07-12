@@ -312,14 +312,14 @@ function handleNameClick(wpCode: string) {
 
 /* 铁律：表格字体 13px */
 .checklist-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .checklist-table :deep(.el-table__header th) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 .checklist-table :deep(.el-table__body td) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 板块高亮：浅蓝背景 (Req 5.5, 9.5) */
@@ -345,7 +345,7 @@ function handleNameClick(wpCode: string) {
   gap: 14px;
   padding: 8px 4px;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .progress-stat {

@@ -460,7 +460,7 @@ function loadFromHtmlData(data: any): void {
 <style scoped>
 .g7-disclosure-soe {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .audit-objective {

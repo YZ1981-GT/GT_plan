@@ -405,7 +405,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .k1-tab-detail {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色） */
@@ -447,7 +447,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 表格 */
 .detail-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-top: -1px;
 }
 .amount-cell {

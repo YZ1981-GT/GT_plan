@@ -335,17 +335,17 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.k5-tab-adjustment { padding: 12px; font-size: 13px; }
+.k5-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .head-actions { display: flex; gap: 8px; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .adj-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 10px; }
-.entry-count { font-size: 13px; color: #909399; }
-.balance-indicator { margin-left: auto; font-size: 13px; color: #606266; }
-:deep(.el-table) { font-size: 13px; }
+.entry-count { font-size: var(--wp-font-size, 13px); color: #909399; }
+.balance-indicator { margin-left: auto; font-size: var(--wp-font-size, 13px); color: #606266; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.el-table__footer-wrapper) { font-weight: 600; }
-.k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

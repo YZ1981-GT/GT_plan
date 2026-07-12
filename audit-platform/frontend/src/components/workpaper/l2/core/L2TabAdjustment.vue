@@ -341,7 +341,7 @@ function fmtAmount(val: number | null | undefined): string {
 <style scoped>
 .l2-tab-adjustment {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景） ─── */
@@ -351,7 +351,7 @@ function fmtAmount(val: number | null | undefined): string {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -394,7 +394,7 @@ function fmtAmount(val: number | null | undefined): string {
   padding: 10px 14px;
   border-radius: 6px;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   border: 1px solid #ebeef5;
   background: #fafafa;
   flex-wrap: wrap;
@@ -437,11 +437,11 @@ function fmtAmount(val: number | null | undefined): string {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table th .cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -465,7 +465,7 @@ function fmtAmount(val: number | null | undefined): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

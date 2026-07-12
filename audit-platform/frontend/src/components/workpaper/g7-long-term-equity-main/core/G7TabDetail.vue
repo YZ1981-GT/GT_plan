@@ -1054,13 +1054,13 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.g7-detail { padding: 12px; font-size: 13px; }
+.g7-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .segment-bar { margin-bottom: 12px; }
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .compact-num { width: 100%; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; display: inline-block; min-width: 40px; text-align: right; }
 .total-label { font-weight: 600; color: #303133; }

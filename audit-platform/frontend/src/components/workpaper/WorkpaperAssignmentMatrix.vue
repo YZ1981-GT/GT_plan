@@ -420,7 +420,7 @@ function onUnassignedClick(cycle: string) {
 .gt-wp-matrix-member-name {
   font-weight: 600;
   color: var(--gt-color-text-primary);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-wp-matrix-member-role {
   font-size: 11px;
@@ -518,7 +518,7 @@ function onUnassignedClick(cycle: string) {
   background: #fff8e1;
   border-radius: 8px;
   border: 1px solid #ffe082;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   display: flex;
   align-items: center;
   flex-wrap: wrap;

@@ -663,7 +663,7 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
 }
 
 .panel-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin-bottom: 6px;
   font-weight: 500;
@@ -728,7 +728,7 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
 
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   white-space: pre-wrap;
   line-height: 1.6;
@@ -769,7 +769,7 @@ const guidanceContent = `1. CAS 22 金融工具确认与计量中ECL三阶段模
 }
 
 .writeback-item-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #303133;
 }

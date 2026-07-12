@@ -190,7 +190,7 @@ function onRowChange(row: { seq?: number } | undefined) {
 </script>
 
 <style scoped>
-.g8-fv { font-size: 13px; }
+.g8-fv { font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .methodology { flex: 1; border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; }
 .l3-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }

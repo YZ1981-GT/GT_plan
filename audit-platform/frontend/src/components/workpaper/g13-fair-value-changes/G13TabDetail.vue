@@ -250,7 +250,7 @@ function fmt(v: number | null | undefined): string {
 .cross-alert { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .audit-objective { margin-bottom: 8px; }
-.g13-detail { padding: 12px; font-size: 13px; }
+.g13-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g13-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .g13-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .g13-title { margin: 0; font-size: 15px; font-weight: 600; }

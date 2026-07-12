@@ -661,7 +661,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.m6-tab-detail { padding: 12px; font-size: 13px; }
+.m6-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-area {
@@ -680,7 +680,7 @@ onUnmounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1a5276;
   line-height: 1.5;
 }
@@ -701,7 +701,7 @@ onUnmounted(() => {
 
 /* 方法论上下文 */
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* 联动警告 */
 .linkage-alert { margin-bottom: 12px; }
@@ -713,8 +713,8 @@ onUnmounted(() => {
 .action-bar { margin-bottom: 8px; }
 
 /* 表格 */
-.detail-table { font-size: 13px; }
-:deep(.el-table) { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.formula-row) { background: #f0f9ff !important; }
 :deep(.formula-row td) { border-bottom: 1px dashed #409eff; }
 :deep(.category-row) { background: #fafafa !important; font-weight: 600; }
@@ -747,7 +747,7 @@ onUnmounted(() => {
   border-radius: 6px;
   margin-top: 16px;
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .cross-wp-label {
   font-weight: 600;
@@ -762,7 +762,7 @@ onUnmounted(() => {
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 
 /* 编制提示 */
-.m6-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m6-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m6-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }
 .m6-details-tip ul { margin: 8px 0 0; padding-left: 20px; }
 .m6-details-tip li { margin-bottom: 4px; line-height: 1.5; }

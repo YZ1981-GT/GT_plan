@@ -329,7 +329,7 @@ function fmtPercent(val: number | null | undefined): string {
 <style scoped>
 .k6-tab-group-impairment {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 蓝色渐变引导区 */
@@ -349,7 +349,7 @@ function fmtPercent(val: number | null | undefined): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1d3557;
 }
 .step-num {
@@ -441,7 +441,7 @@ function fmtPercent(val: number | null | undefined): string {
 
 /* 表格 */
 .group-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .group-table :deep(.el-table__cell) {
   padding: 6px 0;

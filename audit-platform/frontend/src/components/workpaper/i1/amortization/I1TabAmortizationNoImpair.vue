@@ -344,7 +344,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .i1-tab-amort-no-impair {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .methodology-context {
@@ -405,7 +405,7 @@ function fmtAmt(val: number | null | undefined): string {
   margin-top: 12px;
   background: var(--el-fill-color-light);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .note-card {

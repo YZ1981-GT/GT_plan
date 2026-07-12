@@ -425,13 +425,13 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 
 <style scoped>
 .d3-detail { padding: 16px; }
-.d3-detail :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.d3-detail :deep(.el-table .cell) { font-size: 13px !important; }
+.d3-detail :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.d3-detail :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
 /* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 

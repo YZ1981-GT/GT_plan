@@ -220,12 +220,12 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h5-tab-detail { padding: 16px; font-size: 13px; }
+.h5-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .segment-bar { margin-bottom: 16px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.detail-table { font-size: 13px; }
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .formula-cell { font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .cross-alert { margin-bottom: 12px; }

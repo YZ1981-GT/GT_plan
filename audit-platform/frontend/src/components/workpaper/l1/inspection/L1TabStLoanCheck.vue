@@ -282,7 +282,7 @@ function getResultClass(result: string): string {
 <style scoped>
 .l1-tab-st-loan-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 头部 ─── */
@@ -313,7 +313,7 @@ function getResultClass(result: string): string {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 14px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -324,11 +324,11 @@ function getResultClass(result: string): string {
 
 /* ─── 表格统一13px字体 ─── */
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table th .cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -366,7 +366,7 @@ function getResultClass(result: string): string {
   background: #f5f7fa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .summary-item {
@@ -408,7 +408,7 @@ function getResultClass(result: string): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

@@ -218,7 +218,7 @@ function getSummary({ columns }: { columns: any[] }) {
 </script>
 
 <style scoped>
-.h8-tab-simplified-check { padding: 16px; font-size: 13px; }
+.h8-tab-simplified-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -231,7 +231,7 @@ function getSummary({ columns }: { columns: any[] }) {
 .title-actions { display: flex; gap: 6px; }
 
 .table-card { margin-bottom: 16px; }
-.formula-table { font-size: 13px; }
+.formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #f0fdf4; }
 .formula-table :deep(.noncompliant-row) { background: #fef2f2 !important; }
 

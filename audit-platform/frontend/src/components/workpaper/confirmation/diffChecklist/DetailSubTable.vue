@@ -213,7 +213,7 @@ function formatAmount(val?: number): string {
 
 .detail-sub-table__title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .detail-sub-table__total {

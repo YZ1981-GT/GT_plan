@@ -113,7 +113,7 @@ watch(() => props.wpId, (id) => {
 }
 .gt-wp-prep__title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-primary, #4b2d77);
 }
 .gt-wp-prep__summary {

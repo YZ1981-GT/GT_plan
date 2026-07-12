@@ -382,7 +382,7 @@ function fmtNum(v: unknown): string {
 <style scoped>
 .g3-adjudication {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -423,7 +423,7 @@ function fmtNum(v: unknown): string {
   gap: 16px;
   margin: 16px 0;
   align-items: center;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .tb-label {

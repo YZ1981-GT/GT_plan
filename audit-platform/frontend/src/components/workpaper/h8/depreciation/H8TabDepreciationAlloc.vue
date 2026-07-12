@@ -182,7 +182,7 @@ function getAllocSummary({ columns }: { columns: any[] }) {
 </script>
 
 <style scoped>
-.h8-tab-depreciation-alloc { padding: 16px; font-size: 13px; }
+.h8-tab-depreciation-alloc { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -199,7 +199,7 @@ function getAllocSummary({ columns }: { columns: any[] }) {
 .info-label { font-size: 12px; color: var(--el-text-color-secondary); }
 .info-value { font-size: 15px; font-weight: 700; color: var(--el-color-primary); }
 
-.formula-table { font-size: 13px; }
+.formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 

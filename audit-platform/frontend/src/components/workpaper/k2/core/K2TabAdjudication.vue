@@ -375,7 +375,7 @@ function getRowClassName({ row }: { row: K2AdjRow }): string {
 <style scoped>
 .k2-tab-adjudication {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
@@ -397,7 +397,7 @@ function getRowClassName({ row }: { row: K2AdjRow }): string {
   padding: 8px 12px;
   border-radius: 4px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 .reconciliation-banner.balanced {
@@ -432,7 +432,7 @@ function getRowClassName({ row }: { row: K2AdjRow }): string {
 
 /* 审定表 */
 .adj-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .amount-cell {
   text-align: right;

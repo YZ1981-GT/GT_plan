@@ -271,7 +271,7 @@ function _restoreEntries(): void {
 </script>
 
 <style scoped>
-.m7-tab-adjustment { padding: 12px; font-size: 13px; }
+.m7-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
@@ -285,7 +285,7 @@ function _restoreEntries(): void {
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 .balance-status {
   display: flex; align-items: center; gap: 16px;
@@ -294,7 +294,7 @@ function _restoreEntries(): void {
 .balance-status.balanced { background: #f0f9eb; }
 .balance-status.unbalanced { background: #fef0f0; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 .action-bar { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
 .balance-warning { color: #f56c6c; font-size: 12px; }
@@ -307,7 +307,7 @@ function _restoreEntries(): void {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .m7-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }

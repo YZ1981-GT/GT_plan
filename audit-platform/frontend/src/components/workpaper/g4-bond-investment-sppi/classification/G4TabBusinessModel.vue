@@ -287,7 +287,7 @@ function getChipStyle(conclusion: BusinessModelResult): ConclusionChipStyle {
 
 <style scoped>
 .g4-tab-business-model {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 8px 0;
 }
 
@@ -317,7 +317,7 @@ function getChipStyle(conclusion: BusinessModelResult): ConclusionChipStyle {
   padding: 12px 16px;
   margin-bottom: 16px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #856404;
 }
@@ -359,7 +359,7 @@ function getChipStyle(conclusion: BusinessModelResult): ConclusionChipStyle {
 
 .question-text {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 
@@ -378,7 +378,7 @@ function getChipStyle(conclusion: BusinessModelResult): ConclusionChipStyle {
 
 .field-label {
   display: inline-block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   margin-bottom: 6px;

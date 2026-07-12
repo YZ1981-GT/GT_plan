@@ -418,15 +418,15 @@ onMounted(loadData)
 </script>
 
 <style scoped>
-.gt-ch4 { font-size: 13px; display: flex; flex-direction: column; gap: 12px; }
+.gt-ch4 { font-size: var(--wp-font-size, 13px); display: flex; flex-direction: column; gap: 12px; }
 .gt-ch4__card { margin-top: 4px; }
 .gt-ch4__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
 .gt-ch4__card-actions { display: flex; align-items: center; gap: 8px; }
-.gt-ch4__card-actions :deep(.el-switch__label) { font-size: 13px; }
-.gt-ch4__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
+.gt-ch4__card-actions :deep(.el-switch__label) { font-size: var(--wp-font-size, 13px); }
+.gt-ch4__card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #6b21a8; }
 .gt-ch4__sub-items { display: flex; flex-direction: column; gap: 12px; }
 .gt-ch4__sub-item { display: flex; flex-direction: column; gap: 4px; }
-.gt-ch4__sub-label { font-size: 13px; font-weight: 500; color: #606266; }
+.gt-ch4__sub-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; }
 .gt-ch4__table { font-size: 12px; }
 .gt-ch4__table :deep(.el-table__cell) { vertical-align: top; }
 

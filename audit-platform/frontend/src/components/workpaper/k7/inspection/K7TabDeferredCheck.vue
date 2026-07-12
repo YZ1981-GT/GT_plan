@@ -186,20 +186,20 @@ function checkRowClass({ row }: { row: any }): string {
 </script>
 
 <style scoped>
-.k7-tab-check { padding: 12px; font-size: 13px; }
+.k7-tab-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .noncompliant-alert { margin-bottom: 12px; }
 .noncompliant-list { margin: 4px 0 0; padding-left: 16px; font-size: 12px; }
-.progress-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: 13px; color: #606266; }
+.progress-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .check-point { font-weight: 600; color: #303133; }
 .check-desc { font-size: 12px; color: #606266; line-height: 1.5; }
 :deep(.noncompliant-row) { background-color: #fef0f0 !important; }
 :deep(.compliant-row) { background-color: #f0f9eb !important; }
-:deep(.el-table) { font-size: 13px; }
-.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k7-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k7-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

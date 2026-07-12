@@ -970,7 +970,7 @@ defineExpose({
 }
 
 .detail-section__header {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   margin-bottom: 8px;
   padding: 4px 8px;
@@ -1028,7 +1028,7 @@ defineExpose({
 }
 
 .balance-card__value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 

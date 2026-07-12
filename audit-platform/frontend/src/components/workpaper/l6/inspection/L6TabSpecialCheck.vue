@@ -564,7 +564,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.l6-tab-special-check { padding: 12px; font-size: 13px; }
+.l6-tab-special-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* Header */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -574,7 +574,7 @@ onMounted(() => {
 
 /* 方法论上下文 */
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* 检查表卡片 */
 .check-table-card { margin-bottom: 16px; }
@@ -615,10 +615,10 @@ onMounted(() => {
 .summary-value.text-danger { color: #f56c6c; }
 
 /* 表格字体统一13px */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 /* 编制提示 */
-.l6-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.l6-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l6-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l6-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

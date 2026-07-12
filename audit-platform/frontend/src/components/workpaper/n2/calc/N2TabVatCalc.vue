@@ -392,7 +392,7 @@ onMounted(async () => {
 <style scoped>
 .n2-tab-vat-calc {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-header {
@@ -424,7 +424,7 @@ onMounted(async () => {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -452,7 +452,7 @@ onMounted(async () => {
 }
 
 .toolbar-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   white-space: nowrap;
 }
@@ -522,7 +522,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

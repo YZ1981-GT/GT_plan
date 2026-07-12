@@ -395,7 +395,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k6-tab-adjudication { padding: 12px; font-size: 13px; }
+.k6-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── 方法论上下文 ─── */
 .methodology-context {
@@ -404,7 +404,7 @@ function fmtAmt(val: number | null | undefined): string {
   padding: 10px 14px;
   margin-bottom: 16px;
   border-radius: 0 6px 6px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   line-height: 1.6;
 }
@@ -432,12 +432,12 @@ function fmtAmt(val: number | null | undefined): string {
 }
 
 /* ─── 表格样式 ─── */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.subtotal-row) { font-weight: 700; background-color: #fafafa !important; }
 :deep(.reconciliation-error-row) { color: #f56c6c !important; }
 :deep(.formula-col) { background-color: #fafff8; }
 .adj-input { width: 100%; }
-.adj-input :deep(.el-input__inner) { text-align: right; font-size: 13px; }
+.adj-input :deep(.el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
 .rate-warning { color: #e6a23c; font-weight: 500; }
 
 /* ─── TB回写 ─── */
@@ -471,7 +471,7 @@ function fmtAmt(val: number | null | undefined): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 .k6-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }

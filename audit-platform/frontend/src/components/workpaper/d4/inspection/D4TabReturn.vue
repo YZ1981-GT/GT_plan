@@ -710,7 +710,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
 </template>
 
 <style scoped>
-.d4-return { padding: 16px 20px; font-size: 13px; }
+.d4-return { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .stats-dashboard { display: flex; gap: 12px; margin-bottom: 20px; padding: 14px 18px; background: linear-gradient(135deg, #f8f9fe 0%, #f0f4ff 100%); border-radius: 10px; border: 1px solid #e4e7ed; }
@@ -722,7 +722,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
 .stat-unit { font-size: 12px; font-weight: 400; color: #909399; margin-left: 2px; }
 .stat-label { font-size: 12px; color: #909399; margin-top: 2px; }
 .methodology-collapse { margin-bottom: 14px; border-radius: 6px; border: 1px solid #faecd8; border-left: 3px solid #e6a23c; background: #fffbf0; }
-.methodology-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #b88230; }
+.methodology-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #b88230; }
 .methodology-body { padding: 8px 14px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 .methodology-body p { margin: 0 0 6px; }
 .guide-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px; background: #f0f9eb; border-radius: 6px; border: 1px solid #e1f3d8; }
@@ -738,13 +738,13 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
 .assessment-sub { margin-bottom: 12px; }
 .sub-label { display: block; font-size: 12px; color: #606266; font-weight: 500; margin-bottom: 4px; }
 .category-label { font-weight: 500; color: #303133; }
-.summary-table { font-size: 13px; }
+.summary-table { font-size: var(--wp-font-size, 13px); }
 .summary-table :deep(.el-table__cell) { padding: 6px 0; }
 .summary-table :deep(.col-current .el-table__cell) { background-color: #f0f5ff !important; }
 .summary-table :deep(.col-prior .el-table__cell) { background-color: #f0faf0 !important; }
-.provision-table { font-size: 13px; }
+.provision-table { font-size: var(--wp-font-size, 13px); }
 .provision-table :deep(.el-table__cell) { padding: 6px 0; }
-.return-check-table { font-size: 13px; }
+.return-check-table { font-size: var(--wp-font-size, 13px); }
 .return-check-table :deep(.el-table__cell) { padding: 6px 0; }
 .return-check-table :deep(.col-voucher .el-table__cell) { background-color: #f0f5ff !important; }
 .return-check-table :deep(.col-return .el-table__cell) { background-color: #f0faf0 !important; }
@@ -758,7 +758,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
 .opinion-body { display: flex; flex-direction: column; gap: 14px; }
 .opinion-field label { display: block; font-size: 12px; color: #909399; margin-bottom: 4px; }
 .tips-collapse { margin-bottom: 16px; border-radius: 6px; border: 1px solid #fde2e2; border-left: 3px solid #f56c6c; }
-.tips-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #f56c6c; }
+.tips-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #f56c6c; }
 .tips-list { margin: 8px 14px 12px; padding-left: 18px; font-size: 12px; color: #606266; line-height: 2; }
 .oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
 .dropdown-section-label { font-size: 12px !important; color: #909399 !important; font-weight: 500; }

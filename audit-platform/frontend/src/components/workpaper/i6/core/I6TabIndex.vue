@@ -205,10 +205,10 @@ function handleNavigate(row: SheetEntry) {
 </script>
 
 <style scoped>
-.i6-tab-index { padding: 16px; font-size: 13px; }
+.i6-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 .stats-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
 .stat-item { display: flex; flex-direction: column; align-items: center; padding: 12px 8px; border-radius: 8px; background: #f5f7fa; }
@@ -222,7 +222,7 @@ function handleNavigate(row: SheetEntry) {
 .completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
 .completion-bar { margin-bottom: 12px; }
 .index-card { margin-bottom: 16px; }
-.index-table { font-size: 13px; cursor: pointer; }
+.index-table { font-size: var(--wp-font-size, 13px); cursor: pointer; }
 .sheet-link { color: var(--el-color-primary); }
 .sheet-link:hover { text-decoration: underline; }
 .cross-ref-chip { margin-left: 6px; }

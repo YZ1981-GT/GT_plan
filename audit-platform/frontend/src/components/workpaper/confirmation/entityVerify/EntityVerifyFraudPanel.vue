@@ -114,7 +114,7 @@ function getFlagLabel(flagId: string): string {
   gap: 6px;
   padding: 8px 0;
   color: var(--el-color-success);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .entity-verify-fraud-panel__empty-icon {

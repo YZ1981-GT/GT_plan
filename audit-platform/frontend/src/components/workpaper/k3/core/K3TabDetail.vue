@@ -506,7 +506,7 @@ function fmtPercent(val: number): string {
 <style scoped>
 .k3-tab-detail {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
@@ -545,7 +545,7 @@ function fmtPercent(val: number): string {
 
 /* 表格 */
 .detail-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .amount-cell {
   font-variant-numeric: tabular-nums;

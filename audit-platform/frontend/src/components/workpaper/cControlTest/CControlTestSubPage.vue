@@ -1003,7 +1003,7 @@ async function handleAiGenerate(field: string): Promise<void> {
 
 <style scoped>
 .cct-subpage {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-view-header {
@@ -1041,7 +1041,7 @@ async function handleAiGenerate(field: string): Promise<void> {
 }
 
 .cct-section-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #374151;
 }
@@ -1098,11 +1098,11 @@ async function handleAiGenerate(field: string): Promise<void> {
 
 /* ─── Sample Table 13px 铁律 ─── */
 .cct-sample-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-sample-table :deep(.el-table__body td) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-sample-table :deep(.el-table__header th) {
@@ -1127,12 +1127,12 @@ async function handleAiGenerate(field: string): Promise<void> {
   text-align: center;
   padding: 24px;
   color: #9ca3af;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Deviation Summary ─── */
 .cct-deviation-summary {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-stats-row {
@@ -1241,7 +1241,7 @@ async function handleAiGenerate(field: string): Promise<void> {
 
 .cct-compilation-tips summary {
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #6b7280;
   background: #f9fafb;

@@ -339,7 +339,7 @@ function getSummary({ columns, data }: any) {
 </script>
 
 <style scoped>
-.d4-invoice-compare { padding: 16px 20px; font-size: 13px; }
+.d4-invoice-compare { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; align-items: center; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -362,7 +362,7 @@ function getSummary({ columns, data }: any) {
 .guide-chip:hover { background: #f0f9eb; }
 .guide-arrow { color: #a8abb2; font-size: 12px; }
 
-.invoice-table { font-size: 13px; margin-bottom: 24px; }
+.invoice-table { font-size: var(--wp-font-size, 13px); margin-bottom: 24px; }
 .invoice-table :deep(.el-table__cell) { padding: 5px 4px; }
 .invoice-table :deep(.col-revenue .el-table__cell) { background-color: #f0faf0 !important; }
 .invoice-table :deep(.col-invoice .el-table__cell) { background-color: #f0f5ff !important; }
@@ -380,7 +380,7 @@ function getSummary({ columns, data }: any) {
 .opinion-field label { display: block; font-size: 12px; color: #909399; margin-bottom: 4px; font-weight: 500; }
 
 .tips-collapse { margin-bottom: 16px; border-radius: 6px; border: 1px solid #fde2e2; border-left: 3px solid #f56c6c; }
-.tips-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #f56c6c; }
+.tips-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #f56c6c; }
 .tips-list { margin: 8px 14px 12px; padding-left: 18px; font-size: 12px; color: #606266; line-height: 2; }
 
 .oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }

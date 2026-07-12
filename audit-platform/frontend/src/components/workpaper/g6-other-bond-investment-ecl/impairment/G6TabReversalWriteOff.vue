@@ -471,7 +471,7 @@ defineExpose({
 <style scoped>
 .g6-reversal-writeoff {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文 */
@@ -514,7 +514,7 @@ defineExpose({
 
 /* 表格 */
 .reversal-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .compact-num {

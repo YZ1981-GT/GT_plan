@@ -258,7 +258,7 @@ function fmt(n: number) {
 </script>
 
 <style scoped>
-.g9-detail { font-size: 13px; }
+.g9-detail { font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .subtotals { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; color: #606266; }

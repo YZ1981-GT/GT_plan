@@ -453,7 +453,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m5-tab-accrual-test { padding: 12px; font-size: 13px; }
+.m5-tab-accrual-test { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
@@ -461,7 +461,7 @@ onMounted(async () => {
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* 警告提示 */
 .m6-warning { margin-bottom: 12px; }
@@ -494,13 +494,13 @@ onMounted(async () => {
 .audit-note-card { margin-top: 16px; }
 
 /* 编制提示 */
-.m5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m5-details-tip summary { cursor: pointer; font-weight: 600; color: #303133; }
 .m5-details-tip ul { margin: 8px 0 0; padding-left: 20px; }
 .m5-details-tip li { margin-bottom: 4px; line-height: 1.5; }
 
 /* 表格 */
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.accrual-main-table .el-table__row:last-child) { background: #f0f9eb !important; font-weight: 600; }
 :deep(.accrual-main-table .el-table__row:last-child td) { border-top: 2px solid #67c23a; }
 </style>

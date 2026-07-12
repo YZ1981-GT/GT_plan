@@ -216,10 +216,10 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-recoverable { padding: 16px; font-size: 13px; }
+.h2-tab-recoverable { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
-  padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 13px;
+  padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);
 }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
@@ -228,7 +228,7 @@ function fmtAmt(val: number | null | undefined): string {
 .assumption-item { display: flex; align-items: center; gap: 8px; }
 .assumption-label { font-weight: 500; min-width: 110px; }
 .unit { color: var(--el-text-color-secondary); }
-.cf-table { font-size: 13px; }
+.cf-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
@@ -238,7 +238,7 @@ function fmtAmt(val: number | null | undefined): string {
 .result-item.total-item { padding: 12px; background: var(--el-fill-color-light); border-radius: 4px; font-size: 14px; }
 .result-label { font-weight: 500; min-width: 200px; }
 .result-value { font-weight: 600; }
-.sensitivity-table { font-size: 13px; }
+.sensitivity-table { font-size: var(--wp-font-size, 13px); }
 .sensitivity-note { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

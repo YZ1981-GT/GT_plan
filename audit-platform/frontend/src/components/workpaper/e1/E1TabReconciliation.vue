@@ -22,6 +22,8 @@ import {
 } from '../composables/useE1Reconciliation'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -37,10 +39,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -269,7 +268,7 @@ const {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -338,7 +337,7 @@ const {
 }
 .side-title {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   margin-bottom: 8px;
   padding-bottom: 6px;
@@ -351,7 +350,7 @@ const {
   margin-bottom: 8px;
 }
 .side-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   min-width: 130px;
 }
@@ -397,7 +396,7 @@ const {
 }
 .reason-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   display: block;
   margin-bottom: 4px;

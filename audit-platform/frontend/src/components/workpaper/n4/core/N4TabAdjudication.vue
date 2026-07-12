@@ -481,11 +481,11 @@ function yoyClass(val: number | null | undefined): string {
 
 <style scoped>
 .audit-objective { margin-bottom: 16px; }
-.audit-objective :deep(.el-alert__description) { font-size: 13px; line-height: 1.6; }
-.n4-adjudication { padding: 12px; font-size: 13px; }
+.audit-objective :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
+.n4-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* ─── 方法论上下文 ─── */
-.methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: 13px; color: #92400e; line-height: 1.7; }
+.methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #92400e; line-height: 1.7; }
 .methodology-context p { margin: 0; }
 
 /* ─── Section header ─── */
@@ -499,12 +499,12 @@ function yoyClass(val: number | null | undefined): string {
 
 /* ─── 主表格 ─── */
 .adjudication-table { margin-bottom: 16px; }
-:deep(.adjudication-table) { font-size: 13px; }
+:deep(.adjudication-table) { font-size: var(--wp-font-size, 13px); }
 .tax-type-cell { font-weight: 500; color: #303133; }
 .total-row { font-weight: 700; color: #409eff; }
 .cell-input { width: 100%; }
-:deep(.cell-input .el-input__inner) { text-align: right; font-size: 13px; }
-.cell-value { font-size: 13px; color: #606266; }
+:deep(.cell-input .el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
+.cell-value { font-size: var(--wp-font-size, 13px); color: #606266; }
 .normal-header { font-weight: 600; }
 .formula-header { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; font-weight: 500; color: #303133; padding-bottom: 1px; }
@@ -519,7 +519,7 @@ function yoyClass(val: number | null | undefined): string {
 
 /* ─── 交叉验证 ─── */
 .cross-validation-section { margin-bottom: 16px; padding: 14px 16px; background: #fafbfc; border: 1px solid #ebeef5; border-radius: 8px; }
-.cv-title { font-size: 13px; font-weight: 500; color: #303133; margin-bottom: 10px; }
+.cv-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; margin-bottom: 10px; }
 .cv-indicators { display: flex; flex-wrap: wrap; gap: 10px; }
 .cv-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 6px; font-size: 12px; }
 .cv-match { background: #e8f5e9; border: 1px solid #a5d6a7; }
@@ -532,9 +532,9 @@ function yoyClass(val: number | null | undefined): string {
 /* ─── N2计提对应 ─── */
 .n2-comparison-section { margin-bottom: 16px; padding: 14px 16px; background: #fafbfc; border: 1px solid #ebeef5; border-radius: 8px; }
 .n2-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.n2-title { font-size: 13px; font-weight: 500; color: #303133; }
+.n2-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 .n2-table { margin-bottom: 8px; }
-:deep(.n2-table) { font-size: 13px; }
+:deep(.n2-table) { font-size: var(--wp-font-size, 13px); }
 .n2-empty-hint { text-align: center; padding: 6px 0; }
 .diff-err { color: #f56c6c; font-weight: 600; }
 .diff-ok { color: #67c23a; }
@@ -548,10 +548,10 @@ function yoyClass(val: number | null | undefined): string {
 .notes-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 .notes-field { margin-bottom: 12px; }
 .notes-field:last-child { margin-bottom: 0; }
-.field-label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.field-label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 
 /* ─── 编制提示 ─── */
-.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .n4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
 .n4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

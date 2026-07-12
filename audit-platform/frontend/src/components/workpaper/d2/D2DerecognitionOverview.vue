@@ -6,14 +6,15 @@
  * 一屏看清全部保理合同的主要信息、9 步判断状态与终止确认结论。
  * 每份合同独立走 9 步判断向导（附件OCR+知识库+AI辅助+人工确认+回填），判断按 rowId 分别存储。
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import D2DerecognitionWizard from './D2DerecognitionWizard.vue'
-import { useD2SaveInject } from '../composables/useD2SaveInject'
 import {
   STEP_DEFS, parseJudgmentStore, summarizeContract,
   type ContractJudgment, type StepJudgment,
 } from '../composables/useD2Derecognition'
 import type { FactoringRow } from '../composables/useD2PledgeCheck'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   factoringRows: FactoringRow[]
@@ -25,11 +26,7 @@ const props = defineProps<{
 
 const STORAGE_KEY = 'D2-derecognition'
 
-const { saveItems } = useD2SaveInject()
-
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => (v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const viewMode = ref<'card' | 'matrix'>('card')
 const store = ref<Record<string, ContractJudgment>>({})
@@ -53,12 +50,21 @@ function persistStore(): void {
   const remark = JSON.stringify({ byContract: store.value, updatedAt: new Date().toISOString() })
   const item = { item_id: STORAGE_KEY, conclusion: null, remark }
   props.allResponses.set(STORAGE_KEY, item)
-  void saveItems([item])
+  try {
+    window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
+  } catch { /* silent */ }
+}
+
+function onSaveItems(e: Event): void {
+  const items = (e as CustomEvent).detail?.items || []
+  if (Array.isArray(items) && items.some((i: any) => i?.item_id === STORAGE_KEY)) loadStore()
 }
 
 onMounted(() => {
   loadStore()
+  window.addEventListener('d2:save-items', onSaveItems)
 })
+onBeforeUnmount(() => window.removeEventListener('d2:save-items', onSaveItems))
 
 // ─── 展示辅助 ────────────────────────────────────────────────────────────────
 const STEP_META = STEP_DEFS.map((d, i) => ({ stepId: d.stepId, short: `S${i + 1}`, title: d.title, note: d.note }))

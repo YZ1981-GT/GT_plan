@@ -255,7 +255,7 @@
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <ul>
-        <li>逐笔检查营业外支出6个维度：���实性/依据合规/审批完整/分类正确性/期间归属/税前扣除性</li>
+        <li>逐笔检查营业外支出6个维度：真实性/依据合规/审批完整/分类正确性/期间归属/税前扣除性</li>
         <li><strong>分类正确性</strong>：与日常活动<strong>无关</strong>的损失→6711营业外支出；与日常相关→6602管理费用/6601销售费用</li>
         <li><strong>税前扣除性</strong>：捐赠≤12%利润可扣/罚款滞纳金不可扣/资产损失需备案后扣除</li>
         <li>典型营业外支出：非流动资产处置损失/捐赠支出/罚款滞纳金/债务重组损失/资产盘亏损失</li>
@@ -470,7 +470,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 </script>
 
 <style scoped>
-.k13-tab-check { padding: 12px; font-size: 13px; }
+.k13-tab-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -482,7 +482,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b;
   padding: 10px 14px; margin-bottom: 12px;
-  border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6;
+  border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6;
 }
 .methodology-context p { margin: 0; }
 
@@ -517,7 +517,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 
 :deep(.non-compliance-row) { background-color: #fef2f2 !important; }
 :deep(.non-compliance-row:hover > td) { background-color: #fee2e2 !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 .compile-hint {
   margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary);

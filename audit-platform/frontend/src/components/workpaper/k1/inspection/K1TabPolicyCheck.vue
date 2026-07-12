@@ -174,7 +174,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
-.k1-tab-policy-check { padding: 16px; font-size: 13px; }
+.k1-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid var(--el-color-warning);

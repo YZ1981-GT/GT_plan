@@ -465,7 +465,7 @@ watch(
   background-color: var(--el-fill-color-lighter, #f5f7fa);
   border-radius: 4px;
   color: var(--el-text-color-placeholder, #a8abb2);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-style: italic;
 }
 
@@ -476,7 +476,7 @@ watch(
   background-color: var(--el-fill-color-blank, #ffffff);
   border: 1px solid var(--el-border-color-lighter, #e4e7ed);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: var(--el-text-color-primary);
 }

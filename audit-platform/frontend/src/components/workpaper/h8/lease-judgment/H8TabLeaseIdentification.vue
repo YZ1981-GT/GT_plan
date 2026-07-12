@@ -177,7 +177,7 @@ function handleUpdateNote(recordId: string, note: string) {
 </script>
 
 <style scoped>
-.h8-tab-lease-identification { padding: 16px; font-size: 13px; }
+.h8-tab-lease-identification { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -206,7 +206,7 @@ function handleUpdateNote(recordId: string, note: string) {
 .judgment-item { border: 1px solid var(--el-border-color-lighter); border-radius: 6px; padding: 10px 12px; }
 .item-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .category-tag { flex-shrink: 0; }
-.item-label { font-size: 13px; }
+.item-label { font-size: var(--wp-font-size, 13px); }
 .item-body { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .item-explanation { flex: 1; min-width: 200px; }
 .explanation-text { font-size: 12px; color: var(--el-text-color-secondary); }

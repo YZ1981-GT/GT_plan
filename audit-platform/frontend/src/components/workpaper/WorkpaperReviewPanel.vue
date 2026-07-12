@@ -184,12 +184,12 @@ onMounted(fetchPanel)
 .auto-result { color: var(--gt-purple, #4b2d77); font-size: 12px; }
 .auto-result-na { color: var(--el-text-color-placeholder); }
 .unlinked-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--el-border-color-lighter); }
-.unlinked-title { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.conv-section-title { font-size: 13px; font-weight: 600; color: var(--gt-color-text-secondary, #666); margin: 0 0 10px; }
-.conv-empty { color: var(--el-text-color-placeholder); font-size: 13px; padding: 8px 0; }
+.unlinked-title { font-size: var(--wp-font-size, 13px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-section-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: var(--gt-color-text-secondary, #666); margin: 0 0 10px; }
+.conv-empty { color: var(--el-text-color-placeholder); font-size: var(--wp-font-size, 13px); padding: 8px 0; }
 .conv-card { border: 1px solid var(--el-border-color-lighter); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
 .conv-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
-.conv-card-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conv-card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conv-messages { background: var(--gt-purple-light, #f4f0fa); border-radius: 6px; padding: 8px 10px; margin: 6px 0; }
 .conv-msg { font-size: 12px; color: var(--gt-color-text-secondary, #555); padding: 2px 0; }
 .conv-msg-content { line-height: 1.5; }

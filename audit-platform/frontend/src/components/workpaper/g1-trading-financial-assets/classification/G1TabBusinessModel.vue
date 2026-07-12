@@ -191,9 +191,9 @@ watch(conclusion, (v) => {
 </script>
 
 <style scoped>
-.g1-biz-model { padding: 12px; font-size: 13px; }
-.g1-biz-model :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.g1-biz-model :deep(.el-table .cell) { font-size: 13px; }
+.g1-biz-model { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.g1-biz-model :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.g1-biz-model :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

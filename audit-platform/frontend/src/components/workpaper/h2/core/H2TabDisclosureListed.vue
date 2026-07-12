@@ -177,24 +177,24 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-disclosure-listed { padding: 16px; font-size: 13px; }
+.h2-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .disclosure-card { margin-bottom: 16px; }
 .cross-sheet-card { background: #f0f7ff; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.disc-table { font-size: 13px; }
+.disc-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
-.total-line { padding: 8px 0; font-size: 13px; text-align: right; }
-.section-total-line { padding: 8px 0; font-size: 13px; text-align: right; }
+.total-line { padding: 8px 0; font-size: var(--wp-font-size, 13px); text-align: right; }
+.section-total-line { padding: 8px 0; font-size: var(--wp-font-size, 13px); text-align: right; }
 .add-row-bar { margin-top: 8px; }
 .auto-fields { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 12px; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
-.auto-field { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.auto-field { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .af-label { color: var(--el-text-color-secondary); }
 .af-value { font-weight: 600; }
 .note-text-block { margin-top: 12px; }
-.note-label { font-size: 13px; color: var(--el-text-color-secondary); margin-bottom: 6px; }
+.note-label { font-size: var(--wp-font-size, 13px); color: var(--el-text-color-secondary); margin-bottom: 6px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }
 .edit-tips ul { padding-left: 20px; margin-top: 8px; }

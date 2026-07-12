@@ -1015,7 +1015,7 @@ defineExpose({
 
 <style scoped>
 .c22-control-sheet {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 4px 2px 24px;
 }
 
@@ -1036,7 +1036,7 @@ defineExpose({
   color: #7d5b1e;
 }
 .c22cs-methodology-context__icon { font-size: 15px; }
-.c22cs-methodology-context__title { font-size: 13px; }
+.c22cs-methodology-context__title { font-size: var(--wp-font-size, 13px); }
 .c22cs-methodology-context__body {
   padding: 2px 12px 10px;
   color: #7d5b1e;
@@ -1089,7 +1089,7 @@ defineExpose({
 }
 .c22cs-card-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-text, #303133);
 }
 
@@ -1162,7 +1162,7 @@ defineExpose({
   padding: 10px 14px;
   border-bottom: 1px solid var(--gt-color-border-light, #ebeef5);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c22cs-ai-panel__body {
   flex: 1;
@@ -1171,7 +1171,7 @@ defineExpose({
 }
 .c22cs-ai-panel__text {
   white-space: pre-wrap;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   margin: 0;
   font-family: inherit;
@@ -1199,7 +1199,7 @@ defineExpose({
   margin-bottom: 8px;
 }
 .c22cs-sample-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 附件上传区域（Task 8.2） */

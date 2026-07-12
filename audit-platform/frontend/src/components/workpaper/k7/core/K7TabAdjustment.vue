@@ -386,16 +386,16 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 </script>
 
 <style scoped>
-.k7-tab-adjustment { padding: 12px; font-size: 13px; }
+.k7-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .k7-adj-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 .entry-count { font-size: 12px; color: #909399; }
 
 /* 合计行 */
-.k7-adj-footer { display: flex; align-items: center; gap: 20px; margin-top: 10px; padding: 10px 14px; background: #f5f7fa; border-radius: 6px; font-size: 13px; }
+.k7-adj-footer { display: flex; align-items: center; gap: 20px; margin-top: 10px; padding: 10px 14px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .k7-adj-footer.balance-fail { background: #fef0f0; border: 1px solid #fbc4c4; }
 .footer-label { font-weight: 600; color: #303133; }
 .footer-debit { color: #606266; }
@@ -403,8 +403,8 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 .footer-status.ok { color: #67c23a; font-weight: 600; }
 .footer-status.err { color: #f56c6c; font-weight: 600; }
 :deep(.rje-row) { background-color: #fdf6ec !important; }
-:deep(.el-table) { font-size: 13px; }
-.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.k7-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k7-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k7-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 .k7-guide-content p { margin: 4px 0; line-height: 1.7; }

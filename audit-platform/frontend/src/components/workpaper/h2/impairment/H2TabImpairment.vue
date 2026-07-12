@@ -215,18 +215,18 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-impairment { padding: 16px; font-size: 13px; }
+.h2-tab-impairment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.sign-table { font-size: 13px; }
-.calc-table { font-size: 13px; }
+.sign-table { font-size: var(--wp-font-size, 13px); }
+.calc-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
 .sign-conclusion { margin-top: 12px; text-align: center; }
-.summary-line { padding: 12px 0; font-size: 13px; border-top: 1px solid var(--el-border-color-lighter); margin-top: 12px; }
+.summary-line { padding: 12px 0; font-size: var(--wp-font-size, 13px); border-top: 1px solid var(--el-border-color-lighter); margin-top: 12px; }
 .add-row-bar { margin-top: 12px; }
 .audit-note-card { margin-bottom: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

@@ -612,7 +612,7 @@ function rowClassName({ row }: { row: any }) {
 
 <style scoped>
 .c23-sample-sheet {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .methodology-context {
@@ -636,7 +636,7 @@ function rowClassName({ row }: { row: any }) {
 
 .methodology-context p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -659,7 +659,7 @@ function rowClassName({ row }: { row: any }) {
 }
 
 .formula-cell {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #909399;
   border-bottom: 1px dashed #c0c4cc;
   cursor: help;
@@ -667,16 +667,16 @@ function rowClassName({ row }: { row: any }) {
 }
 
 .c23-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c23-table :deep(.el-table__header th) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   background: #f5f7fa;
 }
 
 .c23-table :deep(.el-table__body td) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c23-table :deep(.deviation-row) {
@@ -696,7 +696,7 @@ function rowClassName({ row }: { row: any }) {
 }
 
 /* 表格精简模式 */
-.cell-text { font-size: 13px; color: #303133; }
+.cell-text { font-size: var(--wp-font-size, 13px); color: #303133; }
 .cell-empty { color: #c0c4cc; }
 .attach-flag { font-size: 14px; }
 .attach-empty { color: #c0c4cc; }

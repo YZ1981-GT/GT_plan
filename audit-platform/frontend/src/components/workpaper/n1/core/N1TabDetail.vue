@@ -507,7 +507,7 @@ function handleReview() {
 <style scoped>
 .n1-tab-detail {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 双模式切换条 ─── */
@@ -552,7 +552,7 @@ function handleReview() {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -632,11 +632,11 @@ function handleReview() {
 
 /* ─── 表格统一 ─── */
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table th .cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -650,7 +650,7 @@ function handleReview() {
   border: 1px solid #d9ecff;
   border-radius: 6px;
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .totals-label {
@@ -689,7 +689,7 @@ function handleReview() {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

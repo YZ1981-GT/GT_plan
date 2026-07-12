@@ -2402,7 +2402,7 @@ defineExpose({
 <style scoped>
 .c1-entity-control {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c1-loading {
@@ -2423,7 +2423,7 @@ defineExpose({
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1d4ed8;
   margin-bottom: 10px;
 }
@@ -2464,7 +2464,7 @@ defineExpose({
 
 .c1-guide-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1e293b;
 }
 
@@ -2513,7 +2513,7 @@ defineExpose({
 
 .c1-sec-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c1-sec-applicable {
@@ -2591,7 +2591,7 @@ defineExpose({
 
 .c1-card-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c1-card-actions {
@@ -2616,7 +2616,7 @@ defineExpose({
 .c1-grid-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c1-grid-table th,
@@ -2730,7 +2730,7 @@ defineExpose({
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed #ebeef5;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .c1-ref-label {
@@ -2779,7 +2779,7 @@ defineExpose({
 
 .c1-overall-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #4b2d77;
 }
 
@@ -2824,7 +2824,7 @@ defineExpose({
   padding: 8px 12px;
   background: #dbeafe;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1e40af;
 }
 .c1-step-example-body {
@@ -2855,7 +2855,7 @@ defineExpose({
 }
 .c1-subitem-head {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   margin-bottom: 8px;
 }
@@ -2871,7 +2871,7 @@ defineExpose({
 .c1-subitem-row .el-checkbox__label {
   white-space: normal;
   word-break: break-all;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 步骤行子项计数标签 ─── */
@@ -2919,7 +2919,7 @@ defineExpose({
 .c1-edit-hint-summary {
   padding: 8px 12px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   cursor: pointer;
   background: #fef3c7;
@@ -2958,7 +2958,7 @@ defineExpose({
 }
 .c1-ex-val {
   color: #1f2937;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .c1-ex-desc {
   margin-top: 4px;
@@ -3017,7 +3017,7 @@ defineExpose({
 }
 .c1-overall-progress-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #4b2d77;
   white-space: nowrap;
 }
@@ -3071,7 +3071,7 @@ defineExpose({
   padding: 10px 14px;
   background: #f9fafb;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
   user-select: none;

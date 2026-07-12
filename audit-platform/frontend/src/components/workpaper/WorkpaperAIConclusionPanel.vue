@@ -253,7 +253,7 @@ function onReject() {
 }
 
 .sources-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--gt-color-text-secondary, #909399);
 }
 
@@ -268,7 +268,7 @@ function onReject() {
 .missing-list {
   margin: 4px 0 0;
   padding-left: 18px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .ai-conclusion-content {

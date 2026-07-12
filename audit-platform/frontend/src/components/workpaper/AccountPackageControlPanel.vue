@@ -140,7 +140,7 @@ function handleCommand(programCode: string, command: string) {
 
 .gt-control-panel__code {
   font-weight: 500;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   min-width: 80px;
 }
 
@@ -148,6 +148,6 @@ function handleCommand(programCode: string, command: string) {
   text-align: center;
   color: var(--gt-color-text-secondary, #6e6e73);
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

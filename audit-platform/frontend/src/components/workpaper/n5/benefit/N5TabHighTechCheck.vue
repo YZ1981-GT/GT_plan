@@ -280,8 +280,8 @@ function handleReview() { openReviewDialog ? openReviewDialog('N5-6-2-高新认�
 </script>
 
 <style scoped>
-.n5-high-tech-check { padding: 12px; font-size: 13px; }
-.methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: 13px; color: #92400e; line-height: 1.7; }
+.n5-high-tech-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #92400e; line-height: 1.7; }
 .methodology-context p { margin: 0; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #303133; }
@@ -298,12 +298,12 @@ function handleReview() { openReviewDialog ? openReviewDialog('N5-6-2-高新认�
 .cb-stat.fail { color: #f56c6c; font-weight: 600; }
 
 .check-table { margin-bottom: 16px; }
-:deep(.check-table .el-table) { font-size: 13px; }
+:deep(.check-table .el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.failed-row) { background: #fef0f0 !important; }
 :deep(.passed-row) { background: #f0f9eb !important; }
 .condition-text { font-weight: 500; color: #303133; }
 .standard-text { font-size: 12px; color: #606266; }
-.cell-value { font-size: 13px; color: #606266; }
+.cell-value { font-size: var(--wp-font-size, 13px); color: #606266; }
 .result-badge { padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
 .result-pass { background: #e8f5e9; color: #43a047; }
 .result-fail { background: #fef0f0; color: #f56c6c; }
@@ -321,9 +321,9 @@ function handleReview() { openReviewDialog ? openReviewDialog('N5-6-2-高新认�
 .notes-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 .notes-field { margin-bottom: 12px; }
 .notes-field:last-child { margin-bottom: 0; }
-.field-label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.field-label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 
-.n5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.n5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .n5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
 .n5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

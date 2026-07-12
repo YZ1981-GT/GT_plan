@@ -391,7 +391,7 @@ function fmtAmt(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.k2-disclosure-listed { padding: 16px; font-size: 13px; }
+.k2-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
@@ -410,7 +410,7 @@ function fmtAmt(v: number | null | undefined): string {
 .title-actions { display: flex; gap: 8px; align-items: center; }
 
 /* 表格 */
-.disclosure-table { font-size: 13px; }
+.disclosure-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .auto-fill { color: var(--el-color-primary); }

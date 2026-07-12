@@ -153,12 +153,12 @@ function fmtNum(v: number): string { return v == null || isNaN(v) ? '—' : v.to
 </script>
 
 <style scoped>
-.i2-impairment { font-size: 13px; padding: 16px; }
+.i2-impairment { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
 .section-actions { display: flex; align-items: center; gap: 4px; }
 .methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6; }
-.impairment-table { font-size: 13px; }
+.impairment-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { color: #6366f1; font-weight: 500; border-bottom: 1px dashed #a5b4fc; cursor: help; }
 .text-danger { color: #dc2626 !important; font-weight: 700; }
 .recoverable-cell { display: flex; align-items: center; }

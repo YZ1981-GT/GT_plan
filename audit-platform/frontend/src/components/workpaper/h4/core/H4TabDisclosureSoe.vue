@@ -225,7 +225,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h4-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+.h4-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   border-left: 4px solid #d97706;

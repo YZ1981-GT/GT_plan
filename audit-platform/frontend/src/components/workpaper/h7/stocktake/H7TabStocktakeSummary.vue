@@ -141,7 +141,7 @@ function fmtNum(v: number | null | undefined): string { return v == null ? '-' :
 </script>
 
 <style scoped>
-.h7-tab-stocktake-summary { padding: 16px; font-size: 13px; }
+.h7-tab-stocktake-summary { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
 .dashboard-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }

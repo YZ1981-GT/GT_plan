@@ -87,7 +87,7 @@ defineExpose({ loadData })
   margin-bottom: 8px;
 }
 .opening-reconciliation__count {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #909399;
 }
 .text-danger { color: #f56c6c; font-weight: 600; }

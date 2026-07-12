@@ -368,7 +368,7 @@ onMounted(async () => {
 <style scoped>
 .n2-tab-recognition {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Header ─── */
@@ -401,7 +401,7 @@ onMounted(async () => {
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #5a4e3a;
   line-height: 1.6;
 }
@@ -479,7 +479,7 @@ onMounted(async () => {
 :deep(.fail-row) { background: #fef0f0 !important; }
 :deep(.fail-row:hover > td) { background: #fde2e2 !important; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.el-table th .cell) { font-size: 12px; font-weight: 600; }
 
 /* ─── 编制提示 ─── */
@@ -489,7 +489,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

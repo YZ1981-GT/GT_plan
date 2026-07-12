@@ -328,15 +328,15 @@ function handleFillModeChange(val: FillMode) {
 
 /* 表格样式 */
 .voucher-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .voucher-table :deep(.el-table__row) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .voucher-table :deep(.el-table__header th) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 跨期行高亮 */
@@ -375,13 +375,13 @@ function handleFillModeChange(val: FillMode) {
 }
 
 .fill-mode-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   white-space: nowrap;
 }
 
 /* 备注输入框优化 */
 .voucher-table :deep(.el-input__inner) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 </style>

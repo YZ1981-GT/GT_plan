@@ -443,7 +443,7 @@ watch(() => props.htmlData, () => {
 <style scoped>
 .g7-tab-not-same-control {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文: 琥珀色左边线+浅黄背景 */
@@ -455,7 +455,7 @@ watch(() => props.htmlData, () => {
   border-radius: 4px;
 }
 .methodology-content {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: #92400e;
 }
@@ -480,7 +480,7 @@ watch(() => props.htmlData, () => {
   gap: 8px;
 }
 .guide-step {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1e40af;
 }
 .step-no {
@@ -519,7 +519,7 @@ watch(() => props.htmlData, () => {
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .subtotal-label {

@@ -236,7 +236,7 @@ function handleNavigate(row: SheetEntry) {
 </script>
 
 <style scoped>
-.i2-tab-index { padding: 16px; font-size: 13px; }
+.i2-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 引导区 */
 .guide-area {
@@ -244,7 +244,7 @@ function handleNavigate(row: SheetEntry) {
   border-radius: 8px; padding: 16px; margin-bottom: 16px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
 /* 统计摘要 */
@@ -266,7 +266,7 @@ function handleNavigate(row: SheetEntry) {
 /* 分组目录 */
 .sheet-group { margin-bottom: 12px; }
 .group-header {
-  font-size: 13px; font-weight: 600; padding: 6px 12px;
+  font-size: var(--wp-font-size, 13px); font-weight: 600; padding: 6px 12px;
   border-left: 3px solid #409eff; background: #fafbfc;
   margin-bottom: 4px; border-radius: 2px;
 }
@@ -274,7 +274,7 @@ function handleNavigate(row: SheetEntry) {
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
 .completion-bar { margin-bottom: 12px; }
-.index-table { font-size: 13px; cursor: pointer; }
+.index-table { font-size: var(--wp-font-size, 13px); cursor: pointer; }
 .sheet-link { color: var(--el-color-primary); }
 .sheet-link:hover { text-decoration: underline; }
 .sheet-tag {

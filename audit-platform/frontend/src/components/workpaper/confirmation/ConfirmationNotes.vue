@@ -272,7 +272,7 @@ async function handleAiGenerate() {
 }
 
 .confirmation-notes__section-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
 }
@@ -288,7 +288,7 @@ async function handleAiGenerate() {
   border: none;
   background: transparent;
   padding: 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   box-shadow: none;
 }
 

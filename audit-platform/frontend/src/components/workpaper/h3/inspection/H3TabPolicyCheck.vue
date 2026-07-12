@@ -135,7 +135,7 @@ function openReview(section: string) { openReviewDialog(`H3-4-${section}`) }
 </script>
 
 <style scoped>
-.h3-tab-policy-check { padding: 16px; font-size: 13px; }
+.h3-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .progress-bar { margin-bottom: 16px; }
 .policy-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }

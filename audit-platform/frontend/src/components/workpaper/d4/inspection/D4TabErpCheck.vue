@@ -232,7 +232,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 </template>
 
 <style scoped>
-.d4-erp { padding: 12px 16px; font-size: 13px; }
+.d4-erp { padding: 12px 16px; font-size: var(--wp-font-size, 13px); }
 
 .toolbar {
   display: flex; justify-content: space-between; align-items: center;
@@ -257,8 +257,8 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   border-radius: 4px;
   padding: 10px 14px;
 }
-.guidance summary { cursor: pointer; font-weight: 500; color: #e6a23c; font-size: 13px; }
-.guidance p { margin: 8px 0 0; font-size: 13px; color: #606266; line-height: 1.7; }
+.guidance summary { cursor: pointer; font-weight: 500; color: #e6a23c; font-size: var(--wp-font-size, 13px); }
+.guidance p { margin: 8px 0 0; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.7; }
 
 .oo-container { min-height: 600px; height: calc(100vh - 280px); }
 </style>

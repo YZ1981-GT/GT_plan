@@ -113,11 +113,11 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
   padding: 12px;
 }
 .f3-tab-adjustment :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .f3-tab-adjustment :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -133,7 +133,7 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -165,7 +165,7 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
   background: #f5f7fa;
   border-radius: 4px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .balance-item { color: #606266; }
 .balance-item strong { color: #303133; }

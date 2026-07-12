@@ -470,7 +470,7 @@ defineExpose({
 <style scoped>
 .g6-tab-fair-value-test {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Tabs ─── */
@@ -502,7 +502,7 @@ defineExpose({
 
 /* ─── 表格 ─── */
 .fv-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 名称单元格 ─── */
@@ -571,7 +571,7 @@ defineExpose({
 
 .guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   font-weight: 600;
 }

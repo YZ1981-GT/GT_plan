@@ -556,7 +556,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.g6-adjudication { padding: 12px; font-size: 13px; }
+.g6-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {
@@ -591,7 +591,7 @@ onMounted(() => {
 .group-header.formula-header {
   background: #f0f9eb; border-color: #e1f3d8; cursor: default;
 }
-.group-name { font-weight: 600; font-size: 13px; color: #303133; }
+.group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; }
 .formula-tag {
   margin-left: auto; font-size: 11px; color: #67c23a;
   background: #f0f9eb; border: 1px solid #e1f3d8;
@@ -623,7 +623,7 @@ onMounted(() => {
 }
 
 /* 试算表差异行 */
-.tb-diff-row { display: flex; gap: 16px; margin: 16px 0; align-items: center; font-size: 13px; }
+.tb-diff-row { display: flex; gap: 16px; margin: 16px 0; align-items: center; font-size: var(--wp-font-size, 13px); }
 .tb-label { font-weight: 500; color: #606266; }
 .tb-amount { font-weight: 600; }
 .diff-value { font-weight: 600; }

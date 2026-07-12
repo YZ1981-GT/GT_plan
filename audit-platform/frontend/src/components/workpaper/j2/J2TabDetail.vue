@@ -143,11 +143,11 @@ onMounted(() => {
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .guide-area { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; padding: 12px; background: linear-gradient(135deg, #ecf5ff 0%, #f0f9ff 100%); border-radius: 8px; }
-.guide-step { font-size: 13px; color: #303133; }
+.guide-step { font-size: var(--wp-font-size, 13px); color: #303133; }
 .step-num { display: inline-block; width: 20px; height: 20px; line-height: 20px; text-align: center; background: #409eff; color: #fff; border-radius: 50%; font-size: 11px; margin-right: 6px; }
 .formula-cell { border-bottom: 1px dashed #409eff; cursor: help; }
-.totals-bar { margin-top: 12px; display: flex; gap: 24px; font-size: 13px; font-weight: 500; color: #303133; }
+.totals-bar { margin-top: 12px; display: flex; gap: 24px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 </style>

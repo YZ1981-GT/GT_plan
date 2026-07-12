@@ -333,7 +333,7 @@ function handleFillPreset(item: FraudRiskRow) {
 
 .fraud-risk-checklist__group-name {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .fraud-risk-checklist__group-badge {
@@ -386,7 +386,7 @@ function handleFillPreset(item: FraudRiskRow) {
 
 .fraud-risk-checklist__item-seq {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   min-width: 22px;
   height: 22px;
   line-height: 22px;
@@ -403,7 +403,7 @@ function handleFillPreset(item: FraudRiskRow) {
 
 .fraud-risk-checklist__item-desc {
   flex: 1;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
 }
 

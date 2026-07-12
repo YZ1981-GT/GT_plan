@@ -525,7 +525,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 </script>
 
 <style scoped>
-.k12-tab-non-operating-check { padding: 12px; font-size: 13px; }
+.k12-tab-non-operating-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -537,7 +537,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b;
   padding: 10px 14px; margin-bottom: 12px;
-  border-radius: 4px; font-size: 13px; color: #78350f; line-height: 1.6;
+  border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6;
 }
 .methodology-context p { margin: 0; }
 
@@ -557,7 +557,7 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 
 :deep(.non-compliance-row) { background-color: #fef2f2 !important; }
 :deep(.non-compliance-row:hover > td) { background-color: #fee2e2 !important; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 
 .compile-hint {
   margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary);

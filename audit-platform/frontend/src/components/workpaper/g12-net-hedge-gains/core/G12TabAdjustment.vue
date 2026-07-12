@@ -131,12 +131,12 @@ function fmt(val: number): string {
 </script>
 
 <style scoped>
-.g12-adj-sheet { padding: 12px; font-size: 13px; }
+.g12-adj-sheet { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
 .audit-objective { margin-bottom: 12px; }
-.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: 13px; font-weight: 500; }
+.balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: var(--wp-font-size, 13px); font-weight: 500; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; font-weight: 600; }
 </style>

@@ -167,9 +167,9 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-stocktake-check { padding: 16px; font-size: 13px; }
+.h3-tab-stocktake-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.row-vacant) { background-color: #fef9e7 !important; }
 .summary-row { display: flex; align-items: center; gap: 16px; margin: 12px 0; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }
 .text-warn { color: var(--el-color-warning); }

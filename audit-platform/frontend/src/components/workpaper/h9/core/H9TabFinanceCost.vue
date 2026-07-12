@@ -383,7 +383,7 @@ function getSummaryAdjustment({ columns }: any) {
 </script>
 
 <style scoped>
-.h9-tab-finance-cost { padding: 16px; font-size: 13px; }
+.h9-tab-finance-cost { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
@@ -396,7 +396,7 @@ function getSummaryAdjustment({ columns }: any) {
 }
 .bar-actions { display: flex; gap: 6px; align-items: center; }
 
-.detail-table { font-size: 13px; margin-bottom: 12px; }
+.detail-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .detail-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 .readonly-field { color: var(--el-text-color-secondary); font-style: italic; }

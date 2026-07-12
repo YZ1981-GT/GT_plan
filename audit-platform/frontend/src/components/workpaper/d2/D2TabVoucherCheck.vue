@@ -8,7 +8,6 @@ import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
 import { useD2VoucherCheck } from '../composables/useD2VoucherCheck'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
-import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
@@ -18,6 +17,8 @@ import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
 import type { VoucherSampleRow } from '../composables/useD2VoucherCheck'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -33,11 +34,7 @@ const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
   'D2-7',
 )
 
-const { saveItems } = useD2SaveInject()
-
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话集成 (Task 47.1)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -138,7 +135,7 @@ function saveNote(v: string): void {
   auditNote.value = v
   const item = { item_id: NOTE_KEY, conclusion: null, remark: v }
   props.allResponses.set(NOTE_KEY, item)
-  void saveItems([item])
+  window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
 }
 
 const { aiAvailable, generateAndConfirm } = useD2AiGenerate(toRef(props, 'wpId'))
@@ -494,23 +491,23 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase
 .tab-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .tab-header h4 { margin: 0; font-size: 15px; }
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .toolbar-left { display: flex; gap: 8px; }
 .index-cell { display: flex; align-items: center; gap: 6px; }
 .index-cell .el-input { flex: 1; }
 .section-subtitle { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #303133; margin: 16px 0 10px; }
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 .params-card { margin-bottom: 12px; }
 .sampling-engine-collapse { margin-bottom: 12px; }
-.progress-bar { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; }
+.progress-bar { display: flex; align-items: center; margin-bottom: 12px; font-size: var(--wp-font-size, 13px); }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .virtual-hint { flex: 1; min-width: 200px; margin: 0; }
 .virtual-table { margin-bottom: 12px; }
 .summary-bar {
   display: flex; gap: 24px; padding: 8px 12px; margin-top: 10px;
-  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: 13px;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px; font-size: var(--wp-font-size, 13px);
 }
 </style>

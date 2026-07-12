@@ -451,7 +451,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 </script>
 
 <style scoped>
-.k6-tab-adjustment { padding: 12px; font-size: 13px; }
+.k6-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; }
@@ -466,7 +466,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 
 .balance-bar {
   display: flex; gap: 16px; align-items: center; padding: 8px 12px;
-  background: #f5f7fa; border-radius: 6px; margin-bottom: 12px; font-size: 13px;
+  background: #f5f7fa; border-radius: 6px; margin-bottom: 12px; font-size: var(--wp-font-size, 13px);
 }
 
 .adj-table-card { margin-bottom: 12px; }

@@ -214,7 +214,7 @@ function fmtRate(rate: number | null): string {
 </script>
 
 <style scoped>
-.h10-adjudication { font-size: 13px; }
+.h10-adjudication { font-size: var(--wp-font-size, 13px); }
 .h10-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .h10-title { margin: 0; font-size: 15px; }
 .h10-actions { display: flex; gap: 8px; }

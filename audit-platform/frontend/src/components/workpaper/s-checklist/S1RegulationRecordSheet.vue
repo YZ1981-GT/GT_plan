@@ -461,12 +461,12 @@ onMounted(() => { loadData() })
 .audit-section { margin-bottom: 16px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; }
 .header-actions { display: flex; gap: 8px; }
-.compile-hint { margin-bottom: 12px; font-size: 13px; }
+.compile-hint { margin-bottom: 12px; font-size: var(--wp-font-size, 13px); }
 .compile-hint summary { cursor: pointer; color: #909399; font-size: 12px; margin-bottom: 8px; }
-.methodology-context { padding: 10px 14px; border-left: 4px solid #e6a23c; background-color: #fdf6ec; font-size: 13px; line-height: 1.7; color: #606266; }
+.methodology-context { padding: 10px 14px; border-left: 4px solid #e6a23c; background-color: #fdf6ec; font-size: var(--wp-font-size, 13px); line-height: 1.7; color: #606266; }
 .methodology-context p { margin: 4px 0; }
 .row-actions { margin-top: 12px; }
 .text-placeholder { color: #c0c4cc; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 :deep(.conclusion-cell) { text-align: center; }
 </style>

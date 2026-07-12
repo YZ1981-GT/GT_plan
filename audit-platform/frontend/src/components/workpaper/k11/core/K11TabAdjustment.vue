@@ -368,7 +368,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 </script>
 
 <style scoped>
-.k11-tab-adjustment { padding: 12px; font-size: 13px; }
+.k11-tab-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex;
@@ -405,7 +405,7 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 }
 .balance-row { display: flex; align-items: center; gap: 4px; }
 .balance-label { color: #909399; font-size: 12px; }
-.balance-amount { font-weight: 600; font-size: 13px; }
+.balance-amount { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .balance-diff.balanced .balance-amount { color: #67c23a; }
 .balance-diff.unbalanced .balance-amount { color: #f56c6c; }
 

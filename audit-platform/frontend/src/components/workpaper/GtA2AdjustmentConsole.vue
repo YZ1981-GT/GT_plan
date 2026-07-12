@@ -427,7 +427,7 @@ function debounceSave() {
 .program-card__status-dot { width: 8px; height: 8px; border-radius: 50%; }
 
 .program-card__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.program-card__desc { font-size: 13px; color: #303133; line-height: 1.5; }
+.program-card__desc { font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.5; }
 
 .program-card__summary {
   display: flex;

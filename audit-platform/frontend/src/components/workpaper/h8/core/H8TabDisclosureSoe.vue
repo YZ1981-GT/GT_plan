@@ -93,7 +93,7 @@ const showOO = ref(true)
 </script>
 
 <style scoped>
-.h8-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+.h8-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 

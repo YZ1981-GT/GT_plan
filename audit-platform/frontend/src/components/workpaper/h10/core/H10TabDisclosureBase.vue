@@ -75,7 +75,7 @@ function fmt(v: number) {
 </script>
 
 <style scoped>
-.h10-disclosure { font-size: 13px; }
+.h10-disclosure { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .sheet-title { margin: 0; font-size: 15px; }

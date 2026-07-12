@@ -217,7 +217,7 @@ function handleCancel(): void {
   align-items: center;
 }
 .ocr-picker__filename {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   vertical-align: middle;
 }
 .ocr-picker__tag {

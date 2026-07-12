@@ -110,7 +110,7 @@ function handleEnterConclusion() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .gt-conclusion-entry__status-label {

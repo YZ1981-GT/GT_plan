@@ -16,6 +16,10 @@ const noAmountArithmetic = require('./no-amount-arithmetic.cjs')
 const noAmountToFixed = require('./no-amount-toFixed.cjs')
 const noAmountUnitInScript = require('./no-amount-unit-in-script.cjs')
 const noDialogWithoutAppend = require('./no-dialog-without-append.cjs')
+// Feature: platform-global-hardening — Wp_Kit 等价手写结构检测
+const noAdhocWpStructure = require('./no-adhoc-wp-structure.cjs')
+// Feature: platform-global-hardening — 底稿禁止直接调用取数 URL
+const noDirectAuditFetch = require('./no-direct-audit-fetch.cjs')
 
 /** @type {import('eslint').ESLint.Plugin} */
 const plugin = {
@@ -37,6 +41,10 @@ const plugin = {
     'no-amount-toFixed': noAmountToFixed,
     'no-amount-unit-in-script': noAmountUnitInScript,
     'no-dialog-without-append': noDialogWithoutAppend,
+    // Feature: platform-global-hardening — Wp_Kit 等价手写结构检测
+    'no-adhoc-wp-structure': noAdhocWpStructure,
+    // Feature: platform-global-hardening — 底稿禁止直接调用取数 URL
+    'no-direct-audit-fetch': noDirectAuditFetch,
   },
 }
 

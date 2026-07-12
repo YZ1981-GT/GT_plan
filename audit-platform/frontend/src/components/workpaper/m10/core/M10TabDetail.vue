@@ -870,7 +870,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m10-tab-detail { padding: 12px; font-size: 13px; }
+.m10-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .dual-mode-switcher { margin-bottom: 12px; }
 
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
@@ -879,13 +879,13 @@ onMounted(async () => {
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 .cross-sheet-alert { margin-bottom: 12px; }
 .segment-switcher { margin-bottom: 12px; }
 
 .group-section { margin-bottom: 16px; }
-.group-header { padding: 6px 12px; font-size: 13px; font-weight: 600; border-radius: 4px 4px 0 0; }
+.group-header { padding: 6px 12px; font-size: var(--wp-font-size, 13px); font-weight: 600; border-radius: 4px 4px 0 0; }
 .group-header.perpetual-bond { background: #ecf5ff; color: #409eff; border-left: 3px solid #409eff; }
 .group-header.preferred-stock { background: #f0f9eb; color: #67c23a; border-left: 3px solid #67c23a; }
 .group-header.convertible { background: #fdf6ec; color: #e6a23c; border-left: 3px solid #e6a23c; }
@@ -896,10 +896,10 @@ onMounted(async () => {
 
 .subtotal-row { padding: 6px 12px; font-size: 12px; color: #606266; background: #fafafa; border: 1px solid #ebeef5; border-top: none; border-radius: 0 0 4px 4px; margin-bottom: 4px; }
 
-:deep(.el-table) { font-size: 13px; }
-.total-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; border-radius: 6px; background: #f0f9eb; font-size: 13px; align-items: center; flex-wrap: wrap; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.total-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; border-radius: 6px; background: #f0f9eb; font-size: var(--wp-font-size, 13px); align-items: center; flex-wrap: wrap; }
 
-.m10-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m10-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m10-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m10-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

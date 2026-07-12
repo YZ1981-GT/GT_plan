@@ -341,7 +341,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.k10-tab-receivable-grant { padding: 12px; font-size: 13px; }
+.k10-tab-receivable-grant { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -362,7 +362,7 @@ onMounted(() => {
 
 .non-compliant-alert { margin-bottom: 12px; }
 
-.check-table { font-size: 13px; }
+.check-table { font-size: var(--wp-font-size, 13px); }
 .check-table :deep(.non-compliant-row) { background: #fef0f0 !important; }
 .project-name { font-weight: 500; }
 

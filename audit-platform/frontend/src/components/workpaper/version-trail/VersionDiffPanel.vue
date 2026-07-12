@@ -268,7 +268,7 @@ function displayValue(val: string | null | undefined): string {
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -360,7 +360,7 @@ function displayValue(val: string | null | undefined): string {
 /* ─── Table ──────────────────────────────────────────────────────────────── */
 
 .vdp-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .vdp-value-empty {

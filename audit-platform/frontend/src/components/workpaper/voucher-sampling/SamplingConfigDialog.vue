@@ -610,7 +610,7 @@ function hasError(key: string): boolean {
 }
 
 .stratum-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-secondary);
   min-width: 48px;
 }
@@ -637,7 +637,7 @@ function hasError(key: string): boolean {
 }
 
 .filter-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: var(--el-text-color-regular);
   display: flex;

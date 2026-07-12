@@ -485,7 +485,7 @@ watch([topicDataMap, headerData], () => debouncedSave(), { deep: true })
   flex-wrap: wrap;
 }
 .rl-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #333;
   flex-shrink: 0;
 }

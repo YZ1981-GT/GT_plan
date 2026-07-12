@@ -102,12 +102,12 @@ onMounted(() => { if (props.htmlData) initFromHtmlData(props.htmlData) })
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .guide-area { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; padding: 12px; background: linear-gradient(135deg, #ecf5ff, #f0f9ff); border-radius: 6px; }
-.guide-step { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.guide-step { display: flex; align-items: center; gap: 8px; font-size: var(--wp-font-size, 13px); }
 .step-num { width: 22px; height: 22px; border-radius: 50%; background: #409eff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 .text-danger { color: #f56c6c; font-weight: 600; }
-.total-summary { margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: 13px; }
+.total-summary { margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: var(--wp-font-size, 13px); }
 </style>

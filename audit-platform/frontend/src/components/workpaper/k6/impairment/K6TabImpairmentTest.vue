@@ -380,7 +380,7 @@ function fmtAmt(val: number | null | undefined): string {
 <style scoped>
 .k6-tab-impairment-test {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 蓝色渐变引导区 */
@@ -400,7 +400,7 @@ function fmtAmt(val: number | null | undefined): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1d3557;
 }
 .step-num {
@@ -457,7 +457,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 表格 */
 .impairment-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .impairment-table :deep(.el-table__cell) {
   padding: 6px 0;
@@ -507,7 +507,7 @@ function fmtAmt(val: number | null | undefined): string {
   background: #f9fafb;
   border-radius: 4px;
   border: 1px solid #e5e7eb;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   flex-wrap: wrap;
 }
 .summary-label {

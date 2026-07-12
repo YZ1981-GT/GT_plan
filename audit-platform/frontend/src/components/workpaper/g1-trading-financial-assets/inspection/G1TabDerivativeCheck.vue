@@ -118,9 +118,9 @@ const dc = useG1DerivativeCheck({
 </script>
 
 <style scoped>
-.g1-derivative-check { padding: 12px; font-size: 13px; }
-.g1-derivative-check :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.g1-derivative-check :deep(.el-table .cell) { font-size: 13px; }
+.g1-derivative-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.g1-derivative-check :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.g1-derivative-check :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

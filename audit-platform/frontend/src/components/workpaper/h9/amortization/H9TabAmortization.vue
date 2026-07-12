@@ -352,7 +352,7 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h9-tab-amortization { padding: 16px; font-size: 13px; }
+.h9-tab-amortization { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guide-banner {
@@ -368,7 +368,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .guide-step {
   display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: #0c4a6e; font-weight: 500;
+  font-size: var(--wp-font-size, 13px); color: #0c4a6e; font-weight: 500;
 }
 .step-num {
   display: inline-flex; align-items: center; justify-content: center;
@@ -399,7 +399,7 @@ function fmtAmt(val: number | null | undefined): string {
 .contract-filter {
   display: flex; align-items: center; margin-bottom: 16px;
 }
-.filter-label { font-size: 13px; color: var(--el-text-color-regular); margin-right: 8px; }
+.filter-label { font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); margin-right: 8px; }
 
 /* 参数卡片 */
 .params-card { margin-bottom: 16px; }
@@ -411,7 +411,7 @@ function fmtAmt(val: number | null | undefined): string {
 .param-value { display: block; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* 摊销表 */
-.amortization-table { margin-bottom: 16px; font-size: 13px; }
+.amortization-table { margin-bottom: 16px; font-size: var(--wp-font-size, 13px); }
 .amt-cell { display: block; text-align: right; font-variant-numeric: tabular-nums; }
 .formula-cell {
   display: inline-block; text-align: right;
@@ -431,7 +431,7 @@ function fmtAmt(val: number | null | undefined): string {
 .cross-card { border-left: 4px solid #e6a23c; }
 
 .validation-header {
-  font-size: 13px; font-weight: 600; margin-bottom: 10px;
+  font-size: var(--wp-font-size, 13px); font-weight: 600; margin-bottom: 10px;
   color: var(--el-text-color-primary);
 }
 .validation-grid {
@@ -439,7 +439,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .vd-item { display: flex; flex-direction: column; gap: 2px; }
 .vd-label { font-size: 11px; color: var(--el-text-color-secondary); }
-.vd-value { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.vd-value { font-size: var(--wp-font-size, 13px); font-weight: 600; font-variant-numeric: tabular-nums; }
 .vd-error { color: #f56c6c; }
 .vd-warning {
   margin-top: 10px; padding: 8px 12px;

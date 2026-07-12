@@ -332,7 +332,7 @@ function tableRowClassName({ row }: { row: any }): string {
 <style scoped>
 .g4-tab-adjustment {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -370,7 +370,7 @@ function tableRowClassName({ row }: { row: any }): string {
   background: #f0f9eb;
   border-radius: 4px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .g4-adj-footer.balance-fail {

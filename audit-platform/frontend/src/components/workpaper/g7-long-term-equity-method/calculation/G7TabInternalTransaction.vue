@@ -626,7 +626,7 @@ function fmtNum(v: unknown): string {
 <style scoped>
 .g7-tab-internal-transaction {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 方法论上下文：琥珀色左边线+浅黄背景 */
@@ -636,7 +636,7 @@ function fmtNum(v: unknown): string {
   padding: 10px 14px;
   margin-bottom: 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
 }
 .methodology-context p {
@@ -669,7 +669,7 @@ function fmtNum(v: unknown): string {
 
 /* 表格 */
 .internal-transaction-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 公式列header：虚线下划线 + cursor:help */

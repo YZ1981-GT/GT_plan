@@ -100,7 +100,7 @@ function fmt(v: number) {
 </script>
 
 <style scoped>
-.h10-adjustment { font-size: 13px; }
+.h10-adjustment { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .balance-alert { margin-bottom: 8px; }

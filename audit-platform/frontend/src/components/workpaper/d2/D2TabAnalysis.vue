@@ -14,6 +14,8 @@ import { useAgingConfig } from '@/composables/useAgingConfig'
 import type { useD2CrossSheet } from '../composables/useD2CrossSheet'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -22,9 +24,7 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const { saveItems } = useD2SaveInject()
 
@@ -944,7 +944,7 @@ function getTop10Summary({ columns, data }: any) {
 
 /* Audit objective */
 .audit-objective { margin-bottom: 12px; }
-.audit-objective p { margin: 0; font-size: 13px; line-height: 1.6; }
+.audit-objective p { margin: 0; font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 
 /* Warning */
 .warning-alert { margin-bottom: 12px; }
@@ -959,7 +959,7 @@ function getTop10Summary({ columns, data }: any) {
 .card-sub { font-size: 12px; color: #606266; }
 
 /* Compact table */
-.compact-table { font-size: 13px; }
+.compact-table { font-size: var(--wp-font-size, 13px); }
 :deep(.compact-table .el-table__cell) { padding: 4px 3px; }
 
 /* Auto-calc columns */
@@ -980,7 +980,7 @@ function getTop10Summary({ columns, data }: any) {
   gap: 8px;
   margin: 10px 0 16px;
 }
-.diff-label { white-space: nowrap; font-size: 13px; color: #606266; padding-top: 6px; }
+.diff-label { white-space: nowrap; font-size: var(--wp-font-size, 13px); color: #606266; padding-top: 6px; }
 
 /* Credit summary row */
 .credit-summary-row {
@@ -988,14 +988,14 @@ function getTop10Summary({ columns, data }: any) {
   align-items: center;
   gap: 8px;
   margin: 8px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
 /* Aging total row */
 .aging-total-row {
   margin: 8px 0 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   font-weight: 500;
   padding: 6px 8px;
@@ -1008,7 +1008,7 @@ function getTop10Summary({ columns, data }: any) {
 .toolbar-right { display: flex; gap: 8px; align-items: center; }
 
 /* Guidance fold */
-.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.guidance-fold { margin: 16px 0; border-left: 3px solid #409eff; background: #ecf5ff; padding: 10px 14px; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .guidance-fold summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-fold p { margin: 6px 0; line-height: 1.6; }
 </style>

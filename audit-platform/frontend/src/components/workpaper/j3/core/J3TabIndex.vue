@@ -101,10 +101,10 @@ const indexItems = ref([
 }
 .header-item .label {
   color: #606266;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .header-item .value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 .index-table {

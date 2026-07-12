@@ -274,7 +274,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
 <style scoped>
 .m5-tab-index {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 项目信息区 ─── */
@@ -295,13 +295,13 @@ function getRowClassName({ row }: { row: SheetRow }): string {
 }
 
 .info-label {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #909399;
   white-space: nowrap;
 }
 
 .info-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
 }
@@ -317,7 +317,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
   border: 1px solid #81c784;
   border-left: 4px solid #43a047;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #2e7d32;
 }
@@ -344,7 +344,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
   font-weight: 500;
   color: #1a73e8;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .m5-guide-steps {
@@ -357,7 +357,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
 }
 
@@ -376,7 +376,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
 }
 
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 进度条区 ─── */
@@ -392,7 +392,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -415,7 +415,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
 .sheet-name-link {
   color: #1a73e8;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .sheet-name-link:hover {
@@ -431,7 +431,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
 }
 
 :deep(.el-table) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 :deep(.el-table .el-table__row) {
@@ -449,7 +449,7 @@ function getRowClassName({ row }: { row: SheetRow }): string {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

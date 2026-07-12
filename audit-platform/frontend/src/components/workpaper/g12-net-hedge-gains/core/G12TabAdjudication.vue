@@ -272,7 +272,7 @@ function fmtRate(rate: number | null): string {
 </script>
 
 <style scoped>
-.g12-adj { padding: 12px; font-size: 13px; }
+.g12-adj { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .title { margin: 0; font-size: 15px; font-weight: 600; }
 .actions { display: flex; gap: 8px; align-items: center; }
@@ -284,7 +284,7 @@ function fmtRate(rate: number | null): string {
 .variance.is-error { color: #f56c6c; }
 .note-card { margin-top: 12px; }
 .audit-objective { margin-bottom: 12px; }
-.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .cross-alert { margin-bottom: 12px; }
 .warn-chip { margin-left: 8px; }

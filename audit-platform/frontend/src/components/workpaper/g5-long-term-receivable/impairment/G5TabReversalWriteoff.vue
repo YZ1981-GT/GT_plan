@@ -113,7 +113,7 @@ function onImported(rows: unknown[]) {
 </script>
 
 <style scoped>
-.g5-reversal-writeoff { font-size: 13px; }
+.g5-reversal-writeoff { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

@@ -1258,7 +1258,7 @@ onBeforeUnmount(() => {
   padding: 16px;
   max-width: 1200px;
   margin: 0 auto;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   position: relative;
 }
 
@@ -1287,7 +1287,7 @@ onBeforeUnmount(() => {
   color: #1890ff;
   padding: 4px 12px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
 
@@ -1301,7 +1301,7 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 24px;
   color: #6b7280;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-info-item {
@@ -1338,7 +1338,7 @@ onBeforeUnmount(() => {
   font-weight: 500;
   color: #1a73e8;
   margin-bottom: 10px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cct-guidance-steps {
@@ -1351,7 +1351,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
 }
 
@@ -1386,7 +1386,7 @@ onBeforeUnmount(() => {
 }
 
 .step-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── Cycle Conclusion Card ─── */
@@ -1418,7 +1418,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 6px;
   color: #d97706;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   background: #fffbeb;
   border: 1px solid #fde68a;
   padding: 6px 12px;
@@ -1522,7 +1522,7 @@ onBeforeUnmount(() => {
 
 .cct-compilation-tips summary {
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #6b7280;
   background: #f9fafb;
@@ -1614,7 +1614,7 @@ onBeforeUnmount(() => {
 }
 
 .cct-edit-form :deep(.el-form-item__label) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #374151;
 }
@@ -1656,7 +1656,7 @@ onBeforeUnmount(() => {
 
 .cct-edit-tips-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #92400e;
   margin-bottom: 6px;
 }
@@ -1695,7 +1695,7 @@ onBeforeUnmount(() => {
 
 .cct-edit-attach-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #374151;
   margin-bottom: 6px;
 }

@@ -725,7 +725,7 @@ onBeforeUnmount(() => {
 }
 
 .materiality-comparison {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
@@ -741,7 +741,7 @@ onBeforeUnmount(() => {
 }
 
 .suggestion-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -783,7 +783,7 @@ onBeforeUnmount(() => {
 }
 
 .eliminated-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #909399;
 }
 
@@ -826,7 +826,7 @@ onBeforeUnmount(() => {
 .pending-list {
   margin: 8px 0 0 20px;
   padding: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

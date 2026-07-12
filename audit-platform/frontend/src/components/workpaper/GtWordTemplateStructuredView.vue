@@ -311,7 +311,7 @@ function getCellPlaceholder(child: SectionChild, _rowIdx: number, _colIdx: numbe
   min-width: 100px;
   max-width: 160px;
   padding-top: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: var(--el-text-color-regular);
   flex-shrink: 0;
 }
@@ -331,7 +331,7 @@ function getCellPlaceholder(child: SectionChild, _rowIdx: number, _colIdx: numbe
 .gt-wt-structured-view__readonly-text {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 

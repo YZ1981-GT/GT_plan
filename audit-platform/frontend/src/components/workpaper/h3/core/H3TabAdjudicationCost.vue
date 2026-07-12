@@ -215,11 +215,11 @@ function openReview(section: string) { openReviewDialog(section) }
 </script>
 
 <style scoped>
-.h3-tab-adjudication-cost { padding: 16px; font-size: 13px; }
+.h3-tab-adjudication-cost { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .triangle-warn { color: var(--el-color-danger); font-size: 12px; font-weight: 600; }
-.audit-table { font-size: 13px; }
+.audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .formula-value { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .net-value-card { margin-bottom: 16px; }

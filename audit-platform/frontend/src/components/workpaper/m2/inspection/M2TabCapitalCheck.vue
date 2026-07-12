@@ -438,13 +438,13 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.m2-tab-capital-check { padding: 12px; font-size: 13px; }
+.m2-tab-capital-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: 13px; color: #6b5900; line-height: 1.6; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .check-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
@@ -452,16 +452,16 @@ onMounted(async () => {
 .diff-alert-red { color: #f56c6c !important; font-weight: 700; }
 .rate-alert-yellow { color: #e6a23c !important; font-weight: 600; }
 .rate-ok { color: #67c23a; }
-:deep(.el-table) { font-size: 13px; }
-.summary-bar { display: flex; gap: 20px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: 13px; color: #606266; flex-wrap: wrap; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.summary-bar { display: flex; gap: 20px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; flex-wrap: wrap; }
 .checklist-items { display: flex; flex-direction: column; gap: 12px; }
 .checklist-row { border: 1px solid #ebeef5; border-radius: 6px; padding: 10px 14px; }
 .checklist-row-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.checklist-title { font-size: 13px; font-weight: 500; color: #303133; }
+.checklist-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
 .checklist-remark { margin-top: 8px; }
 .conclusion-card :deep(.el-form-item__label) { font-weight: 500; color: #303133; }
 .ai-section { opacity: 0.9; }
-.m2-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.m2-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m2-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m2-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

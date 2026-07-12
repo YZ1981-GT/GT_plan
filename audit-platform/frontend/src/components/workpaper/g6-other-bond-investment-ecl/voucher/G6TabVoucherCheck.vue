@@ -522,7 +522,7 @@ defineExpose({
 <style scoped>
 .g6-voucher-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .section-head {
@@ -569,7 +569,7 @@ defineExpose({
 
 .balance-label {
   color: #606266;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .balance-value {
@@ -599,7 +599,7 @@ defineExpose({
 
 /* 表格 */
 .voucher-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .compact-num {

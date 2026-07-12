@@ -153,7 +153,7 @@ function handleJump(type: string, code: string) {
 }
 
 .detail-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-text-color-primary);
   margin-bottom: 6px;

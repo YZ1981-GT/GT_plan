@@ -243,7 +243,7 @@ function openReview(id: string) {
 <style scoped>
 .k6-tab-initial-recognition {
   padding: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 蓝色渐变引导区 */
@@ -263,7 +263,7 @@ function openReview(id: string) {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1d3557;
 }
 .step-num {
@@ -372,7 +372,7 @@ function openReview(id: string) {
   padding-top: 14px;
   margin-top: 14px;
   border-top: 1px solid #f0f0f0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b7280;
 }
 

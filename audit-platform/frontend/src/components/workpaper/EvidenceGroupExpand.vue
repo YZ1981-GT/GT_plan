@@ -87,7 +87,7 @@ function sourceLabel(source?: string) {
   padding: 12px;
 }
 .gt-evidence-group__header {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   margin-bottom: 8px;
   color: var(--el-text-color-primary);

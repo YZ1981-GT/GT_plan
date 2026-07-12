@@ -516,7 +516,7 @@ function handleReview(): void {
   white-space: nowrap;
 }
 
-.k12-audit-goal { font-size: 13px; }
+.k12-audit-goal { font-size: var(--wp-font-size, 13px); }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景） ─── */
 .k12-methodology-ctx {
@@ -524,7 +524,7 @@ function handleReview(): void {
   background: #fffbe6;
   border-left: 4px solid #e6a23c;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.7;
 }
@@ -586,7 +586,7 @@ function handleReview(): void {
 
 /* ─── 审定表样式 ─── */
 .adjudication-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .adjudication-table :deep(.el-table__header th) {
   font-size: 12px;
@@ -625,11 +625,11 @@ function handleReview(): void {
 }
 .cell-input :deep(.el-input__inner) {
   text-align: right;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .cell-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
 }
 .cell-value.negative,

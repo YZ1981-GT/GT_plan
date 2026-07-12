@@ -328,11 +328,11 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h1-tab-adjudication { padding: 16px; font-size: 13px; }
+.h1-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
-.adj-table { font-size: 13px; }
+.adj-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
 .amount-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
@@ -341,7 +341,7 @@ function fmtAmt(val: number | null | undefined): string {
 .reconciliation-card { margin-bottom: 16px; }
 .net-value-row { font-size: 14px; font-weight: 500; padding: 8px 0; }
 .tb-diff-section { margin-top: 16px; }
-.tb-diff-section h4 { margin-bottom: 8px; font-size: 13px; }
+.tb-diff-section h4 { margin-bottom: 8px; font-size: var(--wp-font-size, 13px); }
 .cross-warning { margin-top: 12px; }
 .note-card { margin-bottom: 12px; }
 .action-bar { margin-top: 16px; text-align: right; }

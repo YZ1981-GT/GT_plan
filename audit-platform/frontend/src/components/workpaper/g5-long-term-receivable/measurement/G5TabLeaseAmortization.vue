@@ -221,7 +221,7 @@ function fmt(v: number | null | undefined): string {
 </script>
 
 <style scoped>
-.g5-lease-amortization { font-size: 13px; }
+.g5-lease-amortization { font-size: var(--wp-font-size, 13px); }
 .method-context {
   margin-bottom: 12px; padding: 8px 12px;
   border-left: 3px solid #e6a23c; background: #fdf6ec;
@@ -237,7 +237,7 @@ function fmt(v: number | null | undefined): string {
   margin: 12px 0 4px; padding: 6px 12px;
   background: #f0f9eb; border-left: 3px solid #67c23a; border-radius: 0 4px 4px 0;
 }
-.group-title { font-weight: 600; font-size: 13px; }
+.group-title { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }
 .variance-error { color: #f56c6c; font-weight: 600; }
 .continuity-warning { color: #e6a23c; font-size: 12px; margin: 4px 0 8px 12px; }

@@ -223,11 +223,11 @@ onMounted(() => { loadData(); loadAutoData() })
 </script>
 
 <style scoped>
-.gt-ch8 { font-size: 13px; display: flex; flex-direction: column; gap: 12px; }
+.gt-ch8 { font-size: var(--wp-font-size, 13px); display: flex; flex-direction: column; gap: 12px; }
 .gt-ch8__card { margin-top: 4px; }
 .gt-ch8__card--auto { border-color: #e6f0ff; }
 .gt-ch8__card-hd { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-.gt-ch8__card-title { font-size: 13px; font-weight: 600; color: #6b21a8; }
+.gt-ch8__card-title { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #6b21a8; }
 .gt-ch8__loading { text-align: center; padding: 20px; color: #909399; }
 .gt-ch8__stat-row { display: flex; gap: 8px; margin-bottom: 8px; }
 .gt-ch8__table { font-size: 12px; }

@@ -310,15 +310,15 @@ function fmtAmount(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.n5-rd-super-deduction { padding: 12px; font-size: 13px; }
-.methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: 13px; color: #92400e; line-height: 1.7; }
+.n5-rd-super-deduction { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #92400e; line-height: 1.7; }
 .methodology-context p { margin: 0; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 8px; }
 
 .linkage-status { display: flex; gap: 16px; margin-bottom: 16px; }
-.linkage-item { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: 13px; }
+.linkage-item { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .linkage-item.linked { background: #e8f5e9; border: 1px solid #a5d6a7; }
 .linkage-item.pending { background: #f5f7fa; border: 1px solid #ebeef5; }
 .lk-icon { font-size: 14px; }
@@ -340,15 +340,15 @@ function fmtAmount(val: number | null | undefined): string {
 .rd-section { margin-bottom: 20px; }
 .rd-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 12px; background: #f5f7fa; border-radius: 4px; }
 .rd-section-title { font-size: 14px; font-weight: 600; color: #303133; }
-.rd-section-subtotal { font-size: 13px; font-weight: 500; color: #409eff; }
+.rd-section-subtotal { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #409eff; }
 .rd-table { margin-bottom: 4px; }
-:deep(.rd-table .el-table) { font-size: 13px; }
+:deep(.rd-table .el-table) { font-size: var(--wp-font-size, 13px); }
 .item-name { font-weight: 500; color: #303133; }
 .formula-header { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; font-weight: 600; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; font-weight: 500; color: #303133; padding-bottom: 1px; }
 .cell-input { width: 100%; }
-:deep(.cell-input .el-input__inner) { text-align: right; font-size: 13px; }
-.cell-value { font-size: 13px; color: #606266; }
+:deep(.cell-input .el-input__inner) { text-align: right; font-size: var(--wp-font-size, 13px); }
+.cell-value { font-size: var(--wp-font-size, 13px); color: #606266; }
 
 .dynamic-row-bar { margin-bottom: 16px; }
 
@@ -359,9 +359,9 @@ function fmtAmount(val: number | null | undefined): string {
 .notes-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 .notes-field { margin-bottom: 12px; }
 .notes-field:last-child { margin-bottom: 0; }
-.field-label { display: block; font-size: 13px; font-weight: 500; color: #606266; margin-bottom: 6px; }
+.field-label { display: block; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; margin-bottom: 6px; }
 
-.n5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.n5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .n5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
 .n5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

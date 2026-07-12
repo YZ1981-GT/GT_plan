@@ -436,7 +436,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   background: #fff; border: 1px solid #d9c9ff; border-radius: 4px;
   padding: 1px 7px;
 }
-.overview-subtitle { margin: 0; font-size: 13px; color: #909399; }
+.overview-subtitle { margin: 0; font-size: var(--wp-font-size, 13px); color: #909399; }
 .overview-steps { display: flex; gap: 6px; }
 .step-dot {
   display: inline-flex; align-items: center; justify-content: center;
@@ -481,7 +481,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 }
 .sec-nav-item.active .nav-dot { background: #7c5cff; }
 .nav-text { min-width: 0; }
-.nav-label { font-size: 13px; color: #606266; font-weight: 500; }
+.nav-label { font-size: var(--wp-font-size, 13px); color: #606266; font-weight: 500; }
 .sec-nav-item.active .nav-label { color: #7c5cff; }
 .sec-nav-item.done .nav-label { color: #303133; }
 .nav-hint { font-size: 11px; color: #c0c4cc; margin-top: 2px; line-height: 1.4; }
@@ -500,11 +500,11 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   cursor: pointer;
   font-weight: 500;
   color: #e6a23c;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.7;
   white-space: pre-wrap;
@@ -548,7 +548,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #303133;
   margin-bottom: 6px;
@@ -594,5 +594,5 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
   justify-content: space-between;
   padding: 12px 4px 4px;
 }
-.step-indicator { font-size: 13px; color: #909399; }
+.step-indicator { font-size: var(--wp-font-size, 13px); color: #909399; }
 </style>

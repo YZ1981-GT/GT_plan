@@ -357,11 +357,11 @@ const auditConclusion = computed({
   padding: 12px;
 }
 .d4-tab-other-revenue :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d4-tab-other-revenue :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -377,7 +377,7 @@ const auditConclusion = computed({
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -424,7 +424,7 @@ const auditConclusion = computed({
   background: #f5f7fa;
   border-radius: 4px;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .tb-label {
   color: #909399;

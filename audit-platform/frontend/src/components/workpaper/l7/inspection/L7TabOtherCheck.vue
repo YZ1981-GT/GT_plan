@@ -231,11 +231,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.l7-tab-other-check { padding: 12px; font-size: 13px; }
+.l7-tab-other-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 /* 完成度进度条 */
 .completion-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 16px; background: linear-gradient(135deg, #f8f9fe, #f0f4ff); border-radius: 6px; border: 1px solid #e4e7ed; }
-.completion-label { font-size: 13px; font-weight: 500; color: #303133; white-space: nowrap; }
+.completion-label { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; white-space: nowrap; }
 
 /* Section Cards */
 .check-section-card { margin-bottom: 16px; }
@@ -246,7 +246,7 @@ onMounted(async () => {
 /* 检查项 */
 .check-item { padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
 .check-item:last-child { border-bottom: none; }
-.check-item-title { font-size: 13px; color: #303133; margin-bottom: 8px; line-height: 1.5; }
+.check-item-title { font-size: var(--wp-font-size, 13px); color: #303133; margin-bottom: 8px; line-height: 1.5; }
 .check-item-fields { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
 .field-group { display: flex; flex-direction: column; gap: 4px; }
 .field-label { font-size: 12px; color: #909399; }
@@ -257,9 +257,9 @@ onMounted(async () => {
 .conclusion-fields { display: flex; flex-direction: column; gap: 12px; }
 
 /* 编制提示 */
-.l7-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px; color: #606266; }
+.l7-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l7-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l7-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 </style>

@@ -139,12 +139,12 @@ function patch(key: string, val: string | number): void {
 </script>
 
 <style scoped>
-.f2-supplier-info { padding: 12px 16px; font-size: 13px; }
+.f2-supplier-info { padding: 12px 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 

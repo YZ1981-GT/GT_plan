@@ -223,7 +223,7 @@ async function runValidate() {
 </script>
 
 <style scoped>
-.g8-adjudication { font-size: 13px; }
+.g8-adjudication { font-size: var(--wp-font-size, 13px); }
 .g8-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .g8-title { margin: 0; font-size: 15px; }
 .g8-actions { display: flex; gap: 8px; }

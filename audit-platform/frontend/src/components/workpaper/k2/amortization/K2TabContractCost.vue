@@ -551,7 +551,7 @@ function conclusionType(conclusion: string): 'success' | 'danger' | 'warning' | 
 <style scoped>
 .k2-tab-contract-cost {
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ═══ 方法论上下文（琥珀色左边线+浅黄背景）═══ */
@@ -608,7 +608,7 @@ function conclusionType(conclusion: string): 'success' | 'danger' | 'warning' | 
 }
 
 .cas14-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: #409eff;
 }
@@ -638,12 +638,12 @@ function conclusionType(conclusion: string): 'success' | 'danger' | 'warning' | 
 
 /* ═══ 表格 ═══ */
 .contract-cost-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   margin-bottom: 12px;
 }
 
 .contract-cost-table :deep(.el-table__row) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .amount-input {

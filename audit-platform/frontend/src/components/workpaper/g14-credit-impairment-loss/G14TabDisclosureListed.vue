@@ -235,7 +235,7 @@ function fmt(v: number): string {
 
 <style scoped>
 
-.g14-disclosure { padding: 12px; font-size: 13px; }
+.g14-disclosure { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 
@@ -253,7 +253,7 @@ function fmt(v: number): string {
 
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
 
-.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: 13px; color: #409eff; }
+.compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: var(--wp-font-size, 13px); color: #409eff; }
 
 .hint-content { padding: 0 12px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 

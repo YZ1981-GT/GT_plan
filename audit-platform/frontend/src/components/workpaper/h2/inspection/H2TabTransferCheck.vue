@@ -242,22 +242,22 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.h2-tab-transfer-check { padding: 16px; font-size: 13px; }
+.h2-tab-transfer-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
-  padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 13px;
+  padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);
 }
 .methodology-context ol { padding-left: 20px; margin: 8px 0 0; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
-.transfer-table { font-size: 13px; }
+.transfer-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .warning-value { color: var(--el-color-warning); font-weight: 600; }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
-.summary-line { padding: 12px 0; font-size: 13px; border-top: 1px solid var(--el-border-color-lighter); margin-top: 12px; }
+.summary-line { padding: 12px 0; font-size: var(--wp-font-size, 13px); border-top: 1px solid var(--el-border-color-lighter); margin-top: 12px; }
 .add-row-bar { margin-top: 12px; display: flex; gap: 8px; }
 .audit-note-card { margin-bottom: 12px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }

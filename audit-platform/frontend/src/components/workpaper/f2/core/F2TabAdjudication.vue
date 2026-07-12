@@ -195,9 +195,9 @@ async function generateConclusion() {
 </script>
 
 <style scoped>
-.f2-adjudication { padding: 12px; font-size: 13px; }
-.f2-adjudication :deep(.el-table) { --el-table-font-size: 13px; font-size: 13px; }
-.f2-adjudication :deep(.el-table .cell) { font-size: 13px !important; }
+.f2-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.f2-adjudication :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f2-adjudication :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 .guidance-details {
   margin-bottom: 12px;
   border-left: 3px solid #409eff;
@@ -206,7 +206,7 @@ async function generateConclusion() {
   padding: 8px 12px;
 }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 .cross-alert { margin-bottom: 12px; }
@@ -222,7 +222,7 @@ async function generateConclusion() {
   background: #f5f7fa;
   border-radius: 4px;
   margin: 16px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .tb-label { color: #909399; }
 .opinion-card { margin-top: 16px; border-radius: 8px; }

@@ -36,6 +36,8 @@ import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol, virtualSelectCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -49,10 +51,7 @@ const props = defineProps<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) =>
-    v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // 复核对话（Task 19 预留）：仅当 provider 存在时展示 💬 按钮
 const openReviewDialog = inject<any>('openReviewDialog', null)
@@ -608,7 +607,7 @@ const GUIDANCE_TEXTS = [
   background: #ecf5ff;
   padding: 10px 14px;
   border-radius: 0 4px 4px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

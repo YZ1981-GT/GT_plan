@@ -413,7 +413,7 @@ onMounted(async () => {
 <style scoped>
 .m6-tab-retained-check {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 标题栏 ──── */
@@ -459,7 +459,7 @@ onMounted(async () => {
 }
 
 .methodology-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #6b5900;
   line-height: 1.6;
 }
@@ -524,7 +524,7 @@ onMounted(async () => {
 
 /* ─── 核对清单表格 ──── */
 .check-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .check-table :deep(.el-table__header th) {
@@ -590,7 +590,7 @@ onMounted(async () => {
 .manual-check-label {
   flex: 1;
   color: #606266;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.5;
 }
 
@@ -625,7 +625,7 @@ onMounted(async () => {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 

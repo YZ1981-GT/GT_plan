@@ -158,7 +158,7 @@ onMounted(loadRatios)
   margin-bottom: 12px;
 }
 .a15-ratio-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-text-color-primary);
 }

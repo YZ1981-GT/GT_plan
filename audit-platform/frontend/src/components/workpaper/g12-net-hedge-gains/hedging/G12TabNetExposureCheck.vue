@@ -354,7 +354,7 @@ function rowClassName({ row }: { row: { compliance: string } }): string {
 
 <style scoped>
 
-.g12-ne { padding: 12px; font-size: 13px; }
+.g12-ne { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .methodology { border-left: 3px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; }
 
@@ -372,7 +372,7 @@ function rowClassName({ row }: { row: { compliance: string } }): string {
 
 .overall-head { display: flex; justify-content: space-between; align-items: center; }
 
-.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 

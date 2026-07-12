@@ -126,10 +126,10 @@ const {
 </script>
 
 <style scoped>
-.cycle-adjudication { padding: 12px; font-size: 13px; }
+.cycle-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .sheet-title { margin: 0 0 12px; font-size: 15px; }
 .subtotal-table { margin-top: -1px; }
 .tb-diff-row { display: flex; gap: 24px; margin: 16px 0; align-items: center; }
 .diff-red { color: #f56c6c; font-weight: 600; }
-.audit-notes h4 { margin: 12px 0 6px; font-size: 13px; }
+.audit-notes h4 { margin: 12px 0 6px; font-size: var(--wp-font-size, 13px); }
 </style>

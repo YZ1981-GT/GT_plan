@@ -207,14 +207,14 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 </template>
 
 <style scoped>
-.d4-other-margin{padding:16px 20px;font-size:13px}
+.d4-other-margin{padding:16px 20px;font-size: var(--wp-font-size, 13px)}
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:8px}.toolbar-left{display:flex;align-items:center}.toolbar-right{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .biz-management{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;padding:8px 14px;background:#faf5ff;border-radius:6px;border:1px solid #e8d5f5}.biz-label{font-size:12px;color:#9b59b6;font-weight:500}
 .table-wrapper{overflow-x:auto;margin-bottom:24px;border-radius:6px;border:1px solid #ebeef5}
-.margin-table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px}
+.margin-table{width:100%;border-collapse:collapse;font-size: var(--wp-font-size, 13px);min-width:600px}
 .margin-table th,.margin-table td{padding:6px 8px;border:1px solid #ebeef5;text-align:center;white-space:nowrap}
 .margin-table thead{background:#f5f7fa}
-.header-row-1 th{font-weight:600;font-size:13px}
+.header-row-1 th{font-weight:600;font-size: var(--wp-font-size, 13px)}
 .header-row-2 th{font-size:12px;font-weight:400;color:#606266}
 .col-month{font-weight:500;background:#fafbfc;min-width:50px;text-align:center}
 .col-total{background:#f0faf0;color:#303133}
@@ -224,7 +224,7 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 .summary-row td{background:#f0f9eb !important;font-weight:600}
 .prior-row td{background:#fdf6ec !important}
 .delta-row td{background:#f0f5ff !important}
-.margin-table input{width:80px;border:1px solid #dcdfe6;border-radius:3px;padding:2px 6px;font-size:13px;text-align:right;outline:none}
+.margin-table input{width:80px;border:1px solid #dcdfe6;border-radius:3px;padding:2px 6px;font-size: var(--wp-font-size, 13px);text-align:right;outline:none}
 .margin-table input:focus{border-color:#409eff}
 .margin-table input:disabled{background:#f5f7fa;color:#909399;border-color:#ebeef5}
 .audit-opinion-card{margin-bottom:16px}.opinion-header{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.opinion-title{font-size:14px;font-weight:600;color:#303133}.opinion-actions{margin-left:auto;display:flex;gap:8px}.opinion-body{display:flex;flex-direction:column;gap:14px}.opinion-field label{display:block;font-size:12px;color:#909399;margin-bottom:4px;font-weight:500}

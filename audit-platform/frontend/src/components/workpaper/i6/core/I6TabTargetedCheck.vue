@@ -189,10 +189,10 @@ function handleReview(): void { openReviewDialog('I6-4 针对性检查') }
 </script>
 
 <style scoped>
-.i6-tab-targeted-check { padding: 16px; font-size: 13px; }
+.i6-tab-targeted-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
+.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 .check-section { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
@@ -204,7 +204,7 @@ function handleReview(): void { openReviewDialog('I6-4 针对性检查') }
 .check-items { margin-bottom: 12px; }
 .check-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
 .check-item:last-child { border-bottom: none; }
-.check-label { font-size: 13px; color: var(--el-text-color-regular); flex: 1; }
+.check-label { font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); flex: 1; }
 .section-conclusion { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--el-border-color-lighter); }
 .conclusion-label { font-size: 12px; color: var(--el-text-color-regular); display: block; margin-bottom: 6px; }
 .conclusion-card { margin-bottom: 16px; }

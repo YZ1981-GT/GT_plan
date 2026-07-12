@@ -332,11 +332,11 @@ function fmtPct100(rate: number): string {
 <style scoped>
 .d6-disclosure { padding: 16px; }
 .d6-disclosure :deep(.el-table) {
-  --el-table-font-size: 13px;
-  font-size: 13px;
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
 }
 .d6-disclosure :deep(.el-table .cell) {
-  font-size: 13px !important;
+  font-size: var(--wp-font-size, 13px) !important;
 }
 
 /* 编制提示 */
@@ -354,7 +354,7 @@ function fmtPct100(rate: number): string {
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.6;
 }
@@ -390,7 +390,7 @@ function fmtPct100(rate: number): string {
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; cursor: help; }
 .group-block { margin-bottom: 12px; }
 .group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.group-name { font-weight: 600; font-size: 13px; }
+.group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); }
 .note-block { margin-top: 12px; }
-.note-label { font-size: 13px; color: #606266; margin-bottom: 6px; }
+.note-label { font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 6px; }
 </style>

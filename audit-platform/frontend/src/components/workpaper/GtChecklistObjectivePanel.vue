@@ -269,7 +269,7 @@ function statusText(status: string): string {
   border-radius: 50%;
   background: var(--gt-color-primary, #409eff);
   color: #fff;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -282,12 +282,12 @@ function statusText(status: string): string {
 
 .objective-card__status {
   margin-left: auto;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
 }
 
 .objective-card__desc {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
   color: var(--gt-color-text-secondary, #606266);
   margin: 0 0 12px;

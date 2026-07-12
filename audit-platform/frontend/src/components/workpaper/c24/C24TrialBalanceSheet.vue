@@ -84,17 +84,17 @@ defineEmits<{
 </script>
 
 <style scoped>
-.c24-trial-balance { font-size: 13px; }
+.c24-trial-balance { font-size: var(--wp-font-size, 13px); }
 .methodology-context { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin-bottom: 16px; background: #fffbf0; border-radius: 4px; }
 .methodology-bar { width: 3px; min-height: 20px; align-self: stretch; background: #e6a23c; border-radius: 2px; flex-shrink: 0; }
-.methodology-context p { margin: 0; font-size: 13px; color: #606266; line-height: 1.6; }
+.methodology-context p { margin: 0; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .c24-section { margin-bottom: 20px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .section-title { font-weight: 600; font-size: 14px; color: #303133; }
-.c24-table { font-size: 13px; }
+.c24-table { font-size: var(--wp-font-size, 13px); }
 .c24-table :deep(.el-table__header th),
 .c24-table :deep(.el-table__body td),
-.c24-table :deep(.cell) { font-size: 13px; }
+.c24-table :deep(.cell) { font-size: var(--wp-font-size, 13px); }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; color: #409eff; }
 .text-danger { color: #f56c6c !important; }
 .unit-label { font-size: 12px; color: #909399; font-weight: normal; }

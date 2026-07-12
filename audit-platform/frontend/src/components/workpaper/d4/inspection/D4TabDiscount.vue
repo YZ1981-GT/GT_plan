@@ -393,7 +393,7 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
 </template>
 
 <style scoped>
-.d4-discount { padding: 16px 20px; font-size: 13px; }
+.d4-discount { padding: 16px 20px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
 .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .stats-dashboard { display: flex; gap: 12px; margin-bottom: 20px; padding: 14px 18px; background: linear-gradient(135deg, #f8f9fe 0%, #f0f4ff 100%); border-radius: 10px; border: 1px solid #e4e7ed; }
@@ -405,7 +405,7 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
 .stat-unit { font-size: 12px; font-weight: 400; color: #909399; margin-left: 2px; }
 .stat-label { font-size: 12px; color: #909399; margin-top: 2px; }
 .methodology-collapse { margin-bottom: 14px; border-radius: 6px; border: 1px solid #faecd8; border-left: 3px solid #e6a23c; background: #fffbf0; }
-.methodology-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #b88230; }
+.methodology-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #b88230; }
 .methodology-body { padding: 8px 14px 12px; font-size: 12px; color: #606266; line-height: 1.8; }
 .methodology-body p { margin: 0 0 6px; }
 .guide-strip { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; padding: 10px 14px; background: #f0f9eb; border-radius: 6px; border: 1px solid #e1f3d8; }
@@ -413,7 +413,7 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
 .guide-chip { background: #fff; border: 1px solid #c2e7b0; border-radius: 4px; padding: 2px 8px; font-size: 12px; color: #529b2e; cursor: help; }
 .guide-chip:hover { background: #f0f9eb; }
 .guide-arrow { color: #a8abb2; font-size: 12px; }
-.discount-table { font-size: 13px; }
+.discount-table { font-size: var(--wp-font-size, 13px); }
 .discount-table :deep(.el-table__cell) { padding: 6px 0; }
 .discount-table :deep(.col-basic .el-table__cell) { background-color: #f0faf0 !important; }
 .discount-table :deep(.col-voucher .el-table__cell) { background-color: #f0f5ff !important; }
@@ -427,7 +427,7 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
 .opinion-body { display: flex; flex-direction: column; gap: 14px; }
 .opinion-field label { display: block; font-size: 12px; color: #909399; margin-bottom: 4px; }
 .tips-collapse { margin-bottom: 16px; border-radius: 6px; border: 1px solid #fde2e2; border-left: 3px solid #f56c6c; }
-.tips-summary { cursor: pointer; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #f56c6c; }
+.tips-summary { cursor: pointer; padding: 8px 14px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #f56c6c; }
 .tips-list { margin: 8px 14px 12px; padding-left: 18px; font-size: 12px; color: #606266; line-height: 2; }
 .oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
 </style>

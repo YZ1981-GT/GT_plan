@@ -604,9 +604,9 @@ onMounted(() => { loadData() })
 .audit-section { margin-bottom: 16px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.compile-hint { margin-bottom: 12px; font-size: 13px; }
+.compile-hint { margin-bottom: 12px; font-size: var(--wp-font-size, 13px); }
 .compile-hint summary { cursor: pointer; color: #909399; font-size: 12px; margin-bottom: 8px; }
-.methodology-context { padding: 10px 14px; border-left: 4px solid #e6a23c; background-color: #fdf6ec; font-size: 13px; line-height: 1.7; color: #606266; }
+.methodology-context { padding: 10px 14px; border-left: 4px solid #e6a23c; background-color: #fdf6ec; font-size: var(--wp-font-size, 13px); line-height: 1.7; color: #606266; }
 .methodology-context p { margin: 4px 0; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 .audited-amount { font-weight: 600; color: #303133; }
@@ -614,5 +614,5 @@ onMounted(() => { loadData() })
 .row-actions { margin-top: 12px; }
 .cross-ref-chips { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
 :deep(.formula-column) { background-color: #fafafa; }
-:deep(.el-table) { font-size: 13px; }
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 </style>

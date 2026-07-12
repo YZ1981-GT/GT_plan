@@ -396,19 +396,19 @@ defineExpose({ reload: () => flushPendingSaves() })
 .gt-a121__explanation { border-radius: 6px; margin-bottom: 16px; }
 
 .gt-a121__empty { padding: 16px; text-align: center; border: 1px dashed #dcdfe6; border-radius: 6px; margin-bottom: 12px; }
-.gt-a121__empty-text { color: #909399; font-size: 13px; }
+.gt-a121__empty-text { color: #909399; font-size: var(--wp-font-size, 13px); }
 
 .gt-a121__litigation-card { border: 1px solid #e4e7ed; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
-.gt-a121__litigation-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 13px; font-weight: 500; color: #606266; }
+.gt-a121__litigation-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #606266; }
 .gt-a121__litigation-fields { display: flex; flex-direction: column; gap: 8px; }
 
 .gt-a121__add-btn { margin-top: 8px; }
 
-.gt-a121__simplified-note { font-size: 13px; color: #909399; font-style: italic; margin: 12px 0; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; }
+.gt-a121__simplified-note { font-size: var(--wp-font-size, 13px); color: #909399; font-style: italic; margin: 12px 0; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; }
 
 .gt-a121__conditional-textarea { margin-top: 12px; }
 .gt-a121__conditional-input { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
-.gt-a121__conditional-input label { font-size: 13px; color: #606266; white-space: nowrap; }
+.gt-a121__conditional-input label { font-size: var(--wp-font-size, 13px); color: #606266; white-space: nowrap; }
 
 .gt-a121__oo { height: calc(100vh - 200px); min-height: 500px; }
 

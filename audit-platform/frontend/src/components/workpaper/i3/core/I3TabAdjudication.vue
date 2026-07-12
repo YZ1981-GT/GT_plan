@@ -532,7 +532,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i3-adjudication {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -587,7 +587,7 @@ function fmtAmount(value: number | null | undefined): string {
 
 /* 审定表 */
 .adjudication-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .adjudication-table :deep(.el-table__footer td) {
   font-weight: 600;
@@ -653,7 +653,7 @@ function fmtAmount(value: number | null | undefined): string {
   margin-top: 24px;
 }
 .tb-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .difference-warning {
   color: #dc2626;
@@ -671,7 +671,7 @@ function fmtAmount(value: number | null | undefined): string {
 }
 .cross-ref-label {
   color: #606266;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 审计说明/结论 el-card */

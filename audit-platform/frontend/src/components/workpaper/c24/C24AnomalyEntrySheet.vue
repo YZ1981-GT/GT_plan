@@ -540,14 +540,14 @@ function onAnomalyChange(index: number, field: string, value: string) {
 </script>
 
 <style scoped>
-.c24-anomaly-entry { font-size: 13px; }
+.c24-anomaly-entry { font-size: var(--wp-font-size, 13px); }
 .methodology-context { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; margin-bottom: 16px; background: #fffbf0; border-radius: 4px; }
 .methodology-bar { width: 3px; min-height: 20px; align-self: stretch; background: #e6a23c; border-radius: 2px; flex-shrink: 0; }
-.methodology-context p { margin: 0; font-size: 13px; color: #606266; line-height: 1.6; }
+.methodology-context p { margin: 0; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .c24-section { margin-bottom: 20px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .section-title { font-weight: 600; font-size: 14px; color: #303133; }
-.c24-table { font-size: 13px; }
+.c24-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; color: #409eff; }
 .rules-card { margin-bottom: 16px; }
 .rules-card :deep(.el-card__body) { padding: 12px 16px; }

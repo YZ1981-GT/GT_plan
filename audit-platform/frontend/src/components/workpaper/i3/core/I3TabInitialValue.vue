@@ -763,7 +763,7 @@ function handleReview() {
 
 <style scoped>
 .i3-initial-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
 
@@ -841,7 +841,7 @@ function handleReview() {
 }
 .methodology-content strong {
   color: #92400e;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* 被投资单位工具栏 */
@@ -870,7 +870,7 @@ function handleReview() {
 .calc-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .calc-table th,
 .calc-table td {
@@ -895,7 +895,7 @@ function handleReview() {
 }
 .group-header {
   font-weight: 700;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1f2937;
   padding: 10px 12px;
 }

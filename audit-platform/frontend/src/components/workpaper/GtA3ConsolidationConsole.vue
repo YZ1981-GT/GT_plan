@@ -472,7 +472,7 @@ function debounceSave() {
 .program-card__status-dot { width: 8px; height: 8px; border-radius: 50%; }
 
 .program-card__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
-.program-card__desc { font-size: 13px; color: #303133; line-height: 1.5; }
+.program-card__desc { font-size: var(--wp-font-size, 13px); color: #303133; line-height: 1.5; }
 .program-card__summary {
   display: flex; align-items: center; gap: 4px;
   font-size: 12px; color: #2c5282;
@@ -531,13 +531,13 @@ function debounceSave() {
   flex-wrap: wrap;
 }
 .gt-a3-console__index-code {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 700;
   color: #2c5282;
   min-width: 70px;
 }
 .gt-a3-console__index-name {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   flex: 1;
   min-width: 160px;

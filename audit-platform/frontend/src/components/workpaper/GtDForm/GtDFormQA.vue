@@ -944,7 +944,7 @@ onBeforeUnmount(() => {
   padding: 10px 14px;
   background: var(--gt-color-bg-soft, #f5f7fa);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .gt-dfq__header-meta {
   display: flex;
@@ -1022,7 +1022,7 @@ onBeforeUnmount(() => {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   table-layout: fixed;
 }
 .gt-dfq__col-label {
@@ -1157,7 +1157,7 @@ onBeforeUnmount(() => {
   margin: 0;
   white-space: pre-wrap;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   color: var(--el-text-color-regular);
 }
@@ -1199,7 +1199,7 @@ onBeforeUnmount(() => {
   margin-bottom: 8px;
 }
 .gt-dfq__ai-panel-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   color: var(--el-color-primary);
 }
@@ -1209,7 +1209,7 @@ onBeforeUnmount(() => {
   background: var(--gt-color-bg-white, #fff);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;

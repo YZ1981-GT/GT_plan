@@ -417,7 +417,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.k10-tab-grant-reconcile { padding: 12px; font-size: 13px; }
+.k10-tab-grant-reconcile { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
 .section-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -458,7 +458,7 @@ onMounted(() => {
 .diff-warning { color: #f56c6c; font-weight: 600; }
 
 /* 表格 */
-.reconcile-table { font-size: 13px; }
+.reconcile-table { font-size: var(--wp-font-size, 13px); }
 .reconcile-table :deep(.formula-col) { background: #fafafa; }
 .formula-value {
   border-bottom: 1px dashed #909399;
@@ -472,7 +472,7 @@ onMounted(() => {
   display: flex; justify-content: space-between; align-items: center;
   margin-top: 12px; flex-wrap: wrap; gap: 8px;
 }
-.total-recognized { font-size: 13px; }
+.total-recognized { font-size: var(--wp-font-size, 13px); }
 .total-recognized strong { color: #e6a23c; }
 
 /* 编制提示 */

@@ -139,7 +139,7 @@ function fmtPct(v: number | null) { return v === null ? '-' : (v * 100).toFixed(
 </script>
 
 <style scoped>
-.g11-detail { font-size: 13px; }
+.g11-detail { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

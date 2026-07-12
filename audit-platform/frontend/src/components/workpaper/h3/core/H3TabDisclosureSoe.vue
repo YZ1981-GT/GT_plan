@@ -177,12 +177,12 @@ function generateAI(section: string) {
 </script>
 
 <style scoped>
-.h3-tab-disclosure-soe { padding: 16px; font-size: 13px; }
+.h3-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .method-context { margin-bottom: 16px; }
 .context-bar { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 8px 12px; border-radius: 4px; font-size: 12px; }
 .note-section { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
-.note-table { font-size: 13px; margin-bottom: 12px; }
+.note-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .note-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }
 .formula-value { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

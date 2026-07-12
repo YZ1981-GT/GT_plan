@@ -136,7 +136,7 @@ function fmt(v: number) {
 </script>
 
 <style scoped>
-.g10-adjustment { font-size: 13px; }
+.g10-adjustment { font-size: var(--wp-font-size, 13px); }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

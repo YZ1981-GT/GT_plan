@@ -126,7 +126,7 @@ function handleAiConclusion() { /* TODO */ }
   font-size: 12px; color: #8a6914; line-height: 1.5;
 }
 .conclusion-card { margin-top: 16px; }
-.conclusion-text { white-space: pre-wrap; font-size: 13px; line-height: 1.6; color: #303133; }
+.conclusion-text { white-space: pre-wrap; font-size: var(--wp-font-size, 13px); line-height: 1.6; color: #303133; }
 .edit-hints { margin-top: 16px; font-size: 12px; color: #909399; }
 .edit-hints summary { cursor: pointer; user-select: none; }
 .edit-hints p { margin: 4px 0; line-height: 1.5; }

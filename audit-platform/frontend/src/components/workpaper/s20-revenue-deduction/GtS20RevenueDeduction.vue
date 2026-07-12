@@ -1025,7 +1025,7 @@ onMounted(() => {
 <style scoped>
 .s20-revenue-deduction {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .loading-container {
@@ -1046,7 +1046,7 @@ onMounted(() => {
 }
 
 .audit-objective-text {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
 }
 
@@ -1151,11 +1151,11 @@ onMounted(() => {
 
 /* ─── 表格 ─── */
 .s20-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .s20-table :deep(.el-table__cell) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   padding: 6px 8px;
 }
 

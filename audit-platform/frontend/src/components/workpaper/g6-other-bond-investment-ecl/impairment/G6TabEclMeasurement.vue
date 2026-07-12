@@ -647,7 +647,7 @@ defineExpose({
 <style scoped>
 .g6-tab-ecl-measurement {
   padding: 12px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
@@ -698,7 +698,7 @@ defineExpose({
 
 /* ─── 表格 ─── */
 .ecl-table {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .audit-req-text {
@@ -714,7 +714,7 @@ defineExpose({
 
 .g6-guide-details summary {
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   font-weight: 600;
 }

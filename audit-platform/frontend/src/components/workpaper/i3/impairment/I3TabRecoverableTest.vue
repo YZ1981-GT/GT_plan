@@ -728,7 +728,7 @@ function pct(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i3-tab-recoverable-test { padding: 16px; font-size: 13px; }
+.i3-tab-recoverable-test { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 /* 蓝色渐变引导区 */
 .guidance-block {
@@ -747,7 +747,7 @@ function pct(val: number | null | undefined): string {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #1a5276;
   line-height: 1.5;
 }
@@ -782,7 +782,7 @@ function pct(val: number | null | undefined): string {
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 
 .sub-section-title {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 600;
   margin: 16px 0 10px;
   padding-bottom: 6px;
@@ -794,7 +794,7 @@ function pct(val: number | null | undefined): string {
 /* DCF表格 */
 .dcf-input-section { margin-top: 8px; }
 .dcf-table-wrapper { border: 1px solid var(--el-border-color-lighter); border-radius: 4px; }
-.dcf-core-table { font-size: 13px; }
+.dcf-core-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 
@@ -827,7 +827,7 @@ function pct(val: number | null | undefined): string {
   font-weight: 500;
 }
 .param-value {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
@@ -838,7 +838,7 @@ function pct(val: number | null | undefined): string {
   align-items: center;
   gap: 8px;
   padding: 8px 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .wacc-value {
   font-size: 16px;

@@ -476,7 +476,7 @@ function fmtAmount(v: number): string {
 }
 .overview-desc {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
 
@@ -484,7 +484,7 @@ function fmtAmount(v: number): string {
   padding: 40px 20px;
   text-align: center;
   color: #909399;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   border: 1px dashed #dcdfe6;
   border-radius: 8px;
   margin-bottom: 16px;
@@ -492,7 +492,7 @@ function fmtAmount(v: number): string {
 
 /* Tab 样式微调 */
 :deep(.el-tabs--card > .el-tabs__header .el-tabs__item) {
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 
 .guidance-section { margin: 20px 0 16px; }
@@ -507,11 +507,11 @@ function fmtAmount(v: number): string {
   cursor: pointer;
   font-weight: 500;
   color: #409eff;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
 }
 .guidance-content {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #606266;
   line-height: 1.7;
   white-space: pre-wrap;
@@ -533,7 +533,7 @@ function fmtAmount(v: number): string {
   padding: 10px 12px;
   background: #f5f7fa;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   color: #303133;
   margin-bottom: 14px;
   line-height: 1.6;
@@ -542,7 +542,7 @@ function fmtAmount(v: number): string {
 .opinion-fields { display: flex; flex-direction: column; gap: 14px; }
 .opinion-field label {
   display: block;
-  font-size: 13px;
+  font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
   margin-bottom: 6px;

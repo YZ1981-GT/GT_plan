@@ -78,7 +78,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 </template>
 
 <style scoped>
-.g12-dir { padding: 12px; font-size: 13px; }
+.g12-dir { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .index-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .title { margin: 0; font-size: 15px; font-weight: 600; }
 .progress-wrap { min-width: 220px; }
@@ -88,7 +88,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 .index-review-dot { margin-left: 4px; }
 .methodology-hint {
   margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff;
-  background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: 13px; color: #606266;
+  background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266;
 }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 </style>
