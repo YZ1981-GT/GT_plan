@@ -266,14 +266,12 @@
             <el-table-column type="index" label="#" width="50" />
             <el-table-column label="规则名称" min-width="200">
               <template #default="{ row }">
-                <el-input v-if="row._editing" v-model="row.label" size="small" />
-                <span v-else style="font-size: var(--gt-font-size-xs);">{{ row.label }}</span>
+                <span style="font-size: var(--gt-font-size-xs);">{{ row.label }}</span>
               </template>
             </el-table-column>
             <el-table-column label="左侧（源）" min-width="180">
               <template #default="{ row }">
-                <el-input v-if="row._editing" v-model="row.left_ref" size="small" placeholder="如 BS-002 或 NOTE('货币资金','合计')" />
-                <code v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.left_ref || '—' }}</code>
+                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.left_ref || '—' }}</code>
               </template>
             </el-table-column>
             <el-table-column label="关系" width="60" align="center">
@@ -281,15 +279,13 @@
             </el-table-column>
             <el-table-column label="右侧（目标）" min-width="180">
               <template #default="{ row }">
-                <el-input v-if="row._editing" v-model="row.right_ref" size="small" placeholder="如 E1-1.审定数 或 NOTE('货币资金','期末')" />
-                <code v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.right_ref || '—' }}</code>
+                <code style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ row.right_ref || '—' }}</code>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="100" align="center">
+            <el-table-column label="操作" width="120" align="center">
               <template #default="{ row, $index }">
                 <div style="display: flex; gap: 4px; justify-content: center;">
-                  <el-button v-if="!row._editing" size="small" link type="primary" @click="row._editing = true">编辑</el-button>
-                  <el-button v-if="row._editing" size="small" link type="success" @click="row._editing = false">完成</el-button>
+                  <el-button size="small" link type="primary" @click="onEditCrossRule(row, $index)">编辑</el-button>
                   <el-button size="small" link style="color: var(--gt-color-text-tertiary);" @click="onRemoveCrossRule($index)">删除</el-button>
                 </div>
               </template>
@@ -298,6 +294,51 @@
           <div style="margin-top: 8px; text-align: right; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
             {{ crossCheckRulesForCurrent.length }} 条规则
           </div>
+
+          <!-- 表间审核规则编辑弹窗 -->
+          <el-dialog
+            v-model="showCrossRuleDialog"
+            :title="crossRuleDialogTitle"
+            width="640px"
+            append-to-body
+            destroy-on-close
+          >
+            <el-form :model="crossRuleForm" label-width="100px" label-position="top" style="padding: 0 10px;">
+              <el-form-item label="规则名称" required>
+                <el-input v-model="crossRuleForm.label" placeholder="如：BS货币资金 = 附注货币资金合计" />
+              </el-form-item>
+              <el-form-item label="左侧（源）" required>
+                <el-input v-model="crossRuleForm.left_ref" placeholder="报表行次引用，如 REPORT('BS-002','期末')">
+                  <template #prepend>源</template>
+                </el-input>
+                <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
+                  语法：REPORT('行次','字段') 或 ROW('行次')。示例：REPORT('BS-002','期末')
+                </div>
+              </el-form-item>
+              <el-form-item label="关系运算符">
+                <el-select v-model="crossRuleForm.operator" style="width: 120px;">
+                  <el-option label="=" value="=" />
+                  <el-option label="≤" value="<=" />
+                  <el-option label="≥" value=">=" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="右侧（目标）" required>
+                <el-input v-model="crossRuleForm.right_ref" placeholder="附注/底稿引用，如 NOTE('货币资金','合计') 或 WP('E1','E1-1','审定数')">
+                  <template #prepend>目标</template>
+                </el-input>
+                <div style="font-size: 11px; color: var(--gt-color-text-tertiary); margin-top: 4px;">
+                  语法：NOTE('章节','字段') / WP('底稿','sheet','坐标') / TB('科目','字段')
+                </div>
+              </el-form-item>
+              <el-form-item label="说明（选填）">
+                <el-input v-model="crossRuleForm.description" type="textarea" :autosize="{ minRows: 2 }" placeholder="描述该规则的业务含义" />
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="showCrossRuleDialog = false">取消</el-button>
+              <el-button type="primary" @click="onSaveCrossRule" :disabled="!crossRuleForm.label || !crossRuleForm.left_ref || !crossRuleForm.right_ref">确认保存</el-button>
+            </template>
+          </el-dialog>
         </div>
       </div>
     </div>
@@ -1589,15 +1630,61 @@ const crossCheckRulesForCurrent = computed(() => {
   return crossCheckRulesMap.value[key] || []
 })
 
+// ── 表间审核规则弹窗编辑 ──
+const showCrossRuleDialog = ref(false)
+const crossRuleDialogTitle = ref('新增规则')
+const crossRuleEditIndex = ref(-1)  // -1 = 新增，>= 0 = 编辑已有行
+const crossRuleForm = ref({
+  label: '',
+  left_ref: '',
+  operator: '=',
+  right_ref: '',
+  description: '',
+})
+
 function onAddCrossRule() {
+  crossRuleDialogTitle.value = '新增表间审核规则'
+  crossRuleEditIndex.value = -1
+  crossRuleForm.value = { label: '', left_ref: '', operator: '=', right_ref: '', description: '' }
+  showCrossRuleDialog.value = true
+}
+
+function onEditCrossRule(row: any, index: number) {
+  crossRuleDialogTitle.value = '编辑表间审核规则'
+  crossRuleEditIndex.value = index
+  crossRuleForm.value = {
+    label: row.label || '',
+    left_ref: row.left_ref || '',
+    operator: row.operator || '=',
+    right_ref: row.right_ref || '',
+    description: row.description || '',
+  }
+  showCrossRuleDialog.value = true
+}
+
+function onSaveCrossRule() {
   const key = selectedNodeKey.value
   if (!crossCheckRulesMap.value[key]) crossCheckRulesMap.value[key] = []
-  crossCheckRulesMap.value[key].push({
-    label: '新规则',
-    left_ref: '',
-    right_ref: '',
-    _editing: true,
-  })
+
+  const ruleData = {
+    label: crossRuleForm.value.label,
+    left_ref: crossRuleForm.value.left_ref,
+    operator: crossRuleForm.value.operator,
+    right_ref: crossRuleForm.value.right_ref,
+    description: crossRuleForm.value.description,
+    _editing: false,
+  }
+
+  if (crossRuleEditIndex.value >= 0) {
+    // 编辑已有行
+    Object.assign(crossCheckRulesMap.value[key][crossRuleEditIndex.value], ruleData)
+  } else {
+    // 新增
+    crossCheckRulesMap.value[key].push(ruleData)
+  }
+
+  showCrossRuleDialog.value = false
+  ElMessage.success(crossRuleEditIndex.value >= 0 ? '规则已更新' : '规则已新增')
 }
 
 function onRemoveCrossRule(index: number) {
