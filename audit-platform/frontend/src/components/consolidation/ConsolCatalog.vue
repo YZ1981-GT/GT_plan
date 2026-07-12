@@ -89,20 +89,45 @@ onUnmounted(() => {
   eventBus.off('four-col-switch', onSwitchFourCol)
 })
 
-// ─── 报表树 ──────────────────────────────────────────────────────────────────
-const reportTree = computed(() => [
+// ─── 报表树（动态从 API 加载，项目不同可能有不同合并报表） ──────────────────
+const CONSOL_REPORT_FALLBACK = [
   { key: 'bs', label: '资产负债表', icon: '📋', type: 'balance_sheet' },
   { key: 'is', label: '利润表', icon: '📈', type: 'income_statement' },
   { key: 'cf', label: '现金流量表', icon: '💰', type: 'cash_flow_statement' },
   { key: 'eq', label: '权益变动表', icon: '📊', type: 'equity_statement' },
   { key: 'cfs', label: '现金流附表', icon: '📑', type: 'cash_flow_supplement' },
   { key: 'imp', label: '资产减值准备表', icon: '⚠️', type: 'impairment_provision' },
-])
+]
+const reportTreeDynamic = ref<any[]>([])
+
+async function loadReportTree() {
+  try {
+    const { data } = await api.get('/api/report-config/types', {
+      params: { scope: 'consolidated' },
+    })
+    if (Array.isArray(data) && data.length) {
+      reportTreeDynamic.value = data.map((r: any) => ({
+        key: r.report_type || r.type,
+        label: r.label || r.report_type,
+        icon: '',
+        type: r.report_type || r.type,
+      }))
+      return
+    }
+  } catch { /* 降级 */ }
+  reportTreeDynamic.value = []
+}
+
+const reportTree = computed(() =>
+  reportTreeDynamic.value.length ? reportTreeDynamic.value : CONSOL_REPORT_FALLBACK
+)
 
 // ─── 附注树 ──────────────────────────────────────────────────────────────────
 const noteTree = ref<any[]>([])
 
 async function loadData() {
+  // 先加载合并报表类型树（动态）
+  await loadReportTree()
   try {
     // 从合并附注章节 API 加载（按父章节分组的树形）
     const data = await api.get(`/api/consol-note-sections/${standard.value}`, {

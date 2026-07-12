@@ -438,7 +438,29 @@
       <div style="margin-bottom: 8px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
         跨全部作用域（单体附注 / 合并附注 / 合并工作底稿 / 合并报表 / 报表 / 试算平衡表 / 底稿）展示所有公式，共 {{ scopeCatalog.totalCount.value }} 条。各作用域公式集互不串扰。
       </div>
-      <el-empty v-if="!globalScopeGroups.length" description="暂无公式" />
+      <div v-if="!globalScopeGroups.length" style="text-align: center; padding: 40px 20px;">
+        <el-empty description="暂无公式" :image-size="80" style="margin-bottom: 16px;" />
+        <div style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 20px; line-height: 1.8;">
+          当前项目尚未创建任何公式。您可以通过以下方式快速初始化：
+        </div>
+        <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 12px;">
+          <el-button type="primary" plain @click="onImportPresetFormulas">
+            📦 从预设库导入公式
+          </el-button>
+          <el-button plain @click="onAutoGenerateReportFormulas">
+            ⚡ 自动生成报表公式
+          </el-button>
+          <el-button plain @click="showGlobalScopeOverview = false">
+            ✏️ 手动新增公式
+          </el-button>
+        </div>
+        <div style="margin-top: 16px; padding: 12px 16px; background: var(--gt-color-fill-tertiary, #f5f7fa); border-radius: 6px; text-align: left; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); line-height: 1.8;">
+          <div><strong>💡 说明：</strong></div>
+          <div>• <strong>从预设库导入</strong>：导入致同标准版报表/附注/审定表公式模板（可按作用域选择性导入）</div>
+          <div>• <strong>自动生成报表公式</strong>：基于当前项目 report_config 自动生成 auto_calc / logic_check 公式</div>
+          <div>• <strong>手动新增</strong>：在左侧导航树选中目标节点后，点击"新增公式"逐条创建</div>
+        </div>
+      </div>
       <div v-else style="max-height: 72vh; overflow-y: auto;">
         <div v-for="group in globalScopeGroups" :key="group.scope" style="margin-bottom: 14px;">
           <div style="font-weight: 600; font-size: var(--gt-font-size-sm); margin-bottom: 6px; color: var(--gt-color-text-primary);">
@@ -479,7 +501,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, shallowRef, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -493,6 +515,7 @@ import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
+import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
 import {
   useFormulaScopeCatalog,
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
@@ -578,6 +601,49 @@ async function onOpenGlobalScopeOverview() {
   }
 }
 
+/** 从预设库导入公式（空态引导按钮） */
+async function onImportPresetFormulas() {
+  if (!props.projectId) return
+  try {
+    await ElMessageBox.confirm(
+      '将从致同标准预设库导入公式模板到当前项目（已有公式不会被覆盖）。确认导入？',
+      '从预设库导入公式',
+      { confirmButtonText: '确认导入', cancelButtonText: '取消', type: 'info' },
+    )
+    const { data } = await http.post(`/api/projects/${props.projectId}/formula/import-presets`)
+    const count = data?.imported_count ?? data?.count ?? 0
+    ElMessage.success(`已成功导入 ${count} 条预设公式`)
+    // 刷新全局视图
+    showGlobalScopeOverview.value = false
+    await onOpenGlobalScopeOverview()
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.toString() !== 'cancel') {
+      ElMessage.error('导入预设公式失败：' + (e?.message || '未知错误'))
+    }
+  }
+}
+
+/** 自动生成报表公式（空态引导按钮） */
+async function onAutoGenerateReportFormulas() {
+  if (!props.projectId) return
+  try {
+    await ElMessageBox.confirm(
+      '将基于当前项目的 report_config 自动生成 auto_calc（自动运算）和 logic_check（逻辑审核）公式。确认生成？',
+      '自动生成报表公式',
+      { confirmButtonText: '确认生成', cancelButtonText: '取消', type: 'info' },
+    )
+    const { data } = await http.post(`/api/projects/${props.projectId}/formula/auto-generate`)
+    const count = data?.generated_count ?? data?.count ?? 0
+    ElMessage.success(`已自动生成 ${count} 条报表公式`)
+    showGlobalScopeOverview.value = false
+    await onOpenGlobalScopeOverview()
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.toString() !== 'cancel') {
+      ElMessage.error('自动生成公式失败：' + (e?.message || '未知错误'))
+    }
+  }
+}
+
 // ── 树形导航数据 ──
 const selectedNodeKey = ref('report_balance_sheet')
 const selectedPath = ref('报表 > 资产负债表')
@@ -608,13 +674,24 @@ function allowTreeDrop(draggingNode: any, dropNode: any, type: string) {
   return draggingNode.parent === dropNode.parent && type !== 'inner'
 }
 
-// ── 动态附注树（从实际模板加载） ──
+// ── 动态附注树（从项目实际附注章节加载，项目不同内容不同） ──
 const noteTreeChildren = ref<any[]>([])
 const noteTreeLoaded = ref(false)
 
 async function loadNoteTree() {
   if (noteTreeLoaded.value) return
   try {
+    // 优先从项目级附注 API 加载（项目不同结构不同）
+    if (props.projectId && props.year) {
+      const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
+      const notes = await getDisclosureNoteTree(props.projectId, Number(props.year))
+      if (Array.isArray(notes) && notes.length) {
+        noteTreeChildren.value = buildNoteTreeFromProjectData(notes)
+        noteTreeLoaded.value = true
+        return
+      }
+    }
+    // 降级：从模板级 API 加载（不区分项目）
     const data = await api.get(P_nt.list(fmTemplateType.value), {
       validateStatus: (s: number) => s < 600,
     })
@@ -680,129 +757,352 @@ async function loadNoteTree() {
   } catch { /* ignore, fallback to static tree */ }
 }
 
-// 静态附注树（降级用）
+/** 从项目级附注数据构建章节树（动态，项目不同结构不同） */
+function buildNoteTreeFromProjectData(notes: Array<{ note_section: string; section_title?: string; tables?: any[]; check_presets?: Record<string, any> }>): any[] {
+  const CHAPTER_ORDER = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七']
+  const chapterMap: Record<string, { label: string; children: any[] }> = {}
+
+  for (const n of notes) {
+    const sectionId = n.note_section || ''
+    const title = n.section_title || sectionId
+    // 提取章节编号
+    const chMatch = sectionId.match(/^([一二三四五六七八九十]+(?:[一二三四五六七八九十])?)/)
+    const chapter = chMatch ? chMatch[1] : '其他'
+
+    if (!chapterMap[chapter]) {
+      chapterMap[chapter] = { label: `${chapter}、${title.split('、')[0] || ''}`, children: [] }
+    }
+    chapterMap[chapter].children.push({
+      key: `note_${sectionId.replace(/[、，。\s]/g, '_')}`,
+      label: title.length > 24 ? title.slice(0, 24) + '…' : title,
+      icon: '',
+      _sectionTitle: title,
+      _sectionId: sectionId,
+      _tableCount: n.tables?.length || 0,
+      count: n.check_presets ? Object.keys(n.check_presets).length : 0,
+    })
+  }
+
+  const result: any[] = []
+  for (const ch of CHAPTER_ORDER) {
+    if (chapterMap[ch]) {
+      result.push({
+        key: `note_chapter_${ch}`,
+        label: chapterMap[ch].label,
+        icon: '',
+        children: chapterMap[ch].children,
+      })
+    }
+  }
+  if (chapterMap['其他']?.children.length) {
+    result.push({ key: 'note_chapter_other', label: '其他', icon: '', children: chapterMap['其他'].children })
+  }
+  return result
+}
+
+// 静态附注树（降级用 / ACNR 尚未覆盖 note 域时显示）
+// 结构与致同 2025 修订版附注模板全章节对齐，key 遵循 ACNR note 索引语法 `note:{section_id}`
 const staticNoteTree = [
-  { key: 'note_current_asset', label: '流动资产', icon: '', children: [
-    { key: 'note_cash', label: '货币资金', icon: '', _sectionTitle: '货币资金' },
-    { key: 'note_ar', label: '应收账款', icon: '', _sectionTitle: '应收账款' },
-    { key: 'note_other_recv', label: '其他应收款', icon: '', _sectionTitle: '其他应收款' },
-    { key: 'note_inventory', label: '存货', icon: '', _sectionTitle: '存货' },
+  { key: 'note_chapter_yi', label: '一、公司概况', icon: '', children: [
+    { key: 'note_yi_1', label: '公司注册地/组织形式/总部', icon: '', _sectionTitle: '公司概况' },
+    { key: 'note_yi_2', label: '经营范围/主要业务', icon: '', _sectionTitle: '经营范围' },
   ]},
-  { key: 'note_noncurrent_asset', label: '长期资产', icon: '', children: [
-    { key: 'note_fixed_asset', label: '固定资产', icon: '', _sectionTitle: '固定资产' },
-    { key: 'note_intangible', label: '无形资产', icon: '', _sectionTitle: '无形资产' },
-    { key: 'note_lt_equity', label: '长期股权投资', icon: '', _sectionTitle: '长期股权投资' },
+  { key: 'note_chapter_er', label: '二、编制基础', icon: '', children: [
+    { key: 'note_er_1', label: '编制基础说明', icon: '', _sectionTitle: '编制基础' },
+    { key: 'note_er_2', label: '持续经营', icon: '', _sectionTitle: '持续经营' },
   ]},
-  { key: 'note_liability', label: '负债', icon: '', children: [
-    { key: 'note_ap', label: '应付账款', icon: '', _sectionTitle: '应付账款' },
-    { key: 'note_employee_pay', label: '应付职工薪酬', icon: '', _sectionTitle: '应付职工薪酬' },
+  { key: 'note_chapter_san', label: '三、重要会计政策及估计', icon: '', children: [
+    { key: 'note_san_1', label: '遵循企业准则声明', icon: '', _sectionTitle: '遵循企业准则声明' },
+    { key: 'note_san_2', label: '会计期间', icon: '', _sectionTitle: '会计期间' },
+    { key: 'note_san_3', label: '营业周期', icon: '', _sectionTitle: '营业周期' },
+    { key: 'note_san_4', label: '记账本位币', icon: '', _sectionTitle: '记账本位币' },
+    { key: 'note_san_5', label: '金融工具分类', icon: '', _sectionTitle: '金融工具分类' },
+    { key: 'note_san_6', label: '金融资产减值', icon: '', _sectionTitle: '金融资产减值' },
+    { key: 'note_san_7', label: '存货', icon: '', _sectionTitle: '存货' },
+    { key: 'note_san_8', label: '固定资产', icon: '', _sectionTitle: '固定资产' },
+    { key: 'note_san_9', label: '无形资产', icon: '', _sectionTitle: '无形资产' },
+    { key: 'note_san_10', label: '长期股权投资', icon: '', _sectionTitle: '长期股权投资' },
+    { key: 'note_san_11', label: '投资性房地产', icon: '', _sectionTitle: '投资性房地产' },
+    { key: 'note_san_12', label: '收入确认', icon: '', _sectionTitle: '收入确认' },
+    { key: 'note_san_13', label: '政府补助', icon: '', _sectionTitle: '政府补助' },
+    { key: 'note_san_14', label: '所得税', icon: '', _sectionTitle: '所得税' },
+    { key: 'note_san_15', label: '租赁', icon: '', _sectionTitle: '租赁' },
+    { key: 'note_san_16', label: '重要会计估计和判断', icon: '', _sectionTitle: '重要会计估计和判断' },
   ]},
-  { key: 'note_income_expense', label: '损益类', icon: '', children: [
-    { key: 'note_revenue', label: '营业收入/成本', icon: '', _sectionTitle: '营业收入' },
-    { key: 'note_finance_exp', label: '财务费用', icon: '', _sectionTitle: '财务费用' },
+  { key: 'note_chapter_si', label: '四、税项', icon: '', children: [
+    { key: 'note_si_1', label: '主要税种及税率', icon: '', _sectionTitle: '主要税种及税率' },
+    { key: 'note_si_2', label: '税收优惠', icon: '', _sectionTitle: '税收优惠' },
+  ]},
+  { key: 'note_chapter_wu', label: '五、报表科目注释', icon: '', children: [
+    // ── 资产类 ──
+    { key: 'note_wu_cash', label: '货币资金', icon: '', _sectionTitle: '货币资金' },
+    { key: 'note_wu_trading_fa', label: '交易性金融资产', icon: '', _sectionTitle: '交易性金融资产' },
+    { key: 'note_wu_notes_recv', label: '应收票据', icon: '', _sectionTitle: '应收票据' },
+    { key: 'note_wu_ar', label: '应收账款', icon: '', _sectionTitle: '应收账款' },
+    { key: 'note_wu_recv_financing', label: '应收款项融资', icon: '', _sectionTitle: '应收款项融资' },
+    { key: 'note_wu_prepay', label: '预付款项', icon: '', _sectionTitle: '预付款项' },
+    { key: 'note_wu_other_recv', label: '其他应收款', icon: '', _sectionTitle: '其他应收款' },
+    { key: 'note_wu_inventory', label: '存货', icon: '', _sectionTitle: '存货' },
+    { key: 'note_wu_contract_asset', label: '合同资产', icon: '', _sectionTitle: '合同资产' },
+    { key: 'note_wu_noncurrent_1y', label: '一年内到期非流动资产', icon: '', _sectionTitle: '一年内到期非流动资产' },
+    { key: 'note_wu_other_current', label: '其他流动资产', icon: '', _sectionTitle: '其他流动资产' },
+    { key: 'note_wu_lt_recv', label: '长期应收款', icon: '', _sectionTitle: '长期应收款' },
+    { key: 'note_wu_lt_equity', label: '长期股权投资', icon: '', _sectionTitle: '长期股权投资' },
+    { key: 'note_wu_other_equity', label: '其他权益工具投资', icon: '', _sectionTitle: '其他权益工具投资' },
+    { key: 'note_wu_other_noncurrent_fa', label: '其他非流动金融资产', icon: '', _sectionTitle: '其他非流动金融资产' },
+    { key: 'note_wu_invest_property', label: '投资性房地产', icon: '', _sectionTitle: '投资性房地产' },
+    { key: 'note_wu_fixed_asset', label: '固定资产', icon: '', _sectionTitle: '固定资产' },
+    { key: 'note_wu_cip', label: '在建工程', icon: '', _sectionTitle: '在建工程' },
+    { key: 'note_wu_rou', label: '使用权资产', icon: '', _sectionTitle: '使用权资产' },
+    { key: 'note_wu_intangible', label: '无形资产', icon: '', _sectionTitle: '无形资产' },
+    { key: 'note_wu_goodwill', label: '商誉', icon: '', _sectionTitle: '商誉' },
+    { key: 'note_wu_lt_prepaid', label: '长期待摊费用', icon: '', _sectionTitle: '长期待摊费用' },
+    { key: 'note_wu_deferred_tax_asset', label: '递延所得税资产', icon: '', _sectionTitle: '递延所得税资产' },
+    { key: 'note_wu_other_noncurrent', label: '其他非流动资产', icon: '', _sectionTitle: '其他非流动资产' },
+    // ── 负债类 ──
+    { key: 'note_wu_st_borrow', label: '短期借款', icon: '', _sectionTitle: '短期借款' },
+    { key: 'note_wu_trading_fl', label: '交易性金融负债', icon: '', _sectionTitle: '交易性金融负债' },
+    { key: 'note_wu_notes_payable', label: '应付票据', icon: '', _sectionTitle: '应付票据' },
+    { key: 'note_wu_ap', label: '应付账款', icon: '', _sectionTitle: '应付账款' },
+    { key: 'note_wu_advance_recv', label: '预收款项/合同负债', icon: '', _sectionTitle: '合同负债' },
+    { key: 'note_wu_employee_pay', label: '应付职工薪酬', icon: '', _sectionTitle: '应付职工薪酬' },
+    { key: 'note_wu_tax_payable', label: '应交税费', icon: '', _sectionTitle: '应交税费' },
+    { key: 'note_wu_other_payable', label: '其他应付款', icon: '', _sectionTitle: '其他应付款' },
+    { key: 'note_wu_current_1y', label: '一年内到期非流动负债', icon: '', _sectionTitle: '一年内到期非流动负债' },
+    { key: 'note_wu_other_current_liab', label: '其他流动负债', icon: '', _sectionTitle: '其他流动负债' },
+    { key: 'note_wu_lt_borrow', label: '长期借款', icon: '', _sectionTitle: '长期借款' },
+    { key: 'note_wu_bonds_payable', label: '应付债券', icon: '', _sectionTitle: '应付债券' },
+    { key: 'note_wu_lease_liab', label: '租赁负债', icon: '', _sectionTitle: '租赁负债' },
+    { key: 'note_wu_lt_payable', label: '长期应付款', icon: '', _sectionTitle: '长期应付款' },
+    { key: 'note_wu_deferred_tax_liab', label: '递延所得税负债', icon: '', _sectionTitle: '递延所得税负债' },
+    { key: 'note_wu_provision', label: '预计负债', icon: '', _sectionTitle: '预计负债' },
+    { key: 'note_wu_deferred_income', label: '递延收益', icon: '', _sectionTitle: '递延收益' },
+    // ── 权益类 ──
+    { key: 'note_wu_share_capital', label: '股本/实收资本', icon: '', _sectionTitle: '股本' },
+    { key: 'note_wu_capital_reserve', label: '资本公积', icon: '', _sectionTitle: '资本公积' },
+    { key: 'note_wu_other_ci', label: '其他综合收益', icon: '', _sectionTitle: '其他综合收益' },
+    { key: 'note_wu_surplus_reserve', label: '盈余公积', icon: '', _sectionTitle: '盈余公积' },
+    { key: 'note_wu_undist_profit', label: '未分配利润', icon: '', _sectionTitle: '未分配利润' },
+    // ── 损益类 ──
+    { key: 'note_wu_revenue', label: '营业收入/营业成本', icon: '', _sectionTitle: '营业收入' },
+    { key: 'note_wu_tax_surcharge', label: '税金及附加', icon: '', _sectionTitle: '税金及附加' },
+    { key: 'note_wu_selling_exp', label: '销售费用', icon: '', _sectionTitle: '销售费用' },
+    { key: 'note_wu_admin_exp', label: '管理费用', icon: '', _sectionTitle: '管理费用' },
+    { key: 'note_wu_rd_exp', label: '研发费用', icon: '', _sectionTitle: '研发费用' },
+    { key: 'note_wu_finance_exp', label: '财务费用', icon: '', _sectionTitle: '财务费用' },
+    { key: 'note_wu_other_income', label: '其他收益', icon: '', _sectionTitle: '其他收益' },
+    { key: 'note_wu_invest_income', label: '投资收益', icon: '', _sectionTitle: '投资收益' },
+    { key: 'note_wu_credit_loss', label: '信用减值损失', icon: '', _sectionTitle: '信用减值损失' },
+    { key: 'note_wu_asset_loss', label: '资产减值损失', icon: '', _sectionTitle: '资产减值损失' },
+    { key: 'note_wu_asset_disposal', label: '资产处置收益', icon: '', _sectionTitle: '资产处置收益' },
+    { key: 'note_wu_non_op_income', label: '营业外收入', icon: '', _sectionTitle: '营业外收入' },
+    { key: 'note_wu_non_op_exp', label: '营业外支出', icon: '', _sectionTitle: '营业外支出' },
+    { key: 'note_wu_income_tax', label: '所得税费用', icon: '', _sectionTitle: '所得税费用' },
+  ]},
+  { key: 'note_chapter_liu', label: '六、其他重要事项', icon: '', children: [
+    { key: 'note_liu_1', label: '分部报告', icon: '', _sectionTitle: '分部报告' },
+    { key: 'note_liu_2', label: '金融工具风险', icon: '', _sectionTitle: '金融工具风险' },
+    { key: 'note_liu_3', label: '公允价值层次', icon: '', _sectionTitle: '公允价值层次' },
+  ]},
+  { key: 'note_chapter_qi', label: '七、关联方关系及交易', icon: '', children: [
+    { key: 'note_qi_1', label: '关联方清单', icon: '', _sectionTitle: '关联方清单' },
+    { key: 'note_qi_2', label: '关联交易', icon: '', _sectionTitle: '关联交易' },
+    { key: 'note_qi_3', label: '关联方应收应付', icon: '', _sectionTitle: '关联方应收应付' },
+  ]},
+  { key: 'note_chapter_ba', label: '八、或有事项', icon: '', children: [
+    { key: 'note_ba_1', label: '未决诉讼', icon: '', _sectionTitle: '未决诉讼' },
+    { key: 'note_ba_2', label: '担保事项', icon: '', _sectionTitle: '担保事项' },
+  ]},
+  { key: 'note_chapter_jiu', label: '九、承诺事项', icon: '', children: [
+    { key: 'note_jiu_1', label: '资本承诺', icon: '', _sectionTitle: '资本承诺' },
+    { key: 'note_jiu_2', label: '经营租赁承诺', icon: '', _sectionTitle: '经营租赁承诺' },
+  ]},
+  { key: 'note_chapter_shi', label: '十、资产负债表日后事项', icon: '', children: [
+    { key: 'note_shi_1', label: '日后调整事项', icon: '', _sectionTitle: '日后调整事项' },
+    { key: 'note_shi_2', label: '日后非调整事项', icon: '', _sectionTitle: '日后非调整事项' },
   ]},
 ]
 
-const treeData = computed(() => [
-  {
-    key: 'trial_balance', label: '试算平衡表', icon: '📑', children: [
+// ── ACNR 五域导航树（动态构建，与地址坐标名称库一致） ──
+// 域标签与图标映射（五域 + 合并/表间/质量规则扩展）
+const DOMAIN_TREE_META: Record<string, { label: string; icon: string }> = {
+  tb: { label: '试算平衡表', icon: '📑' },
+  report: { label: '报表', icon: '📊' },
+  note: { label: '附注', icon: '📝' },
+  wp: { label: '底稿', icon: '📋' },
+  aux: { label: '辅助余额', icon: '📎' },
+}
+
+// WP 域循环中文标签
+const CYCLE_LABEL_MAP: Record<string, string> = {
+  D: 'D 销售循环', E: 'E 货币资金', F: 'F 采购循环',
+  G: 'G 生产循环', H: 'H 固定资产', I: 'I 无形资产',
+  J: 'J 投资循环', K: 'K 筹资循环', L: 'L 人力循环',
+  M: 'M 权益循环', N: 'N 税项循环', S: 'S 特定项目',
+}
+
+// 报表子类（动态从 report_config API 获取，项目不同可能有不同报表类型）
+const reportTypes = ref<Array<{ type: string; label: string; count: number }>>([])
+const reportTypesLoaded = ref(false)
+
+async function loadReportTypes() {
+  if (reportTypesLoaded.value) return
+  try {
+    const { data } = await http.get('/api/report-config/types', {
+      params: { project_id: props.projectId },
+    })
+    if (Array.isArray(data) && data.length) {
+      reportTypes.value = data.map((r: any) => ({
+        type: r.report_type || r.type,
+        label: r.label || REPORT_SUBTYPE_LABELS_FALLBACK[r.report_type || r.type] || r.report_type,
+        count: r.formula_count ?? 0,
+      }))
+      reportTypesLoaded.value = true
+      return
+    }
+  } catch { /* 降级到静态 */ }
+  // 降级：API 不可用时用静态
+  reportTypes.value = Object.entries(REPORT_SUBTYPE_LABELS_FALLBACK).map(([type, label]) => ({
+    type, label, count: countFormulas(type),
+  }))
+  reportTypesLoaded.value = true
+}
+
+// 报表类型静态降级标签
+const REPORT_SUBTYPE_LABELS_FALLBACK: Record<string, string> = {
+  balance_sheet: '资产负债表',
+  income_statement: '利润表',
+  cash_flow_statement: '现金流量表',
+  equity_statement: '权益变动表',
+  cash_flow_supplement: '现金流附表',
+  impairment_provision: '资产减值准备表',
+}
+
+// ACNR sheet 列表缓存（从 useAcnr 加载）
+const acnrSheets = shallowRef<AcnrSheetEntry[]>([])
+const acnrTreeLoaded = ref(false)
+
+async function loadAcnrTree() {
+  if (acnrTreeLoaded.value) return
+  try {
+    const acnr = useAcnr()
+    acnrSheets.value = await acnr.listSheets()
+    acnrTreeLoaded.value = true
+  } catch (e) {
+    console.warn('[FormulaManager] ACNR listSheets 降级为静态树', e)
+  }
+}
+
+/** 从 ACNR sheet 列表按域构建 wp 子树（cycle → parent → sheet） */
+function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
+  const wpSheets = sheets.filter(s => s.domain === 'wp')
+  // 按 cycle 分组
+  const byCycle = new Map<string, AcnrSheetEntry[]>()
+  for (const s of wpSheets) {
+    const c = s.cycle || s.parent_wp_code?.charAt(0) || '?'
+    if (!byCycle.has(c)) byCycle.set(c, [])
+    byCycle.get(c)!.push(s)
+  }
+  // 每个 cycle 下按 parent_wp_code 再分组
+  const cycleNodes: any[] = []
+  for (const [cycle, cycleSheets] of [...byCycle.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    const byParent = new Map<string, AcnrSheetEntry[]>()
+    for (const s of cycleSheets) {
+      const p = s.parent_wp_code
+      if (!byParent.has(p)) byParent.set(p, [])
+      byParent.get(p)!.push(s)
+    }
+    const parentNodes = [...byParent.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([parentCode, parentSheets]) => ({
+        key: `wp_${parentCode.toLowerCase()}`,
+        label: parentCode,
+        icon: '',
+        children: parentSheets
+          .sort((a, b) => (a.sheet_code || '').localeCompare(b.sheet_code || ''))
+          .map(s => ({
+            key: `wp_${s.sheet_code?.replace(/-/g, '_')?.toLowerCase() || s.addr_id}`,
+            label: `${s.sheet_code} ${s.sheet_name || ''}`.trim(),
+            icon: '',
+            _addrId: s.addr_id,
+          })),
+      }))
+    cycleNodes.push({
+      key: `wp_cycle_${cycle.toLowerCase()}`,
+      label: CYCLE_LABEL_MAP[cycle.toUpperCase()] || `${cycle} 循环`,
+      icon: '',
+      children: parentNodes,
+    })
+  }
+  return cycleNodes
+}
+
+const treeData = computed(() => {
+  // ACNR 五域树（动态，来自 catalog；与地址坐标名称库一致）
+  const acnrDrivenTree: any[] = []
+
+  // 1. 试算平衡表域
+  acnrDrivenTree.push({
+    key: 'trial_balance', label: DOMAIN_TREE_META.tb.label, icon: DOMAIN_TREE_META.tb.icon, children: [
       { key: 'tb_detail', label: '科目明细', icon: '' },
       { key: 'tb_summary', label: '试算平衡表', icon: '' },
     ],
-  },
-  {
-    key: 'report', label: '报表', icon: '📊', children: [
-      { key: 'report_balance_sheet', label: '资产负债表', icon: '', count: countFormulas('balance_sheet') },
-      { key: 'report_income_statement', label: '利润表', icon: '', count: countFormulas('income_statement') },
-      { key: 'report_cash_flow_statement', label: '现金流量表', icon: '', count: countFormulas('cash_flow_statement') },
-      { key: 'report_equity_statement', label: '权益变动表', icon: '', count: countFormulas('equity_statement') },
-      { key: 'report_cash_flow_supplement', label: '现金流附表', icon: '', count: countFormulas('cash_flow_supplement') },
-      { key: 'report_impairment_provision', label: '资产减值准备表', icon: '', count: countFormulas('impairment_provision') },
-    ],
-  },
-  {
-    key: 'note', label: '附注', icon: '📝',
+  })
+
+  // 2. 报表域（动态从 API 获取，项目不同可能有不同报表类型）
+  acnrDrivenTree.push({
+    key: 'report', label: DOMAIN_TREE_META.report.label, icon: DOMAIN_TREE_META.report.icon, children:
+      reportTypes.value.map(r => ({
+        key: `report_${r.type}`, label: r.label, icon: '', count: r.count || countFormulas(r.type),
+      })),
+  })
+
+  // 3. 附注域（动态加载，降级静态）
+  acnrDrivenTree.push({
+    key: 'note', label: DOMAIN_TREE_META.note.label, icon: DOMAIN_TREE_META.note.icon,
     children: noteTreeChildren.value.length ? noteTreeChildren.value : staticNoteTree,
-  },
-  {
-    key: 'workpaper', label: '底稿', icon: '📋', children: [
-      { key: 'wp_d', label: 'D 销售循环', icon: '', children: [
-        { key: 'wp_d_ar', label: '应收账款', icon: '', children: [
-          { key: 'wp_d2_1', label: 'D2-1 审定表', icon: '' },
-          { key: 'wp_d2_2', label: 'D2-2 明细表', icon: '' },
-          { key: 'wp_d2_3', label: 'D2-3 坏账准备', icon: '' },
-        ]},
-        { key: 'wp_d_revenue', label: '营业收入', icon: '', children: [
-          { key: 'wp_d1_1', label: 'D1-1 审定表', icon: '' },
-          { key: 'wp_d1_2', label: 'D1-2 收入明细', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_e', label: 'E 货币资金', icon: '', children: [
-        { key: 'wp_e_cash', label: '货币资金', icon: '', children: [
-          { key: 'wp_e1_1', label: 'E1-1 审定表', icon: '' },
-          { key: 'wp_e1_2', label: 'E1-2 现金明细', icon: '' },
-          { key: 'wp_e1_3', label: 'E1-3 银行存款', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_f', label: 'F 采购循环', icon: '', children: [
-        { key: 'wp_f_ap', label: '应付账款', icon: '', children: [
-          { key: 'wp_f1_1', label: 'F1-1 审定表', icon: '' },
-        ]},
-        { key: 'wp_f_prepay', label: '预付款项', icon: '', children: [
-          { key: 'wp_f2_1', label: 'F2-1 审定表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_g', label: 'G 生产循环', icon: '', children: [
-        { key: 'wp_g_inv', label: '存货', icon: '', children: [
-          { key: 'wp_g1_1', label: 'G1-1 审定表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_h', label: 'H 固定资产', icon: '', children: [
-        { key: 'wp_h_fa', label: '固定资产', icon: '', children: [
-          { key: 'wp_h1_1', label: 'H1-1 审定表', icon: '' },
-          { key: 'wp_h1_2', label: 'H1-2 明细表', icon: '' },
-          { key: 'wp_h1_12', label: 'H1-12 折旧测算', icon: '' },
-        ]},
-        { key: 'wp_h_cip', label: '在建工程', icon: '', children: [
-          { key: 'wp_h2_1', label: 'H2-1 审定表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_i', label: 'I 无形资产', icon: '', children: [
-        { key: 'wp_i_ia', label: '无形资产', icon: '', children: [
-          { key: 'wp_i1_1', label: 'I1-1 审定表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_j', label: 'J 投资循环', icon: '', children: [
-        { key: 'wp_j_lte', label: '长期股权投资', icon: '', children: [
-          { key: 'wp_j1_1', label: 'J1-1 审定表', icon: '' },
-          { key: 'wp_j1_2', label: 'J1-2 明细表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_k', label: 'K 筹资循环', icon: '', children: [
-        { key: 'wp_k_borrow', label: '借款', icon: '', children: [
-          { key: 'wp_k1_1', label: 'K1-1 短期借款审定表', icon: '' },
-          { key: 'wp_k2_1', label: 'K2-1 长期借款审定表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_l', label: 'L 人力循环', icon: '', children: [
-        { key: 'wp_l_salary', label: '应付职工薪酬', icon: '', children: [
-          { key: 'wp_l1_1', label: 'L1-1 审定表', icon: '' },
-        ]},
-      ]},
-      { key: 'wp_m', label: 'M 权益循环', icon: '', children: [
-        { key: 'wp_m_equity', label: '所有者权益', icon: '', children: [
-          { key: 'wp_m1_1', label: 'M1-1 审定表', icon: '' },
-        ]},
-      ]},
-    ],
-  },
-  {
+  })
+
+  // 4. 底稿域（wp）— 从 ACNR catalog 动态构建，按 cycle → parent → sheet 三级
+  if (acnrSheets.value.length) {
+    acnrDrivenTree.push({
+      key: 'workpaper', label: DOMAIN_TREE_META.wp.label, icon: DOMAIN_TREE_META.wp.icon,
+      children: buildWpDomainTree(acnrSheets.value),
+    })
+  } else {
+    // 降级：ACNR 未加载时展示静态骨架
+    acnrDrivenTree.push({
+      key: 'workpaper', label: DOMAIN_TREE_META.wp.label, icon: DOMAIN_TREE_META.wp.icon, children: [
+        { key: 'wp_loading', label: '加载中…', icon: '⏳' },
+      ],
+    })
+  }
+
+  // 5. 辅助余额域（aux）
+  const auxSheets = acnrSheets.value.filter(s => s.domain === 'aux')
+  if (auxSheets.length) {
+    acnrDrivenTree.push({
+      key: 'aux', label: DOMAIN_TREE_META.aux.label, icon: DOMAIN_TREE_META.aux.icon,
+      children: auxSheets.map(s => ({
+        key: `aux_${s.sheet_code || s.addr_id}`,
+        label: s.sheet_name || s.sheet_code || s.addr_id,
+        icon: '',
+        _addrId: s.addr_id,
+      })),
+    })
+  }
+
+  // ── 扩展节点（非五域核心，保留合并/表间/数据质量规则） ──
+  // 合并报表（收敛为 ACNR report 域子集；保留为独立入口方便审计师直达）
+  acnrDrivenTree.push({
     key: 'consol_report', label: '合并报表', icon: '🔗', children: [
       { key: 'consol_report_bs', label: '合并资产负债表', icon: '' },
       { key: 'consol_report_is', label: '合并利润表', icon: '' },
     ],
-  },
-  {
+  })
+
+  // 合并工作底稿
+  acnrDrivenTree.push({
     key: 'consolidation', label: '合并工作底稿', icon: '🔗', children: [
       { key: 'consol_info', label: '基本信息表', icon: '', _consolSheet: 'info' },
       { key: 'consol_cost', label: '投资明细-成本法和公允值', icon: '', _consolSheet: 'cost' },
@@ -812,8 +1112,10 @@ const treeData = computed(() => [
       { key: 'consol_elimination', label: '合并抵消分录', icon: '', _consolSheet: 'elimination' },
       { key: 'consol_capital', label: '资本公积变动', icon: '', _consolSheet: 'capital' },
     ],
-  },
-  {
+  })
+
+  // 表间审核
+  acnrDrivenTree.push({
     key: 'cross_check', label: '表间审核', icon: '🔗', children: [
       { key: 'cross_report_note', label: '报表 ↔ 附注', icon: '🔄', children: crossCheckItems.value.report_note },
       { key: 'cross_report_wp', label: '报表 ↔ 底稿', icon: '🔄', children: crossCheckItems.value.report_wp },
@@ -824,9 +1126,10 @@ const treeData = computed(() => [
         { key: 'cross_cr_3', label: '资本公积变动 ↔ 合并报表', icon: '📌' },
       ]},
     ],
-  },
-  // 方案 A: 数据质量规则节点 (跳转到 ValidationRules 独立页面)
-  {
+  })
+
+  // 数据质量规则（外链）
+  acnrDrivenTree.push({
     key: 'data_quality', label: '数据质量规则', icon: '📐',
     _isExternalLink: true,
     _externalRoute: '/ledger-import/validation-rules',
@@ -835,28 +1138,77 @@ const treeData = computed(() => [
       { key: 'dq_l2', label: 'L2 逻辑一致性', icon: '📌', _isExternalLink: true, _externalRoute: '/ledger-import/validation-rules' },
       { key: 'dq_l3', label: 'L3 跨表核对', icon: '📌', _isExternalLink: true, _externalRoute: '/ledger-import/validation-rules' },
     ],
-  },
-])
+  })
+
+  return acnrDrivenTree
+})
 
 function countFormulas(reportType: string): number {
   return (allRowsMap.value[reportType] || []).filter(r => r.formula).length
 }
 
 // ── 表间审核自定义规则 ──
+// ── 表间审核规则（动态从 logic_check API 加载，项目不同规则不同） ──
 const crossCheckItems = ref<Record<string, any[]>>({
-  report_note: [
-    { key: 'cross_rn_1', label: 'BS货币资金 = 附注货币资金合计', icon: '📌' },
-    { key: 'cross_rn_2', label: 'BS应收账款 = 附注应收账款合计', icon: '📌' },
-    { key: 'cross_rn_3', label: 'IS营业收入 = 附注营业收入合计', icon: '📌' },
-  ],
-  report_wp: [
-    { key: 'cross_rw_1', label: 'BS货币资金 = E1-1审定数', icon: '📌' },
-    { key: 'cross_rw_2', label: 'BS应收账款 = D2-1审定数', icon: '📌' },
-  ],
-  note_wp: [
-    { key: 'cross_nw_1', label: '附注货币资金 = E1-1审定数', icon: '📌' },
-  ],
+  report_note: [],
+  report_wp: [],
+  note_wp: [],
 })
+const crossCheckLoaded = ref(false)
+
+async function loadCrossCheckItems() {
+  if (crossCheckLoaded.value || !props.projectId) return
+  try {
+    const { data } = await http.get(`/api/projects/${props.projectId}/formula/report-cross-check`)
+    const rules: any[] = Array.isArray(data) ? data : (data?.rules ?? data?.items ?? [])
+    if (rules.length) {
+      // 按勾稽类型分组（source_domain ↔ target_domain）
+      const grouped: Record<string, any[]> = { report_note: [], report_wp: [], note_wp: [] }
+      for (const rule of rules) {
+        const src = rule.source_domain || rule.source_type || ''
+        const tgt = rule.target_domain || rule.target_type || ''
+        const label = rule.description || rule.label || `${rule.source_label || src} = ${rule.target_label || tgt}`
+        const item = {
+          key: `cross_${rule.id || rule.rule_id || Math.random().toString(36).slice(2, 8)}`,
+          label,
+          icon: rule.status === 'pass' ? '✅' : rule.status === 'fail' ? '❌' : '📌',
+          _ruleId: rule.id || rule.rule_id,
+          _status: rule.status,
+        }
+        // 分类到对应分组
+        if ((src === 'report' && tgt === 'note') || (src === 'note' && tgt === 'report')) {
+          grouped.report_note.push(item)
+        } else if ((src === 'report' && tgt === 'wp') || (src === 'wp' && tgt === 'report')) {
+          grouped.report_wp.push(item)
+        } else if ((src === 'note' && tgt === 'wp') || (src === 'wp' && tgt === 'note')) {
+          grouped.note_wp.push(item)
+        } else {
+          // 无法分类的放到 report_note（兜底）
+          grouped.report_note.push(item)
+        }
+      }
+      crossCheckItems.value = grouped
+      crossCheckLoaded.value = true
+      return
+    }
+  } catch { /* 降级到静态 */ }
+  // 降级：API 不可用时使用静态示例
+  crossCheckItems.value = {
+    report_note: [
+      { key: 'cross_rn_1', label: 'BS货币资金 = 附注货币资金合计', icon: '📌' },
+      { key: 'cross_rn_2', label: 'BS应收账款 = 附注应收账款合计', icon: '📌' },
+      { key: 'cross_rn_3', label: 'IS营业收入 = 附注营业收入合计', icon: '📌' },
+    ],
+    report_wp: [
+      { key: 'cross_rw_1', label: 'BS货币资金 = E1-1审定数', icon: '📌' },
+      { key: 'cross_rw_2', label: 'BS应收账款 = D2-1审定数', icon: '📌' },
+    ],
+    note_wp: [
+      { key: 'cross_nw_1', label: '附注货币资金 = E1-1审定数', icon: '📌' },
+    ],
+  }
+  crossCheckLoaded.value = true
+}
 
 // ── 数据加载 ──
 const allRowsMap = ref<Record<string, any[]>>({})
@@ -912,6 +1264,12 @@ watch(visible, async (v) => {
     loadScopeFormulas()
     // 加载动态附注树
     loadNoteTree()
+    // 加载 ACNR 五域导航树（底稿域动态从 catalog 构建）
+    loadAcnrTree()
+    // 加载报表类型（项目级动态）
+    loadReportTypes()
+    // 加载表间审核规则（项目级动态）
+    loadCrossCheckItems()
     // 用传入的 rows 作为当前报表的数据
     if (props.rows?.length) {
       const firstCode = props.rows[0]?.row_code || ''
