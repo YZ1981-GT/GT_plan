@@ -3566,6 +3566,747 @@
       ],
       "source": "eq_preset_generator",
       "description": "本年年末余额 = 本年年初余额 + 本年增减变动金额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-002",
+      "expression": "ROW('IS-024')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IS-024')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "净利润 — 取自利润表净利润（IS-024）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-003",
+      "expression": "TB('6701', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6701')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "加：资产减值损失 — 取损益科目 6701 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-004",
+      "expression": "TB('6711', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6711')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "信用减值损失 — 取损益科目 6711 发生额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-005",
+      "expression": "TB('1602_DEP', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1602_DEP')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "固定资产折旧/油气资产折耗/生产性生物资产折旧 — 本期计提折旧额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-006",
+      "expression": "TB('1701_DEP', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1701_DEP')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "使用权资产折旧 — 本期计提折旧额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-007",
+      "expression": "TB('1702_AMO', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1702_AMO')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "无形资产摊销 — 本期摊销额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-008",
+      "expression": "TB('1801_AMO', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1801_AMO')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "长期待摊费用摊销 — 本期摊销额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-009",
+      "expression": "TB('6115_DISP', '发生额') * -1",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6115_DISP')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "处置固定资产/无形资产/其他长期资产的损失（收益为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-010",
+      "expression": "TB('6115_SCRAP', '发生额') * -1",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6115_SCRAP')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "固定资产报废损失（收益为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-011",
+      "expression": "TB('6031', '发生额') * -1",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6031')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "公允价值变动损失（收益为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-012",
+      "expression": "TB('6604', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6604')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "财务费用（收益为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-013",
+      "expression": "TB('6111', '发生额') * -1",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6111')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "投资损失（收益为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-014",
+      "expression": "TB('1811', '期初余额') - TB('1811', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1811')"
+        },
+        {
+          "formula_ref": "TB('1811')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "递延所得税资产减少（增加为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-015",
+      "expression": "TB('2911', '期末余额') - TB('2911', '期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2911')"
+        },
+        {
+          "formula_ref": "TB('2911')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "递延所得税负债增加（减少为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-016",
+      "expression": "TB('1401', '期初余额') - TB('1401', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1401')"
+        },
+        {
+          "formula_ref": "TB('1401')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "存货的减少（增加为负）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-017",
+      "expression": "(TB('1122', '期初余额') - TB('1122', '期末余额')) + (TB('1123', '期初余额') - TB('1123', '期末余额')) + (TB('1231', '期初余额') - TB('1231', '期末余额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1122')"
+        },
+        {
+          "formula_ref": "TB('1122')"
+        },
+        {
+          "formula_ref": "TB('1123')"
+        },
+        {
+          "formula_ref": "TB('1123')"
+        },
+        {
+          "formula_ref": "TB('1231')"
+        },
+        {
+          "formula_ref": "TB('1231')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "经营性应收项目的减少（增加为负）= 应收账款+预付+其他应收 期初-期末"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-018",
+      "expression": "(TB('2202', '期末余额') - TB('2202', '期初余额')) + (TB('2205', '期末余额') - TB('2205', '期初余额')) + (TB('2241A', '期末余额') - TB('2241A', '期初余额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('2202')"
+        },
+        {
+          "formula_ref": "TB('2202')"
+        },
+        {
+          "formula_ref": "TB('2205')"
+        },
+        {
+          "formula_ref": "TB('2205')"
+        },
+        {
+          "formula_ref": "TB('2241A')"
+        },
+        {
+          "formula_ref": "TB('2241A')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "经营性应付项目的增加（减少为负）= 应付账款+合同负债+其他应付 期末-期初"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-019",
+      "expression": "0",
+      "formula_type": "auto_calc",
+      "refs": [],
+      "source": "cfss_preset_generator",
+      "description": "其他（通常为零，需手工调整）"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-020",
+      "expression": "ROW('CFSS-002') + ROW('CFSS-003') + ROW('CFSS-004') + ROW('CFSS-005') + ROW('CFSS-006') + ROW('CFSS-007') + ROW('CFSS-008') + ROW('CFSS-009') + ROW('CFSS-010') + ROW('CFSS-011') + ROW('CFSS-012') + ROW('CFSS-013') + ROW('CFSS-014') + ROW('CFSS-015') + ROW('CFSS-016') + ROW('CFSS-017') + ROW('CFSS-018') + ROW('CFSS-019')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFSS-002')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-003')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-004')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-005')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-006')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-007')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-008')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-009')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-010')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-011')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-012')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-013')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-014')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-015')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-016')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-017')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-018')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-019')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "经营活动产生的现金流量净额 = 净利润 + 全部调整项"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-022",
+      "expression": "TB('DEBT_TO_EQUITY', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('DEBT_TO_EQUITY')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "债务转为资本"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-023",
+      "expression": "TB('CONV_BOND_1Y', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('CONV_BOND_1Y')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "一年内到期的可转换公司债券"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-024",
+      "expression": "TB('1701_NEW', '变动额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1701_NEW')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "新增使用权资产"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-026",
+      "expression": "TB('1001', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1001')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "现金的期末余额 — 取货币资金科目 1001 期末"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-027",
+      "expression": "TB('1001', '期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1001')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "现金的期初余额 — 取货币资金科目 1001 期初"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-028",
+      "expression": "TB('1002_EQ', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1002_EQ')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "现金等价物的期末余额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-029",
+      "expression": "TB('1002_EQ', '期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1002_EQ')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "现金等价物的期初余额"
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "target_cell": "CFSS-030",
+      "expression": "ROW('CFSS-026') - ROW('CFSS-027') + ROW('CFSS-028') - ROW('CFSS-029')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('CFSS-026')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-027')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-028')"
+        },
+        {
+          "formula_ref": "ROW('CFSS-029')"
+        }
+      ],
+      "source": "cfss_preset_generator",
+      "description": "现金及现金等价物净增加额 = (现金期末-期初) + (等价物期末-期初)"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-001",
+      "expression": "TB('1231_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1231_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "一、坏账准备 — 取减值准备科目 1231_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-002",
+      "expression": "TB('1122_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1122_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "其中：应收账款坏账准备 — 取减值准备科目 1122_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-003",
+      "expression": "TB('1401_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1401_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "二、存货跌价准备 — 取减值准备科目 1401_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-004",
+      "expression": "TB('1141_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1141_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "三、合同资产减值准备 — 取减值准备科目 1141_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-005",
+      "expression": "TB('1142_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1142_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "四、合同取得成本减值准备 — 取减值准备科目 1142_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-006",
+      "expression": "TB('1143_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1143_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "五、合同履约成本减值准备 — 取减值准备科目 1143_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-007",
+      "expression": "TB('1481_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1481_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "六、持有待售资产减值准备 — 取减值准备科目 1481_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-008",
+      "expression": "TB('1503_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1503_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "七、债权投资减值准备 — 取减值准备科目 1503_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-009",
+      "expression": "TB('1521_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1521_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "八、长期股权投资减值准备 — 取减值准备科目 1521_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-010",
+      "expression": "TB('1601_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1601_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "九、投资性房地产减值准备 — 取减值准备科目 1601_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-011",
+      "expression": "TB('1604', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1604')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十、固定资产减值准备 — 取减值准备科目 1604 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-012",
+      "expression": "TB('1604A_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1604A_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十一、在建工程减值准备 — 取减值准备科目 1604A_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-013",
+      "expression": "TB('1621_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1621_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十二、生产性生物资产减值准备 — 取减值准备科目 1621_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-014",
+      "expression": "TB('1631_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1631_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十三、油气资产减值准备 — 取减值准备科目 1631_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-015",
+      "expression": "TB('1701_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1701_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十四、使用权资产减值准备 — 取减值准备科目 1701_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-016",
+      "expression": "TB('1702_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1702_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十五、无形资产减值准备 — 取减值准备科目 1702_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-017",
+      "expression": "TB('1711_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1711_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十六、商誉减值准备 — 取减值准备科目 1711_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-018",
+      "expression": "TB('1999_IMP', '期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('1999_IMP')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "十七、其他减值准备 — 取减值准备科目 1999_IMP 期末余额"
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "target_cell": "IMP-019",
+      "expression": "ROW('IMP-001') + ROW('IMP-003') + ROW('IMP-004') + ROW('IMP-005') + ROW('IMP-006') + ROW('IMP-007') + ROW('IMP-008') + ROW('IMP-009') + ROW('IMP-010') + ROW('IMP-011') + ROW('IMP-012') + ROW('IMP-013') + ROW('IMP-014') + ROW('IMP-015') + ROW('IMP-016') + ROW('IMP-017') + ROW('IMP-018')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "ROW('IMP-001')"
+        },
+        {
+          "formula_ref": "ROW('IMP-003')"
+        },
+        {
+          "formula_ref": "ROW('IMP-004')"
+        },
+        {
+          "formula_ref": "ROW('IMP-005')"
+        },
+        {
+          "formula_ref": "ROW('IMP-006')"
+        },
+        {
+          "formula_ref": "ROW('IMP-007')"
+        },
+        {
+          "formula_ref": "ROW('IMP-008')"
+        },
+        {
+          "formula_ref": "ROW('IMP-009')"
+        },
+        {
+          "formula_ref": "ROW('IMP-010')"
+        },
+        {
+          "formula_ref": "ROW('IMP-011')"
+        },
+        {
+          "formula_ref": "ROW('IMP-012')"
+        },
+        {
+          "formula_ref": "ROW('IMP-013')"
+        },
+        {
+          "formula_ref": "ROW('IMP-014')"
+        },
+        {
+          "formula_ref": "ROW('IMP-015')"
+        },
+        {
+          "formula_ref": "ROW('IMP-016')"
+        },
+        {
+          "formula_ref": "ROW('IMP-017')"
+        },
+        {
+          "formula_ref": "ROW('IMP-018')"
+        }
+      ],
+      "source": "imp_preset_generator",
+      "description": "资产减值准备合计 = 各项减值准备之和"
     }
   ]
 }
