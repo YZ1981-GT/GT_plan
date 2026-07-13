@@ -274,7 +274,29 @@ function handleConclusionRemarkInput(val: string): void {
 
 function handleSectionAi(sectionKey: CheckSection): void {
   const label = sectionLabels[sectionKey] || sectionKey
-  ElMessage.info(`${label} AI辅助分析功能即将上线`)
+  import('@/utils/http').then(({ default: http }) => {
+    http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l2-check-${sectionKey}`,
+      prompt: `请基于"${label}"检查区的各项检查结果，给出审计分析建议`,
+      context: {
+        sectionKey,
+        items: sections.value[sectionKey]?.map(i => ({ title: i.title, conclusion: i.conclusion, remark: i.remark })) || [],
+        accrualStatus: accrualSummary.value.statusText,
+      },
+    }).then(res => {
+      const content = res.data?.data?.content
+      if (content) {
+        // 填入该section第一个空remark项
+        const emptyItem = sections.value[sectionKey]?.find(i => !i.remark)
+        if (emptyItem) {
+          updateRemark(emptyItem.key, content)
+        }
+        ElMessage.success(`${label} AI建议已生成`)
+      }
+    }).catch(() => {
+      ElMessage.info(`${label} AI辅助暂不可用`)
+    })
+  })
 }
 
 // ─── Init ────────────────────────────────────────────────────────────────────

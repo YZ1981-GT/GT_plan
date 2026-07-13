@@ -799,8 +799,26 @@ function triggerFileInput(): void {
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
-function handleAI(): void {
-  ElMessage.info('AI辅助分析功能建设中...')
+async function handleAI(): Promise<void> {
+  try {
+    const context = {
+      rowCount: rows.value.length,
+      totalAccrued: rows.value.reduce((s, r) => s + (r.accrued || 0), 0),
+      totalPaid: rows.value.reduce((s, r) => s + (r.paid || 0), 0),
+      overdueCount: overdueRows.value.length,
+      l1Estimated: l1EstimatedInterest.value,
+      l3Estimated: l3EstimatedInterest.value,
+    }
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'interest-payable-detail',
+      prompt: '请基于应付利息明细表数据，分析计提合理性（与L1/L3测算对比）、逾期风险及审计关注点',
+      context,
+    })
+    const content = res.data?.data?.content
+    if (content) ElMessage.success('AI分析已生成，请查看审计说明区域')
+  } catch {
+    ElMessage.info('AI辅助暂不可用，请手动分析')
+  }
 }
 
 // ─── 复核 ────────────────────────────────────────────────────────────────────
