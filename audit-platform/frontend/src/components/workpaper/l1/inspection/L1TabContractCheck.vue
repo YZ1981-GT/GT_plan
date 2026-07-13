@@ -30,7 +30,7 @@
       </div>
     </div>
 
-    <!-- ═══ 区段Tab切换 ═══ -->
+    <!-- ═══ 区段Tab切换 + 列设置 ═══ -->
     <div class="segment-bar">
       <el-radio-group
         :model-value="activeSegment"
@@ -45,6 +45,19 @@
           {{ seg.label }}（{{ seg.fields.length }}列）
         </el-radio-button>
       </el-radio-group>
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" style="margin-left:8px">⚙ 列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">当前区段列显隐</div>
+          <template v-for="col in currentSegCols" :key="col.key">
+            <el-checkbox v-model="col.visible" size="small" @change="persistContractColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-divider style="margin:6px 0" />
+          <el-button size="small" link @click="resetContractColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
     </div>
 
     <!-- ═══ 合同检查表主体 ═══ -->
@@ -385,7 +398,7 @@
  * Task: 4.6
  * Requirements: 7.1-7.2
  */
-import { inject, ref, onMounted } from 'vue'
+import { inject, ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { useL1FormData, ChecklistItem } from '@/composables/useL1FormData'
@@ -422,6 +435,36 @@ const CONTRACT_SEGMENTS: SegmentDef[] = [
 ]
 
 const activeSegment = ref('basic')
+
+// ─── 列设置（⚙ popover）────────────────────────────────────────────────────
+const CONTRACT_COL_PREFS_KEY = 'l1-6-column-prefs'
+interface ColPref { key: string; label: string; visible: boolean }
+const contractColDefs: Record<string, ColPref[]> = reactive({
+  basic: CONTRACT_SEGMENTS[0].fields.map(f => ({ key: f, label: f, visible: true })),
+  rate: CONTRACT_SEGMENTS[1].fields.map(f => ({ key: f, label: f, visible: true })),
+  guarantee: CONTRACT_SEGMENTS[2].fields.map(f => ({ key: f, label: f, visible: true })),
+  default: CONTRACT_SEGMENTS[3].fields.map(f => ({ key: f, label: f, visible: true })),
+})
+const currentSegCols = computed(() => contractColDefs[activeSegment.value] || [])
+function persistContractColPrefs(): void {
+  try { localStorage.setItem(CONTRACT_COL_PREFS_KEY, JSON.stringify(Object.fromEntries(Object.entries(contractColDefs).map(([k, v]) => [k, v.map(c => ({ key: c.key, visible: c.visible }))])))) } catch { /* */ }
+}
+function resetContractColPrefs(): void {
+  for (const cols of Object.values(contractColDefs)) cols.forEach(c => { c.visible = true })
+  persistContractColPrefs()
+}
+;(function loadContractColPrefs() {
+  try {
+    const saved = localStorage.getItem(CONTRACT_COL_PREFS_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    for (const [seg, prefs] of Object.entries(data as Record<string, Array<{ key: string; visible: boolean }>>)) {
+      const target = contractColDefs[seg]
+      if (!target) continue
+      for (const p of prefs) { const col = target.find(c => c.key === p.key); if (col) col.visible = p.visible }
+    }
+  } catch { /* */ }
+})()
 
 // ─── Contract row type ───────────────────────────────────────────────────────
 
@@ -724,4 +767,7 @@ function fmtAmount(val: number | null | undefined): string {
   margin: 8px 0 0;
   line-height: 1.8;
 }
+.col-prefs { max-height: 280px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }
 </style>

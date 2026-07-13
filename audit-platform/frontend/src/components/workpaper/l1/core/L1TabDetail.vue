@@ -43,7 +43,7 @@
       </div>
     </div>
 
-    <!-- ═══ 区段Tab切换（el-segmented / el-radio-group） ═══ -->
+    <!-- ═══ 区段Tab切换 + 列设置 ═══ -->
     <div class="segment-bar">
       <el-radio-group
         :model-value="activeSegment"
@@ -58,6 +58,21 @@
           {{ seg.label }}（{{ seg.fields.length }}列）
         </el-radio-button>
       </el-radio-group>
+
+      <!-- ⚙ 列设置 popover -->
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" style="margin-left:8px">⚙ 列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">当前区段列显隐</div>
+          <template v-for="col in currentSegmentCols" :key="col.key">
+            <el-checkbox v-model="col.visible" size="small" @change="persistColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-divider style="margin:6px 0" />
+          <el-button size="small" link @click="resetColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
 
       <!-- 筛选区 -->
       <div class="filter-area">
@@ -385,7 +400,7 @@
  * Task: 4.3
  * Requirements: 3.1-3.6
  */
-import { computed, inject, ref, type Ref } from 'vue'
+import { computed, inject, reactive, ref, type Ref } from 'vue'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { DetailRow } from '@/composables/useL1FormData'
 import { useL1Detail, DETAIL_SEGMENTS } from '@/composables/useL1Detail'
@@ -485,6 +500,88 @@ function handleFilterChange(): void {
     currency: filterCurrency.value || undefined,
   })
 }
+
+// ─── 列设置（⚙ popover：当前区段列显隐 + localStorage 持久化）──────────────
+const COL_PREFS_KEY = 'l1-2-column-prefs'
+
+interface ColPref { key: string; label: string; visible: boolean }
+
+// 每个区段的列定义
+const ALL_COL_DEFS: Record<string, ColPref[]> = {
+  basic: [
+    { key: 'bank', label: '借款银行', visible: true },
+    { key: 'loanType', label: '借款种类', visible: true },
+    { key: 'contractNo', label: '合同编号', visible: true },
+    { key: 'amount', label: '借款金额', visible: true },
+    { key: 'rate', label: '年利率', visible: true },
+    { key: 'rateMode', label: '固定/浮动', visible: true },
+    { key: 'startDate', label: '起始日期', visible: true },
+    { key: 'endDate', label: '到期日期', visible: true },
+    { key: 'currency', label: '币种', visible: false },
+    { key: 'purpose', label: '借款用途', visible: true },
+  ],
+  movement: [
+    { key: 'beginning', label: '期初余额', visible: true },
+    { key: 'increase', label: '本期借入', visible: true },
+    { key: 'decrease', label: '本期归还', visible: true },
+  ],
+  balance: [
+    { key: 'endBalance', label: '期末余额', visible: true },
+    { key: 'guarantor', label: '保证人/抵押', visible: true },
+    { key: 'isOverdue', label: '是否逾期', visible: true },
+    { key: 'confirmRef', label: '询证函索引', visible: true },
+    { key: 'creditMatch', label: '征信核对', visible: true },
+    { key: 'remark', label: '备注', visible: true },
+  ],
+}
+
+const colPrefs = reactive<Record<string, ColPref[]>>(JSON.parse(JSON.stringify(ALL_COL_DEFS)))
+
+const currentSegmentCols = computed(() => colPrefs[activeSegment.value] || [])
+
+function isColVisible(key: string): boolean {
+  const seg = colPrefs[activeSegment.value]
+  if (!seg) return true
+  const col = seg.find(c => c.key === key)
+  return col?.visible ?? true
+}
+
+function persistColPrefs(): void {
+  try {
+    const data: Record<string, Array<{ key: string; visible: boolean }>> = {}
+    for (const [seg, cols] of Object.entries(colPrefs)) {
+      data[seg] = cols.map(c => ({ key: c.key, visible: c.visible }))
+    }
+    localStorage.setItem(COL_PREFS_KEY, JSON.stringify(data))
+  } catch { /* */ }
+}
+
+function resetColPrefs(): void {
+  for (const [seg, defs] of Object.entries(ALL_COL_DEFS)) {
+    const target = colPrefs[seg]
+    if (target) {
+      for (let i = 0; i < target.length; i++) target[i].visible = defs[i].visible
+    }
+  }
+  persistColPrefs()
+}
+
+function loadColPrefs(): void {
+  try {
+    const saved = localStorage.getItem(COL_PREFS_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    for (const [seg, prefs] of Object.entries(data as Record<string, Array<{ key: string; visible: boolean }>>)) {
+      const target = colPrefs[seg]
+      if (!target) continue
+      for (const p of prefs) {
+        const col = target.find(c => c.key === p.key)
+        if (col) col.visible = p.visible
+      }
+    }
+  } catch { /* */ }
+}
+loadColPrefs()
 
 // ─── 表格数据（含合计行） ────────────────────────────────────────────────────
 
@@ -776,4 +873,7 @@ function fmtAmount(val: number | null | undefined): string {
 .cell-text {
   font-weight: 500;
 }
+.col-prefs { max-height: 280px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }
 </style>
