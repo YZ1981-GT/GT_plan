@@ -1,5 +1,14 @@
 <template>
   <div class="k9-tab-detail">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生与完整性：</b>各明细项管理费用真实发生且记录完整，合计与 K9-1 审定数一致；</li>
+        <li><b>准确性与分类：</b>各费用明细金额准确、按费用性质恰当分类。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + 导入导出 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K9-2 管理费用明细表</h3>

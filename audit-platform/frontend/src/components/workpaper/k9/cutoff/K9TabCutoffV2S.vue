@@ -1,5 +1,14 @@
 <template>
   <div class="k9-cutoff-v2s">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>截止（发生方向）：</b>由记账凭证追查至原始凭证，验证期末前后记录的管理费用是否真实发生、是否记录于正确期间（防止多记/提前记）；</li>
+        <li><b>准确性：</b>入账金额与原始凭证一致。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <span class="section-title">K9-6 截止性测试（记账凭证→原始凭证）</span>

@@ -1,5 +1,14 @@
 <template>
   <div class="k9-tab-substantive-analysis">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性与准确性：</b>通过与上期/预算/收入的比率分析，评价管理费用整体合理性，识别异常波动；</li>
+        <li><b>发生：</b>对超阈值波动查明原因，验证费用真实发生、无异常虚增。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <span class="section-title">K9-4 实质性分析程序</span>
