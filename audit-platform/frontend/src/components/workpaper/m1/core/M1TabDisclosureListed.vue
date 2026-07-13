@@ -262,6 +262,19 @@ function onAdjudicatedRefresh() {
 
 onMounted(async () => {
   await formData.loadData()
+  // Restore saved text fields
+  const responses = formData.allResponses.value
+  overdueNote.value = responses.get('M1-disclosure-listed-overdue')?.remark || ''
+  policyNote.value = responses.get('M1-disclosure-listed-policy')?.remark || ''
+  planNote.value = responses.get('M1-disclosure-listed-plan')?.remark || ''
+  disclosureConclusion.value = responses.get('M1-disc-listed-conclusion')?.remark || ''
+  // Restore detail rows
+  for (let i = 0; i < detailRows.value.length; i++) {
+    const endResp = responses.get(`M1-disclosure-listed-${i}-endAmount`)
+    const priorResp = responses.get(`M1-disclosure-listed-${i}-priorYearEnd`)
+    if (endResp?.remark) detailRows.value[i].endAmount = Number(endResp.remark) || 0
+    if (priorResp?.remark) detailRows.value[i].priorYearEnd = Number(priorResp.remark) || 0
+  }
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 

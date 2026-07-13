@@ -30,6 +30,17 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>完整性：</b>所有已宣告的应付股利均已记录；</li>
+        <li><b>存在：</b>记录的应付股利在资产负债表日确实存在；</li>
+        <li><b>计价：</b>应付股利金额（含外币折算）准确；</li>
+        <li><b>列报与披露：</b>按股东分类恰当列报和充分披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -457,7 +468,20 @@ function saveAuditNote() {
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function handleAddRow() { addRow() }
+async function handleAddRow() {
+  try {
+    const { value: name } = await (await import('element-plus')).ElMessageBox.prompt(
+      '请输入股东名称', '新增股东',
+      { confirmButtonText: '确定', cancelButtonText: '取消', inputValidator: (v) => (!v?.trim() ? '名称不能为空' : true) }
+    )
+    if (name?.trim()) {
+      addRow()
+      // Set name on last added row
+      const lastIdx = computedRows.value.length - 1
+      if (lastIdx >= 0) handleUpdate(lastIdx, 'shareholderName', name.trim())
+    }
+  } catch { /* cancel */ }
+}
 function handleRemoveRow(index: number) { removeRow(index) }
 function handleUpdate(index: number, field: keyof M1DetailRow, value: any) { updateRow(index, field, value) }
 
@@ -544,6 +568,9 @@ function _restoreRows() {
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .cross-sheet-alert { margin-bottom: 12px; }

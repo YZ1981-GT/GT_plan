@@ -30,6 +30,16 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>计价：</b>应付股利测算金额（可供分配利润×分配比例）准确；</li>
+        <li><b>准确性：</b>宣告差异计算正确，差异超阈值已充分说明；</li>
+        <li><b>完整性：</b>所有股东的股利分配均已纳入测算范围。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ M6联动状态提示 ═══ -->
     <el-alert
       v-if="!m6DataReady"
@@ -208,6 +218,19 @@
       <span class="cross-wp-desc">检查表（宣告核对结果）</span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写股利测算审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m1-details-tip">
       <summary>编制提示</summary>
@@ -235,7 +258,7 @@
  * - Uses calcDeclaredDividend, calcDeclareDiff from useM1DividendEngine
  * - GtIndexChip linking to M6
  */
-import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { Plus, MagicStick, Check, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -284,6 +307,7 @@ const declareThreshold = ref(DECLARE_THRESHOLD_DEFAULT)
 const rows = ref<DividendRow[]>([])
 const m6DataReady = ref(false)
 const m6ProfitDistributed = ref(0)
+const auditNote = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -429,6 +453,10 @@ function handleAI(section: string = 'general'): void {
 }
 function handleReview(): void { openReviewDialog?.('M1-5-dividend-calc', '股利测算表') }
 
+function saveAuditNote() {
+  formData.debouncedSave('M1-5-auditNote', { remark: auditNote.value || null })
+}
+
 // ─── Format ──────────────────────────────────────────────────────────────────
 
 function fmtAmount(val: number): string {
@@ -448,9 +476,6 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('m6:profit-distributed', handleM6ProfitDistributed)
 })
-
-// Watch rows change for auto-persist
-watch(rows, _persistRows, { deep: true })
 </script>
 
 <style scoped>
@@ -459,8 +484,13 @@ watch(rows, _persistRows, { deep: true })
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 .m6-pending-alert { margin-bottom: 12px; }
 .m6-ready-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }

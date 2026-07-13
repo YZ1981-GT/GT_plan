@@ -30,6 +30,15 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>计价：</b>外币应付股利按期末即期汇率折算准确；</li>
+        <li><b>准确性：</b>汇兑差异计算正确并恰当计入财务费用。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -172,6 +181,19 @@
       <span class="cross-wp-desc">财务费用（汇兑差异去向）</span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写外币汇率测算审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m1-details-tip">
       <summary>编制提示</summary>
@@ -199,7 +221,7 @@
  * - Dynamic rows (按外币股东)
  * - 导入导出 button
  */
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -248,6 +270,7 @@ const fxThreshold = ref(FX_THRESHOLD_DEFAULT)
 
 const rows = ref<FxRow[]>([])
 
+const auditNote = ref('')
 // ─── Composables ─────────────────────────────────────────────────────────────
 
 const formData = useM1FormData({
@@ -372,6 +395,10 @@ function handleAI(section: string = 'general'): void {
 }
 function handleReview(): void { openReviewDialog?.('M1-4-fx-rate', '外币汇率测算表') }
 
+function saveAuditNote() {
+  formData.debouncedSave('M1-4-auditNote', { remark: auditNote.value || null })
+}
+
 // ─── Format ──────────────────────────────────────────────────────────────────
 
 function fmtAmount(val: number): string {
@@ -385,9 +412,6 @@ onMounted(async () => {
   await formData.loadData()
   _restoreRows()
 })
-
-// Watch rows change for auto-persist
-watch(rows, _persistRows, { deep: true })
 </script>
 
 <style scoped>
@@ -396,8 +420,13 @@ watch(rows, _persistRows, { deep: true })
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .formula-value--primary { color: #67c23a; font-weight: 600; }

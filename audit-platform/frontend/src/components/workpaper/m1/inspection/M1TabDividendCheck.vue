@@ -1,5 +1,21 @@
 <template>
   <div class="m1-tab-dividend-check">
+    <!-- ═══ 返回目录 + 标题 ═══ -->
+    <div class="section-header">
+      <div class="section-header-left">
+        <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
+        <h3 class="section-title">M1-6 应付股利检查表</h3>
+      </div>
+    </div>
+
+    <!-- ═══ 方法论上下文 ═══ -->
+    <div class="methodology-context">
+      <div class="methodology-text">
+        <strong>检查表目标：</strong>
+        系统性检查应付股利的宣告依据、计算准确性、外币折算、支付及时性与关联方披露完整性，逐项确认后形成审计结论。
+      </div>
+    </div>
+
     <!-- ═══ 完成率进度条 ═══ -->
     <div class="completion-bar">
       <span class="completion-label">检查完成度</span>
@@ -253,6 +269,15 @@ onMounted(async () => {
 
 <style scoped>
 .m1-tab-dividend-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
+
+/* 返回目录+标题 */
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-header-left { display: flex; align-items: center; gap: 8px; }
+.section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
+
+/* 方法论上下文 */
+.methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 
 /* 完成度进度条 */
 .completion-bar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 10px 16px; background: linear-gradient(135deg, #f8f9fe, #f0f4ff); border-radius: 6px; border: 1px solid #e4e7ed; }

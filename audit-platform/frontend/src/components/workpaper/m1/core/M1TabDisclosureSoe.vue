@@ -238,6 +238,18 @@ function onAdjudicatedRefresh() {
 
 onMounted(async () => {
   await formData.loadData()
+  // Restore saved text fields
+  const responses = formData.allResponses.value
+  soeCapitalNote.value = responses.get('M1-disclosure-soe-capital')?.remark || ''
+  distributionNote.value = responses.get('M1-disclosure-soe-distribution')?.remark || ''
+  disclosureConclusion.value = responses.get('M1-disc-soe-conclusion')?.remark || ''
+  // Restore detail rows
+  for (let i = 0; i < detailRows.value.length; i++) {
+    const beginResp = responses.get(`M1-disclosure-soe-${i}-beginBalance`)
+    const endResp = responses.get(`M1-disclosure-soe-${i}-endBalance`)
+    if (beginResp?.remark) detailRows.value[i].beginBalance = Number(beginResp.remark) || 0
+    if (endResp?.remark) detailRows.value[i].endBalance = Number(endResp.remark) || 0
+  }
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
