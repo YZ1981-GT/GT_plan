@@ -47,6 +47,9 @@ from app.services.bulk_tab.bulk_import_service import (
 # Task 2.2: 注册 D 循环 adapter（d1~d7），模块导入即注册
 import app.services.bulk_tab._d_cycle_adapters  # noqa: F401
 
+# Task 8.1: 注册 K/F/G/H 循环 adapter，模块导入即注册
+import app.services.bulk_tab._kfgh_cycle_adapters  # noqa: F401
+
 __all__ = [
     "AdapterSpec",
     "AtomicityMode",

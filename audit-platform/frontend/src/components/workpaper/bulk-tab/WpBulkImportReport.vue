@@ -15,6 +15,10 @@
       <el-tag v-if="report.summary.failed" type="danger">失败: {{ report.summary.failed }}</el-tag>
       <el-tag v-if="report.summary.blocked" type="info">受阻: {{ report.summary.blocked }}</el-tag>
       <el-tag v-if="report.summary.missing" type="info">缺失: {{ report.summary.missing }}</el-tag>
+      <el-tag v-if="report.summary.unlisted" type="info">未登记: {{ report.summary.unlisted }}</el-tag>
+      <el-tag v-if="report.summary.conflict_rejected" type="danger">冲突拒绝: {{ report.summary.conflict_rejected }}</el-tag>
+      <el-tag v-if="report.summary.skipped" type="info">跳过: {{ report.summary.skipped }}</el-tag>
+      <el-tag v-if="report.rolled_back" type="danger">已回滚</el-tag>
     </div>
 
     <!-- 逐 sheet 表格 -->
@@ -34,10 +38,17 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="rows" label="行数" width="80" />
-      <el-table-column label="备注">
+      <el-table-column prop="rows" label="行数" width="80">
         <template #default="{ row }">
-          <span v-if="row.reason">{{ row.reason }}</span>
+          {{ row.rows ?? '—' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="备注/错误">
+        <template #default="{ row }">
+          <span v-if="row.errors?.length" class="text-danger">
+            {{ row.errors.join('; ') }}
+          </span>
+          <span v-else-if="row.reason">{{ row.reason }}</span>
           <span v-else-if="row.warnings?.length" class="text-warning">
             {{ row.warnings.join('; ') }}
           </span>
@@ -61,7 +72,7 @@
  * NOTE: 本文件由 Task 6.1 创建基础结构，Task 6.2 完善交互细节。
  */
 import { computed } from 'vue'
-import type { ImportReport } from './useBulkTabImportExport'
+import type { ImportReport } from '@/composables/useBulkTabImportExport'
 
 const props = defineProps<{
   report: ImportReport | null
@@ -72,8 +83,8 @@ const reportAlertType = computed(() => {
   if (!props.report) return 'info'
   if (props.dryRun) return 'info'
   const s = props.report.summary
-  if (s.failed > 0) return 'error'
-  if (s.partial > 0 || s.blocked > 0) return 'warning'
+  if ((s.failed ?? 0) > 0) return 'error'
+  if ((s.partial ?? 0) > 0 || (s.blocked ?? 0) > 0) return 'warning'
   return 'success'
 })
 
@@ -86,6 +97,7 @@ function statusTagType(status: string): string {
     case 'blocked_by_status': return 'info'
     case 'missing': return 'info'
     case 'unlisted': return 'info'
+    case 'skipped': return 'info'
     default: return ''
   }
 }
@@ -99,6 +111,7 @@ function statusLabel(status: string): string {
     case 'blocked_by_status': return '状态受阻'
     case 'missing': return '文件缺失'
     case 'unlisted': return '未登记'
+    case 'skipped': return '跳过'
     default: return status
   }
 }
@@ -113,6 +126,11 @@ function statusLabel(status: string): string {
 
 .text-warning {
   color: var(--el-color-warning);
+  font-size: 12px;
+}
+
+.text-danger {
+  color: var(--el-color-danger);
   font-size: 12px;
 }
 </style>

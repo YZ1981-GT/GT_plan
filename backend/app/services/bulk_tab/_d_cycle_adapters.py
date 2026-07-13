@@ -404,6 +404,9 @@ def _convert_import_response(result: dict[str, Any]) -> TabImportResult:
             warnings_list.append(f"跳过的列: {', '.join(skipped)}")
 
         if row_count == 0 and warning:
+            # 空表（无数据行）应视为"跳过"而非"失败"——用户未填该 sheet 属正常场景
+            if "无有效数据" in warning or "无数据" in warning:
+                return TabImportResult(status="skipped", warnings=[warning])
             return TabImportResult(status="failed", warnings=warnings_list, errors=[warning])
 
         if row_count > 0 and warnings_list:

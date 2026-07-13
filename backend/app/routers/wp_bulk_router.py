@@ -18,10 +18,11 @@ import asyncio
 import json
 import logging
 from typing import Any
+from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -143,6 +144,32 @@ async def get_bulk_progress_stream(
 # ---------------------------------------------------------------------------
 
 
+class ExportTemplatesRequest(BaseModel):
+    """导出模板请求体。"""
+
+    cycles: list[str] | None = Field(
+        default=None, description="审计循环多选（如 ['D','K']）；None/空 = 全部含 I/E 的循环"
+    )
+
+
+class ExportDataRequest(BaseModel):
+    """导出数据请求体。"""
+
+    cycles: list[str] | None = Field(
+        default=None, description="审计循环多选；None/空 = 全部含 I/E 的循环"
+    )
+    only_with_data: bool = Field(
+        default=False, description="仅导出有数据的 Tab（跳过空表），Req 3.3"
+    )
+
+
+class AsyncTaskResponse(BaseModel):
+    """异步任务受理响应。"""
+
+    task_id: str = Field(..., description="任务 ID，用于 SSE 进度订阅与结果查询")
+    status: str = Field(default="accepted", description="受理状态")
+
+
 class RollbackRequest(BaseModel):
     """回滚请求体。"""
 
@@ -150,6 +177,40 @@ class RollbackRequest(BaseModel):
     snapshots: list[dict[str, str]] = Field(
         ..., description="快照记录列表 [{wp_id, snapshot_id}]"
     )
+
+
+# ---------------------------------------------------------------------------
+# Helpers — 导出
+# ---------------------------------------------------------------------------
+
+
+def _bulk_zip_disposition(filename: str) -> str:
+    """构造 RFC5987 编码的 Content-Disposition 头值（支持中文文件名）。
+
+    平台铁律：StreamingResponse 中文文件名必须 RFC5987 编码。
+    """
+    encoded = quote(filename, safe="")
+    return f"attachment; filename*=UTF-8''{encoded}"
+
+
+async def _load_project_meta(db: AsyncSession, project_id: UUID) -> tuple[Project, int]:
+    """加载项目并返回 (project, audit_year)。项目不存在抛 404。"""
+    project = await db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    audit_year = project.audit_year or 0
+    return project, audit_year
+
+
+def _build_zip_filename(project: Project, audit_year: int, mode_label: str) -> str:
+    """生成 ZIP 文件名: {项目名}_{年度}_底稿批量{模板|数据}.zip。"""
+    parts: list[str] = []
+    base = project.short_name or project.name or "项目"
+    parts.append(base)
+    if audit_year:
+        parts.append(str(audit_year))
+    parts.append(f"底稿批量{mode_label}")
+    return "_".join(parts) + ".zip"
 
 
 # ---------------------------------------------------------------------------
@@ -231,6 +292,213 @@ async def _require_manager_role(
 
 
 # ---------------------------------------------------------------------------
+# POST /export-templates — 批量导出模板 ZIP
+# ---------------------------------------------------------------------------
+
+
+@router.post("/export-templates")
+async def bulk_export_templates(
+    project_id: UUID,
+    body: ExportTemplatesRequest,
+    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """批量导出底稿 Tab **模板**为 ZIP（空表结构 + 编制提示）。
+
+    - 循环多选（body.cycles）；None/空 = 全部含 I/E 的循环
+    - 权限：≥ 只读（require_project_access("readonly")），Req 5.1
+    - 返回 application/zip，中文文件名 RFC5987 编码
+
+    Requirements: 1.1, 3.1, 5.1
+    """
+    from app.core.build_version import get_build_version
+    from app.services.bulk_tab import bulk_export_service
+
+    project, audit_year = await _load_project_meta(db, project_id)
+
+    try:
+        platform_version = get_build_version().get("git_commit", "")
+    except Exception:
+        platform_version = ""
+
+    zip_buffer = await bulk_export_service.export(
+        db=db,
+        project_id=project_id,
+        cycles=body.cycles or None,
+        mode="template",
+        exported_by=current_user.username,
+        platform_version=platform_version,
+        audit_year=audit_year,
+    )
+    zip_buffer.seek(0)
+
+    filename = _build_zip_filename(project, audit_year, "模板")
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": _bulk_zip_disposition(filename)},
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /export-data — 批量导出数据 ZIP
+# ---------------------------------------------------------------------------
+
+
+@router.post("/export-data")
+async def bulk_export_data(
+    project_id: UUID,
+    body: ExportDataRequest,
+    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """批量导出底稿 Tab **数据**为 ZIP（含已填写数据快照）。
+
+    - 循环多选（body.cycles）；None/空 = 全部含 I/E 的循环
+    - only_with_data=True → 仅导出有数据的 Tab（跳过空表），Req 3.3
+    - 权限：≥ 只读（require_project_access("readonly")），Req 5.2
+    - 返回 application/zip，中文文件名 RFC5987 编码
+
+    Requirements: 1.2, 3.1, 3.3, 5.2
+    """
+    from app.core.build_version import get_build_version
+    from app.services.bulk_tab import bulk_export_service
+
+    project, audit_year = await _load_project_meta(db, project_id)
+
+    try:
+        platform_version = get_build_version().get("git_commit", "")
+    except Exception:
+        platform_version = ""
+
+    zip_buffer = await bulk_export_service.export(
+        db=db,
+        project_id=project_id,
+        cycles=body.cycles or None,
+        mode="data",
+        only_with_data=body.only_with_data,
+        exported_by=current_user.username,
+        platform_version=platform_version,
+        audit_year=audit_year,
+    )
+    zip_buffer.seek(0)
+
+    filename = _build_zip_filename(project, audit_year, "数据")
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": _bulk_zip_disposition(filename)},
+    )
+
+
+# ---------------------------------------------------------------------------
+# POST /export-templates/async · /export-data/async — 大项目异步导出（Req 6.1）
+# ---------------------------------------------------------------------------
+
+
+async def _platform_version() -> str:
+    from app.core.build_version import get_build_version
+
+    try:
+        return get_build_version().get("git_commit", "")
+    except Exception:
+        return ""
+
+
+@router.post("/export-templates/async", response_model=AsyncTaskResponse)
+async def bulk_export_templates_async(
+    project_id: UUID,
+    body: ExportTemplatesRequest,
+    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db),
+) -> AsyncTaskResponse:
+    """大项目异步导出**模板** ZIP：立即返回 task_id，后台生成，SSE 推进度。
+
+    进度订阅：`GET /progress/{task_id}`；完成后 `GET /export/{task_id}/download`。
+
+    Requirements: 6.1
+    """
+    from app.services.bulk_tab import bulk_async_runner
+
+    project, audit_year = await _load_project_meta(db, project_id)
+    filename = _build_zip_filename(project, audit_year, "模板")
+
+    task_id = bulk_async_runner.schedule_export(
+        project_id=project_id,
+        cycles=body.cycles or None,
+        mode="template",
+        only_with_data=False,
+        exported_by=current_user.username,
+        platform_version=await _platform_version(),
+        audit_year=audit_year,
+        user_id=str(current_user.id),
+        filename=filename,
+    )
+    return AsyncTaskResponse(task_id=task_id)
+
+
+@router.post("/export-data/async", response_model=AsyncTaskResponse)
+async def bulk_export_data_async(
+    project_id: UUID,
+    body: ExportDataRequest,
+    current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db),
+) -> AsyncTaskResponse:
+    """大项目异步导出**数据** ZIP：立即返回 task_id，后台生成，SSE 推进度。
+
+    Requirements: 6.1
+    """
+    from app.services.bulk_tab import bulk_async_runner
+
+    project, audit_year = await _load_project_meta(db, project_id)
+    filename = _build_zip_filename(project, audit_year, "数据")
+
+    task_id = bulk_async_runner.schedule_export(
+        project_id=project_id,
+        cycles=body.cycles or None,
+        mode="data",
+        only_with_data=body.only_with_data,
+        exported_by=current_user.username,
+        platform_version=await _platform_version(),
+        audit_year=audit_year,
+        user_id=str(current_user.id),
+        filename=filename,
+    )
+    return AsyncTaskResponse(task_id=task_id)
+
+
+# ---------------------------------------------------------------------------
+# GET /export/{task_id}/download — 下载异步导出的 ZIP 结果
+# ---------------------------------------------------------------------------
+
+
+@router.get("/export/{task_id}/download")
+async def bulk_export_download(
+    project_id: UUID,
+    task_id: str,
+    current_user: User = Depends(require_project_access("readonly")),
+) -> FileResponse:
+    """下载已完成的异步导出 ZIP（Req 6.1）。"""
+    task = bulk_progress_service.get_task(task_id)
+    if not task or task.project_id != str(project_id):
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    if task.status != "complete" or not task.result_path:
+        raise HTTPException(status_code=409, detail="导出尚未完成")
+
+    import os
+
+    if not os.path.exists(task.result_path):
+        raise HTTPException(status_code=410, detail="导出文件已被清理")
+
+    filename = task.result_filename or "bulk_export.zip"
+    return FileResponse(
+        task.result_path,
+        media_type="application/zip",
+        headers={"Content-Disposition": _bulk_zip_disposition(filename)},
+    )
+
+
+# ---------------------------------------------------------------------------
 # POST /import — 批量导入（multipart ZIP）
 # ---------------------------------------------------------------------------
 
@@ -239,18 +507,23 @@ async def _require_manager_role(
 async def bulk_import(
     project_id: UUID,
     file: UploadFile = File(..., description="ZIP 文件（bulk-tab 数据包）"),
-    dryRun: bool = Query(default=False, description="预检模式：True=不写库"),
-    strategy: str = Query(
+    dry_run: bool = Form(default=False, description="预检模式：True=不写库"),
+    strategy: str = Form(
         default="overwrite", description="冲突策略: overwrite/fill-empty/reject"
+    ),
+    cycles: str | None = Form(
+        default=None, description="循环多选 JSON 串（仅记录，导入范围以 ZIP manifest 为准）"
     ),
     current_user: User = Depends(require_project_access("edit")),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     """批量导入底稿 Tab 数据（multipart ZIP）。
 
-    - dryRun=True → 仅校验（manifest/完整性/状态门禁），不写库（Req 2.3）
-    - dryRun=False → 正式导入（含快照 → 逐 sheet 写入 → 审计日志）
+    - dry_run=True → 仅校验（manifest/完整性/状态门禁），不写库（Req 2.3）
+    - dry_run=False → 正式导入（含快照 → 逐 sheet 写入 → 审计日志）
     - strategy: overwrite（默认）/ fill-empty / reject
+
+    表单字段（对齐前端 useBulkTabImportExport.ts）：file / dry_run / strategy / cycles。
 
     权限：编制权（require_project_access("edit")），Req 5.3
     门禁：只读/锁定项目拒绝，Req 5.5
@@ -282,7 +555,7 @@ async def bulk_import(
 
     project_id_str = str(project_id)
 
-    if dryRun:
+    if dry_run:
         report = await bulk_import_service.dry_run(
             db=db,
             project_id=project_id_str,
@@ -301,6 +574,89 @@ async def bulk_import(
         await db.commit()
 
     return report.to_dict()
+
+
+# ---------------------------------------------------------------------------
+# POST /import/async — 大项目异步导入（Req 6.1, 4.2）
+# ---------------------------------------------------------------------------
+
+
+@router.post("/import/async", response_model=AsyncTaskResponse)
+async def bulk_import_async(
+    project_id: UUID,
+    file: UploadFile = File(..., description="ZIP 文件（bulk-tab 数据包）"),
+    strategy: str = Form(
+        default="overwrite", description="冲突策略: overwrite/fill-empty/reject"
+    ),
+    all_or_nothing: bool = Form(
+        default=False, description="all-or-nothing 原子性：任一 sheet 失败则全量回滚（Req 4.2）"
+    ),
+    current_user: User = Depends(require_project_access("edit")),
+    db: AsyncSession = Depends(get_db),
+) -> AsyncTaskResponse:
+    """大项目异步导入：立即返回 task_id，后台跑导入，SSE 推进度（Req 6.1）。
+
+    - `all_or_nothing=True` → AtomicityMode.ALL_OR_NOTHING（任一失败全回滚，Req 4.2）
+    - 完成后 `GET /import/{task_id}/result` 查 ImportReport；进度 `GET /progress/{task_id}`
+    - 门禁：编制权 + 只读/锁定项目拒绝（Req 5.3, 5.5）
+
+    Requirements: 6.1, 6.2, 4.2
+    """
+    from app.services.bulk_tab import bulk_async_runner
+    from app.services.bulk_tab.snapshot_guard import AtomicityMode
+
+    # Req 5.5: 项目可导入性门禁（归档/锁定拒绝）
+    await _check_project_importable(db, project_id)
+
+    valid_strategies = ("overwrite", "fill-empty", "reject")
+    if strategy not in valid_strategies:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效的冲突策略: '{strategy}'。可选值: {', '.join(valid_strategies)}",
+        )
+
+    try:
+        zip_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"文件读取失败: {e}")
+    if not zip_bytes:
+        raise HTTPException(status_code=400, detail="上传文件为空")
+
+    atomicity = (
+        AtomicityMode.ALL_OR_NOTHING if all_or_nothing else AtomicityMode.PER_SHEET
+    )
+    task_id = bulk_async_runner.schedule_import(
+        project_id=project_id,
+        zip_bytes=zip_bytes,
+        strategy=strategy,
+        atomicity=atomicity,
+        user_id=current_user.id,
+        username=current_user.username,
+        role_value=current_user.role.value,
+    )
+    return AsyncTaskResponse(task_id=task_id)
+
+
+# ---------------------------------------------------------------------------
+# GET /import/{task_id}/result — 查询异步导入结果报告
+# ---------------------------------------------------------------------------
+
+
+@router.get("/import/{task_id}/result")
+async def bulk_import_result(
+    project_id: UUID,
+    task_id: str,
+    current_user: User = Depends(require_project_access("readonly")),
+) -> dict[str, Any]:
+    """查询已完成的异步导入 ImportReport（Req 6.1）。"""
+    task = bulk_progress_service.get_task(task_id)
+    if not task or task.project_id != str(project_id):
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    if task.status == "failed":
+        return {"status": "failed", "error": task.error}
+    if task.status != "complete" or task.result is None:
+        raise HTTPException(status_code=409, detail="导入尚未完成")
+    return {"status": "complete", "report": task.result}
 
 
 # ---------------------------------------------------------------------------

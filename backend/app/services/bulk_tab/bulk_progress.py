@@ -37,6 +37,11 @@ class BulkTaskProgress:
     error: Optional[str] = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
+    # 异步导出结果：ZIP 文件磁盘路径（供 GET /export/{task_id}/download）
+    result_path: Optional[str] = None
+    result_filename: Optional[str] = None
+    # 异步导入结果：ImportReport.to_dict()（供 GET /import/{task_id}/result）
+    result: Optional[dict[str, Any]] = None
 
 
 class BulkProgressService:
@@ -72,6 +77,27 @@ class BulkProgressService:
 
     def get_task(self, task_id: str) -> Optional[BulkTaskProgress]:
         return self._tasks.get(task_id)
+
+    def set_total(self, task_id: str, total: int) -> None:
+        """任务真实条目数已知后回填 total（异步 export/import 场景）。"""
+        task = self._tasks.get(task_id)
+        if task:
+            task.total = max(0, int(total))
+
+    def set_result_path(
+        self, task_id: str, path: str, filename: str | None = None
+    ) -> None:
+        """记录异步导出的 ZIP 磁盘路径 + 下载文件名。"""
+        task = self._tasks.get(task_id)
+        if task:
+            task.result_path = path
+            task.result_filename = filename
+
+    def set_result(self, task_id: str, result: dict[str, Any]) -> None:
+        """记录异步导入的 ImportReport（供完成后 GET 查询）。"""
+        task = self._tasks.get(task_id)
+        if task:
+            task.result = result
 
     # ------------------------------------------------------------------
     # 进度更新（由 BulkExport/Import Service 的 progress 回调调用）

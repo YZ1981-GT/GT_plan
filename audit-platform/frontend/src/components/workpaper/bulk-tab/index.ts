@@ -5,5 +5,11 @@
  */
 export { default as WpBulkDialog } from './WpBulkDialog.vue'
 export { default as WpBulkImportReport } from './WpBulkImportReport.vue'
-export { useBulkTabImportExport } from './useBulkTabImportExport'
-export type { ImportReport, ImportReportSheet } from './useBulkTabImportExport'
+export { default as WpBulkProgressBar } from './WpBulkProgressBar.vue'
+export { useBulkTabImportExport } from '@/composables/useBulkTabImportExport'
+export type {
+  ImportReport,
+  SheetReportItem,
+  SheetImportStatus,
+  ConflictStrategy,
+} from '@/composables/useBulkTabImportExport'

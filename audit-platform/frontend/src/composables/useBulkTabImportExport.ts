@@ -30,7 +30,7 @@ import { createSSE, type SSEConnection } from '@/utils/sse'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** 导入报告中每个 sheet 的状态 */
+/** 导入报告中每个 sheet 的状态（与后端 bulk_import_service.SheetStatus 对齐） */
 export type SheetImportStatus =
   | 'success'
   | 'partial'
@@ -39,6 +39,7 @@ export type SheetImportStatus =
   | 'unlisted'
   | 'blocked_by_status'
   | 'conflict_rejected'
+  | 'skipped'
 
 /** 导入报告中单个 sheet 的结果 */
 export interface SheetReportItem {
@@ -56,15 +57,16 @@ export interface SnapshotEntry {
   snapshot_id: string
 }
 
-/** 导入报告汇总 */
+/** 导入报告汇总（后端只回显 count>0 的键，故除已知外均可选） */
 export interface ImportReportSummary {
-  success: number
-  partial: number
-  failed: number
-  blocked: number
-  missing: number
+  success?: number
+  partial?: number
+  failed?: number
+  blocked?: number
+  missing?: number
   unlisted?: number
   conflict_rejected?: number
+  skipped?: number
 }
 
 /** 完整导入报告 */
@@ -75,6 +77,8 @@ export interface ImportReport {
   snapshots: SnapshotEntry[]
   sheets: SheetReportItem[]
   summary: ImportReportSummary
+  /** 失败回滚标记（all-or-nothing 策略触发） */
+  rolled_back?: boolean
 }
 
 /** 冲突策略 */
@@ -84,6 +88,8 @@ export type ConflictStrategy = 'overwrite' | 'fill-empty' | 'reject'
 export interface BulkImportOptions {
   dryRun?: boolean
   strategy?: ConflictStrategy
+  /** 循环多选（仅记录，导入范围以 ZIP manifest 为准） */
+  cycles?: string[]
 }
 
 /** SSE 进度事件数据 */
@@ -256,13 +262,14 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       const paths = buildPaths(projectId.value)
       const formData = new FormData()
       formData.append('file', file)
-
-      const params: Record<string, unknown> = {}
-      if (options.dryRun !== undefined) params.dry_run = options.dryRun
-      if (options.strategy) params.strategy = options.strategy
+      // 后端用 FastAPI Form(...) 读取，必须放 multipart 表单体（放 query 无法命中）
+      formData.append('dry_run', String(options.dryRun ?? false))
+      formData.append('strategy', options.strategy ?? 'overwrite')
+      if (options.cycles && options.cycles.length > 0) {
+        formData.append('cycles', JSON.stringify(options.cycles))
+      }
 
       const response = await http.post(paths.import, formData, {
-        params,
         headers: { 'Content-Type': 'multipart/form-data' },
       })
       const data = (response.data?.data ?? response.data) as ImportReport
@@ -272,7 +279,7 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       } else {
         const s = data.summary
         ElMessage.success(
-          `导入完成：成功 ${s.success}，部分 ${s.partial}，失败 ${s.failed}`,
+          `导入完成：成功 ${s.success ?? 0}，部分 ${s.partial ?? 0}，失败 ${s.failed ?? 0}`,
         )
       }
       return data

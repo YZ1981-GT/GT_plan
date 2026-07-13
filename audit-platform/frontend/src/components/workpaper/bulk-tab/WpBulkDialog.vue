@@ -119,6 +119,12 @@
       <div v-if="loading" class="bulk-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>正在{{ actionLabel }}，请稍候...</p>
+        <WpBulkProgressBar
+          :project-id="projectId"
+          :label="actionLabel"
+          :task-id="progressTaskId"
+          style="width: 100%; margin-top: 8px;"
+        />
       </div>
       <div v-else-if="report" class="bulk-report">
         <WpBulkImportReport
@@ -169,11 +175,16 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
-import { useBulkTabImportExport } from './useBulkTabImportExport'
+import {
+  useBulkTabImportExport,
+  type ImportReport,
+  type ConflictStrategy,
+} from '@/composables/useBulkTabImportExport'
 import WpBulkImportReport from './WpBulkImportReport.vue'
+import WpBulkProgressBar from './WpBulkProgressBar.vue'
 
 export type BulkAction = 'export-templates' | 'import-data' | 'export-data'
-export type ConflictStrategy = 'overwrite' | 'fill-empty' | 'reject'
+export type { ConflictStrategy }
 type Step = 'action' | 'options' | 'executing'
 
 const props = defineProps<{
@@ -192,12 +203,13 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val),
 })
 
+const projectIdRef = computed(() => props.projectId)
 const {
   exportTemplates,
   exportData,
   importData,
   loading,
-} = useBulkTabImportExport()
+} = useBulkTabImportExport(projectIdRef)
 
 // ─── 步骤状态 ───
 const step = ref<Step>('action')
@@ -217,7 +229,9 @@ const conflictStrategy = ref<ConflictStrategy>('overwrite')
 const dryRun = ref(true)
 const onlyWithData = ref(false)
 const uploadFile = ref<File | null>(null)
-const report = ref<any>(null)
+const report = ref<ImportReport | null>(null)
+/** 异步任务 ID（同步端点无此值时进度条走不确定态） */
+const progressTaskId = ref<string | null>(null)
 
 // ─── 计算属性 ───
 const actionLabel = computed(() => {
@@ -268,37 +282,38 @@ async function handleExecute() {
   try {
     switch (currentAction.value) {
       case 'export-templates': {
-        await exportTemplates(props.projectId, selectedCycles.value)
-        ElMessage.success('模板导出成功')
+        await exportTemplates(selectedCycles.value)
         emit('exported')
         break
       }
       case 'export-data': {
-        await exportData(props.projectId, selectedCycles.value, onlyWithData.value)
-        ElMessage.success('数据导出成功')
+        await exportData(selectedCycles.value, onlyWithData.value)
         emit('exported')
         break
       }
       case 'import-data': {
         if (!uploadFile.value) return
-        const result = await importData(
-          props.projectId,
-          uploadFile.value,
-          selectedCycles.value,
-          conflictStrategy.value,
-          dryRun.value,
-        )
+        const result = await importData(uploadFile.value, {
+          dryRun: dryRun.value,
+          strategy: conflictStrategy.value,
+          cycles: selectedCycles.value,
+        })
+        // 组合式函数内部已弹 ElMessage；失败返回 null
+        if (result === null) {
+          step.value = 'options'
+          return
+        }
         report.value = result
         if (!dryRun.value) {
-          ElMessage.success('数据导入完成')
           emit('imported')
         }
         break
       }
     }
-  } catch (err: any) {
-    ElMessage.error(err?.message || `${actionLabel.value}失败`)
+  } catch (err: unknown) {
+    // 组合式函数已弹出错误提示，此处仅回退步骤
     step.value = 'options'
+    void err
   }
 }
 
@@ -315,6 +330,7 @@ function handleClose() {
   currentAction.value = 'export-templates'
   report.value = null
   uploadFile.value = null
+  progressTaskId.value = null
 }
 </script>
 
