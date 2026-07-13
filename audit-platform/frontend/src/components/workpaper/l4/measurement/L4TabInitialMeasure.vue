@@ -247,7 +247,15 @@ function getTagType(val: number): 'success' | 'danger' | 'info' {
   return 'info'
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-initial-measure-${section}`,
+      prompt: `请基于应付债券初始计量"${section}"数据（发行价/交易费用/IRR），给出审计建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 function fmtAmount(val: number): string {

@@ -217,7 +217,15 @@ function triggerSave(index: number) {
   formData.debouncedSave(`L4-3-row-${n}-data`, { remark: JSON.stringify(row) })
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-fin-liab-other-${section}`,
+      prompt: `请基于划分为金融负债的其他金融工具"${section}"数据，给出分类合理性审计建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 function fmtAmount(val: number): string {

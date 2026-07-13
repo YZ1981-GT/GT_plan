@@ -168,7 +168,15 @@ function reconRowClassName({ row }: { row: any }) {
   return row.isOverThreshold ? 'over-threshold-row' : ''
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-book-recon-bullet-${section}`,
+      prompt: `请基于应付债券账面核对（到期一次还本付息）"${section}"数据，给出核对差异分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 function fmtAmount(val: number): string {

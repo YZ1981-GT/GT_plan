@@ -223,7 +223,15 @@ function getRowClassName({ row }: { row: any }) {
   return row.isAbnormal ? 'abnormal-row' : ''
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-equity-liab-${section}`,
+      prompt: `请基于权益与负债划分检查"${section}"数据，给出复合金融工具分拆合理性审计建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 function fmtAmount(val: number): string {

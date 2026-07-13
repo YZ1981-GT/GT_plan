@@ -197,7 +197,15 @@ onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onAdjudicated)
 })
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-disclosure-listed-${section}`,
+      prompt: `请基于应付债券附注披露（上市）"${section}"区段，检查披露完整性并给出审计建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 </script>
 

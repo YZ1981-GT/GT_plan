@@ -187,7 +187,15 @@ function getRowClassName({ rowIndex }: { rowIndex: number }) {
   return ''
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-subsequent-bullet-${section}`,
+      prompt: `请基于应付债券后续计量（到期一次还本付息）"${section}"数据，验证实际利率法摊销合理性`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 function fmtAmount(val: number): string {

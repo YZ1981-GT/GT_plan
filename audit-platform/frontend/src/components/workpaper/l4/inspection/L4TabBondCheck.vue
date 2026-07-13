@@ -167,7 +167,15 @@ function getResultTagType(result: string): 'success' | 'danger' | 'info' | 'warn
   return 'warning'
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l4-bond-check-${section}`,
+      prompt: `请基于应付债券检查表"${section}"检查结果，给出审计建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 onMounted(async () => {
