@@ -591,6 +591,10 @@ async def export_template(
         wb = _build_accrual_wb()
     elif sheet_type == "allocation":
         wb = _build_allocation_wb()
+    elif sheet_type == "non_monetary":
+        wb = _build_nonmonetary_wb()
+    elif sheet_type == "severance":
+        wb = _build_severance_wb()
     else:
         wb = Workbook()
         ws = wb.active
@@ -700,6 +704,17 @@ async def export_data(
             "J1-7-alloc-rows", "J1-7-policy", "J1-7-note", "J1-7-conclusion",
         ])
         wb = _build_allocation_wb(items)
+    elif sheet_type == "non_monetary":
+        items = await _fetch_items(db, wp_id, [
+            "J1-9-vouchers", "J1-9-policy", "J1-9-accrual-basis", "J1-9-note", "J1-9-conclusion",
+        ])
+        wb = _build_nonmonetary_wb(items)
+    elif sheet_type == "severance":
+        items = await _fetch_items(db, wp_id, [
+            "J1-10-vouchers", "J1-10-experts", "J1-10-assumptions",
+            "J1-10-policy", "J1-10-plan", "J1-10-condition", "J1-10-note", "J1-10-conclusion",
+        ])
+        wb = _build_severance_wb(items)
     else:
         # 检查表类 - 走原有逻辑
         item_id = f"J1-{sheet_type}-data"
@@ -1031,6 +1046,39 @@ async def import_data(
             items.append(("J1-7-conclusion", str(kv.get("审计结论") or "")))
         await _upsert_items(db, wp_id, items)
         return {"imported_count": total, "sheet_type": sheet_type}
+    elif sheet_type == "non_monetary":
+        items, total = [], 0
+        if "增减变动检查" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["增减变动检查"], J19_VOUCHER_COLS)
+            items.append(("J1-9-vouchers", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "政策与说明" in wb.sheetnames:
+            kv = _kv_read(wb["政策与说明"])
+            items.append(("J1-9-policy", str(kv.get("非货币性福利政策及内容") or "")))
+            items.append(("J1-9-accrual-basis", str(kv.get("计提金额的确定") or "")))
+            items.append(("J1-9-note", str(kv.get("审计说明") or "")))
+            items.append(("J1-9-conclusion", str(kv.get("审计结论") or "")))
+        await _upsert_items(db, wp_id, items)
+        return {"imported_count": total, "sheet_type": sheet_type}
+    elif sheet_type == "severance":
+        items, total = [], 0
+        if "增减变动检查" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["增减变动检查"], J110_VOUCHER_COLS)
+            items.append(("J1-10-vouchers", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "专家利用" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["专家利用"], J110_EXPERT_COLS)
+            items.append(("J1-10-experts", json.dumps(rows, ensure_ascii=False)))
+        if "关键假设" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["关键假设"], J110_ASSUMPTION_COLS)
+            items.append(("J1-10-assumptions", json.dumps(rows, ensure_ascii=False)))
+        if "政策与说明" in wb.sheetnames:
+            kv = _kv_read(wb["政策与说明"])
+            items.append(("J1-10-policy", str(kv.get("辞退福利制度及内容") or "")))
+            items.append(("J1-10-plan", str(kv.get("近期辞退/裁减计划及阶段") or "")))
+            items.append(("J1-10-condition", str(kv.get("是否符合确认条件") or "")))
+            items.append(("J1-10-note", str(kv.get("审计说明") or "")))
+            items.append(("J1-10-conclusion", str(kv.get("审计结论") or "")))
+        await _upsert_items(db, wp_id, items)
+        return {"imported_count": total, "sheet_type": sheet_type}
     else:
         # 检查表类 — 原有逻辑
         ws = wb.active
@@ -1307,5 +1355,85 @@ def _build_allocation_wb(data: dict | None = None) -> Workbook:
         "  1. 「是否分区标题」列填「是」表示分组标题行（如「(1)短期薪酬」），其余留空",
         "  2. 「层级」列 0/1 控制缩进",
         "  3. 分配合计应与实际计提数勾稽一致，差异≠0需填差异原因",
+    ])
+    return wb
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# J1-9 非货币性福利检查表 / J1-10 辞退福利检查表 多区块导入导出
+# ══════════════════════════════════════════════════════════════════════════════
+
+# J1-9 增减变动凭证明细
+J19_VOUCHER_COLS = [
+    ("date", "日期", False), ("voucherType", "凭证种类", False), ("voucherNo", "凭证编号", False),
+    ("business", "业务内容", False), ("subAccount", "明细科目", False), ("offsetAccount", "对方科目", False),
+    ("debit", "借方", True), ("credit", "贷方", True),
+    ("benefitForm", "非货币性福利形式", False), ("source", "实物来源", False), ("conclusion", "结论", False),
+]
+# J1-10 增减变动凭证明细
+J110_VOUCHER_COLS = [
+    ("date", "日期", False), ("voucherType", "凭证种类", False), ("voucherNo", "凭证编号", False),
+    ("business", "业务内容", False), ("subAccount", "明细科目", False), ("offsetAccount", "对方明细科目", False),
+    ("debit", "借方", True), ("credit", "贷方", True), ("conclusion", "结论", False),
+]
+J110_EXPERT_COLS = [("label", "项目", False), ("indexNo", "索引号", False)]
+J110_ASSUMPTION_COLS = [("label", "关键假设/参数", False), ("value", "取值", False), ("basis", "确定依据", False)]
+
+
+def _build_nonmonetary_wb(data: dict | None = None) -> Workbook:
+    data = data or {}
+    wb = Workbook()
+    wb.remove(wb.active)
+    _rows_to_sheet(wb.create_sheet("增减变动检查"), J19_VOUCHER_COLS, _parse_json_array(data.get("J1-9-vouchers")))
+    _kv_sheet(wb.create_sheet("政策与说明"), [
+        ("非货币性福利政策及内容", data.get("J1-9-policy") or ""),
+        ("计提金额的确定", data.get("J1-9-accrual-basis") or ""),
+        ("审计说明", data.get("J1-9-note") or ""),
+        ("审计结论", data.get("J1-9-conclusion") or ""),
+    ])
+    _note_sheet(wb.create_sheet("编制说明"), "J1-9 非货币性福利检查表 — 编制说明", [
+        "", "一、sheet结构",
+        "  增减变动检查：抽查本期非货币性福利凭证（日期/凭证/科目/借贷方/福利形式/实物来源/结论）",
+        "  政策与说明：非货币性福利政策及内容、计提金额的确定、审计说明、审计结论 key-value",
+        "", "二、导入说明",
+        "  1. 整行全空自动跳过；借方/贷方按数值填写",
+        "  2. 非货币性福利形式：自产产品/外购商品/房屋等资产使用/免费低价服务",
+        "  3. 依据 CAS 9：自产产品按公允价值计量，关注增值税视同销售/个税代扣代缴",
+    ])
+    return wb
+
+
+def _build_severance_wb(data: dict | None = None) -> Workbook:
+    data = data or {}
+    wb = Workbook()
+    wb.remove(wb.active)
+    _rows_to_sheet(wb.create_sheet("增减变动检查"), J110_VOUCHER_COLS, _parse_json_array(data.get("J1-10-vouchers")))
+    _rows_to_sheet(wb.create_sheet("专家利用"), J110_EXPERT_COLS,
+                   _parse_json_array(data.get("J1-10-experts")) or [
+                       {"label": "利用专家的工作", "indexNo": "S12"},
+                       {"label": "评估专家工作", "indexNo": "S12A"}])
+    _rows_to_sheet(wb.create_sheet("关键假设"), J110_ASSUMPTION_COLS,
+                   _parse_json_array(data.get("J1-10-assumptions")) or [
+                       {"label": "基本工资/生活费增长率", "value": "", "basis": ""},
+                       {"label": "社保、公积金增长率", "value": "", "basis": ""},
+                       {"label": "死亡率", "value": "", "basis": ""},
+                       {"label": "折现率", "value": "", "basis": ""}])
+    _kv_sheet(wb.create_sheet("政策与说明"), [
+        ("辞退福利制度及内容", data.get("J1-10-policy") or ""),
+        ("近期辞退/裁减计划及阶段", data.get("J1-10-plan") or ""),
+        ("是否符合确认条件", data.get("J1-10-condition") or ""),
+        ("审计说明", data.get("J1-10-note") or ""),
+        ("审计结论", data.get("J1-10-conclusion") or ""),
+    ])
+    _note_sheet(wb.create_sheet("编制说明"), "J1-10 辞退福利检查表 — 编制说明", [
+        "", "一、sheet结构",
+        "  增减变动检查：抽查本期辞退福利凭证（日期/凭证/科目/借贷方/结论）",
+        "  专家利用：利用专家的工作(S12)/评估专家工作(S12A)，可填索引号",
+        "  关键假设：工资增长率/社保公积金增长率/死亡率/折现率 及取值、确定依据",
+        "  政策与说明：辞退福利制度、裁减计划、确认条件判断、审计说明、审计结论 key-value",
+        "", "二、导入说明",
+        "  1. 整行全空自动跳过；借方/贷方按数值填写",
+        "  2. 折现率为同期限同币种国债利率或高质量公司债券市场收益率，缺失期限用外推法估计",
+        "  3. 辞退福利在不能单方面撤回计划与确认重组成本孰早日确认；付款超一年按折现计量",
     ])
     return wb
