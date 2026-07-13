@@ -1,18 +1,16 @@
 <!--
-  J1TabGeneralCheck.vue — J1-8 应付职工薪酬检查表（凭证级测试）
+  J1TabGeneralCheck.vue — J1-8 应付职工薪酬检查表（凭证级测试 · 卡片+矩阵）
 
   致同源模板 J1-8：
     一、测试目标（发生/完整性准确性/截止）
     二、样本选取标准与规模
-    三、测试（三区凭证检查：贷方计提+借方发放+期后支付）
+    三、测试（三区凭证检查：贷方计提+借方发放+期后支付）——卡片视图/矩阵视图双模
     四、审计说明 — 检查比例
     五、审计结论
 
-  复用 useK1VoucherCheck。科目 2211 应付职工薪酬（贷方/负债类）。
-  源模板特点：
-    - 贷方检查含"职工薪酬计算表"列（月份/人数/金额/是否恰当审批）
-    - 借方检查含"付款审批单/银行回单"列
-    - 期后支付区用于验证完整性（是否漏提）
+  复用 useK1VoucherCheck（科目 2211 应付职工薪酬 贷方/负债类）。
+  卡片视图：每笔凭证一张可展开卡片，含证据区 📎 上传 + OCR 识别回填。
+  矩阵视图：紧凑核对状态矩阵，一屏纵览。
 -->
 <template>
   <div class="j1-general-check">
@@ -26,19 +24,7 @@
     <div class="section-head">
       <h3 class="sheet-title">J1-8 应付职工薪酬检查表</h3>
       <div class="head-actions">
-        <el-popover placement="bottom-end" :width="260" trigger="click">
-          <template #reference>
-            <el-button size="small">⚙ 列设置</el-button>
-          </template>
-          <div class="col-prefs">
-            <div class="col-prefs-title">显示/隐藏列</div>
-            <el-checkbox v-for="col in columnDefs" :key="col.key" v-model="col.visible" size="small" @change="persistColumnPrefs">
-              {{ col.label }}
-            </el-checkbox>
-            <el-divider style="margin:8px 0" />
-            <el-button size="small" link @click="resetColumnPrefs">重置默认</el-button>
-          </div>
-        </el-popover>
+        <el-segmented v-model="viewMode" :options="viewOptions" size="small" />
         <el-button size="small" type="primary" link @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -124,159 +110,88 @@
       </div>
     </el-card>
 
-    <!-- 三、测试 — 贷方检查（计提/增加） -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="card-header-row">
-          <span class="card-title">三-A、贷方检查（计提/增加）</span>
-          <div>
-            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="openSampling('credit')"><el-icon><MagicStick /></el-icon> 抽凭(贷方)</el-button>
-            <el-button v-if="!isReadonly" size="small" @click="addOccurrenceRow(); persist()">＋ 新增</el-button>
+    <!-- 三、测试 — 三区 -->
+    <template v-for="grp in groups" :key="grp.key">
+      <el-card shadow="never" class="section-card">
+        <template #header>
+          <div class="card-header-row">
+            <span class="card-title">{{ grp.title }}</span>
+            <div class="grp-actions">
+              <span class="grp-total">合计 {{ fmtAmt(grp.total.value) }}</span>
+              <el-button v-if="!isReadonly && grp.key !== 'post'" size="small" type="primary" plain @click="openSampling(grp.key)"><el-icon><MagicStick /></el-icon> 抽凭</el-button>
+              <el-button v-if="!isReadonly" size="small" @click="addRow(grp.key)">＋ 新增凭证</el-button>
+            </div>
           </div>
-        </div>
-      </template>
-      <el-table :data="occurrenceRows" border size="small" :max-height="400" class="voucher-table" :row-class-name="abnormalRowClass">
-        <el-table-column label="#" type="index" width="42" align="center" />
-        <el-table-column v-if="isColVisible('debtorName')" label="薪酬项目" min-width="120">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('date')" label="日期" width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" /><span v-else>{{ row.date || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('voucherNo')" label="凭证编号" width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.voucherNo" size="small" @change="persist" /><span v-else>{{ row.voucherNo || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('businessContent')" label="业务内容/摘要" min-width="140">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.businessContent" size="small" @change="persist" /><span v-else>{{ row.businessContent || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('offsetAccount')" label="对方科目" min-width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetAccount" size="small" @change="persist" /><span v-else>{{ row.offsetAccount || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('creditAmount')" label="贷方金额" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('checks')" label="核对内容" width="170" align="center">
-          <template #header>
-            <el-tooltip placement="top">
-              <template #content><div v-for="(lbl, i) in checkLabels" :key="i">{{ i + 1 }}. {{ lbl }}</div></template>
-              <span class="col-help">核对内容 ⓘ</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <el-checkbox-group :model-value="checkedValues(row)" :disabled="isReadonly" class="check-group" @update:model-value="(v: any) => setChecks(row, v as number[])">
-              <el-checkbox v-for="(lbl, i) in checkLabels" :key="i" :value="i" :label="i + 1" />
-            </el-checkbox-group>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('abnormal')" label="异常" width="70" align="center">
-          <template #default="{ row }"><el-switch v-model="row.abnormal" :disabled="isReadonly" size="small" @change="persist" /></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('remark')" label="备注" min-width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" /><span v-else>{{ row.remark || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
-          <template #default="{ row }"><el-button size="small" type="danger" link @click="removeOccurrenceRow(row.id); persist()">删除</el-button></template>
-        </el-table-column>
-        <template #append><div class="table-total">贷方合计：{{ fmtAmt(occurrenceCreditChecked) }}</div></template>
-      </el-table>
-    </el-card>
+        </template>
 
-    <!-- 三-B、借方检查（发放/减少） -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="card-header-row">
-          <span class="card-title">三-B、借方检查（发放/减少）</span>
-          <div>
-            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="openSampling('debit')"><el-icon><MagicStick /></el-icon> 抽凭(借方)</el-button>
-            <el-button v-if="!isReadonly" size="small" @click="addPostCollectionRow(); persist()">＋ 新增</el-button>
-          </div>
+        <!-- 卡片视图 -->
+        <div v-if="viewMode === 'card'">
+          <J1VoucherCard
+            v-for="(row, idx) in grp.rows.value"
+            :key="row.id"
+            :row="row"
+            :seq="idx + 1"
+            :direction="grp.key"
+            :check-labels="grp.key === 'debit' ? debitCheckLabels : checkLabels"
+            :is-readonly="isReadonly"
+            :ocr-loading-id="ocrLoadingId"
+            @change="persist"
+            @remove="(id) => removeRow(grp.key, id)"
+            @upload="onCardUpload"
+          />
+          <el-empty v-if="grp.rows.value.length === 0" description="暂无凭证，点击「＋新增凭证」或「抽凭」" :image-size="60" />
         </div>
-      </template>
-      <el-table :data="postCollectionRows" border size="small" :max-height="400" class="voucher-table" :row-class-name="abnormalRowClass">
-        <el-table-column label="#" type="index" width="42" align="center" />
-        <el-table-column v-if="isColVisible('debtorName')" label="薪酬项目" min-width="120">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('date')" label="日期" width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" /><span v-else>{{ row.date || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('voucherNo')" label="凭证编号" width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.voucherNo" size="small" @change="persist" /><span v-else>{{ row.voucherNo || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('businessContent')" label="业务内容/摘要" min-width="140">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.businessContent" size="small" @change="persist" /><span v-else>{{ row.businessContent || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('offsetAccount')" label="对方科目" min-width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetAccount" size="small" @change="persist" /><span v-else>{{ row.offsetAccount || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('debitAmount')" label="借方金额" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('checks')" label="核对内容" width="170" align="center">
-          <template #header>
-            <el-tooltip placement="top">
-              <template #content><div v-for="(lbl, i) in debitCheckLabels" :key="i">{{ i + 1 }}. {{ lbl }}</div></template>
-              <span class="col-help">核对内容 ⓘ</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <el-checkbox-group :model-value="checkedValues(row)" :disabled="isReadonly" class="check-group" @update:model-value="(v: any) => setChecks(row, v as number[])">
-              <el-checkbox v-for="(lbl, i) in debitCheckLabels" :key="i" :value="i" :label="i + 1" />
-            </el-checkbox-group>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('abnormal')" label="异常" width="70" align="center">
-          <template #default="{ row }"><el-switch v-model="row.abnormal" :disabled="isReadonly" size="small" @change="persist" /></template>
-        </el-table-column>
-        <el-table-column v-if="isColVisible('remark')" label="备注" min-width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" /><span v-else>{{ row.remark || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
-          <template #default="{ row }"><el-button size="small" type="danger" link @click="removePostCollectionRow(row.id); persist()">删除</el-button></template>
-        </el-table-column>
-        <template #append><div class="table-total">借方合计：{{ fmtAmt(postDebitChecked) }}</div></template>
-      </el-table>
-    </el-card>
 
-    <!-- 三-C、期后支付检查 -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="card-header-row">
-          <span class="card-title">三-C、期后支付检查（完整性验证）</span>
-          <el-button v-if="!isReadonly" size="small" @click="addPostPeriodRow(); persist()">＋ 新增</el-button>
-        </div>
-      </template>
-      <el-table :data="postPeriodRows" border size="small" :max-height="260" class="voucher-table">
-        <el-table-column label="#" type="index" width="42" align="center" />
-        <el-table-column label="支付日期" width="120">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.date" size="small" @change="persist" /><span v-else>{{ row.date || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column label="凭证编号" width="110">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.voucherNo" size="small" @change="persist" /><span v-else>{{ row.voucherNo || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column label="薪酬项目/摘要" min-width="150">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column label="支付金额" width="130" align="right">
-          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span></template>
-        </el-table-column>
-        <el-table-column label="归属期间" width="130">
-          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.businessContent" size="small" placeholder="如2025年12月" @change="persist" /><span v-else>{{ row.businessContent || '-' }}</span></template>
-        </el-table-column>
-        <el-table-column label="是否应计提" width="100" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.remark" size="small" placeholder="—" @change="persist">
-              <el-option label="是(漏提)" value="是" /><el-option label="否" value="否" /><el-option label="待定" value="待定" />
-            </el-select>
-            <span v-else>{{ row.remark || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
-          <template #default="{ row }"><el-button size="small" type="danger" link @click="removePostPeriodRow(row.id); persist()">删除</el-button></template>
-        </el-table-column>
-        <template #append><div class="table-total">期后支付合计：{{ fmtAmt(postPeriodTotal) }}</div></template>
-      </el-table>
-    </el-card>
+        <!-- 矩阵视图 -->
+        <el-table v-else :data="grp.rows.value" border size="small" :max-height="400" class="matrix-table" :row-class-name="abnormalRowClass">
+          <el-table-column label="#" type="index" width="42" align="center" />
+          <el-table-column label="薪酬项目" min-width="120">
+            <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
+          </el-table-column>
+          <el-table-column label="凭证编号" width="110">
+            <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.voucherNo" size="small" @change="persist" /><span v-else>{{ row.voucherNo || '-' }}</span></template>
+          </el-table-column>
+          <el-table-column :label="grp.key === 'credit' ? '贷方金额' : '借方/支付金额'" width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" v-model="row[grp.key === 'credit' ? 'creditAmount' : 'debitAmount']" :controls="false" size="small" class="amount-input" @change="persist" />
+              <span v-else class="amount-cell">{{ fmtAmt(row[grp.key === 'credit' ? 'creditAmount' : 'debitAmount']) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="核对内容（点击色块切换）" min-width="190" align="center">
+            <template #header>
+              <el-tooltip placement="top">
+                <template #content><div v-for="(lbl, i) in (grp.key === 'debit' ? debitCheckLabels : checkLabels)" :key="i">{{ i + 1 }}. {{ lbl }}</div></template>
+                <span class="col-help">核对内容 ⓘ</span>
+              </el-tooltip>
+            </template>
+            <template #default="{ row }">
+              <span class="matrix-cells">
+                <span
+                  v-for="(lbl, i) in (grp.key === 'debit' ? debitCheckLabels : checkLabels)"
+                  :key="i"
+                  class="mx-cell"
+                  :class="{ on: row.checks[i], off: !row.checks[i] }"
+                  :title="lbl"
+                  @click="toggleCheck(row, i)"
+                >{{ i + 1 }}</span>
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="证据" width="70" align="center">
+            <template #default="{ row }">
+              <el-tag v-if="attachmentCount(row) > 0" size="small" type="success" effect="plain">📎{{ attachmentCount(row) }}</el-tag>
+              <span v-else class="muted">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="异常" width="64" align="center">
+            <template #default="{ row }"><el-switch v-model="row.abnormal" :disabled="isReadonly" size="small" @change="persist" /></template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+            <template #default="{ row }"><el-button size="small" type="danger" link @click="removeRow(grp.key, row.id)">删除</el-button></template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </template>
 
     <!-- 四、审计说明 — 检查比例 -->
     <el-card shadow="never" class="section-card">
@@ -296,7 +211,10 @@
         <template #title>检查比例偏低（&lt;30%），应扩大检查样本量或说明原因</template>
       </el-alert>
       <div class="note-block">
-        <label>审计说明</label>
+        <div class="note-label-row">
+          <label>审计说明</label>
+          <el-button v-if="!isReadonly" size="small" type="primary" plain :loading="aiNoteLoading" @click="generateAuditNote">🤖 AI补充异常分析</el-button>
+        </div>
         <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="说明检查过程/发现/比例合理性..." @change="persist" />
       </div>
     </el-card>
@@ -342,9 +260,9 @@
 
 <script setup lang="ts">
 /**
- * J1TabGeneralCheck — J1-8 应付职工薪酬凭证级检查表
- * 科目 2211（贷方/负债类）。三区：贷方+借方+期后。
- * 复用 useK1VoucherCheck composable。
+ * J1TabGeneralCheck — J1-8 应付职工薪酬凭证级检查表（卡片+矩阵+OCR）
+ * 科目 2211（贷方/负债类）。三区：贷方计提+借方发放+期后支付。
+ * 复用 useK1VoucherCheck composable + useJ1VoucherOcr 行级 OCR。
  * 自持久化模式（J1 composable-internal persist pattern）。
  */
 import { ref, reactive, computed, onMounted, defineAsyncComponent } from 'vue'
@@ -352,6 +270,8 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
+import J1VoucherCard from './J1VoucherCard.vue'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -367,52 +287,94 @@ const yearNum = computed(() => {
   return d?.year ?? new Date().getFullYear()
 })
 
-// ─── 本地 allResponses Map（自持久化，不依赖父级传递） ─────────────────────
+// 视图模式
+const viewMode = ref<'card' | 'matrix'>('card')
+const viewOptions = [
+  { label: '📇 卡片视图', value: 'card' },
+  { label: '▦ 矩阵视图', value: 'matrix' },
+]
+
+// ─── 本地 allResponses Map（自持久化） ────────────────────────────────────────
 const localAllResponses = ref(new Map<string, any>())
 const allResponsesRef = computed(() => localAllResponses.value)
-
 const ITEM_ID = 'J1-8-voucher-check'
 
 const {
-  itemId, checkLabels,
+  checkLabels,
   criteria, occurrenceRows, postCollectionRows, auditNote, conclusion, conclusionOption,
   checkRatios, lowRatioWarnings, abnormalRows,
-  occurrenceCreditChecked, occurrenceDebitChecked,
+  occurrenceCreditChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
   addPostCollectionRow, removePostCollectionRow,
   fillFromSamples, serialize,
 } = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: ITEM_ID })
 
+const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId))
+
 // 借方检查的核对内容标签（发放）
 const debitCheckLabels = [
-  '付款审批单齐全',
-  '银行回单/转账凭证',
-  '代扣代缴凭证（个税/社保/公积金）',
-  '与薪酬发放表相符',
-  '发放金额与审批一致',
+  '付款审批单齐全', '银行回单/转账凭证', '代扣代缴凭证（个税/社保/公积金）', '与薪酬发放表相符', '发放金额与审批一致',
 ]
 
-// 检查比例保留贷方+借方两行
 const j1CheckRatios = computed(() => checkRatios.value)
 
 // 期后支付区（独立管理）
 const postPeriodRows = ref<K1VoucherRow[]>([])
-const postPeriodTotal = computed(() => postPeriodRows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
 const postDebitChecked = computed(() => postCollectionRows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
+const postPeriodTotal = computed(() => postPeriodRows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
 
-function addPostPeriodRow() {
-  postPeriodRows.value.push({
+// 三区分组定义（供 v-for 渲染卡片/矩阵）
+const groups = [
+  { key: 'credit' as const, title: '三-A、贷方检查（计提/增加）', rows: occurrenceRows, total: occurrenceCreditChecked },
+  { key: 'debit' as const, title: '三-B、借方检查（发放/减少）', rows: postCollectionRows, total: postDebitChecked },
+  { key: 'post' as const, title: '三-C、期后支付检查（完整性验证）', rows: postPeriodRows, total: postPeriodTotal },
+]
+
+function addRow(key: 'credit' | 'debit' | 'post') {
+  if (key === 'credit') addOccurrenceRow()
+  else if (key === 'debit') addPostCollectionRow()
+  else postPeriodRows.value.push({
     id: `pp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     debtorName: '', date: '', voucherNo: '', businessContent: '',
-    offsetAccount: '', offsetSubAccount: '',
-    creditAmount: 0, debitAmount: 0,
-    supportingDoc: '',
-    checks: [false, false, false, false, false],
+    offsetAccount: '', offsetSubAccount: '', creditAmount: 0, debitAmount: 0,
+    supportingDoc: '', checks: [false, false, false, false, false],
     abnormal: false, indexNo: '', remark: '',
   })
+  persist()
 }
-function removePostPeriodRow(id: string) {
-  postPeriodRows.value = postPeriodRows.value.filter(r => r.id !== id)
+function removeRow(key: 'credit' | 'debit' | 'post', id: string) {
+  if (key === 'credit') removeOccurrenceRow(id)
+  else if (key === 'debit') removePostCollectionRow(id)
+  else postPeriodRows.value = postPeriodRows.value.filter(r => r.id !== id)
+  persist()
+}
+
+// 矩阵视图核对色块切换
+function toggleCheck(row: K1VoucherRow, i: number) {
+  if (isReadonly.value) return
+  const next = [...row.checks]
+  next[i] = !next[i]
+  row.checks = next
+  persist()
+}
+function attachmentCount(row: any): number {
+  const a = row.attachments
+  return a ? Object.keys(a).length : 0
+}
+
+// 卡片证据上传 → OCR
+function onCardUpload(payload: { rowId: string; file: File; evidenceKey: string }) {
+  const allRows = [...occurrenceRows.value, ...postCollectionRows.value, ...postPeriodRows.value]
+  const row = allRows.find(r => r.id === payload.rowId)
+  if (!row) return
+  const direction: 'credit' | 'debit' | 'post' =
+    occurrenceRows.value.some(r => r.id === payload.rowId) ? 'credit'
+    : postCollectionRows.value.some(r => r.id === payload.rowId) ? 'debit' : 'post'
+  uploadAndMerge(payload.rowId, payload.file, direction, (id, patch) => {
+    const target = allRows.find(r => r.id === id)
+    if (target) Object.assign(target, patch)
+    persist()
+  })
 }
 
 // ─── selfLoad 从 checklist-responses 恢复 ────────────────────────────────────
@@ -434,46 +396,12 @@ onMounted(async () => {
   }
 })
 
-// ─── 列设置 ─────────────────────────────────────────────────────────────────
-const COL_PREFS_KEY = 'j1-8-column-prefs'
-interface ColDef { key: string; label: string; visible: boolean }
-const columnDefs = reactive<ColDef[]>([
-  { key: 'debtorName', label: '薪酬项目', visible: true },
-  { key: 'date', label: '日期', visible: true },
-  { key: 'voucherNo', label: '凭证编号', visible: true },
-  { key: 'businessContent', label: '业务内容', visible: true },
-  { key: 'offsetAccount', label: '对方科目', visible: true },
-  { key: 'creditAmount', label: '贷方金额', visible: true },
-  { key: 'debitAmount', label: '借方金额', visible: true },
-  { key: 'checks', label: '核对内容', visible: true },
-  { key: 'abnormal', label: '异常', visible: true },
-  { key: 'remark', label: '备注', visible: true },
-])
-function isColVisible(key: string): boolean { return columnDefs.find(c => c.key === key)?.visible ?? true }
-function persistColumnPrefs(): void {
-  try { localStorage.setItem(COL_PREFS_KEY, JSON.stringify(columnDefs.map(c => ({ key: c.key, visible: c.visible })))) } catch { /* */ }
-}
-function loadColumnPrefs(): void {
-  try {
-    const saved = localStorage.getItem(COL_PREFS_KEY)
-    if (!saved) return
-    const prefs: Array<{ key: string; visible: boolean }> = JSON.parse(saved)
-    for (const p of prefs) { const col = columnDefs.find(c => c.key === p.key); if (col) col.visible = p.visible }
-  } catch { /* */ }
-}
-function resetColumnPrefs(): void {
-  for (const col of columnDefs) col.visible = true
-  persistColumnPrefs()
-}
-loadColumnPrefs()
-
-// ─── Persistence（J1 自持久化模式） ──────────────────────────────────────────
+// ─── Persistence ─────────────────────────────────────────────────────────────
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 function persist() {
   if (persistTimer) clearTimeout(persistTimer)
   persistTimer = setTimeout(doPersist, 800)
 }
-
 async function doPersist() {
   try {
     const data = serialize()
@@ -488,18 +416,10 @@ async function doPersist() {
   }
 }
 
-// ─── Handlers ────────────────────────────────────────────────────────────────
-function checkedValues(row: K1VoucherRow): number[] {
-  return row.checks.map((c, i) => (c ? i : -1)).filter(i => i >= 0)
-}
-function setChecks(row: K1VoucherRow, vals: number[]): void {
-  row.checks = Array.from({ length: 5 }, (_, i) => vals.includes(i))
-  persist()
-}
-
+// ─── 抽凭 ────────────────────────────────────────────────────────────────────
 const samplingVisible = ref(false)
 const samplingPhase = ref<'current' | 'post'>('current')
-function openSampling(direction: 'credit' | 'debit') {
+function openSampling(direction: 'credit' | 'debit' | 'post') {
   samplingPhase.value = direction === 'credit' ? 'current' : 'post'
   samplingVisible.value = true
 }
@@ -521,84 +441,97 @@ function onConclusionOption(val: string) {
 }
 
 function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
+  if (val == null || val === 0) return '-'
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
 
-// AI 生成抽样过程
+// ─── AI ──────────────────────────────────────────────────────────────────────
 const aiSamplingLoading = ref(false)
-
-// 自动取数：从四表库获取测试总体
+const aiNoteLoading = ref(false)
 const autoFetchLoading = ref(false)
+
 async function autoFetchPopulation() {
   if (isReadonly.value) return
   autoFetchLoading.value = true
   try {
-    // 从试算表取全部科目，再过滤2211
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { year: yearNum.value },
-      _silent: true,
+      params: { year: yearNum.value }, _silent: true,
     } as any)
     const items = res.data?.data || res.data || []
     const allRows = Array.isArray(items) ? items : []
-    // 找科目2211（可能是2211或以2211开头的子科目）
     const matched = allRows.filter((r: any) => {
       const code = r.standard_account_code || r.account_code || ''
       return code === '2211' || code.startsWith('2211')
     })
     if (matched.length > 0) {
-      // 汇总所有2211系科目的发生额
-      let creditTotal = 0
-      let debitTotal = 0
+      let creditTotal = 0, debitTotal = 0
       for (const tb of matched) {
-        // trial_balance v2正数口径：aje_adjustment可能包含借贷
-        // 通常 unadjusted_amount 是期末未审，但发生额需要从 tb_balance 或直接字段取
         creditTotal += Math.abs(tb.credit_amount || tb.period_credit || 0)
         debitTotal += Math.abs(tb.debit_amount || tb.period_debit || 0)
       }
-      // 如果没有分方向字段，尝试用 unadjusted_amount（负债贷方科目期末=正数）
       if (creditTotal === 0 && debitTotal === 0 && matched[0].unadjusted_amount) {
         creditTotal = Math.abs(matched[0].unadjusted_amount)
       }
-      if (creditTotal > 0) criteria.populationCreditAmount = creditTotal
-      if (debitTotal > 0) criteria.populationDebitAmount = debitTotal
+      if (creditTotal > 0) criteria.value.populationCreditAmount = creditTotal
+      if (debitTotal > 0) criteria.value.populationDebitAmount = debitTotal
       persist()
       ElMessage.success(`已从试算表取数（科目2211系${matched.length}条）：贷方${fmtAmt(creditTotal)}，借方${fmtAmt(debitTotal)}`)
     } else {
       ElMessage.warning('试算表中未找到科目2211，请确认四表库已导入该科目')
     }
-  } catch (e) {
+  } catch {
     ElMessage.warning('自动取数失败，请手动填写')
   } finally {
     autoFetchLoading.value = false
   }
 }
+
 async function generateSamplingProcess() {
   if (isReadonly.value) return
   aiSamplingLoading.value = true
   try {
     const ctx = {
-      '测试总体(贷方)': `${criteria.populationCreditCount || 0}笔/${criteria.populationCreditAmount || 0}元`,
-      '测试总体(借方)': `${criteria.populationDebitCount || 0}笔/${criteria.populationDebitAmount || 0}元`,
-      '特定样本': criteria.specificSample || '未填',
-      '抽样总体': `${criteria.samplingPopulationCount || 0}笔/${criteria.samplingPopulationAmount || 0}元`,
-      '样本量': `${criteria.sampleSize || 0}笔`,
-      '抽样方法': criteria.samplingMethod || '未选择',
+      '测试总体(贷方)': `${criteria.value.populationCreditCount || 0}笔/${criteria.value.populationCreditAmount || 0}元`,
+      '测试总体(借方)': `${criteria.value.populationDebitCount || 0}笔/${criteria.value.populationDebitAmount || 0}元`,
+      '特定样本': criteria.value.specificSample || '未填',
+      '抽样总体': `${criteria.value.samplingPopulationCount || 0}笔/${criteria.value.samplingPopulationAmount || 0}元`,
+      '样本量': `${criteria.value.sampleSize || 0}笔`,
+      '抽样方法': criteria.value.samplingMethod || '未选择',
     }
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'j1-8-sampling-process',
-      prompt: '根据以下样本选取标准信息，生成简洁的抽样过程描述（如"使用IDEA从贷方发生额XX笔中按货币单元抽样选取XX笔计提凭证+从借方发生额中选取XX笔发放凭证进行检查"）：',
+      prompt: '根据以下样本选取标准信息，生成简洁的抽样过程描述：',
       context: ctx,
-      existingContent: criteria.samplingProcess || '',
+      existingContent: criteria.value.samplingProcess || '',
     })
     const text = res.data?.data?.content || res.data?.content
-    if (text) {
-      criteria.samplingProcess = text
-      persist()
-    }
+    if (text) { criteria.value.samplingProcess = text; persist() }
   } catch { /* silent */ }
   finally { aiSamplingLoading.value = false }
+}
+
+async function generateAuditNote() {
+  if (isReadonly.value) return
+  aiNoteLoading.value = true
+  try {
+    const abnormalList = abnormalRows.value.map(r => `${r.debtorName || '未填'}(凭证${r.voucherNo || '-'}): ${r.remark || '未说明'}`)
+    const ratioInfo = j1CheckRatios.value.map(r => `${r.direction} 检查比例${r.ratio != null ? (r.ratio * 100).toFixed(1) + '%' : '—'}`)
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'j1-8-audit-note',
+      prompt: '根据检查比例与异常凭证情况，生成审计说明，重点对异常项进行分析补充：',
+      context: {
+        '检查比例': ratioInfo.join('；'),
+        '异常凭证': abnormalList.length ? abnormalList.join('；') : '无异常',
+        '贷方检查笔数': occurrenceRows.value.length,
+        '借方检查笔数': postCollectionRows.value.length,
+      },
+      existingContent: auditNote.value || '',
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) { auditNote.value = text; persist() }
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiNoteLoading.value = false }
 }
 
 async function handleAiGenerate() {
@@ -620,10 +553,7 @@ function handleReview() { /* 复核对话暂桩 */ }
 .gs-no { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 11px; font-weight: 600; flex-shrink: 0; }
 .section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
-.head-actions { display: flex; gap: 8px; align-items: center; }
-.col-prefs { max-height: 320px; overflow-y: auto; }
-.col-prefs-title { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
-.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 4px; }
+.head-actions { display: flex; gap: 10px; align-items: center; }
 .audit-objective { margin-bottom: 10px; }
 .audit-objective :deep(.el-alert__content) { padding: 2px 0; }
 .ao-title { font-weight: 600; }
@@ -634,6 +564,8 @@ function handleReview() { /* 复核对话暂桩 */ }
 .section-card :deep(.el-card__body) { padding: 12px 14px; }
 .card-title { font-weight: 600; }
 .card-header-row { display: flex; align-items: center; justify-content: space-between; }
+.grp-actions { display: flex; align-items: center; gap: 10px; }
+.grp-total { font-size: 12px; color: var(--el-text-color-regular); font-weight: 600; }
 .criteria-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 18px; }
 .cg-item { display: flex; flex-direction: column; gap: 4px; }
 .cg-item.cg-full { grid-column: 1 / -1; }
@@ -645,18 +577,22 @@ function handleReview() { /* 复核对话暂桩 */ }
 .cg-unit { font-size: 12px; color: var(--el-text-color-secondary); }
 .num-sm { width: 78px; }
 .num-md { width: 130px; }
-.voucher-table { font-size: var(--wp-font-size, 13px); }
+.matrix-table { font-size: var(--wp-font-size, 13px); }
+.matrix-table :deep(th), .matrix-table :deep(td) { font-size: 13px; }
+.matrix-table :deep(.abnormal-row td) { background-color: #fef2f2 !important; }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .amount-input { width: 100%; }
 .col-help { cursor: help; border-bottom: 1px dashed var(--el-border-color); }
-.check-group { display: flex; flex-wrap: wrap; gap: 0 4px; }
-.check-group :deep(.el-checkbox) { margin-right: 4px; }
-.table-total { padding: 6px 12px; text-align: right; font-size: 12px; color: var(--el-text-color-regular); font-weight: 600; }
-.voucher-table :deep(.abnormal-row td) { background-color: #fef2f2 !important; }
+.matrix-cells { display: inline-flex; gap: 4px; }
+.mx-cell { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 4px; font-size: 12px; cursor: pointer; user-select: none; transition: all 0.15s; }
+.mx-cell.on { background: #10b981; color: #fff; font-weight: 600; }
+.mx-cell.off { background: #f1f5f9; color: #94a3b8; }
+.mx-cell:hover { transform: scale(1.1); }
 .ratio-table { max-width: 640px; }
 .ratio-warn { margin-top: 12px; }
 .muted { color: var(--el-text-color-placeholder); }
 .note-block { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.note-label-row { display: flex; align-items: center; justify-content: space-between; }
 .note-block label { font-size: 12px; color: var(--el-text-color-secondary); }
 .abnormal-summary { margin-bottom: 10px; padding: 10px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #fecaca; }
 .as-header { font-weight: 600; color: var(--el-color-danger); margin-bottom: 6px; }
