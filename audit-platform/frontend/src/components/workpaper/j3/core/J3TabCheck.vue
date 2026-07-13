@@ -151,6 +151,7 @@
  * J3TabCheck — J3-2 股份支付检查表（19列段落型 + CAS11 + BS参数逐项验证）
  */
 import { ref, computed } from 'vue'
+import { http } from '@/utils/http'
 import { useJ3Check } from '@/composables/workpaper/j3/useJ3Check'
 import { useJ3Disclosure } from '@/composables/workpaper/j3/useJ3Disclosure'
 import { calcBlackScholes } from '@/composables/workpaper/j3/useJ3OptionPricingEngine'
@@ -188,12 +189,43 @@ const conclusionType = computed(() => {
 })
 
 function handleAIAnalysis() {
-  // 调用通用AI端点分析BS参数合理性
-  console.log('[J3 Check] AI analysis triggered for BS params')
+  const p = checkData.bsParams.value
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    section: 'bs-param-analysis',
+    prompt: '请分析以下Black-Scholes定价参数的合理性，对比同行业可比公司水平，给出审计判断建议',
+    context: {
+      stockPrice: p.S,
+      exercisePrice: p.K,
+      timeToExpiry: p.T,
+      riskFreeRate: p.r,
+      volatility: p.sigma,
+      bsResult: bsResult.value,
+    },
+  }).then(res => {
+    const content = res.data?.data?.content
+    if (content) conclusionNote.value = content
+  }).catch(() => { /* 降级静默 */ })
 }
 
 function handleSectionAI(sectionId: string) {
-  console.log('[J3 Check] AI assist for section:', sectionId)
+  const section = checkData.sections.value.find(s => s.id === sectionId)
+  if (!section) return
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    section: `j3-check-${sectionId}`,
+    prompt: `请基于CAS11股份支付准则，对"${section.title}"检查区的各项逐一给出审计检查建议`,
+    context: {
+      sectionTitle: section.title,
+      items: section.items.map((it: any) => ({ label: it.label, value: it.value, conclusion: it.conclusion })),
+    },
+  }).then(res => {
+    const content = res.data?.data?.content
+    if (content) {
+      // 将AI建议填入该section最后一项的value（如有空项）
+      const emptyItem = section.items.find((it: any) => !it.value)
+      if (emptyItem) emptyItem.value = content
+      else conclusionNote.value += '\n' + content
+    }
+  }).catch(() => { /* 降级静默 */ })
 }
 
 formData.loadData()
