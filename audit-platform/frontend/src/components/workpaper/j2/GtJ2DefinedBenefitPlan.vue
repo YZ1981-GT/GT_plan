@@ -28,7 +28,9 @@
         :wp-id="wpId"
         :project-id="projectId"
         :html-data="htmlData"
+        :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :save-immediate="handleChildSave"
         @save="onSave"
       />
       <!-- J2-2 明细表 -->
@@ -37,7 +39,9 @@
         :wp-id="wpId"
         :project-id="projectId"
         :html-data="htmlData"
+        :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :save-immediate="handleChildSave"
       />
       <!-- J2-3 调整分录 -->
       <J2TabAdjustment
@@ -45,7 +49,9 @@
         :wp-id="wpId"
         :project-id="projectId"
         :html-data="htmlData"
+        :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :save-immediate="handleChildSave"
       />
       <!-- J2-4 计提情况检查表 -->
       <J2TabAccrualCheck
@@ -53,7 +59,9 @@
         :wp-id="wpId"
         :project-id="projectId"
         :html-data="htmlData"
+        :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :save-immediate="handleChildSave"
       />
       <!-- 附注（上市公司） -->
       <J2TabDisclosureListed
@@ -88,13 +96,12 @@
  * 按 sheetName v-if 分发到各子组件（defineAsyncComponent lazy 加载）。
  * 科目2221长期应付职工薪酬-设定受益计划（贷方/负债类）：期末=期初+贷方-借方
  *
- * J2 包含：底稿目录 + 审定表(设定受益/其他长期/辞退) + 明细表 + 调整分录 +
- *          计提检查(精算假设+ISA620) + 附注(双版本)
+ * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)
  */
 import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
-import { useJ2FormData } from '@/composables/workpaper/j2/useJ2FormData'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
+import http from '@/utils/http'
 
 // ── defineAsyncComponent lazy loading ───────────────────────────────────────
 const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
@@ -124,21 +131,10 @@ const emit = defineEmits<{
 
 const isLoading = ref(true)
 
-// ── selfLoad ────────────────────────────────────────────────────────────────
-const formData = useJ2FormData({
-  wpId: props.wpId,
-  projectId: props.projectId,
-  year: props.year,
-  sheetName: props.sheetName,
-  htmlData: props.htmlData,
-})
-
 /** 当前 sheet 名（从 props.sheetName 提取） */
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
-  // 程序表 J2A（须先于其他匹配）
   if (/\bJ2A\b/.test(sn) || sn.includes('实质性程序表')) return 'J2A'
-  // 匹配 J2-1, J2-2, J2-3, J2-4, J2附注(上市), J2附注(国企), 底稿目录
   if (sn.includes('底稿目录')) return '底稿目录'
   if (sn.includes('J2-1') || sn.includes('审定表')) return 'J2-1'
   if (sn.includes('J2-2') || sn.includes('明细表')) return 'J2-2'
@@ -146,12 +142,62 @@ const currentSheet = computed(() => {
   if (sn.includes('J2-4') || sn.includes('计提') || sn.includes('检查表')) return 'J2-4'
   if (sn.includes('上市')) return 'J2附注(上市)'
   if (sn.includes('国有') || sn.includes('国企')) return 'J2附注(国企)'
-  // 尝试正则
   const m = sn.match(/^(J2-\d+)/)
   return m ? m[1] : sn
 })
 
-// ─── 版本追踪 useWorkpaperVersionToolbar ─────────────────────────────────────
+// ─── Persistence: allResponses Map ──────────────────────────────────────────
+const allResponses = ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>(new Map())
+
+async function selfLoad() {
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const items = res.data?.data || res.data || []
+    if (Array.isArray(items)) {
+      const map = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
+      for (const it of items) {
+        if (it.item_id) map.set(it.item_id, { item_id: it.item_id, conclusion: it.conclusion ?? null, remark: it.remark ?? null })
+      }
+      allResponses.value = map
+    }
+  } catch { /* silent */ }
+  // merge from htmlData
+  _mergeResponses(props.htmlData)
+}
+
+function _mergeResponses(data: Record<string, unknown> | null | undefined) {
+  if (!data) return
+  const snapshot = (data.responses_snapshot || data.checklist_responses) as any
+  if (!snapshot) return
+  if (Array.isArray(snapshot)) {
+    for (const it of snapshot) {
+      if (it.item_id && !allResponses.value.has(String(it.item_id))) {
+        allResponses.value.set(String(it.item_id), { item_id: String(it.item_id), conclusion: it.conclusion ?? null, remark: it.remark ?? null })
+      }
+    }
+  } else if (typeof snapshot === 'object') {
+    for (const [key, val] of Object.entries(snapshot)) {
+      if (!allResponses.value.has(key) && val && typeof val === 'object') {
+        const v = val as Record<string, unknown>
+        allResponses.value.set(key, { item_id: key, conclusion: (v.conclusion as string) ?? null, remark: (v.remark as string) ?? null })
+      }
+    }
+  }
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+async function handleChildSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
+  for (const it of items) allResponses.value.set(it.item_id, it)
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    try {
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
+      scheduleAutoSnapshot()
+    } catch { /* silent */ }
+  }, 800)
+}
+
+// ─── 版本追踪 ────────────────────────────────────────────────────────────────
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 provide('j2VersionTrailRef', versionTrailRef)
@@ -163,7 +209,7 @@ function onSave() {
 }
 
 onMounted(async () => {
-  await formData.loadData()
+  await selfLoad()
   isLoading.value = false
 })
 </script>

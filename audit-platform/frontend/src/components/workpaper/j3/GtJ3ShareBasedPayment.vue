@@ -33,7 +33,9 @@
         :project-id="props.projectId"
         :year="props.year"
         :html-data="props.htmlData"
+        :all-responses="allResponses"
         :is-readonly="props.isReadonly"
+        :save-immediate="handleChildSave"
       />
 
       <!-- J3-2 股份支付检查表 -->
@@ -43,7 +45,9 @@
         :project-id="props.projectId"
         :year="props.year"
         :html-data="props.htmlData"
+        :all-responses="allResponses"
         :is-readonly="props.isReadonly"
+        :save-immediate="handleChildSave"
       />
 
       <!-- 兜底 OnlyOffice -->
@@ -60,18 +64,15 @@
 /**
  * GtJ3ShareBasedPayment — J3 股份支付主入口组件
  *
- * 按 sheetName v-if 分发到各子组件（defineAsyncComponent lazy 加载）。
  * J3 无独立科目（费用端走 K8/K9，权益端走 M4，现金端走 J1）。
- *
- * J3 包含：程序表(J3A) + 情况表(Black-Scholes参数+等待期) + 检查表(公允价值/服务年限/测算)
- * 程序表在专属组件内分发（对齐 H1A/L1A），不再单独走 a-program-console。
+ * persistence三连环：selfLoad + allResponses Map + handleChildSave
  *
  * Spec: .kiro/specs/j3-share-based-payment/
- * Requirements: 1.1-1.10
  */
 import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
+import http from '@/utils/http'
 
 // defineAsyncComponent 懒加载
 const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
@@ -100,17 +101,53 @@ const isLoading = ref(true)
 /** 当前 sheet 名（从 props.sheetName 提取编码） */
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
-  // 程序表 J3A（须先于 J3-\d+）
   if (/\bJ3A\b/.test(sn) || sn.includes('实质性程序表')) return 'J3A'
-  // 匹配 J3-1, J3-2 等编码
   const m = sn.match(/(J3-\d+)/)
   if (m) return m[1]
-  // 匹配底稿目录
   if (sn.includes('目录') || sn === 'J3') return 'J3'
   return sn
 })
 
-// ─── 版本追踪 useWorkpaperVersionToolbar ─────────────────────────────────────
+// ─── Persistence: allResponses Map ──────────────────────────────────────────
+const allResponses = ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>(new Map())
+
+async function selfLoad() {
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const items = res.data?.data || res.data || []
+    if (Array.isArray(items)) {
+      const map = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
+      for (const it of items) {
+        if (it.item_id) map.set(it.item_id, { item_id: it.item_id, conclusion: it.conclusion ?? null, remark: it.remark ?? null })
+      }
+      allResponses.value = map
+    }
+  } catch { /* silent */ }
+  if (props.htmlData) {
+    const snapshot = ((props.htmlData as any).responses_snapshot || (props.htmlData as any).checklist_responses) as any
+    if (Array.isArray(snapshot)) {
+      for (const it of snapshot) {
+        if (it.item_id && !allResponses.value.has(String(it.item_id))) {
+          allResponses.value.set(String(it.item_id), { item_id: String(it.item_id), conclusion: it.conclusion ?? null, remark: it.remark ?? null })
+        }
+      }
+    }
+  }
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+async function handleChildSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
+  for (const it of items) allResponses.value.set(it.item_id, it)
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    try {
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
+      scheduleAutoSnapshot()
+    } catch { /* silent */ }
+  }, 800)
+}
+
+// ─── 版本追踪 ────────────────────────────────────────────────────────────────
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 provide('j3VersionTrailRef', versionTrailRef)
@@ -121,7 +158,7 @@ function handleNavigateSheet(sheetName: string) {
 }
 
 onMounted(async () => {
-  // selfLoad — 后续 wave 已在子组件内实现
+  await selfLoad()
   isLoading.value = false
 })
 </script>
