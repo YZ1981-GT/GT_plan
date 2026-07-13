@@ -1,5 +1,14 @@
 <template>
   <div class="k10-tab-receivable-grant">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在与权利：</b>应收政府补助真实存在、被审计单位有权收取（已满足确认条件）；</li>
+        <li><b>完整性与计价：</b>符合确认条件的应收补助均已确认、金额以批文/文件为据计量恰当。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 标题 + 按钮 ═══ -->
     <div class="section-header">
       <div class="section-header-left">

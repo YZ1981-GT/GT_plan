@@ -1,5 +1,16 @@
 <template>
   <div class="k11-tab-adjudication">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生：</b>记录的资产减值损失确已发生（对应存货/固定资产/无形资产等减值计提）；</li>
+        <li><b>完整性：</b>所有应计提的资产减值损失均已确认，不存在漏提；</li>
+        <li><b>准确性：</b>减值损失金额与各资产减值测算一致、计算准确；</li>
+        <li><b>分类与列报：</b>已记录于恰当账户并恰当列报披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K11-1 资产减值损失审定表</h3>

@@ -1,5 +1,14 @@
 <template>
   <div class="k12-tab-detail">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生与完整性：</b>各明细项营业外收入真实发生、记录完整，合计与 K12-1 审定数一致；</li>
+        <li><b>准确性与分类：</b>各项金额准确、按收入性质恰当分类。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 + 导入导出 ═══ -->
     <div class="section-header">
       <div class="section-header-left">

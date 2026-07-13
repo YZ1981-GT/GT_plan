@@ -1,5 +1,16 @@
 <template>
   <div class="k12-tab-adjudication">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生：</b>记录的营业外收入（政府补助/罚没利得/债务重组利得等）确已发生；</li>
+        <li><b>完整性：</b>所有应确认的营业外收入均已记录，不存在漏记或跨期；</li>
+        <li><b>准确性：</b>营业外收入金额计算准确、与支持性文件一致；</li>
+        <li><b>分类与列报：</b>与营业收入/其他收益的划分恰当，列报披露充分。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 跨底稿引用（GtIndexChip：K12-1 → TB） ═══ -->
     <div class="cross-ref-bar">
       <span class="cross-refs-label">关联引用：</span>

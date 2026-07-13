@@ -1,5 +1,14 @@
 <template>
   <div class="k10-tab-grant-reconcile">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性与准确性：</b>政府补助收到、递延、计入损益金额相互勾稽核对一致（与 K7 递延收益/K10-5 联动）；</li>
+        <li><b>发生与分类：</b>补助真实、与资产/收益相关分类恰当，计入其他收益/营业外收入判断正确。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 标题 + 按钮 ═══ -->
     <div class="section-header">
       <div class="section-header-left">

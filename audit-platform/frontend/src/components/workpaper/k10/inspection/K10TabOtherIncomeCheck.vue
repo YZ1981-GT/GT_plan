@@ -1,5 +1,15 @@
 <template>
   <div class="k10-tab-other-income-check">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生：</b>记录的其他收益确已发生且与本期相关；</li>
+        <li><b>完整性与准确性：</b>其他收益记录完整、金额准确，无虚列或漏记；</li>
+        <li><b>分类与列报：</b>与资产/收益相关政府补助分类恰当、列报披露充分。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 标题 + 按钮 ═══ -->
     <div class="section-header">
       <div class="section-header-left">

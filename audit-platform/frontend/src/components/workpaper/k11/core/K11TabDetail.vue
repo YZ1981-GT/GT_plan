@@ -1,5 +1,14 @@
 <template>
   <div class="k11-tab-detail">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性与发生：</b>各类资产减值损失（存货跌价/坏账/固定资产/无形资产/商誉等）逐项列示完整、真实发生；</li>
+        <li><b>准确性：</b>各项减值损失金额与对应资产减值底稿勾稽一致，合计与 K11-1 审定数一致。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + 导入导出 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K11-2 资产减值损失明细表</h3>
