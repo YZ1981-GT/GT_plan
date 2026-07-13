@@ -1,5 +1,14 @@
 <template>
   <div class="k8-contract-check">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生与准确性：</b>合同项下销售费用（广告/促销/服务等）真实发生、金额与合同一致；</li>
+        <li><b>截止与分类：</b>按合同履行期间恰当确认与分摊，记入正确期间与账户。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K8-5 合同检查表</h3>

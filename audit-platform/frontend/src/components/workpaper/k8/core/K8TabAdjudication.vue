@@ -1,5 +1,17 @@
 <template>
   <div class="k8-tab-adjudication">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>发生：</b>记录的销售费用确已发生且与被审计单位相关；</li>
+        <li><b>完整性：</b>所有应当记录的销售费用均已记录，不存在漏记或跨期；</li>
+        <li><b>准确性：</b>销售费用金额计算准确、记录金额恰当；</li>
+        <li><b>截止：</b>销售费用记录于正确的会计期间；</li>
+        <li><b>分类：</b>销售费用已记录于恰当账户并恰当列报。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K8-1 销售费用审定表</h3>

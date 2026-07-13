@@ -1,5 +1,14 @@
 <template>
   <div class="k8-cutoff-s2v">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>截止（完整性方向）：</b>由原始凭证追查至记账凭证，验证期末前后的销售费用是否记录于正确期间，是否存在应记未记（漏记）；</li>
+        <li><b>发生与准确性：</b>抽取的费用真实发生、入账金额准确。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <span class="section-title">K8-7 截止性测试（原始凭证→记账凭证）</span>
