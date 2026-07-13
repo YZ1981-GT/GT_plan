@@ -3,6 +3,7 @@
     <!-- ═══ 标题 + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
+        <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">L4-7A 后续计量（到期一次还本付息）</h3>
         <el-tag type="info" size="small">利息资本化滚入</el-tag>
         <GtIndexChip value="L2" :context-project-id="props.projectId" />
@@ -20,6 +21,16 @@
         </el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>计价与分摊：</b>初始/后续计量金额（摊余成本）准确，实际利率法应用正确；</li>
+        <li><b>准确性：</b>利息费用计算正确，溢折价摊销金额恰当；</li>
+        <li><b>截止：</b>利息费用已记录于正确的会计期间。</li>
+      </ol>
+    </el-alert>
 
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
@@ -113,6 +124,19 @@
       <span>累计利息费用：<strong>{{ fmtAmount(totalInterestExpense) }}</strong></span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写后续计量审计说明..."
+        :disabled="isReadonly"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l4-details-tip">
       <summary>编制提示</summary>
@@ -147,6 +171,10 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{
+  (e: 'navigate', sheetName: string): void
+}>()
+
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})
 const bondBranch = inject<import('vue').Ref<L4BondBranch>>('bondBranch', ref('bullet'))
 
@@ -171,6 +199,11 @@ const {
 } = useL4Subsequent(formData, ref('bullet') as import('vue').Ref<L4BondBranch>, bondParams)
 
 // ─── 债券选择器选项 ─────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+function saveAuditNote() {
+  formData.debouncedSave('L4-7A-auditNote', { remark: auditNote.value || null })
+}
 
 const bondOptions = computed(() =>
   bondParams.value.map((p, i) => ({ label: p.bondName || `债券${i + 1}`, value: i }))
@@ -245,4 +278,10 @@ onMounted(async () => {
 }
 .l4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

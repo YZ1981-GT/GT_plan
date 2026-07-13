@@ -19,6 +19,16 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>分类：</b>复合金融工具的权益成分与负债成分已正确分拆；</li>
+        <li><b>计价：</b>负债成分按市场利率折现计量准确；</li>
+        <li><b>列报：</b>权益/负债分别列报在正确的报表项目中。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -280,4 +290,8 @@ onMounted(async () => {
 }
 .l4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 </style>

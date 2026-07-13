@@ -15,6 +15,16 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>计价与分摊：</b>初始/后续计量金额（摊余成本）准确，实际利率法应用正确；</li>
+        <li><b>准确性：</b>利息费用计算正确，溢折价摊销金额恰当；</li>
+        <li><b>截止：</b>利息费用已记录于正确的会计期间。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -252,4 +262,8 @@ onMounted(async () => {
 }
 .l4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
 </style>

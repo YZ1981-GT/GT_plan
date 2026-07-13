@@ -20,6 +20,18 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title>审计目标（认定）</template>
+      <ol class="ao-list">
+        <li><b>完整性：</b>所有应付债券均已记录（负债完整性重点在前）；</li>
+        <li><b>存在：</b>记录的应付债券在资产负债表日确实存在；</li>
+        <li><b>义务：</b>应付债券确为被审计单位的义务；</li>
+        <li><b>计价与分摊：</b>应付债券以恰当金额（摊余成本）列示；</li>
+        <li><b>列报与披露：</b>应付债券已恰当列报和充分披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -283,6 +295,26 @@
       <span>共 <strong>{{ computedRows.length }}</strong> 只债券</span>
     </div>
 
+    <!-- ═══ 审计说明+结论 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明与结论</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="请填写明细表审计说明与结论..."
+        :disabled="isReadonly"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l4-details-tip">
       <summary>编制提示</summary>
@@ -353,8 +385,24 @@ const segmentOptions = [
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function handleAddRow() {
-  addRow()
+const auditNote = ref('')
+function saveAuditNote() {
+  formData.debouncedSave('L4-2-auditNote', { remark: auditNote.value || null })
+}
+
+async function handleAddRow() {
+  try {
+    const { value: name } = await (await import('element-plus')).ElMessageBox.prompt(
+      '请输入债券名称', '新增应付债券',
+      { confirmButtonText: '确定', cancelButtonText: '取消', inputValidator: (v) => (!v?.trim() ? '名称不能为空' : true) }
+    )
+    if (name?.trim()) {
+      addRow()
+      // Set bond name on last added row
+      const lastRow = computedRows.value[computedRows.value.length - 1]
+      if (lastRow) handleUpdate(computedRows.value.length - 1, 'bondName', name.trim())
+    }
+  } catch { /* cancel */ }
 }
 
 function handleRemoveRow(index: number) {
@@ -486,4 +534,10 @@ onMounted(async () => {
   margin: 8px 0 0;
   line-height: 1.8;
 }
+
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>
