@@ -47,6 +47,16 @@
       <p>应付职工薪酬（2211）为<strong>贷方/负债类</strong>科目（期末=期初+贷方-借方）。贷方检查对应<strong>计提/增加</strong>（检查凭证+薪酬计算表/审批单）；借方检查对应<strong>发放/减少</strong>（付款审批单+银行回单+代扣代缴凭证）；期后支付检查用于验证资产负债表日应付未付薪酬的<strong>完整性</strong>（是否存在漏提）。核对要点：①原始凭证齐全 ②与记账凭证相符 ③计算正确（人数/比例/月份） ④审批手续完整 ⑤期间归属正确。</p>
     </div>
 
+    <!-- 在线编辑（OnlyOffice 编辑整张 J1-8 sheet） -->
+    <div v-if="viewMode === 'excel'" class="oo-wrap">
+      <el-alert type="info" :closable="false" show-icon class="oo-tip">
+        <template #title>在线编辑模式直接编辑 J1-8 Excel 原表（与卡片/矩阵为同一底稿的不同呈现，适合习惯 Excel 操作或复杂公式场景）。</template>
+      </el-alert>
+      <GtOnlyOfficeSheet :wp-id="props.wpId" sheet-name="检查表J1-8" :project-id="props.projectId" />
+    </div>
+
+    <!-- 结构化视图（卡片/矩阵） -->
+    <template v-else>
     <!-- 二、样本选取 -->
     <el-card shadow="never" class="section-card">
       <template #header><span class="card-title">二、样本选取标准与规模</span></template>
@@ -237,6 +247,7 @@
       </el-select>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" placeholder="基于上述检查情况，形成综合审计结论..." @change="persist" />
     </el-card>
+    </template>
 
     <!-- 编制提示 -->
     <details class="compile-hint">
@@ -274,6 +285,7 @@ import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
 import J1VoucherCard from './J1VoucherCard.vue'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
+const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../../GtOnlyOfficeSheet.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -288,10 +300,11 @@ const yearNum = computed(() => {
 })
 
 // 视图模式
-const viewMode = ref<'card' | 'matrix'>('card')
+const viewMode = ref<'card' | 'matrix' | 'excel'>('card')
 const viewOptions = [
   { label: '📇 卡片视图', value: 'card' },
   { label: '▦ 矩阵视图', value: 'matrix' },
+  { label: '📊 在线编辑', value: 'excel' },
 ]
 
 // ─── 本地 allResponses Map（自持久化） ────────────────────────────────────────
@@ -593,6 +606,8 @@ function handleReview() { /* 复核对话暂桩 */ }
 .cg-unit { font-size: 12px; color: var(--el-text-color-secondary); }
 .num-sm { width: 78px; }
 .num-md { width: 130px; }
+.oo-wrap { margin-bottom: 10px; }
+.oo-tip { margin-bottom: 10px; }
 .matrix-table { font-size: var(--wp-font-size, 13px); }
 .matrix-table :deep(th), .matrix-table :deep(td) { font-size: 13px; }
 .matrix-table :deep(.abnormal-row td) { background-color: #fef2f2 !important; }
