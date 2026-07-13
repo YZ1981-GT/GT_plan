@@ -41,10 +41,20 @@ export interface K5DetailRow {
   projectName: string              // 项目名称
   provisionType: string            // 类型（产品质保/未决诉讼/亏损合同/重组义务/弃置义务/其他）
   obligationDesc: string           // 现时义务描述
-  beginBalance: number             // 期初余额
-  provision: number                // 本期计提
-  release: number                  // 本期转销
-  endBalance: number               // 期末余额（负债类：期初+计提-转销）
+  beginBalance: number             // 未审期初余额
+  provision: number                // 未审本期增加
+  release: number                  // 未审本期减少
+  endBalance: number               // 未审期末余额（负债类：期初+增加-减少）
+  // 区段3: 调整（对齐源模板）
+  openingAdjust: number            // 期初调整
+  ajeIncrease: number              // 账项调整-本期增加
+  ajeDecrease: number              // 账项调整-本期减少
+  rjeIncrease: number              // 重分类调整-本期增加
+  rjeDecrease: number              // 重分类调整-本期减少
+  auditedBegin: number             // 审定期初（=未审期初+期初调整）
+  auditedIncrease: number          // 审定本期增加
+  auditedDecrease: number          // 审定本期减少
+  auditedEnd: number               // 审定期末
   // 区段1: 判断
   likelihood: LikelihoodLevel | '' // 可能性级别
   recognition: Recognition | ''    // 是否确认（自动派生）
@@ -63,7 +73,7 @@ export interface K5DetailRow {
 
 export type K5DetailSection = 0 | 1 | 2
 
-export const K5_DETAIL_SECTION_LABELS = ['基础', '判断', '估计'] as const
+export const K5_DETAIL_SECTION_LABELS = ['基础', '判断', '估计', '调整'] as const
 
 export interface K5DetailSubtotals {
   beginBalance: number
@@ -71,6 +81,12 @@ export interface K5DetailSubtotals {
   release: number
   endBalance: number
   bestEstimate: number
+  openingAdjust: number
+  ajeIncrease: number
+  ajeDecrease: number
+  rjeIncrease: number
+  rjeDecrease: number
+  auditedEnd: number
   count: number
 }
 
@@ -134,6 +150,15 @@ export function useK5Detail(params: {
       provision: Number(raw.provision) || 0,
       release: Number(raw.release) || 0,
       endBalance: Number(raw.endBalance) || 0,
+      openingAdjust: Number(raw.openingAdjust) || 0,
+      ajeIncrease: Number(raw.ajeIncrease) || 0,
+      ajeDecrease: Number(raw.ajeDecrease) || 0,
+      rjeIncrease: Number(raw.rjeIncrease) || 0,
+      rjeDecrease: Number(raw.rjeDecrease) || 0,
+      auditedBegin: 0,
+      auditedIncrease: 0,
+      auditedDecrease: 0,
+      auditedEnd: 0,
       likelihood,
       recognition: likelihood ? determineRecognition(likelihood as LikelihoodLevel) : '',
       recognitionBasis: raw.recognitionBasis ?? '',
@@ -154,6 +179,11 @@ export function useK5Detail(params: {
   function _recalcRow(row: K5DetailRow): void {
     // 负债类期末=期初+计提-转销
     row.endBalance = calcLiabilityEndBalance(row.beginBalance, row.provision, row.release)
+    // 审定列（对齐源模板：未审 + 期初调整 + 账项调整 + 重分类调整）
+    row.auditedBegin = row.beginBalance + row.openingAdjust
+    row.auditedIncrease = row.provision + row.ajeIncrease + row.rjeIncrease
+    row.auditedDecrease = row.release + row.ajeDecrease + row.rjeDecrease
+    row.auditedEnd = row.auditedBegin + row.auditedIncrease - row.auditedDecrease
 
     // 或有事项判断自动派生
     if (row.likelihood) {
@@ -189,6 +219,12 @@ export function useK5Detail(params: {
       release: calcSubtotal(r.map(x => x.release)),
       endBalance: calcSubtotal(r.map(x => x.endBalance)),
       bestEstimate: calcSubtotal(r.map(x => x.bestEstimate)),
+      openingAdjust: calcSubtotal(r.map(x => x.openingAdjust)),
+      ajeIncrease: calcSubtotal(r.map(x => x.ajeIncrease)),
+      ajeDecrease: calcSubtotal(r.map(x => x.ajeDecrease)),
+      rjeIncrease: calcSubtotal(r.map(x => x.rjeIncrease)),
+      rjeDecrease: calcSubtotal(r.map(x => x.rjeDecrease)),
+      auditedEnd: calcSubtotal(r.map(x => x.auditedEnd)),
       count: r.length,
     }
   })
@@ -242,6 +278,15 @@ export function useK5Detail(params: {
       provision: 0,
       release: 0,
       endBalance: 0,
+      openingAdjust: 0,
+      ajeIncrease: 0,
+      ajeDecrease: 0,
+      rjeIncrease: 0,
+      rjeDecrease: 0,
+      auditedBegin: 0,
+      auditedIncrease: 0,
+      auditedDecrease: 0,
+      auditedEnd: 0,
       likelihood: '',
       recognition: '',
       recognitionBasis: '',

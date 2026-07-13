@@ -37,6 +37,82 @@
       <el-tag v-else type="danger" size="small">差异 {{ fmtNum(crossCheck.diff) }}</el-tag>
     </div>
 
+    <!-- ═══（一）弃置费用的完整性检查 ═══ -->
+    <el-card shadow="never" class="k5-section-card">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">（一）弃置费用的完整性检查</span>
+          <el-button v-if="!isReadonly" size="small" @click="addCompletenessRow()">＋ 新增行</el-button>
+        </div>
+      </template>
+      <el-table :data="completenessRows" border size="small" style="width:100%">
+        <el-table-column type="index" label="序" width="46" align="center" />
+        <el-table-column label="内部资料/外部评估报告" min-width="170">
+          <template #default="{ row }"><el-input v-model="row.internalDesc" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" @change="(v: string) => updateCompletenessCell(row.rowId, 'internalDesc', v)" /></template>
+        </el-table-column>
+        <el-table-column label="与第三方/监管机构函件" min-width="170">
+          <template #default="{ row }"><el-input v-model="row.thirdPartyDesc" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" @change="(v: string) => updateCompletenessCell(row.rowId, 'thirdPartyDesc', v)" /></template>
+        </el-table-column>
+        <el-table-column label="固定资产本期增加是否迹象计提不足" min-width="180">
+          <template #default="{ row }"><el-input v-model="row.faIncreaseCheck" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" @change="(v: string) => updateCompletenessCell(row.rowId, 'faIncreaseCheck', v)" /></template>
+        </el-table-column>
+        <el-table-column label="实地观察是否迹象计提不足" min-width="170">
+          <template #default="{ row }"><el-input v-model="row.onSiteObservation" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" @change="(v: string) => updateCompletenessCell(row.rowId, 'onSiteObservation', v)" /></template>
+        </el-table-column>
+        <el-table-column label="索引" width="90">
+          <template #default="{ row }"><el-input v-model="row.indexNo" :disabled="isReadonly" size="small" @change="(v: string) => updateCompletenessCell(row.rowId, 'indexNo', v)" /></template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="46" align="center">
+          <template #default="{ $index }"><el-button link type="danger" size="small" @click="removeCompletenessRow($index)"><el-icon><Delete /></el-icon></el-button></template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- ═══（二）关键假设评估 ═══ -->
+    <el-card shadow="never" class="k5-section-card">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">（二）关键假设评估</span>
+          <el-button v-if="!isReadonly" size="small" @click="addAssumptionRow()">＋ 新增行</el-button>
+        </div>
+      </template>
+      <el-table :data="assumptionRows" border size="small" style="width:100%">
+        <el-table-column type="index" label="序" width="46" align="center" />
+        <el-table-column label="关键假设" min-width="200">
+          <template #default="{ row }"><el-input v-model="row.assumption" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" size="small" placeholder="如：弃置支出金额、折现率、弃置时间等" @change="(v: string) => updateAssumptionCell(row.rowId, 'assumption', v)" /></template>
+        </el-table-column>
+        <el-table-column label="是否与历史/行业数据一致" width="150" align="center">
+          <template #default="{ row }">
+            <el-select v-model="row.consistentWithData" :disabled="isReadonly" size="small" placeholder="选择" @change="(v: string) => updateAssumptionCell(row.rowId, 'consistentWithData', v)">
+              <el-option label="是" value="是" /><el-option label="否" value="否" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="期后事项是否影响" width="140" align="center">
+          <template #default="{ row }">
+            <el-select v-model="row.affectedByPostEvent" :disabled="isReadonly" size="small" placeholder="选择" @change="(v: string) => updateAssumptionCell(row.rowId, 'affectedByPostEvent', v)">
+              <el-option label="是" value="是" /><el-option label="否" value="否" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="假设是否合理" width="130" align="center">
+          <template #default="{ row }">
+            <el-select v-model="row.isReasonable" :disabled="isReadonly" size="small" placeholder="选择" @change="(v: string) => updateAssumptionCell(row.rowId, 'isReasonable', v)">
+              <el-option label="是" value="是" /><el-option label="否" value="否" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引" width="90">
+          <template #default="{ row }"><el-input v-model="row.indexNo" :disabled="isReadonly" size="small" @change="(v: string) => updateAssumptionCell(row.rowId, 'indexNo', v)" /></template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="46" align="center">
+          <template #default="{ $index }"><el-button link type="danger" size="small" @click="removeAssumptionRow($index)"><el-icon><Delete /></el-icon></el-button></template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- ═══ 现值折现测算（计量辅助）═══ -->
+    <div class="sub-section-title">（三）弃置费用现值折现测算（计量辅助）</div>
     <!-- ═══ 主表 ═══ -->
     <el-table :data="decommissionRows" border size="small" style="width: 100%" max-height="480">
       <el-table-column type="index" label="序" width="48" align="center" />
@@ -113,6 +189,41 @@
       <span>期末合计: <strong>{{ fmtNum(subtotals.endBalance) }}</strong></span>
     </div>
 
+    <!-- ═══ 借方/贷方发生额分析 ═══ -->
+    <el-card shadow="never" class="k5-section-card" style="margin-top:12px">
+      <template #header><span class="card-title">借方/贷方发生额分析</span></template>
+      <div class="dc-grid">
+        <div class="dc-col">
+          <div class="dc-head">
+            <span>借方发生额分析</span>
+            <el-button v-if="!isReadonly" size="small" @click="addAmountRow('debit')">＋ 新增</el-button>
+          </div>
+          <el-table :data="debitRows" border size="small" style="width:100%">
+            <el-table-column type="index" label="序" width="42" align="center" />
+            <el-table-column label="对应科目" min-width="120"><template #default="{ row }"><el-input v-model="row.offsetAccount" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('debit', row.rowId, 'offsetAccount', v)" /></template></el-table-column>
+            <el-table-column label="对应金额" width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateAmountCell('debit', row.rowId, 'amount', v)" /></template></el-table-column>
+            <el-table-column label="备注" min-width="110"><template #default="{ row }"><el-input v-model="row.remark" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('debit', row.rowId, 'remark', v)" /></template></el-table-column>
+            <el-table-column v-if="!isReadonly" label="" width="42" align="center"><template #default="{ $index }"><el-button link type="danger" size="small" @click="removeAmountRow('debit', $index)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+            <template #append><div class="table-total">借方小计：{{ fmtNum(debitTotal) }}</div></template>
+          </el-table>
+        </div>
+        <div class="dc-col">
+          <div class="dc-head">
+            <span>贷方发生额分析</span>
+            <el-button v-if="!isReadonly" size="small" @click="addAmountRow('credit')">＋ 新增</el-button>
+          </div>
+          <el-table :data="creditRows" border size="small" style="width:100%">
+            <el-table-column type="index" label="序" width="42" align="center" />
+            <el-table-column label="对应科目" min-width="120"><template #default="{ row }"><el-input v-model="row.offsetAccount" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('credit', row.rowId, 'offsetAccount', v)" /></template></el-table-column>
+            <el-table-column label="对应金额" width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateAmountCell('credit', row.rowId, 'amount', v)" /></template></el-table-column>
+            <el-table-column label="备注" min-width="110"><template #default="{ row }"><el-input v-model="row.remark" :disabled="isReadonly" size="small" @change="(v: string) => updateAmountCell('credit', row.rowId, 'remark', v)" /></template></el-table-column>
+            <el-table-column v-if="!isReadonly" label="" width="42" align="center"><template #default="{ $index }"><el-button link type="danger" size="small" @click="removeAmountRow('credit', $index)"><el-icon><Delete /></el-icon></el-button></template></el-table-column>
+            <template #append><div class="table-total">贷方小计：{{ fmtNum(creditTotal) }}</div></template>
+          </el-table>
+        </div>
+      </div>
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="k5-details-tip">
       <summary>编制提示</summary>
@@ -161,6 +272,21 @@ const {
   updateCell,
   addRow,
   removeRow,
+  completenessRows,
+  addCompletenessRow,
+  updateCompletenessCell,
+  removeCompletenessRow,
+  assumptionRows,
+  addAssumptionRow,
+  updateAssumptionCell,
+  removeAssumptionRow,
+  debitRows,
+  creditRows,
+  debitTotal,
+  creditTotal,
+  addAmountRow,
+  updateAmountCell,
+  removeAmountRow,
 } = useK5Decommission({
   allResponses: allResponsesRef,
   saveResponse: async (field: string, value: any) => {
@@ -188,6 +314,16 @@ function fmtNum(v: number): string {
 .formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
 .formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
 .summary-bar { display: flex; gap: 24px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+.k5-section-card { margin-bottom: 12px; }
+.k5-section-card :deep(.el-card__header) { padding: 8px 14px; }
+.k5-section-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-title { font-weight: 600; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; }
+.sub-section-title { font-weight: 600; color: #303133; margin: 4px 0 8px; font-size: 13px; }
+.hnum { width: 100%; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; color: #606266; font-weight: 600; }
+.dc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.dc-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: #606266; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }

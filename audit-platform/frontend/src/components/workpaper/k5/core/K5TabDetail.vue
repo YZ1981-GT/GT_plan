@@ -200,10 +200,64 @@
       </el-table-column>
     </el-table>
 
+    <!-- ═══ 区段3: 调整信息（未审→期初调整/账项调整/重分类调整→审定，对齐源模板）═══ -->
+    <el-table
+      v-if="activeSection === 3"
+      :data="detailRows"
+      border
+      size="small"
+      style="width: 100%"
+      max-height="560"
+      show-summary
+      :summary-method="getAdjustSummary"
+    >
+      <el-table-column type="index" label="序" width="44" align="center" fixed />
+      <el-table-column prop="projectName" label="项目" width="120" fixed />
+      <el-table-column label="未审期末" width="100" align="right">
+        <template #default="{ row }"><span class="formula-cell">{{ fmtNum(row.endBalance) }}</span></template>
+      </el-table-column>
+      <el-table-column label="期初调整" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.openingAdjust" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:85px" @change="(v:number) => handleUpdate(row.rowId, 'openingAdjust', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="账项调整-增" width="105" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.ajeIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'ajeIncrease', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="账项调整-减" width="105" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.ajeDecrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'ajeDecrease', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="重分类-增" width="105" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.rjeIncrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'rjeIncrease', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="重分类-减" width="105" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.rjeDecrease" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:88px" @change="(v:number) => handleUpdate(row.rowId, 'rjeDecrease', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="审定期初" width="105" align="right">
+        <template #default="{ row }"><span class="formula-cell">{{ fmtNum(row.auditedBegin) }}</span></template>
+      </el-table-column>
+      <el-table-column label="审定期末" width="115" align="right">
+        <template #default="{ row }">
+          <el-tooltip content="审定期初 + 审定增加 − 审定减少" placement="top">
+            <span class="formula-cell formula-underline">{{ fmtNum(row.auditedEnd) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+    </el-table>
+
     <!-- ═══ 合计统计栏 ═══ -->
     <div class="summary-bar">
       <span>合计行数: {{ subtotals.count }}</span>
-      <span>期末合计: <strong>{{ fmtNum(subtotals.endBalance) }}</strong></span>
+      <span>未审期末合计: <strong>{{ fmtNum(subtotals.endBalance) }}</strong></span>
+      <span>审定期末合计: <strong>{{ fmtNum(subtotals.auditedEnd) }}</strong></span>
       <span>最佳估计合计: <strong>{{ fmtNum(subtotals.bestEstimate) }}</strong></span>
     </div>
 
@@ -273,6 +327,7 @@ const sectionOptions = [
   { label: '基础', value: 0 },
   { label: '判断', value: 1 },
   { label: '估计', value: 2 },
+  { label: '调整', value: 3 },
 ]
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -320,6 +375,22 @@ function getEstimateSummary({ columns }: any) {
   columns.forEach((_: any, idx: number) => {
     if (idx === 0) { sums[idx] = '合计'; return }
     if (idx === 2) { sums[idx] = fmtNum(subtotals.value.bestEstimate); return }
+    sums[idx] = ''
+  })
+  return sums
+}
+
+function getAdjustSummary({ columns }: any) {
+  const sums: string[] = []
+  columns.forEach((_: any, idx: number) => {
+    if (idx === 0) { sums[idx] = '合计'; return }
+    if (idx === 2) { sums[idx] = fmtNum(subtotals.value.endBalance); return }
+    if (idx === 3) { sums[idx] = fmtNum(subtotals.value.openingAdjust); return }
+    if (idx === 4) { sums[idx] = fmtNum(subtotals.value.ajeIncrease); return }
+    if (idx === 5) { sums[idx] = fmtNum(subtotals.value.ajeDecrease); return }
+    if (idx === 6) { sums[idx] = fmtNum(subtotals.value.rjeIncrease); return }
+    if (idx === 7) { sums[idx] = fmtNum(subtotals.value.rjeDecrease); return }
+    if (idx === 9) { sums[idx] = fmtNum(subtotals.value.auditedEnd); return }
     sums[idx] = ''
   })
   return sums

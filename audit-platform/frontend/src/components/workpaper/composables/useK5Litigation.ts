@@ -34,7 +34,10 @@ export interface K5LitigationRow {
   stage: string                // 诉讼阶段（一审/二审/执行/仲裁）
   lawyerOpinion: string        // 律师意见
   lossLikelihood: LikelihoodLevel | ''  // 败诉可能性级别
-  estimatedLoss: number        // 预计损失金额
+  estimatedLoss: number        // 应承担的赔偿支出金额（预计损失）
+  bookProvision: number        // 已计提预计负债（账面）
+  variance: number             // 差异金额（应承担赔偿 − 已计提，自动派生）
+  varianceReason: string       // 差异原因
   recognition: Recognition | ''  // 是否确认（自动派生）
   shouldDisclose: boolean      // 是否需披露（possible→附注）
   lawyerLetterRef: string      // 律师函编号/附件路径（律师函联动）
@@ -111,6 +114,9 @@ export function useK5Litigation(params: UseK5LitigationParams) {
       lawyerOpinion: raw.lawyerOpinion ?? '',
       lossLikelihood: likelihood,
       estimatedLoss: Number(raw.estimatedLoss) || 0,
+      bookProvision: Number(raw.bookProvision) || 0,
+      variance: (Number(raw.estimatedLoss) || 0) - (Number(raw.bookProvision) || 0),
+      varianceReason: raw.varianceReason ?? '',
       recognition,
       shouldDisclose: recognition === 'disclose',
       lawyerLetterRef: raw.lawyerLetterRef ?? '',
@@ -131,6 +137,8 @@ export function useK5Litigation(params: UseK5LitigationParams) {
       row.recognition = ''
       row.shouldDisclose = false
     }
+    // 差异金额 = 应承担赔偿（预计损失）− 已计提预计负债
+    row.variance = (row.estimatedLoss || 0) - (row.bookProvision || 0)
   }
 
   function recalcAll(): void {
@@ -244,6 +252,9 @@ export function useK5Litigation(params: UseK5LitigationParams) {
       lawyerOpinion: '',
       lossLikelihood: '',
       estimatedLoss: 0,
+      bookProvision: 0,
+      variance: 0,
+      varianceReason: '',
       recognition: '',
       shouldDisclose: false,
       lawyerLetterRef: '',

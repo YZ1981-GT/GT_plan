@@ -58,6 +58,34 @@ export interface K5DecommissionCrossCheck {
   isMatch: boolean
 }
 
+/** （一）弃置费用完整性检查行 */
+export interface K5CompletenessRow {
+  rowId: string
+  internalDesc: string       // 描述相关内部资料、外部评估报告等
+  thirdPartyDesc: string     // 描述与第三方机构或监管机构的函件
+  faIncreaseCheck: string    // 检查固定资产本期增加，是否迹象表明计提不足
+  onSiteObservation: string  // 实地观察固定资产，是否迹象表明计提不足
+  indexNo: string            // 相关支持性资料索引
+}
+
+/** （二）关键假设评估行 */
+export interface K5AssumptionRow {
+  rowId: string
+  assumption: string          // 关键假设
+  consistentWithData: string  // 是否与历史/行业数据一致（是/否）
+  affectedByPostEvent: string // 期后事项是否会影响关键假设（是/否）
+  isReasonable: string        // 关键假设是否合理（是/否）
+  indexNo: string             // 相关支持性资料索引
+}
+
+/** 借/贷方发生额分析行 */
+export interface K5AmountAnalysisRow {
+  rowId: string
+  offsetAccount: string  // 对应科目
+  amount: number         // 对应金额
+  remark: string         // 备注
+}
+
 export interface UseK5DecommissionParams {
   allResponses: Ref<Map<string, any>>
   saveResponse: (field: string, value: any) => Promise<void>
@@ -66,6 +94,10 @@ export interface UseK5DecommissionParams {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEM_ID_ROWS = 'K5-5-rows'
+const ITEM_ID_COMPLETENESS = 'K5-5-completeness-rows'
+const ITEM_ID_ASSUMPTION = 'K5-5-assumption-rows'
+const ITEM_ID_DEBIT = 'K5-5-debit-analysis'
+const ITEM_ID_CREDIT = 'K5-5-credit-analysis'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -75,22 +107,66 @@ export function useK5Decommission(params: UseK5DecommissionParams) {
   // ─── State ─────────────────────────────────────────────────────────────────
 
   const decommissionRows = ref<K5DecommissionRow[]>([])
+  const completenessRows = ref<K5CompletenessRow[]>([])    // （一）完整性检查
+  const assumptionRows = ref<K5AssumptionRow[]>([])         // （二）关键假设评估
+  const debitRows = ref<K5AmountAnalysisRow[]>([])          // 借方发生额分析
+  const creditRows = ref<K5AmountAnalysisRow[]>([])         // 贷方发生额分析
 
   // ─── Load ──────────────────────────────────────────────────────────────────
 
   function _loadRows(): void {
     const item = allResponses.value.get(ITEM_ID_ROWS)
     const raw = item?.remark ?? item?.conclusion ?? (typeof item === 'string' ? item : null)
-    if (!raw) { decommissionRows.value = []; return }
+    if (!raw) { decommissionRows.value = [] } else {
+      try {
+        const parsed = JSON.parse(raw)
+        decommissionRows.value = Array.isArray(parsed) && parsed.length > 0 ? parsed.map(_normalizeRow) : []
+      } catch { decommissionRows.value = [] }
+    }
+    completenessRows.value = _loadArray(ITEM_ID_COMPLETENESS, _normalizeCompletenessRow)
+    assumptionRows.value = _loadArray(ITEM_ID_ASSUMPTION, _normalizeAssumptionRow)
+    debitRows.value = _loadArray(ITEM_ID_DEBIT, _normalizeAmountRow)
+    creditRows.value = _loadArray(ITEM_ID_CREDIT, _normalizeAmountRow)
+  }
+
+  function _loadArray<T>(itemId: string, mapper: (raw: any) => T): T[] {
+    const item = allResponses.value.get(itemId)
+    const raw = item?.remark ?? item?.conclusion ?? null
+    if (!raw) return []
     try {
       const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        decommissionRows.value = parsed.map(_normalizeRow)
-      } else {
-        decommissionRows.value = []
-      }
-    } catch {
-      decommissionRows.value = []
+      return Array.isArray(parsed) ? parsed.map(mapper) : []
+    } catch { return [] }
+  }
+
+  function _normalizeCompletenessRow(raw: any): K5CompletenessRow {
+    return {
+      rowId: raw.rowId ?? `crow-${Math.random().toString(36).slice(2, 10)}`,
+      internalDesc: raw.internalDesc ?? '',
+      thirdPartyDesc: raw.thirdPartyDesc ?? '',
+      faIncreaseCheck: raw.faIncreaseCheck ?? '',
+      onSiteObservation: raw.onSiteObservation ?? '',
+      indexNo: raw.indexNo ?? '',
+    }
+  }
+
+  function _normalizeAssumptionRow(raw: any): K5AssumptionRow {
+    return {
+      rowId: raw.rowId ?? `arow-${Math.random().toString(36).slice(2, 10)}`,
+      assumption: raw.assumption ?? '',
+      consistentWithData: raw.consistentWithData ?? '',
+      affectedByPostEvent: raw.affectedByPostEvent ?? '',
+      isReasonable: raw.isReasonable ?? '',
+      indexNo: raw.indexNo ?? '',
+    }
+  }
+
+  function _normalizeAmountRow(raw: any): K5AmountAnalysisRow {
+    return {
+      rowId: raw.rowId ?? `mrow-${Math.random().toString(36).slice(2, 10)}`,
+      offsetAccount: raw.offsetAccount ?? '',
+      amount: Number(raw.amount) || 0,
+      remark: raw.remark ?? '',
     }
   }
 
@@ -235,7 +311,68 @@ export function useK5Decommission(params: UseK5DecommissionParams) {
   function _persist(): void {
     saveResponse('5-rows', { remark: JSON.stringify(decommissionRows.value) })
     saveResponse('5-decommission-total', { remark: String(subtotals.value.endBalance) })
+    saveResponse('5-completeness-rows', { remark: JSON.stringify(completenessRows.value) })
+    saveResponse('5-assumption-rows', { remark: JSON.stringify(assumptionRows.value) })
+    saveResponse('5-debit-analysis', { remark: JSON.stringify(debitRows.value) })
+    saveResponse('5-credit-analysis', { remark: JSON.stringify(creditRows.value) })
   }
+
+  // ─── （一）完整性检查 CRUD ─────────────────────────────────────────────────
+  function addCompletenessRow(): void {
+    completenessRows.value.push(_normalizeCompletenessRow({}))
+    _persist()
+  }
+  function updateCompletenessCell(rowId: string, field: string, value: any): void {
+    const row = completenessRows.value.find(r => r.rowId === rowId)
+    if (!row) return
+    ;(row as any)[field] = value
+    _persist()
+  }
+  function removeCompletenessRow(idx: number): void {
+    if (idx < 0 || idx >= completenessRows.value.length) return
+    completenessRows.value.splice(idx, 1)
+    _persist()
+  }
+
+  // ─── （二）关键假设评估 CRUD ───────────────────────────────────────────────
+  function addAssumptionRow(): void {
+    assumptionRows.value.push(_normalizeAssumptionRow({}))
+    _persist()
+  }
+  function updateAssumptionCell(rowId: string, field: string, value: any): void {
+    const row = assumptionRows.value.find(r => r.rowId === rowId)
+    if (!row) return
+    ;(row as any)[field] = value
+    _persist()
+  }
+  function removeAssumptionRow(idx: number): void {
+    if (idx < 0 || idx >= assumptionRows.value.length) return
+    assumptionRows.value.splice(idx, 1)
+    _persist()
+  }
+
+  // ─── 借/贷方发生额分析 CRUD ────────────────────────────────────────────────
+  function addAmountRow(side: 'debit' | 'credit'): void {
+    const arr = side === 'debit' ? debitRows : creditRows
+    arr.value.push(_normalizeAmountRow({}))
+    _persist()
+  }
+  function updateAmountCell(side: 'debit' | 'credit', rowId: string, field: string, value: any): void {
+    const arr = side === 'debit' ? debitRows : creditRows
+    const row = arr.value.find(r => r.rowId === rowId)
+    if (!row) return
+    ;(row as any)[field] = value
+    _persist()
+  }
+  function removeAmountRow(side: 'debit' | 'credit', idx: number): void {
+    const arr = side === 'debit' ? debitRows : creditRows
+    if (idx < 0 || idx >= arr.value.length) return
+    arr.value.splice(idx, 1)
+    _persist()
+  }
+
+  const debitTotal = computed(() => calcSubtotal(debitRows.value.map(r => r.amount)))
+  const creditTotal = computed(() => calcSubtotal(creditRows.value.map(r => r.amount)))
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -252,5 +389,23 @@ export function useK5Decommission(params: UseK5DecommissionParams) {
     addRow,
     removeRow,
     importRows,
+    // （一）完整性检查
+    completenessRows,
+    addCompletenessRow,
+    updateCompletenessCell,
+    removeCompletenessRow,
+    // （二）关键假设评估
+    assumptionRows,
+    addAssumptionRow,
+    updateAssumptionCell,
+    removeAssumptionRow,
+    // 借/贷方发生额分析
+    debitRows,
+    creditRows,
+    debitTotal,
+    creditTotal,
+    addAmountRow,
+    updateAmountCell,
+    removeAmountRow,
   }
 }

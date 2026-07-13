@@ -71,9 +71,26 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="预计损失" width="110" align="right">
+      <el-table-column label="应赔/预计损失" width="115" align="right">
         <template #default="{ row }">
           <el-input-number v-model="row.estimatedLoss" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => save(row.rowId, 'estimatedLoss', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="已计提预计负债" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.bookProvision" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => save(row.rowId, 'bookProvision', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="差异金额" width="105" align="right">
+        <template #default="{ row }">
+          <el-tooltip content="应赔/预计损失 − 已计提" placement="top">
+            <span class="formula-cell formula-underline" :class="{ 'diff-warn': Math.abs(row.variance) > 0.01 }">{{ fmtNum(row.variance) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="差异原因" min-width="130">
+        <template #default="{ row }">
+          <el-input v-model="row.varianceReason" :disabled="isReadonly" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 3 }" placeholder="差异原因" @blur="save(row.rowId, 'varianceReason', row.varianceReason)" />
         </template>
       </el-table-column>
       <el-table-column label="确认" width="72" align="center">
@@ -122,12 +139,23 @@
       />
     </el-dialog>
 
+    <!-- ═══ 证监会监管报告提示（方法论上下文）═══ -->
+    <div class="csrc-hint">
+      <div class="csrc-title">⚠ 证监会《2020年上市公司年报会计监管报告》提示</div>
+      <ol>
+        <li><b>未恰当确认因诉讼产生的支付义务：</b>未决诉讼被证实很可能导致经济利益流出且金额能可靠计量时，应确认预计负债。个别公司一审判决败诉并要求赔偿的情况下，仍以上诉为由未确认相关损失和预计负债，缺乏合理性。</li>
+        <li><b>不恰当抵销预计负债与或有资产：</b>与或有事项相关的义务满足现时义务、很可能流出、金额可计量时应确认预计负债；或有资产只有在基本确定能收到时才确认，不得与预计负债抵销。</li>
+        <li><b>业务咨询提示：</b>财务报表批准报出日已取得一审判决且判决公司败诉要求赔偿的，如被审计单位未按一审判决金额计提预计负债，建议项目组尽早履行业务咨询。</li>
+      </ol>
+    </div>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="k5-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>败诉可能性 > 50% → 确认预计负债，金额为预计损失</li>
+        <li>败诉可能性 > 50% → 确认预计负债，金额为最佳估计（应承担赔偿）</li>
         <li>败诉可能性 ≤ 50% 但非极小 → 附注披露或有负债</li>
+        <li>差异金额 = 应承担赔偿（预计损失）− 已计提预计负债，差异应说明原因</li>
         <li>律师函/回函应作为判断败诉可能性的核心证据</li>
         <li>已确认预计损失合计应与 K5-1 未决诉讼行审定数一致</li>
         <li>📎列可上传律师函附件 → OCR识别自动填充律师意见</li>
@@ -252,6 +280,13 @@ function fmtNum(v: number): string {
 .header-actions { display: flex; gap: 8px; }
 .methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .cross-check-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
+.formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
+.formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
+.diff-warn { color: #e6a23c; font-weight: 600; }
+.csrc-hint { margin-top: 12px; padding: 12px 14px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 12px; color: #78350f; line-height: 1.6; }
+.csrc-title { font-weight: 600; margin-bottom: 6px; }
+.csrc-hint ol { padding-left: 18px; margin: 0; }
+.csrc-hint li { margin-bottom: 4px; }
 .text-muted { color: #c0c4cc; font-size: 12px; }
 .text-danger { color: #f56c6c; }
 .text-warning { color: #e6a23c; }
