@@ -291,6 +291,7 @@ import { ref, computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, View, Upload, QuestionFilled } from '@element-plus/icons-vue'
 import { useK6Adjudication, type K6AdjRow, type K6AdjSection } from '../../composables/useK6Adjudication'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -389,8 +390,36 @@ async function handleWritebackTB() {
 
 // ─── AI / 复核 ──────────────────────────────────────────────────────────────
 
-function handleAiGenerate(section: string) {
-  console.log('[K6-1] AI generate:', section)
+const aiLoading = ref(false)
+
+async function handleAiGenerate(section: string) {
+  if (props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const context = `持有待售审定表：资产审定合计 ${getAssetAuditedTotal()}，负债审定合计 ${getLiabilityAuditedTotal()}；`
+      + `资产区块三角勾稽${assetReconciliation.value.isBalanced ? '平衡' : '不平衡(差异' + assetReconciliation.value.diff + ')'}，`
+      + `负债区块三角勾稽${liabilityReconciliation.value.isBalanced ? '平衡' : '不平衡(差异' + liabilityReconciliation.value.diff + ')'}`
+    const isConclusion = section === 'conclusion'
+    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: isConclusion ? 'k6-adjudication-conclusion' : 'k6-adjudication-note',
+      context,
+      prompt: isConclusion
+        ? '根据持有待售资产和负债审定表勾稽结果，生成审计结论'
+        : '根据持有待售资产和负债审定表，生成审计说明（执行程序、获取证据、分析结论）',
+      existingContent: isConclusion ? auditConclusion.value : auditNote.value,
+    })
+    const text = resp?.data?.content || resp?.data?.text || resp?.content || ''
+    if (text) {
+      if (isConclusion) auditConclusion.value = text
+      else auditNote.value = text
+      saveConclusion()
+      ElMessage.success('AI内容已生成')
+    }
+  } catch (e: any) {
+    ElMessage.error('AI生成失败: ' + (e?.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function handleReview(id: string) {

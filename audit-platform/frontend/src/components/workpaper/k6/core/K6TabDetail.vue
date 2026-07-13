@@ -259,6 +259,26 @@
       </div>
     </div>
 
+    <!-- ═══ 明细分析说明（AI辅助） ═══ -->
+    <el-card shadow="never" class="analysis-card">
+      <template #header>
+        <div class="card-header-row">
+          <span>明细分析说明</span>
+          <el-button size="small" text type="primary" :loading="aiLoading" @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="analysisNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="对持有待售明细的分析说明（如：处置组构成、异常项分析、与审定表勾稽情况等，可AI辅助生成）"
+        @blur="saveAnalysisNote"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="k6-details-tip">
       <summary>编制提示</summary>
@@ -301,9 +321,11 @@
  * - 40行 max-height virtual scrolling
  */
 import { ref, computed, inject } from 'vue'
+import { ElMessage } from 'element-plus'
 import { Plus, ArrowDown, MagicStick, View, Delete, QuestionFilled } from '@element-plus/icons-vue'
 import { useK6Detail } from '../../composables/useK6Detail'
 import { useK6ImportExport } from '../../composables/useK6ImportExport'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -323,6 +345,17 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const allResponsesRef = computed(() => props.allResponses)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
+
+// ─── 明细分析说明（本地状态 + 持久化） ────────────────────────────────────────
+const analysisNote = ref('')
+function _loadAnalysisNote() {
+  const item = props.allResponses.get('K6-2-analysis-note')
+  analysisNote.value = item?.remark ?? item?.conclusion ?? ''
+}
+_loadAnalysisNote()
+function saveAnalysisNote() {
+  emit('save', 'K6-2-analysis-note', { remark: analysisNote.value })
+}
 
 // ─── Composable wiring ───────────────────────────────────────────────────────
 
@@ -389,8 +422,33 @@ async function handleFileSelected(event: Event) {
   input.value = ''
 }
 
-function handleAiGenerate() {
-  console.log('[K6-2] AI generate: detail-conclusion')
+const aiLoading = ref(false)
+
+async function handleAiGenerate() {
+  if (props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const anomalies = detailRows.value.filter((r: any) => r.conclusion === '存在异常').map((r: any) => r.assetName)
+    const context = `持有待售明细：共 ${subtotals.value.count} 项，账面价值合计 ${subtotals.value.bookValue}，`
+      + `原值合计 ${subtotals.value.costValue}，减值合计 ${subtotals.value.impairmentProvision}；`
+      + `异常项：${anomalies.length ? anomalies.join('、') : '无'}`
+    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'k6-detail-analysis',
+      context,
+      prompt: '根据持有待售明细表数据，生成明细分析说明（处置组构成、异常项分析、与审定表勾稽情况）',
+      existingContent: analysisNote.value,
+    })
+    const text = resp?.data?.content || resp?.data?.text || resp?.content || ''
+    if (text) {
+      analysisNote.value = text
+      saveAnalysisNote()
+      ElMessage.success('AI分析已生成')
+    }
+  } catch (e: any) {
+    ElMessage.error('AI生成失败: ' + (e?.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function handleReview(id: string) {
@@ -467,6 +525,17 @@ function fmtAmt(val: number | null | undefined): string {
 .stat-item { display: flex; align-items: center; gap: 4px; }
 .stat-label { font-size: var(--wp-font-size, 13px); color: #909399; }
 .stat-value { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
+
+/* ─── 明细分析说明卡 ─── */
+.analysis-card { margin-top: 14px; }
+.analysis-card :deep(.el-card__header) { padding: 10px 16px; }
+.card-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: 500;
+}
 
 /* ─── 编制提示 ─── */
 .k6-details-tip {

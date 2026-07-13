@@ -32,6 +32,7 @@ export interface K6ImpairmentRow {
   assetName: string          // 项目（资产名称或处置组）
   bookValue: number          // 账面价值
   fairValue: number          // 公允价值
+  fairValueBasis: string     // 公允价值确定依据（源模板列）
   sellingCost: number        // 预计出售费用
   fairValueNet: number       // 公允价值净额（公式）
   impairmentAmount: number   // 减值金额（公式：孰低法）
@@ -102,6 +103,7 @@ export function useK6Impairment(params: UseK6ImpairmentParams) {
       assetName: raw.assetName ?? '',
       bookValue,
       fairValue,
+      fairValueBasis: raw.fairValueBasis ?? '',
       sellingCost,
       fairValueNet,
       impairmentAmount,
@@ -178,6 +180,7 @@ export function useK6Impairment(params: UseK6ImpairmentParams) {
       assetName: name,
       bookValue: 0,
       fairValue: 0,
+      fairValueBasis: '',
       sellingCost: 0,
       fairValueNet: 0,
       impairmentAmount: 0,

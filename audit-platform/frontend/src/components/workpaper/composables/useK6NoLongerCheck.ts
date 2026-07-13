@@ -18,24 +18,35 @@
  * Prefix: "K6-7-"
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { calcSubtotal } from './useK6FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** 检查状态 */
 export type CheckStatus = 'compliant' | 'non_compliant' | 'na' | ''
 
+/** 分类：非流动资产 / 处置组资产 / 处置组负债（对齐源模板行结构） */
+export type NoLongerCategory = 'asset_noncurrent' | 'asset_group' | 'liability_group'
+
 export interface K6NoLongerCheckItem {
   rowId: string
   seqNo: number
-  assetName: string            // 项目/资产名称
-  noLongerReason: string       // 不再满足原因
-  reclassificationDate: string // 重分类日期
-  assumedBookValue: number     // 假设未分类时的账面价值
-  recoverableAmount: number    // 可收回金额
-  adjustedBookValue: number    // 调整后账面价值（公式：两者取低）
-  adjustment: number           // 账面价值调整金额
-  status: CheckStatus          // 合规/不合规/不适用
-  voucherRef: string           // 凭证/抽凭
+  category: NoLongerCategory    // 分类
+  groupName: string             // 处置组/主体（子公司A等）
+  assetName: string             // 项目/资产名称
+  // ─── 源模板 ①②③④ 净额分解（CAS42 第22条(a)）───
+  preClassBookValue: number     // ① 被划归为持有待售之前的账面价值
+  assumedDepreciation: number   // ② 假设未划归原应确认的折旧、摊销
+  assumedImpairment: number     // ③ 假设未划归原应确认的减值准备
+  netValue: number              // ④ 净额 = ① - ② - ③（公式）
+  recoverableAmount: number     // 决定不再出售之日的可收回金额（CAS42 第22条(b)）
+  adjustedBookValue: number     // 调整后账面价值（公式：min(④净额, 可收回金额)，孰低）
+  noLongerReason: string        // 不再满足原因
+  reclassificationDate: string  // 重分类日期
+  decisionRef: string           // 不再处置决议（索引）
+  agreementRef: string          // 不再处置协议（索引）
+  status: CheckStatus           // 合规/不合规/不适用
+  voucherRef: string            // 凭证/抽凭
   conclusion: string
   remark: string
 }
@@ -78,23 +89,35 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
   }
 
   function _normalizeItem(raw: any, idx?: number): K6NoLongerCheckItem {
-    const assumedBookValue = Number(raw.assumedBookValue) || 0
+    // ① 兼容历史字段 assumedBookValue（旧模型的单一"假设未分类账面"→映射为①被划归前账面）
+    const preClassBookValue = Number(raw.preClassBookValue ?? raw.assumedBookValue) || 0
+    const assumedDepreciation = Number(raw.assumedDepreciation) || 0
+    const assumedImpairment = Number(raw.assumedImpairment) || 0
+    const netValue = preClassBookValue - assumedDepreciation - assumedImpairment
     const recoverableAmount = Number(raw.recoverableAmount) || 0
-    // 两者取低（Req 7.2）
-    const adjustedBookValue = Math.min(assumedBookValue, recoverableAmount)
-    const currentBook = Number(raw.currentBookValue) || 0
-    const adjustment = adjustedBookValue - currentBook
+    // 调整后账面 = min(④净额, 可收回金额)（孰低，Req 7.2）
+    const adjustedBookValue = _calcAdjusted(netValue, recoverableAmount)
+    const category: NoLongerCategory =
+      raw.category === 'asset_group' || raw.category === 'liability_group'
+        ? raw.category
+        : 'asset_noncurrent'
 
     return {
       rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
       seqNo: raw.seqNo ?? (idx != null ? idx + 1 : 1),
+      category,
+      groupName: raw.groupName ?? '',
       assetName: raw.assetName ?? '',
-      noLongerReason: raw.noLongerReason ?? '',
-      reclassificationDate: raw.reclassificationDate ?? '',
-      assumedBookValue,
+      preClassBookValue,
+      assumedDepreciation,
+      assumedImpairment,
+      netValue,
       recoverableAmount,
       adjustedBookValue,
-      adjustment: Number(raw.adjustment) || adjustment,
+      noLongerReason: raw.noLongerReason ?? '',
+      reclassificationDate: raw.reclassificationDate ?? '',
+      decisionRef: raw.decisionRef ?? '',
+      agreementRef: raw.agreementRef ?? '',
       status: (raw.status || '') as CheckStatus,
       voucherRef: raw.voucherRef ?? '',
       conclusion: raw.conclusion ?? '',
@@ -102,15 +125,19 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
     }
   }
 
-  // ─── Recalc（Req 7.2：两者取低） ──────────────────────────────────────────
+  // ─── Recalc（④=①-②-③；调整后账面=min(④,可收回金额)） ──────────────────
+
+  /** 调整后账面 = min(净额, 可收回金额)；两者均为0时返回0 */
+  function _calcAdjusted(netValue: number, recoverableAmount: number): number {
+    if (netValue === 0 && recoverableAmount === 0) return 0
+    if (recoverableAmount === 0) return netValue
+    if (netValue === 0) return recoverableAmount
+    return Math.min(netValue, recoverableAmount)
+  }
 
   function _recalcItem(item: K6NoLongerCheckItem): void {
-    // 调整后账面 = min(假设未分类账面, 可收回金额)
-    if (item.assumedBookValue > 0 || item.recoverableAmount > 0) {
-      item.adjustedBookValue = Math.min(item.assumedBookValue, item.recoverableAmount)
-    } else {
-      item.adjustedBookValue = 0
-    }
+    item.netValue = item.preClassBookValue - item.assumedDepreciation - item.assumedImpairment
+    item.adjustedBookValue = _calcAdjusted(item.netValue, item.recoverableAmount)
   }
 
   function recalcAll(): void {
@@ -127,6 +154,27 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
     return nonCompliantItems.value.length > 0
   })
 
+  // ─── 分区小计（资产合计 / 负债合计） ──────────────────────────────────────
+
+  const subtotals: ComputedRef<{
+    assetPreClass: number; assetNet: number; assetAdjusted: number; assetCount: number
+    liabilityPreClass: number; liabilityNet: number; liabilityAdjusted: number; liabilityCount: number
+  }> = computed(() => {
+    const items = checkItems.value
+    const assets = items.filter(i => i.category === 'asset_noncurrent' || i.category === 'asset_group')
+    const liabs = items.filter(i => i.category === 'liability_group')
+    return {
+      assetPreClass: calcSubtotal(assets.map(i => i.preClassBookValue)),
+      assetNet: calcSubtotal(assets.map(i => i.netValue)),
+      assetAdjusted: calcSubtotal(assets.map(i => i.adjustedBookValue)),
+      assetCount: assets.length,
+      liabilityPreClass: calcSubtotal(liabs.map(i => i.preClassBookValue)),
+      liabilityNet: calcSubtotal(liabs.map(i => i.netValue)),
+      liabilityAdjusted: calcSubtotal(liabs.map(i => i.adjustedBookValue)),
+      liabilityCount: liabs.length,
+    }
+  })
+
   // ─── Cell Update ───────────────────────────────────────────────────────────
 
   function updateCell(rowId: string, field: string, value: any): void {
@@ -139,44 +187,32 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
 
   // ─── Dynamic Row Add ───────────────────────────────────────────────────────
 
-  async function addItem(assetName?: string): Promise<void> {
-    let name = assetName
-    if (!name) {
-      try {
-        const { ElMessageBox } = await import('element-plus')
-        const { value } = await ElMessageBox.prompt(
-          '请输入资产名称',
-          '新增检查项',
-          {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            inputPlaceholder: '例如：XX资产不再满足',
-            inputValidator: (val) => (!val?.trim() ? '名称不能为空' : true),
-          },
-        )
-        name = value?.trim()
-      } catch {
-        return
-      }
+  async function addItem(category: NoLongerCategory = 'asset_noncurrent'): Promise<void> {
+    let name = ''
+    try {
+      const { ElMessageBox } = await import('element-plus')
+      const catLabel =
+        category === 'asset_noncurrent' ? '不再满足的非流动资产'
+        : category === 'asset_group' ? '处置组资产'
+        : '处置组负债'
+      const { value } = await ElMessageBox.prompt(
+        `请输入项目名称（${catLabel}）`,
+        '新增检查项',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPlaceholder: category === 'liability_group' ? '例如：应付账款' : '例如：固定资产 / 长期股权投资-联营企业',
+          inputValidator: (val: string) => (!val?.trim() ? '名称不能为空' : true),
+        },
+      )
+      name = value?.trim() ?? ''
+    } catch {
+      return
     }
     if (!name) return
 
-    const newItem: K6NoLongerCheckItem = {
-      rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      seqNo: checkItems.value.length + 1,
-      assetName: name,
-      noLongerReason: '',
-      reclassificationDate: '',
-      assumedBookValue: 0,
-      recoverableAmount: 0,
-      adjustedBookValue: 0,
-      adjustment: 0,
-      status: '',
-      voucherRef: '',
-      conclusion: '',
-      remark: '',
-    }
-    checkItems.value.push(newItem)
+    checkItems.value.push(_normalizeItem({ category, assetName: name }, checkItems.value.length))
+    checkItems.value.forEach((r, i) => { r.seqNo = i + 1 })
     _persist()
   }
 
@@ -226,6 +262,7 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
     checkItems,
     nonCompliantItems,
     hasNonCompliant,
+    subtotals,
     auditConclusion,
     updateCell,
     recalcAll,

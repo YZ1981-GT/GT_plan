@@ -55,6 +55,32 @@ export function calcFairValueNet(fairValue: number, sellingCost: number): number
 }
 
 /**
+ * 公允价值优先级取值（对应源模板 K6-4：=IF(销售协议价>0, 销售协议价, IF(活跃市场价>0, 活跃市场价, 估计价))）
+ *
+ * 公允价值确定顺序（可靠性由高到低）：
+ * 1. 销售协议价格（不可撤销转让协议约定价）—— 最可靠
+ * 2. 资产活跃市场价格 —— 次之
+ * 3. 估计价格（评估/内部测算）—— 兜底
+ *
+ * 取第一个 > 0 的价格作为公允价值；三者均 ≤ 0 时返回 0。
+ *
+ * @param salesPrice 销售协议价格
+ * @param marketPrice 资产活跃市场价格
+ * @param estimatePrice 估计价格
+ * @returns 公允价值
+ *
+ * Requirements 4.1, 4.3（初始确认估值表）
+ */
+export function calcFairValuePriority(salesPrice: number, marketPrice: number, estimatePrice: number): number {
+  const s = safeNum(salesPrice)
+  if (s > 0) return s
+  const m = safeNum(marketPrice)
+  if (m > 0) return m
+  const e = safeNum(estimatePrice)
+  return e > 0 ? e : 0
+}
+
+/**
  * 减值金额 = MAX(0, 账面价值 - 公允价值净额)
  *
  * 孰低法：账面价值高于公允价值净额时确认减值。

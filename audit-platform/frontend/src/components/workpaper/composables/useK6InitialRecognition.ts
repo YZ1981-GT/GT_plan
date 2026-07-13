@@ -22,6 +22,8 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { classifyHeldForSale, type ClassificationResult } from './useK6ClassificationEngine'
+import { calcFairValuePriority, calcFairValueNet } from './useK6ImpairmentEngine'
+import { calcSubtotal } from './useK6FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,45 @@ export interface K6Condition {
   description: string
   status: ConditionStatus
   evidence: string       // 审计证据/说明
+}
+
+/** 估值表分类：非流动资产 / 处置组资产 / 处置组负债 */
+export type ValuationCategory = 'asset_noncurrent' | 'asset_group' | 'liability_group'
+
+/**
+ * K6-4 初始确认估值表行（对照源模板 19 列）
+ * 公允价值三方法确定 + 孰低净额 + CAS42 判断列（预计出售时间/即可立即出售/决议索引/协议索引）
+ */
+export interface K6ValuationRow {
+  rowId: string
+  seqNo: number
+  category: ValuationCategory
+  groupName: string           // 处置组/主体（如子公司A、分公司B；非流动资产可留空）
+  itemName: string            // 项目（如固定资产、长期股权投资-联营企业）
+  bookValue: number           // 账面价值（可从 K6-2 明细表联动）
+  salesPrice: number          // 销售协议价格
+  salesBasis: string          // 依据
+  marketPrice: number         // 资产活跃市场价格
+  marketBasis: string         // 依据
+  estimatePrice: number       // 估计价格
+  estimateBasis: string       // 依据
+  fairValue: number           // 公允价值（公式：优先级取值）
+  sellingCost: number         // 出售费用（资产处置的直接归属费用）
+  fairValueNet: number        // 公允价值减去出售费用后的净额（公式）
+  expectedSaleTime: string    // 预计出售时间（预计一年内完成）
+  immediatelySellable: string // 当前状况即可立即出售（是/否/待定）
+  decisionRef: string         // 就出售计划作出决议（索引）
+  agreementRef: string        // 与受让方签订的不可撤销购买协议（索引）
+}
+
+/** 估值表分区小计 */
+export interface K6ValuationSubtotals {
+  assetBook: number           // 资产账面合计（非流动资产 + 处置组资产）
+  assetFairNet: number        // 资产公允净额合计
+  liabilityBook: number       // 负债账面合计
+  liabilityFairNet: number    // 负债公允净额合计
+  assetCount: number
+  liabilityCount: number
 }
 
 export interface UseK6InitialRecognitionParams {
@@ -78,6 +119,10 @@ export function useK6InitialRecognition(params: UseK6InitialRecognitionParams) {
 
   const classificationConclusion = ref('')
 
+  // 估值表行
+  const valuationRows = ref<K6ValuationRow[]>([])
+  const auditNote = ref('')
+
   // ─── 从 allResponses 加载条件状态 ─────────────────────────────────────────
 
   function _loadConditions(): void {
@@ -88,6 +133,67 @@ export function useK6InitialRecognition(params: UseK6InitialRecognitionParams) {
       conditions.value[i].evidence = evidence
     }
     classificationConclusion.value = getVal(allResponses.value, 'K6-4-conclusion')
+    auditNote.value = getVal(allResponses.value, 'K6-4-audit-note')
+  }
+
+  // ─── 估值表：加载 / 归一化 / 重算 ──────────────────────────────────────────
+
+  function _normalizeValuationRow(raw: any, idx: number): K6ValuationRow {
+    const bookValue = Number(raw.bookValue) || 0
+    const salesPrice = Number(raw.salesPrice) || 0
+    const marketPrice = Number(raw.marketPrice) || 0
+    const estimatePrice = Number(raw.estimatePrice) || 0
+    const sellingCost = Number(raw.sellingCost) || 0
+    const fairValue = calcFairValuePriority(salesPrice, marketPrice, estimatePrice)
+    const fairValueNet = calcFairValueNet(fairValue, sellingCost)
+    const category: ValuationCategory =
+      raw.category === 'asset_group' || raw.category === 'liability_group'
+        ? raw.category
+        : 'asset_noncurrent'
+    return {
+      rowId: raw.rowId ?? `val-${Math.random().toString(36).slice(2, 10)}`,
+      seqNo: idx + 1,
+      category,
+      groupName: raw.groupName ?? '',
+      itemName: raw.itemName ?? '',
+      bookValue,
+      salesPrice,
+      salesBasis: raw.salesBasis ?? '',
+      marketPrice,
+      marketBasis: raw.marketBasis ?? '',
+      estimatePrice,
+      estimateBasis: raw.estimateBasis ?? '',
+      fairValue,
+      sellingCost,
+      fairValueNet,
+      expectedSaleTime: raw.expectedSaleTime ?? '',
+      immediatelySellable: raw.immediatelySellable ?? '',
+      decisionRef: raw.decisionRef ?? '',
+      agreementRef: raw.agreementRef ?? '',
+    }
+  }
+
+  function _loadValuation(): void {
+    const item = allResponses.value.get('K6-4-valuation-rows')
+    const raw = item?.remark ?? item?.conclusion ?? (typeof item === 'string' ? item : null)
+    if (!raw) { valuationRows.value = []; return }
+    try {
+      let parsed = JSON.parse(raw)
+      // 兼容历史双重包裹 {"remark":"[...]"}：再解一层
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed) && typeof parsed.remark === 'string') {
+        parsed = JSON.parse(parsed.remark)
+      }
+      valuationRows.value = Array.isArray(parsed)
+        ? parsed.map((r, i) => _normalizeValuationRow(r, i))
+        : []
+    } catch {
+      valuationRows.value = []
+    }
+  }
+
+  function _recalcValuationRow(row: K6ValuationRow): void {
+    row.fairValue = calcFairValuePriority(row.salesPrice, row.marketPrice, row.estimatePrice)
+    row.fairValueNet = calcFairValueNet(row.fairValue, row.sellingCost)
   }
 
   // ─── 分类判断结果（Req 4.2） ──────────────────────────────────────────────
@@ -111,6 +217,77 @@ export function useK6InitialRecognition(params: UseK6InitialRecognitionParams) {
   const unmetConditions: ComputedRef<K6Condition[]> = computed(() => {
     return conditions.value.filter(c => c.status === 'not_met')
   })
+
+  // ─── 估值表分区小计（资产合计 / 负债合计） ────────────────────────────────
+
+  const valuationSubtotals: ComputedRef<K6ValuationSubtotals> = computed(() => {
+    const rows = valuationRows.value
+    const assets = rows.filter(r => r.category === 'asset_noncurrent' || r.category === 'asset_group')
+    const liabs = rows.filter(r => r.category === 'liability_group')
+    return {
+      assetBook: calcSubtotal(assets.map(r => r.bookValue)),
+      assetFairNet: calcSubtotal(assets.map(r => r.fairValueNet)),
+      liabilityBook: calcSubtotal(liabs.map(r => r.bookValue)),
+      liabilityFairNet: calcSubtotal(liabs.map(r => r.fairValueNet)),
+      assetCount: assets.length,
+      liabilityCount: liabs.length,
+    }
+  })
+
+  // ─── 估值表：更新 / 新增 / 删除 / 持久化 ──────────────────────────────────
+
+  function _persistValuation(): void {
+    saveResponse('K6-4-valuation-rows', { remark: JSON.stringify(valuationRows.value) })
+    saveResponse('K6-4-asset-fairnet-total', { remark: String(valuationSubtotals.value.assetFairNet) })
+  }
+
+  function updateValuationCell(rowId: string, field: keyof K6ValuationRow, value: any): void {
+    const row = valuationRows.value.find(r => r.rowId === rowId)
+    if (!row) return
+    ;(row as any)[field] = value
+    _recalcValuationRow(row)
+    _persistValuation()
+  }
+
+  async function addValuationRow(category: ValuationCategory): Promise<void> {
+    let name = ''
+    try {
+      const { ElMessageBox } = await import('element-plus')
+      const catLabel =
+        category === 'asset_noncurrent' ? '持有待售非流动资产'
+        : category === 'asset_group' ? '处置组资产'
+        : '处置组负债'
+      const { value } = await ElMessageBox.prompt(
+        `请输入项目名称（${catLabel}）`,
+        '新增估值行',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPlaceholder: category === 'liability_group' ? '例如：应付票据及应付账款' : '例如：固定资产 / 长期股权投资-联营企业',
+          inputValidator: (val: string) => (!val?.trim() ? '名称不能为空' : true),
+        },
+      )
+      name = value?.trim() ?? ''
+    } catch {
+      return
+    }
+    if (!name) return
+    valuationRows.value.push(_normalizeValuationRow({ category, itemName: name }, valuationRows.value.length))
+    valuationRows.value.forEach((r, i) => { r.seqNo = i + 1 })
+    _persistValuation()
+  }
+
+  function removeValuationRow(rowId: string): void {
+    const idx = valuationRows.value.findIndex(r => r.rowId === rowId)
+    if (idx < 0) return
+    valuationRows.value.splice(idx, 1)
+    valuationRows.value.forEach((r, i) => { r.seqNo = i + 1 })
+    _persistValuation()
+  }
+
+  async function saveAuditNote(): Promise<void> {
+    await saveResponse('K6-4-audit-note', { remark: auditNote.value })
+  }
 
   // ─── 更新条件状态 ─────────────────────────────────────────────────────────
 
@@ -142,11 +319,15 @@ export function useK6InitialRecognition(params: UseK6InitialRecognitionParams) {
 
   // ─── Watch init ────────────────────────────────────────────────────────────
 
-  watch(allResponses, () => _loadConditions(), { immediate: true })
+  watch(allResponses, () => {
+    _loadConditions()
+    _loadValuation()
+  }, { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 
   return {
+    // CAS42 五条件辅助判断区
     conditions,
     classificationResult,
     classificationConclusion,
@@ -156,5 +337,14 @@ export function useK6InitialRecognition(params: UseK6InitialRecognitionParams) {
     updateConditionEvidence,
     saveConclusion,
     setAiConclusion,
+    // 初始确认估值表
+    valuationRows,
+    valuationSubtotals,
+    updateValuationCell,
+    addValuationRow,
+    removeValuationRow,
+    // 审计说明
+    auditNote,
+    saveAuditNote,
   }
 }

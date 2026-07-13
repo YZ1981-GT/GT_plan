@@ -159,6 +159,9 @@
     </template>
 
     <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+
+    <!-- 复核对话（供子组件 inject('openReviewDialog') 触发） -->
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -183,11 +186,13 @@ import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from '
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 // core
 const K6TabIndex = defineAsyncComponent(() => import('./k6/core/K6TabIndex.vue'))
@@ -316,13 +321,22 @@ const currentSheet = computed(() => {
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
   if (!props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  // 子组件 composable 统一以 { remark, conclusion } 形态传值：解包为 checklist_responses 的两列，
+  // 避免二次 JSON.stringify 造成 remark 双重包裹（reload 时无法还原）。
+  let remark: string | null = null
+  let conclusion: string | null = null
+  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
+    remark = value.remark != null ? String(value.remark) : null
+    conclusion = value.conclusion != null ? String(value.conclusion) : null
+  } else if (value != null) {
+    remark = typeof value === 'string' ? value : JSON.stringify(value)
+  }
   // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
+  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: strVal }],
+      items: [{ item_id: itemId, conclusion, remark }],
     })
   } catch {
     // 静默失败，数据保留在本地
@@ -342,11 +356,11 @@ async function writebackTB(assetAudited: number, liabilityAudited: number): Prom
   if (!props.projectId) return
   try {
     await Promise.all([
-      http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
+      http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
         account_code: ACCOUNT_CODE_ASSET,
         audited_amount: assetAudited,
       }),
-      http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
+      http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
         account_code: ACCOUNT_CODE_LIABILITY,
         audited_amount: liabilityAudited,
       }),
@@ -377,11 +391,11 @@ async function writebackTB(assetAudited: number, liabilityAudited: number): Prom
 
 // ─── TB自动取数（持有待售资产+负债） ────────────────────────────────────────────
 async function _loadTbData(): Promise<void> {
-  if (!props.projectId) return
+  if (!props.projectId || !props.year) return
   try {
     // 持有待售资产科目 1481 / 持有待售负债科目（报表列报，通常自定义）
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1481' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '1481', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -401,20 +415,24 @@ async function _loadTbData(): Promise<void> {
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
+/** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  for (const [k, v] of Object.entries(src)) map.set(k, v)
+}
+
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
       // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
-      }
+      // 兼容两种键名：allResponses（历史）/ responses_snapshot（K6 render 策略实际输出）
+      const map = new Map<string, any>()
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'k6-held-for-sale' },
         _silent: true,
       } as any)
@@ -422,11 +440,8 @@ async function selfLoad(): Promise<void> {
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
+          _mergeResponses(map, sheet.html_data?.allResponses)
+          _mergeResponses(map, sheet.html_data?.responses_snapshot)
         }
         allResponses.value = map
       }
@@ -439,10 +454,10 @@ async function selfLoad(): Promise<void> {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, _sectionLabel?: string): void {
-  console.log('[K6] openReviewDialog:', sectionId, _sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// 真实复核对话（替代原 console.log 桩）：provide('openReviewDialog') + 模板挂载 GtWpReviewDialogHost
+const wpIdRefForReview = computed(() => props.wpId)
+const projectIdRefForReview = computed(() => props.projectId)
+useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
 provide('k6WritebackTB', writebackTB)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────

@@ -36,6 +36,124 @@
       <p><strong>CAS42 处置组减值分摊规则：</strong>处置组确认的减值损失金额，应当<strong>先抵减处置组中商誉的账面价值</strong>，再根据处置组中适用CAS8的各项非流动资产账面价值所占比重，按比例抵减其账面价值。处置组中各项资产减值后的账面价值不应低于以下三者中的最高者：公允价值减去出售费用后的净额、使用价值、零。</p>
     </div>
 
+    <!-- ═══ （一）处置组减值测算（孰低法） ═══ -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">（一）处置组减值测算（孰低法）</span>
+          <div class="section-header-actions">
+            <el-button size="small" type="primary" plain @click="syncMeasurementToAllocation">
+              应计提减值合计 → 组整体减值
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-empty v-if="measurementRows.length === 0" description="暂无处置组，点击下方按钮新增（如子公司A、分公司B）" :image-size="60" />
+
+      <el-table
+        v-else
+        :data="measurementRows"
+        border
+        stripe
+        size="small"
+        class="group-table"
+        row-key="rowId"
+      >
+        <el-table-column type="index" label="序" width="44" align="center" />
+        <el-table-column label="处置组" min-width="120">
+          <template #default="{ row }">
+            <el-input :model-value="row.groupName" :disabled="isReadonly" size="small"
+              @blur="(e: FocusEvent) => updateMeasurementCell(row.rowId, 'groupName', (e.target as HTMLInputElement)?.value ?? '')" />
+          </template>
+        </el-table-column>
+        <el-table-column label="账面价值" min-width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number :model-value="row.bookValue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="amt-input"
+              @change="(v: number | undefined) => updateMeasurementCell(row.rowId, 'bookValue', v ?? 0)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="公允价值" min-width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number :model-value="row.fairValue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="amt-input"
+              @change="(v: number | undefined) => updateMeasurementCell(row.rowId, 'fairValue', v ?? 0)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="公允价值确定依据" min-width="130">
+          <template #default="{ row }">
+            <el-input :model-value="row.fairValueBasis" :disabled="isReadonly" size="small" placeholder="如：评估报告"
+              @blur="(e: FocusEvent) => updateMeasurementCell(row.rowId, 'fairValueBasis', (e.target as HTMLInputElement)?.value ?? '')" />
+          </template>
+        </el-table-column>
+        <el-table-column label="出售费用" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number :model-value="row.sellingCost" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="amt-input"
+              @change="(v: number | undefined) => updateMeasurementCell(row.rowId, 'sellingCost', v ?? 0)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="公允净额" min-width="115" align="right">
+          <template #header><span class="formula-header" title="= 公允价值 - 出售费用">公允净额</span></template>
+          <template #default="{ row }"><span class="formula-cell">{{ fmtAmt(row.fairValueNet) }}</span></template>
+        </el-table-column>
+        <el-table-column label="应计提减值" min-width="115" align="right">
+          <template #header><span class="formula-header" title="= MAX(0, 账面价值 - 公允净额)（孰低法）">应计提减值</span></template>
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'impaired-amount': row.impairmentProvision > 0 }]">{{ fmtAmt(row.impairmentProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面期末减值" min-width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number :model-value="row.existingProvision" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="amt-input"
+              @change="(v: number | undefined) => updateMeasurementCell(row.rowId, 'existingProvision', v ?? 0)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="应补提/转回" min-width="115" align="right">
+          <template #header><span class="formula-header" title="= 应计提减值 - 账面期末减值">应补提/转回</span></template>
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'provision-positive': row.additionalProvision > 0 }]">{{ fmtAmt(row.additionalProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input :model-value="row.remark" :disabled="isReadonly" size="small"
+              @blur="(e: FocusEvent) => updateMeasurementCell(row.rowId, 'remark', (e.target as HTMLInputElement)?.value ?? '')" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="46" align="center">
+          <template #default="{ $index }"><el-button size="small" type="danger" link @click="removeMeasurementRow($index)">✕</el-button></template>
+        </el-table-column>
+      </el-table>
+
+      <div class="summary-row">
+        <span class="summary-label">测算合计</span>
+        <span class="summary-item">账面: <strong>{{ fmtAmt(measurementSubtotals.bookValue) }}</strong></span>
+        <span class="summary-item">公允净额: <strong>{{ fmtAmt(measurementSubtotals.fairValueNet) }}</strong></span>
+        <span class="summary-item" :class="{ 'impaired-amount': measurementSubtotals.impairmentProvision > 0 }">应计提减值: <strong>{{ fmtAmt(measurementSubtotals.impairmentProvision) }}</strong></span>
+        <span class="summary-item">应补提/转回: <strong>{{ fmtAmt(measurementSubtotals.additionalProvision) }}</strong></span>
+      </div>
+
+      <div v-if="!isReadonly" class="add-row-bar">
+        <el-button size="small" @click="addMeasurementRow()">+ 新增处置组</el-button>
+      </div>
+    </el-card>
+
+    <!-- ═══ 勾稽一致：Part(一)应计提减值 vs Part(二)已分摊 ═══ -->
+    <el-alert
+      :type="reconciliation.isBalanced ? 'success' : 'warning'"
+      :closable="false"
+      show-icon
+      class="reconciliation-alert"
+    >
+      <template #title>
+        <span v-if="reconciliation.isBalanced">
+          勾稽一致：（一）应计提减值合计 {{ fmtAmt(reconciliation.measurement) }} = （二）已分摊减值合计 {{ fmtAmt(reconciliation.allocated) }}
+        </span>
+        <span v-else>
+          勾稽不一致：（一）应计提减值 {{ fmtAmt(reconciliation.measurement) }} 与（二）已分摊 {{ fmtAmt(reconciliation.allocated) }} 差异 {{ fmtAmt(reconciliation.diff) }} 元，请核对（可点击上方"应计提减值合计 → 组整体减值"联动）
+        </span>
+      </template>
+    </el-alert>
+
     <!-- ═══ 顶部摘要：组整体减值+商誉抵减+余额分摊 ═══ -->
     <div class="group-summary-panel">
       <div class="summary-card">
@@ -73,7 +191,7 @@
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span class="section-title">K6-6 处置组减值分摊表</span>
+          <span class="section-title">（二）处置组减值损失的分摊（先抵商誉→按比例分摊）</span>
           <div class="section-header-actions">
             <el-button size="small" circle @click="openReview('K6-6')">💬</el-button>
           </div>
@@ -295,6 +413,15 @@ const {
   addRow,
   removeRow,
   saveConclusion,
+  // Part(一) 减值测算
+  measurementRows,
+  measurementSubtotals,
+  updateMeasurementCell,
+  addMeasurementRow,
+  removeMeasurementRow,
+  syncMeasurementToAllocation,
+  // 勾稽
+  reconciliation,
 } = useK6GroupImpairment({
   allResponses: allResponsesRef,
   saveResponse,
@@ -431,6 +558,22 @@ function fmtPercent(val: number | null | undefined): string {
 .block-card {
   margin-bottom: 16px;
 }
+.block-card :deep(.el-card__header) { padding: 8px 14px; }
+.block-card :deep(.el-card__body) { padding: 12px; }
+
+/* 勾稽提示 */
+.reconciliation-alert { margin-bottom: 16px; }
+
+/* 合计行 */
+.summary-row {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 12px; margin-top: 10px;
+  background: #f9fafb; border-radius: 4px; border: 1px solid #e5e7eb;
+  font-size: var(--wp-font-size, 13px); flex-wrap: wrap;
+}
+.summary-label { font-weight: 600; color: #374151; }
+.summary-item { color: #4b5563; }
+.provision-positive { color: #dc2626; }
 
 /* Section标题 */
 .section-header {

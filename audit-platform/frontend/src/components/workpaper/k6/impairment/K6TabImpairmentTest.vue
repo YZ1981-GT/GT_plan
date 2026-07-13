@@ -118,6 +118,20 @@
           </template>
         </el-table-column>
 
+        <!-- 公允价值确定依据 -->
+        <el-table-column label="公允价值确定依据" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.fairValueBasis"
+              size="small"
+              placeholder="如：评估报告/活跃市场报价/协议价"
+              @blur="(e: FocusEvent) => updateCell(row.rowId, 'fairValueBasis', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+            <span v-else>{{ row.fairValueBasis || '-' }}</span>
+          </template>
+        </el-table-column>
+
         <!-- 出售费用 -->
         <el-table-column label="出售费用" min-width="110" align="right">
           <template #default="{ row }">
