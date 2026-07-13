@@ -52,17 +52,32 @@
 
     <!-- 1/2/3 文本政策区 -->
     <el-card shadow="never" class="section-card">
-      <template #header><span class="card-title">1、公司是否制定了关于辞退福利的相关制度，及其内容</span></template>
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">1、公司是否制定了关于辞退福利的相关制度，及其内容</span>
+          <el-button size="small" type="primary" plain :loading="aiField === 'policy'" :disabled="isReadonly" @click="generateField('policy')">🤖 AI辅助</el-button>
+        </div>
+      </template>
       <el-input v-model="policyText" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
         placeholder="描述辞退福利相关制度、决议、计划、协议及主要内容..." @change="persist" />
     </el-card>
     <el-card shadow="never" class="section-card">
-      <template #header><span class="card-title">2、公司近期是否正在实施辞退或裁减计划，具体内容及所处阶段</span></template>
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">2、公司近期是否正在实施辞退或裁减计划，具体内容及所处阶段</span>
+          <el-button size="small" type="primary" plain :loading="aiField === 'plan'" :disabled="isReadonly" @click="generateField('plan')">🤖 AI辅助</el-button>
+        </div>
+      </template>
       <el-input v-model="planText" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
         placeholder="描述近期辞退/裁减计划的具体内容、涉及范围及所处阶段（拟定/公告/执行/完成）..." @change="persist" />
     </el-card>
     <el-card shadow="never" class="section-card">
-      <template #header><span class="card-title">3、解除劳动关系计划/自愿裁减建议是否符合准则规定的确认辞退福利的条件</span></template>
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">3、解除劳动关系计划/自愿裁减建议是否符合准则规定的确认辞退福利的条件</span>
+          <el-button size="small" type="primary" plain :loading="aiField === 'condition'" :disabled="isReadonly" @click="generateField('condition')">🤖 AI辅助</el-button>
+        </div>
+      </template>
       <el-input v-model="conditionText" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
         placeholder="判断是否满足CAS9确认条件：①企业已制定正式的解除劳动关系计划或提出自愿裁减建议且即将实施；②企业不能单方面撤回..." @change="persist" />
     </el-card>
@@ -338,6 +353,39 @@ function triggerImport() {
     for (const it of items) if (it.item_id === 'J1-10-vouchers') { try { rows.value = JSON.parse(it.remark || '[]') } catch { /* */ } }
   }
   input.click()
+}
+
+// 三个文本政策区 AI 辅助
+const aiField = ref<'policy' | 'plan' | 'condition' | null>(null)
+const FIELD_META: Record<'policy' | 'plan' | 'condition', { ref: () => string; set: (v: string) => void; prompt: string }> = {
+  policy: {
+    ref: () => policyText.value, set: (v) => { policyText.value = v },
+    prompt: '根据被审计单位辞退福利相关制度、决议、计划、协议，生成"公司辞退福利制度及其内容"说明段落，客观描述制度依据与主要内容。',
+  },
+  plan: {
+    ref: () => planText.value, set: (v) => { planText.value = v },
+    prompt: '根据被审计单位近期辞退或裁减计划情况，生成"近期辞退/裁减计划及所处阶段"说明段落，涵盖计划内容、涉及范围与所处阶段（拟定/公告/执行/完成）。',
+  },
+  condition: {
+    ref: () => conditionText.value, set: (v) => { conditionText.value = v },
+    prompt: '依据CAS9辞退福利确认条件，生成"解除劳动关系计划/自愿裁减建议是否符合确认条件"的判断段落：①是否已制定正式方案且即将实施；②企业是否不能单方面撤回；③预计经济利益流出可能性是否超过50%。',
+  },
+}
+async function generateField(field: 'policy' | 'plan' | 'condition') {
+  if (isReadonly.value) return
+  aiField.value = field
+  const meta = FIELD_META[field]
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `j1-10-${field}`,
+      prompt: meta.prompt,
+      context: { policy: policyText.value, plan: planText.value, condition: conditionText.value },
+      existingContent: meta.ref(),
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) { meta.set(text); persist() }
+  } catch { ElMessage.warning('AI 生成失败') }
+  finally { aiField.value = null }
 }
 
 const aiNoteLoading = ref(false)
