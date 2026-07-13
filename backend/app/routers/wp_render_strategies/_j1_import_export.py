@@ -1049,7 +1049,7 @@ async def import_data(
     elif sheet_type == "non_monetary":
         items, total = [], 0
         if "增减变动检查" in wb.sheetnames:
-            rows = _sheet_to_rows(wb["增减变动检查"], J19_VOUCHER_COLS)
+            rows = _sheet_to_rows(wb["增减变动检查"], J19_VOUCHER_COLS, start_row=3)
             items.append(("J1-9-vouchers", json.dumps(rows, ensure_ascii=False))); total += len(rows)
         if "政策与说明" in wb.sheetnames:
             kv = _kv_read(wb["政策与说明"])
@@ -1062,7 +1062,7 @@ async def import_data(
     elif sheet_type == "severance":
         items, total = [], 0
         if "增减变动检查" in wb.sheetnames:
-            rows = _sheet_to_rows(wb["增减变动检查"], J110_VOUCHER_COLS)
+            rows = _sheet_to_rows(wb["增减变动检查"], J110_VOUCHER_COLS, start_row=3)
             items.append(("J1-10-vouchers", json.dumps(rows, ensure_ascii=False))); total += len(rows)
         if "专家利用" in wb.sheetnames:
             rows = _sheet_to_rows(wb["专家利用"], J110_EXPERT_COLS)
@@ -1174,10 +1174,10 @@ def _rows_to_sheet(ws, cols, rows):
         ws.column_dimensions[get_column_letter(i)].width = 15
 
 
-def _sheet_to_rows(ws, cols):
-    """通用：sheet → 行对象列表（按列位置解析，跳过表头行）."""
+def _sheet_to_rows(ws, cols, start_row: int = 2):
+    """通用：sheet → 行对象列表（按列位置解析，start_row 起，跳过表头行）."""
     out = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
+    for row in ws.iter_rows(min_row=start_row, values_only=True):
         if not row or not any(v is not None and str(v).strip() != "" for v in row):
             continue
         d = {"id": f"imp-{len(out)}"}
@@ -1379,12 +1379,39 @@ J110_VOUCHER_COLS = [
 J110_EXPERT_COLS = [("label", "项目", False), ("indexNo", "索引号", False)]
 J110_ASSUMPTION_COLS = [("label", "关键假设/参数", False), ("value", "取值", False), ("basis", "确定依据", False)]
 
+# 凭证明细两行合并表头分组（对齐源模板：金额跨"借方/贷方"合并，其余列纵向合并；参照 J1-8）
+# 分组扁平化后的列顺序必须与 J19_VOUCHER_COLS / J110_VOUCHER_COLS 严格一致
+J19_VOUCHER_GROUPS = [
+    ("日期", None), ("凭证种类", None), ("凭证编号", None), ("业务内容", None),
+    ("明细科目", None), ("对方科目", None), ("金额", ["借方", "贷方"]),
+    ("非货币性福利形式", None), ("实物来源", None), ("结论", None),
+]
+J110_VOUCHER_GROUPS = [
+    ("日期", None), ("凭证种类", None), ("凭证编号", None), ("业务内容", None),
+    ("明细科目", None), ("对方明细科目", None), ("金额", ["借方", "贷方"]), ("结论", None),
+]
+
+
+def _rows_to_sheet_grouped(ws, groups, field_cols, rows):
+    """两行合并表头(groups) + 数据行(field_cols顺序, 自第3行起). 参照 J1-8 _write_voucher_header."""
+    col_count = _write_voucher_header(ws, groups)
+    for r in (rows or []):
+        line = []
+        for field, _label, is_num in field_cols:
+            if is_num:
+                line.append(_to_num(r.get(field)))
+            else:
+                line.append(r.get(field, ""))
+        ws.append(line)
+    for i in range(1, col_count + 1):
+        ws.column_dimensions[get_column_letter(i)].width = 14
+
 
 def _build_nonmonetary_wb(data: dict | None = None) -> Workbook:
     data = data or {}
     wb = Workbook()
     wb.remove(wb.active)
-    _rows_to_sheet(wb.create_sheet("增减变动检查"), J19_VOUCHER_COLS, _parse_json_array(data.get("J1-9-vouchers")))
+    _rows_to_sheet_grouped(wb.create_sheet("增减变动检查"), J19_VOUCHER_GROUPS, J19_VOUCHER_COLS, _parse_json_array(data.get("J1-9-vouchers")))
     _kv_sheet(wb.create_sheet("政策与说明"), [
         ("非货币性福利政策及内容", data.get("J1-9-policy") or ""),
         ("计提金额的确定", data.get("J1-9-accrual-basis") or ""),
@@ -1407,7 +1434,7 @@ def _build_severance_wb(data: dict | None = None) -> Workbook:
     data = data or {}
     wb = Workbook()
     wb.remove(wb.active)
-    _rows_to_sheet(wb.create_sheet("增减变动检查"), J110_VOUCHER_COLS, _parse_json_array(data.get("J1-10-vouchers")))
+    _rows_to_sheet_grouped(wb.create_sheet("增减变动检查"), J110_VOUCHER_GROUPS, J110_VOUCHER_COLS, _parse_json_array(data.get("J1-10-vouchers")))
     _rows_to_sheet(wb.create_sheet("专家利用"), J110_EXPERT_COLS,
                    _parse_json_array(data.get("J1-10-experts")) or [
                        {"label": "利用专家的工作", "indexNo": "S12"},
