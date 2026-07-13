@@ -211,25 +211,34 @@ const currentSheet = computed(() => {
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
   if (!props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
+  let remark: string | null = null
+  let conclusion: string | null = null
+  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
+    const r = (value as any).remark
+    remark = r != null ? (typeof r === 'string' ? r : JSON.stringify(r)) : null
+    const c = (value as any).conclusion
+    conclusion = c != null ? (typeof c === 'string' ? c : JSON.stringify(c)) : null
+  } else {
+    remark = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  }
+  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: strVal }],
+      items: [{ item_id: itemId, conclusion, remark }],
     })
   } catch {
     // 静默失败，数据保留在本地
   }
+  scheduleAutoSnapshot()
 }
 
 // ─── TB自动取数（6711营业外支出 — 损益类取发生额！借方=支出增加） ──────────────
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6711' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '6711', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -265,7 +274,7 @@ async function selfLoad(): Promise<void> {
       if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'k13-non-operating-expense' },
         _silent: true,
       } as any)
