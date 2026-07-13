@@ -335,7 +335,15 @@ function handleConclusionChange(val: string): void {
 }
 
 async function handleAiConclusion(): Promise<void> {
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
+  try {
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'pledge-check-conclusion',
+      prompt: '请基于抵质押资产检查情况，生成审计结论（包含权属确认、价值充分性、有效性判断）',
+      context: { rowCount: pledgeRows.value.length },
+    })
+    const content = res.data?.data?.content
+    if (content) { conclusion.value = content; handleConclusionChange(content) }
+  } catch { (await import('element-plus')).ElMessage.info('AI辅助暂不可用') }
 }
 
 // ─── 字段编辑处理 ────────────────────────────────────────────────────────────

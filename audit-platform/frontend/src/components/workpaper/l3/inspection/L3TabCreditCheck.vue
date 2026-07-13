@@ -369,7 +369,15 @@ function handleConclusionChange(val: string): void {
 }
 
 async function handleAiConclusion(): Promise<void> {
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
+  try {
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'credit-check-conclusion',
+      prompt: '请基于征信报告核对情况，生成审计结论（包含余额一致性、差异说明、信用风险评估）',
+      context: { rowCount: creditRows.value.length },
+    })
+    const content = res.data?.data?.content
+    if (content) { conclusion.value = content; handleConclusionChange(content) }
+  } catch { (await import('element-plus')).ElMessage.info('AI辅助暂不可用') }
 }
 
 // ─── 字段编辑处理 ────────────────────────────────────────────────────────────

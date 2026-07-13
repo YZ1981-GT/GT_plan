@@ -470,7 +470,16 @@ function handleConclusionInput(val: string): void {
 }
 
 async function handleAiConclusion(): Promise<void> {
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
+  try {
+    const items = Object.values(sectionRefs).flatMap(s => s.items.value.map(i => ({ content: i.content, result: i.result, remark: i.remark })))
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'lt-loan-check-conclusion',
+      prompt: '请基于长期借款检查表各项检查结果，生成审计结论',
+      context: { items, passCount: items.filter(i => i.result === '符合').length, failCount: items.filter(i => i.result === '不符合').length },
+    })
+    const content = res.data?.data?.content
+    if (content) { conclusion.value = content; handleConclusionInput(content) }
+  } catch { ElMessage.info('AI辅助暂不可用') }
 }
 
 // ─── Result styling ──────────────────────────────────────────────────────────

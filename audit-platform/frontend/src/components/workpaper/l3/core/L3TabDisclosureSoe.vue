@@ -238,16 +238,37 @@ function handleConclusionChange() {
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
-function handleAiAssist() {
-  ElMessage.info('AI辅助功能开发中...')
+async function handleAiAssist() {
+  try {
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'l3-disclosure-soe',
+      prompt: '请基于长期借款附注披露（国有企业）数据，检查披露完整性并给出审计建议',
+      context: { wpId: props.wpId },
+    })
+    if (res.data?.data?.content) ElMessage.success('AI建议已生成')
+  } catch { ElMessage.info('AI辅助暂不可用') }
 }
 
-function handleSectionAi(section: string) {
-  ElMessage.info(`AI辅助（${section}）功能开发中...`)
+async function handleSectionAi(section: string) {
+  try {
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l3-disclosure-soe-${section}`,
+      prompt: `请对长期借款附注（国企）"${section}"区段给出披露合规性审计建议`,
+      context: { section },
+    })
+    if (res.data?.data?.content) ElMessage.success(`${section} AI建议已生成`)
+  } catch { ElMessage.info('AI辅助暂不可用') }
 }
 
-function handleAiConclusion() {
-  ElMessage.info('AI生成结论功能开发中...')
+async function handleAiConclusion() {
+  try {
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'l3-disclosure-soe-conclusion',
+      prompt: '请基于长期借款附注（国企）检查情况，生成审计结论',
+      context: { wpId: props.wpId },
+    })
+    if (res.data?.data?.content) ElMessage.success('AI结论已生成')
+  } catch { ElMessage.info('AI辅助暂不可用') }
 }
 
 // ─── EventBus 订阅：审定变更后刷新 ──────────────────────────────────────────
