@@ -20,6 +20,7 @@
             </el-button>
             <el-button size="small" @click="showWpImportEnhanced = true">增强导入</el-button>
             <el-button size="small" @click="showBatchExportEnhanced = true">批量导出(元数据)</el-button>
+            <el-button size="small" @click="showBulkTab = true">批量Tab导入导出</el-button>
             <el-button size="small" @click="showTemplateCopy = true">模板复制</el-button>
             <el-button type="primary" size="small" @click="onBatchDownload" :loading="downloadLoading">
               批量下载 ({{ selectedWpIds.length || '全部' }})
@@ -113,6 +114,12 @@
       v-model="showBatchExportEnhanced"
       :project-id="projectId"
     />
+    <!-- 项目级底稿批量 Tab 导入导出（结构化数据包，与整份文件导出并列） -->
+    <WpBulkDialog
+      v-model="showBulkTab"
+      :project-id="projectId"
+      @imported="fetchWpIndex"
+    />
     <WpTemplateCopyDialog
       v-model="showTemplateCopy"
       :project-id="projectId"
@@ -171,6 +178,7 @@ import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpBatchExportDialog from '@/components/workpaper/WpBatchExportDialog.vue'
+import WpBulkDialog from '@/components/workpaper/bulk-tab/WpBulkDialog.vue'
 import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
 import WorkpaperTrimDialog from '@/components/workpaper/WorkpaperTrimDialog.vue'
 
@@ -207,6 +215,7 @@ const userOptions = ref<any[]>([])
 const showWpImport = ref(false)
 const showWpImportEnhanced = ref(false)
 const showBatchExportEnhanced = ref(false)
+const showBulkTab = ref(false)
 const showTemplateCopy = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)

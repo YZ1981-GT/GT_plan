@@ -1975,6 +1975,7 @@ declare module 'vue' {
     WpBatchExportDialog: typeof import('./components/workpaper/WpBatchExportDialog.vue')['default']
     WpBulkDialog: typeof import('./components/workpaper/bulk-tab/WpBulkDialog.vue')['default']
     WpBulkImportReport: typeof import('./components/workpaper/bulk-tab/WpBulkImportReport.vue')['default']
+    WpBulkProgressBar: typeof import('./components/workpaper/bulk-tab/WpBulkProgressBar.vue')['default']
     WpConflictPanel: typeof import('./components/workpaper/WpConflictPanel.vue')['default']
     WpDynamicTable: typeof import('./components/workpaper/kit/WpDynamicTable.vue')['default']
     WpExportButton: typeof import('./components/workpaper/WpExportButton.vue')['default']

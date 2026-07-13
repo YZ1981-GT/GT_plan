@@ -254,16 +254,15 @@ def _create_template_workbook(sheet: str, segments: list[Any] | None = None) -> 
     ws = wb.active
     ws.title = sheet
 
-    # D2-2 明细表：2 行合并表头，对齐前端 el-table 多级列头
+    # 列头：D2-2 明细表用动态账龄扁平列（get_d2_2_columns，与导入解析器/导出值同源，保证往返一致）；
+    # 其余 sheet 用 SHEET_COLUMNS 固定列。
+    # 注：D2-2 曾用 2 行合并表头（_build_d2_2_multi_row_header），但导入解析器只读单行扁平表头，
+    #     导致导出模板无法被自身导入（列名不匹配）。改为单行扁平表头修复往返。
     if sheet == 'D2-2':
-        _build_d2_2_multi_row_header(ws, segments or [])
-        # 编制说明 sheet（插入到第一个位置）
-        ws_instr = wb.create_sheet("编制说明", 0)
-        _build_d2_2_instruction_sheet(ws_instr, segments or [])
-        return wb
+        columns = get_d2_2_columns(segments or [])
+    else:
+        columns = SHEET_COLUMNS[sheet]
 
-    # 其他 sheet：单行表头
-    columns = SHEET_COLUMNS[sheet]
     header_font = Font(bold=True, size=11)
     header_fill = PatternFill(
         start_color="D9E1F2", end_color="D9E1F2", fill_type="solid"
@@ -289,9 +288,30 @@ def _create_template_workbook(sheet: str, segments: list[Any] | None = None) -> 
 
     # 所有 sheet 都加编制说明（插入到第一个位置）
     ws_instr = wb.create_sheet("编制说明", 0)
-    _build_generic_instruction_sheet(ws_instr, sheet, columns)
+    if sheet == 'D2-2':
+        _build_d2_2_instruction_sheet(ws_instr, segments or [])
+    else:
+        _build_generic_instruction_sheet(ws_instr, sheet, columns)
 
     return wb
+
+
+def _select_data_ws(wb: Any, sheet: str) -> Any:
+    """选择数据工作表（而非 `wb.active`）。
+
+    模板工作簿把"编制说明"插入到 index 0 → `wb.active` 会指向说明 sheet，
+    导致导入/导出数据误读/误写说明 sheet。此处优先按 sheet 名精确选取，
+    其次回退到首个非"编制说明"工作表，最后回退 active。
+    """
+    try:
+        if sheet in wb.sheetnames:
+            return wb[sheet]
+    except Exception:
+        pass
+    for name in wb.sheetnames:
+        if name != "编制说明":
+            return wb[name]
+    return wb.active
 
 
 def _build_d2_2_multi_row_header(ws, segments: list[Any]) -> None:
@@ -1519,7 +1539,8 @@ async def export_data(
     # D2-2 明细表：账龄列头/值按项目账龄配置动态生成（Task 12.1）
     segments = await resolve_aging_segments(db, wp_id, 'D2') if sheet == 'D2-2' else None
     wb = _create_template_workbook(sheet, segments)
-    ws = wb.active
+    # 数据须写入数据 sheet（非"编制说明"，后者是模板首个 sheet 会成为 wb.active）
+    ws = _select_data_ws(wb, sheet)
     for row in stored:
         if sheet == 'D2-2':
             ws.append(_d2_2_export_values(row, segments or []))
@@ -1567,7 +1588,8 @@ async def import_data(
             status_code=400, detail=f"无法解析xlsx文件: {str(e)}"
         )
 
-    ws = wb.active
+    # 按 sheet 名选取数据工作表（模板首个 sheet 是"编制说明"，不能用 wb.active）
+    ws = _select_data_ws(wb, sheet)
 
     if sheet == 'D2-1':
         invalid_columns = _validate_columns(ws, sheet)
