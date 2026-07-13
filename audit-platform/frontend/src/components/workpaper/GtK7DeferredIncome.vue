@@ -93,13 +93,14 @@
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- K7-5 递延收益检查表 -->
+        <!-- K7-5 递延收益检查表（凭证级测试） -->
         <K7TabDeferredCheck
           v-else-if="currentSheet === 'K7-5'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -218,7 +219,7 @@ const dualMode = (() => {
 
   async function checkOoHealth(): Promise<void> {
     try {
-      const res = await http.get('/workpapers/onlyoffice/health', { _silent: true } as any)
+      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
       isOoAvailable.value = !!(res?.data?.data?.healthy ?? res?.data?.healthy)
     } catch {
       isOoAvailable.value = false
@@ -274,25 +275,34 @@ const currentSheet = computed(() => {
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
   if (!props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
+  let remark: string | null = null
+  let conclusion: string | null = null
+  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
+    const r = (value as any).remark
+    remark = r != null ? (typeof r === 'string' ? r : JSON.stringify(r)) : null
+    const c = (value as any).conclusion
+    conclusion = c != null ? (typeof c === 'string' ? c : JSON.stringify(c)) : null
+  } else {
+    remark = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  }
+  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: strVal }],
+      items: [{ item_id: itemId, conclusion, remark }],
     })
   } catch {
     // 静默失败，数据保留在本地
   }
+  scheduleAutoSnapshot()
 }
 
 // ─── TB自动取数（2401递延收益） ───────────────────────────────────────────────
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '2401' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '2401', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -312,36 +322,45 @@ async function _loadTbData(): Promise<void> {
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
+/** 合并 render 输出的 responses（兼容 responses_snapshot / allResponses / checklist_responses） */
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src) return
+  if (Array.isArray(src)) {
+    for (const item of src) {
+      const id = item?.item_id ?? item?.itemId
+      if (id) map.set(id, item)
+    }
+  } else if (typeof src === 'object') {
+    for (const [k, v] of Object.entries(src)) map.set(k, v)
+  }
+}
+
 async function selfLoad(): Promise<void> {
   try {
+    const map = new Map<string, any>()
     if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
-      }
+      _mergeResponses(map, props.htmlData.responses_snapshot)
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.checklist_responses)
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'k7-deferred-income' },
         _silent: true,
       } as any)
       const data = res.data?.data || res.data
       if (data?.sheets && Array.isArray(data.sheets)) {
-        const map = new Map<string, any>()
         for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
+          const hd = sheet.html_data
+          if (hd) {
+            _mergeResponses(map, hd.responses_snapshot)
+            _mergeResponses(map, hd.allResponses)
+            _mergeResponses(map, hd.checklist_responses)
           }
         }
-        allResponses.value = map
       }
     }
+    allResponses.value = map
   } catch (err) {
     console.warn('[GtK7DeferredIncome] selfLoad failed:', err)
   } finally {
