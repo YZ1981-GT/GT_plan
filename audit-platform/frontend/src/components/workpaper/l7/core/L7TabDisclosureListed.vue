@@ -134,7 +134,15 @@ function updateRow(index: number, field: 'endAmount' | 'priorYearEnd', val: numb
   }
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l7-disclosure-listed-${section}`,
+      prompt: `请基于其他非流动负债底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.('L7-disclosure-listed', '附注披露（上市）') }
 
 function fmtAmount(val: number): string {

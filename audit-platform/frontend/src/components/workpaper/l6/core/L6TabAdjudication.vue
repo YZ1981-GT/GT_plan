@@ -485,8 +485,14 @@ function saveAuditNote() {
   formData.debouncedSave('L6-L6-1-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（集成时实现）
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l6-adjudication-${section}`,
+      prompt: `请基于专项应付款底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

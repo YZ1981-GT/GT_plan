@@ -285,7 +285,15 @@ function handleUpdate(index: number, field: keyof L5DetailRow, value: string | n
 function handleImportExport(command: string) {
   // Delegate to useL5ImportExport composable
 }
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l5-detail-${section}`,
+      prompt: `请基于长期应付款底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.() }
 
 function fmtAmount(val: number): string {

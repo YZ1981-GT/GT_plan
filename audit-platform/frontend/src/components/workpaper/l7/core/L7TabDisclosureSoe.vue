@@ -161,7 +161,15 @@ function handleSoeNoteChange() {
   formData.debouncedSave('L7-disclosure-soe-special', { remark: soeSpecialNote.value || null })
 }
 
-function handleAI(_section: string) {}
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l7-disclosure-soe-${section}`,
+      prompt: `请基于其他非流动负债底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.('L7-disclosure-soe', '附注披露（国企）') }
 
 function fmtAmount(val: number): string {

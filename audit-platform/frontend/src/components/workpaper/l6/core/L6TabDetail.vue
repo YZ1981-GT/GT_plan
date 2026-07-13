@@ -391,8 +391,14 @@ function triggerFileUpload() {
   input.click()
 }
 
-function handleAI(_section: string) {
-  // AI辅助 — 由上层集成
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `l6-detail-${section}`,
+      prompt: `请基于专项应付款底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {
