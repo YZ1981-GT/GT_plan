@@ -39,6 +39,31 @@
       <div class="total-summary">非货币性福利合计: {{ totalAmount?.toLocaleString() }} 元</div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="header-row">
+          <span class="section-title">审计说明</span>
+          <el-button size="small" type="primary" link @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+          <el-button size="small" @click="handleReview">💬 复核</el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="描述非货币性福利检查过程、发现的问题及处理意见..." @change="persistNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="section-title">审计结论</span></template>
+      <el-select v-model="conclusionOption" size="small" class="concl-select" placeholder="选择结论模板" @change="onConclusionSelect">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述不合规事项外，其余未见异常" value="B" />
+        <el-option label="C、存在重大不合规事项，需进一步调整" value="C" />
+      </el-select>
+      <el-input v-model="conclusionText" type="textarea" :autosize="{ minRows: 3 }" placeholder="基于上述检查情况，形成审计结论..." @change="persistNote" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -54,6 +79,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { MagicStick } from '@element-plus/icons-vue'
+import { http } from '@/utils/http'
 import { useJ1NonMonetaryCheck } from '@/composables/workpaper/j1/useJ1NonMonetaryCheck'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -66,7 +93,59 @@ const props = defineProps<{
 const htmlDataRef = ref(props.htmlData || {})
 const { rows, totalAmount, hasNonCompliant, initFromHtmlData } = useJ1NonMonetaryCheck(htmlDataRef)
 
-onMounted(() => { if (props.htmlData) initFromHtmlData(props.htmlData) })
+const auditNote = ref('')
+const conclusionText = ref('')
+const conclusionOption = ref('')
+
+onMounted(async () => {
+  if (props.htmlData) initFromHtmlData(props.htmlData)
+  // selfLoad 审计说明+结论
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const items: Array<{ item_id: string; remark?: string; conclusion?: string }> = res.data?.data || res.data || []
+    for (const item of items) {
+      if (item.item_id === 'J1-9-audit-note') {
+        auditNote.value = item.remark || ''
+        conclusionText.value = item.conclusion || ''
+      }
+    }
+  } catch { /* */ }
+})
+
+function onConclusionSelect(val: string) {
+  const map: Record<string, string> = {
+    A: '经检查，被审计单位非货币性福利计量方式恰当、金额准确、税务处理合规，未见异常。',
+    B: '除上述不合规事项应整改外，其余非货币性福利项目的计量、记录与税务处理未见异常。',
+    C: '存在重大不合规事项，非货币性福利计量/税务处理有误，需调整。',
+  }
+  if (map[val] && !conclusionText.value) conclusionText.value = map[val]
+  persistNote()
+}
+
+let noteTimer: ReturnType<typeof setTimeout> | null = null
+function persistNote() {
+  if (noteTimer) clearTimeout(noteTimer)
+  noteTimer = setTimeout(async () => {
+    try {
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+        items: [{ item_id: 'J1-9-audit-note', remark: auditNote.value, conclusion: conclusionText.value }],
+      })
+    } catch { /* */ }
+  }, 800)
+}
+
+async function handleAiGenerate() {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'non-monetary-check',
+      prompt: '请基于非货币性福利检查情况生成审计说明',
+      context: { totalAmount: totalAmount.value, hasNonCompliant: hasNonCompliant.value, rowCount: rows.value.length },
+    })
+    if (res.data?.data?.content) auditNote.value = res.data.data.content
+    persistNote()
+  } catch { /* */ }
+}
+function handleReview() { /* 复核对话桩 */ }
 </script>
 
 <style scoped>
@@ -76,6 +155,13 @@ onMounted(() => { if (props.htmlData) initFromHtmlData(props.htmlData) })
 .chip-wrap { display: inline-flex; align-items: center; }
 .section-title { font-weight: 600; font-size: 15px; }
 .total-summary { margin-top: 12px; font-size: var(--wp-font-size, 13px); color: #606266; padding: 8px; background: #f5f7fa; border-radius: 4px; }
+.note-card { margin-top: 16px; }
+.note-card :deep(.el-card__header) { padding: 8px 14px; }
+.note-card :deep(.el-card__body) { padding: 12px 14px; }
+.conclusion-card { margin-top: 10px; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
