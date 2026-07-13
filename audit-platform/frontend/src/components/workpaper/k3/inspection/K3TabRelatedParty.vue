@@ -9,6 +9,16 @@
         行级抽凭+OCR识别自动填充审计证据。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性：</b>关联方识别是否完整（8 类关联关系），是否存在未识别关联方；</li>
+        <li><b>义务与计价：</b>对关联方的其他应付款真实、金额公允，无异常资金占用；</li>
+        <li><b>列报与披露：</b>关联交易及余额按 CAS36 充分披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K3-6 关联方及交易检查</h3>

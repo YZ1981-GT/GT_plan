@@ -8,6 +8,16 @@
         ④逐行核查结论（合规/需处理/不适用）。3年以上行自动标记并提示评估转销必要性。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在与义务：</b>长期挂账的其他应付款是否仍为真实存在的偿还义务；</li>
+        <li><b>计价和分摊：</b>无需支付/无法支付的款项是否应按 CAS16 转入营业外收入，计价恰当；</li>
+        <li><b>列报与披露：</b>长期挂账原因及处理已恰当披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K3-5 长期挂账检查表</h3>

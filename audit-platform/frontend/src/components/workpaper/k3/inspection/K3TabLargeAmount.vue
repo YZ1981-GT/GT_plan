@@ -8,6 +8,16 @@
         超过阈值的行橙色高亮，提示重点关注。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在与义务：</b>大额其他应付款真实存在且为被审计单位应履行的偿还义务；</li>
+        <li><b>完整性：</b>所有应记录的大额其他应付款均已记录，不存在少计；</li>
+        <li><b>计价和分摊：</b>以恰当金额列示，长期挂账/异常款项已恰当评估与披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K3-4 大额其他应付款情况分析表</h3>
