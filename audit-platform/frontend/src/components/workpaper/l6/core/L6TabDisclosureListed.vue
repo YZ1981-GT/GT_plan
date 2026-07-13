@@ -94,6 +94,19 @@
       <span>数据自动从L6-2明细表审定数区（P~T列）拉取，订阅审定事件自动刷新</span>
     </div>
 
+    <!-- ═══ 核对结论 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">核对结论</span>
+          <el-button size="small" @click="handleAI('conclusion')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写附注核对结论..." :disabled="isReadonly" @change="saveConclusion" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l6-details-tip">
       <summary>编制提示</summary>
@@ -170,6 +183,12 @@ const totalBegin = computed(() => disclosureRows.value.reduce((s, r) => s + r.be
 const totalIncrease = computed(() => disclosureRows.value.reduce((s, r) => s + r.increase, 0))
 const totalDecrease = computed(() => disclosureRows.value.reduce((s, r) => s + r.decrease, 0))
 const totalEnd = computed(() => disclosureRows.value.reduce((s, r) => s + r.endBalance, 0))
+
+const conclusion = ref('')
+
+function saveConclusion() {
+  formData.debouncedSave('L6-disc-listed-conclusion', { remark: conclusion.value || null })
+}
 
 // ─── Load from responses (L6-2 审定数区自动填充) ─────────────────────────────
 
@@ -267,6 +286,8 @@ onUnmounted(() => {
 .total-row { display: flex; gap: 20px; padding: 10px 16px; margin-top: 8px; background: #f5f7fa; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .auto-pull-notice { display: flex; align-items: center; gap: 6px; padding: 8px 12px; background: #ecf5ff; border-radius: 4px; margin-bottom: 12px; font-size: 12px; color: #409eff; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.conclusion-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .l6-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l6-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l6-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }

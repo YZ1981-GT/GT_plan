@@ -272,6 +272,19 @@
       <span>共 <strong>{{ computedRows.length }}</strong> 个专项项目</span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写明细表审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l6-details-tip">
       <summary>编制提示</summary>
@@ -348,6 +361,12 @@ const importExport = useL6ImportExport({
 })
 
 const crossSheet = useL6CrossSheet(formData.responses)
+
+const auditNote = ref('')
+
+function saveAuditNote() {
+  formData.debouncedSave('L6-2-auditNote', { remark: auditNote.value || null })
+}
 
 const segmentOptions = L6_DETAIL_SEGMENTS.map(s => ({ label: s.label, value: s.key }))
 
@@ -489,6 +508,8 @@ function restoreRowsFromResponses() {
 .formula-value.negative-warning { color: #f56c6c; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .summary-bar { display: flex; gap: 20px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; flex-wrap: wrap; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .l6-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l6-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l6-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
