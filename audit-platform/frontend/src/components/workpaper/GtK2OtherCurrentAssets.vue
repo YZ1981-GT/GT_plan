@@ -104,13 +104,14 @@
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- K2-6 检查表 -->
+        <!-- K2-6 检查表（凭证级测试） -->
         <K2TabCheck
           v-else-if="currentSheet === 'K2-6'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -228,7 +229,7 @@ const dualMode = (() => {
 
   async function checkOoHealth(): Promise<void> {
     try {
-      const res = await http.get('/workpapers/onlyoffice/health', { _silent: true } as any)
+      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
       isOoAvailable.value = !!(res?.data?.data?.healthy ?? res?.data?.healthy)
     } catch {
       isOoAvailable.value = false
@@ -284,13 +285,21 @@ const currentSheet = computed(() => {
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
   if (!props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
+  let remark: string | null = null
+  let conclusion: string | null = null
+  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
+    const r = (value as any).remark
+    remark = r != null ? (typeof r === 'string' ? r : JSON.stringify(r)) : null
+    const c = (value as any).conclusion
+    conclusion = c != null ? (typeof c === 'string' ? c : JSON.stringify(c)) : null
+  } else {
+    remark = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  }
+  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: strVal }],
+      items: [{ item_id: itemId, conclusion, remark }],
     })
     scheduleAutoSnapshot()
   } catch {
@@ -302,8 +311,8 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1231' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '1231', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -331,7 +340,7 @@ async function selfLoad(): Promise<void> {
 
   // 加载 checklist_responses
   try {
-    const res = await http.get(`/workpapers/${props.wpId}/checklist-responses`, {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`, {
       params: { project_id: props.projectId },
       _silent: true,
     } as any)
