@@ -196,6 +196,19 @@
       <span>共 <strong>{{ computedRows.length }}</strong> 笔款项</span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写未确认融资费用审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l5-details-tip">
       <summary>编制提示</summary>
@@ -277,6 +290,9 @@ function handleAI(section: string) {
 }
 function handleReview() { openReviewDialog?.() }
 
+const auditNote = ref('')
+function saveAuditNote() { formData.debouncedSave('L5-3-auditNote', { remark: auditNote.value || null }) }
+
 function fmtAmount(val: number): string {
   if (val === 0) return '—'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -300,6 +316,8 @@ onMounted(async () => {
 .formula-value { color: #409eff; font-weight: 500; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .l5-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
