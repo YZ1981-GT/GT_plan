@@ -1,5 +1,14 @@
 <template>
   <div class="k6-tab-group-impairment">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>计价和分摊：</b>处置组整体减值先抵减商誉再按比例分摊至各非流动资产，分摊计算准确；</li>
+        <li><b>完整性：</b>处置组减值损失确认完整，与 K6-5 单项测试勾稽一致。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 蓝色渐变引导区 ═══ -->
     <div class="guidance-block">
       <div class="guidance-grid">

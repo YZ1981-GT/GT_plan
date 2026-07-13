@@ -1,5 +1,14 @@
 <template>
   <div class="k6-tab-no-longer-check">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>列报与披露：</b>不再满足持有待售条件的资产/处置组已及时终止分类并重分类回原项目；</li>
+        <li><b>计价和分摊：</b>重分类时按孰低原则（可收回金额与假设未划分持有待售的账面价值孰低）恰当计量。</li>
+      </ol>
+    </el-alert>
+
     <!-- Section标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">K6-7 检查表（不再满足持有待售条件）</h3>

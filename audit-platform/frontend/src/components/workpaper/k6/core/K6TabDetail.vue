@@ -7,6 +7,16 @@
         合计行应与K6-1审定表交叉验证。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在与完整性：</b>逐项登记的持有待售处置组/资产真实存在且登记完整；</li>
+        <li><b>计价和分摊：</b>账面价值与公允价值净额计算准确（账面=原值−累计折旧摊销−减值；净额=公允−出售费用），合计与 K6-1 交叉验证一致；</li>
+        <li><b>列报与披露：</b>分类结论恰当。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 操作栏：新增 + 导入导出 + AI + 复核 ═══ -->
     <div class="detail-toolbar">
       <div class="toolbar-left">

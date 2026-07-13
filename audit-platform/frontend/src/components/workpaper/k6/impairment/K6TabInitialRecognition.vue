@@ -1,5 +1,14 @@
 <template>
   <div class="k6-tab-initial-recognition">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>列报与披露（分类恰当）：</b>持有待售的初始分类满足 CAS42 五条件（管理层决议/签订不可撤销转让协议/一年内完成出售等）；</li>
+        <li><b>计价和分摊：</b>初始确认时按孰低原则计量，划分时点恰当。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 蓝色渐变引导区 ═══ -->
     <div class="guidance-block">
       <div class="guidance-grid">

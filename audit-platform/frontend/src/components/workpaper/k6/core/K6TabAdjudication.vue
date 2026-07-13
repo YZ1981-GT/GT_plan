@@ -7,6 +7,17 @@
         审定数=未审数+AJE+RJE。三角勾稽要求期末(公式)与审定数一致或差异合理。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>存在与权利：</b>划分为持有待售的资产/处置组真实存在且由被审计单位拥有或控制；</li>
+        <li><b>完整性：</b>符合 CAS42 条件的资产/处置组均已划分并记录；</li>
+        <li><b>计价和分摊：</b>按账面价值与公允价值减出售费用后净额孰低计量，减值确认恰当；</li>
+        <li><b>列报与披露：</b>持有待售分类、计量及终止经营已按 CAS42 恰当列报披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 持有待售资产区块（1481，借方/资产类） ═══ -->
     <div v-for="section in adjudicationSections" :key="section.sectionKey" class="adj-section">
       <div class="section-header">

@@ -1,5 +1,14 @@
 <template>
   <div class="k6-tab-impairment-test">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>计价和分摊：</b>持有待售资产按账面价值与公允价值减出售费用后净额孰低计量，减值损失计算准确；</li>
+        <li><b>完整性：</b>应计提的减值损失均已确认，公允价值/出售费用估计合理。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 蓝色渐变引导区 ═══ -->
     <div class="guidance-block">
       <div class="guidance-grid">
