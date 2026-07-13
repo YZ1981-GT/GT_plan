@@ -568,15 +568,33 @@ async function handleConclusionSave() {
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助分析递延所得税负债审定表数据...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n3-adjudication',
+      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleNotesAi() {
-  ElMessage.info('AI辅助生成审计说明...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n3-adjudication',
+      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReasonAi() {
-  ElMessage.info('AI辅助分析变动原因...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n3-adjudication',
+      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────

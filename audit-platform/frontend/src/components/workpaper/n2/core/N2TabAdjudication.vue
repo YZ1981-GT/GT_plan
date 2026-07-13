@@ -474,11 +474,23 @@ async function handleConclusionSave() {
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助分析审定表数据...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n2-adjudication',
+      prompt: '请基于应交税费底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleNotesAi() {
-  ElMessage.info('AI辅助生成审计说明...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n2-adjudication',
+      prompt: '请基于应交税费底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────

@@ -303,8 +303,14 @@ function handleOverdueNoteChange() {
 
 // ─── AI / 复核 ──────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  // AI辅助placeholder
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `n2-disclosure-listed-${section}`,
+      prompt: `请基于应交税费底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

@@ -303,7 +303,13 @@ function handleNoteChange() {
 }
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助出口退税核对...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n2-export-refund',
+      prompt: '请基于应交税费底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

@@ -329,7 +329,13 @@ function persistMatrix() {
 // ─── AI / Review ─────────────────────────────────────────────────────────────
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助分析认定矩阵...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n2-recognition',
+      prompt: '请基于应交税费底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

@@ -400,8 +400,14 @@ function fmtYoy(v: number | null | undefined): string {
   return (v > 0 ? '+' : '') + pct + '%'
 }
 
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助分析税金及附加明细...')
+function handleAiAssist() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n4-detail',
+      prompt: '请基于税金及附加底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 </script>
 

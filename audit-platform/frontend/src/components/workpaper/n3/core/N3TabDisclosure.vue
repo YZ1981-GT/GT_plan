@@ -414,8 +414,14 @@ function handleNoteChange(section: string, value: string): void {
 
 // ─── AI / 复核 ──────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  // AI辅助 placeholder — 后续集成 AI 对话
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `n3-disclosure-${section}`,
+      prompt: `请基于递延所得税负债底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

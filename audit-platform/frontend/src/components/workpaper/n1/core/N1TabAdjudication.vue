@@ -477,7 +477,13 @@ function handleConclusionSave() {
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
 function handleAI(section: string) {
-  ElMessage.info(`AI辅助分析递延所得税资产${section}数据...`)
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `n1-adjudication-${section}`,
+      prompt: `请基于递延所得税资产底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 </script>
 

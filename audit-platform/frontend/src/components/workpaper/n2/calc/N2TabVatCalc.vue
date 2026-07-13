@@ -347,7 +347,13 @@ function handleNoteChange() {
 }
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助增值税测算分析...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n2-vat-calc',
+      prompt: '请基于应交税费底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

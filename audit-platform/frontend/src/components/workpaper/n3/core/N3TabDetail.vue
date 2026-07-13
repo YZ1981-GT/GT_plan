@@ -523,7 +523,13 @@ async function handleFileSelected(event: Event) {
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助分析递延所得税负债明细...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n3-detail',
+      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

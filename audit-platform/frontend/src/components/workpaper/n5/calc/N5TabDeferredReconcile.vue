@@ -294,8 +294,24 @@ function getSummaries({ columns }: { columns: any[] }) {
 
 async function saveNotes() { await formData.setField('8', 'audit-notes', auditNotes.value) }
 async function saveConclusion() { await formData.setField('8', 'audit-conclusion', auditConclusion.value) }
-function handleAiAssist() { ElMessage.info('AI辅助分析递延所得税核对...') }
-function handleNotesAi() { ElMessage.info('AI辅助生成审计说明...') }
+function handleAiAssist() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-deferred-reconcile',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
+function handleNotesAi() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-deferred-reconcile',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog ? openReviewDialog('N5-8-递延核对') : ElMessage.info('复核对话未配置') }
 
 function fmtAmount(val: number | null | undefined): string {

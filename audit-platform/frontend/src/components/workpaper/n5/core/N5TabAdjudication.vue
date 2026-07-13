@@ -264,8 +264,24 @@ async function handleWritebackTB() {
 async function handleNotesSave() { await formData.setField('1', 'audit-notes', auditNotes.value) }
 async function handleConclusionSave() { await formData.setField('1', 'audit-conclusion', auditConclusion.value) }
 
-function handleAiAssist() { ElMessage.info('AI辅助分析所得税费用审定表...') }
-function handleNotesAi() { ElMessage.info('AI辅助生成审计说明...') }
+function handleAiAssist() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-adjudication',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
+function handleNotesAi() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-adjudication',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog ? openReviewDialog('N5-1-审定表') : ElMessage.info('复核对话未配置') }
 
 function getSummaries({ columns }: { columns: any[] }) {

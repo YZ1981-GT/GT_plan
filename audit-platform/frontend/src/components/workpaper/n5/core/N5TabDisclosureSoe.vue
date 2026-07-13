@@ -209,8 +209,24 @@ async function handleSupplementSave() {
 
 async function saveNotes() { await formData.setField('disclosure-soe', 'audit-notes', auditNotes.value) }
 async function saveConclusion() { await formData.setField('disclosure-soe', 'audit-conclusion', auditConclusion.value) }
-function handleAiAssist() { ElMessage.info('AI辅助生成国企附注披露...') }
-function handleSupplementAi() { ElMessage.info('AI辅助生成补充说明...') }
+function handleAiAssist() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-disclosure-soe',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
+function handleSupplementAi() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-disclosure-soe',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog ? openReviewDialog('N5-附注国企') : ElMessage.info('复核对话未配置') }
 
 function fmtAmount(val: number | null | undefined): string {

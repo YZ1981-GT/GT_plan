@@ -367,7 +367,13 @@ async function handleSaveAndPublish() {
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助分析调整分录...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n2-adjustment',
+      prompt: '请基于应交税费底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {

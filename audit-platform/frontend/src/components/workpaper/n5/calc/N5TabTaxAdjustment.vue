@@ -304,8 +304,24 @@ function handleImportExportCmd(cmd: string) {
 
 async function saveNotes() { await formData.setField('5', 'audit-notes', auditNotes.value) }
 async function saveConclusion() { await formData.setField('5', 'audit-conclusion', auditConclusion.value) }
-function handleAiAssist() { ElMessage.info('AI辅助分析纳税调整项...') }
-function handleNotesAi() { ElMessage.info('AI辅助生成审计说明...') }
+function handleAiAssist() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-tax-adjustment',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
+function handleNotesAi() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n5-tax-adjustment',
+      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog ? openReviewDialog('N5-5-纳税调整明细') : ElMessage.info('复核对话未配置') }
 
 function fmtAmount(val: number | null | undefined): string {

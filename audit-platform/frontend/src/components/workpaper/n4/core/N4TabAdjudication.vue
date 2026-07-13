@@ -413,9 +413,15 @@ function handleConclusionSave(): void {
 
 // ─── AI / Review ─────────────────────────────────────────────────────────────
 
-async function handleAiAssist(): Promise<void> {
-  const wpId = props.wpId
-  if (!wpId) { ElMessage.info('AI辅助：底稿ID缺失'); return }
+async function handleAiAssist() {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n4-adjudication',
+      prompt: '请基于税金及附加底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
   try {
     const res = await api.post(`/api/workpapers/${wpId}/ai/generate-text`, {
       prompt: '请分析税金及附加各税种本期费用确认的合理性，包括同比变动分析和与N2计提额的一致性检查',

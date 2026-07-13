@@ -536,8 +536,14 @@ async function handleSaveAndPublish() {
 
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  ElMessage.info('AI辅助分析递延所得税资产调整分录...')
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `n1-adjustment-${section}`,
+      prompt: `请基于递延所得税资产底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 // ─── 格式化金额 ──────────────────────────────────────────────────────────────

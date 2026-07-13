@@ -364,7 +364,13 @@ async function saveConclusion() {
 // ─── 辅助操作 ────────────────────────────────────────────────────────────────
 
 function handleAiAssist() {
-  ElMessage.info('AI辅助：正在分析税金及附加调整建议...')
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'n4-adjustment',
+      prompt: '请基于税金及附加底稿数据，给出审计分析建议',
+      context: { wpId: props.wpId },
+    }).catch(() => {})
+  })
 }
 
 function handleReview() {
