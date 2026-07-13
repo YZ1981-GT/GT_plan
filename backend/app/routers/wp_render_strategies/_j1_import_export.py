@@ -34,7 +34,7 @@ from app.deps import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["j1-import-export"])
 
-SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly"}
+SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher"}
 
 # ─── J1-2 明细表 14 列定义 ────────────────────────────────────────────────────
 
@@ -94,6 +94,148 @@ CHECK_COLUMNS = {
     "non_monetary": ["日期", "凭证种类", "凭证编号", "业务内容", "明细科目", "对方科目", "借方", "贷方", "附件", "非货币性福利形式", "实物来源", "结论"],
     "severance": ["日期", "凭证种类", "凭证编号", "业务内容", "明细科目", "对方明细科目", "借方", "贷方", "附件", "结论"],
 }
+
+# ─── J1-8 检查表（凭证级测试）列定义（对齐源模板：记账凭证+外部单据+核对） ──────────
+# 贷方检查（计提/增加）— occurrenceRows；外部单据=职工薪酬计算表
+VOUCHER_CREDIT_COLUMNS = [
+    "序号", "薪酬项目", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "贷方金额",
+    "人数", "审批人",
+    "计算表-月份", "计算表-金额", "计算表-是否恰当审批",
+    "核对1原始凭证齐全", "核对2记账相符", "核对3科目正确", "核对4计算准确", "核对5截止正确",
+    "索引号", "是否异常", "备注",
+]
+# 借方检查（发放/减少）/ 期后支付 — postCollectionRows / postPeriodRows；外部单据=付款审批单+银行回单
+VOUCHER_DEBIT_COLUMNS = [
+    "序号", "薪酬项目", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "借方金额",
+    "人数", "审批人",
+    "审批单-日期编号", "审批单-是否恰当审批",
+    "银行回单-日期", "银行回单-摘要说明", "银行回单-金额",
+    "核对1付款审批单齐全", "核对2银行回单", "核对3代扣代缴", "核对4薪酬发放表相符", "核对5发放金额一致",
+    "索引号", "是否异常", "备注",
+]
+VOUCHER_SHEET_NAMES = {
+    "credit": "贷方检查(计提)",
+    "debit": "借方检查(发放)",
+    "post": "期后支付检查",
+}
+
+
+def _bool_cell(v) -> bool:
+    """Excel 单元格 → 布尔（是/√/true/1 视为 True）."""
+    if v is None:
+        return False
+    s = str(v).strip().lower()
+    return s in ("是", "√", "true", "1", "y", "yes", "√")
+
+
+def _voucher_row_to_excel(row: dict, direction: str) -> list:
+    """凭证行 dict → Excel 行值（按方向选列结构）."""
+    ev = row.get("evidence") or {}
+    calc = ev.get("calc") or {}
+    approval = ev.get("approval") or {}
+    bank = ev.get("bank") or {}
+    checks = row.get("checks") or [False] * 5
+    checks = (list(checks) + [False] * 5)[:5]
+    chk = ["是" if c else "" for c in checks]
+    base = [
+        row.get("debtorName", ""), row.get("date", ""), row.get("voucherNo", ""),
+        row.get("businessContent", ""), row.get("offsetAccount", ""), row.get("offsetSubAccount", ""),
+    ]
+    tail = [row.get("indexNo", ""), "是" if row.get("abnormal") else "", row.get("remark", "")]
+    if direction == "credit":
+        return [
+            *base,
+            _to_num(row.get("creditAmount")), row.get("staffCount", ""), row.get("approver", ""),
+            calc.get("month", ""), calc.get("amount", ""), calc.get("approved", ""),
+            *chk, *tail,
+        ]
+    return [
+        *base,
+        _to_num(row.get("debitAmount")), row.get("staffCount", ""), row.get("approver", ""),
+        approval.get("dateNo", ""), approval.get("approved", ""),
+        bank.get("date", ""), bank.get("summary", ""), bank.get("amount", ""),
+        *chk, *tail,
+    ]
+
+
+def _excel_to_voucher_row(vals: list, direction: str, seq: int) -> dict:
+    """Excel 行值 → 凭证行 dict（跳过序号列）."""
+    # vals 已跳过序号列（从第2列开始）
+    g = lambda i: vals[i] if i < len(vals) and vals[i] is not None else ""  # noqa: E731
+    checks_start = 12 if direction == "credit" else 14
+    checks = [_bool_cell(g(checks_start + k)) for k in range(5)]
+    idx_off = checks_start + 5
+    row = {
+        "id": f"j1vc-imp-{direction}-{seq}",
+        "debtorName": str(g(0)), "date": str(g(1)), "voucherNo": str(g(2)),
+        "businessContent": str(g(3)), "offsetAccount": str(g(4)), "offsetSubAccount": str(g(5)),
+        "creditAmount": 0, "debitAmount": 0,
+        "staffCount": g(7), "approver": str(g(8)),
+        "supportingDoc": "", "checks": checks,
+        "indexNo": str(g(idx_off)), "abnormal": _bool_cell(g(idx_off + 1)), "remark": str(g(idx_off + 2)),
+    }
+    if direction == "credit":
+        row["creditAmount"] = _to_num(g(6))
+        row["evidence"] = {
+            "calc": {"month": str(g(9)), "amount": _to_num(g(10)), "approved": str(g(11))},
+            "approval": {"dateNo": "", "approved": ""},
+            "bank": {"date": "", "summary": "", "amount": 0},
+        }
+    else:
+        row["debitAmount"] = _to_num(g(6))
+        row["evidence"] = {
+            "calc": {"month": "", "amount": 0, "approved": ""},
+            "approval": {"dateNo": str(g(9)), "approved": str(g(10))},
+            "bank": {"date": str(g(11)), "summary": str(g(12)), "amount": _to_num(g(13))},
+        }
+    return row
+
+
+def _build_voucher_template_wb(vc_data: dict | None = None, post_rows: list | None = None) -> Workbook:
+    """构建 J1-8 检查表工作簿（贷方检查/借方检查/期后支付 + 编制说明）."""
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    sections = [
+        ("credit", VOUCHER_CREDIT_COLUMNS, (vc_data or {}).get("occurrenceRows") or []),
+        ("debit", VOUCHER_DEBIT_COLUMNS, (vc_data or {}).get("postCollectionRows") or []),
+        ("post", VOUCHER_DEBIT_COLUMNS, post_rows or []),
+    ]
+    for direction, columns, rows in sections:
+        ws = wb.create_sheet(title=VOUCHER_SHEET_NAMES[direction])
+        ws.append(columns)
+        _style_header(ws, 1, len(columns))
+        for i, r in enumerate(rows, start=1):
+            ws.append([i, *_voucher_row_to_excel(r, direction)])
+        for col_idx in range(1, len(columns) + 1):
+            ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = 14
+
+    # 编制说明
+    ws_note = wb.create_sheet(title="编制说明")
+    ws_note["A1"] = "J1-8 应付职工薪酬检查表 — 编制说明"
+    ws_note["A1"].font = Font(name="微软雅黑", size=14, bold=True)
+    notes = [
+        "",
+        "一、表格结构（3个数据sheet + 本说明）",
+        "  Sheet「贷方检查(计提)」：本期计提/增加凭证，外部单据=职工薪酬计算表(月份/金额/是否恰当审批)",
+        "  Sheet「借方检查(发放)」：本期发放/减少凭证，外部单据=付款审批单(日期编号/是否恰当审批)+银行回单(日期/摘要/金额)",
+        "  Sheet「期后支付检查」：资产负债表日后支付凭证，用于验证完整性（是否漏提），列结构同借方检查",
+        "",
+        "二、核对内容（5项，填「是」表示已核对通过，留空表示未通过/不适用）",
+        "  贷方：①原始凭证齐全 ②记账凭证与原始凭证相符 ③会计科目正确 ④金额计算准确 ⑤截止期间正确",
+        "  借方/期后：①付款审批单齐全 ②银行回单/转账凭证 ③代扣代缴凭证 ④与薪酬发放表相符 ⑤发放金额与审批一致",
+        "",
+        "三、导入说明",
+        "  1. 按 sheet 名匹配三区（贷方检查/借方检查/期后支付），序号列自动生成可留空",
+        "  2. 「是否异常」「是否恰当审批」等列填「是」或留空",
+        "  3. 金额列为数字；空行（薪酬项目为空）自动跳过",
+        "  4. 导入不覆盖「样本选取标准」与「审计说明/结论」，仅替换三区凭证明细",
+        "  5. 科目 2211 应付职工薪酬（贷方/负债类），期末=期初+贷方-借方",
+    ]
+    for i, line in enumerate(notes, start=2):
+        ws_note.cell(row=i, column=1, value=line)
+    ws_note.column_dimensions["A"].width = 90
+    return wb
 
 # ─── 样式 ─────────────────────────────────────────────────────────────────────
 
@@ -384,6 +526,8 @@ async def export_template(
         wb = _build_detail_template_wb()
     elif sheet_type == "monthly":
         wb = _build_monthly_template_wb()
+    elif sheet_type == "voucher":
+        wb = _build_voucher_template_wb()
     else:
         wb = Workbook()
         ws = wb.active
@@ -453,6 +597,30 @@ async def export_data(
             except (json.JSONDecodeError, TypeError):
                 pass
         wb = _build_monthly_template_wb(monthly_data)
+    elif sheet_type == "voucher":
+        # 读 J1-8 凭证检查数据（J1-8-voucher-check + J1-8-post-period）
+        vc_data, post_rows = None, None
+        r1 = await db.execute(
+            sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"),
+            {"wp_id": wp_id, "iid": "J1-8-voucher-check"},
+        )
+        row1 = r1.fetchone()
+        if row1 and row1.remark:
+            try:
+                vc_data = json.loads(row1.remark)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        r2 = await db.execute(
+            sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"),
+            {"wp_id": wp_id, "iid": "J1-8-post-period"},
+        )
+        row2 = r2.fetchone()
+        if row2 and row2.remark:
+            try:
+                post_rows = json.loads(row2.remark)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        wb = _build_voucher_template_wb(vc_data, post_rows)
     else:
         # 检查表类 - 走原有逻辑
         item_id = f"J1-{sheet_type}-data"
@@ -664,6 +832,65 @@ async def import_data(
 
         await db.commit()
         return {"imported_count": total_imported, "sheet_type": sheet_type}
+    elif sheet_type == "voucher":
+        # 导入 J1-8 凭证检查三区（贷方检查/借方检查/期后支付）
+        name_to_dir = {v: k for k, v in VOUCHER_SHEET_NAMES.items()}
+        parsed = {"credit": [], "debit": [], "post": []}
+        for sheet_name in wb.sheetnames:
+            direction = name_to_dir.get(sheet_name)
+            if not direction:
+                continue
+            ws = wb[sheet_name]
+            seq = 0
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                if not row:
+                    continue
+                vals = list(row[1:])  # 跳过序号列
+                # 整行全空才跳过（任一业务列有值即保留）
+                if not vals or not any(v is not None and str(v).strip() != "" for v in vals):
+                    continue
+                seq += 1
+                parsed[direction].append(_excel_to_voucher_row(vals, direction, seq))
+
+        # 读 project_id（checklist_responses.project_id NOT NULL）
+        pid_res = await db.execute(
+            sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+            {"wp_id": wp_id},
+        )
+        pid_row = pid_res.fetchone()
+        project_id = str(pid_row.project_id) if pid_row and pid_row.project_id else None
+
+        # 读现有 J1-8-voucher-check，保留 criteria/auditNote/conclusion，仅替换三区明细
+        existing = {}
+        r_exist = await db.execute(
+            sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"),
+            {"wp_id": wp_id, "iid": "J1-8-voucher-check"},
+        )
+        row_e = r_exist.fetchone()
+        if row_e and row_e.remark:
+            try:
+                existing = json.loads(row_e.remark) or {}
+            except (json.JSONDecodeError, TypeError):
+                existing = {}
+        existing["occurrenceRows"] = parsed["credit"]
+        existing["postCollectionRows"] = parsed["debit"]
+        _upsert_sql = sa.text(
+            "INSERT INTO checklist_responses (wp_id, project_id, item_id, remark) "
+            "VALUES (:wp_id, :pid, :iid, :remark) "
+            "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
+        )
+        await db.execute(_upsert_sql, {
+            "wp_id": wp_id, "pid": project_id, "iid": "J1-8-voucher-check",
+            "remark": json.dumps(existing, ensure_ascii=False),
+        })
+        # 期后支付独立存储
+        await db.execute(_upsert_sql, {
+            "wp_id": wp_id, "pid": project_id, "iid": "J1-8-post-period",
+            "remark": json.dumps(parsed["post"], ensure_ascii=False),
+        })
+        await db.commit()
+        total = len(parsed["credit"]) + len(parsed["debit"]) + len(parsed["post"])
+        return {"imported_count": total, "sheet_type": sheet_type}
     else:
         # 检查表类 — 原有逻辑
         ws = wb.active

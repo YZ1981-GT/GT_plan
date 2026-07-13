@@ -25,6 +25,16 @@
       <h3 class="sheet-title">J1-8 应付职工薪酬检查表</h3>
       <div class="head-actions">
         <el-segmented v-model="viewMode" :options="viewOptions" size="small" />
+        <el-dropdown size="small" trigger="click">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('voucher')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('voucher')">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="triggerImport">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button size="small" type="primary" link @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -282,6 +292,7 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 import { useJ1VoucherOcr } from '@/composables/workpaper/j1/useJ1VoucherOcr'
+import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import J1VoucherCard from './J1VoucherCard.vue'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -323,6 +334,7 @@ const {
 } = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: ITEM_ID })
 
 const { ocrLoadingId, uploadAndMerge } = useJ1VoucherOcr(computed(() => props.wpId))
+const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
 
 // 借方检查的核对内容标签（发放）
 const debitCheckLabels = [
@@ -407,7 +419,7 @@ function onCardUpload(payload: { rowId: string; file: File; evidenceKey: string 
 }
 
 // ─── selfLoad 从 checklist-responses 恢复 ────────────────────────────────────
-onMounted(async () => {
+async function reloadFromServer() {
   try {
     const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
     const items: Array<{ item_id: string; remark?: string; conclusion?: string }> = res.data?.data || res.data || []
@@ -423,7 +435,22 @@ onMounted(async () => {
   } catch (e) {
     console.warn('[J1-8] selfLoad failed:', e)
   }
-})
+}
+onMounted(reloadFromServer)
+
+// 导入数据（xlsx）→ 成功后从服务端重载三区
+function triggerImport() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0]
+    if (!f) return
+    const ok = await importData('voucher', f)
+    if (ok) await reloadFromServer()
+  }
+  input.click()
+}
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 let persistTimer: ReturnType<typeof setTimeout> | null = null
