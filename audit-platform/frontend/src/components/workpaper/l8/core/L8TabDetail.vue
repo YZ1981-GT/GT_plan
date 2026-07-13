@@ -220,6 +220,19 @@
       <span class="cross-wp-desc">未确认融资费用摊销</span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写财务费用明细审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l8-details-tip">
       <summary>编制提示</summary>
@@ -358,6 +371,14 @@ function handleImportExport(command: string) {
   }
 }
 
+// ─── Audit Note ──────────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+
+function saveAuditNote() {
+  formData.debouncedSave('L8-2-auditNote', { remark: auditNote.value || null })
+}
+
 function handleAI(section: string) {
   import('@/utils/http').then(({ default: h }) => {
     h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
@@ -421,6 +442,8 @@ function _restoreRows() {
 .cross-wp-links { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #d9ecff; border-radius: 6px; flex-wrap: wrap; }
 .cross-wp-label { font-size: 12px; color: #409eff; font-weight: 500; }
 .cross-wp-desc { font-size: 12px; color: #909399; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .l8-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l8-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l8-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }

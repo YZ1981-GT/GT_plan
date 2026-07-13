@@ -88,6 +88,19 @@
       />
     </el-card>
 
+    <!-- ═══ 核对结论 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">核对结论</span>
+          <el-button size="small" @click="handleAI('conclusion')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写附注核对结论..." :disabled="isReadonly" @change="saveConclusion" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="l7-details-tip">
       <summary>编制提示</summary>
@@ -161,6 +174,14 @@ function handleSoeNoteChange() {
   formData.debouncedSave('L7-disclosure-soe-special', { remark: soeSpecialNote.value || null })
 }
 
+// ─── Conclusion ──────────────────────────────────────────────────────────────
+
+const conclusion = ref('')
+
+function saveConclusion() {
+  formData.debouncedSave('L7-disc-soe-conclusion', { remark: conclusion.value || null })
+}
+
 function handleAI(section: string) {
   import('@/utils/http').then(({ default: h }) => {
     h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
@@ -204,6 +225,8 @@ onUnmounted(() => {
 .disclosure-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+.conclusion-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .l7-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .l7-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .l7-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
