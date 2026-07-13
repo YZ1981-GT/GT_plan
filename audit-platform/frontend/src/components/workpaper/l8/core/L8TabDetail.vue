@@ -60,7 +60,22 @@
     </el-alert>
 
     <!-- ═══ 区段Tab切换器 ═══ -->
-    <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" class="segment-switcher" />
+    <div style="display:flex;align-items:center;margin-bottom:12px">
+      <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" />
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" style="margin-left:8px">⚙ 列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">当前区段列显隐</div>
+          <template v-for="col in currentSegmentCols" :key="col.key">
+            <el-checkbox v-model="col.visible" size="small" @change="persistColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-divider style="margin:6px 0" />
+          <el-button size="small" link @click="resetColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
+    </div>
 
     <!-- ═══ 明细表主体 ═══ -->
     <el-table :data="computedRows" border size="small" style="width: 100%" highlight-current-row>
@@ -74,7 +89,7 @@
 
       <!-- ═══ 区段1: 费用项目信息 ═══ -->
       <template v-if="activeSegment === 'items'">
-        <el-table-column label="与相关科目勾稽" min-width="200">
+        <el-table-column v-if="isColVisible('crossRef')" label="与相关科目勾稽" min-width="200">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.crossRef" size="small" placeholder="如:短期借款利息/L1" @change="(val: string) => handleUpdate($index, 'crossRef', val)" />
             <span v-else>{{ row.crossRef || '—' }}</span>
@@ -84,30 +99,31 @@
 
       <!-- ═══ 区段2: 月度金额（1月~12月） ═══ -->
       <template v-if="activeSegment === 'monthly'">
-        <el-table-column
-          v-for="m in 12"
-          :key="`month-${m}`"
-          :label="`${m}月`"
-          width="100"
-          align="right"
-        >
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.monthly[m - 1]"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => handleMonthlyUpdate($index, m - 1, val ?? 0)"
-            />
-            <span v-else>{{ fmtAmount(row.monthly[m - 1]) }}</span>
-          </template>
-        </el-table-column>
+        <template v-for="m in 12" :key="`month-${m}`">
+          <el-table-column
+            v-if="isMonthVisible(m - 1)"
+            :label="`${m}月`"
+            width="100"
+            align="right"
+          >
+            <template #default="{ row, $index }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.monthly[m - 1]"
+                :controls="false"
+                size="small"
+                style="width: 100%"
+                @change="(val: number | undefined) => handleMonthlyUpdate($index, m - 1, val ?? 0)"
+              />
+              <span v-else>{{ fmtAmount(row.monthly[m - 1]) }}</span>
+            </template>
+          </el-table-column>
+        </template>
       </template>
 
       <!-- ═══ 区段3: 期末汇总+审定 ═══ -->
       <template v-if="activeSegment === 'summary'">
-        <el-table-column label="本期未审" width="130" align="right">
+        <el-table-column v-if="isColVisible('periodUnadjusted')" label="本期未审" width="130" align="right">
           <template #header>
             <el-tooltip content="公式: SUM(1月~12月)" placement="top">
               <span class="formula-col-header">本期未审</span>
@@ -118,21 +134,21 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="AJE" width="110" align="right">
+        <el-table-column v-if="isColVisible('aje')" label="AJE" width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.aje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'aje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.aje) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="RJE" width="110" align="right">
+        <el-table-column v-if="isColVisible('rje')" label="RJE" width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.rje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'rje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.rje) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="本期审定" width="130" align="right">
+        <el-table-column v-if="isColVisible('periodAudited')" label="本期审定" width="130" align="right">
           <template #header>
             <el-tooltip content="公式: 未审合计 + AJE + RJE" placement="top">
               <span class="formula-col-header">本期审定</span>
@@ -143,7 +159,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="占比" width="80" align="right">
+        <el-table-column v-if="isColVisible('ratio')" label="占比" width="80" align="right">
           <template #header>
             <el-tooltip content="公式: 本期审定/合计×100%" placement="top">
               <span class="formula-col-header">占比</span>
@@ -154,28 +170,28 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="上期未审" width="110" align="right">
+        <el-table-column v-if="isColVisible('priorUnadjusted')" label="上期未审" width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorUnadjusted', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.priorUnadjusted) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="上期AJE" width="100" align="right">
+        <el-table-column v-if="isColVisible('priorAje')" label="上期AJE" width="100" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorAje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.priorAje) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="上期RJE" width="100" align="right">
+        <el-table-column v-if="isColVisible('priorRje')" label="上期RJE" width="100" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'priorRje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.priorRje) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="上期审定" width="130" align="right">
+        <el-table-column v-if="isColVisible('priorAudited')" label="上期审定" width="130" align="right">
           <template #header>
             <el-tooltip content="公式: 上期未审+上期AJE+上期RJE" placement="top">
               <span class="formula-col-header">上期审定</span>
@@ -258,7 +274,7 @@
  * - 公式列：虚线下划线 + cursor:help + tooltip
  * - 与L8-1审定表交叉验证
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, reactive } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
@@ -330,6 +346,70 @@ const { exportTemplate, exportData, importData } = useL8ImportExport({
 // ─── Segment options ─────────────────────────────────────────────────────────
 
 const segmentOptions = L8_DETAIL_SEGMENTS.map(s => ({ label: s.label, value: s.key }))
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const COL_PREFS_KEY = 'l8-2-column-prefs'
+interface ColPref { key: string; label: string; visible: boolean }
+const colPrefs = reactive<Record<string, ColPref[]>>({
+  items: [
+    { key: 'crossRef', label: '与相关科目勾稽', visible: true },
+  ],
+  monthly: [
+    { key: 'month1', label: '1月', visible: true },
+    { key: 'month2', label: '2月', visible: true },
+    { key: 'month3', label: '3月', visible: true },
+    { key: 'month4', label: '4月', visible: true },
+    { key: 'month5', label: '5月', visible: true },
+    { key: 'month6', label: '6月', visible: true },
+    { key: 'month7', label: '7月', visible: true },
+    { key: 'month8', label: '8月', visible: true },
+    { key: 'month9', label: '9月', visible: true },
+    { key: 'month10', label: '10月', visible: true },
+    { key: 'month11', label: '11月', visible: true },
+    { key: 'month12', label: '12月', visible: true },
+  ],
+  summary: [
+    { key: 'periodUnadjusted', label: '本期未审', visible: true },
+    { key: 'aje', label: 'AJE', visible: true },
+    { key: 'rje', label: 'RJE', visible: true },
+    { key: 'periodAudited', label: '本期审定', visible: true },
+    { key: 'ratio', label: '占比', visible: true },
+    { key: 'priorUnadjusted', label: '上期未审', visible: true },
+    { key: 'priorAje', label: '上期AJE', visible: true },
+    { key: 'priorRje', label: '上期RJE', visible: true },
+    { key: 'priorAudited', label: '上期审定', visible: true },
+  ],
+})
+const currentSegmentCols = computed(() => colPrefs[activeSegment.value] || [])
+function isColVisible(key: string): boolean {
+  const seg = colPrefs[activeSegment.value]
+  if (!seg) return true
+  const col = seg.find(c => c.key === key)
+  return col?.visible ?? true
+}
+function isMonthVisible(monthIndex: number): boolean {
+  return isColVisible(`month${monthIndex + 1}`)
+}
+function persistColPrefs(): void {
+  try { localStorage.setItem(COL_PREFS_KEY, JSON.stringify(Object.fromEntries(Object.entries(colPrefs).map(([k, v]) => [k, v.map(c => ({ key: c.key, visible: c.visible }))])))) } catch {}
+}
+function resetColPrefs(): void {
+  for (const cols of Object.values(colPrefs)) cols.forEach(c => { c.visible = true })
+  persistColPrefs()
+}
+;(function loadColPrefs() {
+  try {
+    const saved = localStorage.getItem(COL_PREFS_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    for (const [seg, prefs] of Object.entries(data as Record<string, Array<{ key: string; visible: boolean }>>)) {
+      const target = colPrefs[seg]
+      if (!target) continue
+      for (const p of prefs) { const col = target.find(c => c.key === p.key); if (col) col.visible = p.visible }
+    }
+  } catch {}
+})()
 
 // ─── Cross-sheet ─────────────────────────────────────────────────────────────
 
@@ -433,6 +513,9 @@ function _restoreRows() {
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .cross-sheet-alert { margin-bottom: 12px; }
 .segment-switcher { margin-bottom: 12px; }
+.col-prefs { max-height: 280px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .formula-value--primary { color: #67c23a; font-weight: 600; }

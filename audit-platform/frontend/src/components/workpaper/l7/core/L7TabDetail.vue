@@ -61,7 +61,22 @@
     </el-alert>
 
     <!-- ═══ 区段Tab切换器 ═══ -->
-    <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" class="segment-switcher" />
+    <div style="display:flex;align-items:center;margin-bottom:12px">
+      <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" />
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" style="margin-left:8px">⚙ 列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">当前区段列显隐</div>
+          <template v-for="col in currentSegmentCols" :key="col.key">
+            <el-checkbox v-model="col.visible" size="small" @change="persistColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-divider style="margin:6px 0" />
+          <el-button size="small" link @click="resetColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
+    </div>
 
     <!-- ═══ 明细表主体 ═══ -->
     <el-table :data="computedRows" border size="small" style="width: 100%" highlight-current-row>
@@ -75,43 +90,43 @@
 
       <!-- ═══ 区段1: 项目信息 ═══ -->
       <template v-if="activeSegment === 'project-info'">
-        <el-table-column label="性质" min-width="130">
+        <el-table-column v-if="isColVisible('nature')" label="性质" min-width="130">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.nature" size="small" @change="(val: string) => handleUpdate($index, 'nature', val)" />
             <span v-else>{{ row.nature || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="形成原因" min-width="180">
+        <el-table-column v-if="isColVisible('reason')" label="形成原因" min-width="180">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.reason" size="small" @change="(val: string) => handleUpdate($index, 'reason', val)" />
             <span v-else>{{ row.reason || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="到期情况" min-width="130">
+        <el-table-column v-if="isColVisible('maturityInfo')" label="到期情况" min-width="130">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.maturityInfo" size="small" @change="(val: string) => handleUpdate($index, 'maturityInfo', val)" />
             <span v-else>{{ row.maturityInfo || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初未审" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('beginUnadjusted')" label="期初未审" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginUnadjusted" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'beginUnadjusted', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.beginUnadjusted) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初AJE" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('beginAje')" label="期初AJE" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginAje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'beginAje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.beginAje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初RJE" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('beginRje')" label="期初RJE" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginRje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'beginRje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.beginRje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初审定" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('beginAudited')" label="期初审定" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期初未审+期初AJE−期初RJE" placement="top">
               <span class="formula-col-header">期初审定</span>
@@ -125,43 +140,43 @@
 
       <!-- ═══ 区段2: 金额变动 ═══ -->
       <template v-if="activeSegment === 'amount-movement'">
-        <el-table-column label="本期AJE增加" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('ajeIncrease')" label="本期AJE增加" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.ajeIncrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'ajeIncrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.ajeIncrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期RJE增加" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('rjeIncrease')" label="本期RJE增加" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.rjeIncrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'rjeIncrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.rjeIncrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末AJE增" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('endAjeIncrease')" label="期末AJE增" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.endAjeIncrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'endAjeIncrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.endAjeIncrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末RJE减" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('endRjeDecrease')" label="期末RJE减" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.endRjeDecrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'endRjeDecrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.endRjeDecrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末AJE减" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('endAjeDecrease')" label="期末AJE减" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.endAjeDecrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'endAjeDecrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.endAjeDecrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末RJE增" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('endRjeIncrease')" label="期末RJE增" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.endRjeIncrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'endRjeIncrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.endRjeIncrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末未审" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('endUnadjusted')" label="期末未审" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期初未审+本期AJE增+本期RJE增" placement="top">
               <span class="formula-col-header">期末未审</span>
@@ -171,7 +186,7 @@
             <span class="formula-value">{{ fmtAmount(row.endUnadjusted) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末AJE" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('endAje')" label="期末AJE" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期初AJE+期末AJE增+期末AJE减" placement="top">
               <span class="formula-col-header">期末AJE</span>
@@ -181,7 +196,7 @@
             <span class="formula-value">{{ fmtAmount(row.endAje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末RJE" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('endRje')" label="期末RJE" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期初RJE+期末RJE减+期末RJE增" placement="top">
               <span class="formula-col-header">期末RJE</span>
@@ -191,7 +206,7 @@
             <span class="formula-value">{{ fmtAmount(row.endRje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末审定" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('endAudited')" label="期末审定" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期末未审+期末AJE−期末RJE" placement="top">
               <span class="formula-col-header">期末审定</span>
@@ -260,7 +275,7 @@
  * - 与L7-1审定表交叉验证（红色警告）using useL7CrossSheet.adjudicationVsDetail
  * - Font 13px, min-width自适应列
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, reactive } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useL7FormData } from '../../composables/useL7FormData'
@@ -309,6 +324,60 @@ const { adjudicationVsDetail } = useL7CrossSheet(formData.allResponses)
 // ─── Segment options ─────────────────────────────────────────────────────────
 
 const segmentOptions = L7_DETAIL_SEGMENTS.map(s => ({ label: s.label, value: s.key }))
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const COL_PREFS_KEY = 'l7-2-column-prefs'
+interface ColPref { key: string; label: string; visible: boolean }
+const colPrefs = reactive<Record<string, ColPref[]>>({
+  'project-info': [
+    { key: 'nature', label: '性质', visible: true },
+    { key: 'reason', label: '形成原因', visible: true },
+    { key: 'maturityInfo', label: '到期情况', visible: true },
+    { key: 'beginUnadjusted', label: '期初未审', visible: true },
+    { key: 'beginAje', label: '期初AJE', visible: true },
+    { key: 'beginRje', label: '期初RJE', visible: true },
+    { key: 'beginAudited', label: '期初审定', visible: true },
+  ],
+  'amount-movement': [
+    { key: 'ajeIncrease', label: '本期AJE增加', visible: true },
+    { key: 'rjeIncrease', label: '本期RJE增加', visible: true },
+    { key: 'endAjeIncrease', label: '期末AJE增', visible: true },
+    { key: 'endRjeDecrease', label: '期末RJE减', visible: true },
+    { key: 'endAjeDecrease', label: '期末AJE减', visible: true },
+    { key: 'endRjeIncrease', label: '期末RJE增', visible: true },
+    { key: 'endUnadjusted', label: '期末未审', visible: true },
+    { key: 'endAje', label: '期末AJE', visible: true },
+    { key: 'endRje', label: '期末RJE', visible: true },
+    { key: 'endAudited', label: '期末审定', visible: true },
+  ],
+})
+const currentSegmentCols = computed(() => colPrefs[activeSegment.value] || [])
+function isColVisible(key: string): boolean {
+  const seg = colPrefs[activeSegment.value]
+  if (!seg) return true
+  const col = seg.find(c => c.key === key)
+  return col?.visible ?? true
+}
+function persistColPrefs(): void {
+  try { localStorage.setItem(COL_PREFS_KEY, JSON.stringify(Object.fromEntries(Object.entries(colPrefs).map(([k, v]) => [k, v.map(c => ({ key: c.key, visible: c.visible }))])))) } catch {}
+}
+function resetColPrefs(): void {
+  for (const cols of Object.values(colPrefs)) cols.forEach(c => { c.visible = true })
+  persistColPrefs()
+}
+;(function loadColPrefs() {
+  try {
+    const saved = localStorage.getItem(COL_PREFS_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    for (const [seg, prefs] of Object.entries(data as Record<string, Array<{ key: string; visible: boolean }>>)) {
+      const target = colPrefs[seg]
+      if (!target) continue
+      for (const p of prefs) { const col = target.find(c => c.key === p.key); if (col) col.visible = p.visible }
+    }
+  } catch {}
+})()
 
 // ─── Cross-sheet validation ──────────────────────────────────────────────────
 
@@ -432,6 +501,9 @@ function _restoreRowsFromResponses() {
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .cross-sheet-alert { margin-bottom: 12px; }
 .segment-switcher { margin-bottom: 12px; }
+.col-prefs { max-height: 280px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .formula-value--primary { color: #67c23a; font-weight: 600; }

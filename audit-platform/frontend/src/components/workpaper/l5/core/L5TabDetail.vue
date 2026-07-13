@@ -48,7 +48,22 @@
     </div>
 
     <!-- ═══ 区段Tab切换器 ═══ -->
-    <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" class="segment-switcher" />
+    <div style="display:flex;align-items:center;margin-bottom:12px">
+      <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" />
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" style="margin-left:8px">⚙ 列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">当前区段列显隐</div>
+          <template v-for="col in currentSegmentCols" :key="col.key">
+            <el-checkbox v-model="col.visible" size="small" @change="persistColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-divider style="margin:6px 0" />
+          <el-button size="small" link @click="resetColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
+    </div>
 
     <!-- ═══ 明细表主体 ═══ -->
     <el-table :data="computedRows" border size="small" style="width: 100%" highlight-current-row>
@@ -62,25 +77,25 @@
 
       <!-- 未审数区段 -->
       <template v-if="activeSegment === 'unadjusted'">
-        <el-table-column label="债权人" min-width="140">
+        <el-table-column v-if="isColVisible('creditor')" label="债权人" min-width="140">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.creditor" size="small" @change="(val: string) => handleUpdate($index, 'creditor', val)" />
             <span v-else>{{ row.creditor || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="起始日" min-width="120">
+        <el-table-column v-if="isColVisible('startDate')" label="起始日" min-width="120">
           <template #default="{ row, $index }">
             <el-date-picker v-if="!isReadonly" :model-value="row.startDate" type="date" size="small" value-format="YYYY-MM-DD" style="width:100%" @change="(val: string) => handleUpdate($index, 'startDate', val)" />
             <span v-else>{{ row.startDate || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="到期日" min-width="120">
+        <el-table-column v-if="isColVisible('maturityDate')" label="到期日" min-width="120">
           <template #default="{ row, $index }">
             <el-date-picker v-if="!isReadonly" :model-value="row.maturityDate" type="date" size="small" value-format="YYYY-MM-DD" style="width:100%" @change="(val: string) => handleUpdate($index, 'maturityDate', val)" />
             <span v-else>{{ row.maturityDate || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="款项类型" min-width="130">
+        <el-table-column v-if="isColVisible('category')" label="款项类型" min-width="130">
           <template #default="{ row, $index }">
             <el-select v-if="!isReadonly" :model-value="row.category" size="small" style="width:100%" @change="(val: string) => handleUpdate($index, 'category', val)">
               <el-option label="融资租赁" value="融资租赁" />
@@ -90,13 +105,13 @@
             <span v-else>{{ row.category || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="名义金额" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('nominalAmount')" label="名义金额" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.nominalAmount" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'nominalAmount', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.nominalAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="折现率(%)" min-width="100" align="right">
+        <el-table-column v-if="isColVisible('discountRate')" label="折现率(%)" min-width="100" align="right">
           <template #header>
             <el-tooltip content="实际利率（EIR），与L5-5摊销一致" placement="top">
               <span class="formula-col-header">折现率(%)</span>
@@ -107,31 +122,31 @@
             <span v-else>{{ (row.discountRate * 100).toFixed(4) }}%</span>
           </template>
         </el-table-column>
-        <el-table-column label="现值" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('presentValue')" label="现值" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.presentValue" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'presentValue', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.presentValue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初余额" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('beginning')" label="期初余额" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginning" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'beginning', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.beginning) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期增加(贷方)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('periodIncrease')" label="本期增加(贷方)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.periodIncrease" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'periodIncrease', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.periodIncrease) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期偿还(借方)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('periodRepayment')" label="本期偿还(借方)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.periodRepayment" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'periodRepayment', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.periodRepayment) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('endBalance')" label="期末余额" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期初+本期增加(贷方)−本期偿还(借方)，负债类" placement="top">
               <span class="formula-col-header">期末余额</span>
@@ -145,25 +160,25 @@
 
       <!-- 调整区段 -->
       <template v-if="activeSegment === 'adjustment'">
-        <el-table-column label="未审数" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('unadjusted')" label="未审数" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.unadjusted" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'unadjusted', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.unadjusted) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="AJE" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('aje')" label="AJE" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.aje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'aje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.aje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="RJE" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('rje')" label="RJE" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.rje" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'rje', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.rje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定数" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('audited')" label="审定数" min-width="130" align="right">
           <template #header>
             <el-tooltip content="未审+AJE+RJE" placement="top">
               <span class="formula-col-header">审定数</span>
@@ -177,7 +192,7 @@
 
       <!-- 审定数区段 -->
       <template v-if="activeSegment === 'audited'">
-        <el-table-column label="币种" min-width="100">
+        <el-table-column v-if="isColVisible('currency')" label="币种" min-width="100">
           <template #default="{ row, $index }">
             <el-select v-if="!isReadonly" :model-value="row.currency" size="small" style="width:100%" @change="(val: string) => handleUpdate($index, 'currency', val)">
               <el-option label="CNY" value="CNY" />
@@ -187,13 +202,13 @@
             <span v-else>{{ row.currency || 'CNY' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="担保方式" min-width="160">
+        <el-table-column v-if="isColVisible('guaranteeType')" label="担保方式" min-width="160">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.guaranteeType" size="small" @change="(val: string) => handleUpdate($index, 'guaranteeType', val)" />
             <span v-else>{{ row.guaranteeType || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="200">
+        <el-table-column v-if="isColVisible('remark')" label="备注" min-width="200">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(val: string) => handleUpdate($index, 'remark', val)" />
             <span v-else>{{ row.remark || '—' }}</span>
@@ -248,7 +263,7 @@
  * L5TabDetail — L5-2 长期应付款明细表（30列·区段Tab）
  * Requirements: 3.1-3.6
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, reactive } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL5FormData } from '../../composables/useL5FormData'
 import { useL5Detail, type L5DetailRow, L5_DETAIL_SEGMENTS } from '../../composables/useL5Detail'
@@ -287,6 +302,63 @@ const {
 } = useL5Detail(formData, detailRows)
 
 const segmentOptions = L5_DETAIL_SEGMENTS.map(s => ({ label: s.label, value: s.key }))
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const COL_PREFS_KEY = 'l5-2-column-prefs'
+interface ColPref { key: string; label: string; visible: boolean }
+const colPrefs = reactive<Record<string, ColPref[]>>({
+  unadjusted: [
+    { key: 'creditor', label: '债权人', visible: true },
+    { key: 'startDate', label: '起始日', visible: true },
+    { key: 'maturityDate', label: '到期日', visible: true },
+    { key: 'category', label: '款项类型', visible: true },
+    { key: 'nominalAmount', label: '名义金额', visible: true },
+    { key: 'discountRate', label: '折现率', visible: true },
+    { key: 'presentValue', label: '现值', visible: true },
+    { key: 'beginning', label: '期初余额', visible: true },
+    { key: 'periodIncrease', label: '本期增加', visible: true },
+    { key: 'periodRepayment', label: '本期偿还', visible: true },
+    { key: 'endBalance', label: '期末余额', visible: true },
+  ],
+  adjustment: [
+    { key: 'unadjusted', label: '未审数', visible: true },
+    { key: 'aje', label: 'AJE', visible: true },
+    { key: 'rje', label: 'RJE', visible: true },
+    { key: 'audited', label: '审定数', visible: true },
+  ],
+  audited: [
+    { key: 'currency', label: '币种', visible: true },
+    { key: 'guaranteeType', label: '担保方式', visible: true },
+    { key: 'remark', label: '备注', visible: true },
+  ],
+})
+const currentSegmentCols = computed(() => colPrefs[activeSegment.value] || [])
+function isColVisible(key: string): boolean {
+  const seg = colPrefs[activeSegment.value]
+  if (!seg) return true
+  const col = seg.find(c => c.key === key)
+  return col?.visible ?? true
+}
+function persistColPrefs(): void {
+  try { localStorage.setItem(COL_PREFS_KEY, JSON.stringify(Object.fromEntries(Object.entries(colPrefs).map(([k, v]) => [k, v.map(c => ({ key: c.key, visible: c.visible }))])))) } catch {}
+}
+function resetColPrefs(): void {
+  for (const cols of Object.values(colPrefs)) cols.forEach(c => { c.visible = true })
+  persistColPrefs()
+}
+;(function loadColPrefs() {
+  try {
+    const saved = localStorage.getItem(COL_PREFS_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    for (const [seg, prefs] of Object.entries(data as Record<string, Array<{ key: string; visible: boolean }>>)) {
+      const target = colPrefs[seg]
+      if (!target) continue
+      for (const p of prefs) { const col = target.find(c => c.key === p.key); if (col) col.visible = p.visible }
+    }
+  } catch {}
+})()
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -331,6 +403,9 @@ onMounted(async () => {
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .segment-switcher { margin-bottom: 12px; }
+.col-prefs { max-height: 280px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }

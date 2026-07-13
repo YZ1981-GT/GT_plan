@@ -48,7 +48,22 @@
     </div>
 
     <!-- ═══ 区段Tab切换器 ═══ -->
-    <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" class="segment-switcher" />
+    <div style="display:flex;align-items:center;margin-bottom:12px">
+      <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" />
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" style="margin-left:8px">⚙ 列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">当前区段列显隐</div>
+          <template v-for="col in currentSegmentCols" :key="col.key">
+            <el-checkbox v-model="col.visible" size="small" @change="persistColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-divider style="margin:6px 0" />
+          <el-button size="small" link @click="resetColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
+    </div>
 
     <!-- ═══ L6-1交叉验证指示器 ═══ -->
     <div v-if="!crossSheet.isMatch.value" class="cross-validation-warning">
@@ -72,49 +87,49 @@
 
       <!-- ═══ 区段1: 项目信息 ═══ -->
       <template v-if="activeSegment === 'project-info'">
-        <el-table-column label="拨款来源" min-width="140">
+        <el-table-column v-if="isColVisible('fundSource')" label="拨款来源" min-width="140">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.fundSource" size="small" @change="(val: string) => handleUpdate($index, 'fundSource', val)" />
             <span v-else>{{ row.fundSource || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="批文号" min-width="130">
+        <el-table-column v-if="isColVisible('approvalNo')" label="批文号" min-width="130">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.approvalNo" size="small" @change="(val: string) => handleUpdate($index, 'approvalNo', val)" />
             <span v-else>{{ row.approvalNo || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="用途" min-width="160">
+        <el-table-column v-if="isColVisible('purpose')" label="用途" min-width="160">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.purpose" size="small" @change="(val: string) => handleUpdate($index, 'purpose', val)" />
             <span v-else>{{ row.purpose || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初余额" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('beginBalance')" label="期初余额" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'beginBalance', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.beginBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期拨入(贷方)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('creditIn')" label="本期拨入(贷方)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.creditIn" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'creditIn', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.creditIn) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期结转(借方)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('carryForward')" label="本期结转(借方)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.carryForward" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'carryForward', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.carryForward) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期返还(借方)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('refund')" label="本期返还(借方)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.refund" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'refund', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.refund) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('endBalance')" label="期末余额" min-width="130" align="right">
           <template #header>
             <el-tooltip content="期初+本期拨入(贷方)−本期结转(借方)−本期返还(借方)，负债类" placement="top">
               <span class="formula-col-header">期末余额</span>
@@ -128,7 +143,7 @@
 
       <!-- ═══ 区段2: 资金变动（AJE+RJE） ═══ -->
       <template v-if="activeSegment === 'fund-movement'">
-        <el-table-column label="AJE调整" align="center">
+        <el-table-column v-if="isColVisible('ajeBegin')" label="AJE调整" align="center">
           <el-table-column label="期初AJE" min-width="110" align="right">
             <template #default="{ row, $index }">
               <el-input-number v-if="!isReadonly" :model-value="row.ajeBegin" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'ajeBegin', val ?? 0)" />
@@ -154,7 +169,7 @@
             </template>
           </el-table-column>
         </el-table-column>
-        <el-table-column label="RJE调整" align="center">
+        <el-table-column v-if="isColVisible('rjeBegin')" label="RJE调整" align="center">
           <el-table-column label="期初RJE" min-width="110" align="right">
             <template #default="{ row, $index }">
               <el-input-number v-if="!isReadonly" :model-value="row.rjeBegin" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'rjeBegin', val ?? 0)" />
@@ -184,7 +199,7 @@
 
       <!-- ═══ 区段3: 用途核查 ═══ -->
       <template v-if="activeSegment === 'usage-check'">
-        <el-table-column label="审定期初" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('auditedBegin')" label="审定期初" min-width="120" align="right">
           <template #header>
             <el-tooltip content="审定期初=期初+期初AJE+期初RJE" placement="top">
               <span class="formula-col-header">审定期初</span>
@@ -195,25 +210,25 @@
             <span v-else>{{ fmtAmount(row.auditedBegin) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定拨入" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('auditedCredit')" label="审定拨入" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.auditedCredit" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedCredit', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.auditedCredit) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定结转" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('auditedCarryFwd')" label="审定结转" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.auditedCarryFwd" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedCarryFwd', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.auditedCarryFwd) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定返还" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('auditedRefund')" label="审定返还" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.auditedRefund" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'auditedRefund', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.auditedRefund) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定期末" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('auditedEnd')" label="审定期末" min-width="130" align="right">
           <template #header>
             <el-tooltip content="审定期初+审定拨入−审定结转−审定返还，负债类" placement="top">
               <span class="formula-col-header">审定期末</span>
@@ -223,19 +238,19 @@
             <span class="formula-value" :class="{ 'negative-warning': row.auditedEnd < 0 }">{{ fmtAmount(row.auditedEnd) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="文件依据" min-width="140">
+        <el-table-column v-if="isColVisible('docRef')" label="文件依据" min-width="140">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.docRef" size="small" @change="(val: string) => handleUpdate($index, 'docRef', val)" />
             <span v-else>{{ row.docRef || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="索引" min-width="100">
+        <el-table-column v-if="isColVisible('indexRef')" label="索引" min-width="100">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" @change="(val: string) => handleUpdate($index, 'indexRef', val)" />
             <span v-else>{{ row.indexRef || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="完成状态" min-width="120">
+        <el-table-column v-if="isColVisible('completionStatus')" label="完成状态" min-width="120">
           <template #default="{ row, $index }">
             <el-select v-if="!isReadonly" :model-value="row.completionStatus" size="small" style="width:100%" @change="(val: string) => handleUpdate($index, 'completionStatus', val)">
               <el-option label="未开始" value="未开始" />
@@ -246,7 +261,7 @@
             <el-tag v-else :type="statusTagType(row.completionStatus)" size="small">{{ row.completionStatus || '未开始' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="180">
+        <el-table-column v-if="isColVisible('remark')" label="备注" min-width="180">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(val: string) => handleUpdate($index, 'remark', val)" />
             <span v-else>{{ row.remark || '—' }}</span>
@@ -313,7 +328,7 @@
  * 公式列虚线下划线 + cursor:help + tooltip
  * L6-1交叉验证: show diff indicator
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, reactive } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL6FormData } from '../../composables/useL6FormData'
 import { useL6Detail, type L6DetailRow, L6_DETAIL_SEGMENTS } from '../../composables/useL6Detail'
@@ -369,6 +384,64 @@ function saveAuditNote() {
 }
 
 const segmentOptions = L6_DETAIL_SEGMENTS.map(s => ({ label: s.label, value: s.key }))
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const COL_PREFS_KEY = 'l6-2-column-prefs'
+interface ColPref { key: string; label: string; visible: boolean }
+const colPrefs = reactive<Record<string, ColPref[]>>({
+  'project-info': [
+    { key: 'fundSource', label: '拨款来源', visible: true },
+    { key: 'approvalNo', label: '批文号', visible: true },
+    { key: 'purpose', label: '用途', visible: true },
+    { key: 'beginBalance', label: '期初余额', visible: true },
+    { key: 'creditIn', label: '本期拨入', visible: true },
+    { key: 'carryForward', label: '本期结转', visible: true },
+    { key: 'refund', label: '本期返还', visible: true },
+    { key: 'endBalance', label: '期末余额', visible: true },
+  ],
+  'fund-movement': [
+    { key: 'ajeBegin', label: 'AJE调整(4列)', visible: true },
+    { key: 'rjeBegin', label: 'RJE调整(4列)', visible: true },
+  ],
+  'usage-check': [
+    { key: 'auditedBegin', label: '审定期初', visible: true },
+    { key: 'auditedCredit', label: '审定拨入', visible: true },
+    { key: 'auditedCarryFwd', label: '审定结转', visible: true },
+    { key: 'auditedRefund', label: '审定返还', visible: true },
+    { key: 'auditedEnd', label: '审定期末', visible: true },
+    { key: 'docRef', label: '文件依据', visible: true },
+    { key: 'indexRef', label: '索引', visible: true },
+    { key: 'completionStatus', label: '完成状态', visible: true },
+    { key: 'remark', label: '备注', visible: true },
+  ],
+})
+const currentSegmentCols = computed(() => colPrefs[activeSegment.value] || [])
+function isColVisible(key: string): boolean {
+  const seg = colPrefs[activeSegment.value]
+  if (!seg) return true
+  const col = seg.find(c => c.key === key)
+  return col?.visible ?? true
+}
+function persistColPrefs(): void {
+  try { localStorage.setItem(COL_PREFS_KEY, JSON.stringify(Object.fromEntries(Object.entries(colPrefs).map(([k, v]) => [k, v.map(c => ({ key: c.key, visible: c.visible }))])))) } catch {}
+}
+function resetColPrefs(): void {
+  for (const cols of Object.values(colPrefs)) cols.forEach(c => { c.visible = true })
+  persistColPrefs()
+}
+;(function loadColPrefs() {
+  try {
+    const saved = localStorage.getItem(COL_PREFS_KEY)
+    if (!saved) return
+    const data = JSON.parse(saved)
+    for (const [seg, prefs] of Object.entries(data as Record<string, Array<{ key: string; visible: boolean }>>)) {
+      const target = colPrefs[seg]
+      if (!target) continue
+      for (const p of prefs) { const col = target.find(c => c.key === p.key); if (col) col.visible = p.visible }
+    }
+  } catch {}
+})()
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -502,6 +575,9 @@ function restoreRowsFromResponses() {
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .segment-switcher { margin-bottom: 12px; }
+.col-prefs { max-height: 280px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }
 .cross-validation-warning { margin-bottom: 12px; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
