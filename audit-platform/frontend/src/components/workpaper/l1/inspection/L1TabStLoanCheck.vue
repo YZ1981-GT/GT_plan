@@ -136,7 +136,7 @@
  * Requirements: 7.3-7.4
  */
 import { computed, inject, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import type { useL1FormData, ChecklistItem } from '@/composables/useL1FormData'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -264,7 +264,28 @@ function handleConclusionInput(val: string): void {
 }
 
 async function handleAiConclusion(): Promise<void> {
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
+  try {
+    const context = {
+      totalItems: checklistItems.value.length,
+      passCount: passCount.value,
+      failCount: failCount.value,
+      naCount: naCount.value,
+      pendingCount: pendingCount.value,
+      failItems: checklistItems.value.filter(i => i.result === '不符合').map(i => ({ content: i.content, remark: i.remark })),
+    }
+    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'st-loan-check-conclusion',
+      prompt: '请基于短期借款检查表各项检查结果，生成审计结论（包含符合情况、不符合事项及整体判断）',
+      context,
+    })
+    const content = res.data?.data?.content
+    if (content) {
+      conclusion.value = content
+      handleConclusionInput(content)
+    }
+  } catch {
+    ElMessage.info('AI辅助暂不可用，请手动撰写结论')
+  }
 }
 
 // ─── Result styling ──────────────────────────────────────────────────────────
