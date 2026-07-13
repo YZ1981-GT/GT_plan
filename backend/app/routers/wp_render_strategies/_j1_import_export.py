@@ -35,7 +35,7 @@ from app.deps import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["j1-import-export"])
 
-SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher"}
+SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher", "industry"}
 
 # ─── J1-2 明细表 14 列定义 ────────────────────────────────────────────────────
 
@@ -585,6 +585,12 @@ async def export_template(
         wb = _build_monthly_template_wb()
     elif sheet_type == "voucher":
         wb = _build_voucher_template_wb()
+    elif sheet_type == "industry":
+        wb = _build_industry_wb()
+    elif sheet_type == "accrual":
+        wb = _build_accrual_wb()
+    elif sheet_type == "allocation":
+        wb = _build_allocation_wb()
     else:
         wb = Workbook()
         ws = wb.active
@@ -678,6 +684,22 @@ async def export_data(
             except (json.JSONDecodeError, TypeError):
                 pass
         wb = _build_voucher_template_wb(vc_data, post_rows)
+    elif sheet_type == "industry":
+        items = await _fetch_items(db, wp_id, [
+            "J1-5-company-dept", "J1-5-revenue", "J1-5-social-left", "J1-5-social-right",
+            "J1-5-peer-production", "J1-5-peer-smr", "J1-5-note", "J1-5-conclusion",
+        ])
+        wb = _build_industry_wb(items)
+    elif sheet_type == "accrual":
+        items = await _fetch_items(db, wp_id, [
+            "J1-6-short-term", "J1-6-post-employment", "J1-6-questions", "J1-6-conclusion",
+        ])
+        wb = _build_accrual_wb(items)
+    elif sheet_type == "allocation":
+        items = await _fetch_items(db, wp_id, [
+            "J1-7-alloc-rows", "J1-7-policy", "J1-7-note", "J1-7-conclusion",
+        ])
+        wb = _build_allocation_wb(items)
     else:
         # 检查表类 - 走原有逻辑
         item_id = f"J1-{sheet_type}-data"
@@ -948,6 +970,67 @@ async def import_data(
         await db.commit()
         total = len(parsed["credit"]) + len(parsed["debit"]) + len(parsed["post"])
         return {"imported_count": total, "sheet_type": sheet_type}
+    elif sheet_type == "industry":
+        items, total = [], 0
+        if "公司薪酬总览" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["公司薪酬总览"], J15_DEPT_COLS)
+            items.append(("J1-5-company-dept", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "社保人数核对" in wb.sheetnames:
+            left, right = [], []
+            for row in wb["社保人数核对"].iter_rows(min_row=2, values_only=True):
+                if not row or row[1] is None or str(row[1]).strip() == "":
+                    continue
+                rec = {"label": str(row[1]), "count": _to_num(row[2] if len(row) > 2 else 0)}
+                (right if str(row[0] or "").strip() == "社保人数" else left).append(rec)
+            items.append(("J1-5-social-left", json.dumps(left, ensure_ascii=False)))
+            items.append(("J1-5-social-right", json.dumps(right, ensure_ascii=False)))
+            total += len(left) + len(right)
+        if "同行业-生产人员" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["同行业-生产人员"], J15_PROD_COLS)
+            items.append(("J1-5-peer-production", json.dumps(rows, ensure_ascii=False)))
+            names = [r.get("company", "") for r in rows if r.get("company")]
+            items.append(("J1-5-peers", json.dumps(names, ensure_ascii=False))); total += len(rows)
+        if "同行业-销管研" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["同行业-销管研"], J15_SMR_COLS)
+            items.append(("J1-5-peer-smr", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "营业收入及说明" in wb.sheetnames:
+            kv = _kv_read(wb["营业收入及说明"])
+            items.append(("J1-5-revenue", str(_to_num(kv.get("营业收入")))))
+            items.append(("J1-5-note", str(kv.get("审计说明") or "")))
+            items.append(("J1-5-conclusion", str(kv.get("审计结论") or "")))
+        await _upsert_items(db, wp_id, items)
+        return {"imported_count": total, "sheet_type": sheet_type}
+    elif sheet_type == "accrual":
+        items, total = [], 0
+        if "短期薪酬" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["短期薪酬"], J16_ACCRUAL_COLS)
+            items.append(("J1-6-short-term", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "离职后福利" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["离职后福利"], J16_ACCRUAL_COLS)
+            items.append(("J1-6-post-employment", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "审计说明与结论" in wb.sheetnames:
+            kv = _kv_read(wb["审计说明与结论"])
+            q_labels = ["公司对社会保险费的缴费方法", "国家关于计缴比例、计缴基数的规定",
+                        "相关部门为公司确定的计缴基数的依据", "公司未给员工计缴社会保险的情况", "其他需要说明的事项"]
+            answers = [str(kv.get(lbl) or "") for lbl in q_labels]
+            items.append(("J1-6-questions", json.dumps(answers, ensure_ascii=False)))
+            items.append(("J1-6-conclusion", str(kv.get("审计结论") or "")))
+        await _upsert_items(db, wp_id, items)
+        return {"imported_count": total, "sheet_type": sheet_type}
+    elif sheet_type == "allocation":
+        items, total = [], 0
+        if "分配情况" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["分配情况"], J17_ALLOC_COLS)
+            items.append(("J1-7-alloc-rows", json.dumps(rows, ensure_ascii=False))); total += len(rows)
+        if "政策与说明" in wb.sheetnames:
+            kv = _kv_read(wb["政策与说明"])
+            p_labels = ["工资总额的组成部分", "公司是否执行工效挂钩", "福利政策", "职工薪酬核算、计提分配及支付政策及流程"]
+            answers = [str(kv.get(lbl) or "") for lbl in p_labels]
+            items.append(("J1-7-policy", json.dumps(answers, ensure_ascii=False)))
+            items.append(("J1-7-note", str(kv.get("审计说明") or "")))
+            items.append(("J1-7-conclusion", str(kv.get("审计结论") or "")))
+        await _upsert_items(db, wp_id, items)
+        return {"imported_count": total, "sheet_type": sheet_type}
     else:
         # 检查表类 — 原有逻辑
         ws = wb.active
@@ -982,3 +1065,247 @@ def _to_num(val) -> float:
         return float(val)
     except (ValueError, TypeError):
         return 0
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# J1-5 / J1-6 / J1-7 多区块导入导出（数据驱动行 helper）
+# 列定义元素：(json_field, 列头, is_num)
+# 特殊 field：rate_pct=rate×100 显示；isSection=bool→是/空
+# ══════════════════════════════════════════════════════════════════════════════
+
+# J1-5 与同行业对比分析表
+J15_DEPT_COLS = [
+    ("dept", "部门/岗位", False), ("curHeadcount", "本期人数", True), ("curTotal", "本期总额", True),
+    ("priorHeadcount", "上期人数", True), ("priorTotal", "上期总额", True),
+    ("industryAvg", "行业人均", True), ("analysis", "异常分析说明", False),
+]
+J15_PROD_COLS = [
+    ("company", "公司", False), ("headcount", "人数", True), ("laborCost", "人工成本", True),
+    ("mainLaborCost", "主营成本中人工成本", True), ("revenue", "营业收入", True),
+    ("totalCost", "成本总额", True), ("mainCost", "主营业务成本", True),
+]
+J15_SMR_COLS = [
+    ("company", "公司", False),
+    ("salesCount", "销售人数", True), ("salesCost", "销售成本", True),
+    ("mgmtCount", "管理人数", True), ("mgmtCost", "管理成本", True),
+    ("rdCount", "研发人数", True), ("rdCost", "研发成本", True),
+]
+# J1-6 计提情况检查表
+J16_ACCRUAL_COLS = [
+    ("label", "项目", False), ("indent", "层级", True),
+    ("baseName", "计提基数-名称", False), ("baseAmount", "计提基数-金额", True), ("baseIndex", "计提基数-索引", False),
+    ("rate_pct", "计提比例(%)", True), ("actual", "实际计提数", True),
+    ("diffReason", "差异原因", False), ("conclusion", "结论", False),
+]
+# J1-7 分配情况检查表
+J17_ALLOC_COLS = [
+    ("label", "项目名称", False), ("indent", "层级", True), ("isSection", "是否分区标题", False),
+    ("productionCost", "生产成本", True), ("manufacturing", "制造费用", True), ("adminExpense", "管理费用", True),
+    ("sellingExpense", "销售费用", True), ("otherExpense", "其他", True),
+    ("actualAccrual", "本期实际计提数", True), ("diffReason", "差异原因", False), ("conclusion", "结论", False),
+]
+
+
+def _rows_to_sheet(ws, cols, rows):
+    """通用：行对象列表 → sheet（首行表头 + 数据行）."""
+    ws.append([c[1] for c in cols])
+    _style_header(ws, 1, len(cols))
+    for r in (rows or []):
+        line = []
+        for field, _label, is_num in cols:
+            if field == "rate_pct":
+                line.append(_to_num(r.get("rate")) * 100)
+            elif field == "isSection":
+                line.append("是" if r.get("isSection") else "")
+            elif is_num:
+                line.append(_to_num(r.get(field)))
+            else:
+                line.append(r.get(field, ""))
+        ws.append(line)
+    for i in range(1, len(cols) + 1):
+        ws.column_dimensions[get_column_letter(i)].width = 15
+
+
+def _sheet_to_rows(ws, cols):
+    """通用：sheet → 行对象列表（按列位置解析，跳过表头行）."""
+    out = []
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or not any(v is not None and str(v).strip() != "" for v in row):
+            continue
+        d = {"id": f"imp-{len(out)}"}
+        for i, (field, _label, is_num) in enumerate(cols):
+            val = row[i] if i < len(row) else None
+            if field == "rate_pct":
+                d["rate"] = _to_num(val) / 100
+            elif field == "isSection":
+                d["isSection"] = str(val).strip() == "是" if val is not None else False
+            elif is_num:
+                d[field] = _to_num(val)
+            else:
+                d[field] = str(val) if val is not None else ""
+        out.append(d)
+    return out
+
+
+def _kv_sheet(ws, pairs):
+    """写 key-value 说明 sheet（键|值 两列）."""
+    ws.append(["项目", "内容"])
+    _style_header(ws, 1, 2)
+    for k, v in pairs:
+        ws.append([k, v])
+    ws.column_dimensions["A"].width = 28
+    ws.column_dimensions["B"].width = 70
+
+
+def _kv_read(ws):
+    """读 key-value sheet → dict."""
+    out = {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or row[0] is None:
+            continue
+        out[str(row[0]).strip()] = row[1] if len(row) > 1 and row[1] is not None else ""
+    return out
+
+
+def _note_sheet(ws, title, lines):
+    """编制说明 sheet."""
+    ws["A1"] = title
+    ws["A1"].font = Font(name="微软雅黑", size=14, bold=True)
+    for i, line in enumerate(lines, start=2):
+        ws.cell(row=i, column=1, value=line)
+    ws.column_dimensions["A"].width = 90
+
+
+async def _fetch_items(db, wp_id: str, item_ids: list) -> dict:
+    """批量读取 checklist_responses.remark → {item_id: raw_str}."""
+    out = {}
+    for iid in item_ids:
+        r = await db.execute(
+            sa.text("SELECT remark FROM checklist_responses WHERE wp_id=:w AND item_id=:i LIMIT 1"),
+            {"w": wp_id, "i": iid},
+        )
+        row = r.fetchone()
+        out[iid] = row.remark if row and row.remark else None
+    return out
+
+
+async def _upsert_items(db, wp_id: str, items: list):
+    """批量 upsert（自动补 project_id NOT NULL）."""
+    pid_res = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id=:w LIMIT 1"), {"w": wp_id},
+    )
+    pid_row = pid_res.fetchone()
+    project_id = str(pid_row.project_id) if pid_row and pid_row.project_id else None
+    sql = sa.text(
+        "INSERT INTO checklist_responses (wp_id, project_id, item_id, remark) "
+        "VALUES (:w, :p, :i, :r) ON CONFLICT (wp_id, item_id) DO UPDATE SET remark=:r"
+    )
+    for iid, remark in items:
+        await db.execute(sql, {"w": wp_id, "p": project_id, "i": iid, "r": remark})
+    await db.commit()
+
+
+def _parse_json_array(raw):
+    if not raw:
+        return []
+    try:
+        v = json.loads(raw)
+        return v if isinstance(v, list) else []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+# ─── J1-5 与同行业对比分析表 ──────────────────────────────────────────────────
+
+def _build_industry_wb(data: dict | None = None) -> Workbook:
+    data = data or {}
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    _rows_to_sheet(wb.create_sheet("公司薪酬总览"), J15_DEPT_COLS, _parse_json_array(data.get("J1-5-company-dept")))
+
+    ws_soc = wb.create_sheet("社保人数核对")
+    ws_soc.append(["类别", "项目", "人数"])
+    _style_header(ws_soc, 1, 3)
+    for r in _parse_json_array(data.get("J1-5-social-left")):
+        ws_soc.append(["工资人数", r.get("label", ""), _to_num(r.get("count"))])
+    for r in _parse_json_array(data.get("J1-5-social-right")):
+        ws_soc.append(["社保人数", r.get("label", ""), _to_num(r.get("count"))])
+    ws_soc.column_dimensions["A"].width = 14
+    ws_soc.column_dimensions["B"].width = 40
+    ws_soc.column_dimensions["C"].width = 12
+
+    _rows_to_sheet(wb.create_sheet("同行业-生产人员"), J15_PROD_COLS, _parse_json_array(data.get("J1-5-peer-production")))
+    _rows_to_sheet(wb.create_sheet("同行业-销管研"), J15_SMR_COLS, _parse_json_array(data.get("J1-5-peer-smr")))
+
+    revenue = data.get("J1-5-revenue") or "0"
+    _kv_sheet(wb.create_sheet("营业收入及说明"), [
+        ("营业收入", str(revenue).strip('"') if revenue else "0"),
+        ("审计说明", (data.get("J1-5-note") or "")),
+        ("审计结论", (data.get("J1-5-conclusion") or "")),
+    ])
+    _note_sheet(wb.create_sheet("编制说明"), "J1-5 与同行业对比分析表 — 编制说明", [
+        "", "一、sheet结构",
+        "  公司薪酬总览：按部门/岗位填本期/上期人数与总额、行业人均；人均/变动率/占收入比为系统自动计算不导入",
+        "  社保人数核对：类别列填「工资人数」或「社保人数」区分左右两区",
+        "  同行业-生产人员 / 同行业-销管研：各可比公司数据；人均/占比等为自动计算不导入",
+        "  营业收入及说明：营业收入(数值)、审计说明、审计结论 三项 key-value",
+        "", "二、导入说明",
+        "  1. 按 sheet 名匹配各区块，序号/公式列不导入",
+        "  2. 整行全空自动跳过；可比公司名取自各行「公司」列",
+        "  3. 计提比例等百分比列按数值填写（如 8 表示 8%）",
+    ])
+    return wb
+
+
+# ─── J1-6 计提情况检查表 ──────────────────────────────────────────────────────
+
+def _build_accrual_wb(data: dict | None = None) -> Workbook:
+    data = data or {}
+    wb = Workbook()
+    wb.remove(wb.active)
+    _rows_to_sheet(wb.create_sheet("短期薪酬"), J16_ACCRUAL_COLS, _parse_json_array(data.get("J1-6-short-term")))
+    _rows_to_sheet(wb.create_sheet("离职后福利"), J16_ACCRUAL_COLS, _parse_json_array(data.get("J1-6-post-employment")))
+
+    questions = _parse_json_array(data.get("J1-6-questions"))
+    q_labels = ["公司对社会保险费的缴费方法", "国家关于计缴比例、计缴基数的规定",
+                "相关部门为公司确定的计缴基数的依据", "公司未给员工计缴社会保险的情况", "其他需要说明的事项"]
+    pairs = [(lbl, questions[i] if i < len(questions) else "") for i, lbl in enumerate(q_labels)]
+    pairs.append(("审计结论", data.get("J1-6-conclusion") or ""))
+    _kv_sheet(wb.create_sheet("审计说明与结论"), pairs)
+    _note_sheet(wb.create_sheet("编制说明"), "J1-6 计提情况检查表 — 编制说明", [
+        "", "一、sheet结构",
+        "  短期薪酬 / 离职后福利：计提基数(名称/金额/索引)、计提比例(%)、实际计提数；应提金额=基数×比例、差异为系统自动计算不导入",
+        "  审计说明与结论：5项审计说明问答 + 审计结论 key-value",
+        "", "二、导入说明",
+        "  1. 「层级」列 0=一级项目 1=子项目（缩进）",
+        "  2. 计提比例(%)按数值填写（如 8 表示 8%）",
+        "  3. 整行全空自动跳过",
+    ])
+    return wb
+
+
+# ─── J1-7 分配情况检查表 ──────────────────────────────────────────────────────
+
+def _build_allocation_wb(data: dict | None = None) -> Workbook:
+    data = data or {}
+    wb = Workbook()
+    wb.remove(wb.active)
+    _rows_to_sheet(wb.create_sheet("分配情况"), J17_ALLOC_COLS, _parse_json_array(data.get("J1-7-alloc-rows")))
+
+    policy = _parse_json_array(data.get("J1-7-policy"))
+    p_labels = ["工资总额的组成部分", "公司是否执行工效挂钩", "福利政策", "职工薪酬核算、计提分配及支付政策及流程"]
+    pairs = [(lbl, policy[i] if i < len(policy) else "") for i, lbl in enumerate(p_labels)]
+    pairs.append(("审计说明", data.get("J1-7-note") or ""))
+    pairs.append(("审计结论", data.get("J1-7-conclusion") or ""))
+    _kv_sheet(wb.create_sheet("政策与说明"), pairs)
+    _note_sheet(wb.create_sheet("编制说明"), "J1-7 分配情况检查表 — 编制说明", [
+        "", "一、sheet结构",
+        "  分配情况：各薪酬项目在 生产成本/制造费用/管理费用/销售费用/其他 的分配额 + 本期实际计提数；本期合计、差异为系统自动计算不导入",
+        "  政策与说明：4项计提分配政策问答 + 审计说明 + 审计结论 key-value",
+        "", "二、导入说明",
+        "  1. 「是否分区标题」列填「是」表示分组标题行（如「(1)短期薪酬」），其余留空",
+        "  2. 「层级」列 0/1 控制缩进",
+        "  3. 分配合计应与实际计提数勾稽一致，差异≠0需填差异原因",
+    ])
+    return wb

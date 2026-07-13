@@ -1,5 +1,19 @@
 <template>
   <div class="j1-tab-allocation">
+    <!-- 顶部工具栏 -->
+    <div class="ie-toolbar">
+      <el-dropdown size="small" trigger="click">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate('allocation')">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData('allocation')">导出数据</el-dropdown-item>
+            <el-dropdown-item @click="triggerImport">导入数据</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
       <template #title>审计目标：验证应付职工薪酬按受益对象在各费用/成本科目间分配的合理性与完整性，确保分配合计与实际计提数一致。</template>
@@ -136,6 +150,7 @@
 import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -259,6 +274,34 @@ function persist() {
   save(items).catch(() => {})
 }
 
+// ─── 导入导出 ───────────────────────────────────────────────────────────
+const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
+function triggerImport() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0]
+    if (!f) return
+    const ok = await importData('allocation', f)
+    if (!ok) return
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const arr = res.data?.data || res.data || []
+    for (const it of arr) allResponsesRef.value.set(it.item_id, it)
+    allRows.value = loadRows()
+    const sp = allResponsesRef.value.get(KEYS.policy)?.remark
+    if (sp) {
+      try {
+        const a = JSON.parse(sp)
+        if (Array.isArray(a)) a.forEach((x: string, i: number) => { if (i < policyQuestions.length) policyQuestions[i].answer = x || '' })
+      } catch { /* */ }
+    }
+    auditNote.value = allResponsesRef.value.get(KEYS.note)?.remark || ''
+    auditConclusion.value = allResponsesRef.value.get(KEYS.conclusion)?.remark || ''
+  }
+  input.click()
+}
+
 // ─── AI ─────────────────────────────────────────────────────────────────
 const aiLoading = ref(false)
 async function generateAi(section: 'note' | 'conclusion') {
@@ -287,6 +330,7 @@ function fmtAmt(v: number): string {
 
 <style scoped>
 .j1-tab-allocation { padding: 12px; }
+.ie-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .j1-tab-allocation :deep(.el-table) { font-size: 13px !important; }
 .j1-tab-allocation :deep(.el-table th), .j1-tab-allocation :deep(.el-table td) { font-size: 13px !important; padding: 4px 0 !important; }
 .j1-tab-allocation :deep(.el-table th .cell) { white-space: normal !important; line-height: 1.3; }

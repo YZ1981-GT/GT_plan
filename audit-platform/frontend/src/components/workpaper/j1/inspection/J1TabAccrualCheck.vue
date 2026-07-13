@@ -1,5 +1,19 @@
 <template>
   <div class="j1-tab-accrual">
+    <!-- 顶部工具栏 -->
+    <div class="ie-toolbar">
+      <el-dropdown size="small" trigger="click">
+        <el-button size="small">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item @click="exportTemplate('accrual')">导出模板</el-dropdown-item>
+            <el-dropdown-item @click="exportData('accrual')">导出数据</el-dropdown-item>
+            <el-dropdown-item @click="triggerImport">导入数据</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
       <template #title>审计目标：复核各类薪酬计提基数、比例与应提金额，与实际计提对比，验证计提的完整性与准确性。</template>
@@ -85,6 +99,7 @@ import { ref, reactive, computed, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AccrualTable from './AccrualTable.vue'
+import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -217,6 +232,34 @@ const auditConclusion = ref(allResponsesRef.value.get(KEYS.conclusion)?.remark |
 
 function saveOpinion() { scheduleSave() }
 
+// ─── 导入导出 ───────────────────────────────────────────────────────────
+const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
+function triggerImport() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0]
+    if (!f) return
+    const ok = await importData('accrual', f)
+    if (!ok) return
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const arr = res.data?.data || res.data || []
+    for (const it of arr) allResponsesRef.value.set(it.item_id, it)
+    shortTermRows.value = loadSection('shortTerm')
+    postEmploymentRows.value = loadSection('postEmployment')
+    const sq = allResponsesRef.value.get(KEYS.questions)?.remark
+    if (sq) {
+      try {
+        const a = JSON.parse(sq)
+        if (Array.isArray(a)) a.forEach((x: string, i: number) => { if (i < auditQuestions.length) auditQuestions[i].answer = x || '' })
+      } catch { /* */ }
+    }
+    auditConclusion.value = allResponsesRef.value.get(KEYS.conclusion)?.remark || ''
+  }
+  input.click()
+}
+
 // ─── AI ─────────────────────────────────────────────────────────────────
 const aiLoading = ref(false)
 const aiConcLoading = ref(false)
@@ -250,6 +293,7 @@ async function generateAiConc() {
 
 <style scoped>
 .j1-tab-accrual { padding: 12px; }
+.ie-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .j1-tab-accrual :deep(.el-table) { font-size: 13px !important; }
 .j1-tab-accrual :deep(.el-table th), .j1-tab-accrual :deep(.el-table td) { font-size: 13px !important; padding: 4px 0 !important; }
 .j1-tab-accrual :deep(.el-table th .cell) { white-space: normal !important; line-height: 1.3; }

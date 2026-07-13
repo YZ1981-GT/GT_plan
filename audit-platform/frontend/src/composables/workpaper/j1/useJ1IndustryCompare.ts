@@ -357,12 +357,22 @@ export function useJ1IndustryCompare(options: UseJ1IndustryOptions) {
   // ─── Helpers ───────────────────────────────────────────────────────
   function genId(): string { return `j1i-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` }
 
+  // ─── Reload（导入后从 allResponses 重载各区块） ────────────────────────
+  function reload() {
+    revenue.value = parseNum(allResponses.value.get(KEYS.revenue)?.remark)
+    loadCompanyDept()
+    loadSocial()
+    loadPeers()
+    auditNote.value = allResponses.value.get(KEYS.note)?.remark || ''
+    auditConclusion.value = allResponses.value.get(KEYS.conclusion)?.remark || ''
+  }
+
   return {
     revenue, companyDeptRows, companyTotal, socialLeft, socialRight,
     socialLeftTotal, socialRightTotal, socialDiff,
     peerCompanies, peerProductionRows, peerSMRRows, peerProdAvg, peerSMRAvg,
     auditNote, auditConclusion,
     updateDeptCell, updateProdCell, updateSMRCell,
-    addPeer, removePeer, scheduleSave, saveOpinion,
+    addPeer, removePeer, scheduleSave, saveOpinion, reload,
   }
 }

@@ -64,6 +64,16 @@
           <el-input-number v-if="!isReadonly" v-model="revenue" :controls="false" size="small" style="width:140px" @change="scheduleSave" />
           <b v-else>{{ fmtAmt(revenue) }}</b>
         </span>
+        <el-dropdown size="small" trigger="click">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('industry')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('industry')">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="triggerImport">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -374,6 +384,7 @@
 import { ref, computed, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJ1IndustryCompare } from '@/composables/workpaper/j1/useJ1IndustryCompare'
+import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -395,12 +406,32 @@ const {
   peerCompanies, peerProductionRows, peerSMRRows, peerProdAvg, peerSMRAvg,
   auditNote, auditConclusion,
   updateDeptCell, updateProdCell, updateSMRCell,
-  addPeer, removePeer, scheduleSave, saveOpinion,
+  addPeer, removePeer, scheduleSave, saveOpinion, reload,
 } = useJ1IndustryCompare({
   allResponses: allResponsesRef,
   saveImmediate: props.saveImmediate || (async () => {}),
   isReadonly: toRef(props, 'isReadonly') as any || ref(false),
 })
+
+// 导入导出
+const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
+function triggerImport() {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (e) => {
+    const f = (e.target as HTMLInputElement).files?.[0]
+    if (!f) return
+    const ok = await importData('industry', f)
+    if (ok) {
+      const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+      const arr = res.data?.data || res.data || []
+      for (const it of arr) allResponsesRef.value.set(it.item_id, it)
+      reload()
+    }
+  }
+  input.click()
+}
 
 const activeTab = ref('overview')
 const newPeerName = ref('')
