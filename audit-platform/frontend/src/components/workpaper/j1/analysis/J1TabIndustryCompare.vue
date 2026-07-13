@@ -136,9 +136,17 @@
               </el-tooltip>
             </template>
           </el-table-column>
-          <el-table-column label="异常分析说明" min-width="160" show-overflow-tooltip>
+          <el-table-column label="异常分析说明" min-width="200" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input v-if="!isReadonly && row.id !== 'total'" :model-value="row.analysis" size="small" @change="(v: string) => updateDeptCell(row.id, 'analysis', v)" />
+              <div v-if="!isReadonly && row.id !== 'total'" class="analysis-cell">
+                <el-input :model-value="row.analysis" size="small" placeholder="异常原因说明" @change="(v: string) => updateDeptCell(row.id, 'analysis', v)" />
+                <el-button
+                  v-if="Math.abs(row.avgChangeRate) > 30 || Math.abs(row.industryDiff) > 30"
+                  size="small" type="primary" link class="ai-btn"
+                  :loading="aiAnalysisLoading === row.id"
+                  @click="generateRowAnalysis(row)"
+                >🤖</el-button>
+              </div>
               <span v-else>{{ row.analysis || '-' }}</span>
             </template>
           </el-table-column>
@@ -493,6 +501,28 @@ const diffSMRRow = computed(() => {
   }
 })
 
+// AI row-level analysis
+const aiAnalysisLoading = ref<string | null>(null)
+
+async function generateRowAnalysis(row: any) {
+  if (isReadonly.value) return
+  aiAnalysisLoading.value = row.id
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'j1-5-row-analysis',
+      prompt: `请分析以下薪酬异常情况并给出可能原因（50字以内简要说明）：岗位"${row.dept}"，本期人均${fmtAmt(row.curAvg)}，上期人均${fmtAmt(row.priorAvg)}，人均变动率${row.avgChangeRate.toFixed(1)}%，行业人均${fmtAmt(row.industryAvg)}，与行业差异${row.industryDiff.toFixed(1)}%。`,
+      context: { '岗位': row.dept, '人均变动率': `${row.avgChangeRate.toFixed(1)}%`, '行业差异': `${row.industryDiff.toFixed(1)}%` },
+      existingContent: row.analysis || '',
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) {
+      updateDeptCell(row.id, 'analysis', text)
+      ElMessage.success('AI分析完成')
+    }
+  } catch { ElMessage.warning('AI分析失败') }
+  finally { aiAnalysisLoading.value = null }
+}
+
 // AI
 const aiLoading = ref<string | null>(null)
 async function generateAi(section: 'note' | 'conclusion') {
@@ -556,6 +586,9 @@ async function generateAi(section: 'note' | 'conclusion') {
 .text-danger { color: #f56c6c; font-weight: 600; }
 :deep(.total-row) { background: #f0f5ff !important; font-weight: 600; }
 :deep(.total-row td) { border-top: 1px solid #d9ecff !important; }
+.analysis-cell { display: flex; align-items: center; gap: 4px; }
+.analysis-cell .el-input { flex: 1; }
+.ai-btn { padding: 2px 4px; min-width: auto; }
 .social-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .social-card :deep(.el-card__header) { padding: 8px 12px; background: #fafafa; }
 .social-title { font-size: 13px; font-weight: 600; }

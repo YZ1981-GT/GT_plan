@@ -66,7 +66,7 @@
       <template #header><span class="card-title">二、样本选取标准与规模</span></template>
       <div class="criteria-grid">
         <div class="cg-item">
-          <label>测试总体（贷方发生额）</label>
+          <label>测试总体（贷方发生额）<el-button v-if="!isReadonly" size="small" type="primary" link :loading="autoFetchLoading" @click="autoFetchPopulation" style="margin-left:6px">🔄 自动取数</el-button></label>
           <div class="cg-inline">
             <el-input-number v-model="criteria.populationCreditCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
             <span class="cg-unit">笔</span>
@@ -115,8 +115,11 @@
         </div>
         <div class="cg-item cg-full">
           <label>抽样过程</label>
-          <el-input v-model="criteria.samplingProcess" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" size="small"
-            placeholder="使用IDEA选取XX笔贷方计提+XX笔借方发放进行检查" @change="persist" />
+          <div class="sampling-process-row">
+            <el-input v-model="criteria.samplingProcess" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" size="small"
+              placeholder="使用IDEA选取XX笔贷方计提+XX笔借方发放进行检查" @change="persist" />
+            <el-button v-if="!isReadonly" size="small" type="primary" plain :loading="aiSamplingLoading" @click="generateSamplingProcess" class="ai-sampling-btn">🤖</el-button>
+          </div>
         </div>
       </div>
     </el-card>
@@ -346,7 +349,8 @@
  */
 import { ref, reactive, computed, onMounted, defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -522,6 +526,81 @@ function fmtAmt(val: number | null | undefined): string {
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
 
+// AI 生成抽样过程
+const aiSamplingLoading = ref(false)
+
+// 自动取数：从四表库获取测试总体
+const autoFetchLoading = ref(false)
+async function autoFetchPopulation() {
+  if (isReadonly.value) return
+  autoFetchLoading.value = true
+  try {
+    // 从试算表取全部科目，再过滤2211
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { year: yearNum.value },
+      _silent: true,
+    } as any)
+    const items = res.data?.data || res.data || []
+    const allRows = Array.isArray(items) ? items : []
+    // 找科目2211（可能是2211或以2211开头的子科目）
+    const matched = allRows.filter((r: any) => {
+      const code = r.standard_account_code || r.account_code || ''
+      return code === '2211' || code.startsWith('2211')
+    })
+    if (matched.length > 0) {
+      // 汇总所有2211系科目的发生额
+      let creditTotal = 0
+      let debitTotal = 0
+      for (const tb of matched) {
+        // trial_balance v2正数口径：aje_adjustment可能包含借贷
+        // 通常 unadjusted_amount 是期末未审，但发生额需要从 tb_balance 或直接字段取
+        creditTotal += Math.abs(tb.credit_amount || tb.period_credit || 0)
+        debitTotal += Math.abs(tb.debit_amount || tb.period_debit || 0)
+      }
+      // 如果没有分方向字段，尝试用 unadjusted_amount（负债贷方科目期末=正数）
+      if (creditTotal === 0 && debitTotal === 0 && matched[0].unadjusted_amount) {
+        creditTotal = Math.abs(matched[0].unadjusted_amount)
+      }
+      if (creditTotal > 0) criteria.populationCreditAmount = creditTotal
+      if (debitTotal > 0) criteria.populationDebitAmount = debitTotal
+      persist()
+      ElMessage.success(`已从试算表取数（科目2211系${matched.length}条）：贷方${fmtAmt(creditTotal)}，借方${fmtAmt(debitTotal)}`)
+    } else {
+      ElMessage.warning('试算表中未找到科目2211，请确认四表库已导入该科目')
+    }
+  } catch (e) {
+    ElMessage.warning('自动取数失败，请手动填写')
+  } finally {
+    autoFetchLoading.value = false
+  }
+}
+async function generateSamplingProcess() {
+  if (isReadonly.value) return
+  aiSamplingLoading.value = true
+  try {
+    const ctx = {
+      '测试总体(贷方)': `${criteria.populationCreditCount || 0}笔/${criteria.populationCreditAmount || 0}元`,
+      '测试总体(借方)': `${criteria.populationDebitCount || 0}笔/${criteria.populationDebitAmount || 0}元`,
+      '特定样本': criteria.specificSample || '未填',
+      '抽样总体': `${criteria.samplingPopulationCount || 0}笔/${criteria.samplingPopulationAmount || 0}元`,
+      '样本量': `${criteria.sampleSize || 0}笔`,
+      '抽样方法': criteria.samplingMethod || '未选择',
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'j1-8-sampling-process',
+      prompt: '根据以下样本选取标准信息，生成简洁的抽样过程描述（如"使用IDEA从贷方发生额XX笔中按货币单元抽样选取XX笔计提凭证+从借方发生额中选取XX笔发放凭证进行检查"）：',
+      context: ctx,
+      existingContent: criteria.samplingProcess || '',
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) {
+      criteria.samplingProcess = text
+      persist()
+    }
+  } catch { /* silent */ }
+  finally { aiSamplingLoading.value = false }
+}
+
 async function handleAiGenerate() {
   try {
     await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
@@ -560,6 +639,9 @@ function handleReview() { /* 复核对话暂桩 */ }
 .cg-item.cg-full { grid-column: 1 / -1; }
 .cg-item label { font-size: 12px; color: var(--el-text-color-secondary); }
 .cg-inline { display: flex; align-items: center; gap: 5px; }
+.sampling-process-row { display: flex; gap: 6px; align-items: flex-start; }
+.sampling-process-row .el-textarea { flex: 1; }
+.ai-sampling-btn { flex-shrink: 0; margin-top: 2px; }
 .cg-unit { font-size: 12px; color: var(--el-text-color-secondary); }
 .num-sm { width: 78px; }
 .num-md { width: 130px; }

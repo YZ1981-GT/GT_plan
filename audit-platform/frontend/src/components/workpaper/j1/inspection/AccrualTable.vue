@@ -3,7 +3,16 @@
     <!-- 项目 -->
     <el-table-column label="项目" min-width="180" fixed>
       <template #default="{ row }">
-        <span :style="{ paddingLeft: row.indent * 16 + 'px' }">{{ row.label }}</span>
+        <span :style="{ paddingLeft: row.indent * 16 + 'px' }">
+          <el-input
+            v-if="!isReadonly && row.indent > 0"
+            :model-value="row.label"
+            size="small"
+            placeholder="填写项目名称"
+            @change="(v: string) => $emit('update', row.id, 'label', v)"
+          />
+          <span v-else>{{ row.label }}</span>
+        </span>
       </template>
     </el-table-column>
     <!-- 计提基数 -->

@@ -69,14 +69,13 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         result = await ctx.db.execute(
             sa.text(
-                "SELECT item_id, content, conclusion, remark FROM checklist_responses "
+                "SELECT item_id, conclusion, remark FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT 10000"
             ),
             {"wp_id": str(ctx.wp_id), "pfx": "J1-%"},
         )
         for row in result.fetchall():
             responses_snapshot[row.item_id] = {
-                "content": row.content or "",
                 "conclusion": row.conclusion or "",
                 "remark": row.remark or "",
             }
