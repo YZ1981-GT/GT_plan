@@ -52,8 +52,24 @@
       </template>
     </el-alert>
 
-    <!-- ═══ 区段Tab切换器 ═══ -->
-    <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" class="segment-switcher" />
+    <!-- ═══ 区段Tab切换器 + 列设置 ═══ -->
+    <div class="segment-toolbar">
+      <el-segmented v-model="activeSegment" :options="segmentOptions" size="default" class="segment-switcher" />
+      <el-popover placement="bottom-end" :width="220" trigger="click">
+        <template #reference>
+          <el-button size="small" circle>
+            <el-icon><Setting /></el-icon>
+          </el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-title">⚙ 列设置</div>
+          <template v-for="col in ALL_COLS.filter(c => c.segment === activeSegment)" :key="col.key">
+            <el-checkbox v-model="colPrefs[col.key]" @change="persistColPrefs">{{ col.label }}</el-checkbox>
+          </template>
+          <el-button size="small" text type="primary" style="margin-top:8px" @click="resetColPrefs">重置默认</el-button>
+        </div>
+      </el-popover>
+    </div>
 
     <!-- ═══ 明细表主体 ═══ -->
     <el-table :data="computedRows" border size="small" style="width: 100%" highlight-current-row>
@@ -67,13 +83,13 @@
 
       <!-- ═══ 区段1: 股东信息 ═══ -->
       <template v-if="activeSegment === 'shareholder'">
-        <el-table-column label="持股比例(%)" width="110" align="right">
+        <el-table-column v-if="isColVisible('shareholdingRatio')" label="持股比例(%)" width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.shareholdingRatio" :controls="false" :precision="2" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'shareholdingRatio', val ?? 0)" />
             <span v-else>{{ row.shareholdingRatio ? row.shareholdingRatio.toFixed(2) + '%' : '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="币种" width="90" align="center">
+        <el-table-column v-if="isColVisible('currency')" label="币种" width="90" align="center">
           <template #default="{ row, $index }">
             <el-select v-if="!isReadonly" :model-value="row.currency" size="small" style="width:100%" @change="(val: string) => handleUpdate($index, 'currency', val)">
               <el-option value="CNY" label="CNY" />
@@ -85,7 +101,7 @@
             <span v-else>{{ row.currency || 'CNY' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="股东类型" width="110" align="center">
+        <el-table-column v-if="isColVisible('shareholderType')" label="股东类型" width="110" align="center">
           <template #default="{ row, $index }">
             <el-select v-if="!isReadonly" :model-value="row.shareholderType" size="small" style="width:100%" placeholder="选择" @change="(val: string) => handleUpdate($index, 'shareholderType', val)">
               <el-option v-for="opt in SHAREHOLDER_TYPE_OPTIONS" :key="opt.value" :value="opt.value" :label="opt.label" />
@@ -93,7 +109,7 @@
             <span v-else>{{ shareholderTypeLabel(row.shareholderType) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="160">
+        <el-table-column v-if="isColVisible('remark')" label="备注" min-width="160">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注" @change="(val: string) => handleUpdate($index, 'remark', val)" />
             <span v-else>{{ row.remark || '—' }}</span>
@@ -103,13 +119,13 @@
 
       <!-- ═══ 区段2: 宣告金额（贷方增加） ═══ -->
       <template v-if="activeSegment === 'declared'">
-        <el-table-column label="期初应付" width="130" align="right">
+        <el-table-column v-if="isColVisible('beginBalance')" label="期初应付" width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'beginBalance', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.beginBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期宣告" width="130" align="right">
+        <el-table-column v-if="isColVisible('declaredAmount')" label="本期宣告" width="130" align="right">
           <template #header>
             <el-tooltip content="贷方增加：宣告分配股利时贷记应付股利" placement="top">
               <span class="formula-col-header">本期宣告</span>
@@ -120,31 +136,31 @@
             <span v-else>{{ fmtAmount(row.declaredAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="宣告日期" width="130" align="center">
+        <el-table-column v-if="isColVisible('declaredDate')" label="宣告日期" width="130" align="center">
           <template #default="{ row, $index }">
             <el-date-picker v-if="!isReadonly" :model-value="row.declaredDate" type="date" size="small" style="width:100%" value-format="YYYY-MM-DD" @update:model-value="(val: string) => handleUpdate($index, 'declaredDate', val || '')" />
             <span v-else>{{ row.declaredDate || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="决议文号" width="140">
+        <el-table-column v-if="isColVisible('resolutionRef')" label="决议文号" width="140">
           <template #default="{ row, $index }">
             <el-input v-if="!isReadonly" :model-value="row.resolutionRef" size="small" placeholder="如：董〔2025〕01号" @change="(val: string) => handleUpdate($index, 'resolutionRef', val)" />
             <span v-else>{{ row.resolutionRef || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="分配比例(%)" width="110" align="right">
+        <el-table-column v-if="isColVisible('distributionRatio')" label="分配比例(%)" width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.distributionRatio" :controls="false" :precision="2" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'distributionRatio', val ?? 0)" />
             <span v-else>{{ row.distributionRatio ? row.distributionRatio.toFixed(2) + '%' : '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="分配基数" width="130" align="right">
+        <el-table-column v-if="isColVisible('distributionBase')" label="分配基数" width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.distributionBase" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'distributionBase', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.distributionBase) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="应宣告" width="130" align="right">
+        <el-table-column v-if="isColVisible('expectedDeclared')" label="应宣告" width="130" align="right">
           <template #header>
             <el-tooltip content="公式: 分配基数 × 分配比例" placement="top">
               <span class="formula-col-header">应宣告</span>
@@ -154,7 +170,7 @@
             <span class="formula-value">{{ fmtAmount(row.expectedDeclared) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="宣告差异" width="120" align="right">
+        <el-table-column v-if="isColVisible('declareDiff')" label="宣告差异" width="120" align="right">
           <template #header>
             <el-tooltip content="公式: 本期宣告 − 应宣告" placement="top">
               <span class="formula-col-header">宣告差异</span>
@@ -168,7 +184,7 @@
 
       <!-- ═══ 区段3: 支付情况（借方减少） ═══ -->
       <template v-if="activeSegment === 'payment'">
-        <el-table-column label="本期支付" width="130" align="right">
+        <el-table-column v-if="isColVisible('paidAmount')" label="本期支付" width="130" align="right">
           <template #header>
             <el-tooltip content="借方减少：实际支付时借记应付股利" placement="top">
               <span class="formula-col-header">本期支付</span>
@@ -179,13 +195,13 @@
             <span v-else>{{ fmtAmount(row.paidAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="支付日期" width="130" align="center">
+        <el-table-column v-if="isColVisible('paidDate')" label="支付日期" width="130" align="center">
           <template #default="{ row, $index }">
             <el-date-picker v-if="!isReadonly" :model-value="row.paidDate" type="date" size="small" style="width:100%" value-format="YYYY-MM-DD" @update:model-value="(val: string) => handleUpdate($index, 'paidDate', val || '')" />
             <span v-else>{{ row.paidDate || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="支付方式" width="110" align="center">
+        <el-table-column v-if="isColVisible('paymentMethod')" label="支付方式" width="110" align="center">
           <template #default="{ row, $index }">
             <el-select v-if="!isReadonly" :model-value="row.paymentMethod" size="small" style="width:100%" placeholder="选择" @change="(val: string) => handleUpdate($index, 'paymentMethod', val)">
               <el-option v-for="opt in PAYMENT_METHOD_OPTIONS" :key="opt.value" :value="opt.value" :label="opt.label" />
@@ -193,13 +209,13 @@
             <span v-else>{{ paymentMethodLabel(row.paymentMethod) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="代扣税金" width="120" align="right">
+        <el-table-column v-if="isColVisible('withholdingTax')" label="代扣税金" width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number v-if="!isReadonly" :model-value="row.withholdingTax" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => handleUpdate($index, 'withholdingTax', val ?? 0)" />
             <span v-else>{{ fmtAmount(row.withholdingTax) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="实付净额" width="130" align="right">
+        <el-table-column v-if="isColVisible('netPaidAmount')" label="实付净额" width="130" align="right">
           <template #header>
             <el-tooltip content="公式: 本期支付 − 代扣税金" placement="top">
               <span class="formula-col-header">实付净额</span>
@@ -209,7 +225,7 @@
             <span class="formula-value">{{ fmtAmount(row.netPaidAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末应付" width="130" align="right">
+        <el-table-column v-if="isColVisible('endBalance')" label="期末应付" width="130" align="right">
           <template #header>
             <el-tooltip content="公式: 期初 + 本期宣告 − 本期支付（负债类）" placement="top">
               <span class="formula-col-header">期末应付</span>
@@ -219,7 +235,7 @@
             <span class="formula-value formula-value--primary">{{ fmtAmount(row.endBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定数" width="130" align="right">
+        <el-table-column v-if="isColVisible('endAudited')" label="审定数" width="130" align="right">
           <template #header>
             <el-tooltip content="审定期末余额（=期末应付，供M1-1交叉验证）" placement="top">
               <span class="formula-col-header">审定数</span>
@@ -229,7 +245,7 @@
             <span class="formula-value">{{ fmtAmount(row.endAudited) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期变动" width="120" align="right">
+        <el-table-column v-if="isColVisible('periodChange')" label="本期变动" width="120" align="right">
           <template #header>
             <el-tooltip content="公式: 本期宣告 − 本期支付" placement="top">
               <span class="formula-col-header">本期变动</span>
@@ -273,6 +289,19 @@
       <span class="cross-wp-desc">利润分配（分配股利来源）</span>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计说明</span>
+          <el-button size="small" @click="handleAI('auditNote')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写明细表审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m1-details-tip">
       <summary>编制提示</summary>
@@ -301,8 +330,8 @@
  *
  * 科目：2232 应付股利（贷方/负债类！期末=期初+贷方-借方）
  */
-import { computed, inject, onMounted, ref } from 'vue'
-import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
+import { computed, inject, onMounted, reactive, ref } from 'vue'
+import { Plus, MagicStick, Check, Setting } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useM1FormData } from '../../composables/useM1FormData'
@@ -358,9 +387,73 @@ const { exportTemplate, exportData, importData } = useM1ImportExport({
 
 const segmentOptions = M1_DETAIL_SEGMENTS.map(s => ({ label: s.label, value: s.key }))
 
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const COL_PREFS_KEY = 'm1-2-column-prefs'
+
+interface ColDef { key: string; label: string; segment: string }
+
+const ALL_COLS: ColDef[] = [
+  { key: 'shareholdingRatio', label: '持股比例', segment: 'shareholder' },
+  { key: 'currency', label: '币种', segment: 'shareholder' },
+  { key: 'shareholderType', label: '股东类型', segment: 'shareholder' },
+  { key: 'remark', label: '备注', segment: 'shareholder' },
+  { key: 'beginBalance', label: '期初应付', segment: 'declared' },
+  { key: 'declaredAmount', label: '本期宣告', segment: 'declared' },
+  { key: 'declaredDate', label: '宣告日期', segment: 'declared' },
+  { key: 'resolutionRef', label: '决议文号', segment: 'declared' },
+  { key: 'distributionRatio', label: '分配比例', segment: 'declared' },
+  { key: 'distributionBase', label: '分配基数', segment: 'declared' },
+  { key: 'expectedDeclared', label: '应宣告', segment: 'declared' },
+  { key: 'declareDiff', label: '宣告差异', segment: 'declared' },
+  { key: 'paidAmount', label: '本期支付', segment: 'payment' },
+  { key: 'paidDate', label: '支付日期', segment: 'payment' },
+  { key: 'paymentMethod', label: '支付方式', segment: 'payment' },
+  { key: 'withholdingTax', label: '代扣税金', segment: 'payment' },
+  { key: 'netPaidAmount', label: '实付净额', segment: 'payment' },
+  { key: 'endBalance', label: '期末应付', segment: 'payment' },
+  { key: 'endAudited', label: '审定数', segment: 'payment' },
+  { key: 'periodChange', label: '本期变动', segment: 'payment' },
+]
+
+const colPrefs = reactive<Record<string, boolean>>(
+  Object.fromEntries(ALL_COLS.map(c => [c.key, true]))
+)
+
+function isColVisible(key: string): boolean {
+  return colPrefs[key] !== false
+}
+
+function persistColPrefs(): void {
+  const hidden = Object.entries(colPrefs).filter(([, v]) => !v).map(([k]) => k)
+  localStorage.setItem(COL_PREFS_KEY, JSON.stringify(hidden))
+}
+
+function resetColPrefs(): void {
+  for (const c of ALL_COLS) colPrefs[c.key] = true
+  persistColPrefs()
+}
+
+// IIFE: load saved prefs
+;(() => {
+  try {
+    const raw = localStorage.getItem(COL_PREFS_KEY)
+    if (raw) {
+      const hidden: string[] = JSON.parse(raw)
+      for (const k of hidden) { if (k in colPrefs) colPrefs[k] = false }
+    }
+  } catch { /* ignore */ }
+})()
+
 // ─── Cross-sheet ─────────────────────────────────────────────────────────────
 
 const showCrossSheetWarning = ref(false) // populated by CrossSheet composable integration
+
+const auditNote = ref('')
+
+function saveAuditNote() {
+  formData.debouncedSave('M1-2-auditNote', { remark: auditNote.value || null })
+}
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -397,7 +490,15 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `m1-detail-${section}`,
+      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.('M1-2-detail', '明细表') }
 
 // ─── Label helpers ───────────────────────────────────────────────────────────
@@ -447,6 +548,9 @@ function _restoreRows() {
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .cross-sheet-alert { margin-bottom: 12px; }
 .segment-switcher { margin-bottom: 12px; }
+.segment-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.col-prefs { display: flex; flex-direction: column; gap: 4px; }
+.col-prefs-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: #303133; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }
 .formula-value--primary { color: #67c23a; font-weight: 600; }
@@ -459,4 +563,6 @@ function _restoreRows() {
 .m1-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m1-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m1-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

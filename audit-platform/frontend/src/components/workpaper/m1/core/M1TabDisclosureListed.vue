@@ -127,6 +127,26 @@
       />
     </el-card>
 
+    <!-- ═══ 审计结论 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button size="small" @click="handleAI('conclusion')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="disclosureConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :readonly="isReadonly"
+        placeholder="请填写上市公司附注披露审计结论..."
+        @change="handleConclusionChange"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m1-details-tip">
       <summary>编制提示</summary>
@@ -191,6 +211,7 @@ const detailRows = ref([
 const overdueNote = ref('')
 const policyNote = ref('')
 const planNote = ref('')
+const disclosureConclusion = ref('')
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -213,7 +234,19 @@ function handlePlanNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-plan', { remark: planNote.value || null })
 }
 
-function handleAI(_section: string) {}
+function handleConclusionChange() {
+  formData.debouncedSave('M1-disc-listed-conclusion', { remark: disclosureConclusion.value || null })
+}
+
+function handleAI(section: string) {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `m1-disclosure-listed-${section}`,
+      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview() { openReviewDialog?.('M1-disclosure-listed', '附注披露（上市）') }
 
 function fmtAmount(val: number): string {
@@ -246,6 +279,7 @@ onUnmounted(() => {
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .disclosure-card { margin-bottom: 16px; }
+.conclusion-card { margin-bottom: 16px; border: 1px solid #d9ecff; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .m1-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }

@@ -21,7 +21,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI">
+        <el-button size="small" @click="handleAI('general')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -361,7 +361,15 @@ function handleImportExport(command: string): void {
   }
 }
 
-function handleAI(): void { /* AI辅助待集成 */ }
+function handleAI(section: string = 'general'): void {
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `m1-fx-rate-${section}`,
+      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
+      context: { section, wpId: props.wpId },
+    }).catch(() => {})
+  })
+}
 function handleReview(): void { openReviewDialog?.('M1-4-fx-rate', '外币汇率测算表') }
 
 // ─── Format ──────────────────────────────────────────────────────────────────

@@ -228,8 +228,16 @@ const naCount = computed(() => {
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 function handleAI(sectionId: string) {
-  // AI辅助功能占位——后续集成AI生成
-  setAiSectionGenerating(sectionId, false)
+  setAiSectionGenerating(sectionId, true)
+  import('@/utils/http').then(({ default: h }) => {
+    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `m1-dividend-check-${sectionId}`,
+      prompt: `请基于应付股利底稿"${sectionId}"区段数据，给出审计分析建议`,
+      context: { section: sectionId, wpId: props.wpId },
+    }).catch(() => {}).finally(() => {
+      setAiSectionGenerating(sectionId, false)
+    })
+  })
 }
 
 function handleReview(sectionId: string) {
