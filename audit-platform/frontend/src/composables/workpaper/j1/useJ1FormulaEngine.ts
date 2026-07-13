@@ -172,3 +172,7 @@ export function validateAllocationClosure(
     difference,
   }
 }
+
+// ─── Re-exports from useJ1SalaryCalc (backward compatibility) ────────────────
+
+export { calcIndustryDiffRate, calcPerCapitaSalary, calcSalaryRevenueRatio } from './useJ1SalaryCalc'

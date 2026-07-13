@@ -1,109 +1,364 @@
 /**
- * useJ1MonthlyAnalysis — J1-4 月度分析 composable（12列横向矩阵+趋势图）
+ * useJ1MonthlyAnalysis — J1-4 应付职工薪酬实质性分析表（对齐源模板）
  *
- * 列结构(16列)：项目 | 1月~12月 | 合计 | 月均 | 波动分析
- * 行结构：短期薪酬小计 + 各明细项 + 合计 + 去年同期行
+ * 源模板结构：8大指标区块 × 动态部门行 × 12月列
+ *   1. 本期计提工资（输入）    5. 上期员工数量（输入）
+ *   2. 本期员工数量（输入）    6. 上期人均工资（公式=4/5）
+ *   3. 本期人均工资（公式=1/2）7. 人均工资变动率（公式=(3-6)/6）
+ *   4. 上期计提工资（输入）    8. 本期各月计提占比（公式）
+ * 底部附加：本期实际发放额/本期留存/上年同期留存
  *
- * Source: J1-4 月度分析表 B12=SUM(B13:B16) 每月合计
+ * 前端交互：Tab切换3区段（本期/同期对比/占比与留存） + 统计概览卡片 + 异常高亮
  *
  * Spec: .kiro/specs/j1-employee-compensation/
- * Requirements: 3.4, 3.5
  */
-import { ref, computed, type Ref } from 'vue'
-import { calcMonthlyTotal, calcMonthlyAverage, calcChangeRate, parseNum } from './useJ1FormulaEngine'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { parseNum, calcChangeRate } from './useJ1FormulaEngine'
 
-export interface MonthlyRow {
+// ─── Types ────────────────────────────────────────────────────────────────
+
+export interface DeptMonthlyRow {
   id: string
+  deptName: string
+  months: number[]  // 12 values
+}
+
+/** 一个指标区块的完整数据 */
+export interface IndicatorBlock {
   label: string
-  category: string
-  months: number[]          // 12个月数值
-  total: number             // 合计=SUM(12月)
-  average: number           // 月均=合计/12
-  priorYearTotal: number    // 去年合计
-  changeRate: number        // 同比变动率
-  isSubtotal: boolean       // 是否小计行
+  isInput: boolean       // true=用户输入, false=公式计算
+  totalRow: number[]     // 合计行12个月
+  deptRows: DeptMonthlyRow[]
 }
 
 export interface MonthlyFluctuation {
-  rowId: string
-  monthIndex: number        // 0-11
+  dept: string
+  monthIndex: number
   amount: number
-  avgDeviation: number      // 偏离月均的百分比
-  isAbnormal: boolean       // 是否异常(偏离>30%)
+  avgDeviation: number
 }
 
-export function useJ1MonthlyAnalysis(htmlData: Ref<Record<string, unknown>>) {
-  const rows: Ref<MonthlyRow[]> = ref([])
-  const fluctuations: Ref<MonthlyFluctuation[]> = ref([])
+// ─── 存储键 ────────────────────────────────────────────────────────────────
 
-  function initFromHtmlData(data: Record<string, unknown>) {
-    const rawRows = (data.monthly_rows || []) as Array<Record<string, unknown>>
-    rows.value = rawRows.map(r => {
-      const months = Array.isArray(r.months)
-        ? (r.months as unknown[]).map(v => parseNum(v as number))
-        : Array(12).fill(0)
-      const total = calcMonthlyTotal(months)
-      const average = calcMonthlyAverage(months)
-      const priorYearTotal = parseNum(r.prior_year_total as number)
-      return {
-        id: String(r.id || ''),
-        label: String(r.label || ''),
-        category: String(r.category || ''),
-        months,
-        total,
-        average,
-        priorYearTotal,
-        changeRate: calcChangeRate(total, priorYearTotal),
-        isSubtotal: Boolean(r.is_subtotal),
-      }
-    })
-    detectFluctuations()
+const STORAGE_KEY = 'J1-4-monthly-analysis'
+const DEPT_KEY = 'J1-4-departments'
+
+// ─── Composable ────────────────────────────────────────────────────────────
+
+export interface UseJ1MonthlyOptions {
+  allResponses: Ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>
+  saveImmediate: (items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>) => Promise<void>
+  isReadonly: Ref<boolean>
+}
+
+export function useJ1MonthlyAnalysis(options: UseJ1MonthlyOptions) {
+  const { allResponses, saveImmediate, isReadonly } = options
+
+  // ─── 部门列表（动态） ─────────────────────────────────────────────────
+  const departments = ref<string[]>(['A部门', 'B部门', 'C部门'])
+
+  // ─── 4个输入区块的数据 ─────────────────────────────────────────────────
+  // 每个区块: Map<deptName, number[12]>
+  const currentAccrual = ref<Map<string, number[]>>(new Map())   // 本期计提工资
+  const currentHeadcount = ref<Map<string, number[]>>(new Map()) // 本期员工数量
+  const priorAccrual = ref<Map<string, number[]>>(new Map())     // 上期计提工资
+  const priorHeadcount = ref<Map<string, number[]>>(new Map())   // 上期员工数量
+
+  // 底部附加
+  const actualPaid = ref<number[]>(Array(12).fill(0))       // 本期实际发放额
+  const currentRetained = ref<number[]>(Array(12).fill(0))  // 本期留存
+  const priorRetained = ref<number[]>(Array(12).fill(0))    // 上年同期留存
+
+  // ─── 初始化空数据 ─────────────────────────────────────────────────────
+  function initEmptyBlock(block: Ref<Map<string, number[]>>) {
+    const map = new Map<string, number[]>()
+    for (const dept of departments.value) {
+      map.set(dept, Array(12).fill(0))
+    }
+    block.value = map
   }
 
-  // ── 波动检测 ──────────────────────────────────────────────────────────────
+  // ─── Load ──────────────────────────────────────────────────────────────
+  function loadAll() {
+    // 加载部门
+    const deptRaw = allResponses.value.get(DEPT_KEY)?.remark
+    if (deptRaw) {
+      try {
+        const parsed = JSON.parse(deptRaw)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          departments.value = parsed.map(String)
+        }
+      } catch { /* keep default */ }
+    }
 
-  function detectFluctuations() {
+    // 加载数据
+    const raw = allResponses.value.get(STORAGE_KEY)?.remark
+    if (raw) {
+      try {
+        const data = JSON.parse(raw)
+        loadBlock(currentAccrual, data.currentAccrual)
+        loadBlock(currentHeadcount, data.currentHeadcount)
+        loadBlock(priorAccrual, data.priorAccrual)
+        loadBlock(priorHeadcount, data.priorHeadcount)
+        actualPaid.value = ensureArr(data.actualPaid)
+        currentRetained.value = ensureArr(data.currentRetained)
+        priorRetained.value = ensureArr(data.priorRetained)
+        return
+      } catch { /* fall through to init */ }
+    }
+    // Default init
+    initEmptyBlock(currentAccrual)
+    initEmptyBlock(currentHeadcount)
+    initEmptyBlock(priorAccrual)
+    initEmptyBlock(priorHeadcount)
+  }
+
+  function loadBlock(block: Ref<Map<string, number[]>>, data: Record<string, number[]> | undefined) {
+    const map = new Map<string, number[]>()
+    if (data && typeof data === 'object') {
+      for (const dept of departments.value) {
+        map.set(dept, ensureArr(data[dept]))
+      }
+    } else {
+      for (const dept of departments.value) {
+        map.set(dept, Array(12).fill(0))
+      }
+    }
+    block.value = map
+  }
+
+  function ensureArr(val: unknown): number[] {
+    if (Array.isArray(val) && val.length >= 12) return val.slice(0, 12).map(v => parseNum(v as number))
+    return Array(12).fill(0)
+  }
+
+  loadAll()
+
+  // ─── Save ──────────────────────────────────────────────────────────────
+  let saveTimer: ReturnType<typeof setTimeout> | null = null
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer)
+    saveTimer = setTimeout(persist, 1500)
+  }
+
+  function persist() {
+    const data = {
+      currentAccrual: mapToObj(currentAccrual.value),
+      currentHeadcount: mapToObj(currentHeadcount.value),
+      priorAccrual: mapToObj(priorAccrual.value),
+      priorHeadcount: mapToObj(priorHeadcount.value),
+      actualPaid: actualPaid.value,
+      currentRetained: currentRetained.value,
+      priorRetained: priorRetained.value,
+    }
+    const items = [
+      { item_id: STORAGE_KEY, conclusion: null, remark: JSON.stringify(data) },
+      { item_id: DEPT_KEY, conclusion: null, remark: JSON.stringify(departments.value) },
+    ]
+    items.forEach(it => allResponses.value.set(it.item_id, it))
+    saveImmediate(items).catch(() => {})
+  }
+
+  function mapToObj(map: Map<string, number[]>): Record<string, number[]> {
+    const obj: Record<string, number[]> = {}
+    map.forEach((v, k) => { obj[k] = v })
+    return obj
+  }
+
+  // ─── 更新单元格 ────────────────────────────────────────────────────────
+  type BlockName = 'currentAccrual' | 'currentHeadcount' | 'priorAccrual' | 'priorHeadcount'
+
+  function getBlock(name: BlockName): Ref<Map<string, number[]>> {
+    switch (name) {
+      case 'currentAccrual': return currentAccrual
+      case 'currentHeadcount': return currentHeadcount
+      case 'priorAccrual': return priorAccrual
+      case 'priorHeadcount': return priorHeadcount
+    }
+  }
+
+  function updateCell(block: BlockName, dept: string, monthIdx: number, value: number) {
+    if (isReadonly.value) return
+    const map = getBlock(block).value
+    const arr = [...(map.get(dept) || Array(12).fill(0))]
+    arr[monthIdx] = value
+    map.set(dept, arr)
+    getBlock(block).value = new Map(map) // trigger reactivity
+    scheduleSave()
+  }
+
+  function updateBottomCell(field: 'actualPaid' | 'currentRetained' | 'priorRetained', monthIdx: number, value: number) {
+    if (isReadonly.value) return
+    const target = field === 'actualPaid' ? actualPaid : field === 'currentRetained' ? currentRetained : priorRetained
+    const arr = [...target.value]
+    arr[monthIdx] = value
+    target.value = arr
+    scheduleSave()
+  }
+
+  // ─── 部门管理 ──────────────────────────────────────────────────────────
+  function addDept(name: string) {
+    if (isReadonly.value || departments.value.includes(name)) return
+    departments.value = [...departments.value, name]
+    // 为每个区块添加空行
+    for (const block of [currentAccrual, currentHeadcount, priorAccrual, priorHeadcount]) {
+      block.value.set(name, Array(12).fill(0))
+      block.value = new Map(block.value)
+    }
+    scheduleSave()
+  }
+
+  function removeDept(name: string) {
+    if (isReadonly.value) return
+    departments.value = departments.value.filter(d => d !== name)
+    for (const block of [currentAccrual, currentHeadcount, priorAccrual, priorHeadcount]) {
+      block.value.delete(name)
+      block.value = new Map(block.value)
+    }
+    scheduleSave()
+  }
+
+  function renameDept(oldName: string, newName: string) {
+    if (isReadonly.value || !newName.trim() || oldName === newName) return
+    if (departments.value.includes(newName)) return // 避免重名
+    departments.value = departments.value.map(d => d === oldName ? newName : d)
+    for (const block of [currentAccrual, currentHeadcount, priorAccrual, priorHeadcount]) {
+      const data = block.value.get(oldName)
+      if (data) {
+        block.value.delete(oldName)
+        block.value.set(newName, data)
+        block.value = new Map(block.value)
+      }
+    }
+    scheduleSave()
+  }
+
+  // ─── 公式计算（computed） ──────────────────────────────────────────────
+
+  /** 按部门求合计行（所有部门之和） */
+  function calcTotalRow(block: Ref<Map<string, number[]>>): number[] {
+    const total = Array(12).fill(0)
+    block.value.forEach(arr => { arr.forEach((v, i) => { total[i] += v }) })
+    return total
+  }
+
+  /** 除法安全（0→0） */
+  function divArr(a: number[], b: number[]): number[] {
+    return a.map((v, i) => b[i] === 0 ? 0 : v / b[i])
+  }
+
+  /** 变动率 = (本期-上期)/|上期| × 100，上期=0时返回0或100 */
+  function changeRateArr(cur: number[], prior: number[]): number[] {
+    return cur.map((v, i) => calcChangeRate(v, prior[i]))
+  }
+
+  // 合计行
+  const currentAccrualTotal = computed(() => calcTotalRow(currentAccrual))
+  const currentHeadcountTotal = computed(() => calcTotalRow(currentHeadcount))
+  const priorAccrualTotal = computed(() => calcTotalRow(priorAccrual))
+  const priorHeadcountTotal = computed(() => calcTotalRow(priorHeadcount))
+
+  // 本期人均工资 = 本期计提 / 本期员工
+  const currentAvgWage = computed(() => divArr(currentAccrualTotal.value, currentHeadcountTotal.value))
+  // 上期人均工资 = 上期计提 / 上期员工
+  const priorAvgWage = computed(() => divArr(priorAccrualTotal.value, priorHeadcountTotal.value))
+  // 人均变动率
+  const avgWageChangeRate = computed(() => changeRateArr(currentAvgWage.value, priorAvgWage.value))
+
+  // 各月占比 = 当月计提合计 / 年合计
+  const monthlyProportion = computed(() => {
+    const yearTotal = currentAccrualTotal.value.reduce((s, v) => s + v, 0)
+    if (yearTotal === 0) return Array(12).fill(0)
+    return currentAccrualTotal.value.map(v => (v / yearTotal) * 100)
+  })
+
+  // 按部门计算人均
+  function deptAvgWage(block: BlockName, dept: string): number[] {
+    const accrualBlock = block.startsWith('current') ? currentAccrual : priorAccrual
+    const headcountBlock = block.startsWith('current') ? currentHeadcount : priorHeadcount
+    const a = accrualBlock.value.get(dept) || Array(12).fill(0)
+    const h = headcountBlock.value.get(dept) || Array(12).fill(0)
+    return divArr(a, h)
+  }
+
+  // ─── 统计概览 ──────────────────────────────────────────────────────────
+  const yearAccrualTotal = computed(() => currentAccrualTotal.value.reduce((s, v) => s + v, 0))
+  const yearHeadcountAvg = computed(() => {
+    const total = currentHeadcountTotal.value.reduce((s, v) => s + v, 0)
+    return Math.round(total / 12)
+  })
+  const yearAvgWage = computed(() => {
+    const headTotal = currentHeadcountTotal.value.reduce((s, v) => s + v, 0)
+    return headTotal === 0 ? 0 : yearAccrualTotal.value / headTotal
+  })
+  const yearAvgChangeRate = computed(() => {
+    const priorTotal = priorAccrualTotal.value.reduce((s, v) => s + v, 0)
+    const priorHead = priorHeadcountTotal.value.reduce((s, v) => s + v, 0)
+    const priorAvg = priorHead === 0 ? 0 : priorTotal / priorHead
+    return calcChangeRate(yearAvgWage.value, priorAvg)
+  })
+
+  // ─── 异常检测（月度偏离均值>30%） ─────────────────────────────────────
+  const fluctuations = computed<MonthlyFluctuation[]>(() => {
     const results: MonthlyFluctuation[] = []
-    for (const row of rows.value) {
-      if (row.isSubtotal || row.average === 0) continue
+    for (const dept of departments.value) {
+      const arr = currentAccrual.value.get(dept) || Array(12).fill(0)
+      const avg = arr.reduce((s, v) => s + v, 0) / 12
+      if (avg === 0) continue
       for (let i = 0; i < 12; i++) {
-        const deviation = ((row.months[i] - row.average) / Math.abs(row.average)) * 100
+        const deviation = ((arr[i] - avg) / Math.abs(avg)) * 100
         if (Math.abs(deviation) > 30) {
-          results.push({
-            rowId: row.id,
-            monthIndex: i,
-            amount: row.months[i],
-            avgDeviation: deviation,
-            isAbnormal: true,
-          })
+          results.push({ dept, monthIndex: i, amount: arr[i], avgDeviation: deviation })
         }
       }
     }
-    fluctuations.value = results
-  }
-
-  // ── 趋势图数据 ────────────────────────────────────────────────────────────
-
-  const chartData = computed(() => {
-    const totalRow = rows.value.find(r => r.isSubtotal && r.category === 'total')
-    if (!totalRow) {
-      // 用所有非小计行合计
-      const months = Array(12).fill(0)
-      rows.value
-        .filter(r => !r.isSubtotal)
-        .forEach(r => r.months.forEach((v, i) => { months[i] += v }))
-      return months
-    }
-    return totalRow.months
+    return results
   })
 
-  const hasAbnormalFluctuation = computed(() => fluctuations.value.length > 0)
+  // ─── 审计说明/结论 ─────────────────────────────────────────────────────
+  const auditNote = ref(allResponses.value.get('J1-4-note')?.remark || '')
+  const auditConclusion = ref(allResponses.value.get('J1-4-conclusion')?.remark || '')
+
+  function saveOpinion() {
+    if (isReadonly.value) return
+    const items = [
+      { item_id: 'J1-4-note', conclusion: null, remark: auditNote.value },
+      { item_id: 'J1-4-conclusion', conclusion: null, remark: auditConclusion.value },
+    ]
+    items.forEach(it => allResponses.value.set(it.item_id, it))
+    saveImmediate(items).catch(() => {})
+  }
 
   return {
-    rows,
+    departments,
+    currentAccrual,
+    currentHeadcount,
+    priorAccrual,
+    priorHeadcount,
+    actualPaid,
+    currentRetained,
+    priorRetained,
+    currentAccrualTotal,
+    currentHeadcountTotal,
+    priorAccrualTotal,
+    priorHeadcountTotal,
+    currentAvgWage,
+    priorAvgWage,
+    avgWageChangeRate,
+    monthlyProportion,
+    yearAccrualTotal,
+    yearHeadcountAvg,
+    yearAvgWage,
+    yearAvgChangeRate,
     fluctuations,
-    chartData,
-    hasAbnormalFluctuation,
-    initFromHtmlData,
+    auditNote,
+    auditConclusion,
+    updateCell,
+    updateBottomCell,
+    addDept,
+    removeDept,
+    renameDept,
+    saveOpinion,
+    deptAvgWage,
   }
 }

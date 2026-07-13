@@ -1,10 +1,20 @@
 """J1 应付职工薪酬 — 导入导出3端点.
 
-支持的sheet类型：detail(明细表J1-2) / accrual(计提J1-6) / allocation(分配J1-7)
-/ general(检查J1-8) / non_monetary(非货币J1-9) / severance(辞退J1-10)
+支持的sheet类型：
+- detail: 明细表J1-2（3分区×14列对齐源模板，导出3 sheet + 编制说明）
+- accrual / allocation / general / non_monetary / severance: 检查表类
+
+模板结构（detail）：
+  Sheet1: (1)短期薪酬
+  Sheet2: (2)离职后福利
+  Sheet3: (3)辞退福利
+  Sheet4: 编制说明
+
+14列表头：序号|项目名称|未审-期初数|未审-本期增加|未审-本期减少|未审-期末数|
+         期初调整-账项调整|账项调整-本期增加|账项调整-本期减少|
+         审定-期初数|审定-本期增加|审定-本期减少|审定-期末数|备注
 
 Spec: .kiro/specs/j1-employee-compensation/
-Requirements: 5.2
 """
 from __future__ import annotations
 import io
@@ -16,6 +26,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 import sqlalchemy as sa
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
 from app.core.database import get_db
 from app.deps import get_current_user
@@ -23,20 +34,341 @@ from app.deps import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["j1-import-export"])
 
-SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance"}
+SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly"}
 
-SHEET_COLUMNS = {
-    "detail": ["项目", "期初未审", "期初AJE", "期初RJE", "期初审定",
-               "期末未审", "期末AJE", "期末RJE", "期末审定",
-               "附注期初", "附注增加", "附注减少", "附注期末"],
-    "accrual": ["薪酬类别", "人数", "基数/均薪", "比例", "月数", "应提(测算)", "实提", "差异率", "说明"],
-    "allocation": ["薪酬项目", "管理费用", "销售费用", "生产成本", "制造费用",
-                   "研发费用", "在建工程", "其他", "行合计", "贷方增加", "差额"],
-    "general": ["区块", "凭证号", "日期", "摘要", "金额", "对方科目", "检查结果"],
-    "non_monetary": ["福利形式", "实物来源", "计量方式", "金额", "凭证号", "受益人数", "检查结论"],
-    "severance": ["部门", "涉及人数", "预计金额", "实际计提", "正式计划", "不可撤回", "精算师", "支付期间", "结论"],
+# ─── J1-2 明细表 14 列定义 ────────────────────────────────────────────────────
+
+DETAIL_COLUMNS = [
+    "序号", "项目名称",
+    "未审-期初数", "未审-本期增加", "未审-本期减少", "未审-期末数",
+    "期初调整-账项调整",
+    "账项调整-本期增加", "账项调整-本期减少",
+    "审定-期初数", "审定-本期增加", "审定-本期减少", "审定-期末数",
+    "备注",
+]
+
+# 3分区默认行
+SECTION_ROWS = {
+    "(1)短期薪酬": [
+        ("一", "工资、奖金、津贴和补贴"),
+        ("", "其中：1.工资"),
+        ("", "2.奖金"),
+        ("", "3.津贴"),
+        ("", "4.补贴"),
+        ("", "5.其他"),
+        ("二", "职工福利费"),
+        ("三", "社会保险费"),
+        ("", "1.基本医疗保险费"),
+        ("", "2.补充医疗保险费"),
+        ("", "3.工伤保险费"),
+        ("", "4.生育保险费"),
+        ("四", "住房公积金"),
+        ("五", "工会经费"),
+        ("六", "职工教育经费"),
+        ("七", "短期带薪缺勤"),
+        ("八", "短期利润分享计划"),
+        ("九", "非货币性福利"),
+        ("十", "其他短期薪酬"),
+        ("", "其中：以现金结算的股份支付"),
+    ],
+    "(2)离职后福利": [
+        ("一", "离职后福利"),
+        ("", "其中：1.基本养老保险"),
+        ("", "2.失业保险费"),
+        ("", "3.企业年金缴费"),
+        ("", "4.其他"),
+        ("二", "其他长期职工福利"),
+        ("", "其中：1."),
+        ("", "2.其他"),
+    ],
+    "(3)辞退福利": [
+        ("1", ""),
+    ],
 }
 
+# 检查表类列定义（保留兼容）
+CHECK_COLUMNS = {
+    "accrual": ["项目", "计提基数-名称", "计提基数-金额", "计提基数-索引", "计提比例", "应提金额", "实际计提数", "差异", "差异原因", "结论"],
+    "allocation": ["项目名称", "生产成本", "制造费用", "管理费用", "销售费用", "其他", "本期合计", "本期实际计提数", "本期差异", "差异原因", "结论"],
+    "general": ["区块", "项目", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "金额", "附件", "结论"],
+    "non_monetary": ["日期", "凭证种类", "凭证编号", "业务内容", "明细科目", "对方科目", "借方", "贷方", "附件", "非货币性福利形式", "实物来源", "结论"],
+    "severance": ["日期", "凭证种类", "凭证编号", "业务内容", "明细科目", "对方明细科目", "借方", "贷方", "附件", "结论"],
+}
+
+# ─── 样式 ─────────────────────────────────────────────────────────────────────
+
+HEADER_FONT = Font(name="微软雅黑", size=11, bold=True)
+HEADER_FILL = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
+CALC_FILL = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+THIN_BORDER = Border(
+    left=Side(style="thin"), right=Side(style="thin"),
+    top=Side(style="thin"), bottom=Side(style="thin"),
+)
+
+
+def _style_header(ws, row_num: int, col_count: int):
+    """给表头行添加样式."""
+    for col in range(1, col_count + 1):
+        cell = ws.cell(row=row_num, column=col)
+        cell.font = HEADER_FONT
+        cell.fill = HEADER_FILL
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        cell.border = THIN_BORDER
+
+
+def _build_detail_template_wb(data_sections: dict | None = None) -> Workbook:
+    """构建 J1-2 明细表工作簿（3分区sheet + 编制说明）."""
+    wb = Workbook()
+    # 删除默认sheet
+    wb.remove(wb.active)
+
+    section_keys = ["(1)短期薪酬", "(2)离职后福利", "(3)辞退福利"]
+    storage_keys = ["shortTerm", "postEmployment", "severance"]
+
+    for idx, (sec_name, stor_key) in enumerate(zip(section_keys, storage_keys)):
+        ws = wb.create_sheet(title=sec_name)
+        # 写表头
+        ws.append(DETAIL_COLUMNS)
+        _style_header(ws, 1, len(DETAIL_COLUMNS))
+
+        # 写默认行骨架或实际数据
+        rows_data = None
+        if data_sections and stor_key in data_sections:
+            rows_data = data_sections[stor_key]
+
+        if rows_data:
+            for item in rows_data:
+                ws.append([
+                    item.get("seq", ""),
+                    item.get("label", ""),
+                    item.get("unadjBegin", ""),
+                    item.get("unadjIncrease", ""),
+                    item.get("unadjDecrease", ""),
+                    "",  # 期末=公式
+                    item.get("openingAdj", ""),
+                    item.get("ajeIncrease", ""),
+                    item.get("ajeDecrease", ""),
+                    "",  # 审定期初=公式
+                    "",  # 审定增加=公式
+                    "",  # 审定减少=公式
+                    "",  # 审定期末=公式
+                    item.get("remark", ""),
+                ])
+        else:
+            # 空模板：填入默认行名
+            for seq, label in SECTION_ROWS[sec_name]:
+                ws.append([seq, label] + [""] * 12)
+
+        # 列宽设置
+        ws.column_dimensions["A"].width = 6
+        ws.column_dimensions["B"].width = 24
+        for col_letter in "CDEFGHIJKLMN":
+            ws.column_dimensions[col_letter].width = 13
+
+        # 灰底标记公式列(F/J/K/L/M = 6/10/11/12/13)
+        for row_num in range(2, ws.max_row + 1):
+            for col in [6, 10, 11, 12, 13]:
+                cell = ws.cell(row=row_num, column=col)
+                cell.fill = CALC_FILL
+
+    # 编制说明 sheet
+    ws_note = wb.create_sheet(title="编制说明")
+    ws_note["A1"] = "J1-2 应付职工薪酬明细表 — 编制说明"
+    ws_note["A1"].font = Font(name="微软雅黑", size=14, bold=True)
+    notes = [
+        "",
+        "一、表格结构",
+        "本明细表分3个分区（对应3个sheet）：",
+        "  (1) 短期薪酬 — 工资/社保/公积金/福利等",
+        "  (2) 离职后福利中设定提存计划、其他长期福利中符合设定提存条件的负债",
+        "  (3) 一年内支付的辞退福利",
+        "",
+        "二、列说明（14列）",
+        "  A-序号：分类编号（一/二/三...或1/2/3）",
+        "  B-项目名称：薪酬项目名称",
+        "  C~F-未审数：期初数 / 本期增加 / 本期减少 / 期末数(公式)",
+        "  G-期初调整：账项调整额",
+        "  H~I-账项调整：本期增加 / 本期减少",
+        "  J~M-审定数：期初数(公式) / 本期增加(公式) / 本期减少(公式) / 期末数(公式)",
+        "  N-备注",
+        "",
+        "三、公式规则（灰底列为自动计算，导入时可留空）",
+        "  未审期末(F) = 期初(C) + 增加(D) - 减少(E)",
+        "  审定期初(J) = 未审期初(C) + 期初调整(G)",
+        "  审定增加(K) = 未审增加(D) + 账项增加(H)",
+        "  审定减少(L) = 未审减少(E) + 账项减少(I)",
+        "  审定期末(M) = 审定期初(J) + 审定增加(K) - 审定减少(L)",
+        "",
+        "四、导入规则",
+        "  1. 导入时仅读取非公式列(A/B/C/D/E/G/H/I/N)的数据",
+        "  2. 灰底公式列(F/J/K/L/M)可留空，系统自动计算",
+        "  3. 每个sheet独立对应一个分区，按sheet名匹配",
+        "  4. 辞退福利分区可自由增减行数",
+        "",
+        "五、科目方向",
+        "  2211 应付职工薪酬为负债类贷方科目",
+        "  期末 = 期初 + 贷方发生(增加) - 借方发生(减少)",
+    ]
+    for i, line in enumerate(notes, start=2):
+        ws_note.cell(row=i, column=1, value=line)
+    ws_note.column_dimensions["A"].width = 80
+
+    return wb
+
+
+# ─── J1-4 月度分析表模板 ──────────────────────────────────────────────────────
+
+MONTHLY_COLUMNS = ["部门"] + [f"{m}月" for m in range(1, 13)] + ["合计"]
+
+MONTHLY_DEFAULT_DEPTS = ["A部门", "B部门", "C部门"]
+
+MONTHLY_BLOCKS = [
+    ("本期计提工资", True),
+    ("本期员工数量", True),
+    ("本期人均工资", False),      # 公式=计提/数量
+    ("上期计提工资", True),
+    ("上期员工数量", True),
+    ("上期人均工资", False),      # 公式
+    ("人均工资变动率", False),    # 公式
+]
+
+MONTHLY_BOTTOM_ROWS = ["本期实际发放额", "本期留存", "上年同期留存"]
+
+
+def _build_monthly_template_wb(data: dict | None = None) -> Workbook:
+    """构建 J1-4 月度分析表工作簿（4 sheets: 本期分析/同期对比/占比与留存/编制说明）."""
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    # Sheet1: 本期分析（本期计提+本期员工数量，用户填入）
+    ws1 = wb.create_sheet(title="本期分析")
+    _write_monthly_block(ws1, "本期计提工资", data, "currentAccrual", start_row=1)
+    next_row = 2 + len(MONTHLY_DEFAULT_DEPTS) + 2  # header + dept rows + total + gap
+    _write_monthly_block(ws1, "本期员工数量", data, "currentHeadcount", start_row=next_row, is_integer=True)
+    _set_monthly_col_widths(ws1)
+
+    # Sheet2: 同期对比（上期计提+上期员工数量）
+    ws2 = wb.create_sheet(title="同期对比")
+    _write_monthly_block(ws2, "上期计提工资", data, "priorAccrual", start_row=1)
+    next_row2 = 2 + len(MONTHLY_DEFAULT_DEPTS) + 2
+    _write_monthly_block(ws2, "上期员工数量", data, "priorHeadcount", start_row=next_row2, is_integer=True)
+    _set_monthly_col_widths(ws2)
+
+    # Sheet3: 占比与留存（实际发放/本期留存/上年同期留存）
+    ws3 = wb.create_sheet(title="占比与留存")
+    ws3.append(MONTHLY_COLUMNS)
+    _style_header(ws3, 1, len(MONTHLY_COLUMNS))
+    bottom_data = data or {}
+    for label in MONTHLY_BOTTOM_ROWS:
+        field_map = {"本期实际发放额": "actualPaid", "本期留存": "currentRetained", "上年同期留存": "priorRetained"}
+        field = field_map.get(label, "")
+        row_data = bottom_data.get(field, [0] * 12) if data else [0] * 12
+        if not isinstance(row_data, list) or len(row_data) < 12:
+            row_data = [0] * 12
+        ws3.append([label] + row_data[:12] + [sum(row_data[:12])])
+    _set_monthly_col_widths(ws3)
+
+    # Sheet4: 编制说明
+    ws_note = wb.create_sheet(title="编制说明")
+    ws_note["A1"] = "J1-4 应付职工薪酬实质性分析表 — 编制说明"
+    ws_note["A1"].font = Font(name="微软雅黑", size=14, bold=True)
+    notes = [
+        "",
+        "一、表格结构",
+        "本分析表分3个sheet（本期分析/同期对比/占比与留存），对应前端3个Tab：",
+        "  Sheet1「本期分析」：本期计提工资（按部门×12月）+ 本期员工数量",
+        "  Sheet2「同期对比」：上期计提工资 + 上期员工数量",
+        "  Sheet3「占比与留存」：本期实际发放额 / 本期留存 / 上年同期留存",
+        "",
+        "二、列结构（14列）",
+        "  A-部门：部门/人员类型名称（如A部门、B部门，可自由命名）",
+        "  B~M-1月~12月：各月金额或人数",
+        "  N-合计：12个月之和（公式列，导入时可留空）",
+        "",
+        "三、行结构",
+        "  每个区块：N个部门行（动态，可增删）+ 1个合计行（公式，导入时可留空）",
+        "  导入时按部门名称匹配，新部门自动创建，空行跳过",
+        "",
+        "四、公式规则（系统自动计算，导入时可留空）",
+        "  合计(N列) = SUM(1月~12月)",
+        "  本期人均工资 = 本期计提工资 ÷ 本期员工数量（按部门×月）",
+        "  上期人均工资 = 上期计提工资 ÷ 上期员工数量",
+        "  人均工资变动率 = (本期人均 - 上期人均) ÷ |上期人均| × 100%",
+        "  本期各月占比 = 当月计提合计 ÷ 全年合计 × 100%",
+        "",
+        "五、导入规则",
+        "  1. 仅读取用户输入区块（本期计提/本期员工/上期计提/上期员工/底部3行）",
+        "  2. 公式区块（人均/变动率/占比）不导入，系统自动计算",
+        "  3. 按sheet名匹配分区：本期分析→currentAccrual+currentHeadcount",
+        "  4. 「合计」行不导入（系统自动求和）",
+        "  5. 部门名称为空的行跳过",
+        "",
+        "六、审计关注点",
+        "  1. 关注各月之间波动有无异常，如果异常降低，考虑是否存在其他方",
+        "     （如关联方）代付工资的情况",
+        "  2. 关注实际薪酬发放日与资产负债表日的间隔时间，考虑本期留存",
+        "     金额是否合理",
+        "  3. 人均工资变动率>30% 系统自动红色预警，须结合业务实质判断",
+        "",
+        "七、科目方向",
+        "  2211 应付职工薪酬为负债类贷方科目",
+        "  计提=贷方增加（各月计提金额为正数）",
+        "  发放=借方减少",
+    ]
+    for i, line in enumerate(notes, start=2):
+        ws_note.cell(row=i, column=1, value=line)
+    ws_note.column_dimensions["A"].width = 80
+
+    return wb
+
+
+def _write_monthly_block(ws, title: str, data: dict | None, field: str, start_row: int, is_integer: bool = False):
+    """向ws写入一个指标区块（标题行+表头+部门行+合计行）."""
+    # 标题行
+    ws.cell(row=start_row, column=1, value=title)
+    ws.cell(row=start_row, column=1).font = Font(bold=True, size=11)
+    # 表头行
+    header_row = start_row + 1
+    for col_idx, col_name in enumerate(MONTHLY_COLUMNS, 1):
+        ws.cell(row=header_row, column=col_idx, value=col_name)
+    _style_header(ws, header_row, len(MONTHLY_COLUMNS))
+
+    # 数据行
+    depts = MONTHLY_DEFAULT_DEPTS
+    block_data = {}
+    if data and field in data and isinstance(data[field], dict):
+        block_data = data[field]
+        # 如果数据中有额外部门，加入
+        for dept in block_data:
+            if dept not in depts:
+                depts = list(depts) + [dept]
+
+    current_row = header_row + 1
+    for dept in depts:
+        months = block_data.get(dept, [0] * 12)
+        if not isinstance(months, list) or len(months) < 12:
+            months = [0] * 12
+        total = sum(months[:12])
+        row_values = [dept] + months[:12] + [total]
+        for col_idx, val in enumerate(row_values, 1):
+            ws.cell(row=current_row, column=col_idx, value=val)
+        current_row += 1
+
+    # 合计行（灰底）
+    ws.cell(row=current_row, column=1, value="合计")
+    ws.cell(row=current_row, column=1).font = Font(bold=True)
+    for col in range(1, len(MONTHLY_COLUMNS) + 1):
+        ws.cell(row=current_row, column=col).fill = CALC_FILL
+
+
+def _set_monthly_col_widths(ws):
+    """设置月度表列宽."""
+    ws.column_dimensions["A"].width = 14
+    for letter in "BCDEFGHIJKLMN":
+        ws.column_dimensions[letter].width = 11
+
+
+# ─── 路由 ─────────────────────────────────────────────────────────────────────
 
 @router.get("/api/workpapers/{wp_id}/j1/export-template")
 async def export_template(
@@ -44,15 +376,21 @@ async def export_template(
     sheet_type: str = Query(...),
     _user=Depends(get_current_user),
 ):
-    """导出模板（空表头）."""
+    """导出模板（空表头 + 默认行骨架 + 编制说明）."""
     if sheet_type not in SHEET_TYPES:
         raise HTTPException(400, f"不支持的sheet类型: {sheet_type}")
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"J1-{sheet_type}"
-    columns = SHEET_COLUMNS[sheet_type]
-    ws.append(columns)
+    if sheet_type == "detail":
+        wb = _build_detail_template_wb()
+    elif sheet_type == "monthly":
+        wb = _build_monthly_template_wb()
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"J1-{sheet_type}"
+        columns = CHECK_COLUMNS[sheet_type]
+        ws.append(columns)
+        _style_header(ws, 1, len(columns))
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -78,27 +416,69 @@ async def export_data(
     if sheet_type not in SHEET_TYPES:
         raise HTTPException(400, f"不支持的sheet类型: {sheet_type}")
 
-    # 从 checklist_responses 读取数据
-    item_id = f"J1-{sheet_type}-data"
-    result = await db.execute(
-        sa.text("SELECT content FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"),
-        {"wp_id": wp_id, "iid": item_id},
-    )
-    row = result.fetchone()
-    data_rows = []
-    if row and row.content:
-        try:
-            data_rows = json.loads(row.content)
-        except (json.JSONDecodeError, TypeError):
-            pass
+    if sheet_type == "detail":
+        # 读3分区数据
+        data_sections = {}
+        for stor_key in ["shortTerm", "postEmployment", "severance"]:
+            item_id = f"J1-2-detail-{stor_key}"
+            result = await db.execute(
+                sa.text(
+                    "SELECT remark FROM checklist_responses "
+                    "WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"
+                ),
+                {"wp_id": wp_id, "iid": item_id},
+            )
+            row = result.fetchone()
+            if row and row.remark:
+                try:
+                    data_sections[stor_key] = json.loads(row.remark)
+                except (json.JSONDecodeError, TypeError):
+                    pass
 
-    wb = Workbook()
-    ws = wb.active
-    ws.title = f"J1-{sheet_type}"
-    columns = SHEET_COLUMNS[sheet_type]
-    ws.append(columns)
-    for item in data_rows:
-        ws.append([item.get(c, "") for c in columns])
+        wb = _build_detail_template_wb(data_sections if data_sections else None)
+    elif sheet_type == "monthly":
+        # 读月度分析数据
+        result = await db.execute(
+            sa.text(
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"
+            ),
+            {"wp_id": wp_id, "iid": "J1-4-monthly-analysis"},
+        )
+        row = result.fetchone()
+        monthly_data = None
+        if row and row.remark:
+            try:
+                monthly_data = json.loads(row.remark)
+            except (json.JSONDecodeError, TypeError):
+                pass
+        wb = _build_monthly_template_wb(monthly_data)
+    else:
+        # 检查表类 - 走原有逻辑
+        item_id = f"J1-{sheet_type}-data"
+        result = await db.execute(
+            sa.text(
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"
+            ),
+            {"wp_id": wp_id, "iid": item_id},
+        )
+        row = result.fetchone()
+        data_rows = []
+        if row and row.remark:
+            try:
+                data_rows = json.loads(row.remark)
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"J1-{sheet_type}"
+        columns = CHECK_COLUMNS[sheet_type]
+        ws.append(columns)
+        _style_header(ws, 1, len(columns))
+        for item in data_rows:
+            ws.append([item.get(c, "") for c in columns])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -127,30 +507,194 @@ async def import_data(
 
     content = await file.read()
     wb = load_workbook(io.BytesIO(content), data_only=True)
-    ws = wb.active
 
-    # 读取表头
-    headers = [str(cell.value or "").strip() for cell in ws[1]]
-    # 读取数据行
-    imported_rows = []
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        row_dict = {}
-        for i, val in enumerate(row):
-            if i < len(headers):
-                row_dict[headers[i]] = val
-        if any(v is not None and v != "" for v in row_dict.values()):
-            imported_rows.append(row_dict)
+    if sheet_type == "detail":
+        # 导入3分区
+        section_map = {
+            "(1)短期薪酬": "shortTerm",
+            "(2)离职后福利": "postEmployment",
+            "(3)辞退福利": "severance",
+        }
+        total_imported = 0
+        for sheet_name, stor_key in section_map.items():
+            if sheet_name not in wb.sheetnames:
+                continue
+            ws = wb[sheet_name]
+            # 读表头
+            headers = [str(cell.value or "").strip() for cell in ws[1]]
+            rows = []
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                row_dict = {}
+                for i, val in enumerate(row):
+                    if i < len(headers):
+                        row_dict[headers[i]] = val
+                # 跳过完全空行
+                if not any(v is not None and v != "" for v in row_dict.values()):
+                    continue
+                # 转换为composable字段名
+                parsed = {
+                    "seq": str(row_dict.get("序号", "") or ""),
+                    "label": str(row_dict.get("项目名称", "") or ""),
+                    "unadjBegin": _to_num(row_dict.get("未审-期初数")),
+                    "unadjIncrease": _to_num(row_dict.get("未审-本期增加")),
+                    "unadjDecrease": _to_num(row_dict.get("未审-本期减少")),
+                    "openingAdj": _to_num(row_dict.get("期初调整-账项调整")),
+                    "ajeIncrease": _to_num(row_dict.get("账项调整-本期增加")),
+                    "ajeDecrease": _to_num(row_dict.get("账项调整-本期减少")),
+                    "remark": str(row_dict.get("备注", "") or ""),
+                }
+                rows.append(parsed)
+                total_imported += 1
 
-    # 存储到 checklist_responses
-    item_id = f"J1-{sheet_type}-data"
-    await db.execute(
-        sa.text(
-            "INSERT INTO checklist_responses (wp_id, item_id, content) "
-            "VALUES (:wp_id, :iid, :content) "
-            "ON CONFLICT (wp_id, item_id) DO UPDATE SET content = :content"
-        ),
-        {"wp_id": wp_id, "iid": item_id, "content": json.dumps(imported_rows, ensure_ascii=False)},
-    )
-    await db.commit()
+            if rows:
+                item_id = f"J1-2-detail-{stor_key}"
+                serialized = json.dumps(rows, ensure_ascii=False)
+                await db.execute(
+                    sa.text(
+                        "INSERT INTO checklist_responses (wp_id, item_id, remark) "
+                        "VALUES (:wp_id, :iid, :remark) "
+                        "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
+                    ),
+                    {"wp_id": wp_id, "iid": item_id, "remark": serialized},
+                )
 
-    return {"imported_count": len(imported_rows), "sheet_type": sheet_type}
+        await db.commit()
+        return {"imported_count": total_imported, "sheet_type": sheet_type}
+    elif sheet_type == "monthly":
+        # 导入月度分析
+        monthly_sheet_map = {
+            "本期分析": [("本期计提工资", "currentAccrual"), ("本期员工数量", "currentHeadcount")],
+            "同期对比": [("上期计提工资", "priorAccrual"), ("上期员工数量", "priorHeadcount")],
+            "占比与留存": [],  # bottom rows
+        }
+        result_data: dict = {}
+        total_imported = 0
+
+        for sheet_name, blocks in monthly_sheet_map.items():
+            if sheet_name not in wb.sheetnames:
+                continue
+            ws = wb[sheet_name]
+
+            if sheet_name == "占比与留存":
+                # 读底部3行
+                headers = [str(cell.value or "").strip() for cell in ws[1]]
+                field_map = {"本期实际发放额": "actualPaid", "本期留存": "currentRetained", "上年同期留存": "priorRetained"}
+                for row in ws.iter_rows(min_row=2, values_only=True):
+                    if not row or not row[0]:
+                        continue
+                    label = str(row[0]).strip()
+                    if label in field_map:
+                        months = [_to_num(row[i] if i < len(row) else 0) for i in range(1, 13)]
+                        result_data[field_map[label]] = months
+                        total_imported += 1
+            else:
+                # 读各区块
+                current_block_field = None
+                reading_data = False
+                for row in ws.iter_rows(min_row=1, values_only=True):
+                    if not row:
+                        continue
+                    first_cell = str(row[0] or "").strip()
+                    # 检查是否是区块标题
+                    matched_block = None
+                    for block_title, field_name in blocks:
+                        if first_cell == block_title:
+                            matched_block = field_name
+                            break
+                    if matched_block:
+                        current_block_field = matched_block
+                        if current_block_field not in result_data:
+                            result_data[current_block_field] = {}
+                        reading_data = False
+                        continue
+                    # 检查是否是表头行
+                    if first_cell == "部门":
+                        reading_data = True
+                        continue
+                    # 读数据行
+                    if reading_data and current_block_field and first_cell:
+                        if first_cell == "合计":
+                            reading_data = False
+                            continue
+                        months = [_to_num(row[i] if i < len(row) else 0) for i in range(1, 13)]
+                        result_data[current_block_field][first_cell] = months
+                        total_imported += 1
+
+        if result_data:
+            # 合并到已有数据
+            existing_raw = None
+            existing_result = await db.execute(
+                sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"),
+                {"wp_id": wp_id, "iid": "J1-4-monthly-analysis"},
+            )
+            existing_row = existing_result.fetchone()
+            if existing_row and existing_row.remark:
+                try:
+                    existing_raw = json.loads(existing_row.remark)
+                except (json.JSONDecodeError, TypeError):
+                    existing_raw = {}
+            if not existing_raw:
+                existing_raw = {}
+            existing_raw.update(result_data)
+
+            serialized = json.dumps(existing_raw, ensure_ascii=False)
+            await db.execute(
+                sa.text(
+                    "INSERT INTO checklist_responses (wp_id, item_id, remark) "
+                    "VALUES (:wp_id, :iid, :remark) "
+                    "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
+                ),
+                {"wp_id": wp_id, "iid": "J1-4-monthly-analysis", "remark": serialized},
+            )
+            # 更新部门列表
+            all_depts = set()
+            for field in ["currentAccrual", "currentHeadcount", "priorAccrual", "priorHeadcount"]:
+                if field in existing_raw and isinstance(existing_raw[field], dict):
+                    all_depts.update(existing_raw[field].keys())
+            if all_depts:
+                dept_serialized = json.dumps(sorted(all_depts), ensure_ascii=False)
+                await db.execute(
+                    sa.text(
+                        "INSERT INTO checklist_responses (wp_id, item_id, remark) "
+                        "VALUES (:wp_id, :iid, :remark) "
+                        "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
+                    ),
+                    {"wp_id": wp_id, "iid": "J1-4-departments", "remark": dept_serialized},
+                )
+
+        await db.commit()
+        return {"imported_count": total_imported, "sheet_type": sheet_type}
+    else:
+        # 检查表类 — 原有逻辑
+        ws = wb.active
+        headers = [str(cell.value or "").strip() for cell in ws[1]]
+        imported_rows = []
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            row_dict = {}
+            for i, val in enumerate(row):
+                if i < len(headers):
+                    row_dict[headers[i]] = val
+            if any(v is not None and v != "" for v in row_dict.values()):
+                imported_rows.append(row_dict)
+
+        item_id = f"J1-{sheet_type}-data"
+        await db.execute(
+            sa.text(
+                "INSERT INTO checklist_responses (wp_id, item_id, remark) "
+                "VALUES (:wp_id, :iid, :remark) "
+                "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
+            ),
+            {"wp_id": wp_id, "iid": item_id, "remark": json.dumps(imported_rows, ensure_ascii=False)},
+        )
+        await db.commit()
+        return {"imported_count": len(imported_rows), "sheet_type": sheet_type}
+
+
+def _to_num(val) -> float:
+    """安全数值转换."""
+    if val is None or val == "":
+        return 0
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return 0

@@ -1,81 +1,195 @@
 <template>
   <div class="j1-tab-monthly">
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      <template #title>
-        审计目标：通过月度趋势分析识别应付职工薪酬计提的异常波动（偏离月均 &gt;30%），关注年终奖跨期、离职集中、社保调整等异常，实施分析性程序。
-      </template>
-    </el-alert>
+    <!-- 方法论上下文（琥珀块） -->
+    <div class="amber-context">
+      <p><b>提示1：</b>关注各月之间波动有无异常。如果异常降低，考虑是否存在其他方（如关联方）代付工资的情况。</p>
+      <p><b>提示2：</b>关注实际薪酬发放日与资产负债表日的间隔时间，考虑本期留存金额是否合理。</p>
+    </div>
 
-    <el-card shadow="never">
-      <template #header>
-        <div class="header-row">
-          <span class="section-title">应付职工薪酬月度分析表（12列横向）</span>
-          <el-tag v-if="hasAbnormalFluctuation" type="danger" size="small">存在异常波动</el-tag>
-          <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
-          <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    <!-- 统计概览卡片 -->
+    <div class="stats-cards">
+      <div class="stat-card">
+        <div class="stat-label">本期计提合计</div>
+        <div class="stat-value">{{ fmtAmount(yearAccrualTotal) }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">月均员工人数</div>
+        <div class="stat-value">{{ yearHeadcountAvg }} 人</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">年度人均工资</div>
+        <div class="stat-value">{{ fmtAmount(yearAvgWage) }}</div>
+      </div>
+      <div class="stat-card" :class="{ 'stat-danger': Math.abs(yearAvgChangeRate) > 30 }">
+        <div class="stat-label">人均变动率</div>
+        <div class="stat-value">{{ yearAvgChangeRate.toFixed(1) }}%</div>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddDept">
+          + 新增部门
+        </el-button>
+        <GtIndexChip value="wp:J1-1" :context-project-id="projectId" />
+        <el-tag size="small" type="info">{{ departments.length }} 个部门</el-tag>
+      </div>
+      <div class="toolbar-right">
+        <el-dropdown size="small" trigger="click">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('monthly')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('monthly')">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="triggerImport">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
+    </div>
+
+    <!-- 3区段Tab -->
+    <el-tabs v-model="activeTab" type="border-card">
+      <!-- Tab1: 本期分析 -->
+      <el-tab-pane label="本期分析" name="current">
+        <h4 class="block-title">本期计提工资</h4>
+        <MonthlyBlockTable
+          :departments="departments" :data="currentAccrual" :total-row="currentAccrualTotal"
+          :is-readonly="isReadonly" block-name="currentAccrual" show-proportion
+          @update="(dept, mi, v) => updateCell('currentAccrual', dept, mi, v)"
+          @remove-dept="removeDept"
+          @rename-dept="renameDept"
+        />
+
+        <h4 class="block-title">本期员工数量</h4>
+        <MonthlyBlockTable
+          :departments="departments" :data="currentHeadcount" :total-row="currentHeadcountTotal"
+          :is-readonly="isReadonly" block-name="currentHeadcount" :is-integer="true"
+          @update="(dept, mi, v) => updateCell('currentHeadcount', dept, mi, v)"
+          @remove-dept="removeDept"
+          @rename-dept="renameDept"
+        />
+
+        <h4 class="block-title">本期人均工资 <el-tag size="small" type="info">公式=计提÷数量</el-tag></h4>
+        <MonthlyBlockTable
+          :departments="departments" :data="currentAccrual" :total-row="currentAvgWage"
+          :is-readonly="true" block-name="currentAvgWage" :is-formula="true"
+          :formula-fn="(dept) => deptAvgWage('currentAccrual', dept)"
+        />
+      </el-tab-pane>
+
+      <!-- Tab2: 同期对比 -->
+      <el-tab-pane label="同期对比" name="compare">
+        <h4 class="block-title">上期计提工资</h4>
+        <MonthlyBlockTable
+          :departments="departments" :data="priorAccrual" :total-row="priorAccrualTotal"
+          :is-readonly="isReadonly" block-name="priorAccrual"
+          @update="(dept, mi, v) => updateCell('priorAccrual', dept, mi, v)"
+          @remove-dept="removeDept"
+          @rename-dept="renameDept"
+        />
+
+        <h4 class="block-title">上期员工数量</h4>
+        <MonthlyBlockTable
+          :departments="departments" :data="priorHeadcount" :total-row="priorHeadcountTotal"
+          :is-readonly="isReadonly" block-name="priorHeadcount" :is-integer="true"
+          @update="(dept, mi, v) => updateCell('priorHeadcount', dept, mi, v)"
+          @remove-dept="removeDept"
+        />
+
+        <h4 class="block-title">上期人均工资 <el-tag size="small" type="info">公式</el-tag></h4>
+        <MonthlyBlockTable
+          :departments="departments" :data="priorAccrual" :total-row="priorAvgWage"
+          :is-readonly="true" block-name="priorAvgWage" :is-formula="true"
+          :formula-fn="(dept) => deptAvgWage('priorAccrual', dept)"
+        />
+
+        <h4 class="block-title">人均工资变动率 <el-tag size="small" type="danger">异常>30%红色</el-tag></h4>
+        <div class="rate-table-wrapper">
+          <el-table :data="changeRateTableData" border size="small" style="font-size:13px">
+            <el-table-column prop="dept" label="部门" width="120" fixed />
+            <el-table-column v-for="m in 12" :key="m" :label="`${m}月`" width="75" align="right">
+              <template #default="{ row }">
+                <span :class="{ 'text-danger': Math.abs(row.months[m-1]) > 30 }">
+                  {{ row.months[m-1].toFixed(1) }}%
+                </span>
+              </template>
+            </el-table-column>
+          </el-table>
         </div>
-      </template>
+      </el-tab-pane>
 
-      <!-- 12列横向表格 -->
-      <div class="monthly-table-wrapper">
-        <el-table :data="rows" border size="small" style="font-size: 13px" max-height="500"
-          :row-class-name="({ row }) => row.isSubtotal ? 'subtotal-row' : ''">
-          <el-table-column prop="label" label="项目" min-width="140" fixed />
-          <el-table-column v-for="m in 12" :key="m" :label="`${m}月`" width="90" align="right">
+      <!-- Tab3: 占比与留存 -->
+      <el-tab-pane label="占比与留存" name="retention">
+        <h4 class="block-title">本期各月计提占比 <el-tag size="small" type="info">公式=当月÷全年合计</el-tag></h4>
+        <div class="proportion-bar">
+          <div v-for="(pct, idx) in monthlyProportion" :key="idx" class="prop-item">
+            <div class="prop-bar" :style="{ height: Math.max(4, pct * 1.5) + 'px' }" />
+            <span class="prop-val">{{ pct.toFixed(1) }}%</span>
+            <span class="prop-label">{{ idx + 1 }}月</span>
+          </div>
+        </div>
+
+        <h4 class="block-title">本期实际发放额 & 留存分析</h4>
+        <el-table :data="retentionTableData" border size="small" style="font-size:13px">
+          <el-table-column prop="label" label="项目" width="140" fixed />
+          <el-table-column v-for="m in 12" :key="m" :label="`${m}月`" width="100" align="right">
             <template #default="{ row }">
-              <span :class="{ 'fluctuation-cell': isFluctuation(row.id, m - 1) }">
-                {{ row.months?.[m - 1]?.toLocaleString() || '-' }}
-              </span>
+              <el-input-number
+                v-if="!isReadonly && row.editable"
+                :model-value="row.months[m-1]"
+                :controls="false" size="small" style="width:88px"
+                @change="(v: number) => updateBottomCell(row.field, m-1, v ?? 0)"
+              />
+              <span v-else>{{ fmtNum(row.months[m-1]) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="合计" width="110" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
-              <span class="formula-cell" title="合计=SUM(1月~12月)">{{ row.total?.toLocaleString() }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="月均" width="100" align="right">
-            <template #default="{ row }">{{ row.average?.toFixed(0) }}</template>
-          </el-table-column>
-          <el-table-column label="同比变动" width="90" align="right">
-            <template #default="{ row }">
-              <span :class="{ 'text-danger': Math.abs(row.changeRate) > 30 }">
-                {{ row.changeRate?.toFixed(1) }}%
-              </span>
+              <b>{{ fmtNum(row.months.reduce((s: number, v: number) => s + v, 0)) }}</b>
             </template>
           </el-table-column>
         </el-table>
-      </div>
-    </el-card>
+      </el-tab-pane>
+    </el-tabs>
 
-    <!-- 趋势图 -->
-    <el-card shadow="never" class="chart-card">
-      <template #header><span class="section-title">月度趋势图</span></template>
-      <div class="chart-placeholder">
-        <div class="mini-bar-chart">
-          <div v-for="(val, idx) in chartData" :key="idx" class="bar-item">
-            <div class="bar" :style="{ height: barHeight(val) + 'px' }" />
-            <span class="bar-label">{{ idx + 1 }}月</span>
-          </div>
+    <!-- 异常波动提示 -->
+    <el-alert v-if="fluctuations.length > 0" type="warning" :closable="false" show-icon style="margin-top:12px">
+      <template #title>
+        发现 {{ fluctuations.length }} 处异常波动（偏离月均>30%）
+      </template>
+      <template #default>
+        <div style="font-size:12px;max-height:100px;overflow-y:auto">
+          <span v-for="(f, i) in fluctuations.slice(0, 10)" :key="i" style="margin-right:12px">
+            {{ f.dept }} {{ f.monthIndex + 1 }}月 偏离{{ f.avgDeviation.toFixed(0) }}%
+          </span>
+          <span v-if="fluctuations.length > 10">...等</span>
         </div>
-      </div>
-    </el-card>
+      </template>
+    </el-alert>
 
-    <!-- 波动高亮说明 -->
-    <el-card v-if="fluctuations.length > 0" shadow="never" class="fluctuation-card">
-      <template #header><span class="section-title">异常波动（偏离月均>30%）</span></template>
-      <el-table :data="fluctuations" size="small" style="font-size: 13px">
-        <el-table-column prop="rowId" label="项目" width="120" />
-        <el-table-column label="月份" width="80">
-          <template #default="{ row }">{{ row.monthIndex + 1 }}月</template>
-        </el-table-column>
-        <el-table-column prop="amount" label="金额" width="120" align="right" />
-        <el-table-column label="偏离率" width="100" align="right">
-          <template #default="{ row }">
-            <span class="text-danger">{{ row.avgDeviation?.toFixed(1) }}%</span>
-          </template>
-        </el-table-column>
-      </el-table>
+    <!-- 审计说明与结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明与结论</span>
+        </div>
+      </template>
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">三、审计说明</span>
+          <el-button size="small" type="primary" plain :loading="aiLoading === 'note'" :disabled="isReadonly" @click="generateAi('note')">🤖 AI辅助</el-button>
+        </div>
+        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" placeholder="请输入审计说明..." :disabled="isReadonly" @change="saveOpinion" />
+      </div>
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">四、审计结论</span>
+          <el-button size="small" type="primary" plain :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="generateAi('conclusion')">🤖 AI辅助</el-button>
+        </div>
+        <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2 }" placeholder="请输入审计结论..." :disabled="isReadonly" @change="saveOpinion" />
+      </div>
     </el-card>
 
     <!-- 编制提示 -->
@@ -83,61 +197,154 @@
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
         <p>1. 月度分析用于实施分析性程序，识别薪酬计提的期间异常与合理性。</p>
-        <p>2. 灰色底纹"合计"列为自动计算列（SUM 1~12 月），不可手动编辑。</p>
-        <p>3. 单月金额偏离月均超过 30% 自动高亮，须结合业务实质（年终奖、离职补偿等）判断合理性。</p>
-        <p>4. 同比变动率异常项应与同行业对比分析表（J1-5）交叉印证。</p>
+        <p>2. 人均工资=计提工资÷员工数量（按部门+合计双维度）。</p>
+        <p>3. 人均工资变动率>30%自动红色预警，须结合业务实质（年终奖、离职补偿等）判断。</p>
+        <p>4. "本期留存=计提-实际发放"，关注留存金额与上年同期对比是否合理。</p>
       </div>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, toRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJ1MonthlyAnalysis } from '@/composables/workpaper/j1/useJ1MonthlyAnalysis'
+import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import MonthlyBlockTable from './MonthlyBlockTable.vue'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   htmlData?: Record<string, unknown> | null
+  allResponses?: Map<string, any>
+  isReadonly?: boolean
+  saveImmediate?: (items: Array<any>) => Promise<void>
 }>()
 
-const htmlDataRef = ref(props.htmlData || {})
-const { rows, fluctuations, chartData, hasAbnormalFluctuation, initFromHtmlData } = useJ1MonthlyAnalysis(htmlDataRef)
+const isReadonly = computed(() => props.isReadonly ?? false)
+const allResponsesRef = ref(props.allResponses || new Map())
 
-onMounted(() => { if (props.htmlData) initFromHtmlData(props.htmlData) })
+const {
+  departments, currentAccrual, currentHeadcount, priorAccrual, priorHeadcount,
+  actualPaid, currentRetained, priorRetained,
+  currentAccrualTotal, currentHeadcountTotal, priorAccrualTotal, priorHeadcountTotal,
+  currentAvgWage, priorAvgWage, avgWageChangeRate, monthlyProportion,
+  yearAccrualTotal, yearHeadcountAvg, yearAvgWage, yearAvgChangeRate,
+  fluctuations, auditNote, auditConclusion,
+  updateCell, updateBottomCell, addDept, removeDept, renameDept, saveOpinion, deptAvgWage,
+} = useJ1MonthlyAnalysis({
+  allResponses: allResponsesRef,
+  saveImmediate: props.saveImmediate || (async () => {}),
+  isReadonly: toRef(props, 'isReadonly') as any || ref(false),
+})
 
-function isFluctuation(rowId: string, monthIdx: number): boolean {
-  return fluctuations.value.some(f => f.rowId === rowId && f.monthIndex === monthIdx)
+const activeTab = ref('current')
+const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
+
+// 变动率表格数据
+const changeRateTableData = computed(() => {
+  const rows: Array<{ dept: string; months: number[] }> = []
+  for (const dept of departments.value) {
+    const curAvg = deptAvgWage('currentAccrual', dept)
+    const priAvg = deptAvgWage('priorAccrual', dept)
+    const rates = curAvg.map((v, i) => priAvg[i] === 0 ? 0 : ((v - priAvg[i]) / Math.abs(priAvg[i])) * 100)
+    rows.push({ dept, months: rates })
+  }
+  rows.push({ dept: '合计', months: avgWageChangeRate.value })
+  return rows
+})
+
+// 留存表格数据
+const retentionTableData = computed(() => [
+  { label: '本期实际发放额', months: actualPaid.value, editable: true, field: 'actualPaid' as const },
+  { label: '本期留存', months: currentRetained.value, editable: true, field: 'currentRetained' as const },
+  { label: '上年同期留存', months: priorRetained.value, editable: true, field: 'priorRetained' as const },
+])
+
+async function handleAddDept() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入部门名称', '新增部门', { confirmButtonText: '确定', cancelButtonText: '取消' })
+    if (value?.trim()) addDept(value.trim())
+  } catch { /* cancelled */ }
 }
 
-function barHeight(val: number): number {
-  const max = Math.max(...chartData.value.map(Math.abs), 1)
-  return Math.max(4, (Math.abs(val) / max) * 120)
+function triggerImport() {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx,.xls'
+  input.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) importData('monthly', f) }
+  input.click()
+}
+
+function fmtAmount(v: number): string {
+  if (v === 0) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function fmtNum(v: number): string {
+  if (v === 0) return '-'
+  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+
+// AI
+const aiLoading = ref<string | null>(null)
+async function generateAi(section: 'note' | 'conclusion') {
+  if (isReadonly.value) return
+  aiLoading.value = section
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `j1-4-${section}`,
+      prompt: section === 'note'
+        ? '根据应付职工薪酬月度分析数据，生成审计说明。关注异常波动、变动率、留存合理性。'
+        : '根据应付职工薪酬月度分析数据和审计说明，生成审计结论。',
+      context: { '年度计提合计': fmtAmount(yearAccrualTotal.value), '人均变动率': `${yearAvgChangeRate.value.toFixed(1)}%`, '异常波动数': String(fluctuations.value.length) },
+      existingContent: section === 'note' ? auditNote.value : auditConclusion.value,
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) {
+      if (section === 'note') auditNote.value = text; else auditConclusion.value = text
+      saveOpinion()
+      ElMessage.success('AI生成完成')
+    }
+  } catch { ElMessage.warning('AI生成失败') }
+  finally { aiLoading.value = null }
 }
 </script>
 
 <style scoped>
-.j1-tab-monthly { padding: 16px; }
-.audit-objective { margin-bottom: 12px; }
-.header-row { display: flex; align-items: center; gap: 12px; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.section-title { font-weight: 600; font-size: 15px; }
-.monthly-table-wrapper { overflow-x: auto; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.j1-tab-monthly { padding: 12px; }
+.j1-tab-monthly :deep(.el-table) { font-size: 13px !important; }
+.j1-tab-monthly :deep(.el-table th), .j1-tab-monthly :deep(.el-table td) { font-size: 13px !important; }
+.amber-context { border-left: 3px solid #e6a23c; background: #fdf6ec; padding: 10px 14px; border-radius: 4px; margin-bottom: 12px; font-size: 13px; color: #606266; }
+.amber-context p { margin: 2px 0; }
+.stats-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 12px; }
+.stat-card { background: #f5f7fa; border-radius: 8px; padding: 12px 16px; text-align: center; }
+.stat-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+.stat-value { font-size: 18px; font-weight: 700; color: #303133; }
+.stat-danger .stat-value { color: #f56c6c; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; }
+.block-title { font-size: 13px; font-weight: 600; color: #303133; margin: 12px 0 6px; }
+.block-title .el-tag { vertical-align: middle; }
+.rate-table-wrapper { overflow-x: auto; }
+.text-danger { color: #f56c6c; font-weight: 600; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+.proportion-bar { display: flex; align-items: flex-end; gap: 6px; height: 100px; padding: 8px; background: #fafafa; border-radius: 4px; margin-bottom: 12px; }
+.prop-item { display: flex; flex-direction: column; align-items: center; flex: 1; }
+.prop-bar { width: 100%; max-width: 36px; background: linear-gradient(180deg, #409eff, #79bbff); border-radius: 2px 2px 0 0; }
+.prop-val { font-size: 10px; color: #606266; margin-top: 2px; }
+.prop-label { font-size: 10px; color: #909399; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 10px 14px; background: #fafafa; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; }
+.opinion-section { margin-bottom: 14px; }
+.opinion-section:last-child { margin-bottom: 0; }
+.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.opinion-section-label { font-size: 13px; font-weight: 500; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
-.fluctuation-cell { background: #fef0f0; color: #f56c6c; font-weight: 600; padding: 2px 4px; border-radius: 2px; }
-.subtotal-row { background-color: #f5f7fa !important; font-weight: 600; }
-.text-danger { color: #f56c6c; }
-.chart-card { margin-top: 16px; }
-.fluctuation-card { margin-top: 16px; }
-.chart-placeholder { padding: 16px; }
-.mini-bar-chart { display: flex; align-items: flex-end; gap: 8px; height: 140px; padding: 0 16px; }
-.bar-item { display: flex; flex-direction: column; align-items: center; flex: 1; }
-.bar { width: 100%; max-width: 40px; background: linear-gradient(180deg, #409eff 0%, #79bbff 100%); border-radius: 2px 2px 0 0; transition: height 0.3s; }
-.bar-label { font-size: 11px; color: #909399; margin-top: 4px; }
 </style>

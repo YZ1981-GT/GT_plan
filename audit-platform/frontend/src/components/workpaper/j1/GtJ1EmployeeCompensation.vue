@@ -20,34 +20,40 @@
       />
       <!-- J1-1 审定表 -->
       <J1TabAdjudication v-else-if="currentSheet === 'J1-1'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" :is-readonly="isReadonly" />
       <!-- J1-2 明细表 -->
       <J1TabDetail v-else-if="currentSheet === 'J1-2'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- J1-3 调整分录 -->
       <J1TabAdjustment v-else-if="currentSheet === 'J1-3'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- J1-4 月度分析表 -->
       <J1TabMonthlyAnalysis v-else-if="currentSheet === 'J1-4'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- J1-5 同行业对比 -->
       <J1TabIndustryCompare v-else-if="currentSheet === 'J1-5'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- J1-6 计提检查 -->
       <J1TabAccrualCheck v-else-if="currentSheet === 'J1-6'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- J1-7 分配检查 -->
       <J1TabAllocationCheck v-else-if="currentSheet === 'J1-7'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- J1-8 一般检查 -->
       <J1TabGeneralCheck v-else-if="currentSheet === 'J1-8'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" :is-readonly="isReadonly" />
       <!-- J1-9 非货币性福利 -->
       <J1TabNonMonetaryCheck v-else-if="currentSheet === 'J1-9'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" :is-readonly="isReadonly" />
       <!-- J1-10 辞退福利 -->
       <J1TabSeveranceCheck v-else-if="currentSheet === 'J1-10'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" :is-readonly="isReadonly" />
       <!-- 附注（上市公司） -->
       <J1TabDisclosureListed v-else-if="currentSheet === 'J1附注(上市)'"
         :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
@@ -71,11 +77,12 @@
  * 按 sheetName v-if 分发到各子组件（defineAsyncComponent lazy 加载）。
  * 科目2211应付职工薪酬（贷方/负债类）：期末=期初+贷方-借方
  *
- * 12个子组件全部采用 defineAsyncComponent 实现按需加载。
+ * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)
  */
 import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
+import http from '@/utils/http'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
 const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
@@ -114,27 +121,83 @@ const isLoading = ref(true)
 /** 当前 sheet 名（从 props.sheetName 提取） */
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
-  // 程序表 J1A（须先于 J1-\d+，避免误匹配）
   if (/\bJ1A\b/.test(sn) || sn.includes('实质性程序表')) return 'J1A'
-  // 匹配 J1-X 格式
   const mCode = sn.match(/(J1-\d+)/)
   if (mCode) return mCode[1]
-  // 匹配附注特殊名称
   if (sn.includes('上市')) return 'J1附注(上市)'
   if (sn.includes('国有') || sn.includes('国企')) return 'J1附注(国企)'
-  // 底稿目录
   if (sn.includes('目录')) return 'J1-index'
   return sn
 })
 
-// ─── 版本追踪 useWorkpaperVersionToolbar ─────────────────────────────────────
+// ─── Persistence: allResponses Map ──────────────────────────────────────────
+const allResponses = ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>(new Map())
+
+/** selfLoad: 从后端加载已保存数据 */
+async function selfLoad() {
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const items = res.data?.data || res.data || []
+    if (Array.isArray(items)) {
+      const map = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
+      for (const it of items) {
+        if (it.item_id) map.set(it.item_id, { item_id: it.item_id, conclusion: it.conclusion ?? null, remark: it.remark ?? null })
+      }
+      allResponses.value = map
+    }
+  } catch { /* silent — first open may 404 */ }
+
+  // Also merge from htmlData.responses_snapshot (render-config output)
+  _mergeResponses(props.htmlData)
+}
+
+function _mergeResponses(data: Record<string, unknown> | null | undefined) {
+  if (!data) return
+  // render-config may output responses_snapshot or checklist_responses
+  const snapshot = (data.responses_snapshot || data.checklist_responses) as Array<Record<string, unknown>> | Record<string, unknown> | undefined
+  if (!snapshot) return
+  if (Array.isArray(snapshot)) {
+    for (const it of snapshot) {
+      if (it.item_id && !allResponses.value.has(String(it.item_id))) {
+        allResponses.value.set(String(it.item_id), { item_id: String(it.item_id), conclusion: (it.conclusion as string) ?? null, remark: (it.remark as string) ?? null })
+      }
+    }
+  } else if (typeof snapshot === 'object') {
+    for (const [key, val] of Object.entries(snapshot)) {
+      if (!allResponses.value.has(key) && val && typeof val === 'object') {
+        const v = val as Record<string, unknown>
+        allResponses.value.set(key, { item_id: key, conclusion: (v.conclusion as string) ?? null, remark: (v.remark as string) ?? null })
+      }
+    }
+  }
+}
+
+/** handleChildSave: 子tab调用此函数持久化数据 */
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+async function handleChildSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
+  // 写入本地 Map
+  for (const it of items) {
+    allResponses.value.set(it.item_id, it)
+  }
+  // 防抖 PUT
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(async () => {
+    try {
+      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
+      scheduleAutoSnapshot()
+    } catch { /* silent */ }
+  }, 800)
+}
+
+// ─── 版本追踪 ────────────────────────────────────────────────────────────────
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 provide('j1VersionTrailRef', versionTrailRef)
 provide('j1OpenVersionHistory', openVersionHistory)
 
 onMounted(async () => {
-  // 轻量初始化 — selfLoad 由各子组件自行管理
+  await selfLoad()
   isLoading.value = false
 })
 </script>

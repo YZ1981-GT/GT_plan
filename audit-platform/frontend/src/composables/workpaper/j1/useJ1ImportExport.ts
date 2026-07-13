@@ -7,7 +7,7 @@
  * Spec: .kiro/specs/j1-employee-compensation/
  */
 import { ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 
 export function useJ1ImportExport(wpId: string) {

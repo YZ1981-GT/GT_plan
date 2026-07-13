@@ -553,7 +553,8 @@ async def _get_render_config_impl(
     _real_sheets = [c for c in classifications
                     if not (c.sheet_name and "GT_Custom" in c.sheet_name)
                     and not (getattr(c, "class_code", "") or "").startswith("I-")
-                    and _WP_CODE_OVERRIDE.get(c.sheet_name) != "skip"]
+                    and _WP_CODE_OVERRIDE.get(c.sheet_name) != "skip"
+                    and not (c.sheet_name and (c.sheet_name.endswith("-原版") or c.sheet_name.endswith("-原")))]
     _is_multi_sheet = len(_real_sheets) > 1
 
     # 多 sheet 底稿 tab 排序：按模板 xlsx sheetnames 顺序排列
@@ -581,6 +582,12 @@ async def _get_render_config_impl(
             continue
         # sheet_name 级 skip override（隐藏辅助 sheet，如 A1-11 的文号规则页）
         if cls.sheet_name and _WP_CODE_OVERRIDE.get(cls.sheet_name) == "skip":
+            continue
+        # 隐藏"原版/原"历史遗留程序表（如 "J1A-原版"、"L1A-原"）
+        if cls.sheet_name and (cls.sheet_name.endswith("-原版") or cls.sheet_name.endswith("-原")):
+            continue
+        # 隐藏含"删除"关键字的历史遗留sheet（如 "股份支付检查表J1-10-删除"/"IPO企业股权激励工具-删除"）
+        if cls.sheet_name and "删除" in cls.sheet_name:
             continue
         # 编码级 skip override：从 sheet_name 提取编码后再查（如 "C1-1 企业层面..." → "C1-1" → skip）
         if cls.sheet_name:
