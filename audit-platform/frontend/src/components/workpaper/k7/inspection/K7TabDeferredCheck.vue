@@ -1,5 +1,15 @@
 <template>
   <div class="k7-tab-check">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性与义务：</b>政府补助/递延收益确认完整，与资产相关或与收益相关分类判断恰当；</li>
+        <li><b>计价和分摊：</b>补助确认时点、分摊方法符合 CAS16，计量准确；</li>
+        <li><b>列报与披露：</b>政府补助及递延收益按准则恰当列报披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K7-5 递延收益检查表</h3>

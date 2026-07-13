@@ -1,5 +1,16 @@
 <template>
   <div class="k7-tab-adjudication">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性（负债重点）：</b>所有应确认的递延收益（政府补助等）均已记录；</li>
+        <li><b>存在与义务：</b>递延收益对应尚未满足条件/尚未分摊的政府补助或收益，真实存在；</li>
+        <li><b>计价和分摊：</b>与资产相关递延收益按资产使用寿命系统分摊、与收益相关的按期确认，分摊金额恰当（CAS16）；</li>
+        <li><b>列报与披露：</b>递延收益及政府补助已恰当列报披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K7-1 递延收益审定表</h3>

@@ -1,5 +1,14 @@
 <template>
   <div class="k7-tab-amort-calc">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>计价和分摊：</b>递延收益分摊方法与分摊期恰当，本期应分摊金额测算准确（与资产相关按寿命/与收益相关按期）；</li>
+        <li><b>完整性：</b>应分摊转入损益的递延收益均已及时分摊，与账面核对差异合理。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 蓝色渐变引导区 ═══ -->
     <div class="guide-steps">
       <div class="guide-grid">

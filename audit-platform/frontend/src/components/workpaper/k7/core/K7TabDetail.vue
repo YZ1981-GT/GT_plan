@@ -23,6 +23,16 @@
       <p>K7-2明细表按补助项目逐笔列示递延收益明细。<strong>负债类科目</strong>：期末=期初+收到-分摊。32列拆为3区段，补助项目名称贯穿各区段。按"与资产相关/与收益相关"分组小计。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性：</b>所有递延收益（政府补助）项目均已逐笔登记（负债完整性重点）；</li>
+        <li><b>计价和分摊：</b>期末=期初+收到-分摊，各项余额计算准确，合计与 K7-1 一致；</li>
+        <li><b>列报与披露：</b>按"与资产相关/与收益相关"分类恰当。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K7-2 递延收益明细表</h3>
