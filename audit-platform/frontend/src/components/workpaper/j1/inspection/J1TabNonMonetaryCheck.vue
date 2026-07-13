@@ -80,7 +80,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 import { useJ1NonMonetaryCheck } from '@/composables/workpaper/j1/useJ1NonMonetaryCheck'
 import GtIndexChip from '../../GtIndexChip.vue'
 

@@ -12,7 +12,7 @@
  * Spec: .kiro/specs/j1-employee-compensation/
  * Requirements: 6.1-6.6
  */
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 
 export interface CompensationAdjustedPayload {
   accountCode: string
