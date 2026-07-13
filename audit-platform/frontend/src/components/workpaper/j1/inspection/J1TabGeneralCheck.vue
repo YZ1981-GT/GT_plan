@@ -61,7 +61,7 @@
           </div>
         </div>
         <div class="cg-item">
-          <label>测试总体（借方发生额）</label>
+          <label>测试总体（借方发生额）<el-button v-if="!isReadonly" size="small" type="primary" link :loading="autoFetchLoading" @click="autoFetchPopulation" style="margin-left:6px">🔄 自动取数</el-button></label>
           <div class="cg-inline">
             <el-input-number v-model="criteria.populationDebitCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
             <span class="cg-unit">笔</span>
