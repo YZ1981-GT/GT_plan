@@ -9,6 +9,7 @@ Requirements: 1.2, 3.0.3, 3.0.5
 from __future__ import annotations
 
 import logging
+import os
 import re
 from pathlib import Path
 from uuid import UUID
@@ -71,6 +72,32 @@ router = APIRouter(
 
 # ─── Singleton schema service (stateless + cache) ────────────────────────────
 _schema_service = WpRenderSchemaService()
+
+# 模板 sheet 顺序缓存（path → (mtime, {sheet_name: index})）。
+# render-config 每次调用曾用 openpyxl 同步加载整册模板仅为算 tab 排序（J1 等大底稿约 0.4s），
+# 该同步操作阻塞事件循环，并发请求（checklist-responses/active-job）被连累到数秒级。
+# 模板文件运行时不变，按 (path, mtime) 缓存后每个模板只加载一次，消除重复阻塞。
+_TEMPLATE_SHEET_ORDER_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
+
+
+def _get_template_sheet_order(tpl_path: str) -> dict[str, int]:
+    """返回 {sheet_name: index}（按模板 xlsx tab 顺序），带 (path, mtime) 缓存。"""
+    try:
+        mtime = os.path.getmtime(tpl_path)
+    except OSError:
+        return {}
+    cached = _TEMPLATE_SHEET_ORDER_CACHE.get(tpl_path)
+    if cached and cached[0] == mtime:
+        return cached[1]
+    try:
+        import openpyxl
+        _wb = openpyxl.load_workbook(tpl_path, read_only=True, data_only=True)
+        order = {name: idx for idx, name in enumerate(_wb.sheetnames)}
+        _wb.close()
+    except Exception:  # noqa: BLE001 — 加载失败返回空序（保持原序）
+        order = {}
+    _TEMPLATE_SHEET_ORDER_CACHE[tpl_path] = (mtime, order)
+    return order
 
 # sheet 名尾部的 sheet 级编码提取（如「合同负债及销售替代程序D0-5」→「D0-5」、
 # 「审定表D2-1」→「D2-1」、「应收票据审计程序表D1A」→「D1A」）。
@@ -561,18 +588,13 @@ async def _get_render_config_impl(
     # （DB created_at 顺序不可靠；openpyxl read_only 取 sheetnames → 按 index 排序）
     # 注意：pkg_sheets（来自 account_package_registry）的顺序已经是正确的 registry 声明顺序，
     # 不应被模板 xlsx 的 sheet tab 顺序覆盖（registry 名称可能与模板 sheet tab 名不完全匹配）。
-    if _is_multi_sheet and not pkg_sheets and _tpl and Path(_tpl).exists() and str(_tpl).endswith((".xlsx", ".xls")):
-        try:
-            import openpyxl
-            _wb = openpyxl.load_workbook(_tpl, read_only=True, data_only=True)
-            _template_order = {name: idx for idx, name in enumerate(_wb.sheetnames)}
-            _wb.close()
+    if _is_multi_sheet and not pkg_sheets and _tpl and str(_tpl).endswith((".xlsx", ".xls")):
+        _template_order = _get_template_sheet_order(str(_tpl))  # 带 (path,mtime) 缓存，避免每次同步加载整册
+        if _template_order:
             classifications = sorted(
                 classifications,
                 key=lambda c: _template_order.get(c.sheet_name, 999),
             )
-        except Exception:  # noqa: BLE001 — 排序失败不影响渲染，保持原序
-            pass
 
     sheets: list[dict] = []
     for cls in classifications:
