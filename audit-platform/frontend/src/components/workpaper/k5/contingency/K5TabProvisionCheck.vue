@@ -1,5 +1,15 @@
 <template>
   <div class="k5-tab-provision-check">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性（负债重点）：</b>所有符合 CAS13 三条件（现时义务/很可能流出/金额可靠计量）的事项均已确认预计负债；</li>
+        <li><b>存在与计价：</b>已确认预计负债真实存在且以最佳估计数计量，未确认的或有负债判断恰当；</li>
+        <li><b>列报与披露：</b>预计负债及或有事项已按准则恰当列报披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 ═══ -->
     <div class="section-header">
       <h3>K5-7 预计负债综合检查表</h3>

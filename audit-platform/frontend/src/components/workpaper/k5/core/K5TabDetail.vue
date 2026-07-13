@@ -1,5 +1,15 @@
 <template>
   <div class="k5-tab-detail">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性：</b>所有应当确认的预计负债项目均已记录（负债完整性重点）；</li>
+        <li><b>存在与义务：</b>各项预计负债是存在的现时义务，明细合计与 K5-1 审定数一致；</li>
+        <li><b>计价和分摊：</b>各项预计负债以最佳估计数恰当计量。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + 操作按钮 ═══ -->
     <div class="section-header">
       <h3>K5-2 预计负债明细表</h3>

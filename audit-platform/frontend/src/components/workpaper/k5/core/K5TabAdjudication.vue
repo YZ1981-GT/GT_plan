@@ -1,5 +1,16 @@
 <template>
   <div class="k5-tab-adjudication">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性（负债重点）：</b>所有应当确认的预计负债均已记录，不存在未确认的现时义务（或有事项）；</li>
+        <li><b>存在与义务：</b>已记录的预计负债是资产负债表日存在的、很可能导致经济利益流出的现时义务；</li>
+        <li><b>计价和分摊：</b>预计负债金额为履行现时义务所需支出的最佳估计数，计量恰当；</li>
+        <li><b>列报与披露：</b>预计负债及或有事项已按 CAS13 恰当列报披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
       <h3>K5-1 预计负债审定表</h3>

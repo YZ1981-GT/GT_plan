@@ -1,5 +1,15 @@
 <template>
   <div class="k5-tab-decommission">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性与义务：</b>存在弃置义务的固定资产均已确认弃置费用预计负债；</li>
+        <li><b>计价和分摊：</b>弃置费用按未来支出现值（折现）恰当计量，折现率与期间合理；</li>
+        <li><b>列报与披露：</b>弃置费用及其增值已按 CAS13/CAS4 恰当处理与披露。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 ═══ -->
     <div class="section-header">
       <h3>K5-5 弃置费用检查表</h3>

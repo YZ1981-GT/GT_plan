@@ -1,5 +1,15 @@
 <template>
   <div class="k5-tab-litigation">
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性：</b>所有未决诉讼/仲裁事项均已识别，很可能败诉且金额可估计的已计提预计负债；</li>
+        <li><b>计价和分摊：</b>败诉损失金额为最佳估计（结合律师意见），计量恰当；</li>
+        <li><b>列报与披露：</b>未决诉讼（含或有负债）已按 CAS13 恰当披露，必要时取得律师声明书。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ Section标题 ═══ -->
     <div class="section-header">
       <h3>K5-6 未决诉讼检查表</h3>
