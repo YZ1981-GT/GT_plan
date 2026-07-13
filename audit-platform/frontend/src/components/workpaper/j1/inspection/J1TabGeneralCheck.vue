@@ -371,8 +371,24 @@ function onCardUpload(payload: { rowId: string; file: File; evidenceKey: string 
     occurrenceRows.value.some(r => r.id === payload.rowId) ? 'credit'
     : postCollectionRows.value.some(r => r.id === payload.rowId) ? 'debit' : 'post'
   uploadAndMerge(payload.rowId, payload.file, direction, (id, patch) => {
-    const target = allRows.find(r => r.id === id)
-    if (target) Object.assign(target, patch)
+    const target = allRows.find(r => r.id === id) as any
+    if (target) {
+      Object.assign(target, patch)
+      // 同步 OCR 结果到对应外部单据的独立字段
+      if (!target.evidence) target.evidence = { calc: { month: '', amount: 0, approved: '' }, approval: { dateNo: '', approved: '' }, bank: { date: '', summary: '', amount: 0 } }
+      const amt = patch.creditAmount ?? patch.debitAmount
+      const key = payload.evidenceKey
+      if (key === 'calc') {
+        if (patch.date) target.evidence.calc.month = patch.date
+        if (amt) target.evidence.calc.amount = amt
+      } else if (key === 'approval') {
+        if (patch.voucherNo || patch.date) target.evidence.approval.dateNo = patch.voucherNo || patch.date
+      } else if (key === 'bank') {
+        if (patch.date) target.evidence.bank.date = patch.date
+        if (amt) target.evidence.bank.amount = amt
+        if (patch.businessContent) target.evidence.bank.summary = patch.businessContent
+      }
+    }
     persist()
   })
 }
