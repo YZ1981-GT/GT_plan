@@ -5,6 +5,35 @@
       <span :class="['coverage', { warn: ic.isCoverageLow.value }]">覆盖率 {{ ic.coverageRatio.value.toFixed(1) }}%</span>
     </header>
 
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 抽取样本核查材料领用业务，逐笔核对领用部门、单号、品名、金额与领用凭证（CAS 1 号存货）。</p>
+        <p>2. 覆盖率＝已查金额 ÷ 账面总额，覆盖率偏低（＜50%）自动橙色提示，应扩大样本或说明抽样理由。</p>
+        <p>3. 关注材料领用是否与生产计划、BOM 耗用匹配，是否存在超额领用、以领代耗调节成本或跨期领用。</p>
+        <p>4. 可用抽凭引擎按存货科目抽取领用凭证，📎附件 OCR 可自动识别单据信息辅助核对。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：验证材料领用的真实性、完整性与计价准确性，确认领用记录与生产耗用、成本归集勾稽一致，防止材料成本虚增或跨期。"
+    />
+
+    <!-- 工具栏（索引联动 + 计数） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
+        <el-tag size="small" type="info">共 {{ ic.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <div class="meta-bar">
       <span>账面总额<el-input-number :model-value="ic.bookTotal.value" size="small" :controls="false" :disabled="isReadonly" @change="(v: number) => ic.updateBookTotal(v ?? 0)" /></span>
       <span>已查 {{ ic.checkedTotal.value.toLocaleString() }}</span>
@@ -78,17 +107,34 @@
       </el-table-column>
     </el-table>
 
-    <footer class="footer"><h4>检查结论</h4><el-input v-model="ic.auditNote.value" type="textarea" :rows="2" :disabled="isReadonly" /></footer>
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input v-model="ic.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计说明：概述材料领用核查程序、样本覆盖率、与生产耗用勾稽情况及核对结果，以及异常事项处理。" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, onMounted, toRef } from 'vue'
 import { useF2MaterialUsageCheck } from '../../composables/useF2InspectionCheck'
 import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import type { SampledVoucher, FillMode, SamplingMethod } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 const props = defineProps<{
@@ -102,6 +148,21 @@ const props = defineProps<{
 const ic = useF2MaterialUsageCheck({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计结论（独立持久化，F2 计价组事件；检查说明沿用 composable auditNote） ──
+const CONCLUSION_KEY = 'F2-34-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 /** 材料领用检查科目范围（保留原 F2_INVENTORY_ACCOUNT_CODES 值，拆为多科目数组） */

@@ -1,14 +1,21 @@
 <template>
   <div class="h1-tab-stocktake-summary">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：汇总固定资产监盘结果，评价账实相符率与盘盈盘亏影响，形成对固定资产存在性与账面真实性的监盘结论。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-11" :context-project-id="projectId" />
+      <el-tag size="small" type="info">盘点 {{ stats.totalCount }} 项</el-tag>
+    </div>
+
     <!-- 仪表板 -->
     <el-card shadow="never" class="dashboard-card">
       <template #header>
         <div class="section-title">
           <span>H1-11 监盘小结</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('stocktake-summary')">
-              <el-icon><MagicStick /></el-icon> AI总结
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-11')">💬 复核</el-button>
           </div>
         </div>
@@ -61,11 +68,18 @@
       </el-table>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：监盘执行概况、盘盈盘亏明细核对与跟进、对报表的影响评估。" @change="saveAuditNote" />
+    </el-card>
+
     <!-- 监盘结论 -->
     <el-card shadow="never" class="note-card">
       <template #header><span>监盘总结与审计结论</span></template>
       <el-input v-model="summaryConclusion" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly"
-        placeholder="总结盘点结果、异常情况及审计结论..." />
+        placeholder="总结盘点结果、异常情况及审计结论..." @change="saveSummaryConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -80,14 +94,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Stocktake } from '../../composables/useH1Stocktake'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const summaryConclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-11-audit-note'
+const CONCLUSION_KEY = 'H1-11-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveSummaryConclusion() { saveResponse(CONCLUSION_KEY, summaryConclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) summaryConclusion.value = c.remark
+})
 const state = useH1Stocktake(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
 const stats = computed(() => ({
@@ -101,7 +126,6 @@ const stats = computed(() => ({
 const surplusRows = computed(() => state.surplusRows.value)
 const shortageRows = computed(() => state.deficitRows.value)
 
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

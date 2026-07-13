@@ -130,6 +130,28 @@
       <span>上期合计：{{ fmt(detail.totalRow.value.priorYearTotal) }}</span>
       <span>变动率：{{ pct(detail.totalRow.value.changeRate) }}</span>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+        </div>
+      </template>
+      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="营业成本月度明细分析说明（月度波动、异常月度原因、与生产/销售节奏匹配情况等）..." @change="saveNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="月度明细审计结论..." @change="saveConclusion" />
+    </el-card>
   </div>
 </template>
 
@@ -159,11 +181,25 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 
 const segment = ref('h1')
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const NOTE_KEY = 'F5-2-audit-note'
+const CONCLUSION_KEY = 'F5-2-audit-conclusion'
 
 const detail = useF5MonthlyDetail({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
+const conclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
+
+function saveNote() {
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] } }))
+}
+function saveConclusion() {
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value }] } }))
+}
 
 const importExportCtx = computed(() =>
   isImportExportSheet('f5', 'F5-2') ? resolveImportExportSheet('f5', 'F5-2') : null,
@@ -214,4 +250,10 @@ void reloadWorkpaperData
 .f5-formula.is-warn { color: #e6a23c; font-weight: 600; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .f5-monthly-total { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; flex-wrap: wrap; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

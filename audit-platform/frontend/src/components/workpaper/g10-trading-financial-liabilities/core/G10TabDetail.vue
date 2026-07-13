@@ -9,6 +9,17 @@
       </div>
     </div>
 
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实交易性金融负债各项目的存在、完整与准确，验证公允价值变动计入损益的正确性，明细合计与 G10-1 审定表期末审定数勾稽一致。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-2" /></span>
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" />
 
     <el-table
@@ -189,6 +200,20 @@
       · FV变动合计 {{ fmt(detail.rows.value.reduce((s, r) => s + r.fairValueChange, 0)) }}
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述明细各项目的核实情况、公允价值变动计入损益的验证、嵌入衍生拆分判断及与审定表勾稽结果。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -201,11 +226,12 @@
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useG10Detail, type G10DetailRow } from '../../composables/useG10Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -238,6 +264,26 @@ function onRowChange(row: G10DetailRow | undefined) {
   if (idx >= 0) detail.setActiveRowIndex(idx)
 }
 
+// ─── 审计说明 / 审计结论（自由文本，conclusion:null 落库）────────────────────
+const NOTE_KEY = 'G10-2-detail-audit-note'
+const CONCLUSION_KEY = 'G10-2-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+})
+
 function fmt(v: number) {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -252,4 +298,10 @@ function fmt(v: number) {
 .total-bar { margin-top: 8px; padding: 8px; background: #f5f7fa; font-size: 12px; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .guidance-content p { margin: 4px 0; }
+.objective-alert { margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

@@ -20,7 +20,6 @@
         <div class="section-title">
           <span>附注披露 — 国有企业版</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('disc-soe')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" link @click="handleReview('H7-disc-soe')">💬 复核</el-button>
           </div>
         </div>
@@ -63,6 +62,16 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录附注披露项的编制依据、与审定表勾稽核对情况。" @blur="persist('H7-disc-soe-note', auditNote)" />
+    </el-card>
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="附注披露完整、准确，与审定数一致，未见异常。" @blur="persist('H7-disc-soe-conclusion', auditConclusion)" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示（CAS 5 生物资产准则）</summary>
@@ -89,7 +98,6 @@
  */
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -106,6 +114,8 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
 const policyText = ref('')
 const disclosureText = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 const adjudicatedAmount = ref<number | null>(null)
 
 function num(v: any): number { const n = Number(v); return Number.isFinite(n) ? n : 0 }
@@ -161,6 +171,8 @@ async function loadOwn() {
   } catch { /* empty */ }
   policyText.value = getStr('H7-disc-soe-policy')
   disclosureText.value = getStr('H7-disc-soe-text')
+  auditNote.value = getStr('H7-disc-soe-note')
+  auditConclusion.value = getStr('H7-disc-soe-conclusion')
 }
 
 async function persist(itemId: string, value: any) {
@@ -174,9 +186,6 @@ async function persist(itemId: string, value: any) {
   } catch { ElMessage.error('保存失败，请稍后重试') }
 }
 
-function handleAi(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
-}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   if (v == null) return '-'
@@ -198,6 +207,7 @@ onUnmounted(() => {
 .tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
+.note-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .hint-alert { margin-bottom: 12px; }

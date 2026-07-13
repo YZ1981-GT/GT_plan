@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-depreciation-no-impair">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实未发生减值迹象的使用权资产折旧计提（直线法）的准确性，确认折旧期=min(租赁期,使用寿命)且本期折旧与 H8-1 累计折旧计提一致（CAS21第21条）。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS21第21条：使用权资产应当自租赁期开始日起按直线法计提折旧。折旧期=min(租赁期, 使用寿命)。不含减值版本适用于未发生减值迹象的使用权资产。</p>
@@ -129,6 +133,20 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -149,7 +167,7 @@
  * 51行25列62公式，OO渲染+参数摘要
  * Spec: Task 4.6 | Requirements: 6.1-6.6
  */
-import { ref, toRef, defineAsyncComponent } from 'vue'
+import { ref, toRef, watch, defineAsyncComponent } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8Depreciation } from '../../composables/useH8Depreciation'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -172,6 +190,30 @@ const emit = defineEmits<{
 }>()
 
 const showOO = ref(true)
+
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-dep-no-impair-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-dep-no-impair-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
 
 const {
   depRows, depTotal, accDepTotal,
@@ -207,6 +249,10 @@ function getDepSummary({ columns }: { columns: any[] }) {
 
 <style scoped>
 .h8-tab-depreciation-no-impair { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

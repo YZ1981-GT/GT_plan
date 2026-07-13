@@ -43,6 +43,15 @@
     <!-- 2区段Tab切换 -->
     <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
 
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-4" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 表格（单一实例，列按Tab切换） -->
     <el-table
       :data="rows"
@@ -292,6 +301,36 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <span>审计说明</span>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，重大影响判断依据及例外情况。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <span>审计结论</span>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除已调整事项外未见异常。C、存在重大未调整事项或审计范围受限，不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 底部编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
@@ -323,6 +362,8 @@
  */
 import { ref, reactive, inject, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { BasicInfoRow } from '../../composables/useG7EquityMethodFormData'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -339,6 +380,37 @@ const isReadonly = computed(() => props.readonly ?? false)
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+// ─── 审计说明 / 审计结论持久化（checklist_responses，conclusion:null） ─────────
+
+const auditFormData = useG7EquityMethodFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const AUDIT_NOTE_KEY = 'G7-4-audit-note'
+const AUDIT_CONCLUSION_KEY = 'G7-4-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  auditConclusion.value = val
+  auditFormData.debouncedSave(AUDIT_CONCLUSION_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 // ─── 2区段Tab ────────────────────────────────────────────────────────────────
 
@@ -509,6 +581,10 @@ onMounted(() => {
 <style scoped>
 .g7-tab-basic-info { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
+.conclusion-card { margin-top: 16px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

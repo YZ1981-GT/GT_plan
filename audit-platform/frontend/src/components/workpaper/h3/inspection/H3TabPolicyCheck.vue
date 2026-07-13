@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-policy-check">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表按 CAS3 五段落检查投资性房地产会计政策：确认条件、计量模式选择、后续计量、转换、处置。</p>
+        <p>2. 计量模式在成本模式与公允价值模式之间选择；采用公允价值模式须满足有活跃交易市场且可获取同类价格信息。</p>
+        <p>3. 逐段填写实际政策与审计师评价，并作出「适当 / 不适当 / N/A」结论，进度条反映完成度。</p>
+        <p>4. 关注计量模式是否一经确定不得随意变更（公允→成本视为会计政策变更受限）。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：评价投资性房地产会计政策（确认、计量模式、后续计量、转换、处置）的适当性与一贯性，是否符合 CAS3。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-4" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ paragraphs.length }} 段</el-tag>
+    </div>
+
     <!-- 整体进度条 -->
     <el-progress :percentage="progressPct" :stroke-width="8" class="progress-bar" />
 
@@ -64,6 +89,22 @@
         </el-radio-group>
       </div>
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：会计政策检查过程、计量模式选择依据、各段落评价结果及异常事项。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、会计政策适当且一贯，符合 CAS3。B、除下列事项外未见异常。C、政策存在不适当，需关注。" :disabled="isReadonly" @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
@@ -72,9 +113,10 @@
  * H3TabPolicyCheck.vue — H3-4 会计政策检查
  * CAS3五段落卡片+计量模式突出+进度条+AI+💬复核
  */
-import { ref, reactive, computed, inject, toRef } from 'vue'
+import { ref, reactive, computed, inject, toRef, onMounted } from 'vue'
 import { useH3PolicyCheck } from '../../composables/useH3PolicyCheck'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -128,6 +170,30 @@ function onConclusionChange(key: string) {
   updateConclusion(key, conclusions[key])
 }
 
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-4-audit-note'
+const CONCLUSION_KEY = 'H3-4-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
+
 function generateAI(section: string) {
   window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section: `H3-4-${section}`, wpId: props.wpId } }))
 }
@@ -136,6 +202,15 @@ function openReview(section: string) { openReviewDialog(`H3-4-${section}`) }
 
 <style scoped>
 .h3-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .progress-bar { margin-bottom: 16px; }
 .policy-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }

@@ -67,6 +67,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I5-3 调整分录 -->
@@ -87,6 +89,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（上市） -->
@@ -96,6 +100,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（国企） -->
@@ -105,6 +111,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->

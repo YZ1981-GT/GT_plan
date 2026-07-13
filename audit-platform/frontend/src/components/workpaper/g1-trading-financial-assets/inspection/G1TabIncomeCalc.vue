@@ -2,7 +2,7 @@
   <div class="g1-income-calc">
     <div class="section-head">
       <h3 class="sheet-title">G1-5 投资收益测算表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="calc.addRow()">新增测算行</el-button>
         <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
@@ -77,6 +77,12 @@
     </div>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）投资收益与处置损益的测算过程及与账面确认金额的核对结果；（2）应收实收差异及处置损益异常事项。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="calc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" placeholder="对投资收益/处置损益测算的复核结论..." />
@@ -94,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed, inject } from 'vue'
+import { ref, toRef, computed, inject, watch } from 'vue'
 import { useG1IncomeCalc, type G1IncomeCalcRow } from '../../composables/useG1IncomeCalc'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -111,6 +117,12 @@ const calc = useG1IncomeCalc({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-5-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
 const segment = ref<'income' | 'disposal'>('income')

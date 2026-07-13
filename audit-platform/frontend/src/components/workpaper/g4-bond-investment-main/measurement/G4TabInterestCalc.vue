@@ -42,6 +42,15 @@
       </div>
     </div>
 
+    <!-- 工具栏：索引 chip + 项目数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-4" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ calc.computedGroups.value.length }} 个项目</el-tag>
+      </div>
+    </div>
+
     <!-- 无分组占位 -->
     <el-empty v-if="calc.computedGroups.value.length === 0" description="暂无投资项目，点击“新增投资项目”开始" />
 
@@ -361,6 +370,19 @@
       </el-table>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：实际利率法利息测算的执行情况、利率合理性判断与测算差异分析结果。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
     <!-- 底部：合计对比行 -->
     <div v-if="calc.computedGroups.value.length > 0" class="summary-section">
       <div class="summary-compare" :class="{ 'variance-alert': calc.isVarianceHighlight() }">
@@ -431,11 +453,13 @@
  *
  * 使用 useG4MainInterestCalc composable（已实现）
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import { useG4MainInterestCalc } from '../../composables/useG4MainInterestCalc'
 import { useG4MainImportExport } from '../../composables/useG4MainImportExport'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -484,6 +508,39 @@ async function onImportFile(f: { raw?: File } | File): Promise<void> {
 
 // ─── 审计结论 ───
 const auditConclusion = ref('')
+
+// ─── 审计说明（走 checklist_responses，conclusion:null + remark 文本） ───
+const NOTE_KEY = 'G4-4-interestcalc-audit-note'
+const auditNote = ref('')
+
+function readSaved(key: string): string {
+  const cr = props.htmlData?.checklist_responses
+  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+    const v = (cr as Record<string, any>)[key]
+    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+  }
+  const resp = props.htmlData?.responses
+  if (Array.isArray(resp)) {
+    const found = resp.find((r: any) => r?.item_id === key)
+    if (found?.remark) return found.remark
+  }
+  return ''
+}
+
+async function saveAuditNote(val: string): Promise<void> {
+  auditNote.value = val
+  if (props.isReadonly) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: NOTE_KEY, conclusion: null, remark: val }],
+    })
+  } catch { /* silent */ }
+}
+
+onMounted(() => {
+  auditNote.value = readSaved(NOTE_KEY)
+})
 
 // ─── 事件处理 ───
 
@@ -566,6 +623,16 @@ function fmtRate(v: number | null | undefined): string {
   gap: 8px;
   align-items: center;
 }
+
+/* 工具栏（索引 chip） */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明卡片 */
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 
 /* ─── 分组样式 ─── */
 .interest-group {

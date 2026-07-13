@@ -95,6 +95,19 @@
       </span>
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：调整分录的依据、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项，不可确认。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="methodology-hint">
       <summary>📋 编制提示（CAS24 套期会计）</summary>
       <p>AJE=审计调整分录，RJE=重分类调整分录。科目 6103 净敞口套期收益为损益类（贷方）。借贷合计须平衡后方可「同步至审定表」，同步后 G12-1 调整数 overlay 自动更新。</p>
@@ -103,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useG12Adjustment } from '../../composables/useG12Adjustment'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
@@ -124,6 +137,29 @@ const adj = useG12Adjustment({
   debouncedSave: props.debouncedSave,
 })
 
+const NOTE_KEY = 'G12-adjustment-audit-note'
+const CONCLUSION_KEY = 'G12-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 function fmt(val: number): string {
   if (val === 0) return '-'
   return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
@@ -139,4 +175,6 @@ function fmt(val: number): string {
 .balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: var(--wp-font-size, 13px); font-weight: 500; }
 .balanced { color: #67c23a; }
 .unbalanced { color: #f56c6c; font-weight: 600; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

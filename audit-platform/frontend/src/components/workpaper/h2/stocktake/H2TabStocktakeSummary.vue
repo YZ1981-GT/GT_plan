@@ -1,14 +1,23 @@
 <template>
   <div class="h2-tab-stocktake-summary">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：汇总在建工程监盘结果，评价监盘程序是否达到审计目标，登记停工/进度异常/不存在等异常事项及后续处理建议（如关注减值）。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-14" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">异常 {{ state.summary.value.abnormalProjects.length }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- 踏勘总体情况 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span>一、踏勘总体情况</span>
+          <span>一、审计说明（踏勘总体情况）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('summary-overview')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-14')">💬</el-button>
           </div>
         </div>
@@ -32,9 +41,6 @@
           <span>二、异常情况清单</span>
           <div class="section-header-actions">
             <el-button v-if="!isReadonly" size="small" @click="handleAddAnomaly">+ 新增异常</el-button>
-            <el-button size="small" type="primary" link @click="handleAiGenerate('summary-anomaly')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
           </div>
         </div>
       </template>
@@ -94,11 +100,8 @@
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span>三、监盘结论</span>
+          <span>三、审计结论（监盘结论）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('summary-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
           </div>
         </div>
       </template>
@@ -145,6 +148,7 @@ import { inject, toRef, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Stocktake } from '../../composables/useH2Stocktake'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -154,6 +158,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Stocktake({
   wpId: toRef(props, 'wpId'),
@@ -161,6 +166,7 @@ const state = useH2Stocktake({
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
   phase: 'summary',
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const isReadonly = computed(() => props.isReadonly)
@@ -190,9 +196,6 @@ function handleRemoveAnomaly(index: number) {
   state.updateSummary('abnormalProjects', list)
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate H2-14:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -201,6 +204,10 @@ function openReview(id: string) {
 
 <style scoped>
 .h2-tab-stocktake-summary { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

@@ -131,6 +131,17 @@
       <span>本期毛利：{{ fmt(cmp.totalRow.value.currentGrossProfit) }}</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+        </div>
+      </template>
+      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="毛利率比较分析说明（各品种毛利率同比波动、收入成本配比、异常变动原因等）..." @change="saveNote" />
+    </el-card>
+
     <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
@@ -141,7 +152,7 @@
           </div>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
         placeholder="毛利率比较分析结论..." @change="saveConclusion" />
     </el-card>
   </div>
@@ -164,15 +175,21 @@ const props = defineProps<{ allResponses: Map<string, ChecklistResponse>; wpId: 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const NOTE_KEY = 'F5-5-audit-note'
 const CONCLUSION_KEY = 'F5-5-conclusion'
 
 const cmp = useF5Comparison({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
 const conclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
 const ieCtx = computed(() => (isImportExportSheet('f5', 'F5-5') ? resolveImportExportSheet('f5', 'F5-5') : null))
 
+function saveNote() {
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] } }))
+}
 function saveConclusion() {
   allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value })
   window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value }] } }))

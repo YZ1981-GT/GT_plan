@@ -10,6 +10,23 @@
     </div>
 
     <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="核实套期工具与被套期项目的公允价值变动计量恰当，评价套期有效性（前瞻性/回顾性），并与 G12-2 套期关系明细交叉验证公允价值变动一致。"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G12-4" /></span>
+        <el-tag size="small" type="info">共 {{ fv.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
+    <el-alert
       v-if="fvCrossMessage"
       type="warning"
       :closable="false"
@@ -164,6 +181,13 @@
       </el-table-column>
     </el-table>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：公允价值估值方法、FV 层次判断及与 G12-2 交叉验证结果。"
+        @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="conclusion">
       <template #header>
         <div class="conclusion-head">
@@ -184,7 +208,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useG12FairValueTest } from '../../composables/useG12FairValueTest'
 import { useG12HedgeDetail } from '../../composables/useG12HedgeDetail'
 import {
@@ -223,6 +247,20 @@ const hd = useG12HedgeDetail({
 
 const hasHedgeData = computed(() => hasG12HedgeDetailData(props.allResponses))
 
+const NOTE_KEY = 'G12-fv-test-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
+
 const fvCrossMessage = computed(() => {
   const mismatches = findG12FvCrossMismatches(hd.rows.value, props.allResponses)
   return formatG12FvCrossSummaryMessage(mismatches)
@@ -238,6 +276,13 @@ const tabOptions = [
 .g12-fv { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .methodology { border-left: 3px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-objective { margin-bottom: 8px; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .cross-alert { margin-bottom: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
 .warn-chip, .ok-chip { margin-left: 8px; }

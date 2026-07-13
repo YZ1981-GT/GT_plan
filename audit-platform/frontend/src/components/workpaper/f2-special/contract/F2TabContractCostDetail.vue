@@ -201,11 +201,23 @@
       <el-input v-model="cc.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请说明合同履约成本构成的完整性、计量准确性及资本化条件判断结果……" :disabled="isReadonly" />
     </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        :disabled="isReadonly" @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { onMounted, ref, toRef } from 'vue'
 import { useF2ContractCost } from '../../composables/useF2ContractCost'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
@@ -236,6 +248,21 @@ const quadCols = [
 const cc = useF2ContractCost({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// 审计结论（本表独立持久化，item_id 沿用 F2 特殊组 sheet-code 前缀，经 f2-spe:save-items 落库）
+const CONCLUSION_KEY = 'F2-55-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 </script>
 

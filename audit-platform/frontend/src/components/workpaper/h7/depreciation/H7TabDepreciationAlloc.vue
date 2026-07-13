@@ -70,14 +70,19 @@
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
-          <span>审计说明 / 结论</span>
+          <span>审计说明</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('dep-alloc')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" link @click="handleReview('H7-12')">💬 复核</el-button>
           </div>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写折旧分配复核说明..." :disabled="isReadonly" @blur="persist('H7-12-note', auditNote)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-12-conclusion', auditConclusion)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -105,7 +110,6 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7Depreciation } from '../../composables/useH7Depreciation'
@@ -138,6 +142,7 @@ function blankRow(target: string): AllocRow {
 const rows = ref<AllocRow[]>([])
 const totalDepAmount = ref(0)
 const auditNote = ref('')
+const auditConclusion = ref('')
 
 const totalAlloc = computed(() => rows.value.reduce((s, r) => s + num(r.amount), 0))
 const allocDiff = computed(() => Number((totalAlloc.value - num(totalDepAmount.value)).toFixed(2)))
@@ -165,6 +170,7 @@ async function loadOwn() {
     if (noimpRaw) { try { const arr = JSON.parse(noimpRaw); if (Array.isArray(arr)) totalDepAmount.value = arr.reduce((s: number, r: any) => s + num(r.cost) * (1 - num(r.salvageRatePct) / 100) / (num(r.usefulLife) || 1) / 12 * num(r.usedMonths), 0) } catch { /* ignore */ } }
   }
   auditNote.value = getString('H7-12-note') || ''
+  auditConclusion.value = getString('H7-12-conclusion') || ''
   void getNum
 }
 
@@ -193,9 +199,6 @@ function removeRow(rowId: string) {
   onUpdate()
 }
 
-function handleAi(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
-}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   if (v == null) return '-'

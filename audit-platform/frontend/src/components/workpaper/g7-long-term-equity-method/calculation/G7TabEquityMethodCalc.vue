@@ -79,6 +79,14 @@
       <p>• 期末余额 = 期初 + 投资收益份额 + OCI份额 + 其他权益份额 - 利润分配(股利)</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：复核权益法下投资收益、其他综合收益及其他权益变动的确认是否恰当，验证应享有份额计算准确、收益差异在可接受范围内。"
+      class="objective-alert"
+    />
+
     <!-- 重要性水平设置 -->
     <div class="materiality-bar">
       <span class="materiality-label">重要性水平：</span>
@@ -98,6 +106,15 @@
 
     <!-- 2区段Tab切换 -->
     <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-14" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
 
     <!-- 54行虚拟滚动 + 按被投资单位分组 -->
     <div class="equity-scroll-container">
@@ -355,6 +372,21 @@
       </div>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="conclusion-card" shadow="never">
+      <div class="conclusion-head">
+        <span class="conclusion-title">审计说明</span>
+      </div>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-head">
@@ -415,6 +447,8 @@ import {
   calcEquityMethodBalance,
 } from '../../composables/useG7EquityMethodFormulaEngine'
 import { fmtAmount } from '@/utils/formatters'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { EquityMethodCalcRow } from '../../composables/useG7EquityMethodFormData'
 
 // ═══ Props ═══════════════════════════════════════════════════════════════════
@@ -457,6 +491,28 @@ const expandedMap = reactive<Record<string, boolean>>({})
 const materialityLevel = ref<number>(0)
 const conclusion = ref<string>('')
 const selectedRowIndex = ref<number>(-1)
+
+// ═══ 审计说明持久化（checklist_responses，conclusion:null） ═══════════════════
+
+const auditFormData = useG7EquityMethodFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const AUDIT_NOTE_KEY = 'G7-14-audit-note'
+const auditNote = ref('')
+const rowCount = computed(() => groups.reduce((n, g) => n + g.rows.length, 0))
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 type TabKey = 'tab1' | 'tab2'
 const activeTab = ref<TabKey>('tab1')
@@ -805,6 +861,26 @@ onMounted(() => {
 .g7-tab-equity-method-calc {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tab-toolbar .chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Section 标题栏 */

@@ -1,14 +1,21 @@
 <template>
   <div class="h5-tab-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：汇总油气资产（1631）、累计折耗（1632）及减值准备的审定结果，验证三角勾稽平衡并回写试算表。" class="objective-alert" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H5-1" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <!-- 一、油气资产原值 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>一、油气资产原值（科目1631）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('cost-note')">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-1-cost')">
               💬 复核
             </el-button>
@@ -76,9 +83,6 @@
         <div class="section-title">
           <span>二、累计折耗（科目1632·备抵）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('depletion-note')">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-1-depletion')">
               💬 复核
             </el-button>
@@ -253,13 +257,20 @@
       <template #header>
         <div class="section-title">
           <span>审计说明</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明..."
         :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="section-title"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作调整外，其余未见异常。C、存在重大未调整事项/审计范围受限，不可确认。"
+        :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
     </el-card>
 
     <!-- 操作按钮 -->
@@ -289,6 +300,7 @@
 <script setup lang="ts">
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useH5Adjudication } from '../../composables/useH5Adjudication'
 import { useH5FormData } from '../../composables/useH5FormData'
 import { eventBus } from '@/utils/eventBus'
@@ -358,9 +370,6 @@ async function handlePublish() {
   }
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate:', section)
-}
 
 function handleReview(id: string) {
   openReviewDialog(id)
@@ -374,6 +383,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h5-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

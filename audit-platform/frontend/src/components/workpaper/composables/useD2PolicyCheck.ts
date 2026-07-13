@@ -219,7 +219,7 @@ export function useD2PolicyCheck(options: UseD2BaseOptions & { agingBands?: Comp
   const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
   // ─── 改进1: 动态账龄段（联动 useAgingConfig） ────────────────────────────
-  const agingBands = computed(() => {
+  const resolvedAgingBands = computed(() => {
     if (externalBands?.value && externalBands.value.length > 0) {
       return externalBands.value
     }
@@ -238,7 +238,7 @@ export function useD2PolicyCheck(options: UseD2BaseOptions & { agingBands?: Comp
       }
     }
     return DEFAULT_AGING_BANDS
-  }) = options
+  })
 
   // ─── State ─────────────────────────────────────────────────────────────
 
@@ -457,7 +457,7 @@ export function useD2PolicyCheck(options: UseD2BaseOptions & { agingBands?: Comp
 
   // ─── 改进1: 账龄段变化时重建矩阵行 ────────────────────────────────────────
 
-  watch(agingBands, (newBands) => {
+  watch(resolvedAgingBands, (newBands) => {
     // 重建历史损失率矩阵（保留已有段数据）
     const existingHist = historicalRows.value
     historicalRows.value = newBands.map(band => {
@@ -519,7 +519,7 @@ export function useD2PolicyCheck(options: UseD2BaseOptions & { agingBands?: Comp
     updateHistoricalCell,
     updateMigrationCell,
     // 改进1: 动态账龄段
-    agingBands,
+    agingBands: resolvedAgingBands,
     // 改进2: 迁徙率交叉引用
     migrationD10Deviation,
     // 改进4: 审计说明/结论

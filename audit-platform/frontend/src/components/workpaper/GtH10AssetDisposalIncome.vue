@@ -69,16 +69,18 @@
         :debounced-save="onDebouncedSave"
       />
 
-      <H10TabDisclosureListed
+      <H10TabDisclosureBase
         v-else-if="currentSheet === '附注上市'"
+        variant="listed"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
 
-      <H10TabDisclosureSOE
+      <H10TabDisclosureBase
         v-else-if="currentSheet === '附注国企'"
+        variant="soe"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
@@ -140,8 +142,7 @@ const H10TabAdjudication = defineAsyncComponent(() => import('./h10/core/H10TabA
 const H10TabDetail = defineAsyncComponent(() => import('./h10/core/H10TabDetail.vue'))
 const H10TabAdjustment = defineAsyncComponent(() => import('./h10/core/H10TabAdjustment.vue'))
 const H10TabCheck = defineAsyncComponent(() => import('./h10/inspection/H10TabCheck.vue'))
-const H10TabDisclosureListed = defineAsyncComponent(() => import('./h10/core/H10TabDisclosureListed.vue'))
-const H10TabDisclosureSOE = defineAsyncComponent(() => import('./h10/core/H10TabDisclosureSOE.vue'))
+const H10TabDisclosureBase = defineAsyncComponent(() => import('./h10/core/H10TabDisclosureBase.vue'))
 const H10TabDirectory = defineAsyncComponent(() => import('./h10/core/H10TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))

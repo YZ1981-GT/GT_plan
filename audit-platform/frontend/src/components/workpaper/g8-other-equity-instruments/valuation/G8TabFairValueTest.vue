@@ -1,8 +1,21 @@
 <template>
   <div class="g8-fv" data-testid="g8-fv-test">
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实其他权益工具投资以公允价值计量的准确性，验证公允价值层次（Level 1/2/3）划分恰当，Level 3 估值技术与不可观察输入值合理，为审定表 G8-1（科目1503）提供计价支撑。"
+    />
     <div class="toolbar">
       <div class="methodology">公允价值三层次：Level1 活跃市场报价 / Level2 可观察输入值 / Level3 不可观察输入值（估值技术）</div>
       <G8ImportExportDropdown :wp-id="wpId" sheet="G8-4" @imported="onImported" />
+    </div>
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-4" /></span>
+        <el-tag size="small" type="info">共 {{ fv.rows.value.length }} 行</el-tag>
+      </div>
     </div>
     <el-segmented v-model="fv.activeTab.value" :options="[{ label: '基础+审定', value: 'basic' }, { label: '估值详情', value: 'detail' }]" size="small" />
     <el-button v-if="!isReadonly" size="small" style="margin:8px 0" @click="fv.addRow()">+ 新增</el-button>
@@ -142,6 +155,12 @@
     </el-table>
 
     <el-card shadow="never" class="conclusion-card">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：公允价值取数来源、层次划分依据及 Level 3 估值技术/输入值的核实情况与异常事项。" />
+    </el-card>
+
+    <el-card shadow="never" class="conclusion-card">
       <template #header>
         <div class="conclusion-head">
           <span>审计结论</span>
@@ -161,7 +180,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, watch, toRef } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import { useG8FairValueTest } from '../../composables/useG8FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -182,6 +202,12 @@ const fv = useG8FairValueTest({
   isReadonly: computed(() => props.isReadonly),
 })
 
+const AUDIT_NOTE_KEY = 'G8-4-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+})
+
 function onImported() { emit('imported') }
 
 function onRowChange(row: { seq?: number } | undefined) {
@@ -191,6 +217,10 @@ function onRowChange(row: { seq?: number } | undefined) {
 
 <style scoped>
 .g8-fv { font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 .toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
 .methodology { flex: 1; border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; }
 .l3-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }

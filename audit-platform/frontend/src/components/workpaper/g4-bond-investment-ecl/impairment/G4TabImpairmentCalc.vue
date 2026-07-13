@@ -22,6 +22,13 @@
       title="审计目标：确认债权投资减值准备的计量准确，审定减值、审定账面价值及本年计提/转回金额计算正确，按 Stage 分组恰当。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏索引 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-10" :context-project-id="projectId" /></span>
+      </div>
+    </div>
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-10 减值准备测算表</h3>
@@ -273,6 +280,19 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：程序执行情况、测试结果、拟调整/未调整事项及其影响、审计范围受限情况等。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -322,7 +342,9 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG4EclImpairmentCalc } from '../../composables/useG4EclImpairmentCalc'
+import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import type { ImpairmentCalcRow } from '../../composables/useG4EclFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -336,6 +358,19 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 const calc = useG4EclImpairmentCalc()
 const conclusion = ref('')
 const activeTab = ref<'tab1' | 'tab2'>('tab1')
+
+// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
+const formData = useG4EclFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G4-10-impairment-calc-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
 
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
 
@@ -472,12 +507,15 @@ function fmtNum(v: unknown): string {
 
 // ─── 数据加载（从htmlData初始化） ───────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   if (props.htmlData?.impairmentCalc) {
     const data = props.htmlData.impairmentCalc
     if (data.rows) calc.loadRows(data.rows)
     if (data.conclusion) conclusion.value = data.conclusion
   }
+  await formData.loadAll()
+  const note = formData.allResponses.value.get(NOTE_KEY)
+  if (note?.remark) auditNote.value = note.remark
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -513,6 +551,30 @@ defineExpose({
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+/* 工具栏索引 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明卡片 */
+.note-card {
+  margin-top: 16px;
+}
+.note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* 表格 */

@@ -11,6 +11,17 @@
       <GtReviewTrigger section-id="G10-4-classification" />
     </div>
 
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实交易性金融负债分类为「以公允价值计量且其变动计入当期损益」的恰当性，确认其符合 CAS 22/37 的分类条件（近期回购、组合管理短期获利、衍生金融负债），列报分类正确。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-4" /></span>
+        <el-tag size="small" type="info">共 {{ cc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-collapse v-model="expandedSections" class="sections">
       <el-collapse-item v-for="sec in cc.sections.value" :key="sec.title" :name="sec.title">
         <template #title>
@@ -67,19 +78,27 @@
         :disabled="isReadonly" @update:model-value="cc.updateOverallConclusion" />
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述分类适当性检查的测试情况、管理层回复的核实结果、发现的不合规项及审计应对。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
-      <p>逐项填写管理层回复与合规判断；不合规项须在结论中说明审计应对。</p>
+      <p>逐项填写管理层回复与合规判断；不合规项须在结论中说明审计应对。分类不适当的负债应提请重分类调整。</p>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useG10ClassificationCheck } from '../../composables/useG10ClassificationCheck'
 import { G10_COMPLIANCE_OPTIONS } from '../../composables/g10Constants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -96,6 +115,18 @@ const cc = useG10ClassificationCheck({
 })
 
 const expandedSections = ref<string[]>([])
+
+// ─── 审计说明（自由文本，conclusion:null 落库）───────────────────────────────
+const NOTE_KEY = 'G10-4-classification-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+})
 </script>
 
 <style scoped>
@@ -107,5 +138,11 @@ const expandedSections = ref<string[]>([])
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 :deep(.missing .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 </style>

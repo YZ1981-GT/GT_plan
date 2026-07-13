@@ -1,5 +1,22 @@
 <template>
   <div class="h6-tab-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实固定资产清理（1606 过渡科目）清理收入、清理支出（账面价值/清理费用/税费）及清理净损益计算准确、结转完整，确认期末余额清零，为 H10 资产处置损益及财务报表列报提供审定依据。"
+    />
+
+    <!-- 工具栏：底稿索引 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H6-1" :context-project-id="props.projectId" /></span>
+      </div>
+    </div>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>科目1606固定资产清理（借方/资产类，过渡科目）：期末余额 = 期初 + 借方 - 贷方；审定数 = 未审数 + AJE + RJE。清理过程结构：清理收入 - 清理支出(账面价值+清理费用+税费) = 清理净损益。<strong>过渡科目期末余额应为0</strong>（清理完毕结转H10）。</p>
@@ -29,9 +46,6 @@
         <div class="section-header">
           <span>一、清理收入</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('income')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-1-income')">💬</el-button>
           </div>
         </div>
@@ -120,9 +134,6 @@
         <div class="section-header">
           <span>二、清理支出（账面价值 / 清理费用 / 税费）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('expense')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-1-expense')">💬</el-button>
           </div>
         </div>
@@ -378,9 +389,6 @@
         <div class="section-header">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-1-note')">💬</el-button>
           </div>
         </div>
@@ -396,9 +404,6 @@
         <div class="section-header">
           <span>审计结论</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-1-conclusion')">💬</el-button>
           </div>
         </div>
@@ -444,10 +449,10 @@
  */
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useH6Adjudication, type H6AdjudicationRow } from '../../composables/useH6Adjudication'
 import { useH6CrossSheet } from '../../composables/useH6CrossSheet'
 import { calcSubtotal } from '../../composables/useH6FormulaEngine'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -624,10 +629,6 @@ async function handlePublish() {
   }
 }
 
-function handleAiGenerate(section: string) {
-  console.log('[H6-1] AI generate:', section)
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
@@ -645,6 +646,15 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h6-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+
+.tab-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 12px;
+}
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

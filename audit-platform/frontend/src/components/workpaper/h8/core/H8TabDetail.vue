@@ -189,6 +189,20 @@
       <span>期末净值合计：{{ fmtAmt(subtotalRow.netValue) }}元</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -208,7 +222,7 @@
  * H8TabDetail.vue — H8-2 明细表（58列4区段Tab + CAS21初始计量公式）
  * Spec: Task 4.3 | Requirements: 3.1-3.3
  */
-import { ref, toRef } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8Detail } from '../../composables/useH8Detail'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -229,6 +243,30 @@ const emit = defineEmits<{
 
 const tabOptions = ['基础', '初始计量', '折旧', '变更']
 const activeTab = ref('基础')
+
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-detail-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
 
 const {
   rows, subtotalRow, initialTotal,
@@ -284,6 +322,8 @@ function getSummaryDep({ columns }: any) {
 .h8-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;

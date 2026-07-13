@@ -304,6 +304,15 @@
         placeholder="超期未结转的原因和处理计划..."
         :model-value="auditNote3" @update:model-value="auditNote3 = $event" />
     </div>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">审计结论</span>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+        :model-value="auditConclusion" @change="saveAuditConclusion" />
+    </div>
   </el-card>
 </div>
 </template>
@@ -313,7 +322,7 @@
  * F1TabDetail.vue — F1-2 明细表
  * 27列宽表 + 款项性质/关联方下拉 + 公式链自动计算 + 搜索 + 导入
  */
-import { computed, inject, ref, toRef, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF1Detail } from '../composables/useF1Detail'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -338,6 +347,22 @@ const relatedParties = ref<string[]>([])
 const auditNote1 = ref('')
 const auditNote2 = ref('')
 const auditNote3 = ref('')
+
+// ─── 审计结论 ──────────────────────────────────────────────────────────────
+const CONCLUSION_KEY = 'F1-detail-audit-conclusion'
+const auditConclusion = ref('')
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const c = allResponsesRef.value.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 const {
   rows,

@@ -26,6 +26,14 @@
       </ul>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证被投资单位发生超额亏损时，投资方按抵减顺序确认损失及未确认投资损失的计算是否恰当（CAS2 第44条）。"
+      class="objective-alert"
+    />
+
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G7-16 未确认投资损失测试表</h3>
@@ -44,6 +52,15 @@
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G7-16-unrecognized-loss')">💬复核</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-16" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -240,6 +257,23 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header">
+          <span>审计说明</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部：审计结论 el-card + AI辅助按钮 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -295,6 +329,8 @@
 import { ref, reactive, inject, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { parseNum } from '../../composables/useG7EquityMethodFormulaEngine'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { UnrecognizedLossRow } from '../../composables/useG7EquityMethodFormData'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -338,6 +374,27 @@ function onCurrentChange(row: UnrecognizedLossRow | null) {
 
 const rows = reactive<UnrecognizedLossRow[]>([])
 const conclusion = ref<string>('')
+
+// ─── 审计说明持久化（checklist_responses，conclusion:null） ────────────────────
+
+const auditFormData = useG7EquityMethodFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const AUDIT_NOTE_KEY = 'G7-16-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 // ─── 超额亏损为0时Tab2禁用判断 ──────────────────────────────────────────────
 
@@ -522,6 +579,10 @@ onMounted(() => {
 
 <style scoped>
 .g7-tab-unrecognized-loss { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {

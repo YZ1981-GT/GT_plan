@@ -4,15 +4,34 @@
     <div class="section-header">
       <span class="section-title">I2 附注披露（上市公司）— 58行×7列</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI生成
-        </el-button>
         <el-button size="small" type="info" text @click="handleAutoFill">
           自动取数
         </el-button>
         <el-button size="small" type="default" text @click="handleReview">
           复核
         </el-button>
+      </div>
+    </div>
+
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核查上市公司开发支出附注披露的完整性与准确性，确认各研发项目期初、增减变动、期末余额及减值披露与审定表I2-1、明细表I2-2一致。" />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 逐项目核对期初余额、本期增加、本期减少、期末余额及减值披露数据；</p>
+        <p>2. 复核附注披露口径与审定表I2-1、明细表I2-2勾稽一致，防止漏披或错披；</p>
+        <p>3. 依据 CAS6《无形资产》及企业会计准则披露要求核查开发支出附注列报。</p>
+      </div>
+    </details>
+
+    <!-- 索引工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:I2" :context-project-id="props.projectId" />
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -66,9 +85,6 @@
       <template #header>
         <div class="note-text-header">
           <span>附注文字说明</span>
-          <el-button size="small" type="primary" text @click="handleAiNoteText">
-            <el-icon><MagicStick /></el-icon> AI生成文字
-          </el-button>
         </div>
       </template>
       <el-input
@@ -84,13 +100,23 @@
       <el-button size="small" type="primary" plain @click="handleAddRow">+ 新增行</el-button>
       <el-button size="small" type="success" @click="handleSave">保存</el-button>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }" placeholder="记录审计过程、发现的问题及处理..." @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span>审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }" placeholder="填写审计结论..." @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject } from 'vue'
+import { ref, watch, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   sheetName: string
@@ -98,6 +124,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   saveResponse: (sheetCode: string, data: Record<string, any>) => Promise<void>
+  isReadonly?: boolean
 }>()
 
 const emit = defineEmits<{ 'save': []; 'navigate-sheet': [sheetName: string] }>()
@@ -174,8 +201,6 @@ async function handleSave() {
   ElMessage.success('附注披露（上市公司）已保存')
 }
 
-function handleAiGenerate() { ElMessage.info('AI生成附注完整内容...') }
-function handleAiNoteText() { ElMessage.info('AI生成附注文字说明...') }
 function handleReview() { openReviewDialog('I2-附注披露-上市') }
 function fmtNum(v: number): string { return v == null || isNaN(v) ? '—' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>

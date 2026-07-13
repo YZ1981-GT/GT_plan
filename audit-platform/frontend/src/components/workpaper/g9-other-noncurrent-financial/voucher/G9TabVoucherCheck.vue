@@ -1,6 +1,6 @@
 <template>
   <div class="g9-voucher" data-testid="g9-voucher-check">
-    <div class="section-head">
+    <div class="section-head tab-toolbar">
       <h3 class="sheet-title">G9-6 凭证检查表</h3>
       <div class="head-actions">
         <GtIndexChip value="wp:G9-6" />
@@ -208,6 +208,20 @@
         :disabled="isReadonly" @update:model-value="vc.updateConclusion" />
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述抽样方法与范围、核对内容执行情况、借贷平衡核对、异常凭证识别与处理情况。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -219,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, h, onMounted, onBeforeUnmount } from 'vue'
+import { computed, toRef, h, ref, onMounted, onBeforeUnmount } from 'vue'
 import type { Column } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -352,6 +366,26 @@ function fmt(v: number) {
   return Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// ─── 审计说明 / 审计结论（持久化 checklist_responses）─────────────────────
+const NOTE_KEY = 'G9-voucher-audit-note'
+const CONCLUSION_KEY = 'G9-voucher-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+})
+
 function onCutoffFilled(e: Event) {
   const detail = (e as CustomEvent<GCycleCutoffFilledDetail>).detail
   if (!detail?.samples?.length) return
@@ -382,4 +416,6 @@ onBeforeUnmount(() => {
 .abnormal { color: #f56c6c; font-weight: 600; }
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

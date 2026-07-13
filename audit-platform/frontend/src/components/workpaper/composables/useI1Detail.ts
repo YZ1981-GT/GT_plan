@@ -435,6 +435,7 @@ export function useI1Detail(
   /** Tab3 摊销列定义 */
   const amortColumns = [
     { key: 'name', label: '资产名称', width: 180, editable: false, type: 'text' as const },
+    { key: 'costEnd', label: '摊销原值', width: 130, editable: false, type: 'formula' as const, tooltip: '摊销原值=原值期末（摊销计算基数），来源"原值变动"区段' },
     { key: 'accAmortBegin', label: '摊销期初', width: 130, editable: true, type: 'number' as const },
     { key: 'amortProvision', label: '本期摊销', width: 130, editable: true, type: 'number' as const },
     { key: 'amortTransferOut', label: '摊销转出', width: 130, editable: true, type: 'number' as const },

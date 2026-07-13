@@ -1,5 +1,13 @@
 <template>
   <div class="g6-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认其他债权投资(FVOCI-Debt)期初/期末审定余额的准确性与完整性，公允价值变动(OCI)与减值(ECL)计量恰当，并与试算表科目1503勾稽一致，为报表列示提供审定依据。"
+      style="margin-bottom: 12px"
+    />
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p class="methodology-title">FVOCI-Debt计量特征：</p>
@@ -14,6 +22,15 @@
       <h3 class="sheet-title">G6-1 其他债权投资审定表</h3>
       <div class="head-actions">
         <el-button size="small" @click="openReviewDialog('G6-1-adjudication')">💬复核</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-1" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ detailRowCount }} 行</el-tag>
       </div>
     </div>
 
@@ -230,9 +247,10 @@
       <template #header>
         <div class="card-header"><span>审计说明</span></div>
       </template>
-      <el-input v-model="auditNote" type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="对其他债权投资审定表的审计说明…" />
+      <el-input :model-value="auditNote" type="textarea"
+        :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="对其他债权投资审定表的审计说明…"
+        @change="(v: string) => saveAuditNote(v)" />
     </el-card>
 
     <!-- 审计结论 -->
@@ -240,9 +258,10 @@
       <template #header>
         <div class="card-header"><span>审计结论</span></div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="审计结论…" />
+      <el-input :model-value="auditConclusion" type="textarea"
+        :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="审计结论…"
+        @change="(v: string) => saveAuditConclusion(v)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -290,6 +309,7 @@ import {
 } from '@/composables/useG6MainFormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -339,6 +359,43 @@ const sectionData = reactive<Record<string, AdjRow[]>>({
 const auditNote = ref('')
 const auditConclusion = ref('')
 const trialBalanceAmount = ref(0)
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
+const NOTE_KEY = 'G6-1-adjudication-audit-note'
+const CONCLUSION_KEY = 'G6-1-adjudication-audit-conclusion'
+
+function readSaved(key: string): string {
+  const cr = props.htmlData?.checklist_responses
+  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+    const v = (cr as Record<string, any>)[key]
+    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+  }
+  const resp = props.htmlData?.responses
+  if (Array.isArray(resp)) {
+    const found = resp.find((r: any) => r?.item_id === key)
+    if (found?.remark) return found.remark
+  }
+  return ''
+}
+
+async function saveAudit(key: string, val: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: key, conclusion: null, remark: val }],
+    })
+  } catch { /* silent */ }
+}
+
+function saveAuditNote(val: string): void {
+  auditNote.value = val
+  void saveAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  auditConclusion.value = val
+  void saveAudit(CONCLUSION_KEY, val)
+}
 
 // ═══ 折叠状态（默认全展开）═══════════════════════════════════════════════════
 const expandedMap = reactive<Record<string, boolean>>({
@@ -438,6 +495,11 @@ const sections = computed<SectionDef[]>(() => [
 /** 报表列示数（期末审定）为TB比对基准 */
 const adjudicatedAmount = computed(() => sectionSevenRow.value.closingAdjusted)
 const variance = computed(() => Math.round((adjudicatedAmount.value - trialBalanceAmount.value) * 100) / 100)
+
+// ═══ 明细行数（工具栏"共 N 行"） ═══
+const detailRowCount = computed(() =>
+  Object.values(sectionData).reduce((s, arr) => s + arr.length, 0),
+)
 
 // ═══ EventBus publish: substantive:adjudicated ═══════════════════════════════
 watch(adjudicatedAmount, (val) => {
@@ -552,6 +614,10 @@ function adjRowClassName({ row }: { row: AdjRow }): string {
 onMounted(() => {
   hydrateData()
   fetchTrialBalance()
+  const savedNote = readSaved(NOTE_KEY)
+  if (savedNote) auditNote.value = savedNote
+  const savedConc = readSaved(CONCLUSION_KEY)
+  if (savedConc) auditConclusion.value = savedConc
 })
 </script>
 
@@ -576,6 +642,12 @@ onMounted(() => {
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; }
+
+/* 工具栏：索引 chip + 行数 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 /* 虚拟滚动容器 */
 .adj-scroll-container { overflow-y: auto; border: 1px solid #ebeef5; border-radius: 4px; padding: 4px; }

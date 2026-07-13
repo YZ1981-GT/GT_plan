@@ -154,18 +154,28 @@
       已计提 {{ fmt(imp.totalSummary.value.existingProvision) }}
     </div>
 
+    <!-- 审计说明 -->
     <el-card shadow="never" class="opinion-card">
       <template #header>
-        <div class="opinion-header"><span class="opinion-title">测试结论</span></div>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
       </template>
-      <el-input v-model="imp.testConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="跌价准备测试结论..." />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计说明：概述所执行的可变现净值测算与跌价准备复核程序、抽样情况与测试结果，以及拟调整/未调整事项及其影响。" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="opinion-card">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
+      </template>
+      <el-input v-model="imp.testConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、跌价准备计提充分、准确，未见异常。B、除上述应调整事项外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef, type Ref } from 'vue'
+import { ref, onMounted, toRef, type Ref } from 'vue'
 import { useF2ImpairmentTest } from '../../composables/useF2ImpairmentTest'
 import { useF2ImpairmentOcr } from '../../composables/useF2ImpairmentOcr'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
@@ -181,6 +191,21 @@ const props = defineProps<{
 const imp = useF2ImpairmentTest({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计说明（独立持久化，F2 计价组事件；测试结论沿用 composable） ────────
+const NOTE_KEY = 'F2-47-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 const wpIdRef = toRef(() => props.wpId || '') as Ref<string>

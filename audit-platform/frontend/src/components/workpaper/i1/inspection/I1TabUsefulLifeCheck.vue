@@ -17,6 +17,23 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实各项无形资产使用寿命估计的合理性，验证寿命依据充分、本期变更符合 CAS28 会计估计变更处理，使用寿命不确定项已进行减值测试。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-7" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 主检查表 -->
     <el-card shadow="never">
       <template #header>
@@ -24,9 +41,6 @@
           <span>I1-7 使用寿命检查表（{{ rows.length }} 项）</span>
           <div class="title-actions">
             <el-button size="small" type="primary" @click="handleAddRow" :disabled="isReadonly">+ 新增</el-button>
-            <el-button size="small" type="primary" link @click="handleAiGenerate('usefullife-review')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('I1-7')">💬 复核</el-button>
           </div>
         </div>
@@ -157,24 +171,28 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：使用寿命依据核对（合同/法律/技术周期）、不摊销项减值测试情况、本期变更事项处理等。"
+        @change="saveNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header>
-        <div class="section-title">
-          <span>审计结论</span>
-          <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('usefullife-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
-          </div>
-        </div>
-      </template>
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="对各项无形资产使用寿命估计合理性的审计结论..."
+        placeholder="对各项无形资产使用寿命估计合理性的审计结论：寿命估计合理、依据充分，变更处理恰当，未见异常..."
         @change="saveConclusion"
       />
     </el-card>
@@ -197,9 +215,7 @@
 <script setup lang="ts">
 import { ref, computed, inject, watch, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -231,9 +247,11 @@ interface UsefulLifeRow {
 
 const rows = ref<UsefulLifeRow[]>([])
 const auditConclusion = ref('')
+const auditNote = ref('')
 
 const STORAGE_KEY = 'I1-7-rows'
 const CONCLUSION_KEY = 'I1-7-conclusion'
+const NOTE_KEY = 'I1-7-audit-note'
 
 // ─── Computed Stats ───────────────────────────────────────────────────────────
 const indefiniteCount = computed(() => rows.value.filter(r => r.usefulLifeMonths === 0).length)
@@ -318,6 +336,11 @@ function saveConclusion() {
   emit('save', CONCLUSION_KEY, auditConclusion.value)
 }
 
+function saveNote() {
+  if (props.isReadonly) return
+  emit('save', NOTE_KEY, auditNote.value)
+}
+
 function loadFromResponses() {
   if (!props.allResponses) return
   const raw = props.allResponses.get(STORAGE_KEY)
@@ -330,23 +353,10 @@ function loadFromResponses() {
   if (concRaw) {
     auditConclusion.value = typeof concRaw === 'string' ? concRaw : concRaw.value || ''
   }
-}
-
-// ─── AI Generate ──────────────────────────────────────────────────────────────
-async function handleAiGenerate(section: string) {
-  try {
-    const context = `使用寿命检查表共${rows.length}项资产，其中不摊销（使用寿命不确定）${indefiniteCount.value}项，本期变更${changedCount.value}项，结论分布：合理${conclusionStats.value.reasonable}/需关注${conclusionStats.value.attention}/不合理${conclusionStats.value.unreasonable}`
-    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: '请根据使用寿命检查结果，评估各资产寿命估计的合理性，关注不摊销项及本期变更项',
-      context,
-      existingContent: auditConclusion.value,
-    })
-    if (resp.data?.data?.content) {
-      auditConclusion.value = resp.data.data.content
-      saveConclusion()
-    }
-  } catch { /* silent */ }
+  const noteRaw = props.allResponses.get(NOTE_KEY)
+  if (noteRaw) {
+    auditNote.value = typeof noteRaw === 'string' ? noteRaw : (noteRaw.remark ?? noteRaw.value ?? '')
+  }
 }
 
 // ─── Review ───────────────────────────────────────────────────────────────────

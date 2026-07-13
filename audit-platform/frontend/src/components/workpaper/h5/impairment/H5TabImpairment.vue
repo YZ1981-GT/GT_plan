@@ -1,11 +1,21 @@
 <template>
   <div class="h5-tab-impairment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：测算油气资产组减值损失与本期补提，确认减值确认充分且一经确认不得转回(CAS8)。" class="objective-alert" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H5-14" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.testRows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>H5-14 减值测算（本期补提 {{ fmtAmt(state.totalAdditionalImpairment.value) }}）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-14')">💬 复核</el-button>
           </div>
         </div>
@@ -66,6 +76,11 @@
       <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" placeholder="填写减值测算审计结论..." :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -81,20 +96,26 @@
 <script setup lang="ts">
 import { computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useH5Impairment } from '../../composables/useH5Impairment'
+import { useH5FormData } from '../../composables/useH5FormData'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-const state = useH5Impairment({ allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'), onSave: () => {} })
+const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const state = useH5Impairment({ allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'), onSave: (itemId: string, value: any) => formData.setResponse(itemId, value) })
 
-function handleAiGenerate() {}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string { return val == null ? '-' : val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>
 
 <style scoped>
 .h5-tab-impairment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

@@ -1,8 +1,26 @@
 <template>
   <div class="h9-tab-adjudication">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实租赁负债及未确认融资费用期末余额的完整、准确与计价，验证与 H8 使用权资产初始确认的 CAS21 勾稽关系，为报表列报及 TB 回写提供审定依据。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>租赁负债审定表：科目2205（贷方/负债类）+ 未确认融资费用（借方/负债备抵类）。负债类期末=期初+贷方-借方；备抵类期末=期初+借方-贷方。审定数=未审+AJE+RJE。净额=原值-未确认融资费用。</p>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-1" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ liabilityRows.length + unearnedRows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- 区块1: 租赁负债原值（贷方/负债类） -->
@@ -12,7 +30,6 @@
           <span>一、租赁负债原值（科目2205，贷方/负债类）</span>
           <div class="title-actions">
             <el-button v-if="!isReadonly" size="small" @click="handleAddLiabilityRow">+ 新增行</el-button>
-            <el-button size="small" type="primary" plain @click="$emit('open-ai', 'adjudication-liability')">AI 辅助</el-button>
             <el-button size="small" @click="$emit('open-review', 'adjudication-liability')">复核</el-button>
           </div>
         </div>
@@ -91,7 +108,6 @@
           <span>二、未确认融资费用（借方/负债备抵类）</span>
           <div class="title-actions">
             <el-button v-if="!isReadonly" size="small" @click="handleAddUnearnedRow">+ 新增行</el-button>
-            <el-button size="small" type="primary" plain @click="$emit('open-ai', 'adjudication-unearned')">AI 辅助</el-button>
             <el-button size="small" @click="$emit('open-review', 'adjudication-unearned')">复核</el-button>
           </div>
         </div>
@@ -207,7 +223,6 @@
         <div class="section-title">
           <span>审计说明与结论</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" plain @click="$emit('open-ai', 'adjudication-note')">AI 辅助</el-button>
             <el-button size="small" @click="$emit('open-review', 'adjudication-note')">复核</el-button>
           </div>
         </div>
@@ -261,6 +276,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useH9Adjudication, type H9AdjudicationRow } from '../../composables/useH9Adjudication'
 import { useH9CrossSheet } from '../../composables/useH9CrossSheet'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -394,6 +410,15 @@ function getUnearnedSummary({ columns }: { columns: any[]; data: H9AdjudicationR
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .block-card { margin-bottom: 16px; }
 .formula-table { font-size: var(--wp-font-size, 13px); }

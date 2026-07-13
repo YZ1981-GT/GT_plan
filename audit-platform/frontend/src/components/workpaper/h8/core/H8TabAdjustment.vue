@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：确认使用权资产相关审计调整(AJE)与重分类(RJE)分录借贷平衡、依据充分，并已正确同步至 H8-1 审定表及 A13。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H8-3调整分录汇总：记录审计调整(AJE)和重分类(RJE)分录。借贷必须平衡，调整结果双向同步H8-1审定表。</p>
@@ -100,6 +104,20 @@
       <span v-if="!balanceCheck.isBalanced" class="publish-hint">借贷不平衡时不可同步</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -119,7 +137,7 @@
  * H8TabAdjustment.vue — H8-3 调整分录（10列+借贷平衡+EventBus）
  * Spec: Task 4.3 | Requirements: 3.4
  */
-import { toRef } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { useH8Adjustment } from '../../composables/useH8Adjustment'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -149,6 +167,30 @@ const {
   },
 })
 
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-adjustment-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
+
 function fmtAmt(v: number): string {
   if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -175,6 +217,10 @@ function getSummary({ columns }: any) {
 
 <style scoped>
 .h8-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

@@ -160,7 +160,7 @@ function getRegionSubtotal(region: UnrecordedRegion) {
       title="审计目标：执行反向截止测试，检查资产负债表日后是否存在应属本期而未入账的应付账款(2202)，验证负债的完整性。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-button
           type="primary"

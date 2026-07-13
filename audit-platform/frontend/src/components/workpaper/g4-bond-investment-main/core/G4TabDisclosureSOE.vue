@@ -1,5 +1,15 @@
 <template>
   <div class="g4-disclosure-soe">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认债权投资在国有企业财务报表附注中完整、准确披露期初/期末余额、减值准备及摊余成本合计等信息，列报与分类符合企业会计准则披露要求。"
+      class="objective-alert"
+      style="margin-bottom: 12px"
+    />
+
     <!-- Section: 债权投资附注(国企) 71行×7列分多section -->
     <template v-for="(section, sIdx) in sections" :key="section.id">
       <div class="section-head">
@@ -59,6 +69,32 @@
       </el-card>
     </template>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：附注披露项与审定表/明细表的勾稽核对情况，披露完整性与准确性的测试结果。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、附注披露完整、准确。B、除下述事项外，附注披露未见异常。C、存在重大披露不当事项，不可确认。"
+        @change="(v: string) => saveAuditConclusion(v)"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
@@ -82,8 +118,9 @@
  *           publish disclosure:note-text-updated on text change
  * AI辅助按钮 + 复核按钮（每个section标题行右侧）
  */
-import { reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import http from '@/utils/http'
 
 const G4_ACCOUNT_CODE = '1501'
 
@@ -101,6 +138,45 @@ function fmtAmount(v: number | null | undefined): string {
 }
 
 const isReadonly = computed(() => props.isReadonly)
+
+// ═══ 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ═══
+const NOTE_KEY = 'G4-disclosure-soe-audit-note'
+const CONCLUSION_KEY = 'G4-disclosure-soe-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function readSaved(key: string): string {
+  const cr = props.htmlData?.checklist_responses
+  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+    const v = (cr as Record<string, any>)[key]
+    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+  }
+  const resp = props.htmlData?.responses
+  if (Array.isArray(resp)) {
+    const found = resp.find((r: any) => r?.item_id === key)
+    if (found?.remark) return found.remark
+  }
+  return ''
+}
+
+async function saveAudit(key: string, val: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: key, conclusion: null, remark: val }],
+    })
+  } catch { /* silent */ }
+}
+
+function saveAuditNote(val: string): void {
+  auditNote.value = val
+  void saveAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  auditConclusion.value = val
+  void saveAudit(CONCLUSION_KEY, val)
+}
 
 // ═══ 附注结构 —— 71行分为多section ═══
 interface DisclosureRowSOE {
@@ -200,6 +276,8 @@ function handleAdjudicated(e: Event): void {
 onMounted(() => {
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
   loadFromHtmlData()
+  auditNote.value = readSaved(NOTE_KEY)
+  auditConclusion.value = readSaved(CONCLUSION_KEY)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
@@ -249,6 +327,9 @@ function loadFromHtmlData(): void {
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .text-card { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .prep-hint { margin-top: 16px; font-size: 12px; color: #909399; }
 .prep-hint summary { cursor: pointer; }
 .prep-hint ul { margin: 8px 0 0; padding-left: 18px; }

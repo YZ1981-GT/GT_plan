@@ -53,6 +53,8 @@
           block="gross"
           :project-id="projectId"
           :readonly="isReadonly"
+          :wp-id="wpId"
+          :all-responses="allResponses"
           @update="updateCell"
         />
       </el-collapse-item>
@@ -63,6 +65,8 @@
           block="impairment"
           :project-id="projectId"
           :readonly="isReadonly"
+          :wp-id="wpId"
+          :all-responses="allResponses"
           @update="updateCell"
         />
       </el-collapse-item>

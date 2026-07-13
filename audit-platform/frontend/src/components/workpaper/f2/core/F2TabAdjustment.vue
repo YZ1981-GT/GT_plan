@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F2TabAdjustment — F2-14 调整分录 | Task 15.4 */
-import { toRef, inject, type Ref } from 'vue'
+import { ref, toRef, inject, onMounted, type Ref } from 'vue'
 import { useF2Adjustment } from '../../composables/useF2Adjustment'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -16,6 +16,37 @@ const props = defineProps<{
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 async function onImported() { await reloadWorkpaperData?.() }
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const NOTE_KEY = 'F2-adjustment-audit-note'
+const CONCLUSION_KEY = 'F2-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
+}
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function fmt(v: number): string {
   return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -42,6 +73,15 @@ const {
         <p>4. 依《企业会计准则第 1 号——存货》，跌价准备计提/转回、成本结转差错等均通过本表调整。</p>
       </div>
     </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：汇总存货相关的账项调整（AJE）与重分类调整（RJE），确保调整分录借贷平衡、依据充分，准确联动回写 F2-1 审定表账项调整列。"
+    />
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -134,6 +174,32 @@ const {
       借方合计 {{ fmt(debitTotal) }} | 贷方合计 {{ fmt(creditTotal) }} | 差额 {{ fmt(balanceDiff) }}
       <span v-if="!isBalanced"> — 借贷不平衡</span>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述调整分录的编制依据、账项/重分类调整事项及其对审定数的影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -151,10 +217,13 @@ const {
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .balance-bar { margin-top: 8px; text-align: right; font-weight: 600; }
 .balance-bar.unbalanced { color: #f56c6c; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

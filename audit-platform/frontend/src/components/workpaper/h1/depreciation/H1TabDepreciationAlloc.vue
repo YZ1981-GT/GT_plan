@@ -5,6 +5,12 @@
       <template #title>审计目标：验证H1-12测算的折旧总额已按使用部门合理分配至制造费用(D5)/管理费用(K8)/销售费用(K9)，分配合计与折旧总额一致。</template>
     </el-alert>
 
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-13" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>折旧费用分配：将H1-12测算的折旧总额按使用部门分配到制造费用(D5)、管理费用(K8)、销售费用(K9)等科目。分配比例基于部门折旧占比自动计算。</p>
     </div>
@@ -131,6 +137,13 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：折旧分配依据、部门归集口径、与H1-12测算及D5/K8/K9勾稽情况。" @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
@@ -140,7 +153,8 @@
           </div>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论..." @change="saveAllocConclusion" />
     </el-card>
 
     <div class="jump-targets">
@@ -169,15 +183,25 @@
  * - publish 'h1:depreciation-allocated' event
  * - GtIndexChip 跳转 D5/K8/K9
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH1DepreciationAlloc, type AllocRow } from '../../composables/useH1DepreciationAlloc'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-13-audit-note'
+const CONCLUSION_KEY = 'H1-13-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAllocConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 
 const {
   rows,

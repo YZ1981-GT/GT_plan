@@ -187,11 +187,24 @@
       <el-input v-model="pp.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请说明采购价格波动分析结果、异常定价原因及与市场行情/供应商访谈的印证情况……" :disabled="isReadonly" />
     </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="audit-card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusionText"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, h } from 'vue'
+import { computed, ref, onMounted, toRef, h } from 'vue'
 import { ElTag } from 'element-plus'
 import type { Column } from 'element-plus'
 import { useF2PurchasePrice, MONTH_LABELS } from '../../composables/useF2PurchasePrice'
@@ -249,6 +262,24 @@ function fmtPrice(v: number | ''): string {
   if (v === '') return '—'
   return Number(v).toFixed(4)
 }
+
+// ─── 审计结论（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────────────────
+const CONCLUSION_KEY = 'F2-61-audit-conclusion'
+const auditConclusionText = ref('')
+function persistSpeAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusionText.value = val
+  persistSpeAudit(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusionText.value = c.remark
+})
 </script>
 
 <style scoped>
@@ -274,4 +305,7 @@ function fmtPrice(v: number | ''): string {
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.audit-note-card { margin-top: 16px; border-radius: 8px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.audit-card-header { font-weight: 600; font-size: 14px; color: #303133; }
 </style>

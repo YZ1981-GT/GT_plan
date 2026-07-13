@@ -97,6 +97,17 @@
       </span>
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计说明</template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="录入信用减值损失调整事项的审计说明…" @update:model-value="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计结论</template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="录入审计结论…" @update:model-value="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <div class="hint-content">
@@ -109,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, onMounted, onBeforeUnmount } from 'vue'
+import { ref, toRef, onMounted, onBeforeUnmount } from 'vue'
 import { useG14Adjustment } from '../composables/useG14Adjustment'
 import { useG14Detail } from '../composables/useG14Detail'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -144,6 +155,23 @@ const adj = useG14Adjustment({
   },
 })
 
+const NOTE_KEY = 'G14-3-adjustment-audit-note'
+const CONCLUSION_KEY = 'G14-3-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
 function onCutoffFilled(e: Event) {
   const detail = (e as CustomEvent<GCycleCutoffFilledDetail>).detail
   if (!detail?.samples?.length) return
@@ -152,6 +180,10 @@ function onCutoffFilled(e: Event) {
 
 onMounted(() => {
   window.addEventListener(GCYCLE_CUTOFF_EVENT.g14, onCutoffFilled as EventListener)
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 onBeforeUnmount(() => {
@@ -167,6 +199,7 @@ function fmtAmount(val: number): string {
 <style scoped>
 .g14-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+.audit-note-card { margin-top: 12px; }
 .audit-objective { margin-bottom: 12px; }
 .balance-row { display: flex; gap: 24px; padding: 10px 12px; background: #fafafa; border-radius: 4px; margin-top: 12px; font-size: var(--wp-font-size, 13px); font-weight: 500; }
 .balanced { color: #67c23a; }

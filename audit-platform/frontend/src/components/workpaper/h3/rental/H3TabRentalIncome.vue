@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-rental-income">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表测算投资性房地产租金收入，含租赁合同汇总、月度收入明细与到期管理三区。</p>
+        <p>2. 年租金 = 月租 × 12；每㎡月租 = 月租 / 面积；月度差异率 &gt;5% 需关注收入完整性与截止。</p>
+        <p>3. 到期 ≤3 个月的合同应关注续租/空置风险；空置率偏高影响后续估值与减值判断。</p>
+        <p>4. 租金收入结果通过 EventBus 联动，并与收入循环、公允价值/减值测算勾稽。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实投资性房地产租金收入的真实、完整与截止恰当，评估到期与空置风险对收入及估值的影响。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-14" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ contractRows.length }} 份合同</el-tag>
+    </div>
+
     <!-- 区域1：租赁合同汇总 -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -137,17 +162,25 @@
     </div>
 
     <!-- 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-14')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-14')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：租金收入核对、月度差异分析、到期/空置管理及对收入与估值的影响。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、租金收入真实完整、截止恰当。B、除下列事项外未见异常。C、存在重大异常，不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -157,9 +190,10 @@
  * H3TabRentalIncome.vue — H3-14 租金收入测算
  * 三区域(合同/月度12列/到期)+空置高亮+到期预警+AI+💬复核
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH3RentalIncome } from '../../composables/useH3RentalIncome'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -190,7 +224,29 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-const auditConclusion = ref(getValue('H3-14-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-14-audit-note'
+const CONCLUSION_KEY = 'H3-14-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function onContractChange(index: number, row: any) {
   updateContractRow(index, row)
@@ -249,6 +305,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-rental-income { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .action-btns { display: flex; gap: 4px; }

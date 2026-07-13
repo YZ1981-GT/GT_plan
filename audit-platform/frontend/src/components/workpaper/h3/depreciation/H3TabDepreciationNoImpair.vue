@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-depreciation-no-impair">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表为投资性房地产折旧测算（不含减值，直线法），仅适用于成本模式；公允价值模式不计提折旧。</p>
+        <p>2. 月折旧 = 原值 × (1 − 残值率) / 使用年限 / 12；测算累计 = 月折旧 × 已计提月数；差异 = 测算累计 − 账面累计。</p>
+        <p>3. 关注差异（红色高亮，&gt;0.01）行的原因；测算累计合计应与账面累计合计核对一致。</p>
+        <p>4. 若资产存在减值，请使用「含减值」版本重新测算折旧。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：复核投资性房地产（成本模式）折旧计提的准确性，验证直线法参数与账面累计折旧的一致性。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-7" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 成本模式限定提示 -->
     <el-alert title="折旧测算 — 不含减值（直线法）" type="info" :closable="false" show-icon class="mode-alert">
       本表仅适用于成本模式，计算月折旧=原值×(1-残值率)/使用年限/12
@@ -85,17 +110,25 @@
     </div>
 
     <!-- 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-7-no-impair')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-7-no-impair')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：折旧参数（残值率/年限）合理性、测算与账面累计折旧差异及原因。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、折旧测算准确，与账面无重大差异。B、除下列差异外未见异常。C、存在重大未调整差异，不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -105,9 +138,10 @@
  * H3TabDepreciationNoImpair.vue — H3-7(A) 折旧不含减值
  * 28列42公式+差异高亮（仅成本模式）
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH3Depreciation } from '../../composables/useH3Depreciation'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -137,7 +171,29 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-const auditConclusion = ref(getValue('H3-7-noimpair-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-7-noimpair-audit-note'
+const CONCLUSION_KEY = 'H3-7-noimpair-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function onCellChange(index: number, row: any) { updateRow(index, row) }
 
@@ -168,6 +224,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-depreciation-no-impair { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .mode-alert { margin-bottom: 16px; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .audit-table { font-size: var(--wp-font-size, 13px); }

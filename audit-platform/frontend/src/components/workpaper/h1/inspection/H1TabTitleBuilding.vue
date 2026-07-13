@@ -4,6 +4,12 @@
       <template #title>审计目标：核对房屋建筑物产权证书与账面记录，确认权利人为被审计单位、账证价值一致，识别抵押/查封等受限情形并披露。</template>
     </el-alert>
 
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-16" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ buildingRows.length }} 项</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>核对房屋建筑物产权证书信息与账面记录，关注：权利人是否为被审计单位、面积/用途是否一致、是否存在抵押/查封限制。</p>
     </div>
@@ -115,9 +121,17 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：产权证核对情况、账证价值差异、抵押/查封受限资产及披露。" @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
       <template #header><span>审计结论</span></template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写房屋建筑物权属检查审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -128,14 +142,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH1TitleCheck, type BuildingRow } from '../../composables/useH1TitleCheck'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-16-audit-note'
+const CONCLUSION_KEY = 'H1-16-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 const { buildingRows, buildingStats, addBuildingRow, removeBuildingRow, updateBuildingCell } = useH1TitleCheck(
   toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any,
 )

@@ -5,6 +5,23 @@
       <p>对本期减少无形资产进行逐项检查：验证处置方式及审批流程、复核处置损益计算（处置损益 = 处置收入 - 净值）、确认减少合计与审定表"本期减少"勾稽一致。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实本期减少（处置）无形资产的真实性与完整性，验证处置方式审批合规、处置损益计算准确，并与审定表本期减少勾稽一致。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-6" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 主检查表 -->
     <el-card shadow="never">
       <template #header>
@@ -131,24 +148,28 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：处置方式审批核对、处置损益复核、减少合计与审定表勾稽情况、异常项处理等。"
+        @change="saveNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header>
-        <div class="section-title">
-          <span>审计结论</span>
-          <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('disposal-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
-          </div>
-        </div>
-      </template>
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="对本期无形资产减少事项的审计结论..."
+        placeholder="对本期无形资产减少事项的审计结论：处置审批合规、损益计算准确、与审定表勾稽一致，未见异常..."
         @change="saveConclusion"
       />
     </el-card>
@@ -181,11 +202,9 @@
 <script setup lang="ts">
 import { ref, computed, inject, watch, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { calcNetValue, calcDisposalGainLoss } from '../../composables/useI1FormulaEngine'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -219,10 +238,12 @@ interface DisposalRow {
 
 const rows = ref<DisposalRow[]>([])
 const auditConclusion = ref('')
+const auditNote = ref('')
 const showSamplingDialog = ref(false)
 
 const STORAGE_KEY = 'I1-6-rows'
 const CONCLUSION_KEY = 'I1-6-conclusion'
+const NOTE_KEY = 'I1-6-audit-note'
 
 // ─── Computed Totals ──────────────────────────────────────────────────────────
 const totalOriginalCost = computed(() => rows.value.reduce((s, r) => s + (r.originalCost || 0), 0))
@@ -280,6 +301,11 @@ function saveConclusion() {
   emit('save', CONCLUSION_KEY, auditConclusion.value)
 }
 
+function saveNote() {
+  if (props.isReadonly) return
+  emit('save', NOTE_KEY, auditNote.value)
+}
+
 function loadFromResponses() {
   if (!props.allResponses) return
   const raw = props.allResponses.get(STORAGE_KEY)
@@ -291,6 +317,10 @@ function loadFromResponses() {
   const concRaw = props.allResponses.get(CONCLUSION_KEY)
   if (concRaw) {
     auditConclusion.value = typeof concRaw === 'string' ? concRaw : concRaw.value || ''
+  }
+  const noteRaw = props.allResponses.get(NOTE_KEY)
+  if (noteRaw) {
+    auditNote.value = typeof noteRaw === 'string' ? noteRaw : (noteRaw.remark ?? noteRaw.value ?? '')
   }
 }
 
@@ -305,22 +335,6 @@ function onSampleFilled(samples: any[]) {
     rows.value.push(row)
   }
   handleChange()
-}
-
-// ─── AI Generate ──────────────────────────────────────────────────────────────
-async function handleAiGenerate(section: string) {
-  try {
-    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: '请根据减少明细检查结果生成审计结论',
-      context: `本期减少${rows.value.length}项无形资产，原值合计${totalOriginalCost.value}，处置损益合计${totalGainLoss.value}`,
-      existingContent: auditConclusion.value,
-    })
-    if (resp.data?.data?.content) {
-      auditConclusion.value = resp.data.data.content
-      saveConclusion()
-    }
-  } catch { /* silent */ }
 }
 
 // ─── Review ───────────────────────────────────────────────────────────────────

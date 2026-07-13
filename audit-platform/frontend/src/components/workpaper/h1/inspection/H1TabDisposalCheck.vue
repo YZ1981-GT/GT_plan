@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-disposal-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：检查本期减少（处置）固定资产，核实处置审批流程、验证处置损益（收入-净值-处置费用）计算准确，并联动 H10 资产处置损益底稿。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-8" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ state.rows.value.length }} 项</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>对本期减少固定资产进行检查：核实处置审批流程、验证处置损益计算（收入-净值-处置费用=损益）、联动H10资产处置损益底稿。</p>
     </div>
@@ -78,19 +88,24 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：处置审批核查、处置损益核算与计税基础、与 H10 勾稽情况。" @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
           <span>审计结论</span>
           <div class="title-actions">
             <el-button size="small" type="primary" link @click="publishDisposalCompleted" :disabled="isReadonly">📤 发布联动H10</el-button>
-            <el-button size="small" type="primary" link @click="handleAiGenerate('disposal-note')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写减少检查审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -116,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1DisposalCheck } from '../../composables/useH1DisposalCheck'
@@ -132,8 +147,18 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-8-audit-note'
+const CONCLUSION_KEY = 'H1-8-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 const showSamplingDialog = ref(false)
 
 const state = useH1DisposalCheck(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any, {
@@ -173,7 +198,6 @@ function publishDisposalCompleted() {
   state.publishDisposalCompleted?.()
 }
 
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 function navigateToH10() { emit('navigate-sheet', 'H10') }
 function fmtAmt(val: number | null | undefined): string {

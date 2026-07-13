@@ -1,6 +1,6 @@
 <template>
   <div class="g13-detail" data-testid="g13-detail">
-    <div class="g13-toolbar">
+    <div class="g13-toolbar tab-toolbar">
       <h3 class="g13-title">G13-2 公允价值变动明细表</h3>
       <div class="g13-actions">
         <el-input v-model="searchQuery" placeholder="搜索工具名/科目/类型…" size="small"
@@ -171,6 +171,19 @@
       </el-table>
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计说明</template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：可概述公允价值变动明细的测试情况、FV 变动与源科目（G1/G8/G9/G10）交叉验证结果、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计结论</template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应予调整外，其余未见异常。C、由于存在重大未调整事项，不可确认。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <p>1. 12 列拆为「基础信息 / FV与审定」两 Tab；FV变动 = 期末 - 期初，审定 = 未审 + 调整。</p>
@@ -180,7 +193,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, onMounted } from 'vue'
 import { useG13Detail } from '../composables/useG13Detail'
 import { useG13ExternalCross } from '../composables/useG13ExternalCross'
 import {
@@ -202,6 +215,33 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null，remark 存文本） ───
+const NOTE_KEY = 'G13-detail-audit-note'
+const CONCLUSION_KEY = 'G13-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val } as ChecklistResponse)
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val } as ChecklistResponse)
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 const activeTab = ref<'basic' | 'fv'>('basic')
 const tabOptions = [
@@ -259,6 +299,7 @@ function fmt(v: number | null | undefined): string {
 :deep(.g13-row-total) { font-weight: 700; background: #f5f7fa; }
 :deep(.g13-row-mismatch) { background: #fef0f0 !important; }
 .group-card { margin-top: 12px; }
+.audit-note-card { margin-top: 12px; }
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
 .compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 </style>

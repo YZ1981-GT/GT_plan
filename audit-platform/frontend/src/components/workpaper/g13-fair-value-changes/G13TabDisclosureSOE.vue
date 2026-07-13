@@ -10,6 +10,9 @@
       </div>
     </div>
 
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实国企口径公允价值变动收益（6101）附注披露的完整性与准确性，各来源分类与金额与 G13-1 审定表、G13-2 明细勾稽一致（CAS 39 公允价值计量 / 企业会计准则财务报表列报）。" />
+
     <el-alert v-if="dis.adjudicatedAmount.value != null" type="success" :closable="false" class="sync-hint">
       已同步审定数（6101）：{{ fmt(dis.adjudicatedAmount.value) }}
       <el-button link size="small" @click="dis.pullLatestAdjudicated()">刷新</el-button>
@@ -59,6 +62,19 @@
       @refresh="onReconcileRefresh"
     />
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计说明</template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：可概述附注披露各来源分类的核对情况、与审定表/明细勾稽结果、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计结论</template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、披露完整准确，未见异常。B、除上述事项需调整外，其余披露恰当。C、由于存在重大未调整事项，披露不可确认。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <p>1. 国企口径披露 7 类公允价值变动收益来源+合计；本期发生额可「从明细同步」按 G13-2 所属科目汇总。</p>
@@ -69,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, computed } from 'vue'
+import { ref, toRef, computed, onMounted } from 'vue'
 import { useG13Disclosure } from '../composables/useG13Disclosure'
 import { G13_ACCOUNT_CODE, G13_DISCLOSURE_FORMULA_MAP } from '../composables/g13Constants'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -82,6 +98,33 @@ const props = defineProps<{
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null，remark 存文本） ───
+const NOTE_KEY = 'G13-disclosure-soe-audit-note'
+const CONCLUSION_KEY = 'G13-disclosure-soe-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val } as ChecklistResponse)
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val } as ChecklistResponse)
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 const dis = useG13Disclosure({
   variant: 'soe',
@@ -111,8 +154,10 @@ function onReconcileRefresh(): void {
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .sync-hint { margin-bottom: 12px; }
+.objective-alert { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #fafafa; display: inline-block; width: 100%; }
 .note-card { margin-top: 12px; }
+.audit-note-card { margin-top: 12px; }
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
 .compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 :deep(.g13-row-total) { font-weight: 700; background: #f5f7fa; }

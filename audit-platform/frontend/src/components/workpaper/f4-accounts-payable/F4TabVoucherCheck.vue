@@ -9,7 +9,7 @@
  * 导入导出 + 虚拟滚动(73行)
  * Requirements: 11.1~11.9, 14.2
  */
-import { inject, toRef, ref, type Ref } from 'vue'
+import { inject, toRef, ref, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { useF4VoucherCheck } from '../composables/useF4VoucherCheck'
@@ -138,6 +138,23 @@ function fmtAmount(v: number): string {
   if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── 审计说明 ────────────────────────────────────────────────────────────────
+const NOTE_KEY = 'F4-8-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 </script>
 
 <template>
@@ -161,7 +178,7 @@ function fmtAmount(v: number): string {
       title="审计目标：对应付账款(2202)借方(付款)与贷方(采购)发生额抽凭检查，验证真实性、准确性与截止，贷方关注采购订单/入库单/发票三单匹配。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-button type="primary" size="small" :disabled="isReadonly" @click="openSamplingDialog">
           抽凭引擎
@@ -381,6 +398,24 @@ function fmtAmount(v: number): string {
         />
       </el-card>
     </div>
+
+    <!-- ─── 审计说明 ──────────────────────────────────────────────────── -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+          <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-8-note')">💬</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述借方(付款)与贷方(采购)抽凭检查的样本选取、真实性/准确性/截止测试情况，以及三单匹配异常的处理。"
+        @change="saveAuditNote"
+      />
+    </el-card>
 
     <!-- ─── 抽凭引擎对话框 ───────────────────────────────────────────── -->
     <el-dialog

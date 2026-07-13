@@ -13,7 +13,7 @@
  *
  * Requirements: 10.1-10.2
  */
-import { ref, computed, inject, toRef, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -199,6 +199,39 @@ function updateCheckCell(id: string, field: string, value: number | string): voi
   scheduleSave()
 }
 
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+const NOTE_KEY = computed(() => `E1-credit-audit-note-${variant.value}`)
+const CONCLUSION_KEY = computed(() => `E1-credit-audit-conclusion-${variant.value}`)
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function loadAuditText(): void {
+  const noteResp = props.allResponses.get(NOTE_KEY.value)
+  auditNote.value = noteResp?.remark || ''
+  const concResp = props.allResponses.get(CONCLUSION_KEY.value)
+  auditConclusion.value = concResp?.remark || ''
+}
+
+onMounted(loadAuditText)
+watch(variant, loadAuditText)
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY.value, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY.value, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 
 onBeforeUnmount(() => {
@@ -332,6 +365,40 @@ onBeforeUnmount(() => {
         </el-table-column>
       </el-table>
     </template>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        :placeholder="variant === 'check'
+          ? '填写审计说明：可概述（1）征信报告借款、担保、票据承兑等信息与账面（短期借款L1、长期借款L3）核对情况；（2）核对差异及不一致原因；（3）是否存在未入账借款、对外担保等或有事项。'
+          : '填写审计说明：可概述（1）征信报告查询的方式、时间与操作过程（现场查询/被审计单位下载并观察）；（2）取得的贷款卡编码及查询授权情况；（3）征信报告披露的账户与借款概况。'"
+        @change="(val: string) => saveAuditNote(val)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        :placeholder="variant === 'check'
+          ? '填写审计结论：A、征信报告信息与账面记录核对一致，未见未入账负债或或有事项。B、除上述差异事项外，核对相符。C、由于存在以下重大不一致（或资料受限），需进一步核查。'
+          : '填写审计结论：A、已取得并核查企业信用报告，账户及借款信息完整。B、征信查询程序已执行完毕，具体核对见E1-19。C、因资料受限无法完整查询，需补充程序。'"
+        @change="(val: string) => saveAuditConclusion(val)"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -401,5 +468,14 @@ onBeforeUnmount(() => {
 }
 .auto-calc-value {
   color: #606266;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

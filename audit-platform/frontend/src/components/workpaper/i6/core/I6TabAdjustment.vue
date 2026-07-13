@@ -11,6 +11,14 @@
       </ul>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实研发费用相关审计调整分录（AJE/RJE）编制正确、借贷平衡，恰当调整研发费用（6602）发生额，并准确推送至审定表 I6-1 及 A13 错报汇总。"
+      class="objective-alert"
+    />
+
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
@@ -27,7 +35,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" text @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI</el-button>
             <el-button size="small" type="default" text @click="handleReview">复核</el-button>
           </div>
         </div>
@@ -82,7 +89,19 @@
       </div>
     </div>
 
-    <details class="compile-hint"><summary>编制提示</summary><ul>
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="请填写审计说明（调整分录依据、AJE/RJE性质、对研发费用发生额的影响等）..." @blur="onAuditNoteBlur" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="请填写审计结论（调整分录编制正确、借贷平衡、已同步审定表与A13）..." @blur="onAuditConclusionBlur" />
+    </el-card>
+
+    <details class="guidance-details compile-hint"><summary>编制提示</summary><ul>
       <li>借贷方合计必须相等（借贷平衡原则）</li>
       <li>保存后EventBus推送'i6:adjustment-writeback'更新I6-1</li>
       <li>推送A13将错报信息发送至错报汇总底稿</li>
@@ -93,7 +112,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
-import { ArrowDown, MagicStick } from '@element-plus/icons-vue'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -105,19 +124,30 @@ const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', 
 interface AdjRow { rowId: string; description: string; category: 'AJE' | 'RJE'; reportItem: string; accountName: string; noteItem: string; debit: number; credit: number; indexRef: string; remark: string }
 
 const ITEM_ID = 'I6-3-rows'
+const NOTE_KEY = 'I6-3-audit-note'
+const CONCLUSION_KEY = 'I6-3-audit-conclusion'
 const rows = ref<AdjRow[]>([])
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 const totalDebit = computed(() => rows.value.reduce((s, r) => s + (r.debit || 0), 0))
 const totalCredit = computed(() => rows.value.reduce((s, r) => s + (r.credit || 0), 0))
 const isBalanced = computed(() => Math.abs(totalDebit.value - totalCredit.value) < 0.01)
 
+function _str(id: string): string { const it = props.allResponses.get(id); return (it?.remark ?? (typeof it === 'string' ? it : '')) as string }
+
 function _load(): void {
+  auditNote.value = _str(NOTE_KEY)
+  auditConclusion.value = _str(CONCLUSION_KEY)
   const item = props.allResponses.get(ITEM_ID)
   const raw = item?.remark ?? (typeof item === 'string' ? item : null)
   if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) { rows.value = p; return } } catch { /* */ } }
   rows.value = []
 }
 watch(() => props.allResponses, () => _load(), { immediate: true })
+
+function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
+function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
 
 function _persist(): void { emit('save', ITEM_ID, JSON.stringify(rows.value)) }
 function onFieldChange(): void { _persist() }
@@ -159,7 +189,6 @@ async function handleImportExport(cmd: string): Promise<void> {
   }
 }
 
-async function handleAiGenerate(): Promise<void> { try { await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, { section: 'adjustment', prompt: 'I6研发费用调整分录建议', context: { wpCode: 'I6-3' } }) } catch { /* */ } }
 function handleReview(): void { openReviewDialog('I6-3 调整分录') }
 function navigateTo(code: string): void { emit('navigate-sheet', code) }
 function fmtAmount(v: number | null | undefined): string { if (v == null || Math.abs(v) < 0.005) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -167,6 +196,9 @@ function fmtAmount(v: number | null | undefined): string { if (v == null || Math
 
 <style scoped>
 .i6-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .methodology-block { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6; }
 .methodology-block p { margin: 0 0 4px; }
 .methodology-block ul { margin: 0; padding-left: 16px; }

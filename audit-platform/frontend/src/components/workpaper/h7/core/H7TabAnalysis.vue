@@ -86,12 +86,17 @@
         <div class="section-title">
           <span>分析性程序结论</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('analysis')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" link @click="handleReview('H7-5')">💬 复核</el-button>
           </div>
         </div>
       </template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="分析性程序结论..." :disabled="isReadonly" @blur="persist('H7-5-conclusion', conclusion)" />
+    </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录分析性程序的实施情况、异常波动分析与结论。" @blur="persist('H7-5-note', auditNote)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -119,7 +124,6 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7Analysis } from '../../composables/useH7Analysis'
@@ -149,6 +153,7 @@ function blankRow(cat: string): AnalysisRow {
 
 const rows = ref<AnalysisRow[]>([])
 const conclusion = ref('')
+const auditNote = ref('')
 
 function costChangeRate(r: AnalysisRow): number { return num(r.priorCost) === 0 ? 0 : ((num(r.currentCost) - num(r.priorCost)) / num(r.priorCost)) * 100 }
 function depRate(r: AnalysisRow): number { return num(r.currentCost) === 0 ? 0 : (num(r.accDep) / num(r.currentCost)) * 100 }
@@ -171,6 +176,7 @@ async function loadOwn() {
   const raw = getString('H7-5-rows')
   if (raw) { try { const arr = JSON.parse(raw); if (Array.isArray(arr)) rows.value = arr } catch { /* ignore */ } }
   conclusion.value = getString('H7-5-conclusion') || ''
+  auditNote.value = getString('H7-5-note') || ''
   void getNum
 }
 
@@ -199,9 +205,6 @@ function removeRow(rowId: string) {
   onUpdate()
 }
 
-function handleAi(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
-}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   if (v == null) return '-'

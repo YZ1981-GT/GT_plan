@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-detail-fair">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表为投资性房地产明细表（公允价值模式），分「基本 / 公允变动」两区段，行数据在区段间同步。</p>
+        <p>2. 期末公允 = 期初 + 增加 − 减少 ± 转换 + 公允价值变动；公允价值模式下不计提折旧与减值（CAS3）。</p>
+        <p>3. 明细合计应与 H3-1 审定表勾稽一致；关注公允价值来源（活跃市场报价 / 评估）与变动损益列示。</p>
+        <p>4. 若企业采用成本模式，请切换至成本模式明细版本。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：逐项核实投资性房地产（公允价值模式）的期初/期末公允价值及公允价值变动的真实、准确与计量恰当，支持 H3-1 审定表。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-2" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 区段Tab切换 -->
     <el-segmented v-model="activeSegment" :options="segmentOptions" class="segment-bar" />
 
@@ -72,18 +97,26 @@
       </el-table-column>
     </el-table>
 
-    <!-- 审计说明 / 结论 -->
-    <el-card shadow="never" class="conclusion-card">
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-2-fair')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-2-fair')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明/结论..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：明细核对情况、公允价值来源与变动核查、与 H3-1 审定表勾稽差异及原因。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、未见异常。B、除上述事项外未见异常。C、存在重大未调整事项，不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -93,10 +126,11 @@
  * H3TabDetailFair.vue — H3-2 明细表（公允价值模式）
  * 2区段Tab切换+行同步+固定列+合计+导入导出
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH3DetailFair } from '../../composables/useH3DetailFair'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -127,7 +161,29 @@ const {
 
 const activeSegment = ref('基本')
 const segmentOptions = ['基本', '公允变动']
-const conclusion = ref(getValue('H3-2-fair-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-2-fair-audit-note'
+const CONCLUSION_KEY = 'H3-2-fair-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 async function handleAddAsset() {
   const { value } = await ElMessageBox.prompt('请输入资产名称', '添加资产', {
@@ -161,6 +217,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-detail-fair { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .segment-bar { margin-bottom: 12px; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .audit-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }

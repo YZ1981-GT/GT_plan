@@ -5,7 +5,7 @@
  * 借贷平衡校验 + 动态行 + 导入导出
  * Requirements: 4.1~4.5, 6.1~6.4
  */
-import { inject, toRef, ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
+import { inject, toRef, ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import axios from 'axios'
 import { parseNum, calcSubtotal } from '../composables/useF4AccPayFormulaEngine'
@@ -163,6 +163,38 @@ function fmtAmount(v: number): string {
   if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+const NOTE_KEY = 'F4-3-audit-note'
+const CONCLUSION_KEY = 'F4-3-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistF4(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  ;(props.allResponses as Map<string, any>).set(key, item)
+  window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+}
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistF4(NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistF4(CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const map = props.allResponses as Map<string, any>
+  const n = map.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = map.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 </script>
 
 <template>
@@ -175,6 +207,14 @@ function fmtAmount(v: number): string {
         <p>3. 调整分录确认后将自动回写试算表的AJE调整列。</p>
       </div>
     </details>
+
+    <el-alert
+      class="audit-objective"
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：将应付账款(2202)审计发现的错报以调整分录如实记录，确保借贷平衡，经确认后回写试算表 AJE 调整列。"
+    />
 
     <el-alert v-if="!isBalanced" type="error" :closable="false" style="margin-bottom:8px">
       ⚠️ 借贷不平衡：借方合计 {{ fmtAmount(totalDebit) }} ≠ 贷方合计 {{ fmtAmount(totalCredit) }}，差额 {{ fmtAmount(Math.abs(totalDebit - totalCredit)) }}
@@ -251,6 +291,41 @@ function fmtAmount(v: number): string {
       <span v-if="isBalanced" class="balance-ok">✓ 平衡</span>
       <span v-else class="balance-err">✗ 不平衡</span>
     </div>
+
+    <!-- ─── 审计说明 ──────────────────────────────────────────────────── -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+          <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-3-note')">💬</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：说明各笔调整分录的错报来源、性质及依据。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- ─── 审计结论 ──────────────────────────────────────────────────── -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：调整分录已与被审计单位沟通并取得认可情况。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -268,4 +343,9 @@ function fmtAmount(v: number): string {
 .subtotal-bar.balance-fail { background: #fef0f0; }
 .balance-ok { color: #67c23a; margin-left: 12px; }
 .balance-err { color: #f56c6c; margin-left: 12px; }
+.audit-objective { margin-bottom: 12px; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

@@ -1,6 +1,6 @@
 <template>
   <div class="g9-l3" data-testid="g9-l3-reconciliation">
-    <div class="toolbar">
+    <div class="toolbar tab-toolbar">
       <div class="methodology">L3 变动分析：期初 + 购入 − 处置 + 转入 − 转出 + FV(损益) + FV(OCI) + 利息 − 减值 + 其他 = 期末</div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:G9-5" />
@@ -8,6 +8,15 @@
         <G9ImportExportDropdown :wp-id="wpId" sheet="G9-5" @imported="onImported" />
       </div>
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：验证第三层次公允价值资产期初至期末的十因子变动完整、准确，公式期末与企业报告期末勾稽一致。"
+    />
+
     <el-button v-if="!isReadonly" size="small" @click="l3.addRow()">+ 新增</el-button>
     <el-table :data="l3.rows.value" border size="small" style="font-size:13px;margin-top:8px" max-height="480">
       <el-table-column label="资产名称" min-width="110" fixed>
@@ -111,6 +120,13 @@
       <span :class="{ 'var-warn': Math.abs(l3.totals.value.variance) > 0.01 }">差异 {{ l3.totals.value.variance }}</span>
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述 L3 变动因子的取数与核对情况、公式期末与企业报告的勾稽及差异原因分析。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <el-card shadow="never" class="conclusion-card">
       <template #header>
         <div class="conclusion-head">
@@ -134,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, toRef, ref, onMounted } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9L3Reconciliation } from '../../composables/useG9L3Reconciliation'
@@ -157,6 +173,18 @@ const l3 = useG9L3Reconciliation({
 })
 
 function onImported() { emit('imported') }
+
+// ─── 审计说明（持久化 checklist_responses）────────────────────────────────
+const NOTE_KEY = 'G9-l3-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+})
 </script>
 
 <style scoped>
@@ -171,4 +199,7 @@ function onImported() { emit('imported') }
 .totals-row { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; padding: 8px; background: #f5f7fa; font-size: 12px; }
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
+.audit-objective { margin: 8px 0; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

@@ -4,6 +4,12 @@
       <template #title>审计目标：核对运输设备行驶证/登记证与账面记录，确认所有人为被审计单位、年检有效，识别抵押/查封受限情形。</template>
     </el-alert>
 
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-17" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ vehicleRows.length }} 项</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>核对运输设备行驶证/登记证信息，关注：所有人是否为被审计单位、是否年检有效、是否存在抵押查封。</p>
     </div>
@@ -100,9 +106,17 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：行驶证/登记证核对、所有人及年检状态、抵押受限情形。" @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
       <template #header><span>审计结论</span></template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写运输设备权属检查审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -113,14 +127,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH1TitleCheck, type VehicleRow } from '../../composables/useH1TitleCheck'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-17-audit-note'
+const CONCLUSION_KEY = 'H1-17-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 const { vehicleRows, vehicleStats, addVehicleRow, removeVehicleRow, updateVehicleCell } = useH1TitleCheck(
   toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any,
 )

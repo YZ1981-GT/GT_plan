@@ -1,20 +1,34 @@
 <template>
   <div class="h9-tab-related-party">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：识别关联方租赁合同并评价其定价公允性，关注价差率异常（>10%）是否存在利益输送，确认关联租赁已按 CAS36 在附注中充分披露。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H9-6关联交易检查：从H9-2明细表中筛选标记为关联方的租赁合同，评估关联租赁定价的公允性。价差率=(年租金-市场租金)/市场租金×100%，价差率>10%需重点关注是否存在利益输送。</p>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button v-if="!props.isReadonly" size="small" @click="handleRefresh">🔄 从明细表刷新</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-6" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- Section Header -->
     <div class="section-header">
       <span>关联方租赁检查 H9-6</span>
       <div class="section-header-actions">
-        <el-button v-if="!props.isReadonly" size="small" @click="handleRefresh">
-          🔄 从明细表刷新
-        </el-button>
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H9-6-related-party')">💬</el-button>
       </div>
     </div>
@@ -153,16 +167,28 @@
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header" style="margin-bottom:0">
+          <span>审计说明</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H9-6-note')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="请填写关联方租赁检查的审计说明：筛选口径、可比市场租金取数依据、价差率异常处理等..."
+        :disabled="props.isReadonly" @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
           <span>关联租赁公允性审计结论</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H9-6-conclusion')">💬</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
         placeholder="请填写关联租赁公允性审计结论..." :disabled="props.isReadonly"
         @blur="saveConclusion" />
     </el-card>
@@ -195,8 +221,8 @@
  * Requirements: 5.2-5.4
  */
 import { ref, computed, inject, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useH9RelatedParty, type H9RelatedPartyRow } from '../../composables/useH9RelatedParty'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -226,10 +252,18 @@ const {
   onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
-// ─── Audit Conclusion ────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion ─────────────────────────────────────────────────
+const auditNote = ref('')
+const noteData = props.allResponses.get('H9-6-note')
+if (noteData) auditNote.value = noteData.remark ?? noteData.conclusion ?? ''
+
 const auditConclusion = ref('')
 const conclusionData = props.allResponses.get('H9-6-conclusion')
 if (conclusionData) auditConclusion.value = conclusionData.remark ?? conclusionData.conclusion ?? ''
+
+function saveAuditNote() {
+  saveResponse('H9-6-note', auditNote.value)
+}
 
 function saveConclusion() {
   saveResponse('H9-6-conclusion', auditConclusion.value)
@@ -255,10 +289,6 @@ async function handleSave() {
   } finally {
     saving.value = false
   }
-}
-
-function handleAiGenerate() {
-  console.log('[H9-6] AI generate related party assessment')
 }
 
 function openReview(id: string) {
@@ -301,6 +331,15 @@ function fmtAmt(val: number | null | undefined): string {
   font-size: 14px; font-weight: 600; margin-bottom: 12px;
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .summary-bar {
   display: flex; align-items: center; gap: 24px;

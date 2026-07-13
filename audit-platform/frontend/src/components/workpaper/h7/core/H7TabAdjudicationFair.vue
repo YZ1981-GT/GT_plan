@@ -20,7 +20,6 @@
         <div class="section-title">
           <span>生产性生物资产公允价值（科目1621）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('fair-adj')"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" link @click="handleReview('H7-1-fair')">💬 复核</el-button>
           </div>
         </div>
@@ -91,14 +90,19 @@
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
-          <span>审计说明 / 结论</span>
+          <span>审计说明</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('fair-note')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" link @click="handleReview('H7-1-fair-note')">💬 复核</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明/结论（公允价值确定方法、估值层级、变动合理性等）..." :disabled="isReadonly" @blur="persist('H7-1-fair-note', auditNote)" />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明（公允价值确定方法、估值层级、变动合理性等）..." :disabled="isReadonly" @blur="persist('H7-1-fair-note', auditNote)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-1-fair-conclusion', auditConclusion)" />
     </el-card>
 
     <!-- 操作按钮 -->
@@ -132,11 +136,13 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { useProjectStore } from '@/stores/project'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7AdjudicationFair } from '../../composables/useH7AdjudicationFair'
+
+const projectStore = useProjectStore()
 
 const props = defineProps<{
   wpId: string
@@ -159,6 +165,7 @@ function num(v: any): number { const n = Number(v); return Number.isFinite(n) ? 
 interface FairRow { category: string; begin: number; increase: number; decrease: number; fvChange: number; unadjusted: number; aje: number }
 const fairRow = ref<FairRow>({ category: '生产性生物资产(公允价值)', begin: 0, increase: 0, decrease: 0, fvChange: 0, unadjusted: 0, aje: 0 })
 const auditNote = ref('')
+const auditConclusion = ref('')
 const publishing = ref(false)
 
 function fairEnd(r: FairRow): number { return num(r.begin) + num(r.increase) - num(r.decrease) + num(r.fvChange) }
@@ -176,13 +183,15 @@ async function loadOwn() {
   const raw = getString('H7-1-fair')
   if (raw) { try { Object.assign(fairRow.value, JSON.parse(raw)) } catch { /* ignore */ } }
   auditNote.value = getString('H7-1-fair-note') || ''
+  auditConclusion.value = getString('H7-1-fair-conclusion') || ''
   await loadTb()
 }
 
 async function loadTb() {
   if (!props.projectId) return
   try {
-    const res: any = await api.get(`/api/projects/${props.projectId}/trial-balance?account_prefix=1621`)
+    const _year = projectStore.year ?? projectStore.auditYear ?? new Date().getFullYear()
+    const res: any = await api.get(`/api/projects/${props.projectId}/trial-balance?year=${_year}&account_prefix=1621`)
     const list: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? [])
     let unadj = 0
     for (const it of list) {
@@ -220,9 +229,6 @@ async function handlePublish() {
   } catch { ElMessage.warning('回写失败，请手动确认试算表') } finally { publishing.value = false }
 }
 
-function handleAi(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
-}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   if (v == null) return '-'

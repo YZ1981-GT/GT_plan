@@ -475,6 +475,13 @@ async def _get_render_config_impl(
     if not wp_index:
         raise HTTPException(status_code=404, detail="底稿索引不存在")
     wp_code = wp_index.wp_code
+    # 提前固化 audit_cycle 到本地变量：后续 Step 4b 聚合失败 / 单 sheet 渲染失败会触发
+    # `await db.rollback()`，使 wp_index ORM 对象过期；若在 per-sheet 循环里再访问
+    # wp_index.audit_cycle 会触发同步 lazy-load → 异步上下文 MissingGreenlet 致命 500
+    # （H7 等多 sheet 底稿首当其冲）。早取本地值避免过期重载。
+    audit_cycle = wp_index.audit_cycle
+    # 同理固化 current_user.id（rollback 后 User ORM 对象亦过期，循环内访问 .id 会崩）。
+    _user_id = current_user.id
 
     # Step 3: 模板版本
     tpl_ver_id = tpl_ver_str = None
@@ -669,9 +676,9 @@ async def _get_render_config_impl(
                 sheet_schema=sheet_schema, template_file_path=_tpl,
                 year=_prog_year, business_category=_prog_biz,
                 cross_ref_items=[_CRI(wp_code=ci.wp_code, cell=ci.cell) for ci in cross_ref_items],
-                prep_info=None, classifications=classifications, audit_cycle=wp_index.audit_cycle,
+                prep_info=None, classifications=classifications, audit_cycle=audit_cycle,
                 source_files=list(getattr(cls, "source_files", []) or []),
-                user_id=current_user.id)
+                user_id=_user_id)
             try:
                 result = await renderer(ctx)
                 if result is not None:

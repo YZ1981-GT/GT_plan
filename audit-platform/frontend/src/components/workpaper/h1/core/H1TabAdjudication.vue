@@ -1,14 +1,21 @@
 <template>
   <div class="h1-tab-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：复核固定资产原值(1601)、累计折旧(1602)及减值准备的审定数，确认三角勾稽平衡、AJE/RJE 恰当，审定净值与报表及 H1-2 明细一致。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-1" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ costDisplayRows.length }} 行</el-tag>
+    </div>
+
     <!-- 原值区块 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>一、固定资产-原值（科目1601）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-1-cost')">
               💬 复核
             </el-button>
@@ -201,9 +208,6 @@
       <template #header>
         <div class="section-title">
           <span>审计说明</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明..."
@@ -215,9 +219,6 @@
       <template #header>
         <div class="section-title">
           <span>审计结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('adj-conclusion')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写审计结论..."
@@ -249,6 +250,7 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Adjudication } from '../../composables/useH1Adjudication'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -312,10 +314,6 @@ async function handlePublish() {
   }
 }
 
-function handleAiGenerate(section: string) {
-  // AI generate integration - calls backend ai endpoint
-  console.log('AI generate:', section)
-}
 
 function handleReview(id: string) {
   openReviewDialog(id)

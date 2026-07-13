@@ -6,6 +6,11 @@
       </template>
     </el-alert>
 
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H7-9" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
@@ -105,6 +110,16 @@
       </div>
     </el-card>
 
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录本表审计程序的实施情况、核对过程与发现。" @blur="persist('H7-9-note', auditNote)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-9-conclusion', auditConclusion)" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -146,6 +161,8 @@ interface Row {
 }
 
 const rows = ref<Row[]>([])
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 function qtyDiff(r: Row): number { return (Number(r.actualQty) || 0) - (Number(r.bookQty) || 0) }
 
@@ -179,6 +196,8 @@ function normalize(raw: any): Row {
 function seed(): void {
   const raw = stk.getString('H7-9-rows')
   if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) rows.value = p.map(normalize) } catch { /* ignore */ } }
+  auditNote.value = stk.getString('H7-9-note') || ''
+  auditConclusion.value = stk.getString('H7-9-conclusion') || ''
 }
 onMounted(seed)
 
@@ -209,6 +228,9 @@ function fmtAmt(v: number | null | undefined): string { return v == null ? '-' :
 <style scoped>
 .h7-tab-stocktake-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; }
+.note-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .row-tag { margin-left: 8px; }

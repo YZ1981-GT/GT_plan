@@ -2,7 +2,7 @@
   <div class="g1-classification">
     <div class="section-head">
       <h3 class="sheet-title">G1-9 分类适当性检查（SPPI + 业务模式）</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="cls.addRow()">新增投资项目</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ cls.rows.value.length }} 行</el-tag>
@@ -101,6 +101,12 @@
     </el-table>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）执行的分类适当性程序及结果；（2）SPPI 测试与业务模式判定的关键判断、拟调整/未调整事项及其影响。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="cls.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" placeholder="对金融工具分类适当性的复核结论..." />
@@ -118,7 +124,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject } from 'vue'
+import { ref, toRef, inject, watch } from 'vue'
 import { useG1Classification } from '../../composables/useG1Classification'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -135,6 +141,12 @@ const cls = useG1Classification({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-9-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
 const segment = ref<'sppi' | 'bizmodel'>('sppi')

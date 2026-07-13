@@ -16,6 +16,14 @@
       </div>
     </div>
 
+    <!-- 工具栏：索引 chip -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-1" :context-project-id="props.projectId" /></span>
+      </div>
+    </div>
+
     <!-- 三层分组表格 -->
     <template v-for="group in adj.groups.value" :key="group.groupKey">
       <!-- 分组标题行（含展开/折叠控制） -->
@@ -451,6 +459,12 @@ const isReadonly = computed(() => props.isReadonly)
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; }
+
+/* 工具栏（索引 chip） */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 /* 分组标题 */
 .group-header {

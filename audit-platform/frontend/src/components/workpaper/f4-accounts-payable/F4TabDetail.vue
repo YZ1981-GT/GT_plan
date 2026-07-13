@@ -7,7 +7,7 @@
  * 动态行增删 + 底部合计 + 导入导出
  * Requirements: 5.1~5.8, 14.4
  */
-import { inject, toRef, ref, type Ref } from 'vue'
+import { inject, toRef, ref, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import axios from 'axios'
 import { useF4Detail } from '../composables/useF4Detail'
@@ -111,6 +111,37 @@ function fmtAmount(v: number): string {
   if (v < 0) return `(${Math.abs(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+const NOTE_KEY = 'F4-2-audit-note'
+const CONCLUSION_KEY = 'F4-2-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistF4(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+}
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistF4(NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistF4(CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 </script>
 
 <template>
@@ -134,7 +165,7 @@ function fmtAmount(v: number): string {
       title="审计目标：核对应付账款(2202)明细的完整性与准确性，验证期末余额=期初审定+本期贷方-本期借方，账龄划分合理，关注长期挂账与关联方款项。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-input
           v-model="searchQuery"
@@ -387,6 +418,41 @@ function fmtAmount(v: number): string {
     <div class="subtotal-bar">
       <span>合计：期初 {{ fmtAmount(subtotalRow.openingAdjusted) }} ｜借方 {{ fmtAmount(subtotalRow.currentDebit) }} ｜贷方 {{ fmtAmount(subtotalRow.currentCredit) }} ｜期末 {{ fmtAmount(subtotalRow.closingBalance) }} ｜审定 {{ fmtAmount(subtotalRow.adjustedBalance) }}</span>
     </div>
+
+    <!-- ─── 审计说明 ──────────────────────────────────────────────────── -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+          <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-2-note')">💬</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述明细核对情况、账龄划分依据、长期挂账与关联方款项关注点及处理。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- ─── 审计结论 ──────────────────────────────────────────────────── -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或审计范围受限，不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -467,5 +533,24 @@ function fmtAmount(v: number): string {
   border-radius: 4px;
   font-weight: 600;
   font-size: var(--wp-font-size, 13px);
+}
+.opinion-card {
+  margin-top: 16px;
+  border-radius: 8px;
+}
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
 }
 </style>

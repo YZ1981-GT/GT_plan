@@ -25,6 +25,23 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产摊销方法、使用寿命、残值、减值迹象判断及减值测试频率等会计政策符合 CAS6/CAS8，且前后期一致，政策变更按 CAS28 处理。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-4" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ totalCount }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- 进度条 -->
     <div class="progress-section">
       <el-progress :percentage="completionPct" :stroke-width="10" :format="() => `${completedCount}/${totalCount}`" />
@@ -45,9 +62,6 @@
             <el-tag v-if="item.conclusion" :type="getConclusionTagType(item.conclusion)" size="small">
               {{ item.conclusion }}
             </el-tag>
-            <el-button size="small" type="primary" link @click="handleAiGenerate(item.key)" :disabled="isReadonly">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview(`I1-4-${item.key}`)">💬</el-button>
           </div>
         </div>
@@ -112,22 +126,32 @@
       </div>
     </el-card>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-title"><span>审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：各项摊销/减值政策与 CAS6/CAS8 对照检查过程、被审计单位实际政策核对情况、政策一致性及变更事项处理等。"
+        @blur="handleNoteSave"
+      />
+    </el-card>
+
     <!-- ═══ 审计结论 ═══ -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
-        <div class="section-title">
-          <span>政策检查总体结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('overall-conclusion')" :disabled="isReadonly">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
-        </div>
+        <div class="section-title"><span>审计结论（政策检查总体结论）</span></div>
       </template>
       <el-input
         v-model="overallConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="无形资产摊销减值政策检查总体结论..."
+        placeholder="无形资产摊销减值政策检查总体结论：各项会计政策符合准则要求且前后期一致，未见异常..."
         @blur="handleConclusionSave"
       />
     </el-card>
@@ -159,9 +183,8 @@
  * Requirements: Req 5.1~5.4
  */
 import { ref, reactive, computed, watch, inject, onMounted } from 'vue'
-import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import { InfoFilled } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props & Emits ────────────────────────────────────────────────────────────
 
@@ -243,6 +266,7 @@ const checkItems = reactive<CheckItem[]>(
 )
 
 const overallConclusion = ref('')
+const auditNote = ref('')
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 
@@ -272,7 +296,12 @@ function loadFromResponses() {
 
   const conclusionData = responses.get('I1-4-overall-conclusion')
   if (conclusionData) {
-    overallConclusion.value = typeof conclusionData === 'string' ? conclusionData : (conclusionData?.text || '')
+    overallConclusion.value = typeof conclusionData === 'string' ? conclusionData : (conclusionData?.remark ?? conclusionData?.text ?? '')
+  }
+
+  const noteData = responses.get('I1-4-audit-note')
+  if (noteData) {
+    auditNote.value = typeof noteData === 'string' ? noteData : (noteData?.remark ?? noteData?.text ?? '')
   }
 }
 
@@ -295,38 +324,9 @@ function handleConclusionSave() {
   emit('save', 'I1-4-overall-conclusion', overallConclusion.value)
 }
 
-// ─── AI Generate ──────────────────────────────────────────────────────────────
-
-async function handleAiGenerate(section: string) {
-  try {
-    const context = section === 'overall-conclusion'
-      ? `政策检查项完成情况: ${completedCount.value}/${totalCount.value}, 各项结论: ${checkItems.map(i => `${i.label}=${i.conclusion || '未填'}`).join('; ')}`
-      : `检查项: ${checkItems.find(i => i.key === section)?.label || section}`
-
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: section === 'overall-conclusion'
-        ? '根据各项政策检查结论，生成摊销减值政策检查的总体审计结论。'
-        : `根据CAS6/CAS8准则，对无形资产"${checkItems.find(i => i.key === section)?.label}"进行评价。`,
-      context,
-      section: `I1-4-${section}`,
-    })
-
-    if (res.data?.data?.content) {
-      if (section === 'overall-conclusion') {
-        overallConclusion.value = res.data.data.content
-        handleConclusionSave()
-      } else {
-        const item = checkItems.find(i => i.key === section)
-        if (item) {
-          item.evaluation = res.data.data.content
-          handleItemSave(item)
-        }
-      }
-      ElMessage.success('AI生成完成')
-    }
-  } catch {
-    ElMessage.warning('AI生成暂不可用')
-  }
+function handleNoteSave() {
+  if (props.isReadonly) return
+  emit('save', 'I1-4-audit-note', auditNote.value)
 }
 
 // ─── Review Dialog ────────────────────────────────────────────────────────────

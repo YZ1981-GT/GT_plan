@@ -14,7 +14,6 @@
  */
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
-import { parseNum } from './useE1FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,14 +22,16 @@ export type YesNoType = 'Y' | 'N' | ''
 
 export interface AccountListRow {
   id: string
-  bank: string               // 开户银行
-  accountNo: string          // 银行账号
-  accountType: string        // 账户性质
-  openDate: string           // 开户日期
-  inCreditReport: YesNoType  // 是否在征信报告中
-  inAdjudication: YesNoType  // 是否在审定表中
-  checkResult: CheckResultType  // 核对结果
-  reason: string             // 不一致原因 (强制 when checkResult='不一致')
+  bank: string                  // 开户银行
+  accountNo: string             // 银行账号
+  accountType: string           // 账户性质（基本户/一般户/专用户/临时户）
+  openDate: string              // 开户日期
+  openPurpose: string           // 开户目的/原因（评价开户目的合理性）
+  isNewThisPeriod: YesNoType    // 是否本期新开
+  isClosedThisPeriod: YesNoType // 是否本期注销
+  hasBookRecord: YesNoType      // 账面是否有记录（完整性认定核心：清单有而账面无=疑似账外账户）
+  checkResult: CheckResultType  // 清单与账面核对结果（一致/不一致）
+  reason: string                // 差异说明 (强制 when checkResult='不一致')
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -39,7 +40,8 @@ const STORAGE_KEY = 'E1-account-list-rows'
 
 const USER_FIELDS: Array<keyof AccountListRow> = [
   'id', 'bank', 'accountNo', 'accountType', 'openDate',
-  'inCreditReport', 'inAdjudication', 'checkResult', 'reason',
+  'openPurpose', 'isNewThisPeriod', 'isClosedThisPeriod', 'hasBookRecord',
+  'checkResult', 'reason',
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -58,8 +60,10 @@ function createEmptyRow(): AccountListRow {
     accountNo: '',
     accountType: '',
     openDate: '',
-    inCreditReport: '',
-    inAdjudication: '',
+    openPurpose: '',
+    isNewThisPeriod: '',
+    isClosedThisPeriod: '',
+    hasBookRecord: '',
     checkResult: '',
     reason: '',
   }
@@ -96,8 +100,10 @@ export function useE1AccountList(options: UseE1BaseOptions) {
         accountNo: String(r.accountNo || ''),
         accountType: String(r.accountType || ''),
         openDate: String(r.openDate || ''),
-        inCreditReport: (['Y', 'N'].includes(String(r.inCreditReport)) ? String(r.inCreditReport) : '') as YesNoType,
-        inAdjudication: (['Y', 'N'].includes(String(r.inAdjudication)) ? String(r.inAdjudication) : '') as YesNoType,
+        openPurpose: String(r.openPurpose || ''),
+        isNewThisPeriod: (['Y', 'N'].includes(String(r.isNewThisPeriod)) ? String(r.isNewThisPeriod) : '') as YesNoType,
+        isClosedThisPeriod: (['Y', 'N'].includes(String(r.isClosedThisPeriod)) ? String(r.isClosedThisPeriod) : '') as YesNoType,
+        hasBookRecord: (['Y', 'N'].includes(String(r.hasBookRecord)) ? String(r.hasBookRecord) : '') as YesNoType,
         checkResult: (['一致', '不一致'].includes(String(r.checkResult)) ? String(r.checkResult) : '') as CheckResultType,
         reason: String(r.reason || ''),
       }))
@@ -164,6 +170,23 @@ export function useE1AccountList(options: UseE1BaseOptions) {
     return isInconsistent(row) && !row.reason.trim()
   }
 
+  /** 疑似账外账户：清单有该账户但账面无记录 → 完整性认定风险 */
+  function isSuspectedOffBook(row: AccountListRow): boolean {
+    return row.hasBookRecord === 'N'
+  }
+
+  /** 完整性统计（供审计说明/结论参考） */
+  const summary = computed(() => {
+    const list = rows.value.filter(r => r.bank.trim() || r.accountNo.trim())
+    return {
+      total: list.length,
+      newCount: list.filter(r => r.isNewThisPeriod === 'Y').length,
+      closedCount: list.filter(r => r.isClosedThisPeriod === 'Y').length,
+      inconsistentCount: list.filter(isInconsistent).length,
+      offBookCount: list.filter(isSuspectedOffBook).length,
+    }
+  })
+
   // ─── Row CRUD ──────────────────────────────────────────────────────────
 
   function addRow(): void {
@@ -220,8 +243,10 @@ export function useE1AccountList(options: UseE1BaseOptions) {
   return {
     rows,
     isLoading,
+    summary,
     isInconsistent,
     isMissingReason,
+    isSuspectedOffBook,
     addRow,
     removeRow,
     updateCell,

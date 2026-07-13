@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-cost-comparison">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：比较在建工程的合同预算、调整预算与实际造价构成，评估超支/节余的合理性与预算执行情况，识别成本异常并追溯至 H2-2 明细。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-7" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 造价比较表 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -7,9 +19,6 @@
           <span>工程造价比较（H2-7）</span>
           <div class="section-header-actions">
             <GtIndexChip value="H2-2" label="→ H2-2明细" />
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-7')">💬</el-button>
           </div>
         </div>
@@ -134,14 +143,21 @@
       <template #header>
         <div class="section-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
-      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
         placeholder="请填写造价比较分析说明..." :disabled="isReadonly"
         @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如各工程造价构成合理、超支率在预算范围内、偏差原因已核实，未见异常；或说明重大超支事项及其处理。" :disabled="isReadonly"
+        @blur="state.saveConclusion(state.auditConclusion.value)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -177,12 +193,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2CostComparison({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const displayRows = computed(() => [
@@ -214,9 +232,6 @@ function handleRemove(rowId: string) {
   state.removeRow(rowId)
 }
 
-function handleAiGenerate() {
-  console.log('AI generate H2-7')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -230,6 +245,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-cost-comparison { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

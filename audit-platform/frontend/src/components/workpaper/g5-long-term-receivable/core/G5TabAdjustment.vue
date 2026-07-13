@@ -10,7 +10,7 @@
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      汇总长期应收款相关审计调整分录（AJE）与重分类分录（RJE），校验借贷平衡，回写 G5-1 审定表调整列。
+      审计目标：汇总长期应收款相关审计调整分录（AJE）与重分类分录（RJE），校验借贷平衡，回写 G5-1 审定表调整列。
     </el-alert>
 
     <!-- 借贷平衡提示 -->
@@ -70,6 +70,22 @@
       </el-table-column>
     </el-table>
 
+    <el-card shadow="never" style="margin-top: 12px">
+      <template #header><span>审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：调整分录的依据、事由、影响科目及回写审定表情况。"
+        @change="saveAuditNote" />
+    </el-card>
+
+    <el-card shadow="never" style="margin-top: 12px">
+      <template #header><span>审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="props.readonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、调整分录借贷平衡且依据充分。B、除下述事项外未见异常。C、存在未决调整事项。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
       <ul>
@@ -83,7 +99,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref, toRef, onMounted } from 'vue'
 import { useG5Adjustment } from '../../composables/useG5Adjustment'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
@@ -95,6 +113,30 @@ const props = defineProps<{
 }>()
 
 const adj = useG5Adjustment()
+
+// ─── 审计说明 / 审计结论（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const auditConclusion = ref('')
+const G5_NOTE_KEY = 'G5-4-audit-note'
+const G5_CONCLUSION_KEY = 'G5-4-audit-conclusion'
+function saveAuditNote(val: string): void {
+  if (props.readonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.readonly) return
+  auditConclusion.value = val
+  void g5Notes.saveImmediate(G5_CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function fmt(v: number): string {
   return v?.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '-'

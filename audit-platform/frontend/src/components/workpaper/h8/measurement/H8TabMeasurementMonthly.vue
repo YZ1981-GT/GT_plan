@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-measurement-monthly">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实使用权资产初始计量（按月逐期）的准确性，确认逐期利息与折旧计算及初始确认金额与 H9 联动一致（CAS21）。" />
+
     <!-- CAS21公式说明Banner -->
     <div class="formula-banner">
       <div class="formula-icon">📅</div>
@@ -135,6 +139,20 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -155,7 +173,7 @@
  * 361行16列，按月逐期
  * Spec: Task 4.5 | Requirements: 5.1-5.6
  */
-import { ref, toRef, defineAsyncComponent } from 'vue'
+import { ref, toRef, watch, defineAsyncComponent } from 'vue'
 import { useH8Measurement, type H8MeasurementParams } from '../../composables/useH8Measurement'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -177,6 +195,30 @@ const emit = defineEmits<{
 }>()
 
 const showOO = ref(true)
+
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-measurement-monthly-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-measurement-monthly-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
 
 const {
   measurementParams, initialMeasurement, formulaText, annualRental,
@@ -200,6 +242,10 @@ function handleParamChange(field: keyof H8MeasurementParams, value: any) {
 
 <style scoped>
 .h8-tab-measurement-monthly { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .formula-banner {
   display: flex; gap: 12px; align-items: flex-start;

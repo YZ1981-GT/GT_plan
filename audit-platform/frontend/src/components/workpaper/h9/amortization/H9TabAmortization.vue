@@ -10,6 +10,15 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：按实际利率法重算租赁负债各期利息与本金摊销，验证期末余额归零、年金现值与账面初始确认一致，并与 H9-1 审定表本期利息费用勾稽。"
+    />
+
     <!-- 方法论上下文（琥珀色块） -->
     <div class="methodology-context">
       <p><strong>CAS21 §18-19 实际利率法：</strong>承租人应当按照租赁负债的余额和租赁内含利率（或增量借款利率IBR）计算各期利息费用。每期利息=期初余额×实际利率；本金偿还=每期付款-利息费用；期末余额=期初-本金偿还。最后一期调整尾差使期末余额精确归零。</p>
@@ -19,10 +28,16 @@
     <div class="section-header">
       <span>租赁负债摊销表 H9-4</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H9-4-amortization')">💬</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-2" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ schedule.length }} 期</el-tag>
       </div>
     </div>
 
@@ -206,6 +221,31 @@
       </el-card>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计说明</span>
+          <el-button size="small" circle @click="openReview('H9-amortization-note')">💬</el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="请填写摊销表的审计说明：实际利率法参数来源、重算过程、末期归零与现值验证结果、与审定利息的勾稽差异说明等..."
+        :disabled="isReadonly" @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <el-button size="small" circle @click="openReview('H9-amortization-conclusion')">💬</el-button>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="请填写摊销表的审计结论..." :disabled="isReadonly" @blur="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -235,9 +275,9 @@
  * Task: 4.4
  * Requirements: 4.1-4.8
  */
-import { computed, inject, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { useH9Amortization } from '../../composables/useH9Amortization'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -330,13 +370,24 @@ function getSummary({ columns, data }: { columns: any[]; data: any[] }) {
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
-function handleAiGenerate() {
-  // AI生成摊销分析
-  console.log('[H9-4] AI generate amortization analysis')
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
+}
+
+// ─── 审计说明 / 结论 ─────────────────────────────────────────────────────────
+const auditNote = ref('')
+const auditConclusion = ref('')
+const _noteData = props.allResponses.get('H9-amortization-note')
+if (_noteData) auditNote.value = _noteData.remark ?? _noteData.conclusion ?? ''
+const _conclusionData = props.allResponses.get('H9-amortization-conclusion')
+if (_conclusionData) auditConclusion.value = _conclusionData.remark ?? _conclusionData.conclusion ?? ''
+
+function saveAuditNote() {
+  saveResponse('H9-amortization-note', auditNote.value)
+}
+
+function saveAuditConclusion() {
+  saveResponse('H9-amortization-conclusion', auditConclusion.value)
 }
 
 // ─── 金额格式化 ──────────────────────────────────────────────────────────────
@@ -394,6 +445,16 @@ function fmtAmt(val: number | null | undefined): string {
   font-size: 14px; font-weight: 600; margin-bottom: 12px;
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 
 /* 合同筛选 */
 .contract-filter {

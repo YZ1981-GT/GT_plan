@@ -15,7 +15,7 @@
  *
  * Requirements: 5.1-5.5
  */
-import { inject, toRef, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, type Ref } from 'vue'
 import {
   useE1Adjustment,
   type AdjustmentRow,
@@ -69,6 +69,36 @@ const {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '其他']
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+const NOTE_KEY = 'E1-adjustment-audit-note'
+const CONCLUSION_KEY = 'E1-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
 </script>
 
 <template>
@@ -83,6 +113,14 @@ const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '
         <p>4. 确认后可点击"推送至A2"将调整分录汇总至未审计报表调整底稿。</p>
       </div>
     </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：汇总货币资金相关的调整分录，反映审计过程中发现的货币资金相关调整事项，确保借贷平衡并恰当归集至审定表及报表调整底稿。"
+      class="objective-alert"
+    />
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
@@ -250,6 +288,40 @@ const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '
             </span>
           </div>
         </div>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header">
+              <span>审计说明</span>
+            </div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明..."
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header">
+              <span>审计结论</span>
+            </div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论..."
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -286,6 +358,9 @@ const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '
 }
 .guidance-content p {
   margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
 }
 .tab-toolbar {
   display: flex;
@@ -341,5 +416,14 @@ const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '
   color: #f56c6c;
   font-weight: 700;
   font-size: 14px;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

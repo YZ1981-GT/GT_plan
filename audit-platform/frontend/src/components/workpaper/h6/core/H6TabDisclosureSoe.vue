@@ -1,5 +1,14 @@
 <template>
   <div class="h6-tab-disclosure-soe">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实国有企业固定资产清理相关附注披露完整、准确，处置审批与资产评估合规、公开处置及关联方处置充分披露，清理损益勾稽一致且过渡科目 1606 期末余额清零。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>附注披露信息（国有企业）：按照国资委和财政部要求，披露固定资产清理变动情况及相关管控信息。数据从H6-1审定表自动取数，重点关注国有资产处置合规性和审批流程完整性。科目1606固定资产清理为过渡科目，期末余额应为零。</p>
@@ -11,10 +20,7 @@
       <div class="section-header-actions">
         <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions"
           size="small" @change="dualMode.onModeChange" />
-        <el-button size="small" type="primary" link @click="handleAiGenerate" style="margin-left: 8px">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
-        <el-button size="small" circle @click="openReview('H6-disclosure-soe')">💬</el-button>
+        <el-button size="small" circle @click="openReview('H6-disclosure-soe')" style="margin-left: 8px">💬</el-button>
       </div>
     </div>
 
@@ -104,11 +110,6 @@
         <template #header>
           <div class="section-header" style="margin-bottom:0">
             <span>附注披露文本</span>
-            <div class="section-header-actions">
-              <el-button size="small" type="primary" link @click="handleAiGenerate">
-                <el-icon><MagicStick /></el-icon> AI生成
-              </el-button>
-            </div>
           </div>
         </template>
         <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }"
@@ -116,6 +117,36 @@
           @blur="saveNoteText" />
       </el-card>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计说明</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H6-disclosure-soe-note')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
+        placeholder="请填写审计说明..." :disabled="props.isReadonly"
+        @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H6-disclosure-soe-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
+    </el-card>
 
     <!-- 编制提示 -->
     <details class="edit-tips">
@@ -148,7 +179,6 @@
  * Requirements: 1.2
  */
 import { ref, computed, defineAsyncComponent, inject, toRef, onMounted, onUnmounted } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useH6DualMode } from '../../composables/useH6DualMode'
 import { useH6CrossSheet } from '../../composables/useH6CrossSheet'
 
@@ -241,6 +271,20 @@ function saveNoteText() {
   saveResponse('H6-disclosure-soe-text', noteText.value)
 }
 
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+const auditNote = ref('')
+const auditNoteResp = props.allResponses.get('H6-disclosure-soe-note')
+if (auditNoteResp?.remark) auditNote.value = auditNoteResp.remark
+function saveAuditNote() {
+  saveResponse('H6-disclosure-soe-note', auditNote.value)
+}
+const auditConclusion = ref('')
+const auditConcResp = props.allResponses.get('H6-disclosure-soe-conclusion')
+if (auditConcResp?.remark) auditConclusion.value = auditConcResp.remark
+function saveAuditConclusion() {
+  saveResponse('H6-disclosure-soe-conclusion', auditConclusion.value)
+}
+
 // ─── EventBus Subscribe ──────────────────────────────────────────────────────
 let unsubscribe: (() => void) | null = null
 
@@ -271,10 +315,6 @@ function getStr(key: string): string {
   return resp?.remark ?? ''
 }
 
-function handleAiGenerate() {
-  console.log('[H6-Disclosure-SOE] AI generate')
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
@@ -291,6 +331,9 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h6-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

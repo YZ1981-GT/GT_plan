@@ -108,7 +108,7 @@ function fmtAmount(v: number): string {
       title="审计目标：检查超过2年的长期挂账应付款(2202)，评估其真实性及是否应转入营业外收入，防止负债高估、利润跨期。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
       </div>

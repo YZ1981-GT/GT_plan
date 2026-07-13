@@ -165,6 +165,15 @@
       </span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
@@ -175,7 +184,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject } from 'vue'
+import { ref, toRef, inject, onMounted } from 'vue'
 import { useG2Adjudication } from '../composables/useG2Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -198,6 +207,19 @@ const adj = useG2Adjudication({
 function fmtNum(v: unknown): string {
   return typeof v === 'number' ? v.toLocaleString() : String(v ?? '')
 }
+
+// ─── 审计说明（持久化）───────────────────────────────────────────────────────
+const NOTE_KEY = 'G2-1-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 </script>
 
 <style scoped>
@@ -225,4 +247,6 @@ function fmtNum(v: unknown): string {
 .diff-value { font-weight: 600; }
 .diff-red { color: #f56c6c; }
 .conclusion-card { margin-top: 12px; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

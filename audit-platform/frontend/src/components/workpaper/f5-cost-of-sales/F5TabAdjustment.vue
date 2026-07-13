@@ -11,6 +11,14 @@
       </div>
     </details>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实营业成本（科目6401）审计调整分录的完整、准确与借贷平衡，确保审计调整恰当反映于 F5-1 审定表。"
+      class="objective-alert"
+    />
+
     <el-alert v-if="!isBalanced" type="error" :closable="false" style="margin-bottom:8px">
       ⚠️ 借贷不平衡：借方合计 {{ fmt(totalDebit) }} ≠ 贷方合计 {{ fmt(totalCredit) }}，差额 {{ fmt(Math.abs(totalDebit - totalCredit)) }}
     </el-alert>
@@ -100,6 +108,28 @@
       <span v-if="isBalanced" class="ok">✓ 平衡</span>
       <span v-else class="err">✗ 不平衡</span>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="营业成本调整分录审计说明（调整事项、依据、对审定营业成本的影响等）..." @change="saveNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="调整分录审计结论..." @change="saveConclusion" />
+    </el-card>
   </div>
 </template>
 
@@ -120,6 +150,20 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const STORAGE_KEY = 'F5-4-rows'
+const NOTE_KEY = 'F5-4-audit-note'
+const CONCLUSION_KEY = 'F5-4-audit-conclusion'
+
+const auditNote = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
+
+function saveNote() {
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: auditNote.value }] } }))
+}
+function saveConclusion() {
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value }] } }))
+}
 
 interface AdjRow {
   rowId: string; seq: number; entryType: string; date: string; summary: string
@@ -204,12 +248,19 @@ function openReview() { openReviewDialog('F5-4-adjustment') }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
 
 /* 工具栏 */
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计意见卡片 */
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 
 /* 借贷平衡合计 */
 .f5-adj-subtotal { margin-top: 8px; padding: 8px 12px; background: #f0f9eb; border-radius: 4px; font-weight: 600; }

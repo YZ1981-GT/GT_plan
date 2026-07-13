@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-recoverable">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：测算在建工程的可收回金额（使用价值 DCF 与公允价值-处置费用孰高），复核关键假设（折现率/预测期/永续增长率）的合理性，为 H2-15 减值测算提供依据。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-16" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">现金流 {{ state.cashFlowRows.value.length }} 年</el-tag>
+      </div>
+    </div>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p><strong>可收回金额 = MAX(公允价值-处置费用, 预计未来现金流量现值)</strong></p>
@@ -13,9 +25,6 @@
         <div class="section-header">
           <span>一、关键假设</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('dcf-assumptions')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-16')">💬</el-button>
           </div>
         </div>
@@ -152,6 +161,26 @@
       </p>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述 DCF 模型假设来源、现金流预测依据、折现率与永续增长率的选取合理性及敏感性分析结论。" :disabled="isReadonly"
+        @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如可收回金额测算方法恰当、关键假设合理、结果可采信，未见异常；或说明假设不确定性及其影响。" :disabled="isReadonly"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -172,9 +201,10 @@
  * DCF模型(假设+现金流预测+折现) + 敏感性矩阵
  * Spec: Task 4.19 | Requirements: 12.3-12.4
  */
-import { inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Impairment } from '../../composables/useH2Impairment'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -184,6 +214,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Impairment({
   wpId: toRef(props, 'wpId'),
@@ -191,6 +222,32 @@ const state = useH2Impairment({
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
   section: 'recoverable',
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
+})
+
+// H2-16 审计说明/结论：本 sheet 独立 item_id（H2-15/H2-16 共用同一 composable，
+// composable 的 NOTE_KEY/CONCLUSION_KEY 固定为 H2-15，故此处用本地键避免串写）。
+const NOTE_KEY = 'H2-16-audit-note'
+const CONCLUSION_KEY = 'H2-16-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  saveResponse(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 function onAssumptionChange(field: string, value: any) {
@@ -201,9 +258,6 @@ function onCfChange(rowId: string, field: string, value: any) {
   state.updateCashFlowCell(rowId, field, value)
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate H2-16:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -217,6 +271,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-recoverable { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
   padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);

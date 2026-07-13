@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：逐项登记在建工程的基本信息、增减变动与竣工结转，验证三角勾稽（期末=期初+增加-减少-转固）成立，并与 H2-1 审定表交叉核对。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-2" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 区段Tab切换 -->
     <el-segmented v-model="activeSegment" :options="segmentOptions" class="segment-bar" />
 
@@ -19,9 +31,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-2')">💬</el-button>
           </div>
         </div>
@@ -216,6 +225,26 @@
       <template #title>交叉验证：明细合计期末余额 vs H2-1审定数差异 {{ fmtAmt(crossDiff) }}</template>
     </el-alert>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述明细逐项登记的取数来源、三角勾稽核对、与 H2-1/H2-5 交叉验证情况及发现的异常。" :disabled="isReadonly"
+        @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如明细合计与审定表勾稽一致、三角勾稽成立，未见异常；或说明差异事项及其影响。" :disabled="isReadonly"
+        @blur="state.saveConclusion(state.auditConclusion.value)" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -240,6 +269,7 @@ import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Detail } from '../../composables/useH2Detail'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -249,6 +279,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const activeSegment = ref<'basic' | 'movement' | 'transfer'>('basic')
 const segmentOptions = [
@@ -267,6 +298,7 @@ const state = useH2Detail({
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const displayRows = computed(() => [...state.rows.value, state.subtotalRow.value])
@@ -302,9 +334,6 @@ function handleExportCmd(cmd: string) {
   console.log('export command:', cmd)
 }
 
-function handleAiGenerate() {
-  console.log('AI generate H2-2')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -318,6 +347,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .segment-bar { margin-bottom: 16px; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

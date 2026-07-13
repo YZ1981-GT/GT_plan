@@ -1,6 +1,6 @@
 <template>
   <div class="g9-adjudication" data-testid="g9-adjudication">
-    <div class="g9-toolbar">
+    <div class="g9-toolbar tab-toolbar">
       <h3 class="g9-title">G9-1 其他非流动金融资产审定表</h3>
       <div class="g9-actions">
         <GtIndexChip value="wp:G9-1" />
@@ -188,11 +188,18 @@
       <el-input v-if="!isReadonly" v-model="noteProxy" type="textarea" :rows="3" placeholder="审定分析说明" />
       <p v-else class="note-text">{{ adj.auditNote.value || '—' }}</p>
     </el-card>
+
+    <el-card shadow="never" class="g9-note-card">
+      <template #header>审计结论</template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, ref } from 'vue'
+import { computed, toRef, ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
@@ -224,6 +231,18 @@ const adj = useG9Adjudication({
 const noteProxy = computed({
   get: () => adj.auditNote.value,
   set: (v: string) => adj.updateAuditNote(v),
+})
+
+// ─── 审计结论（持久化 checklist_responses）─────────────────────────────────
+const CONCLUSION_KEY = 'G9-adjudication-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
 })
 
 const adjRowCount = computed(() =>

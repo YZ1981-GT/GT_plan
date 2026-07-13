@@ -1,5 +1,19 @@
 <template>
   <div class="g6-tab-sppi-test">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：评估其他债权投资合同现金流量特征是否仅为对本金和以未偿付本金为基础的利息的支付（SPPI），支持金融资产分类结论的恰当性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:G6-8" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ totalRows }} 项检查</el-tag>
+    </div>
+
     <!-- ═══ 顶部方法论上下文（琥珀色） ═══ -->
     <div class="methodology-banner">
       <div class="methodology-text">
@@ -42,14 +56,6 @@
             size="small"
             effect="plain"
           >不适用</el-tag>
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            @click="emitAi(`sppi-${section.id}`)"
-          >
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
           <el-button
             size="small"
             :icon="ChatDotRound"
@@ -237,6 +243,36 @@
       </div>
     </el-card>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="conclusion-header"><span class="conclusion-title">审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="readonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述 SPPI 各测试项的执行情况及结果、合同条款分析与判断依据、拟调整与未调整事项及其影响。"
+        @update:model-value="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="conclusion-header"><span class="conclusion-title">审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="readonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：说明其他债权投资是否满足 SPPI 条件及对分类结论的支持；如不满足，说明重分类处理。"
+        @update:model-value="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="guidance-details">
       <summary>编制提示</summary>
@@ -266,11 +302,12 @@
  * - 任一section FAIL → 红色高亮section标题 + 底部"不满足SPPI，需重分类"提示
  * - 每section标题行AI辅助按钮 + 复核按钮 + 综合结论区 + 编制提示
  */
-import { inject, computed, watch, onMounted } from 'vue'
-import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
+import { inject, computed, ref, watch, onMounted } from 'vue'
+import { ChatDotRound } from '@element-plus/icons-vue'
 import { useG6SppiTest } from '../../composables/useG6SppiTest'
 import type { SppiTestData, SppiItem } from '../../composables/useG6SppiTest'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -281,7 +318,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update', data: SppiTestData): void
-  (e: 'aiGenerate', section: string): void
 }>()
 
 // 模板中以 `readonly` 绑定 :disabled，映射到父级传入的 is-readonly
@@ -291,11 +327,6 @@ const readonly = computed(() => props.isReadonly)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog')
 function handleReview(sectionId: string): void {
   openReviewDialog?.(sectionId)
-}
-
-// ─── AI辅助 ────────────────────────────────────────────────────────────────
-function emitAi(section: string): void {
-  emit('aiGenerate', section)
 }
 
 // ─── useG6SppiTest composable ──────────────────────────────────────────────
@@ -319,10 +350,32 @@ const formData = useG6SppiFormData({
 
 const SPPI_ITEM_ID = 'G6-8-sppi-test-data'
 
+// ─── 审计说明 / 审计结论（独立持久化 checklist_responses） ─────────────────
+const NOTE_KEY = 'G6-8-sppi-test-audit-note'
+const CONCLUSION_KEY = 'G6-8-sppi-test-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  formData.debouncedSave(CONCLUSION_KEY, { remark: val })
+}
+
 // ─── 加载数据 ──────────────────────────────────────────────────────────────
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
 })
 
 watch(() => props.htmlData, () => {
@@ -392,6 +445,25 @@ watch(
 .g6-tab-sppi-test {
   font-size: var(--wp-font-size, 13px);
   padding: 8px 0;
+}
+
+/* ═══ 审计目标 / 工具栏 ═══ */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
+}
+.audit-note-card {
+  margin: 16px 0;
 }
 
 /* ═══ 方法论横幅(琥珀色) ═══ */

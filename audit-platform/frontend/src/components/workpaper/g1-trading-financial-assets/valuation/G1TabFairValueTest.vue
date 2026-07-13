@@ -2,7 +2,7 @@
   <div class="g1-fv-test">
     <div class="section-head">
       <h3 class="sheet-title">G1-6 公允价值测试表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow()">新增证券</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 项</el-tag>
@@ -97,6 +97,12 @@
     </div>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）公允价值层级划分依据及估值方法/关键输入的核实情况；（2）与账面值差异的说明及处理。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="对公允价值计量层级划分与估值合理性的复核结论..." />
@@ -115,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, inject } from 'vue'
+import { ref, toRef, inject, watch } from 'vue'
 import { useG1FairValueTest } from '../../composables/useG1FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -135,6 +141,12 @@ const { rows, auditConclusion, stats, updateRow, addRow, removeRow } = useG1Fair
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-6-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 </script>
 

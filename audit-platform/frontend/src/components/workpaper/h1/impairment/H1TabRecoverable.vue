@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-recoverable">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：复核固定资产（资产组）可收回金额的使用价值DCF模型，关键假设（折现率WACC/预测期/永续增长率）合理，敏感性分析支持减值结论稳健。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-15" :context-project-id="projectId" />
+      <el-tag size="small" type="info">预测 {{ cashFlowTable.length }} 年</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>DCF折现现金流模型：预测资产组未来N年自由现金流，按WACC折现求和得到使用价值(VIU)。加入永续增长率计算终值。敏感性分析验证结论稳健性。</p>
     </div>
@@ -10,9 +20,6 @@
         <div class="section-title">
           <span>一、DCF模型假设</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('impairment-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-15-dcf')">💬 复核</el-button>
           </div>
         </div>
@@ -100,11 +107,18 @@
       <div class="matrix-hint">红色 = 可收回金额 < 账面价值（存在减值）</div>
     </el-card>
 
-    <!-- 结论 -->
+    <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>DCF测试结论</span></template>
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：现金流预测数据来源、关键假设依据、与管理层沟通及复核情况。" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论（DCF测试）</span></template>
       <el-input v-model="dcfConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="基于DCF模型和敏感性分析的减值测试结论..." />
+        placeholder="基于DCF模型和敏感性分析的减值测试结论..." @change="saveDcfConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -120,15 +134,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, inject, toRef } from 'vue'
+import { ref, reactive, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Impairment } from '../../composables/useH1Impairment'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const dcfConclusion = ref('')
+const auditNoteText = ref('')
 const accountBookValue = ref(0)
+const NOTE_KEY = 'H1-15-audit-note'
+const CONCLUSION_KEY = 'H1-15-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveDcfConclusion() { saveResponse(CONCLUSION_KEY, dcfConclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) dcfConclusion.value = c.remark
+})
 
 const state = useH1Impairment(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
@@ -161,7 +186,6 @@ const sensitivityMatrix = computed(() => {
   })
 })
 
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

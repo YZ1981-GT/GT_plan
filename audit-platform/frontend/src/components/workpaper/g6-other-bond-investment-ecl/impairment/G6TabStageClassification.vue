@@ -11,6 +11,23 @@
       <p class="methodology-note">其他债权投资(FVOCI)减值计入OCI，不减少账面价值，但ECL三阶段划分规则与摊余成本口径一致。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实其他债权投资信用风险三阶段划分（Stage1/2/3）的合理性，验证企业阶段判定与审计判定的一致性，为 G6-12 减值准备测算提供阶段依据。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏：索引 + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-11" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ stageLogic.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- Section标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G6-11 其他债权投资三阶段划分</h3>
@@ -302,6 +319,21 @@
         </div>
       </details>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="audit-note-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述执行的审计程序、三阶段划分测试情况与结果、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -327,9 +359,10 @@
  *
  * 使用 useG6EclStageClassification composable
  */
-import { computed, inject, watch, onMounted } from 'vue'
+import { computed, inject, watch, onMounted, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useG6EclStageClassification } from '@/composables/useG6EclStageClassification'
+import { useG6EclFormData } from '../../composables/useG6EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -350,6 +383,19 @@ const stageLogic = useG6EclStageClassification({
   isReadonly: isReadonlyRef,
 })
 
+// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
+const NOTE_KEY = 'G6-11-stage-classification-audit-note'
+const auditNote = ref('')
+const noteFormData = useG6EclFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
 // ─── 虚拟滚动：61行阈值 → 设置 max-height 约520px（~61×50px行高+表头） ───
 const VIRTUAL_SCROLL_THRESHOLD = 61
 const tableMaxHeight = computed(() => {
@@ -357,8 +403,11 @@ const tableMaxHeight = computed(() => {
 })
 
 // ─── 从htmlData初始化数据 ───
-onMounted(() => {
+onMounted(async () => {
   stageLogic.init(props.htmlData)
+  await noteFormData.loadAll()
+  const n = noteFormData.allResponses.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -480,6 +529,33 @@ function requestAiConclusion(): void {
   margin-top: 6px;
   color: #92400e;
   font-style: italic;
+}
+
+/* ─── 审计目标 / 工具栏 ─── */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* ─── 审计说明卡片 ─── */
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* ─── Section标题栏 ─── */

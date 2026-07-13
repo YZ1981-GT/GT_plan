@@ -10,7 +10,7 @@
  *
  * Requirements: 7.3
  */
-import { inject, toRef, computed, type Ref } from 'vue'
+import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useE1CashCount, type CertCountRow } from '../composables/useE1CashCount'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
@@ -77,18 +77,51 @@ async function handleImport(file: File): Promise<boolean> {
 }
 
 function asCert(row: any): CertCountRow { return row }
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+
+const NOTE_KEY = 'E1-cert-audit-note'
+const CONCLUSION_KEY = 'E1-cert-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
 </script>
 
 <template>
   <div class="e1-tab-certificate-count">
     <!-- 编制提示 -->
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制提示（对照源模板 E1-9 审计过程与提示）</summary>
       <div class="guidance-content">
-        <p>1. 检查大额存单/定期存单原件，核对存单编号、金额、存入日、到期日与利率是否与账面一致。</p>
-        <p>2. 关注存单是否存在质押、冻结、担保等权利受限情形，受限部分应单独披露。</p>
-        <p>3. 盘点结果为"未见"的存单应追查原因，必要时执行银行函证程序。</p>
-        <p>4. 核对存单是否已完整登记入账并在货币资金/其他货币资金审定表中恰当列示。</p>
+        <p>1. <b>监盘程序：</b>监盘开户证实书或定期存单（若无法获取，应取得质押回单等其他支持文件），编制银行存单盘点表，核对存款人、账号、期间、截止日、计息等是否与账面记录一致；关注是否抵押或限制使用。</p>
+        <p>2. <b>未质押存单：</b>检查开户证实书/定期存单原件，核对存款人、金额、期限等信息。</p>
+        <p>3. <b>已质押存单：</b>检查定期存单复印件、质押回单，并与相应的<b>质押合同核对</b>（存款人、金额、期限）；<b>关注质押借款是否入账</b>；对质押事项逾期的，重点<b>关注相关质权是否已被行使</b>；为他人担保的关注担保是否逾期。</p>
+        <p>4. <b>已提取/兑付：</b>已到期提取或兑付的存单，核对兑付凭证、银行对账单，确认资金流向及入账。</p>
+        <p>5. <b>电子存单：</b>监盘电子存单的，记录现场获取过程（有权限人员登录网银平台查询、下载等操作）。</p>
+        <p>6. <b>披露：</b>所列存单存在的抵押或限制使用情况应在财务报告附注恰当披露。</p>
+        <p class="calc-hint">警惕舞弊：质押套现后用所得资金虚增收入或挪作他用。核对信息如有异常需实施进一步审计程序。</p>
       </div>
     </details>
 
@@ -96,7 +129,7 @@ function asCert(row: any): CertCountRow { return row }
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实大额存单/定期存款的存在性与权利归属，确认账实相符且无未披露的权利受限。"
+      title="审计目标：确认定期存单/开户证实书在资产负债表日确实存在且账实相符；核实是否被质押、担保或限制使用；确认存单为被审计单位所有并已恰当记录与披露。"
       class="objective-alert"
     />
 
@@ -153,7 +186,27 @@ function asCert(row: any): CertCountRow { return row }
               />
             </template>
           </el-table-column>
-          <el-table-column label="存单类型" width="110">
+          <el-table-column label="存款人/户名" width="130">
+            <template #default="{ row }">
+              <el-input
+                :model-value="asCert(row).depositor"
+                :disabled="isReadonly"
+                size="small"
+                @change="(val: string) => updateCell(row.id, 'depositor', val)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="账号" width="150">
+            <template #default="{ row }">
+              <el-input
+                :model-value="asCert(row).account"
+                :disabled="isReadonly"
+                size="small"
+                @change="(val: string) => updateCell(row.id, 'account', val)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="存款类型" width="110">
             <template #default="{ row }">
               <el-input
                 :model-value="asCert(row).certType"
@@ -212,6 +265,31 @@ function asCert(row: any): CertCountRow { return row }
               />
             </template>
           </el-table-column>
+          <el-table-column label="是否质押/受限" width="120" align="center">
+            <template #default="{ row }">
+              <el-select
+                :model-value="asCert(row).pledged"
+                :disabled="isReadonly"
+                size="small"
+                placeholder="选择"
+                @change="(val: string) => updateCell(row.id, 'pledged', val)"
+              >
+                <el-option label="是" value="是" />
+                <el-option label="否" value="否" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="质押/受限事项" min-width="150">
+            <template #default="{ row }">
+              <el-input
+                :model-value="asCert(row).pledgeMatter"
+                :disabled="isReadonly"
+                size="small"
+                placeholder="质押合同/借款入账/逾期质权等"
+                @change="(val: string) => updateCell(row.id, 'pledgeMatter', val)"
+              />
+            </template>
+          </el-table-column>
           <el-table-column label="盘点结果" width="110" align="center">
             <template #default="{ row }">
               <el-select
@@ -226,6 +304,16 @@ function asCert(row: any): CertCountRow { return row }
               </el-select>
             </template>
           </el-table-column>
+          <el-table-column label="备注" min-width="140">
+            <template #default="{ row }">
+              <el-input
+                :model-value="asCert(row).note"
+                :disabled="isReadonly"
+                size="small"
+                @change="(val: string) => updateCell(row.id, 'note', val)"
+              />
+            </template>
+          </el-table-column>
           <el-table-column label="操作" width="80" align="center" fixed="right">
             <template #default="{ row }">
               <el-button
@@ -238,6 +326,36 @@ function asCert(row: any): CertCountRow { return row }
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：可概述监盘程序执行情况与结果；未质押/已质押存单的检查情况（开户证实书、质押回单、质押合同核对、质押借款入账、逾期质权行使）；账实相符情况；拟调整事项及影响；审计范围受限情况等。"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、未见异常，银行存单存在且账实相符，抵押/限制使用情况已恰当披露。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -302,4 +420,21 @@ function asCert(row: any): CertCountRow { return row }
   align-items: center;
 }
 .chip-wrap { display: inline-flex; align-items: center; }
+
+.calc-hint {
+  margin-top: 6px;
+  color: #e6a23c;
+  font-style: italic;
+}
+
+/* 审计说明 / 审计结论 */
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+}
 </style>

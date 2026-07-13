@@ -2,7 +2,7 @@
   <div class="g1-adjudication">
     <div class="section-head">
       <h3 class="sheet-title">G1-1 交易性金融资产审定表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-3" /></span>
         <el-button size="small" @click="openReviewDialog('G1-1-conclusion')">💬复核</el-button>

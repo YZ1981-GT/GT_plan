@@ -163,11 +163,37 @@
       <el-input v-model="cutoff.cutoffConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="截止测试结论（跨期错报笔数与金额、是否需调整、对存货与营业成本截止的评价等）..." />
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述所执行的存货收发货截止测试程序（正向/反向测试、单据与记账日期比对、跨期核实）、样本选取与测试结果，以及拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, onMounted, type Ref } from 'vue'
 import { useF2CutoffSheet } from '../../composables/useF2CutoffSheet'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import {
@@ -196,6 +222,34 @@ async function onImported() { await reloadWorkpaperData?.() }
 
 const configRef = computed(() => props.config)
 const samplingParams = computed(() => getF2CutoffSamplingParams(props.config))
+
+// ─── 审计说明 / 审计结论（按 sheetCode 分别持久化，防跨截止表串写）─────────────
+const auditNote = ref('')
+const auditConclusion = ref('')
+const noteKey = computed(() => `${props.config.sheetCode}-audit-note`)
+const conclusionKey = computed(() => `${props.config.sheetCode}-audit-conclusion`)
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(noteKey.value, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(conclusionKey.value, val)
+}
+function hydrateAudit(): void {
+  auditNote.value = props.allResponses.get(noteKey.value)?.remark ?? ''
+  auditConclusion.value = props.allResponses.get(conclusionKey.value)?.remark ?? ''
+}
+watch(() => props.config.sheetCode, hydrateAudit)
+onMounted(hydrateAudit)
 
 const year = computed(() => {
   const d = props.bsDate || ''
@@ -263,4 +317,6 @@ async function generateCutoffConclusion() {
 .conclusion-title { font-weight: 600; font-size: 14px; color: #303133; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
 :deep(.error-row) { background: #fef0f0; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

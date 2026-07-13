@@ -207,6 +207,32 @@
       </span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：调整分录的依据、借贷平衡与回写情况，拟调整/未调整事项及其影响。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
+        @change="(v: string) => saveAuditConclusion(v)"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="g4-guide-details">
       <summary>📋 编制提示</summary>
@@ -233,8 +259,9 @@
  * - 保存时自动汇总回写G4-1审定表
  * - section标题栏右侧复核按钮
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import { useG4MainAdjustment } from '../../composables/useG4MainAdjustment'
 import { useG4MainImportExport } from '../../composables/useG4MainImportExport'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -252,6 +279,50 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 // 当父组件未传递 allResponses 时，在本组件中创建本地 Map
 // useG4MainAdjustment 会使用此 Map 进行数据持久化
 const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
+const NOTE_KEY = 'G4-3-adjustment-audit-note'
+const CONCLUSION_KEY = 'G4-3-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function readSaved(key: string): string {
+  const cr = props.htmlData?.checklist_responses
+  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+    const v = (cr as Record<string, any>)[key]
+    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+  }
+  const resp = props.htmlData?.responses
+  if (Array.isArray(resp)) {
+    const found = resp.find((r: any) => r?.item_id === key)
+    if (found?.remark) return found.remark
+  }
+  return ''
+}
+
+async function saveAudit(key: string, val: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: key, conclusion: null, remark: val }],
+    })
+  } catch { /* silent */ }
+}
+
+function saveAuditNote(val: string): void {
+  auditNote.value = val
+  void saveAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  auditConclusion.value = val
+  void saveAudit(CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  auditNote.value = readSaved(NOTE_KEY)
+  auditConclusion.value = readSaved(CONCLUSION_KEY)
+})
 
 // ─── 初始化 composable ───
 const isReadonlyRef = ref(props.isReadonly)
@@ -353,6 +424,10 @@ function tableRowClassName({ row }: { row: any }): string {
   gap: 8px;
   align-items: center;
 }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 
 .g4-adj-toolbar {
   display: flex;

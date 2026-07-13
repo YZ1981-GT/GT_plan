@@ -9,6 +9,27 @@
       </div>
     </div>
 
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 逐项列示本期处置的各类非流动资产（固定资产/在建工程/使用权资产/生产性生物资产/油气资产等），来源底稿应可追溯至 H1~H8。</p>
+        <p>2. 处置损益 = 处置收入 − 账面净值 − 处置费用 − 相关税费；账面净值 = 原值 − 累计折旧（含减值）。</p>
+        <p>3. 依据财会〔2017〕30 号，资产处置损益（6115）核算处置非流动资产（不含金融工具、长期股权投资、投资性房地产）产生的利得或损失。</p>
+        <p>4. 关注处置审批文件、评估报告、合同/发票等审计证据的完整性，损失项目重点核查减值计提是否充分（CAS 8 号资产减值）。</p>
+      </div>
+    </details>
+
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实各项资产处置的原值、累计折旧、账面净值、处置收入及处置损益计算的准确性与完整性，验证处置损益来源可追溯至各资产底稿。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H10-2" /></span>
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-segmented v-model="activeTab" :options="detail.tabOptions" size="small" data-testid="h10-detail-tabs" />
 
     <div class="stats-bar" data-testid="h10-detail-stats">
@@ -141,11 +162,24 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述处置明细的取数与核对情况、来源底稿追溯结果、异常或损失项目的分析。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。"
+        @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useH10Detail } from '../../composables/useH10Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import H10ImportExportDropdown from '../H10ImportExportDropdown.vue'
@@ -174,6 +208,32 @@ async function onImported() {
   detail.reloadFromStore()
 }
 
+const NOTE_KEY = 'H10-2-detail-audit-note'
+const CONCLUSION_KEY = 'H10-2-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 function fmt(v: number) {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -188,4 +248,14 @@ function fmt(v: number) {
 .formula-cell.loss { color: #f56c6c; }
 .stats-bar { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; padding: 10px; background: #f5f7fa; font-size: 12px; }
 :deep(.loss-row) { background: #fef0f0 !important; }
+.guidance-details { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
 </style>

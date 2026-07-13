@@ -2,7 +2,7 @@
   <div class="g1-contract-cf">
     <div class="section-head">
       <h3 class="sheet-title">G1-10 合同现金流量特征（SPPI 逐项分析）</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增投资项目</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-9" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
@@ -87,6 +87,12 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）执行的合同现金流量特征（SPPI）测试程序及结果；（2）逐项条款分析的关键判断及例外情形。" />
+    </el-card>
 
     <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
@@ -175,6 +181,12 @@ function loadRows(): ContractCashflowRow[] {
 
 const rows = ref<ContractCashflowRow[]>(loadRows())
 const conclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.conclusion ?? '')
+
+const AUDIT_NOTE_KEY = 'G1-10-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+})
 
 const SPPI_LABEL: Record<string, string> = { pass: '通过', fail: '不通过' }
 

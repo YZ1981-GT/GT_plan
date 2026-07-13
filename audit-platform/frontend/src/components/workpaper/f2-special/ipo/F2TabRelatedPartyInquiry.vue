@@ -121,11 +121,37 @@
       <el-input v-model="rp.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="汇总询价函核查结论，说明价差异常行的原因及公允性判断……" />
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="audit-card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNoteText"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述所执行的关联方定价询价核查程序、测试范围与结果，以及发现的异常事项及其处理。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="audit-card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusionText"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, onMounted, toRef } from 'vue'
 import { useF2RelatedPartyPricing } from '../../composables/useF2RelatedPartyPricing'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
@@ -137,6 +163,33 @@ const rp = useF2RelatedPartyPricing({
   kind,
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计说明 / 审计结论（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────
+const NOTE_KEY = 'F2-65-audit-note'
+const CONCLUSION_KEY = 'F2-65-audit-conclusion'
+const auditNoteText = ref('')
+const auditConclusionText = ref('')
+function persistSpeAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNoteText.value = val
+  persistSpeAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusionText.value = val
+  persistSpeAudit(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusionText.value = c.remark
 })
 </script>
 
@@ -166,4 +219,7 @@ const rp = useF2RelatedPartyPricing({
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.audit-note-card { margin-top: 16px; border-radius: 8px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.audit-card-header { font-weight: 600; font-size: 14px; color: #303133; }
 </style>

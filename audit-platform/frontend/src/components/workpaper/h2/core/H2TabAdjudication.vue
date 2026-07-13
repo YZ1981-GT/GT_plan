@@ -1,14 +1,23 @@
 <template>
   <div class="h2-tab-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实在建工程（科目1604）期末余额的存在、完整与计价准确，验证三角勾稽（期末=期初+增加-减少-转固）成立，为报表列报与转固时点提供审定依据。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.detailRows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 审定表主区域 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
           <span>在建工程审定表（科目1604）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-1')">💬</el-button>
           </div>
         </div>
@@ -156,9 +165,6 @@
       <template #header>
         <div class="section-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
@@ -171,9 +177,6 @@
       <template #header>
         <div class="section-header">
           <span>审计结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('adj-conclusion')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
@@ -222,6 +225,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const publishing = ref(false)
 
 const state = useH2Adjudication({
@@ -229,6 +233,7 @@ const state = useH2Adjudication({
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const displayRows = computed(() => {
@@ -270,9 +275,6 @@ async function handlePublish() {
   }
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -286,6 +288,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

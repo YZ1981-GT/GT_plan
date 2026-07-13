@@ -101,6 +101,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
         />
 

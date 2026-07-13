@@ -78,7 +78,7 @@ function fmtRate(v: number | 'N/A'): string {
       title="审计目标：通过实质性分析程序识别应付账款(2202)各构成的异常波动，评估余额变动的合理性，为进一步审计程序提供方向。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
       </div>

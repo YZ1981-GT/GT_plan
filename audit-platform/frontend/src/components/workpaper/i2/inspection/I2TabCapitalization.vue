@@ -4,12 +4,32 @@
     <div class="section-header">
       <span class="section-title">I2-6 研发项目资本化时点判断（CAS6五条件核心）</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiSuggest">
-          <el-icon><MagicStick /></el-icon> AI建议
-        </el-button>
         <el-button size="small" type="default" text @click="handleReview">
           复核
         </el-button>
+      </div>
+    </div>
+
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：判断各研发项目开发阶段支出资本化时点的恰当性，核查是否同时满足 CAS6 第9条规定的五个资本化条件，确认资本化起点与归集金额真实、合规。" />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 逐研发项目对照 CAS6 第9条五个条件（技术可行性/完成意图/使用或出售能力/未来经济利益/资源充足）逐条判断；</p>
+        <p>2. 获取立项报告、可行性研究报告、董事会纪要、评审记录等支持性文件作为资本化依据；</p>
+        <p>3. 五条件须同时满足方可资本化，任一不满足则相关支出应费用化；确实无法区分研究/开发阶段的支出全部费用化；</p>
+        <p>4. 资本化时点日期联动 I2-2 明细表"资本化起点"列。</p>
+      </div>
+    </details>
+
+    <!-- 索引工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:I2" :context-project-id="props.projectId" />
+        <el-tag size="small" type="info">共 {{ projectOptions.length }} 个项目</el-tag>
       </div>
     </div>
 
@@ -174,13 +194,24 @@
     <div v-else class="no-project-hint">
       <el-empty description="请选择或新增研发项目以开始CAS6五条件检查" />
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :autosize="{ minRows: 5 }" placeholder="记录资本化时点判断过程、支持性文件核查情况及发现的问题..." @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span>审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :autosize="{ minRows: 3 }" placeholder="填写资本化时点判断总体结论..." @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, inject } from 'vue'
+import { ref, computed, watch, inject, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import {
   evaluateCapitalization,
   CAS6_CONDITION_NAMES,
@@ -382,16 +413,32 @@ async function handleSave() {
   ElMessage.success('资本化时点判断已保存')
 }
 
-// ─── AI Suggest ──────────────────────────────────────────────────────────────
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────
 
-function handleAiSuggest() {
-  if (!selectedProject.value) {
-    ElMessage.warning('请先选择研发项目')
-    return
-  }
-  ElMessage.info(`AI正在为"${selectedProject.value}"生成五条件建议...`)
-  console.log('[I2-Capitalization] AI suggest for:', selectedProject.value)
+const AUDIT_NOTE_KEY = 'I2-6-audit-note'
+const AUDIT_CONCLUSION_KEY = 'I2-6-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function readRemark(key: string): string {
+  const raw = props.allResponses.get(key)
+  if (raw == null) return ''
+  return typeof raw === 'string' ? raw : (raw.remark ?? '')
 }
+function hydrateAudit() {
+  auditNote.value = readRemark(AUDIT_NOTE_KEY)
+  auditConclusion.value = readRemark(AUDIT_CONCLUSION_KEY)
+}
+function saveAuditNote(val: string) {
+  auditNote.value = val
+  void props.saveResponse('I2-6', { [AUDIT_NOTE_KEY]: val })
+}
+function saveAuditConclusion(val: string) {
+  auditConclusion.value = val
+  void props.saveResponse('I2-6', { [AUDIT_CONCLUSION_KEY]: val })
+}
+watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
+onMounted(hydrateAudit)
 
 // ─── Attachment ──────────────────────────────────────────────────────────────
 
@@ -607,4 +654,14 @@ function handleReview() {
 .no-project-hint {
   margin-top: 40px;
 }
+
+/* 打磨要素 */
+.objective-alert { margin-bottom: 12px; }
+.guidance-details { margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-secondary); background: #f9fafb; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 600; color: #374151; }
+.guidance-details .guidance-content { margin-top: 8px; line-height: 1.7; }
+.guidance-details .guidance-content p { margin: 0 0 4px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.audit-note-card, .audit-conclusion-card { margin-top: 16px; }
 </style>

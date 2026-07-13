@@ -1,5 +1,9 @@
 <template>
   <div class="h1-tab-disclosure-listed">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：确认固定资产附注披露（原值/累计折旧/减值变动、闲置、融资租入、经营租出、所有权受限、已提足固定资产）完整，与审定表(H1-1)/明细表(H1-2)勾稽一致，符合上市公司披露要求。" />
+
     <!-- 顶部引导 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -15,9 +19,6 @@
           <div class="section-title">
             <span>{{ section.title }}</span>
             <div class="title-actions">
-              <el-button size="small" type="primary" link @click="handleAiGenerate(section.key)">
-                <el-icon><MagicStick /></el-icon> AI
-              </el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-listed-${section.key}`)">💬</el-button>
             </div>
           </div>
@@ -79,7 +80,15 @@
     <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
       <template #header><span>附注披露审计说明</span></template>
-      <el-input v-model="disclosureNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="disclosureNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写附注披露审计说明..." @change="saveDisclosureNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写附注披露审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -112,8 +121,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const disclosureNote = ref('')
+const auditConclusionText = ref('')
+const NOTE_KEY = 'H1-note-listed-audit-note'
+const CONCLUSION_KEY = 'H1-note-listed-audit-conclusion'
+function saveDisclosureNote() { saveResponse(NOTE_KEY, disclosureNote.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
 
 const sections = LISTED_SECTIONS
 
@@ -146,7 +161,11 @@ function subscribeAdjudicated() {
   } catch { /* SSE not available, degrade silently */ }
 }
 
-onMounted(() => { subscribeAdjudicated() })
+onMounted(() => {
+  subscribeAdjudicated()
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) disclosureNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 onUnmounted(() => { eventSource?.close() })
 
 function getDynamicRows(key: string) {
@@ -159,7 +178,6 @@ function getDynamicSubtotal(key: string): number {
 }
 
 function addDynamicRow(key: string) { _addDynamic(key) }
-function handleAiGenerate(section: string) { console.log('AI disc:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 
 function fmtAmt(val: number | null | undefined): string {

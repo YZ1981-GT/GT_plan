@@ -24,6 +24,15 @@
       </span>
     </div>
 
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ totalRowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 97行分组虚拟滚动容器 -->
     <div class="adj-scroll-container" ref="scrollContainerRef">
       <!-- 正常虚拟滚动模式 / 分页降级模式（结构相同） -->
@@ -232,8 +241,8 @@
         <div class="card-header"><span>审计说明</span></div>
       </template>
       <el-input v-model="auditNote" type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="对长期股权投资审定表的审计说明…" />
+        :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="对长期股权投资审定表的审计说明…" @change="saveNote" />
     </el-card>
 
     <!-- 审计结论 -->
@@ -242,8 +251,8 @@
         <div class="card-header"><span>审计结论</span></div>
       </template>
       <el-input v-model="auditConclusion" type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="审计结论…" />
+        :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="审计结论…" @change="saveConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -610,10 +619,38 @@ function adjRowClassName({ row }: { row: AdjRow }): string {
   return ''
 }
 
+// ═══ 审计说明/结论 持久化（checklist_responses）══════════════════════════════
+const NOTE_KEY = 'G7-1-adjudication-audit-note'
+const CONCLUSION_KEY = 'G7-1-adjudication-audit-conclusion'
+
+function persistAudit(itemId: string, val: string): void {
+  if (props.isReadonly || !props.wpId) return
+  api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+    project_id: props.projectId || undefined,
+    items: [{ item_id: itemId, conclusion: null, remark: val }],
+  }, { _silent: true } as any).catch(() => {})
+}
+
+function saveNote(): void { persistAudit(NOTE_KEY, auditNote.value) }
+function saveConclusion(): void { persistAudit(CONCLUSION_KEY, auditConclusion.value) }
+
+async function loadAuditResponses(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+    const items = Array.isArray(res) ? res : (res as any)?.data || []
+    for (const it of items) {
+      if (it.item_id === NOTE_KEY && it.remark) auditNote.value = it.remark
+      else if (it.item_id === CONCLUSION_KEY && it.remark) auditConclusion.value = it.remark
+    }
+  } catch { /* silent */ }
+}
+
 // ═══ 生命周期 ═══════════════════════════════════════════════════════════════
 onMounted(() => {
   loadCollapseState()
   hydrateData()
+  loadAuditResponses()
   fetchTrialBalance()
   checkPerformance()
 })
@@ -622,6 +659,10 @@ onMounted(() => {
 <style scoped>
 .g7-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 /* Section 标题栏 */
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }

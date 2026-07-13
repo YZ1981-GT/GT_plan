@@ -1,5 +1,14 @@
 <template>
   <div class="h9-tab-disclosure-listed">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实上市公司附注中租赁负债的分类列示、期末/上年年末余额及利息费用披露完整、准确，与 H9-1 审定表勾稽一致，符合 CAS21 及证监会信息披露要求。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>附注披露（上市公司）：按CAS21准则及证监会信息披露要求，披露租赁负债分类余额及利息费用。A1:F18，简单表格。</p>
@@ -11,7 +20,6 @@
         <div class="section-title">
           <span>47、租赁负债</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" plain @click="handleAiGenerate">AI 辅助</el-button>
             <el-button size="small" @click="$emit('open-review', 'disclosure-listed')">复核</el-button>
           </div>
         </div>
@@ -59,7 +67,6 @@
       <template #header>
         <div class="section-title">
           <span>利息费用说明</span>
-          <el-button size="small" type="primary" plain @click="handleAiInterest">AI 辅助</el-button>
         </div>
       </template>
       <el-input
@@ -69,6 +76,36 @@
         :readonly="isReadonly"
         placeholder="2024年计提的租赁负债利息费用金额为XX万元，计入财务费用-利息支出金额为XX万元，计入固定资产金额为XX万元。"
         @change="saveInterestNote"
+      />
+    </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-title"><span>审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :readonly="isReadonly"
+        placeholder="请填写附注披露的审计说明：披露口径、分类依据、与审定表勾稽核对情况等..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-title"><span>审计结论</span></div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :readonly="isReadonly"
+        placeholder="请填写附注披露的审计结论..."
+        @change="saveAuditConclusion"
       />
     </el-card>
 
@@ -124,6 +161,8 @@ const defaultRows: DisclosureRow[] = [
 
 const tableRows = ref<DisclosureRow[]>([])
 const interestNote = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 // 计算合计行
 const summaryRows = computed(() => {
@@ -152,6 +191,10 @@ function loadFromResponses() {
   } else {
     tableRows.value = [...defaultRows]
   }
+  const noteItem = props.allResponses.get('H9-disc-listed-audit-note')
+  auditNote.value = noteItem?.remark ?? noteItem?.conclusion ?? ''
+  const conclusionItem = props.allResponses.get('H9-disc-listed-audit-conclusion')
+  auditConclusion.value = conclusionItem?.remark ?? conclusionItem?.conclusion ?? ''
 }
 
 // --- 保存 ---
@@ -163,6 +206,14 @@ function saveInterestNote() {
   saveAll()
 }
 
+function saveAuditNote() {
+  emit('save', 'H9-disc-listed-audit-note', auditNote.value)
+}
+
+function saveAuditConclusion() {
+  emit('save', 'H9-disc-listed-audit-conclusion', auditConclusion.value)
+}
+
 function saveAll() {
   const payload = {
     rows: tableRows.value,
@@ -170,15 +221,6 @@ function saveAll() {
     interestNote: interestNote.value,
   }
   emit('save', 'H9-disc-listed-rows', JSON.stringify(payload))
-}
-
-// --- AI ---
-function handleAiGenerate() {
-  emit('open-ai', 'disclosure-listed')
-}
-
-function handleAiInterest() {
-  emit('open-ai', 'disclosure-listed-interest')
 }
 
 // --- EventBus: subscribe adjudicated to refresh ---
@@ -209,6 +251,9 @@ watch(() => props.allResponses, loadFromResponses, { deep: true })
 
 <style scoped>
 .h9-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-bottom: 16px; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

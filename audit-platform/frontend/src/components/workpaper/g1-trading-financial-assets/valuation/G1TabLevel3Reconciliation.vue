@@ -2,7 +2,7 @@
   <div class="g1-level3">
     <div class="section-head">
       <h3 class="sheet-title">G1-7 第三层次公允价值变动调节表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="l3.addRow()">新增调节行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-6" /></span>
         <el-tag size="small" type="info">共 {{ l3.rows.value.length }} 行</el-tag>
@@ -70,6 +70,12 @@
     </div>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）第三层次公允价值期初至期末变动调节的核实情况；（2）估值方法、关键假设及敏感性分析的披露充分性。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="l3.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" placeholder="对第三层次公允价值变动的复核结论..." />
@@ -86,7 +92,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, inject } from 'vue'
+import { ref, toRef, inject, watch } from 'vue'
 import { useG1Level3 } from '../../composables/useG1Level3'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -103,6 +109,12 @@ const l3 = useG1Level3({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-7-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
 const FORMULA_HINT = '期末余额 = 期初余额 + 本期增加 - 本期减少 + 本期公允变动'

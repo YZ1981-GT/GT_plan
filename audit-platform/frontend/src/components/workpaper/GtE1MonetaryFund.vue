@@ -246,6 +246,18 @@ onMounted(() => {
   if (props.htmlData?.projectContext) {
     bsDate.value = props.htmlData.projectContext.bs_date || ''
   }
+  // 从 render-config 返回的 responses_snapshot 加载已持久化数据
+  const snapshot = props.htmlData?.responses_snapshot
+  if (snapshot && typeof snapshot === 'object') {
+    for (const [key, val] of Object.entries(snapshot)) {
+      const entry = val as Record<string, unknown>
+      allResponses.value.set(key, {
+        item_id: String(entry?.item_id ?? key),
+        conclusion: (entry?.conclusion as string | null) ?? null,
+        remark: (entry?.remark as string | null) ?? null,
+      })
+    }
+  }
 })
 </script>
 

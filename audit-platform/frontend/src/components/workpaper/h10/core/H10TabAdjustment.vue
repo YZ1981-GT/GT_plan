@@ -8,6 +8,19 @@
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="adj.addRow()">+ 新增</el-button>
       </div>
     </div>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 汇总资产处置损益相关的审计调整（AJE）与重分类调整（RJE），每笔分录借贷必须平衡。</p>
+        <p>2. AJE 用于纠正错报（如处置损益漏记、时点错误、金额差错）；RJE 用于报表列报重分类（如误入营业外收支应重分类至资产处置损益 6115）。</p>
+        <p>3. 调整应有充分依据，注明摘要、科目、金额、日期与制单人，并与 H10-1 审定表的 AJE/RJE 列勾稽一致。</p>
+      </div>
+    </details>
+
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：汇总资产处置损益相关的审计调整与重分类调整，确保借贷平衡、调整依据充分，并与审定表勾稽一致。" />
+
     <el-alert v-if="!adj.isBalanced.value" type="error" :closable="false" class="balance-alert">
       借贷不平衡，差额 {{ fmt(adj.balanceDiff.value) }}
     </el-alert>
@@ -69,11 +82,24 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：说明各笔调整分录的依据、影响的报表项目及与审定表的勾稽情况。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：调整分录借贷平衡、依据充分，已与审定表及被审计单位沟通。"
+        @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useH10Adjustment } from '../../composables/useH10Adjustment'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import H10ImportExportDropdown from '../H10ImportExportDropdown.vue'
@@ -94,6 +120,32 @@ const adj = useH10Adjustment({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
+const NOTE_KEY = 'H10-3-adjustment-audit-note'
+const CONCLUSION_KEY = 'H10-3-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 function fmt(v: number) {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -104,4 +156,10 @@ function fmt(v: number) {
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .balance-alert { margin-bottom: 8px; }
+.guidance-details { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 8px; }
+.audit-note-card { margin-top: 12px; }
 </style>

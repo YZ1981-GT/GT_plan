@@ -12,7 +12,7 @@
   <div class="g3-detail">
     <div class="section-head">
       <h3 class="sheet-title">G3-2 应收股利明细表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" :disabled="isReadonly" @click="detail.addRow()">＋ 新增明细行</el-button>
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
@@ -187,6 +187,32 @@
       <span class="total-item">期末应收：{{ fmtNum(detail.totals.value.netReceivable) }}</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：概述明细核对程序执行情况、持股比例/分红方案/应收金额勾稽结果、拟调整及未调整事项及其影响。"
+        @change="persistNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述调整事项外未见异常。C、存在重大未调整事项无法确认。"
+        @change="persistConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示（CAS 依据）</summary>
@@ -203,7 +229,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, inject } from 'vue'
+import { ref, computed, toRef, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -235,6 +261,20 @@ const detail = useG3Detail({
 
 const investTypeOptions = G3_INVEST_TYPE_OPTIONS
 const methodOptions = G3_ACCOUNTING_METHOD_OPTIONS
+
+// ─── 审计说明 / 审计结论（conclusion=null，文本存 remark，走白名单豁免路径） ───
+const NOTE_KEY = 'G3-2-detail-audit-note'
+const CONCLUSION_KEY = 'G3-2-detail-audit-conclusion'
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+function persistNote() {
+  if (props.isReadonly) return
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: auditNote.value })
+}
+function persistConclusion() {
+  if (props.isReadonly) return
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: auditConclusion.value })
+}
 
 // ─── 当前区段可见列（排除seq和investeeName，已作固定列） ───
 const currentColumns = computed<G3DetailColumn[]>(() => {
@@ -415,5 +455,16 @@ function handleImportData() {
   margin-top: 6px;
   color: #909399;
   font-size: 12px;
+}
+
+/* 审计说明 / 审计结论卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

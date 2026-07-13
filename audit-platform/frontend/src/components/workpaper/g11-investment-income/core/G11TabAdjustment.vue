@@ -1,5 +1,21 @@
 <template>
   <div class="g11-adjustment">
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表汇总投资收益相关的审计调整分录（AJE）与重分类分录（RJE），每笔分录借贷必须平衡。</p>
+        <p>2. 调整净额自动回写 G11-1 审定表 / G11-2 明细表"其他"行，确保审定数与调整一致。</p>
+        <p>3. 摘要应清晰说明调整事由（如公允价值变动结转、权益法损益补提、跨期收益调整等），并交叉索引至底稿。</p>
+      </div>
+    </details>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：确认投资收益调整分录的依据充分、借贷平衡、回写准确，保证审定数据的完整与准确。"
+    />
+
     <div class="section-head">
       <h3 class="sheet-title">G11-3 调整分录汇总</h3>
       <div class="head-actions">
@@ -58,11 +74,35 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述调整分录的事由、依据及对投资收益的影响，未调整事项及其原因。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：调整分录借贷平衡、依据充分，回写审定表/明细表准确，未见异常（或列明重大未调整事项）。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useG11Adjustment } from '../../composables/useG11Adjustment'
 import { useG11DetailAnalysis } from '../../composables/useG11DetailAnalysis'
 import { parseG11AdjStore, patchG11AdjRow } from '../../composables/g11AdjStorage'
@@ -78,6 +118,33 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+
+// ─── 审计说明 / 审计结论 ───
+const NOTE_KEY = 'G11-adjustment-audit-note'
+const CONCLUSION_KEY = 'G11-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  props.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  props.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 const detail = useG11DetailAnalysis({
   allResponses: toRef(props, 'allResponses'),
@@ -103,6 +170,13 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 
 <style scoped>
 .g11-adjustment { font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .balance-alert { margin-bottom: 8px; }

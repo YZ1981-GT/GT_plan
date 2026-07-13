@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-policy-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：评价固定资产会计政策（CAS4确认/分类/折旧/后续支出/减值/处置六段落）符合准则，折旧方法、使用年限、残值率合理且前后期一致。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-5" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ state.sections.value.length }} 段落</el-tag>
+    </div>
+
     <!-- 引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -25,9 +35,6 @@
               <el-tag v-if="section.conclusion" :type="getConclusionType(section.conclusion)" size="small">
                 {{ section.conclusion }}
               </el-tag>
-              <el-button size="small" type="primary" link @click="handleAiGenerate(section.key)">
-                <el-icon><MagicStick /></el-icon> AI
-              </el-button>
               <el-button size="small" type="default" link @click="handleReview(`H1-5-${section.key}`)">💬</el-button>
             </div>
           </div>
@@ -145,13 +152,10 @@
       <template #header>
         <div class="section-title">
           <span>审计结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('policy-evaluation')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="policyConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="会计政策检查总体结论..." />
+        placeholder="会计政策检查总体结论..." @change="savePolicyConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -167,9 +171,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
 import { useH1PolicyCheck } from '../../composables/useH1PolicyCheck'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -179,8 +184,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const policyConclusion = ref('')
+const CONCLUSION_KEY = 'H1-5-audit-conclusion'
+function savePolicyConclusion() { saveResponse(CONCLUSION_KEY, policyConclusion.value) }
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) policyConclusion.value = c.remark
+})
 
 const state = useH1PolicyCheck(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
@@ -196,7 +207,6 @@ function getConclusionType(conclusion: string): 'success' | 'danger' | 'info' {
 
 function onSectionUpdate(_idx: number) { /* debounce save */ }
 function handleAddParam() { state.addDepParam?.() }
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 </script>
 

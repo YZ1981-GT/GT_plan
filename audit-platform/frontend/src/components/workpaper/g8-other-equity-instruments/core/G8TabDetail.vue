@@ -1,5 +1,22 @@
 <template>
   <div class="g8-detail" data-testid="g8-detail-table">
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表按被投资单位分行列示其他权益工具投资（科目1503）的成本、公允价值及 OCI 累计变动明细。</p>
+        <p>2. 灰底列（期初审定/期末余额/审定数）为自动计算列：期末余额 = 期初审定 + 增加 − 减少 + FV变动。</p>
+        <p>3. 指定为以公允价值计量且变动计入 OCI 属不可撤销选择，须逐项填列指定原因；公允价值层次（Level 1/2/3）应与 G8-4 公允价值测试一致。</p>
+        <p>4. 明细合计应与审定表 G8-1（科目1503）勾稽一致。</p>
+      </div>
+    </details>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实其他权益工具投资各被投资单位期末成本、公允价值及 OCI 累计变动明细的准确与完整，验证公允价值层次划分与指定恰当，为审定表 G8-1（科目1503）提供明细支撑。"
+      class="objective-alert"
+    />
+
     <div class="toolbar">
       <h3>G8-2 明细表</h3>
       <div class="head-actions">
@@ -8,6 +25,14 @@
         <el-button v-if="!isReadonly" size="small" data-testid="g8-detail-add" @click="detail.addRow()">+ 新增行</el-button>
       </div>
     </div>
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-2" /></span>
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" data-testid="g8-detail-tabs" />
     <el-table :data="detail.rows.value" border size="small" style="font-size:13px;margin-top:8px" max-height="520"
       highlight-current-row @current-change="onRowChange">
@@ -197,12 +222,25 @@
         <template #default="{ row }"><strong>{{ fmt(row.closingAdjusted) }}</strong></template>
       </el-table-column>
     </el-table>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）明细核对程序及结果；（2）各被投资单位成本、公允价值、OCI 变动的核实情况及异常事项。" />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计结论</template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：明细金额是否准确、完整，是否与审定表 G8-1（科目1503）勾稽一致。" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import { useG8Detail } from '../../composables/useG8Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -220,6 +258,17 @@ const detail = useG8Detail({
   allResponses: computed(() => props.allResponses),
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
+})
+
+const AUDIT_NOTE_KEY = 'G8-2-audit-note'
+const AUDIT_CONCLUSION_KEY = 'G8-2-audit-conclusion'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+})
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
 })
 
 const tabOptions = [
@@ -243,4 +292,13 @@ function fmt(n: number) {
 .toolbar { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center; }
 .head-actions { display: flex; gap: 8px; }
 .formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }
+.guidance-details { margin-bottom: 10px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
 </style>

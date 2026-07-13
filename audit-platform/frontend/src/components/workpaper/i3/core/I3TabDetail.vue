@@ -9,6 +9,29 @@
       <p>③ 减值：累计减值期初/本期减值/累计减值期末(公式)/商誉净值(公式)/所属CGU/可收回金额/测试方法</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：逐被投资单位核实商誉的初始确认（合并成本−可辨认净资产公允价值份额）、累计减值及净值的真实性与准确性；核对商誉分摊至资产组(CGU)的合理性；明细合计与 I3-1 审定表勾稽一致（CAS8、CAS20）。"
+    />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <ul>
+          <li>商誉原值 = 合并成本 − 可辨认净资产公允价值份额（CAS20 非同一控制下企业合并）。</li>
+          <li>商誉不摊销，累计减值期末 = 累计减值期初 + 本期减值；商誉净值 = 原值 − 累计减值。</li>
+          <li>每项商誉须分摊至预期受益的资产组(CGU)，分摊层级不高于经营分部（CAS8 第十八条）。</li>
+          <li>本表 30 列按"基础 / 入账 / 减值"三区段切换查看，行选中在各区段间保持同步。</li>
+          <li>明细合计须与 I3-1 审定表商誉原值 / 累计减值 / 净值一致，差异需查明。</li>
+        </ul>
+      </div>
+    </details>
+
     <!-- 交叉验证警告（黄色alert） -->
     <el-alert
       v-if="crossValidation.hasAnyWarning"
@@ -33,7 +56,7 @@
     </el-alert>
 
     <!-- 区段Tab切换（el-segmented） -->
-    <div class="toolbar-row">
+    <div class="toolbar-row tab-toolbar">
       <el-segmented
         v-model="activeSectionKey"
         :options="segmentOptions"
@@ -41,6 +64,7 @@
       />
 
       <div class="toolbar-right">
+        <GtIndexChip value="wp:I3-2" :context-project-id="projectId" />
         <el-button
           v-if="!isReadonly"
           type="primary"
@@ -201,6 +225,32 @@
         <el-table-column v-if="!isReadonly" label="" width="80" />
       </el-table>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="记录商誉明细的审计说明（如各被投资单位商誉来源、分摊至CGU的依据、评估方法等）..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="记录商誉明细的审计结论（如：商誉明细列示完整、初始确认与减值计价准确，与审定表勾稽一致）..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -224,6 +274,7 @@ import {
   type I3DetailSection,
   I3_DETAIL_SECTION_LABELS,
 } from '../../composables/useI3Detail'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -400,6 +451,34 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
   if (col.type === 'number' || col.type === 'formula') return fmtAmount(val as number)
   return String(val)
 }
+
+// ─── 审计说明 / 审计结论（纯文本，无AI） ─────────────────────────────────────
+const NOTE_KEY = 'I3-2-audit-note'
+const CONCLUSION_KEY = 'I3-2-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', CONCLUSION_KEY, val)
+}
+
+watch(
+  () => props.allResponses,
+  () => {
+    const n = props.allResponses.get(NOTE_KEY)
+    if (n?.remark != null) auditNote.value = n.remark
+    const c = props.allResponses.get(CONCLUSION_KEY)
+    if (c?.remark != null) auditConclusion.value = c.remark
+  },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -544,5 +623,31 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
 .summary-value {
   font-weight: 600;
   color: #166534;
+}
+
+/* 审计目标 alert */
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 编制提示 details */
+.guidance-details {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.guidance-details .guidance-content ul {
+  padding-left: 20px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
+/* 审计说明/结论卡片 */
+.audit-note-card {
+  margin-top: 12px;
 }
 </style>

@@ -13,6 +13,15 @@
       </ul>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：确认商誉相关审计调整分录（AJE/RJE）依据充分、借贷平衡、科目正确；调整后审定数与 I3-1 审定表、A13 错报汇总勾稽一致；商誉减值调整符合 CAS8 不可转回原则。"
+    />
+
     <!-- 操作栏 -->
     <el-card shadow="never">
       <template #header>
@@ -43,6 +52,15 @@
           </div>
         </div>
       </template>
+
+      <!-- 工具栏：索引 chip + 行数 -->
+      <div class="tab-toolbar">
+        <div class="toolbar-left"></div>
+        <div class="toolbar-right">
+          <GtIndexChip value="wp:I3-3" :context-project-id="projectId" />
+          <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        </div>
+      </div>
 
       <!-- 调整分录表格 -->
       <el-table :data="rows" border stripe size="small" class="adj-table" show-summary :summary-method="getSummary">
@@ -161,9 +179,21 @@
       <el-input
         v-model="auditNote"
         type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        :autosize="{ minRows: 5 }"
         :disabled="isReadonly"
         placeholder="记录调整事项的审计判断、与管理层沟通情况（如商誉减值调整原因、CGU划分依据等）..."
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="记录调整分录的审计结论（如：上述调整分录依据充分、借贷平衡，调整后商誉列报恰当）..."
       />
     </el-card>
 
@@ -240,8 +270,11 @@ interface AdjustmentRow {
 // ─── State ─────────────────────────────────────────────────────────────────
 
 const ITEM_ID = 'I3-3-rows'
+const NOTE_KEY = 'I3-3-audit-note'
+const CONCLUSION_KEY = 'I3-3-audit-conclusion'
 const rows = ref<AdjustmentRow[]>([])
 const auditNote = ref('')
+const auditConclusion = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // ─── Load from allResponses ────────────────────────────────────────────────
@@ -255,9 +288,11 @@ function loadRows(): void {
     rows.value = Array.isArray(parsed) ? parsed.map(normalizeRow) : []
   } catch { rows.value = [] }
 
-  // Load audit note
-  const noteItem = props.allResponses.get('I3-3-audit-note')
+  // Load audit note / conclusion
+  const noteItem = props.allResponses.get(NOTE_KEY)
   auditNote.value = noteItem?.remark ?? noteItem?.value ?? ''
+  const conclusionItem = props.allResponses.get(CONCLUSION_KEY)
+  auditConclusion.value = conclusionItem?.remark ?? conclusionItem?.value ?? ''
 }
 
 function normalizeRow(raw: any): AdjustmentRow {
@@ -324,7 +359,8 @@ async function handleSave(): Promise<void> {
     await http.post(`/api/workpapers/${props.wpId}/checklist-responses`, {
       items: [
         { item_id: ITEM_ID, remark: JSON.stringify(rows.value) },
-        { item_id: 'I3-3-audit-note', remark: auditNote.value },
+        { item_id: NOTE_KEY, remark: auditNote.value },
+        { item_id: CONCLUSION_KEY, remark: auditConclusion.value },
       ],
     })
 
@@ -559,6 +595,24 @@ function fmtAmt(val: number | null | undefined): string {
   font-weight: 600;
 }
 .title-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 审计目标 alert */
+.objective-alert {
+  margin-bottom: 16px;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tab-toolbar .toolbar-right {
   display: flex;
   align-items: center;
   gap: 8px;

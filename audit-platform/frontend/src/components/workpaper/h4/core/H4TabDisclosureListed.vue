@@ -5,15 +5,16 @@
       <p>附注披露信息（上市公司）：按照CAS准则和证监会要求，披露工程物资期初/期末余额、本期增减变动、减值准备等。数据从H4-1审定表自动取数填入关键字段，审计人员核对后确认。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实工程物资附注披露的金额与 H4-1 审定表一致、分类与增减变动披露完整，符合上市公司年报披露要求（CAS30/证监会披露准则）。" />
+
     <!-- Section Title -->
     <div class="section-header">
       <span>附注披露信息（上市公司）</span>
       <div class="section-header-actions">
         <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions"
           size="small" @change="dualMode.onModeChange" />
-        <el-button size="small" type="primary" link @click="handleAiGenerate" style="margin-left: 8px">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-disclosure-listed')">💬</el-button>
       </div>
     </div>
@@ -65,9 +66,6 @@
           <div class="section-header" style="margin-bottom:0">
             <span>附注披露文本</span>
             <div class="section-header-actions">
-              <el-button size="small" type="primary" link @click="handleAiGenerate">
-                <el-icon><MagicStick /></el-icon> AI生成
-              </el-button>
             </div>
           </div>
         </template>
@@ -76,6 +74,26 @@
           @blur="saveNoteText" />
       </el-card>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }"
+        placeholder="请填写附注披露核对的审计说明..." :disabled="props.isReadonly"
+        @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
+    </el-card>
 
     <!-- 编制提示 -->
     <details class="edit-tips">
@@ -138,6 +156,7 @@ const impairmentProvision = computed(() => {
 })
 
 // ─── Note Text ───────────────────────────────────────────────────────────────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const noteText = ref('')
 const noteResp = props.allResponses.get('H4-disclosure-listed-text')
 if (noteResp?.remark) noteText.value = noteResp.remark
@@ -146,6 +165,23 @@ function saveNoteText() {
   props.allResponses.set('H4-disclosure-listed-text', {
     item_id: 'H4-disclosure-listed-text', remark: noteText.value, conclusion: null,
   })
+  saveResponse('H4-disclosure-listed-text', noteText.value)
+}
+
+// ─── 审计说明 / 审计结论（inject saveResponse 落库 + setup 恢复） ──────────────
+const auditNote = ref('')
+const auditConclusion = ref('')
+const _anResp = props.allResponses.get('H4-disclosure-listed-note')
+if (_anResp?.remark) auditNote.value = _anResp.remark
+const _acResp = props.allResponses.get('H4-disclosure-listed-conclusion')
+if (_acResp?.remark) auditConclusion.value = _acResp.remark
+function saveAuditNote() {
+  props.allResponses.set('H4-disclosure-listed-note', { item_id: 'H4-disclosure-listed-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-disclosure-listed-note', auditNote.value)
+}
+function saveAuditConclusion() {
+  props.allResponses.set('H4-disclosure-listed-conclusion', { item_id: 'H4-disclosure-listed-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-disclosure-listed-conclusion', auditConclusion.value)
 }
 
 // ─── EventBus Subscribe ──────────────────────────────────────────────────────
@@ -171,9 +207,6 @@ onUnmounted(() => {
 })
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
-function handleAiGenerate() {
-  console.log('[H4-Disclosure-Listed] AI generate')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -191,6 +224,9 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

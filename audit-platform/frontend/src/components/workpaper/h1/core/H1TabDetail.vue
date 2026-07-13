@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：核对固定资产明细的原值、累计折旧、减值准备变动完整准确，期末余额与审定表(H1-1)勾稽一致，折旧方法与使用年限恰当。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-2" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 项</el-tag>
+    </div>
+
     <!-- 引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -230,6 +240,20 @@
       </el-descriptions>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card" style="margin-bottom:12px">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：明细取数来源、原值/折旧/减值变动核对情况、与审定表(H1-1)勾稽差异及跟进。" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card" style="margin-bottom:12px">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -245,9 +269,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, inject, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH1Detail, type DetailRow } from '../../composables/useH1Detail'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -257,6 +282,19 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = computed(() => props.allResponses)
+
+// ─── 审计说明/结论 持久化（inject saveResponse；纯 textarea 不臆造 AI） ──
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+const NOTE_KEY = 'H1-2-audit-note'
+const CONCLUSION_KEY = 'H1-2-audit-conclusion'
+const auditNoteText = ref('')
+const auditConclusionText = ref('')
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 
 const activeSegment = ref('basic')
 const segmentOptions = [

@@ -15,6 +15,23 @@
       </p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：测试企业预期信用损失（ECL）计量模型中 PD/LGD/EAD/折现率/前瞻性信息各要素的数据来源、估计方法与合理性，评价减值计量的适当性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏：索引 + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-13" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ pdSection.length + lgdSection.length + eadSection.length + discountRateSection.length + forwardLookingSection.length }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- ═══ Section(一) PD（违约概率） ═══ -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -415,6 +432,21 @@
       </el-table>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="audit-note-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述 ECL 计量模型各要素的测试情况与结果、参数合理性判断、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 编制提示 details 折叠 -->
     <details class="g6-guide-details">
       <summary>📋 编制提示</summary>
@@ -476,6 +508,15 @@ const formData = useG6EclFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
+const NOTE_KEY = 'G6-13-ecl-measurement-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
 
 // ─── 预定义检查行（49行 across 5 sections） ───
 
@@ -559,6 +600,8 @@ const forwardLookingSection = ref<EclCheckRow[]>([...DEFAULT_FORWARD_LOOKING_ROW
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const n = formData.allResponses.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -672,6 +715,33 @@ defineExpose({
 
 .methodology-context li {
   margin-bottom: 2px;
+}
+
+/* ─── 审计目标 / 工具栏 ─── */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* ─── 审计说明卡片 ─── */
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* ─── Section卡片 ─── */

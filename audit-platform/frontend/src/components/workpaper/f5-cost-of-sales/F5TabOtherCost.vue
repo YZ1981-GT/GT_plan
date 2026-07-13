@@ -138,8 +138,20 @@
           </div>
         </div>
       </template>
-      <el-input v-model="note" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
         placeholder="其他业务成本分析说明（成本与收入配比、变动原因等）..." @change="saveNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="其他业务成本审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项（或审计范围受限），不可确认。"
+        @change="saveConclusion" />
     </el-card>
   </div>
 </template>
@@ -161,17 +173,23 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const NOTE_KEY = 'F5-3-audit-note'
+const CONCLUSION_KEY = 'F5-3-audit-conclusion'
 
 const other = useF5OtherCost({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
+const conclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
 const ieCtx = computed(() => (isImportExportSheet('f5', 'F5-3') ? resolveImportExportSheet('f5', 'F5-3') : null))
 
 function saveNote() {
   allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
   window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] } }))
+}
+function saveConclusion() {
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value }] } }))
 }
 function rowClass({ row }: { row: any }): string { return other.isRowHighlighted(row) ? 'f5-row-orange' : '' }
 function fmt(v: number | null | undefined): string { return v == null ? '-' : v.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }

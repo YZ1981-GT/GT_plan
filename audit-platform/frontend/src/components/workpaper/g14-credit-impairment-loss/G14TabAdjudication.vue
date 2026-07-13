@@ -1,6 +1,6 @@
 <template>
   <div class="g14-adjudication" data-testid="g14-adjudication">
-    <div class="g14-toolbar">
+    <div class="g14-toolbar tab-toolbar">
       <h3 class="g14-title">G14-1 信用减值损失审定表</h3>
       <div class="g14-actions">
         <GtIndexChip value="wp:G14-1" />

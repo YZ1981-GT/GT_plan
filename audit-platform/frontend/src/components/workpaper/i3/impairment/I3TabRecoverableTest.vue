@@ -27,12 +27,22 @@
       <p><strong>CAS8 可收回金额确定：</strong>可收回金额应当根据资产的公允价值减去处置费用后的净额与资产预计未来现金流量的现值（使用价值）两者之间较高者确定。预计未来现金流量的现值应当选择恰当的折现率（WACC）对预测期自由现金流进行折现。折现率应当反映货币时间价值和资产特定风险的当前市场评价。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：验证资产组(CGU)可收回金额确定的合理性——可收回金额 = MAX(公允价值减处置费用, 使用价值DCF)；复核 DCF 预测现金流、WACC 折现率、永续增长率等关键假设及计算准确性；结果回传 I3-6 减值测试表（CAS8）。"
+    />
+
     <!-- CGU选择器 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
           <span class="section-title">I3-7 可收回金额测试（DCF核心）</span>
           <div class="section-header-actions">
+            <GtIndexChip value="wp:I3-7" :context-project-id="projectId" />
             <el-select
               v-model="activeCguIndex"
               size="small"
@@ -56,13 +66,19 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" link @click="handleAiWaccSuggestion">
-              <el-icon><MagicStick /></el-icon> AI建议
-            </el-button>
             <el-button size="small" circle @click="openReview('I3-7')">💬</el-button>
           </div>
         </div>
       </template>
+
+      <!-- 工具栏：索引 chip + CGU 数 -->
+      <div class="tab-toolbar">
+        <div class="toolbar-left"></div>
+        <div class="toolbar-right">
+          <GtIndexChip value="wp:I3-6" :context-project-id="projectId" />
+          <el-tag size="small" type="info">共 {{ cguList.length }} 个资产组</el-tag>
+        </div>
+      </div>
 
       <!-- DCF输入区域：收入5年+成本5年→自由现金流 -->
       <div class="dcf-input-section" v-if="activeCgu">
@@ -109,9 +125,6 @@
         <!-- WACC参数区域 -->
         <h4 class="sub-section-title">
           WACC参数
-          <el-button size="small" type="primary" link @click="handleAiWaccSuggestion" style="margin-left:8px">
-            <el-icon><MagicStick /></el-icon> AI建议WACC
-          </el-button>
         </h4>
         <div class="wacc-params-grid">
           <div class="param-item">
@@ -242,9 +255,6 @@
         <!-- 敏感性分析矩阵 3×3: WACC±1% / growth±0.5% -->
         <h4 class="sub-section-title">
           敏感性分析（WACC ± 1% / 增长率 ± 0.5%）
-          <el-button size="small" type="primary" link @click="handleAiGrowthSuggestion" style="margin-left:8px">
-            <el-icon><MagicStick /></el-icon> AI建议增长率
-          </el-button>
         </h4>
         <div class="sensitivity-matrix-wrapper">
           <table class="sensitivity-matrix">
@@ -278,23 +288,37 @@
       <el-empty v-else description="请先在I3-6减值测试中添加CGU，或在上方选择资产组" />
     </el-card>
 
-    <!-- 审计说明与结论 -->
+    <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
-          <span>审计说明与结论</span>
-          <el-button size="small" type="primary" link @click="handleAiConclusion">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
+          <span>审计说明</span>
         </div>
       </template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写DCF模型测试结论（如：经DCF折现现金流模型测算，该资产组使用价值为…万元，高于/低于其账面价值…）"
+        :autosize="{ minRows: 5 }"
+        placeholder="记录 DCF 测算过程的审计说明（如：现金流预测来源、WACC 参数取值依据、永续增长率假设、公允价值减处置费用测算等）"
         :disabled="isReadonly"
         @blur="handleSaveConclusion"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span>审计结论</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusionText"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        placeholder="DCF 可收回金额测试的审计结论（如：经 DCF 折现现金流模型测算，该资产组使用价值为…，高于/低于其账面价值…）"
+        :disabled="isReadonly"
+        @blur="handleSaveAuditConclusion"
       />
     </el-card>
 
@@ -335,7 +359,6 @@
  * Requirements: 6.1-6.7
  */
 import { ref, reactive, computed, watch, inject, onMounted } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import {
   calcDcfPresentValue,
   calcTerminalValue,
@@ -343,6 +366,7 @@ import {
   calcRecoverableAmount,
   calcSensitivity,
 } from '../../composables/useI3DcfEngine'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -394,6 +418,8 @@ const growthDeltas = [-0.005, 0, 0.005] // growth ±0.5%
 
 const activeCguIndex = ref(0)
 const auditConclusion = ref('')
+const auditConclusionText = ref('')
+const AUDIT_CONCLUSION_KEY = 'I3-7-audit-conclusion'
 const fairValueLessDisposal = ref(0)
 
 /** WACC参数 */
@@ -647,9 +673,12 @@ function loadState() {
       if (state.fairValueLessDisposal != null) fairValueLessDisposal.value = state.fairValueLessDisposal
     } catch { /* ignore parse error */ }
   }
-  // Load conclusion
+  // Load conclusion (审计说明)
   const conclusion = props.allResponses?.get('I3-7-conclusion')
-  if (conclusion) auditConclusion.value = String(conclusion)
+  if (conclusion) auditConclusion.value = typeof conclusion === 'string' ? conclusion : (conclusion.remark ?? '')
+  // Load audit conclusion (审计结论)
+  const auditConc = props.allResponses?.get(AUDIT_CONCLUSION_KEY)
+  if (auditConc) auditConclusionText.value = typeof auditConc === 'string' ? auditConc : (auditConc.remark ?? '')
 }
 
 // ─── Watch CGU switch → reload state ─────────────────────────────────────────
@@ -673,21 +702,6 @@ onMounted(() => {
   loadState()
 })
 
-// ─── AI Handlers ─────────────────────────────────────────────────────────────
-
-function handleAiWaccSuggestion() {
-  console.log('[I3-7] AI: suggest WACC params based on industry data')
-  // TODO: call /api/workpapers/{wp_id}/ai/generate-text with WACC context
-}
-
-function handleAiGrowthSuggestion() {
-  console.log('[I3-7] AI: suggest growth rate based on industry/macro data')
-}
-
-function handleAiConclusion() {
-  console.log('[I3-7] AI: generate DCF conclusion')
-}
-
 // ─── Import/Export ───────────────────────────────────────────────────────────
 
 function handleExportImport(command: string) {
@@ -708,6 +722,10 @@ function handleExportImport(command: string) {
 
 function handleSaveConclusion() {
   emit('save', 'I3-7-conclusion', auditConclusion.value)
+}
+
+function handleSaveAuditConclusion() {
+  emit('save', AUDIT_CONCLUSION_KEY, auditConclusionText.value)
 }
 
 function openReview(id: string) {
@@ -780,6 +798,22 @@ function pct(val: number | null | undefined): string {
 .section-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .section-title { font-weight: 600; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 16px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 .sub-section-title {
   font-size: var(--wp-font-size, 13px);

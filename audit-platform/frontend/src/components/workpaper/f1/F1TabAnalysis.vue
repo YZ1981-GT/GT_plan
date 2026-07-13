@@ -29,6 +29,15 @@
     style="margin-bottom: 12px"
   />
 
+  <!-- 工具栏 -->
+  <div class="tab-toolbar">
+    <div class="toolbar-left"></div>
+    <div class="toolbar-right">
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">主要债务人 {{ top5Debtors.length }} 户</el-tag>
+    </div>
+  </div>
+
   <!-- 区块一：借方发生额分析 -->
   <div class="analysis-card">
     <h4 class="card-title">(一) 借方发生额分析</h4>
@@ -115,6 +124,20 @@
         placeholder="对预付账款借贷方发生额变动、Top5集中度等进行分析性复核说明..."
       />
     </div>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">审计结论</span>
+      </div>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </div>
   </el-card>
 </div>
 </template>
@@ -124,7 +147,7 @@
  * F1TabAnalysis.vue — F1-4 分析表
  * 4区块卡片：借方/贷方/Top5/审计说明
  */
-import { computed, toRef, type Ref } from 'vue'
+import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import { useF1Analysis } from '../composables/useF1Analysis'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
@@ -160,6 +183,22 @@ const {
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+})
+
+// ─── 审计结论 ──────────────────────────────────────────────────────────────
+const CONCLUSION_KEY = 'F1-analysis-audit-conclusion'
+const auditConclusion = ref('')
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const c = allResponsesRef.value.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 // Build table data for debit/credit including total + diff rows
@@ -202,6 +241,12 @@ function isRateHigh(rate: number | '' | 'N/A'): boolean {
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .analysis-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #303133; }

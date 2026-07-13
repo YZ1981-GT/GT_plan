@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-fair-value-review">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表用于复核公允价值模式下投资性房地产公允价值的确定，仅公允价值模式适用。</p>
+        <p>2. 评价评估师胜任能力与独立性，复核评估方法（市场法/收益法/成本法）与关键假设（折现率、租金、资本化率）。</p>
+        <p>3. 独立测算值 = 年租金 /(资本化率 − 增长率)；差异率 &gt;20% 或超出合理区间需重点关注并挑战假设。</p>
+        <p>4. 公允价值变动通过 EventBus 联动 H3-1 审定表与附注披露。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：复核公允价值模式下投资性房地产公允价值计量的恰当性，评价评估师独立性与方法假设的合理性，确认公允价值变动损益准确。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-8" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ reviewCalcRows.length }} 行</el-tag>
+    </div>
+
     <!-- 区域1：评估师信息 -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -160,17 +185,25 @@
     </el-card>
 
     <!-- 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-8')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-8')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：评估师独立性与胜任能力评价、方法与假设复核、独立测算与评估值差异及处理。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、公允价值计量恰当、假设合理。B、除下列事项外未见异常。C、公允价值计量存在重大问题，不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -180,9 +213,10 @@
  * H3TabFairValueReview.vue — H3-8 公允价值复核
  * 四区域(评估师/方法/复核15公式/假设挑战)+AI+💬复核
  */
-import { ref, reactive, computed, inject, toRef } from 'vue'
+import { ref, reactive, computed, inject, toRef, onMounted } from 'vue'
 import { useH3FairValueReview } from '../../composables/useH3FairValueReview'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -214,7 +248,29 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-const auditConclusion = ref(getValue('H3-8-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-8-audit-note'
+const CONCLUSION_KEY = 'H3-8-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function onInfoChange() { updateAppraiserInfo(appraiserInfo) }
 function onMethodChange() { updateMethod(methodText.value) }
@@ -257,6 +313,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-fair-value-review { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .action-btns { display: flex; gap: 4px; }

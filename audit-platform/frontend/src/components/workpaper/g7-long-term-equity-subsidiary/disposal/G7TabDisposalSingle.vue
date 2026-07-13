@@ -18,6 +18,14 @@
 
     <el-skeleton v-if="!props.htmlData" :rows="6" animated />
     <div v-else class="disposal-single-content">
+      <!-- 工具栏：索引 chip + 行数 -->
+      <div class="tab-toolbar">
+        <div class="toolbar-left"></div>
+        <div class="toolbar-right">
+          <span class="chip-wrap"><GtIndexChip value="wp:G7-11" :context-project-id="projectId" /></span>
+          <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+        </div>
+      </div>
       <!-- 47行×14列单表（横向可滚动，固定前2列，max-height虚拟滚动） -->
       <el-table
         :data="rows"
@@ -51,6 +59,21 @@
       </el-table>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 审计结论（AI辅助） -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -67,6 +90,7 @@
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="对非一揽子处置的审计结论..."
+        @change="saveAuditConclusion"
       />
     </el-card>
 
@@ -94,11 +118,13 @@
  *
  * Requirements: 5.1, 5.3, 5.5, 7.5
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { calcDisposalGain, parseNum } from '../../composables/useG7SubFormulaEngine'
+import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -116,6 +142,35 @@ const aiLoading = ref(false)
 
 const rows = computed(() => {
   return props.htmlData?.disposalSingle?.rows ?? []
+})
+const rowCount = computed(() => rows.value.length)
+
+// ═══ 审计说明/结论持久化（checklist_responses，conclusion:null） ═══
+const auditFormData = useG7SubFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G7-11-disposal-single-audit-note'
+const CONCLUSION_KEY = 'G7-11-disposal-single-audit-conclusion'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  conclusion.value = val
+  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(CONCLUSION_KEY)
+  if (c?.remark) conclusion.value = c.remark
 })
 
 function calcIndividualGain(row: any): string {
@@ -138,6 +193,7 @@ async function handleAi(section: string): Promise<void> {
     const text = res?.data?.data?.conclusion ?? res?.data?.conclusion ?? res?.data?.text ?? ''
     if (text) {
       conclusion.value = text
+      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: text, conclusion: null })
       ElMessage.success('AI结论已生成')
     }
   } catch {
@@ -159,5 +215,9 @@ async function handleAi(section: string): Promise<void> {
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }
 .conclusion-card { margin-top: 16px; }
+.audit-note-card { margin-top: 16px; }
 .conclusion-header { display: flex; justify-content: space-between; align-items: center; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; }
 </style>

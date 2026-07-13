@@ -7,8 +7,16 @@
       <p>底部合计行自动汇总各列，分配比例 = 各列合计 ÷ 摊销总额合计 × 100%。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实各项无形资产本期摊销费用在管理费用、销售费用、制造费用、研发费用等科目间分配的合理性与完整性，确保各行分配合计等于摊销总额。"
+      class="objective-alert"
+    />
+
     <!-- 操作栏 -->
-    <div class="toolbar">
+    <div class="tab-toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
         + 新增资产行
       </el-button>
@@ -23,6 +31,8 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-9" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -202,6 +212,32 @@
       <GtIndexChip value="I6" @click="navigateTo('I6')" />
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：摊销费用分配依据、各资产使用部门归属、与费用科目(K8/K9/D5/I6)核对情况等。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：摊销费用分配合理、各行分配合计与摊销总额一致，未见异常等。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -274,6 +310,32 @@ const ITEM_ID = 'I1-9-rows'
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const rows = ref<I1AllocRow[]>([])
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+
+const NOTE_KEY = 'I1-9-audit-note'
+const CONCLUSION_KEY = 'I1-9-audit-conclusion'
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', CONCLUSION_KEY, val)
+}
+
+function loadAuditText(): void {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n) auditNote.value = (n.remark ?? n.conclusion ?? '') as string
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c) auditConclusion.value = (c.remark ?? c.conclusion ?? '') as string
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -316,7 +378,7 @@ function loadRows(): void {
 
 // ─── Watch allResponses to reload ────────────────────────────────────────────
 
-watch(() => props.allResponses, () => { loadRows() }, { immediate: true })
+watch(() => props.allResponses, () => { loadRows(); loadAuditText() }, { immediate: true })
 
 // ─── Sync totalAmort from amortizationByAsset prop ───────────────────────────
 
@@ -547,8 +609,11 @@ function fmtAmt(val: number | null | undefined): string {
   color: #78350f;
 }
 
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 12px; }
+
 /* 工具栏 */
-.toolbar {
+.tab-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -559,6 +624,11 @@ function fmtAmt(val: number | null | undefined): string {
   align-items: center;
   gap: 8px;
 }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 
 /* 表格 */
 .alloc-table {

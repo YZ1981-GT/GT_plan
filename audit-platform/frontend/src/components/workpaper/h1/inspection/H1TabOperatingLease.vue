@@ -4,6 +4,12 @@
       <template #title>审计目标：核实以经营租赁方式租出的固定资产租赁条款合理、租金收益率正常，市场租金偏离超阈值项目已获合理解释。</template>
     </el-alert>
 
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-19" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ operatingRows.length }} 项</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>检查以经营租赁方式租出的固定资产：租赁条款合理性、租金收益率、市场租金对比。净收益=年租金-折旧分摊-维护费；收益率=净收益÷原值。</p>
     </div>
@@ -113,9 +119,17 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：租赁条款合理性、租金收益率与市场租金对比、偏离项解释。" @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
       <template #header><span>审计结论</span></template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写经营租出检查审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -129,14 +143,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH1LeaseCheck, type OperatingLeaseRow } from '../../composables/useH1LeaseCheck'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-19-audit-note'
+const CONCLUSION_KEY = 'H1-19-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 const { operatingRows, operatingSummary, addOperatingRow, removeRow, updateOperatingCell } = useH1LeaseCheck(
   toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any,
 )

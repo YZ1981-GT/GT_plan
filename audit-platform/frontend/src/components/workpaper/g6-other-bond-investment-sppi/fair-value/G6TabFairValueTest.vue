@@ -1,5 +1,19 @@
 <template>
   <div class="g6-tab-fair-value-test">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实其他债权投资以公允价值计量的恰当性，验证公允价值层次（L1/L2/L3）划分与估值方法的合理性，确认 FVOCI 公允价值计量准确。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:G6-5" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ fairValue.rows.value.length }} 行</el-tag>
+    </div>
+
     <!-- 2区段Tab切换 -->
     <el-tabs v-model="fairValue.activeTab.value" class="fv-tabs">
       <el-tab-pane label="基础+审定" name="tab1" />
@@ -320,6 +334,21 @@
       </el-tag>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header"><span class="section-title">审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述公允价值来源与估值方法的测试情况及结果、L3 层次关键假设的合理性评价、拟调整与未调整事项及其影响。"
+        @update:model-value="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -369,11 +398,12 @@
  * - L3校验：层次=L3时Tab2相关字段必填
  * - 动态行增删(ElMessageBox.prompt) + 导入导出
  */
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG6SppiFairValue } from '../../composables/useG6SppiFairValue'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import type { FairValueItem } from '../../composables/useG6SppiFairValue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -410,10 +440,22 @@ function handleRowChange(row: FairValueItem | null): void {
   if (idx >= 0) fairValue.selectedRowIndex.value = idx
 }
 
+// ─── 审计说明（独立持久化 checklist_responses） ───
+const NOTE_KEY = 'G6-5-fair-value-test-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
 // ─── 数据加载 ───
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -471,6 +513,22 @@ defineExpose({
 .g6-tab-fair-value-test {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+/* ─── 审计目标 / 工具栏 ─── */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ─── Tabs ─── */

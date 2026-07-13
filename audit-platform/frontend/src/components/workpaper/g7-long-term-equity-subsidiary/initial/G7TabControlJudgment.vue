@@ -46,13 +46,26 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：验证对被投资方是否构成控制的判断依据充分——按 CAS33 逐项评估权力、可变回报及两者的联系，结合保护性权利与代理人/委托人判断，恰当确定控制类型（控制/共同控制/重大影响/无重大影响）及相应计量方法。" />
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-7" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- ═══ 6 Sections ═══ -->
     <div v-for="section in sections" :key="section.id" class="judgment-section">
       <!-- Section标题行 -->
       <div class="section-header">
         <h4 class="section-title">{{ section.sectionNo }} {{ section.title }}</h4>
         <div class="section-actions">
-          <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAiGenerate(section.id)">
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAiSection(section.id)">
             🤖 AI
           </el-button>
           <el-button size="small" @click="handleReview(section.id)">💬 复核</el-button>
@@ -188,6 +201,23 @@
       </el-table>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="conclusion-header">
+          <span class="conclusion-title">审计说明</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述控制判断所执行的程序、依据的证据及评估结果，需关注事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ 底部综合审计结论（AI辅助） ═══ -->
     <el-card shadow="never" class="overall-conclusion-card">
       <template #header>
@@ -204,6 +234,7 @@
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="根据以上六要素判断结果，综合得出对被投资方的控制类型结论（控制/共同控制/重大影响/无重大影响）"
+        @change="saveAuditConclusion"
       />
     </el-card>
 
@@ -238,6 +269,7 @@
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useG7SubFormData } from '../../composables/useG7SubFormData'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -247,11 +279,6 @@ const props = defineProps<{
   wpId: string
   projectId: string
   readonly?: boolean
-}>()
-
-const emit = defineEmits<{
-  (e: 'aiGenerate', section: string): void
-  (e: 'save', data: G7ControlJudgmentData): void
 }>()
 
 const isReadonly = computed(() => props.readonly ?? false)
@@ -390,6 +417,27 @@ const SECTION_DEFINITIONS: Array<{
 
 const sections = reactive<G7ControlSection[]>([])
 const overallConclusion = ref('')
+const rowCount = computed(() => sections.reduce((n, s) => n + s.rows.length, 0))
+
+// ─── 审计说明/结论持久化（checklist_responses，conclusion:null） ───
+const auditFormData = useG7SubFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G7-7-control-judgment-audit-note'
+const CONCLUSION_KEY = 'G7-7-control-judgment-audit-conclusion'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  overallConclusion.value = val
+  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+}
 
 // ─── 初始化 ──────────────────────────────────────────────────────────────────
 
@@ -477,7 +525,7 @@ function getRiskTagType(risk: string): 'danger' | 'warning' | 'success' | 'info'
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
-async function handleAiGenerate(sectionId: string): Promise<void> {
+async function handleAiSection(sectionId: string): Promise<void> {
   if (isReadonly.value) return
   const section = sections.find(s => s.id === sectionId)
   if (!section) return
@@ -505,7 +553,6 @@ async function handleAiGenerate(sectionId: string): Promise<void> {
   } catch {
     ElMessage.warning('AI辅助暂未连接，请手动填写')
   }
-  emit('aiGenerate', `control-judgment-${sectionId}`)
 }
 
 async function handleAiOverall(): Promise<void> {
@@ -530,8 +577,8 @@ async function handleAiOverall(): Promise<void> {
     const text = res?.data?.data?.conclusion ?? res?.data?.conclusion ?? res?.data?.text ?? ''
     if (text) {
       overallConclusion.value = text
+      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: text, conclusion: null })
       ElMessage.success('AI综合结论已生成')
-      emit('aiGenerate', 'control-judgment-conclusion')
       return
     }
   } catch {
@@ -569,8 +616,7 @@ async function handleAiOverall(): Promise<void> {
   overallConclusion.value = overallConclusion.value
     ? `${overallConclusion.value}\n${draft}`
     : draft
-
-  emit('aiGenerate', 'control-judgment-conclusion')
+  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: overallConclusion.value, conclusion: null })
 }
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -597,8 +643,13 @@ defineExpose({ getData, loadFromHtmlData })
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   loadFromHtmlData(props.htmlData)
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(CONCLUSION_KEY)
+  if (c?.remark) overallConclusion.value = c.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -694,7 +745,14 @@ watch(() => props.htmlData, (newData) => {
 .criterion-text { font-size: 12px; color: #64748b; line-height: 1.5; }
 .multiline-cell { white-space: pre-wrap; word-break: break-all; font-size: 12px; line-height: 1.4; }
 
+/* ═══ 审计目标 / 工具栏 ═══ */
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 16px; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; }
+
 /* ═══ 底部综合结论 ═══ */
+.audit-note-card { margin-top: 20px; }
 .overall-conclusion-card { margin-top: 20px; }
 .conclusion-header {
   display: flex; justify-content: space-between; align-items: center;

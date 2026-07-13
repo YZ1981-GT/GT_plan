@@ -18,6 +18,15 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实上市公司商誉附注披露的完整性与准确性——原值/减值准备变动矩阵与 I3-1、I3-6 勾稽一致；CGU 分摊、减值测试过程、关键假设、敏感性分析及减值结论披露充分符合 CAS8 及企业会计准则解释第 5 号。"
+    />
+
     <!-- 8子节卡片 -->
     <template v-for="section in sections" :key="section.key">
       <el-card shadow="never" class="disclosure-card">
@@ -25,16 +34,6 @@
           <div class="section-title">
             <span>{{ section.title }}</span>
             <div class="title-actions">
-              <el-button
-                v-if="section.hasNoteText"
-                size="small"
-                type="primary"
-                link
-                :loading="isAiGenerating"
-                @click="handleAiGenerate(section.key)"
-              >
-                <el-icon><MagicStick /></el-icon> AI生成
-              </el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-listed-${section.key}`)">💬</el-button>
             </div>
           </div>
@@ -187,6 +186,32 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="记录商誉附注披露的审计说明（各披露项数据来源、与审定表/减值测试底稿的勾稽核对等）..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="商誉附注披露的审计结论（如：披露内容完整、准确，符合企业会计准则列报要求）..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -223,9 +248,8 @@
  * Spec: .kiro/specs/i3-goodwill/
  * Task: 4.10
  */
-import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
+import { ref, computed, inject, toRef, onMounted, onUnmounted, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import {
   useI3Disclosure,
   LISTED_SECTIONS,
@@ -253,7 +277,6 @@ const sections = LISTED_SECTIONS
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 const {
-  isAiGenerating,
   bookValueRows,
   impairmentRows,
   sectionRows,
@@ -267,8 +290,6 @@ const {
   updateDynamicRow,
   updateMatrixCell,
   saveSectionNote,
-  generateNoteText,
-  applyAiGeneratedNote,
   dispose: disposeDisclosure,
 } = useI3Disclosure(
   toRef(props, 'wpId'),
@@ -382,23 +403,34 @@ function handleNoteChange(sectionKey: string) {
   saveSectionNote(sectionKey, sectionNotes.value[sectionKey] ?? '')
 }
 
-// ─── AI generation ───────────────────────────────────────────────────────────
+// ─── 审计说明 / 审计结论（纯文本，无AI） ─────────────────────────────────────
 
-async function handleAiGenerate(sectionKey: string) {
-  const existing = sectionNotes.value[sectionKey] ?? ''
-  const generated = await generateNoteText(sectionKey, existing)
-  if (!generated) return
+const NOTE_KEY = 'I3-disc-listed-audit-note'
+const CONCLUSION_KEY = 'I3-disc-listed-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
 
-  try {
-    await ElMessageBox.confirm(
-      `AI生成内容预览：\n\n${generated.slice(0, 200)}${generated.length > 200 ? '...' : ''}`,
-      'AI生成确认',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
-    )
-    await applyAiGeneratedNote(sectionKey, generated)
-    ElMessage.success('已填入AI生成内容')
-  } catch { /* cancelled */ }
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', NOTE_KEY, val)
 }
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', CONCLUSION_KEY, val)
+}
+
+watch(
+  () => props.allResponses,
+  () => {
+    const n = props.allResponses.get(NOTE_KEY)
+    if (n?.remark != null) auditNote.value = n.remark
+    const c = props.allResponses.get(CONCLUSION_KEY)
+    if (c?.remark != null) auditConclusion.value = c.remark
+  },
+  { immediate: true },
+)
 
 // ─── Review dialog ───────────────────────────────────────────────────────────
 
@@ -446,6 +478,12 @@ function fmtAmt(val: number | null | undefined): string {
 .disclosure-card { margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; align-items: center; }
+
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 12px; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-bottom: 12px; }
 
 /* 金额 */
 .amount-cell { text-align: right; font-variant-numeric: tabular-nums; }

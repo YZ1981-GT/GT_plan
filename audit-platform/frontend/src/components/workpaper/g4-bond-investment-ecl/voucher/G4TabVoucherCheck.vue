@@ -27,6 +27,13 @@
       title="审计目标：通过检查债权投资相关记账凭证及支持性文件，确认业务真实发生、账务处理正确、借贷平衡，异常凭证已识别说明。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏索引 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-13" :context-project-id="projectId" /></span>
+      </div>
+    </div>
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-13 凭证检查表</h3>
@@ -456,6 +463,19 @@
       </el-table>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：凭证检查范围、样本选取、核对结果、异常凭证处理及其影响等。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -509,6 +529,7 @@ import { Delete, Paperclip } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useG4EclVoucherCheck } from '../../composables/useG4EclVoucherCheck'
+import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import type { VoucherCheckRow } from '../../composables/useG4EclFormData'
@@ -526,6 +547,19 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 const vc = useG4EclVoucherCheck()
 const conclusion = ref('')
 const showSampling = ref(false)
+
+// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
+const formData = useG4EclFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G4-13-voucher-check-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
 
 // ─── 当前年份（从htmlData或默认） ────────────────────────────────────────────
 
@@ -728,12 +762,15 @@ function fmtNum(v: unknown): string {
 
 // ─── 数据加载 ───────────────────────────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   if (props.htmlData?.voucherCheck) {
     const data = props.htmlData.voucherCheck
     vc.loadRows(data.rows || [])
     if (data.conclusion) conclusion.value = data.conclusion
   }
+  await formData.loadAll()
+  const note = formData.allResponses.value.get(NOTE_KEY)
+  if (note?.remark) auditNote.value = note.remark
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -750,6 +787,30 @@ defineExpose({
 .g4-voucher-check {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+/* 工具栏索引 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明卡片 */
+.note-card {
+  margin-top: 16px;
+}
+.note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 .section-head {

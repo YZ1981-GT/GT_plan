@@ -41,6 +41,15 @@
       </div>
     </div>
 
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-2" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 资产负债表日设置 -->
     <div class="balance-date-bar">
       <span class="date-label">资产负债表日：</span>
@@ -232,6 +241,32 @@
       </div>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：债权投资明细的存在性、计价（摊余成本/账面价值）、一年内到期分类与列报的测试情况及结果。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
+        @change="(v: string) => saveAuditConclusion(v)"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
@@ -275,6 +310,8 @@ import {
 } from '../../composables/useG4MainDetail'
 import { useG4MainImportExport } from '../../composables/useG4MainImportExport'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
+import http from '@/utils/http'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -284,6 +321,45 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
+const NOTE_KEY = 'G4-2-detail-audit-note'
+const CONCLUSION_KEY = 'G4-2-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function readSaved(key: string): string {
+  const cr = props.htmlData?.checklist_responses
+  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+    const v = (cr as Record<string, any>)[key]
+    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+  }
+  const resp = props.htmlData?.responses
+  if (Array.isArray(resp)) {
+    const found = resp.find((r: any) => r?.item_id === key)
+    if (found?.remark) return found.remark
+  }
+  return ''
+}
+
+async function saveAudit(key: string, val: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: key, conclusion: null, remark: val }],
+    })
+  } catch { /* silent */ }
+}
+
+function saveAuditNote(val: string): void {
+  auditNote.value = val
+  void saveAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  auditConclusion.value = val
+  void saveAudit(CONCLUSION_KEY, val)
+}
 
 // ─── 从 htmlData 中构建 allResponses Map ────────────────────────────────────
 const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
@@ -320,6 +396,8 @@ function debouncedSave(itemId: string, data: Partial<ChecklistResponse>): void {
 
 onMounted(() => {
   hydrateFromHtmlData()
+  auditNote.value = readSaved(NOTE_KEY)
+  auditConclusion.value = readSaved(CONCLUSION_KEY)
 })
 
 // ─── Composable ─────────────────────────────────────────────────────────────
@@ -411,6 +489,12 @@ function fmtNum(v: unknown): string {
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .balance-date-bar { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
 .date-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 .segment-bar { margin-bottom: 12px; }

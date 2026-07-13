@@ -14,6 +14,15 @@
       <p>CAS21第26条：租赁负债按实际利率法后续计量，期末=期初-偿还(借方)+利息(贷方)。22列按3区段Tab展示，与H8使用权资产合同一一对应。</p>
     </div>
 
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-2" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 区段切换 + 工具栏 -->
     <div class="segment-bar">
       <el-segmented v-model="activeTab" :options="tabOptions" size="default" />
@@ -29,7 +38,6 @@
           </template>
         </el-dropdown>
         <el-button v-if="!isReadonly" size="small" type="primary" @click="handleAddRow">+ 新增合同</el-button>
-        <el-button size="small" type="primary" plain @click="$emit('open-ai', 'detail')">AI 辅助</el-button>
         <el-button size="small" @click="$emit('open-review', 'detail')">复核</el-button>
       </div>
     </div>
@@ -234,7 +242,6 @@
       <template #header>
         <div class="note-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" plain @click="$emit('open-ai', 'detail-note')">AI 辅助</el-button>
         </div>
       </template>
       <el-input
@@ -252,7 +259,6 @@
       <template #header>
         <div class="note-header">
           <span>审计结论</span>
-          <el-button size="small" type="primary" plain @click="$emit('open-ai', 'detail-conclusion')">AI 辅助</el-button>
         </div>
       </template>
       <el-input
@@ -264,6 +270,19 @@
         @change="onSaveNote('H9-2-audit-conclusion', auditConclusion)"
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>租赁负债为负债类贷方科目：期末余额 E = 期初 B − 本期偿还 C（借方）+ 本期利息 D（贷方）</li>
+        <li>IBR 增量借款利率按 CAS21 应采用承租人在类似期限、类似担保下的借款利率</li>
+        <li>各合同应与 H8 使用权资产逐一对应（点 H8 索引跳转核对初始确认勾稽）</li>
+        <li>本期利息费用应与 H9 摊销表 Σ 各期利息一致（±1 元容差）</li>
+        <li>审定期末 L = 审定期初 I − 审定偿还 J + 审定利息 K；最终审定 N = L − 重分类 M</li>
+        <li>关联方租赁需在 H9-6 单独评价公允性，并在附注中披露</li>
+      </ul>
+    </details>
 
     <!-- 隐藏文件上传(导入) -->
     <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleFileImport" />
@@ -424,6 +443,21 @@ function getSummaryAdjustment({ columns }: any) {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+.guidance-details {
+  margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff;
+  border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-details ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
 .segment-bar {
   display: flex; align-items: center; justify-content: space-between;

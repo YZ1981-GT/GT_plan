@@ -1,13 +1,13 @@
 <template>
   <div class="h5-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：记录油气资产相关审计调整分录(AJE)与重分类分录(RJE)，确保借贷平衡并汇入A13错报汇总。" class="objective-alert" />
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>H5-3 调整分录</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-3')">
               💬 复核
             </el-button>
@@ -110,6 +110,13 @@
         placeholder="请填写调整分录说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusionText" :autosize="{ minRows: 3, maxRows: 6 }"
+        placeholder="填写调整分录审计结论..." :disabled="isReadonly" @change="savePolishConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -122,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, toRef } from 'vue'
+import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH5Adjustment } from '../../composables/useH5Adjustment'
 import { useH5FormData } from '../../composables/useH5FormData'
@@ -151,7 +158,20 @@ const state = useH5Adjustment({
   },
 })
 
-function handleAiGenerate() { /* AI */ }
+// 审计结论（component-local，沿用本 entry useH5FormData 持久化契约，conclusion:null）
+const CONCLUSION_KEY = 'H5-3-audit-conclusion'
+const auditConclusionText = ref('')
+function savePolishConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusionText.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void formData.saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusionText.value = c.remark
+})
+
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
@@ -161,6 +181,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h5-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

@@ -10,6 +10,14 @@
 
     <GCycleGuideStrip :steps="['G12A 程序', 'G12-1 审定', 'G12-2↔G12-4', 'G12-3 调整', 'G12-5/6', '附注披露']" />
 
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G12-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ adj.dataRows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-alert
       type="info"
       :closable="false"
@@ -290,5 +298,9 @@ function fmtRate(rate: number | null): string {
 .warn-chip { margin-left: 8px; }
 .ok-chip { margin-left: 8px; }
 .cross-ok :deep(.el-alert__content) { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 :deep(.g12-row-total) { font-weight: 700; background: #f5f7fa; }
 </style>

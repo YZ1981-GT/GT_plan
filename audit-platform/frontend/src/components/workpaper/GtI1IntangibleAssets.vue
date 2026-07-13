@@ -66,6 +66,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-3 调整分录 -->
@@ -75,6 +77,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-4 摊销减值政策检查 -->
@@ -84,6 +88,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
         />
 
         <!-- I1-5 增加检查 -->
@@ -93,6 +98,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-6 减少明细 -->
@@ -102,6 +109,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-7 使用寿命检查 -->
@@ -111,6 +120,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-8 权属检查 -->
@@ -120,6 +131,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-9 摊销分配分析 -->
@@ -129,6 +142,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-10 / I1-11 摊销测算 (2分支选择器) -->
@@ -149,6 +164,8 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
           <I1TabAmortizationWithImpair
             v-else
@@ -156,6 +173,8 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
         </template>
 
@@ -166,6 +185,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-13 可收回金额测试(DCF) -->
@@ -175,6 +196,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（上市） -->
@@ -184,6 +207,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
         />
 
         <!-- 附注披露（国企） -->
@@ -193,6 +217,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -316,7 +341,7 @@ const currentSheet = computed(() => {
 
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
-  if (!props.wpId) return
+  if (!props.wpId || !itemId) return
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   // 乐观更新本地 Map
   allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })

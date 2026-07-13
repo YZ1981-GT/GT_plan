@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-addition-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：对本期新增固定资产实施实质性测试，抽样核对原始凭证（发票/合同/验收单），验证入账金额、时点、分类及资本化条件的正确性。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-7" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ state.rows.value.length }} 项</el-tag>
+    </div>
+
     <div class="methodology-context">
       <p>对本期新增固定资产进行实质性测试。通过抽样选取增加样本，核对原始凭证（发票/合同/验收单），验证入账金额、时点、分类的正确性。</p>
     </div>
@@ -83,9 +93,17 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：抽样方法与覆盖率、凭证核对情况、发现的异常及跟进。" @change="saveAuditNote" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
       <template #header><span>审计结论</span></template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写增加检查审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -111,10 +129,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH1AdditionCheck } from '../../composables/useH1AdditionCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -125,8 +144,18 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-7-audit-note'
+const CONCLUSION_KEY = 'H1-7-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 const showSamplingDialog = ref(false)
 
 const state = useH1AdditionCheck(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)

@@ -119,7 +119,7 @@ function confirmAdjudication() {
       审定合计与试算平衡表差异：{{ fmtAmount(variance) }}元
     </el-alert>
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="confirmAdjudication">确认审定</el-button>
       </div>

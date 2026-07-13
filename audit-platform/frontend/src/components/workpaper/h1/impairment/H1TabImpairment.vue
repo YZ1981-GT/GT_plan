@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-impairment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：评价固定资产减值迹象(CAS8六项)判断恰当，存在迹象时以可收回金额=MAX(公允价值净额, 使用价值DCF)测算减值，减值计提充分且不得转回。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-14" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ state.indications.value.length }} 项迹象</el-tag>
+    </div>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS8资产减值：当存在减值迹象时，应估计可收回金额。可收回金额 = MAX(公允价值-处置费用, 预计未来现金流量现值DCF)。减值金额 = MAX(账面价值-可收回金额, 0)。固定资产减值一经计提不得转回。</p>
@@ -11,9 +21,6 @@
         <div class="section-title">
           <span>一、减值迹象判断（CAS8第5条6项）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('impairment-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-14-indications')">💬 复核</el-button>
           </div>
         </div>
@@ -117,13 +124,10 @@
       <template #header>
         <div class="section-title">
           <span>审计结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('impairment-conclusion')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <el-input v-model="impairmentConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="减值测试审计结论..." />
+        placeholder="减值测试审计结论..." @change="saveImpairmentConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -140,15 +144,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Impairment } from '../../composables/useH1Impairment'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const impairmentConclusion = ref('')
+const CONCLUSION_KEY = 'H1-14-audit-conclusion'
+function saveImpairmentConclusion() { saveResponse(CONCLUSION_KEY, impairmentConclusion.value) }
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) impairmentConclusion.value = c.remark
+})
 
 const state = useH1Impairment(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
@@ -162,7 +173,6 @@ async function handleAddCalcRow() {
   const { value: name } = await ElMessageBox.prompt('资产组名称', '新增减值测算', { confirmButtonText: '确定', cancelButtonText: '取消' })
   if (name) state.addCalcRow(name)
 }
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

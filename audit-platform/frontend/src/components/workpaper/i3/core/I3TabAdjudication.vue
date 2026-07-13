@@ -12,6 +12,29 @@
       <p>商誉减值不可转回！审定数=未审数+AJE+RJE。净额=初始确认(商誉原值)-累计减值准备。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：确认商誉（1711）期末余额真实、完整、计价准确；商誉不摊销，本期变动仅来自新并购（增加）与减值（减少）；减值准备计提充分且不可转回；审定数与试算平衡表勾稽一致（CAS8、CAS20）。"
+    />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <ul>
+          <li>商誉不摊销（CAS8），期末余额 = 期初 + 本期增加(新并购) − 本期减少(减值)。</li>
+          <li>"本期增加"仅来自当年新并购确认的商誉，正常年份应为 0；非零时需追溯并购交易依据。</li>
+          <li>"本期减少"仅来自减值损失；商誉减值一经确认<strong>不得转回</strong>（CAS8 第十七条）。</li>
+          <li>审定数 = 未审数 + AJE + RJE；净额 = 初始确认(商誉原值) − 累计减值准备。</li>
+          <li>审定完成后回写 TB 科目 1711（资产类：期末 = 期初 + 借 − 贷），并与 I3-2 明细表勾稽。</li>
+        </ul>
+      </div>
+    </details>
+
     <!-- 新并购黄色警告 -->
     <el-alert
       v-for="w in newAcquisitionWarnings"
@@ -42,12 +65,18 @@
           <el-button size="small" type="primary" @click="addRow">
             + 新增
           </el-button>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('adjudication')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
           <el-button size="small" type="default" text @click="handleReview">
             复核
           </el-button>
+        </div>
+      </div>
+
+      <!-- 工具栏：索引 chip + 行数 -->
+      <div class="tab-toolbar">
+        <div class="toolbar-left"></div>
+        <div class="toolbar-right">
+          <GtIndexChip value="wp:I3-1" :context-project-id="projectId" />
+          <el-tag size="small" type="info">共 {{ displayRows.length }} 行</el-tag>
         </div>
       </div>
 
@@ -284,9 +313,6 @@
       <template #header>
         <div class="card-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('note')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <el-input
@@ -304,9 +330,6 @@
       <template #header>
         <div class="card-header">
           <span>审计结论</span>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('conclusion')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <el-select
@@ -355,14 +378,12 @@
  * Requirements: 2.1-2.8
  */
 import { ref, computed, toRef, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import {
   useI3Adjudication,
   type I3AdjudicationRow,
   type I3Warning,
 } from '../../composables/useI3Adjudication'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -479,34 +500,6 @@ function onNoteBlur(): void {
 
 function onConclusionChange(val: string): void {
   saveConclusion(val)
-}
-
-// ─── AI Generate ─────────────────────────────────────────────────────────────
-
-async function handleAiGenerate(section: string): Promise<void> {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: `I3商誉审定表${section}`,
-      context: {
-        wpCode: 'I3-1',
-        goodwillRule: '商誉不摊销，仅年度减值测试',
-        auditedTotal: subtotals.value.audited,
-        netValue: subtotals.value.netValue,
-      },
-    })
-    if (res.data?.data?.content) {
-      if (section === 'note') {
-        auditNote.value = res.data.data.content
-        saveNote(auditNote.value)
-      } else if (section === 'conclusion') {
-        auditConclusion.value = res.data.data.content
-        saveConclusion(auditConclusion.value)
-      }
-    }
-  } catch {
-    // AI生成失败不阻塞
-  }
 }
 
 // ─── Review (复核对话) ───────────────────────────────────────────────────────
@@ -698,5 +691,39 @@ function fmtAmount(value: number | null | undefined): string {
   margin-top: 16px;
   padding-top: 16px;
   border-top: 1px solid #ebeef5;
+}
+
+/* 审计目标 alert */
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 编制提示 details */
+.guidance-details {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.guidance-details .guidance-content ul {
+  padding-left: 20px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

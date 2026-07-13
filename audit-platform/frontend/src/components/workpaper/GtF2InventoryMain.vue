@@ -44,6 +44,7 @@
           v-else-if="currentSheet === 'F2-2'"
           :all-responses="allResponses"
           :project-id="props.projectId"
+          :is-readonly="isReadonly"
         />
 
         <F2TabAdjustment
@@ -65,6 +66,7 @@
         <F2TabOverallAnalysis
           v-else-if="currentSheet === 'F2-18'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           :cross-sheet="crossSheet"
@@ -73,6 +75,7 @@
         <F2TabProductionSales
           v-else-if="currentSheet === 'F2-19'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -80,6 +83,7 @@
         <F2TabCostComparison
           v-else-if="currentSheet === 'F2-20'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -88,6 +92,7 @@
           v-else-if="detailConfig"
           :config="detailConfig"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />

@@ -27,7 +27,7 @@
     <!-- Section标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G5-9 长期应收款三阶段划分</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" :disabled="isReadonly" @click="handleAddDebtor">
           + 新增债务人
         </el-button>
@@ -38,7 +38,7 @@
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      对各长期应收款债务人执行 ECL 三阶段划分，比对企业划分与审计判断的一致性，识别信用风险显著增加及已减值情形。
+      审计目标：对各长期应收款债务人执行 ECL 三阶段划分，比对企业划分与审计判断的一致性，识别信用风险显著增加及已减值情形。
     </el-alert>
 
     <!-- 无数据占位 -->
@@ -272,6 +272,19 @@
         <span class="summary-total">合计: {{ stageLogic.summary.value.total }} 项</span>
       </div>
 
+      <!-- 审计说明 el-card -->
+      <el-card class="audit-note-card" shadow="never">
+        <template #header><div class="card-header"><span>审计说明</span></div></template>
+        <el-input
+          :model-value="auditNote"
+          type="textarea"
+          :autosize="{ minRows: 5 }"
+          :disabled="isReadonly"
+          placeholder="填写审计说明：可概述三阶段划分依据、企业与审计判断差异、信用风险显著增加/已减值识别情况。"
+          @change="(val: string) => saveAuditNote(val)"
+        />
+      </el-card>
+
       <!-- 审计结论 el-card + AI按钮 -->
       <el-card class="conclusion-card" shadow="never">
         <template #header>
@@ -323,9 +336,10 @@
  *
  * 使用 useG5StageClassification composable
  */
-import { computed, inject, watch, onMounted } from 'vue'
+import { ref, computed, inject, toRef, watch, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useG5StageClassification } from '../../composables/useG5StageClassification'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -336,6 +350,21 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+// ─── 审计说明（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const G5_NOTE_KEY = 'G5-9-audit-note'
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 // ─── 初始化 composable ───
 const isReadonlyRef = computed(() => props.isReadonly)
@@ -598,6 +627,17 @@ defineExpose({
   margin-left: 8px;
   font-weight: 600;
   color: #303133;
+}
+
+/* 审计说明卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* 审计结论卡片 */

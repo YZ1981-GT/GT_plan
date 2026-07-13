@@ -1,5 +1,19 @@
 <template>
   <div class="g6-tab-securities-inventory">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实其他债权投资对应有价证券期末的存在性与数量准确性，通过账实核对确认账面数量与实际持仓相符。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:G6-9" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ inventory.totalCount.value }} 行</el-tag>
+    </div>
+
     <!-- ═══ Section 标题 + 复核按钮 ═══ -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -143,6 +157,21 @@
       </div>
     </el-card>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header"><span class="section-title">审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="props.isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述盘点程序的执行情况及结果、与第三方托管对账单的核对情况、差异追查与处理、拟调整与未调整事项及其影响。"
+        @update:model-value="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ 审计结论 ═══ -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -187,10 +216,11 @@
  * - 动态行增删(ElMessageBox.prompt) + 审计结论 + 编制提示 + 复核按钮
  * - 差异列: 公式计算(盘点-账面)，虚线下划线+cursor:help+tooltip+红色高亮(≠0)
  */
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useG6SppiInventory } from '../../composables/useG6SppiInventory'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import type { SecuritiesInventoryData } from '../../composables/useG6SppiInventory'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -217,10 +247,22 @@ const formData = useG6SppiFormData({
 })
 const inventory = useG6SppiInventory()
 
+// ─── 审计说明（独立持久化 checklist_responses） ───
+const NOTE_KEY = 'G6-9-securities-inventory-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
 // ─── 数据加载 ───
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -268,6 +310,22 @@ defineExpose({
 .g6-tab-securities-inventory {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+/* ─── 审计目标 / 工具栏 ─── */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ─── Section卡片 ─── */

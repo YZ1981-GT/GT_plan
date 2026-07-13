@@ -21,6 +21,23 @@
       <span>公式链：③=①×② / ⑥=⑤×②A+①×(②A-②) / ⑦=①+⑤ / ⑧=③+⑥ / ⑨=⑦-⑧</span>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证其他债权投资减值准备（预期信用损失）计量的准确性与充分性，复核损失率、账面价值及审定坏账计算，确认本年计提/转回金额的合理性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏：索引 + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ calc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G6-12 减值准备测算表</h3>
@@ -349,6 +366,21 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header>
+        <div class="audit-note-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述减值测算执行的审计程序、参数复核情况与结果、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -405,7 +437,7 @@ import { ElMessage } from 'element-plus'
 import { useG6EclImpairmentCalc } from '../../composables/useG6EclImpairmentCalc'
 import { useG6EclImportExport } from '../../composables/useG6EclImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
-import type { ImpairmentCalcRow } from '../../composables/useG6EclFormData'
+import { useG6EclFormData, type ImpairmentCalcRow } from '../../composables/useG6EclFormData'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -425,6 +457,19 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const wpIdRef = computed(() => props.wpId)
 const importExport = useG6EclImportExport({ wpId: wpIdRef })
+
+// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
+const NOTE_KEY = 'G6-12-impairment-calc-audit-note'
+const auditNote = ref('')
+const noteFormData = useG6EclFormData({
+  wpId: wpIdRef,
+  projectId: computed(() => props.projectId),
+})
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
 
 const importExportOptions = computed(() => importExport.getDropdownOptions('G6-12'))
 
@@ -594,12 +639,15 @@ function fmtNum(v: unknown): string {
 
 // ─── 数据加载（从htmlData初始化） ───────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   if (props.htmlData?.impairmentCalc) {
     const data = props.htmlData.impairmentCalc
     if (data.rows) calc.loadRows(data.rows)
     if (data.conclusion) conclusion.value = data.conclusion
   }
+  await noteFormData.loadAll()
+  const n = noteFormData.allResponses.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -631,6 +679,30 @@ defineExpose({
 }
 .methodology-icon {
   margin-right: 6px;
+}
+
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 .section-head {

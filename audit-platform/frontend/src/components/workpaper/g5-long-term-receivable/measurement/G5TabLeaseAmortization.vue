@@ -7,13 +7,13 @@
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      对融资租赁形成的长期应收款按内含利率法测算未实现融资收益的分期摊销，验证各期融资收益与账面确认金额的一致性。
+      审计目标：对融资租赁形成的长期应收款按内含利率法测算未实现融资收益的分期摊销，验证各期融资收益与账面确认金额的一致性。
     </el-alert>
 
     <!-- 区段Tab + 操作按钮 -->
     <div class="segment-tabs">
       <el-segmented v-model="lease.activeTab.value" :options="tabOptions" size="small" />
-      <div class="tab-actions">
+      <div class="tab-actions tab-toolbar">
         <GtIndexChip value="wp:G5-5" />
         <el-button size="small" type="primary" plain @click="lease.addGroup()" :disabled="props.readonly">
           + 新增租赁项目
@@ -146,6 +146,15 @@
       融资收益合计（审计测算）：{{ fmt(lease.totalIncome.value) }}
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述内含利率法测算、净投资额与融资收益摊销、期间连续性校验及与账面确认差异分析。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -178,8 +187,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, toRef, onMounted } from 'vue'
 import { useG5LeaseAmortization } from '../../composables/useG5LeaseAmortization'
 import type { LeaseAmortizationGroup, LeaseAmortizationPeriod } from '../../composables/useG5LeaseAmortization'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -190,6 +201,21 @@ const props = defineProps<{
 }>()
 
 const lease = useG5LeaseAmortization()
+
+// ─── 审计说明（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const G5_NOTE_KEY = 'G5-5-audit-note'
+function saveAuditNote(val: string): void {
+  if (props.readonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 const tabOptions = [
   { label: '租赁基础信息', value: 'basic' },
@@ -243,6 +269,8 @@ function fmt(v: number | null | undefined): string {
 .continuity-warning { color: #e6a23c; font-size: 12px; margin: 4px 0 8px 12px; }
 .totals-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: 12px; }
 .conclusion-card { margin-top: 12px; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .ai-btn { float: right; }
 .prep-tips { margin-top: 12px; font-size: 12px; color: #909399; }

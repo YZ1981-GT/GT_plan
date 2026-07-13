@@ -8,6 +8,14 @@
       title="审计目标：确认债权投资合同现金流量特征仅为本金和利息的支付（SPPI 测试），作为以摊余成本计量分类的依据。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏（索引 chip） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ bondItems.length }} 行</el-tag>
+      </div>
+    </div>
     <!-- ═══ (一) 债券投资及委托贷款 SPPI分析 ═══ -->
     <div class="section-header">
       <h3 class="section-title">（一）债券投资及委托贷款 — 合同现金流量特征分析（SPPI测试）</h3>
@@ -344,6 +352,21 @@
       />
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <span>审计说明</span>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        placeholder="请输入 SPPI 测试审计说明：可概述程序测试情况、结果，以及拟调整/未调整事项及其影响。"
+        :disabled="isReadonly"
+        @change="saveAuditNote(auditNote)"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>编制提示</summary>
@@ -370,8 +393,9 @@
  * - Part 2: 银行理财产品三步判断（step1/step2/step3 各自表格）
  * - 导入导出 slot + AI辅助 + 复核对话
  */
-import { inject, toRef, computed } from 'vue'
+import { inject, toRef, computed, ref, watch } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useG4SppiTest, ANALYSIS_TYPE_OPTIONS, SPPI_CONCLUSION_OPTIONS } from '@/composables/useG4SppiTest'
 import type { BondSppiItem } from '@/composables/useG4SppiTest'
 import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
@@ -426,6 +450,20 @@ const {
 function handleBondUpdate(id: string, patch: Partial<BondSppiItem>): void {
   sppiTestLogic.updateBondItem(id, patch)
 }
+
+// ─── 审计说明（纯 textarea，无 AI；持久化 checklist_responses，conclusion:null） ──
+const NOTE_KEY = 'G4-6-sppitest-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  void formData.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
+}
+watch(
+  () => formData.allResponses.value.get(NOTE_KEY)?.remark,
+  (v) => { if (v != null) auditNote.value = v },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -433,6 +471,18 @@ function handleBondUpdate(id: string, patch: Partial<BondSppiItem>): void {
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; gap: 6px; align-items: center; }
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .sppi-bond-table { margin-bottom: 12px; }
 

@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-dep-multi">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：验证发生多次减值的固定资产各减值时点后折旧重新测算准确，累计折旧与账面勾稽一致，减值不得转回(CAS8)已遵循。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-12" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <div class="branch-selector">
       <el-segmented v-model="depBranch" :options="branchOptions" />
       <span class="branch-hint">当前: 多次减值（94公式）— 多个减值时点/各段剩余年限</span>
@@ -14,9 +24,6 @@
         <div class="section-title">
           <span>H1-12(C) 折旧测算-多次减值</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('depreciation-summary')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-12-C')">💬 复核</el-button>
           </div>
         </div>
@@ -80,7 +87,15 @@
 
     <el-card shadow="never" class="note-card">
       <template #header><span>审计说明</span></template>
-      <el-input v-model="depNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="depNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="说明多次减值折旧测算差异原因..." @change="saveDepNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -95,14 +110,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Depreciation, type DepreciationBranch, type DepreciationRow } from '../../composables/useH1Depreciation'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const depNote = ref('')
+const auditConclusionText = ref('')
+const NOTE_KEY = 'H1-12-audit-note-multi'
+const CONCLUSION_KEY = 'H1-12-audit-conclusion-multi'
+function saveDepNote() { saveResponse(NOTE_KEY, depNote.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) depNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 const selectedRow = ref<DepreciationRow | null>(null)
 const depBranch = ref<DepreciationBranch>('C')
 const branchOptions = [
@@ -115,7 +141,6 @@ const { rows, summary } = useH1Depreciation(toRef(props, 'wpId'), toRef(props, '
 function totalImpairment(row: DepreciationRow): number {
   return (row.impairmentEvents ?? []).reduce((sum, e) => sum + (e.amount || 0), 0)
 }
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

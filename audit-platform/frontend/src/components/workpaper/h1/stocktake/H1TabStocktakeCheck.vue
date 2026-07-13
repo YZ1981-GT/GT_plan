@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-stocktake-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：通过实物监盘核对固定资产账实相符（铭牌/数量/状态），识别盘盈盘亏与减值/报废迹象，证实资产存在性与状况。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-10" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ state.checkRows.value.length }} 项</el-tag>
+    </div>
+
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
@@ -87,6 +97,20 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card" style="margin-top:12px">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：监盘执行情况、账实差异及原因、盘盈盘亏处理跟进。" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card" style="margin-top:12px">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写盘点检查审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -99,13 +123,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH1Stocktake } from '../../composables/useH1Stocktake'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
+const auditNoteText = ref('')
+const auditConclusionText = ref('')
+const NOTE_KEY = 'H1-10-audit-note'
+const CONCLUSION_KEY = 'H1-10-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 const state = useH1Stocktake(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 
 async function handleAddRow() {

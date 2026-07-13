@@ -8,6 +8,14 @@
       title="审计目标：通过盘点日实存倒轧至资产负债表日，确认报表日证券结存数量与账面结存一致，差异已查明并说明。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏（索引 chip） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ items.length }} 行</el-tag>
+      </div>
+    </div>
     <!-- Section标题 + 复核按钮 -->
     <div class="section-header">
       <h3 class="section-title">G4-8 盘点倒轧结存表</h3>
@@ -204,6 +212,21 @@
       <slot name="importExport" />
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <span>审计说明</span>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        placeholder="请输入倒轧表审计说明：可概述盘点程序执行情况、差异查明与处理，以及对报表日结存准确性的判断。"
+        :disabled="isReadonly"
+        @change="saveAuditNote(auditNote)"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -248,8 +271,9 @@
  * - 差异行红色高亮 (|差异|>0)
  * - 合计行 + 审计结论 + AI辅助 + 复核对话
  */
-import { inject, toRef, computed } from 'vue'
+import { inject, toRef, computed, ref, watch } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useG4SppiReconciliation, TAB_OPTIONS } from '@/composables/useG4SppiReconciliation'
 import type { ReconciliationItem, ReconciliationTab } from '@/composables/useG4SppiReconciliation'
 import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
@@ -306,6 +330,20 @@ function getRowClassName({ row, rowIndex }: { row: ReconciliationItem; rowIndex:
   if (varianceHighlights.value[rowIndex]) classes.push('variance-highlight-row')
   return classes.join(' ')
 }
+
+// ─── 审计说明（纯 textarea，无 AI；持久化 checklist_responses，conclusion:null） ──
+const NOTE_KEY = 'G4-8-reconciliation-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  void formData.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
+}
+watch(
+  () => formData.allResponses.value.get(NOTE_KEY)?.remark,
+  (v) => { if (v != null) auditNote.value = v },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -313,6 +351,18 @@ function getRowClassName({ row, rowIndex }: { row: ReconciliationItem; rowIndex:
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; gap: 6px; align-items: center; }
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .reconciliation-tabs { margin-bottom: 12px; }
 

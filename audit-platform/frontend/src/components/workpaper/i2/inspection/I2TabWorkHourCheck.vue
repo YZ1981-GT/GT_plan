@@ -4,12 +4,31 @@
     <div class="section-header">
       <span class="section-title">I2-10 研发人员工时检查表</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiAssist">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
         <el-button size="small" type="default" text @click="handleReview">
           复核
         </el-button>
+      </div>
+    </div>
+
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核查研发人员工时分配的真实性与合理性，确认工时记录与项目实际投入一致、资本化归集的人工费准确。" />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 核对工时记录与考勤、项目工时表一致，验证研发工时占月总工时的比例是否合理；</p>
+        <p>2. 关注工时占比异常偏高的人员，防止将非研发工时虚报计入资本化研发项目；</p>
+        <p>3. 依据 CAS6《无形资产》及研发费用相关规定。</p>
+      </div>
+    </details>
+
+    <!-- 索引工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:I2" :context-project-id="props.projectId" />
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -74,13 +93,27 @@
       <el-button size="small" type="warning" plain @click="handleSampling">抽凭引擎</el-button>
       <el-button size="small" type="success" @click="handleSave">保存</el-button>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="记录检查过程、发现的问题及处理..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span>审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="填写审计结论..." @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject } from 'vue'
+import { ref, watch, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   sheetName: string
@@ -88,6 +121,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   saveResponse: (sheetCode: string, data: Record<string, any>) => Promise<void>
+  isReadonly?: boolean
 }>()
 
 const emit = defineEmits<{ 'save': []; 'navigate-sheet': [sheetName: string] }>()
@@ -121,7 +155,22 @@ function normRow(r: any): WorkHourRow {
   }
 }
 
-watch(() => props.allResponses, () => loadData(), { immediate: true })
+// ─── 审计说明 / 审计结论 ───
+const AUDIT_NOTE_KEY = 'I2-10-audit-note'
+const AUDIT_CONCLUSION_KEY = 'I2-10-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function readRemark(key: string): string {
+  const raw = props.allResponses.get(key)
+  if (raw == null) return ''
+  return typeof raw === 'string' ? raw : (raw.remark ?? '')
+}
+function hydrateAudit() { auditNote.value = readRemark(AUDIT_NOTE_KEY); auditConclusion.value = readRemark(AUDIT_CONCLUSION_KEY) }
+function saveAuditNote(val: string) { auditNote.value = val; void props.saveResponse('I2-10', { [AUDIT_NOTE_KEY]: val }) }
+function saveAuditConclusion(val: string) { auditConclusion.value = val; void props.saveResponse('I2-10', { [AUDIT_CONCLUSION_KEY]: val }) }
+
+watch(() => props.allResponses, () => { loadData(); hydrateAudit() }, { immediate: true })
+onMounted(hydrateAudit)
 
 function recalcRatio(row: WorkHourRow) {
   row.ratio = row.totalHours > 0 ? row.hours / row.totalHours : 0
@@ -139,7 +188,6 @@ async function handleSave() {
 
 function handleOcr(idx: number) { ElMessage.info('OCR识别工时记录...') }
 function handleSampling() { ElMessage.info('抽凭引擎(GtVoucherSamplingEngine)加载中...') }
-function handleAiAssist() { ElMessage.info('AI辅助工时合理性分析...') }
 function handleReview() { openReviewDialog('I2-10-研发人员工时检查') }
 function fmtPercent(v: number): string { return v == null || isNaN(v) ? '—' : `${(v * 100).toFixed(1)}%` }
 </script>
@@ -153,4 +201,12 @@ function fmtPercent(v: number): string { return v == null || isNaN(v) ? '—' : 
 .check-table { font-size: var(--wp-font-size, 13px); }
 .formula-cell { color: #6366f1; font-weight: 500; border-bottom: 1px dashed #a5b4fc; cursor: help; }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
+.objective-alert { margin-bottom: 12px; }
+.guidance-details { margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-secondary); background: #f9fafb; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 600; color: #374151; }
+.guidance-details .guidance-content { margin-top: 8px; line-height: 1.7; }
+.guidance-details .guidance-content p { margin: 0 0 4px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.audit-note-card, .audit-conclusion-card { margin-top: 16px; }
 </style>

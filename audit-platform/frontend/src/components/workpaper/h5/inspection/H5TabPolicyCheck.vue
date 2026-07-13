@@ -1,11 +1,21 @@
 <template>
   <div class="h5-tab-policy-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：逐项检查油气资产会计政策是否符合 CAS27《石油天然气开采》要求（折耗方法、资本化条件、储量估计变更）。" class="objective-alert" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H5-5" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.items.value.length }} 项</el-tag>
+      </div>
+    </div>
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>H5-5 会计政策检查（CAS27 石油天然气开采）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-5')">💬 复核</el-button>
           </div>
         </div>
@@ -42,6 +52,12 @@
     </el-alert>
 
     <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }"
+        placeholder="填写会计政策检查审计说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
       <template #header><div class="section-title"><span>审计结论</span></div></template>
       <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         placeholder="会计政策检查结论..." :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
@@ -61,24 +77,31 @@
 <script setup lang="ts">
 import { computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useH5PolicyCheck } from '../../composables/useH5PolicyCheck'
+import { useH5FormData } from '../../composables/useH5FormData'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 
+const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+
 const state = useH5PolicyCheck({
   allResponses: allResponsesRef as any,
   wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
-  onSave: () => {},
+  onSave: (itemId: string, value: any) => formData.setResponse(itemId, value),
 })
 
-function handleAiGenerate() {}
 function handleReview(id: string) { openReviewDialog(id) }
 </script>
 
 <style scoped>
 .h5-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

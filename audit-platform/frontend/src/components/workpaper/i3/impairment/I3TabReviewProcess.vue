@@ -34,6 +34,29 @@
       商誉减值一经确认不得转回（CAS8第十七条）。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：复核被审计单位商誉减值测试的过程与结论——评价关键假设、DCF 模型逻辑、参数合理性、计算准确性及减值结论恰当性；独立复核是否得出与管理层一致的结论（CAS8 第十七~二十条）。"
+    />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <ul>
+          <li>按"假设审阅→模型检查→参数合理性→计算验证→结论评价"五步复核公司减值测试过程。</li>
+          <li>关键假设（收入增长/毛利率/折现率WACC/永续增长率）须有充分依据并与行业/历史对比。</li>
+          <li>DCF 模型逻辑须正确：现金流预测、折现计算、终值处理（TV=FCFn×(1+g)/(WACC−g)）。</li>
+          <li>逐项给出结论（合理/不合理/需调整/待确认），综合形成复核结论与是否存在重大偏差。</li>
+          <li>商誉减值一经确认不得转回（CAS8 第十七条）。</li>
+        </ul>
+      </div>
+    </details>
+
     <!-- Section Header -->
     <div class="section-header">
       <span class="section-title">I3-8 复核公司减值测试过程及结论</span>
@@ -44,6 +67,14 @@
         <el-button size="small" type="primary" text @click="handleReview">
           💬复核
         </el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：索引 chip -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:I3-8" :context-project-id="projectId" />
       </div>
     </div>
 
@@ -64,10 +95,6 @@
                 <el-tag size="small" :type="sectionTagType('assumptions')">
                   {{ sectionCompletedCount('assumptions') }}/{{ checkItems.assumptions.length }}
                 </el-tag>
-                <el-button size="small" type="primary" text
-                  @click.stop="handleAiSection('assumptions')">
-                  <el-icon><MagicStick /></el-icon> AI
-                </el-button>
               </div>
             </div>
           </template>
@@ -114,10 +141,6 @@
                 <el-tag size="small" :type="sectionTagType('model')">
                   {{ sectionCompletedCount('model') }}/{{ checkItems.model.length }}
                 </el-tag>
-                <el-button size="small" type="primary" text
-                  @click.stop="handleAiSection('model')">
-                  <el-icon><MagicStick /></el-icon> AI
-                </el-button>
               </div>
             </div>
           </template>
@@ -164,10 +187,6 @@
                 <el-tag size="small" :type="sectionTagType('parameters')">
                   {{ sectionCompletedCount('parameters') }}/{{ checkItems.parameters.length }}
                 </el-tag>
-                <el-button size="small" type="primary" text
-                  @click.stop="handleAiSection('parameters')">
-                  <el-icon><MagicStick /></el-icon> AI
-                </el-button>
               </div>
             </div>
           </template>
@@ -214,10 +233,6 @@
                 <el-tag size="small" :type="sectionTagType('calculation')">
                   {{ sectionCompletedCount('calculation') }}/{{ checkItems.calculation.length }}
                 </el-tag>
-                <el-button size="small" type="primary" text
-                  @click.stop="handleAiSection('calculation')">
-                  <el-icon><MagicStick /></el-icon> AI
-                </el-button>
               </div>
             </div>
           </template>
@@ -264,10 +279,6 @@
                 <el-tag size="small" :type="sectionTagType('conclusion')">
                   {{ sectionCompletedCount('conclusion') }}/{{ checkItems.conclusion.length }}
                 </el-tag>
-                <el-button size="small" type="primary" text
-                  @click.stop="handleAiSection('conclusion')">
-                  <el-icon><MagicStick /></el-icon> AI
-                </el-button>
               </div>
             </div>
           </template>
@@ -345,6 +356,32 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><span style="font-weight:600">审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="记录复核公司减值测试过程的审计说明（复核范围、获取的资料、执行的复核程序等）..."
+        @blur="markDirty"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><span style="font-weight:600">审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="复核过程的审计结论（如：公司减值测试过程及结论合理，独立复核未发现重大偏差）..."
+        @blur="markDirty"
+      />
+    </el-card>
+
     <!-- 保存按钮 -->
     <div class="table-actions" v-if="!isReadonly">
       <el-button type="success" size="small" @click="handleSave" :loading="saving">
@@ -357,8 +394,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 /**
  * I3TabReviewProcess.vue — I3-8 复核公司减值测试过程及结论
@@ -602,6 +638,8 @@ const overallAssessment = ref('')
 const hasMajorDeviation = ref(false)
 const deviationDescription = ref('')
 const overallConclusionText = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 // --- Progress computed ---
 type SectionKey = 'assumptions' | 'model' | 'parameters' | 'calculation' | 'conclusion'
@@ -672,6 +710,8 @@ function loadData() {
     hasMajorDeviation.value = parsed.hasMajorDeviation || false
     deviationDescription.value = parsed.deviationDescription || ''
     overallConclusionText.value = parsed.overallConclusionText || ''
+    auditNote.value = parsed.auditNote || ''
+    auditConclusion.value = parsed.auditConclusion || ''
   } catch { /* ignore parse errors */ }
 }
 
@@ -688,6 +728,8 @@ async function handleSave() {
       hasMajorDeviation: hasMajorDeviation.value,
       deviationDescription: deviationDescription.value,
       overallConclusionText: overallConclusionText.value,
+      auditNote: auditNote.value,
+      auditConclusion: auditConclusion.value,
     }
     for (const s of sections) {
       payload.checkItems[s] = checkItems[s].map((it: CheckItem) => ({
@@ -701,32 +743,6 @@ async function handleSave() {
     ElMessage.success('复核过程已保存')
   } finally {
     saving.value = false
-  }
-}
-
-// --- AI per section ---
-const sectionNameMap: Record<string, string> = {
-  assumptions: '假设审阅——收入增长/毛利率/折现率/永续增长率/营运资本/CAPEX假设合理性',
-  model: '模型检查——DCF模型结构/现金流推导/终值处理/WACC应用/模型完整性',
-  parameters: '参数合理性——WACC参数来源验证/收入利润率参数/敏感性分析/参数一致性',
-  calculation: '计算验证——PV/终值/WACC/现金流/减值分摊/独立估算数学复核',
-  conclusion: '结论评价——减值金额判断/管理层偏差/第三方评估/披露要求/审计程序充分性',
-}
-
-async function handleAiSection(sectionKey: string) {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `I3-8-review-${sectionKey}`,
-      prompt: `商誉减值测试复核——${sectionNameMap[sectionKey] || sectionKey}。请针对本部分各检查项提供参考复核意见和常见问题标注。`,
-      context: JSON.stringify({
-        sectionItems: checkItems[sectionKey]?.map((it: CheckItem) => it.title),
-      }),
-    })
-    if (res.data?.data?.content) {
-      ElMessage.success(`AI已为"${sectionKey === 'assumptions' ? '假设审阅' : sectionKey === 'model' ? '模型检查' : sectionKey === 'parameters' ? '参数合理性' : sectionKey === 'calculation' ? '计算验证' : '结论评价'}"生成参考内容`)
-    }
-  } catch {
-    ElMessage.warning('AI辅助暂不可用，请手动填写')
   }
 }
 
@@ -817,6 +833,45 @@ function handleReview() {
   font-size: 15px;
   font-weight: 600;
   color: #1f2937;
+}
+
+/* 审计目标 alert */
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 编制提示 details */
+.guidance-details {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.guidance-details .guidance-content ul {
+  padding-left: 20px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 审计说明/结论卡片 */
+.audit-note-card {
+  margin-top: 12px;
 }
 
 .section-actions {

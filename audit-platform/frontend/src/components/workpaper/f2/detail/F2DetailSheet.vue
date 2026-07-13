@@ -41,7 +41,7 @@
           :disabled="isReadonly"
           @imported="onImported"
         />
-        <span class="chip-wrap"><GtIndexChip :value="'wp:' + config.sheetCode" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="'wp:' + config.sheetCode" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
       </div>
     </div>
@@ -207,11 +207,37 @@
         {{ detail.agingMismatch.value.length }} 行库龄合计≠期末金额
       </span>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述所执行的存货明细核查程序（期初+增减勾稽、单价与金额复核、库龄分布核实、长期积压识别）、测试情况与结果，以及拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, toRef, ref, h, onMounted, onBeforeUnmount } from 'vue'
+import { computed, inject, toRef, ref, h, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useF2DetailSheet } from '../../composables/useF2DetailSheet'
 import { useVirtualTable, type VirtualColumn } from '@/composables/useVirtualTable'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
@@ -223,12 +249,40 @@ import type { F2DetailRow } from '../../composables/useF2DetailSheet'
 const props = defineProps<{
   config: F2DetailSheetConfig
   wpId: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
 
 const configRef = computed(() => props.config)
 const sheetCode = computed(() => props.config.sheetCode)
+
+// ─── 审计说明 / 审计结论（按 sheetCode 分别持久化，防跨明细表串写）─────────────
+const auditNote = ref('')
+const auditConclusion = ref('')
+const noteKey = computed(() => `${sheetCode.value}-audit-note`)
+const conclusionKey = computed(() => `${sheetCode.value}-audit-conclusion`)
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(noteKey.value, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(conclusionKey.value, val)
+}
+function hydrateAudit(): void {
+  auditNote.value = props.allResponses.get(noteKey.value)?.remark ?? ''
+  auditConclusion.value = props.allResponses.get(conclusionKey.value)?.remark ?? ''
+}
+watch(sheetCode, hydrateAudit)
 
 const detail = useF2DetailSheet({
   config: configRef,
@@ -259,6 +313,7 @@ function updateTableWidth() {
 onMounted(() => {
   updateTableWidth()
   window.addEventListener('resize', updateTableWidth)
+  hydrateAudit()
 })
 onBeforeUnmount(() => window.removeEventListener('resize', updateTableWidth))
 
@@ -352,4 +407,6 @@ const { rowEventHandlers } = useVirtualTable({
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .virtual-table { margin-bottom: 8px; }
 :deep(.long-term-row) { background: #fdf6ec; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

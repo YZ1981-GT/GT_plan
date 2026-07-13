@@ -2,7 +2,7 @@
   <div class="g1-sec-count">
     <div class="section-head">
       <h3 class="sheet-title">G1-11 有价证券监盘表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addRow()">新增监盘行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-12" /></span>
         <el-tag size="small" type="info">共 {{ sc.rows.value.length }} 行</el-tag>
@@ -66,6 +66,12 @@
     </el-table>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）监盘或托管对账的执行情况；（2）盘点差异的识别及原因查明结果。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="sc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" placeholder="对有价证券监盘的复核结论..." />
@@ -82,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, inject } from 'vue'
+import { ref, toRef, inject, watch } from 'vue'
 import { useG1SecuritiesCount, type G1SecuritiesCountRow } from '../../composables/useG1SecuritiesCount'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -99,6 +105,12 @@ const sc = useG1SecuritiesCount({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-11-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
 function rowClass({ row }: { row: G1SecuritiesCountRow }): string {

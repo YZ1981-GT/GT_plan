@@ -20,7 +20,6 @@
         <div class="section-title">
           <span>一、生产性生物资产原值（科目1621）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('cost-orig')"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" link @click="handleReview('H7-1-cost-orig')">💬 复核</el-button>
           </div>
         </div>
@@ -81,7 +80,6 @@
         <div class="section-title">
           <span>二、累计折旧（备抵科目）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('cost-dep')"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" link @click="handleReview('H7-1-cost-dep')">💬 复核</el-button>
           </div>
         </div>
@@ -187,14 +185,22 @@
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
-          <span>审计说明 / 结论</span>
-          <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('cost-note')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
-            <el-button size="small" link @click="handleReview('H7-1-cost-note')">💬 复核</el-button>
-          </div>
+          <span>审计说明</span>
+          <el-button size="small" link @click="handleReview('H7-1-cost-note')">💬 复核</el-button>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写审计说明/结论..." :disabled="isReadonly" @blur="persist('H7-1-cost-note', auditNote)" />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="记录成本模式下原值/累计折旧/减值准备的审定过程、TB 勾稽与调整事项。" :disabled="isReadonly" @blur="persist('H7-1-cost-note', auditNote)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="section-title">
+          <span>审计结论</span>
+          <el-button size="small" link @click="handleReview('H7-1-cost-conclusion')">💬 复核</el-button>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" :disabled="isReadonly" @blur="persist('H7-1-cost-conclusion', auditConclusion)" />
     </el-card>
 
     <!-- 操作按钮 -->
@@ -230,11 +236,13 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { useProjectStore } from '@/stores/project'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7AdjudicationCost } from '../../composables/useH7AdjudicationCost'
+
+const projectStore = useProjectStore()
 
 const props = defineProps<{
   wpId: string
@@ -261,6 +269,7 @@ const origRow = ref<AdjRow>({ rowId: 'orig', category: '生产性生物资产原
 const depRow = ref<AdjRow>({ rowId: 'dep', category: '累计折旧', editable: true, begin: 0, debit: 0, credit: 0, unadjusted: 0, aje: 0, rje: 0 })
 const impRow = ref<AdjRow>({ rowId: 'imp', category: '减值准备', editable: true, begin: 0, debit: 0, credit: 0, unadjusted: 0, aje: 0, rje: 0 })
 const auditNote = ref('')
+const auditConclusion = ref('')
 const publishing = ref(false)
 
 const origDisplayRows = computed(() => [origRow.value])
@@ -292,6 +301,7 @@ async function loadOwn() {
   seedRow('H7-1-cost-dep', depRow)
   seedRow('H7-1-cost-imp', impRow)
   auditNote.value = getString('H7-1-cost-note') || ''
+  auditConclusion.value = getString('H7-1-cost-conclusion') || ''
   // 未审数从 TB seed（若持久化过）或保持 0，由 loadTb 覆盖
   await loadTb()
 }
@@ -299,7 +309,8 @@ async function loadOwn() {
 async function loadTb() {
   if (!props.projectId) return
   try {
-    const res: any = await api.get(`/api/projects/${props.projectId}/trial-balance?account_prefix=1621`)
+    const _year = projectStore.year ?? projectStore.auditYear ?? new Date().getFullYear()
+    const res: any = await api.get(`/api/projects/${props.projectId}/trial-balance?year=${_year}&account_prefix=1621`)
     const list: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? [])
     let unadj = 0
     for (const it of list) {
@@ -339,9 +350,6 @@ async function handlePublish() {
   } catch { ElMessage.warning('回写失败，请手动确认试算表') } finally { publishing.value = false }
 }
 
-function handleAi(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
-}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   if (v == null) return '-'

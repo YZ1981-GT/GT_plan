@@ -4,7 +4,7 @@
  * Spec: .kiro/specs/f3-notes-payable/ Task 6.2
  * 比照 D4TabRevenueDetail（精美组件 gold-standard）
  */
-import { computed, toRef, inject, type Ref } from 'vue'
+import { ref, computed, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Detail, type F3NoteDetailRow, type F3DetailColumn } from '../composables/useF3Detail'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -61,6 +61,23 @@ function displayValue(row: F3NoteDetailRow, prop: string): string {
   if (typeof v === 'number') return fmtAmount(v)
   return v ?? ''
 }
+
+// ─── 审计说明 / 审计结论（F3 约定：写入 allResponses + f3:save-items 事件持久化） ───
+const NOTE_KEY = 'F3-2-note'
+const CONCLUSION_KEY = 'F3-2-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void { if (props.isReadonly) return; auditNote.value = val; persistAudit(NOTE_KEY, val) }
+function saveAuditConclusion(val: string): void { if (props.isReadonly) return; auditConclusion.value = val; persistAudit(CONCLUSION_KEY, val) }
+
+watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
+watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof v === 'string') auditConclusion.value = v }, { immediate: true })
 </script>
 
 <template>
@@ -156,6 +173,32 @@ function displayValue(row: F3NoteDetailRow, prop: string): string {
       期末余额: {{ fmtAmount(subtotalRow.closingBalance) }} |
       审定余额: {{ fmtAmount(subtotalRow.adjustedBalance) }}
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：明细核对情况、票据种类与到期状态分类、逾期票据处理及与审定表/试算表的核对结果。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：明细表是否真实完整、期末余额合计与审定表/试算表核对是否一致。"
+        @change="(v: string) => saveAuditConclusion(v)"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -239,5 +282,14 @@ function displayValue(row: F3NoteDetailRow, prop: string): string {
 }
 .segment-tabs :deep(.el-tabs__content) {
   display: none;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

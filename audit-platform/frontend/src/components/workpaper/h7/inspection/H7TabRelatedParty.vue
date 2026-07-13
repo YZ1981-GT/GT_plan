@@ -6,6 +6,11 @@
       </template>
     </el-alert>
 
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H7-17" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
@@ -15,7 +20,6 @@
             <el-tag size="small" type="info" class="row-tag">共 {{ rows.length }} 行</el-tag>
           </span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" type="default" link @click="handleReview('H7-17')">💬 复核</el-button>
           </div>
         </div>
@@ -106,10 +110,14 @@
       <template #header>
         <div class="section-title">
           <span>审计说明与结论</span>
-          <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI说明</el-button>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="记录关联交易识别、定价公允性评价与披露检查结果" @blur="persist('H7-17-note', auditNote)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-17-conclusion', auditConclusion)" />
     </el-card>
 
     <details class="compile-hint">
@@ -127,7 +135,6 @@
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7RelatedParty } from '../../composables/useH7RelatedParty'
 import { calcSubtotal, calcPriceDiffRate } from '../../composables/useH7FormulaEngine'
@@ -135,7 +142,6 @@ import { calcSubtotal, calcPriceDiffRate } from '../../composables/useH7FormulaE
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly?: boolean }>()
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const generateAiText = inject<((section: string, ctx: string, existing: string) => Promise<string>) | null>('generateAiText', null)
 
 const allResponsesRef = computed(() => props.allResponses)
 const check = useH7RelatedParty(allResponsesRef as any, { wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
@@ -156,6 +162,7 @@ interface Row {
 
 const rows = ref<Row[]>([])
 const auditNote = ref('')
+const auditConclusion = ref('')
 
 function priceDiff(r: Row): number { return calcPriceDiffRate(Number(r.txPrice) || 0, Number(r.marketPrice) || 0) }
 function isAbnormal(r: Row): boolean { return (Number(r.marketPrice) || 0) > 0 && Math.abs(priceDiff(r)) > 10 }
@@ -182,6 +189,7 @@ function seed(): void {
   const raw = check.getString('H7-17-rows')
   if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) rows.value = p.map(normalize) } catch { /* ignore */ } }
   auditNote.value = check.getString('H7-17-note')
+  auditConclusion.value = check.getString('H7-17-conclusion') || ''
 }
 onMounted(seed)
 
@@ -198,12 +206,6 @@ function removeRow(rowId: string): void {
   const i = rows.value.findIndex((r) => r.rowId === rowId)
   if (i >= 0) { rows.value.splice(i, 1); persistRows() }
 }
-async function handleAi(): Promise<void> {
-  if (!generateAiText) return
-  const ctx = `关联交易 ${rows.value.length} 项，合计 ${fmtAmt(totalAmount.value)}，价差异常 ${abnormalCount.value} 项，未披露 ${undisclosedCount.value} 项。`
-  const text = await generateAiText('h7-related-party', ctx, auditNote.value)
-  if (text) { auditNote.value = text; persist('H7-17-note', auditNote.value) }
-}
 function handleReview(id: string): void { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   return v == null ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -214,6 +216,8 @@ function fmtRate(v: number): string { return `${v.toFixed(2)}%` }
 <style scoped>
 .h7-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

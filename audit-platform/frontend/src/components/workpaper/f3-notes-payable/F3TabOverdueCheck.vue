@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabOverdueCheck — F3-5 逾期票据检查 | Task 6.4 */
-import { toRef, inject, type Ref } from 'vue'
+import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3OverdueCheck } from '../composables/useF3OverdueCheck'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
@@ -29,6 +29,18 @@ const { rows, summary, auditConclusion, addRow, removeRow, updateCell, rowClassN
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF3AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+// ─── 审计说明（无匹配 AI section → 纯 textarea；F3 约定持久化） ───
+const NOTE_KEY = 'F3-5-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
 
 async function generateAiConclusion() {
   if (props.isReadonly) return
@@ -109,6 +121,21 @@ const riskOptions = ['低', '中', '高', '极高']
     </el-table>
 
     <div class="summary">逾期 {{ summary.count }} 笔 / 金额 {{ fmt(summary.totalAmount) }} / 高风险 {{ summary.highRisk }} 笔 / 已转应付 {{ summary.transferred }} 笔</div>
+
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：逾期票据筛查情况、兑付风险评估、到期未兑付票据的重分类与后续处理。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
 
     <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">

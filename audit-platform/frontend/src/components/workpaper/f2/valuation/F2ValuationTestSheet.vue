@@ -8,6 +8,18 @@
       </div>
     </header>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert" :title="`审计目标：${objectiveText}`" />
+
+    <!-- 工具栏（索引联动 + 计数） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
+        <el-tag size="small" type="info">共 {{ displayRows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 抽样参数区(6字段横排) -->
     <el-form inline size="small" class="sampling-form">
       <el-form-item label="总体金额">
@@ -97,16 +109,32 @@
       <span v-if="exceedCount > 0" class="exceed-stat"> · 超差异 {{ exceedCount }} 笔</span>
     </div>
 
-    <!-- 测试结论 -->
+    <!-- 审计说明 -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
-        <span class="conclusion-header">测试结论</span>
+        <span class="conclusion-header">审计说明</span>
+      </template>
+      <el-input
+        :model-value="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：概述计价方法测试的抽样与重新计算程序、差异分析及核对结果，以及拟调整/未调整事项及其影响。"
+        @update:model-value="(v: string) => $emit('update:auditNote', v)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <span class="conclusion-header">审计结论</span>
       </template>
       <el-input
         :model-value="testConclusion"
         type="textarea"
         :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly"
+        placeholder="填写审计结论：A、计价方法运用正确、一贯，未见异常。B、除上述应调整事项外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
         @update:model-value="(v: string) => $emit('update:testConclusion', v)"
       />
     </el-card>
@@ -130,6 +158,7 @@ import { isVarianceExceeding } from '../../composables/useF2ValuationTestFormula
 import type { ValuationTestRow } from '../../composables/useF2ValuationTestFormulas'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 export interface SegmentOption {
@@ -143,6 +172,8 @@ const props = withDefaults(defineProps<{
   sheetCode: string
   thresholdRate: number
   guidanceText?: string
+  objectiveText?: string
+  auditNote?: string
   segments?: SegmentOption[]
   defaultSegment?: string
   // 数据
@@ -158,6 +189,8 @@ const props = withDefaults(defineProps<{
   isReadonly: boolean
 }>(), {
   guidanceText: '请根据抽样结果逐项核对存货计价方法的正确性，关注差异率超过阈值的样本。',
+  objectiveText: '选取样本存货品种，重新计算发出/结存成本，验证企业存货计价方法运用的正确性与一贯性，防止计价错误导致成本与存货错报。',
+  auditNote: '',
   segments: () => [],
   defaultSegment: '',
 })
@@ -168,6 +201,7 @@ const emit = defineEmits<{
   updateRow: [id: string, patch: Partial<ValuationTestRow>]
   samplingFilled: [payload: { samples: SampledVoucher[]; fillMode: FillMode }]
   'update:testConclusion': [text: string]
+  'update:auditNote': [text: string]
 }>()
 
 const activeSegment = ref(props.defaultSegment || (props.segments.length ? props.segments[0].value : ''))

@@ -5,13 +5,14 @@
       <p>H4-3调整分录：记录工程物资审计过程中发现的审计调整分录(AJE)和重分类调整分录(RJE)。调整分录必须借贷平衡，保存后自动联动H4-1审定表的AJE/RJE列。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：完整记录工程物资（科目1605）审计发现的调整分录（AJE/RJE），验证借贷平衡，并联动 H4-1 审定表 AJE/RJE 列，确保审定数准确。" />
+
     <!-- Section Title -->
     <div class="section-header">
       <span>调整分录汇总 H4-3</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-3-adjustment')">💬</el-button>
       </div>
     </div>
@@ -134,9 +135,6 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-3-note')">💬</el-button>
           </div>
         </div>
@@ -144,6 +142,21 @@
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请填写审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H4-3-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -171,7 +184,7 @@
  * Task: 4.4
  * Requirements: 4.1-4.6
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH4Adjustment } from '../../composables/useH4Adjustment'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
@@ -210,11 +223,22 @@ const importExport = useH4ImportExport({
   projectId: toRef(props, 'projectId'),
 })
 
-// ─── Audit Note ──────────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion（inject saveResponse 落库 + onMounted 恢复） ──────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const auditNote = ref('')
+const auditConclusion = ref('')
 function saveAuditNote() {
   props.allResponses.set('H4-3-note', { item_id: 'H4-3-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-3-note', auditNote.value)
 }
+function saveAuditConclusion() {
+  props.allResponses.set('H4-3-conclusion', { item_id: 'H4-3-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-3-conclusion', auditConclusion.value)
+}
+onMounted(() => {
+  const n = props.allResponses.get('H4-3-note'); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get('H4-3-conclusion'); if (c?.remark) auditConclusion.value = c.remark
+})
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -251,9 +275,6 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[H4-3] AI generate')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -272,6 +293,8 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

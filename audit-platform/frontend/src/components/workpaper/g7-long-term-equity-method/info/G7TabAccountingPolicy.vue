@@ -8,12 +8,29 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实被投资单位会计政策与投资方是否一致，验证不一致事项的调整是否恰当，为权益法测算提供口径一致的基础数据。"
+      class="objective-alert"
+    />
+
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p>CAS 会计政策一致性要求：</p>
       <p>• 投资方应以被投资方的会计政策与投资方一致为前提，对被投资方的财务报表进行调整</p>
       <p>• 被投资方采用的会计政策与投资方不一致的，应按投资方会计政策对被投资方财务报表进行调整</p>
       <p>• 调整后的金额需在 G7-14 权益法测算表"会计政策调整"列反映</p>
+    </div>
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-6" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- 31行×7列问卷表格 -->
@@ -141,6 +158,21 @@
       <el-button size="small" @click="handleSave">💾 保存</el-button>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <span>审计说明</span>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -193,6 +225,8 @@
 import { reactive, ref, computed, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { AccountingPolicyRow } from '../../composables/useG7EquityMethodFormData'
 
 // ═══ Props ═══════════════════════════════════════════════════════════════════
@@ -254,6 +288,27 @@ const DEFAULT_POLICY_ITEMS: string[] = [
 const rows = reactive<AccountingPolicyRow[]>([])
 const conclusion = ref('')
 const isReadonly = computed(() => !!props.readonly)
+
+// ═══ 审计说明持久化（checklist_responses，conclusion:null） ═══════════════════
+
+const auditFormData = useG7EquityMethodFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const AUDIT_NOTE_KEY = 'G7-6-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 // ═══ 动态行增删 ═══════════════════════════════════════════════════════════════
 
@@ -382,6 +437,26 @@ onMounted(() => {
 .g7-tab-accounting-policy {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tab-toolbar .chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Section 标题栏 */

@@ -17,6 +17,23 @@
       关注：是否符合资本化条件（CAS6第8条）、入账时点是否正确、金额是否完整。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实本期新增无形资产入账金额、取得方式及入账时点的正确性与完整性，验证资本化条件符合 CAS6，并与审定表本期增加勾稽一致。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-5" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 跨底稿交叉引用提示区：I2资本化转入 -->
     <div class="cross-ref-bar">
       <span class="cross-ref-label">数据来源：</span>
@@ -131,15 +148,16 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }" :disabled="isReadonly" placeholder="填写审计说明：检查范围与抽样方法、合同/发票/支付凭证核对情况、资本化条件判断及异常项处理等。" @blur="saveAuditNote" />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header>
-        <div class="section-title">
-          <span>审计结论</span>
-          <el-button size="small" link @click="handleAiConclusion" :disabled="isReadonly">🤖 AI辅助</el-button>
-        </div>
-      </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="经检查，本期新增无形资产…" @blur="handleSave" />
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="经检查，本期新增无形资产入账金额、取得方式及入账时点正确，与审定表勾稽一致，未见异常…" @blur="handleSave" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -185,7 +203,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
-  'save': []
+  'save': [itemId?: string, value?: any]
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -213,6 +231,7 @@ interface AdditionRow {
 
 const rows = ref<AdditionRow[]>([])
 const conclusion = ref('')
+const auditNote = ref('')
 const showSamplingDialog = ref(false)
 
 // ─── Storage item_id ─────────────────────────────────────────────────────────
@@ -232,6 +251,9 @@ function loadData() {
 
   const conclusionItem = props.allResponses.get(`${ITEM_PREFIX}-conclusion`)
   conclusion.value = (conclusionItem?.remark ?? conclusionItem?.conclusion ?? '') as string
+
+  const noteItem = props.allResponses.get(`${ITEM_PREFIX}-audit-note`)
+  auditNote.value = (noteItem?.remark ?? noteItem?.conclusion ?? '') as string
 }
 
 function normalizeRow(raw: any): AdditionRow {
@@ -445,25 +467,6 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-/** AI辅助生成结论 */
-async function handleAiConclusion() {
-  try {
-    const context = `本期新增无形资产${rows.value.length}项，合计金额${fmtAmt(totalAmount.value)}元。异常${anomalyCount.value}项。取得方式包括：${[...new Set(rows.value.map(r => r.acquisitionMethod).filter(Boolean))].join('、') || '未填'}`
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'addition-check-conclusion',
-      prompt: '请根据以下无形资产增加检查结果，生成审计结论（简洁专业）',
-      context,
-      existingContent: conclusion.value,
-    })
-    const generated = res.data?.data?.content ?? res.data?.content ?? ''
-    if (generated) {
-      await ElMessageBox.confirm(generated, 'AI生成结论预览', { confirmButtonText: '采用', cancelButtonText: '取消', type: 'info' })
-      conclusion.value = generated
-      persist()
-    }
-  } catch { /* cancelled */ }
-}
-
 function navigateToAdjudication() {
   emit('navigate-sheet', '审定表I1')
 }
@@ -477,12 +480,17 @@ function handleReview(id: string) { openReviewDialog(id) }
 // ─── Persist ─────────────────────────────────────────────────────────────────
 
 function persist() {
-  // 通过 emit save 通知父组件保存
-  emit('save')
+  // 行数据通过 emit save(itemId,value) 通知父组件保存
+  emit('save', `${ITEM_PREFIX}-rows`, JSON.stringify(rows.value))
 }
 
 function handleSave() {
-  persist()
+  emit('save', `${ITEM_PREFIX}-conclusion`, conclusion.value)
+}
+
+function saveAuditNote() {
+  if (props.isReadonly) return
+  emit('save', `${ITEM_PREFIX}-audit-note`, auditNote.value)
 }
 
 // ─── Summary ─────────────────────────────────────────────────────────────────

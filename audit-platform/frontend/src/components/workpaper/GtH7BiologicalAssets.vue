@@ -569,24 +569,7 @@ provide('measurementModel', measurementModel)
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
-// ─── AI 说明生成（子 tab 通过 inject('generateAiText') 调用通用端点） ──────────
-// 契约：generateAiText(section, context, existingContent) => Promise<string>（失败返回 ''，不抛错）
-async function generateAiText(section: string, context: string, existingContent: string): Promise<string> {
-  if (!props.wpId) return ''
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: `请基于 H7 生产性生物资产底稿的以下情况，生成专业、简洁的审计说明/结论：${context}`,
-      context,
-      existingContent: existingContent || '',
-    }, { _silent: true } as any)
-    return res.data?.data?.content || res.data?.content || res.data?.data?.text || res.data?.text || ''
-  } catch (err) {
-    console.warn('[GtH7] generateAiText failed:', err)
-    return ''
-  }
-}
-provide('generateAiText', generateAiText)
+// H7 为 H 循环底稿，审计说明/结论采用纯 textarea，不接 AI（遵循 H6 先例 + fghi spec P7）。
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
 const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })

@@ -6,6 +6,11 @@
       </template>
     </el-alert>
 
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H7-10" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ stat.total }} 项</el-tag>
+    </div>
+
     <el-card shadow="never" class="dashboard-card">
       <template #header>
         <div class="section-title">
@@ -14,7 +19,6 @@
             <GtIndexChip value="wp:H7-9" />
           </span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI总结</el-button>
             <el-button size="small" type="default" link @click="handleReview('H7-10')">💬 复核</el-button>
           </div>
         </div>
@@ -56,10 +60,14 @@
     <el-empty v-if="!totalRows" description="尚无 H7-9 盘点检查数据，请先在盘点检查表录入" :image-size="90" />
 
     <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录本表审计程序的实施情况、核对过程与发现。" @blur="persist('H7-10-note', auditNote)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
           <span>监盘总结与审计结论</span>
-          <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI总结</el-button>
         </div>
       </template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly" placeholder="总结盘点结果、盘盈盘亏及标识异常情况，评价对资产余额真实性与减值的影响，形成审计结论..." @blur="persist('H7-10-conclusion', conclusion)" />
@@ -79,14 +87,12 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7Stocktake } from '../../composables/useH7Stocktake'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly?: boolean }>()
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const generateAiText = inject<((section: string, ctx: string, existing: string) => Promise<string>) | null>('generateAiText', null)
 
 const allResponsesRef = computed(() => props.allResponses)
 const stk = useH7Stocktake(allResponsesRef as any, { wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
@@ -95,6 +101,7 @@ interface Row { rowId: string; name: string; category: string; bookQty: number; 
 
 const checkRows = ref<Row[]>([])
 const conclusion = ref('')
+const auditNote = ref('')
 
 function qtyDiff(r: Row): number { return (Number(r.actualQty) || 0) - (Number(r.bookQty) || 0) }
 const totalRows = computed(() => checkRows.value.length)
@@ -125,17 +132,12 @@ function seed(): void {
     } catch { /* ignore */ }
   }
   conclusion.value = stk.getString('H7-10-conclusion')
+  auditNote.value = stk.getString('H7-10-note') || ''
 }
 onMounted(seed)
 
 function persist(itemId: string, val: any): void { if (!props.isReadonly) saveResponse(itemId, val) }
 
-async function handleAi(): Promise<void> {
-  if (!generateAiText) return
-  const ctx = `监盘小结：盘点总数 ${stat.value.total}，账实相符 ${stat.value.match}，盘盈 ${stat.value.surplus}，盘亏 ${stat.value.deficit}，相符率 ${stat.value.matchRate.toFixed(1)}%。`
-  const text = await generateAiText('h7-stocktake-summary', ctx, conclusion.value)
-  if (text) { conclusion.value = text; persist('H7-10-conclusion', conclusion.value) }
-}
 function handleReview(id: string): void { openReviewDialog(id) }
 function fmtNum(v: number | null | undefined): string { return v == null ? '-' : v.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }
 </script>
@@ -143,6 +145,8 @@ function fmtNum(v: number | null | undefined): string { return v == null ? '-' :
 <style scoped>
 .h7-tab-stocktake-summary { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; }
 .dashboard-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

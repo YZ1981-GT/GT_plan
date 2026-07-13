@@ -2,7 +2,7 @@
   <div class="g1-count-recon">
     <div class="section-head">
       <h3 class="sheet-title">G1-12 证券盘点倒轧表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="recon.addRow()">新增倒轧行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-11" /></span>
         <el-tag size="small" type="info">共 {{ recon.rows.value.length }} 行</el-tag>
@@ -78,6 +78,12 @@
     </div>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）监盘日至报表日倒轧计算过程及依据；（2）倒轧差异的查明与处理情况。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="recon.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" placeholder="对证券盘点倒轧的复核结论..." />
@@ -95,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed, inject } from 'vue'
+import { ref, toRef, computed, inject, watch } from 'vue'
 import {
   useG1CountReconciliation,
   type G1ReconciliationRow,
@@ -115,6 +121,12 @@ const recon = useG1CountReconciliation({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-12-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
 const segment = ref<'countday' | 'calc'>('countday')

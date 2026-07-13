@@ -1,5 +1,14 @@
 <template>
   <div class="h9-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实租赁负债审计调整分录(AJE)与重分类分录(RJE)记录完整、借贷平衡，确认调整已正确联动 H9-1 审定表的 AJE/RJE 列并反映于报表列报。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H9-4调整分录：记录租赁负债审计过程中发现的审计调整分录(AJE)和重分类调整分录(RJE)。调整分录必须借贷平衡，保存后自动通过EventBus联动H9-1审定表的AJE/RJE列。</p>
@@ -9,10 +18,16 @@
     <div class="section-header">
       <span>调整分录汇总 H9-4</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H9-4-adjustment')">💬</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-4" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -134,16 +149,28 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H9-4-note')">💬</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }"
         placeholder="请填写调整分录的审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H9-4-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="请填写调整分录的审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -174,10 +201,10 @@
  * Requirements: 5.1-5.4
  */
 import { ref, computed, inject, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useH9Adjustment } from '../../composables/useH9Adjustment'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -217,14 +244,21 @@ const importExport = useH9ImportExport({
   sheetCode: 'H9-5',
 })
 
-// ─── Audit Note ──────────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion ─────────────────────────────────────────────────
 const auditNote = ref('')
-// 初始化加载审计说明
+const auditConclusion = ref('')
+// 初始化加载审计说明/结论
 const noteData = props.allResponses.get('H9-4-note')
 if (noteData) auditNote.value = noteData.remark ?? noteData.conclusion ?? ''
+const conclusionData = props.allResponses.get('H9-4-audit-conclusion')
+if (conclusionData) auditConclusion.value = conclusionData.remark ?? conclusionData.conclusion ?? ''
 
 function saveAuditNote() {
   saveResponse('H9-4-note', auditNote.value)
+}
+
+function saveAuditConclusion() {
+  saveResponse('H9-4-audit-conclusion', auditConclusion.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -278,10 +312,6 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[H9-4] AI generate adjustment')
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
@@ -316,6 +346,15 @@ function fmtAmt(val: number | null | undefined): string {
   font-size: 14px; font-weight: 600; margin-bottom: 12px;
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .adj-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .amt-input { width: 100%; }

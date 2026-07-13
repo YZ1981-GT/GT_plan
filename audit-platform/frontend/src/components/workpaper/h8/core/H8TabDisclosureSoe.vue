@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-disclosure-soe">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：确认使用权资产附注披露（国有企业）的租赁分类及变动明细完整、准确，符合 CAS21 及国资监管信息公开要求。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>附注披露（国企）：按国资委信息公开要求和CAS21准则，披露使用权资产明细及变动。国企版含更详细的租赁分类信息。32行255列。</p>
@@ -50,6 +54,20 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -69,7 +87,7 @@
  * 32行255列，OO渲染wrapper（宽表）
  * Spec: Task 4.10 | Requirements: 1.2
  */
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
@@ -90,10 +108,38 @@ const emit = defineEmits<{
 }>()
 
 const showOO = ref(true)
+
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-disclosure-soe-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-disclosure-soe-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
 </script>
 
 <style scoped>
 .h8-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 

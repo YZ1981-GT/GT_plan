@@ -22,6 +22,14 @@
 -->
 <template>
   <div class="g6-bad-debt">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认其他债权投资减值准备(ECL)计提的充分性与准确性，信用损失率与Stage分层恰当，坏账调整与审定坏账勾稽一致，为报表列示减值提供审定依据。"
+      style="margin-bottom: 12px"
+    />
     <!-- 方法论上下文（琥珀色） -->
     <div class="methodology-context">
       <strong>ECL公式链推导：</strong>
@@ -56,6 +64,15 @@
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G6-3-bad-debt')">💬复核</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -355,20 +372,31 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：减值准备计提的充分性测试、信用损失率与Stage分层依据、坏账调整与审定的测试情况及结果。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
         <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiConclusion">
-          🤖 AI生成
-        </el-button>
       </div>
       <el-input
-        v-model="auditConclusion"
+        :model-value="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请输入坏账准备的审计结论..."
         :disabled="isReadonly"
+        @change="(v: string) => saveAuditConclusion(v)"
       />
     </el-card>
 
@@ -403,8 +431,9 @@
  */
 import { ref, reactive, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import http from '@/utils/http'
 import {
   calcUnadjustedProvision,
   calcImpairmentAdjustment,
@@ -503,6 +532,44 @@ function createEmptyRow(seq: number, name: string, stage: StageGroup = 'Stage1')
 const rows = reactive<BadDebtRow[]>([])
 const selectedRowIndex = ref(0)
 const auditConclusion = ref('')
+const auditNote = ref('')
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
+const NOTE_KEY = 'G6-3-badDebtDetail-audit-note'
+const CONCLUSION_KEY = 'G6-3-badDebtDetail-audit-conclusion'
+
+function readSaved(key: string): string {
+  const cr = props.htmlData?.checklist_responses
+  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+    const v = (cr as Record<string, any>)[key]
+    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+  }
+  const resp = props.htmlData?.responses
+  if (Array.isArray(resp)) {
+    const found = resp.find((r: any) => r?.item_id === key)
+    if (found?.remark) return found.remark
+  }
+  return ''
+}
+
+async function saveAudit(key: string, val: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: key, conclusion: null, remark: val }],
+    })
+  } catch { /* silent */ }
+}
+
+function saveAuditNote(val: string): void {
+  auditNote.value = val
+  void saveAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  auditConclusion.value = val
+  void saveAudit(CONCLUSION_KEY, val)
+}
 
 // ─── ECL公式重算 ─────────────────────────────────────────────────────────────
 
@@ -655,12 +722,6 @@ async function handleDropdownCommand(command: string) {
   }
 }
 
-// ─── AI生成审计结论 ─────────────────────────────────────────────────────────
-
-function handleAiConclusion() {
-  ElMessage.info('AI生成审计结论功能将在AI模块完成后启用')
-}
-
 // ─── 数字格式化 ─────────────────────────────────────────────────────────────
 
 function fmtNum(v: unknown): string {
@@ -721,6 +782,8 @@ function loadFromHtmlData(data: Record<string, any> | null) {
 
 onMounted(() => {
   loadFromHtmlData(props.htmlData)
+  auditNote.value = readSaved(NOTE_KEY)
+  auditConclusion.value = readSaved(CONCLUSION_KEY)
 })
 </script>
 
@@ -764,6 +827,14 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
 }
+/* 工具栏：索引 chip + 行数 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+/* 审计说明卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .bad-debt-table {
   font-size: var(--wp-font-size, 13px);
 }

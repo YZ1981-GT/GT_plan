@@ -12,7 +12,7 @@
  *
  * Requirements: 10.3-10.4
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useE1InterestCalc,
@@ -88,6 +88,36 @@ function asAccrued(row: any): AccruedInterestRow { return row }
 const totalAccruedRmb = computed(() => {
   return (rows.value as AccruedInterestRow[]).reduce((sum, r) => sum + (r as AccruedInterestRow).accruedRmb, 0)
 })
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+const NOTE_KEY = 'E1-accrued-audit-note'
+const CONCLUSION_KEY = 'E1-accrued-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
 </script>
 
 <template>
@@ -237,6 +267,36 @@ const totalAccruedRmb = computed(() => {
             <strong class="total-amount">{{ displayPrefs.fmtAmount(totalAccruedRmb) }}</strong>
           </span>
         </div>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：可概述（1）各存款账户应计利息的测算方法（结息日至资产负债表日、按约定利率与天数计提）；（2）外币应计利息按期末汇率折算的处理；（3）测算数与账面计提利息收入/应收利息的比较及差异分析。"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、应计利息测算数与账面计提相符，利息收入完整、准确。B、除上述差异应提请调整外，其余未见异常。C、由于存在以下重大差异（或资料受限），需进一步核查。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -321,5 +381,14 @@ const totalAccruedRmb = computed(() => {
 }
 .total-amount {
   color: #303133;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

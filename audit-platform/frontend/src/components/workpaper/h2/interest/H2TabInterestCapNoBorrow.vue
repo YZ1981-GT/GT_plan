@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-interest-cap-no-borrow">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核算无专门借款情形下在建工程应予资本化的借款利息，验证加权平均资本化率与累计支出加权平均数的计算准确性，确认资本化金额不超过当期实际利息总额。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-10" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">借款 {{ state.loansNoBorrow.value.length }} 笔</el-tag>
+      </div>
+    </div>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p><strong>无专门借款利息资本化：</strong>以一般借款的加权平均资本化率为基础，按累计资产支出加权平均数计算应予资本化的利息金额。</p>
@@ -17,9 +29,6 @@
         <div class="section-header">
           <span>一般借款明细</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('interest-summary')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-10')">💬</el-button>
           </div>
         </div>
@@ -161,6 +170,26 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述一般借款加权平均资本化率的计算、累计支出加权平均数的确定及资本化金额的复核。" :disabled="isReadonly"
+        @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如资本化率与资本化金额计算准确、未超过实际利息总额，未见异常。" :disabled="isReadonly"
+        @blur="state.saveConclusion(state.auditConclusion.value)" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -184,6 +213,7 @@
 import { ref, inject, toRef, computed } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2InterestCap } from '../../composables/useH2InterestCap'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -198,6 +228,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const activeBranch = ref('noBorrow')
 const branchOptions = [
@@ -210,6 +241,7 @@ const state = useH2InterestCap({
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onPublishEvent(event: string, payload: any) {
     // Task 6.7 — publish 'h2:interest-capitalized' 利息资本化联动L(财务费用)
     console.log('[H2-10] publish', event, payload)
@@ -233,9 +265,6 @@ function handleRemoveLoan(rowId: string) { state.removeLoanNoBorrow(rowId) }
 function handleAddExp() { state.addExpenditure() }
 function handleRemoveExp(rowId: string) { state.removeExpenditure(rowId) }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate H2-10:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -249,6 +278,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-interest-cap-no-borrow { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
   padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);

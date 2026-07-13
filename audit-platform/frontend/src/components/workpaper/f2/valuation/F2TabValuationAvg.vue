@@ -1,4 +1,9 @@
 <template>
+  <!--
+    打磨要素说明：本 sheet 复用共享基座 F2ValuationTestSheet.vue 统一渲染以下要素——
+    objective-alert（审计目标）、guidance-details（编制提示）、tab-toolbar + GtIndexChip（索引联动）、
+    审计说明（-audit-note，本组件持久化）、审计结论。
+  -->
   <F2ValuationTestSheet
     title="计价方法测试 — 月末一次加权平均"
     sheet-code="F2-38"
@@ -8,18 +13,21 @@
     :exceed-count="vt.exceedCount.value"
     :sampling-params="vt.samplingParams.value"
     :test-conclusion="vt.testConclusion.value"
+    :audit-note="auditNote"
     :wp-id="wpId"
     :project-id="projectId"
     :audit-year="auditYear"
     :is-readonly="isReadonly"
     :segments="segments"
     default-segment="inventory"
+    objective-text="选取样本存货品种，核对企业月末一次加权平均法计算的发出成本是否正确，验证计价方法运用的准确性与一贯性。"
     guidance-text="选取样本存货品种，核对企业月末一次加权平均法计算的发出成本是否正确。关注差异率超过1%的样本。"
     @add-row="vt.addRow()"
     @remove-row="(id: string) => vt.removeRow(id)"
     @update-row="(id: string, patch: any) => vt.updateRow(id, patch)"
     @sampling-filled="handleSamplingFilled"
     @update:test-conclusion="(t: string) => { vt.testConclusion.value = t }"
+    @update:audit-note="saveAuditNote"
   >
     <template #columns="{ segment: seg, isReadonly: ro, fmt, fmtRate, isExceed }">
       <template v-if="seg === 'inventory'">
@@ -88,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, onMounted, toRef } from 'vue'
 import { useF2WeightedAvgTest } from '../../composables/useF2ValuationTestSheet'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
@@ -106,6 +114,21 @@ const vt = useF2WeightedAvgTest({ allResponses: toRef(props, 'allResponses'), is
 const segments = [{ label: '期初/入库', value: 'inventory' }, { label: '发出/差异', value: 'verify' }]
 
 const auditYear = computed(() => props.auditYear ?? new Date().getFullYear() - 1)
+
+// ─── 审计说明（独立持久化，F2 计价组事件；测试结论沿用 composable） ────────
+const NOTE_KEY = 'F2-38-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }) {
   vt.fillFromSampling(payload.samples, payload.fillMode)

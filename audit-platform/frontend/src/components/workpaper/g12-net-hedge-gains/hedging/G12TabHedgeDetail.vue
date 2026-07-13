@@ -51,6 +51,14 @@
       />
     </el-alert>
 
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G12-2" /></span>
+        <el-tag size="small" type="info">共 {{ hd.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-segmented v-model="activeTab" :options="tabOptions" size="small" />
 
     <el-table :data="hd.rows.value" border size="small" style="font-size:13px;margin-top:8px" max-height="480"
@@ -177,6 +185,19 @@
       <span>计入损益合计：{{ hd.totals.value.profitLossAmount.toFixed(2) }}</span>
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：套期指定文档核对、套期有效性测算与 G12-4 交叉验证结果。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：套期关系指定是否合规、有效性评价结论。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="methodology-hint">
       <summary>📋 编制提示（CAS24 套期会计）</summary>
       <p>套期会计三要素：经济关系 + 信用风险主导 + 套期比率。「关系指定」区段录入正式指定信息，「FV与结论」区段录入公允价值变动并测算无效部分（计入损益）。工具/项目 FV 变动须与 G12-4 公允价值测试一致，否则触发交叉验证告警。</p>
@@ -185,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, inject } from 'vue'
+import { ref, computed, toRef, inject, onMounted } from 'vue'
 import { useG12HedgeDetail } from '../../composables/useG12HedgeDetail'
 import { findG12FvCrossMismatches, hasG12FvTestData } from '../../composables/useG12CrossValidate'
 import { resolveG12SheetLabel } from '../../composables/g12SheetLabels'
@@ -215,6 +236,29 @@ const hd = useG12HedgeDetail({
   debouncedSave: props.debouncedSave,
 })
 
+const NOTE_KEY = 'G12-hedge-detail-audit-note'
+const CONCLUSION_KEY = 'G12-hedge-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 const crossMismatches = computed(() =>
   findG12FvCrossMismatches(hd.rows.value, props.allResponses),
 )
@@ -233,6 +277,12 @@ function rowClassName({ row }: { row: { hedgeRelationId: string } }): string {
 <style scoped>
 .g12-hedge { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .audit-objective { margin-bottom: 8px; }
 .methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }

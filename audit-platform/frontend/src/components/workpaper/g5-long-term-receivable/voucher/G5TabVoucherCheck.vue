@@ -2,7 +2,7 @@
   <div class="g5-voucher-check">
     <div class="section-head">
       <h3 class="sheet-title">G5-12 凭证检查表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <GtIndexChip value="wp:G5-12" />
         <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
         <GtReviewTrigger section-id="g5-12-voucher-check" />
@@ -13,7 +13,7 @@
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      对长期应收款重要凭证执行检查：核对摘要、对方科目、金额、日期、凭证号与业务实质，识别异常凭证并形成结论。
+      审计目标：对长期应收款重要凭证执行检查：核对摘要、对方科目、金额、日期、凭证号与业务实质，识别异常凭证并形成结论。
     </el-alert>
 
     <div class="summary-bar" :class="{ 'summary-error': Math.abs(vc.debitTotal.value) > 0.01 }">
@@ -84,6 +84,21 @@
       </template>
     </el-table>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述抽凭方法与样本量、凭证检查结果、异常凭证识别及处理情况。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="props.readonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项，不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
+
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
       <ul>
@@ -97,9 +112,11 @@
 </template>
 
 <script setup lang="ts">
+import { ref, toRef, onMounted } from 'vue'
 import { useG5VoucherCheck } from '../../composables/useG5VoucherCheck'
 import type { VoucherCheckRow } from '../../composables/useG5VoucherCheck'
 import { G5_ACCOUNT_CODE } from '../../composables/g5Constants'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -109,6 +126,30 @@ import http from '@/utils/http'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const vc = useG5VoucherCheck()
+
+// ─── 审计说明 / 审计结论（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const auditConclusion = ref('')
+const G5_NOTE_KEY = 'G5-12-audit-note'
+const G5_CONCLUSION_KEY = 'G5-12-audit-conclusion'
+function saveAuditNote(val: string): void {
+  if (props.readonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.readonly) return
+  auditConclusion.value = val
+  void g5Notes.saveImmediate(G5_CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 const tabOptions = [
   { label: '凭证基础', value: 'basic' },
   { label: '核对内容', value: 'check' },
@@ -185,4 +226,6 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 .prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
 .prep-hint summary { cursor: pointer; font-weight: 500; }
 .prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

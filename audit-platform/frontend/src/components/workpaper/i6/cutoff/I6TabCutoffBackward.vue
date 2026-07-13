@@ -3,12 +3,29 @@
     <div class="section-header">
       <span class="section-title">I6-6 截止测试（单据→账簿）</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiAssist"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         <el-button size="small" type="default" text @click="handleReview">复核</el-button>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：从原始单据出发核对研发费用是否已及时入账，验证期末前发生的研发支出（6602）均已在当期记录，识别跨期交易。"
+      class="objective-alert"
+    />
+
     <div class="methodology-context">
       <p>反向截止测试：从原始单据出发，核对是否已及时入账。验证期末前发生的研发支出是否均已在当期记录。跨期交易以红色高亮标记。</p>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I6-6" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
     <div class="stats-card">
       <div class="stat-item"><span class="stat-label">样本总数</span><span class="stat-value">{{ rows.length }}</span></div>
@@ -53,12 +70,19 @@
       <el-button size="small" type="success" @click="handleSave">保存</el-button>
     </div>
 
-    <el-card shadow="never" class="summary-card">
-      <template #header><span>截止测试结论</span></template>
-      <el-input v-model="summaryConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="请填写反向截止测试结论..." @blur="onSummaryBlur" />
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="summary-card audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="请填写审计说明（反向截止测试样本选取、及时入账核对、跨期分析等）..." @blur="onAuditNoteBlur" />
     </el-card>
 
-    <details class="compile-hint"><summary>编制提示</summary><ul>
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="summary-card audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="请填写审计结论（研发费用截止正确，无重大跨期漏记）..." @blur="onAuditConclusionBlur" />
+    </el-card>
+
+    <details class="guidance-details compile-hint"><summary>编制提示</summary><ul>
       <li>反向截止：从单据出发核对是否已及时入账</li>
       <li>跨期判定：记账期间≠归属期间则为跨期</li>
       <li>"一键提取"自动从序时账±5天采样(反向)</li>
@@ -69,8 +93,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
@@ -80,19 +104,22 @@ const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', 
 interface CutoffRow { rowId: string; amount: number; expenseType: string; recordDate: string; documentDate: string; recordPeriod: string; belongPeriod: string; isCrossPeriod: boolean; conclusion: string }
 
 const ITEM_ID = 'I6-6-rows'
-const CONCLUSION_ID = 'I6-6-conclusion'
+const NOTE_KEY = 'I6-6-audit-note'
+const CONCLUSION_KEY = 'I6-6-audit-conclusion'
 const rows = ref<CutoffRow[]>([])
-const summaryConclusion = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 const crossCount = computed(() => rows.value.filter((r) => r.isCrossPeriod).length)
 const crossAmount = computed(() => rows.value.filter((r) => r.isCrossPeriod).reduce((s, r) => s + (r.amount || 0), 0))
 
 function _load(): void {
+  auditNote.value = _str(NOTE_KEY)
+  auditConclusion.value = _str(CONCLUSION_KEY)
   const item = props.allResponses.get(ITEM_ID)
   const raw = item?.remark ?? (typeof item === 'string' ? item : null)
   if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) { rows.value = p; _recalcCross(); return } } catch { /* */ } }
   rows.value = []
-  summaryConclusion.value = _str(CONCLUSION_ID)
 }
 function _str(id: string): string { const item = props.allResponses.get(id); return (item?.remark ?? (typeof item === 'string' ? item : '')) as string }
 watch(() => props.allResponses, () => _load(), { immediate: true })
@@ -104,7 +131,8 @@ function addRow(): void { rows.value.push({ rowId: `row-${Date.now().toString(36
 function removeRow(idx: number): void { rows.value.splice(idx, 1); _persist() }
 function onRowChange(_idx: number): void { _recalcCross(); _persist() }
 function handleSave(): void { _persist(); ElMessage.success('反向截止测试已保存') }
-function onSummaryBlur(): void { emit('save', CONCLUSION_ID, summaryConclusion.value) }
+function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
+function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
 
 async function handleAutoSampling(): Promise<void> {
   try {
@@ -117,7 +145,6 @@ async function handleAutoSampling(): Promise<void> {
   } catch { ElMessage.warning('自动提取失败，请手工录入') }
 }
 
-function handleAiAssist(): void { ElMessage.info('AI辅助截止性测试分析...') }
 function handleReview(): void { openReviewDialog('I6-6 截止(单据→账)') }
 function rowClassName({ row }: { row: CutoffRow }): string { return row.isCrossPeriod ? 'cross-period-row' : '' }
 function fmtAmount(v: number | null | undefined): string { if (v == null || Math.abs(v) < 0.005) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -125,6 +152,11 @@ function fmtAmount(v: number | null | undefined): string { if (v == null || Math
 
 <style scoped>
 .i6-cutoff-backward { font-size: var(--wp-font-size, 13px); padding: 16px; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; align-items: center; gap: 4px; }

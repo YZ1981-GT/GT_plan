@@ -1,5 +1,9 @@
 <template>
   <div class="h1-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：复核固定资产相关审计调整分录(AJE)与重分类分录(RJE)依据充分、借贷平衡，并已恰当推送至 A13 汇总。" />
+
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
@@ -78,7 +82,15 @@
     <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
       <template #header><span>审计说明</span></template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="调整事项说明..." />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="调整事项说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -94,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, inject, onMounted } from 'vue'
 import { useH1Adjustment } from '../../composables/useH1Adjustment'
 
 const props = defineProps<{
@@ -106,6 +118,18 @@ const props = defineProps<{
 
 const allResponsesRef = computed(() => props.allResponses)
 const auditNote = ref('')
+
+// ─── 审计说明/结论 持久化（inject saveResponse；纯 textarea 不臆造 AI） ──
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+const NOTE_KEY = 'H1-3-audit-note'
+const CONCLUSION_KEY = 'H1-3-audit-conclusion'
+const auditConclusionText = ref('')
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNote.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 
 const state = useH1Adjustment(
   toRef(props, 'wpId'),

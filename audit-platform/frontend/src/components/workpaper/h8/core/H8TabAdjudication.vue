@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实使用权资产（科目1901）原值及累计折旧期末余额、审定数计算的准确性与完整性，确认与 H9 租赁负债初始确认的勾稽关系符合 CAS21（使用权资产=H9+初始直接费用-租赁激励）。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>使用权资产审定表：科目1901（借方/资产类）+ 累计折旧（贷方/备抵类）。原值期末=期初+借-贷；折旧期末=期初+贷-借。审定数=未审+AJE+RJE。</p>
@@ -355,6 +359,8 @@ function getDepSummary({ columns, data }: { columns: any[]; data: H8Adjudication
 
 <style scoped>
 .h8-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

@@ -159,8 +159,20 @@
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
         placeholder="销售数量与结转成本数量核对说明（差异原因、理论结转验证结论等）..." @change="saveNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="量本核对审计结论：销售数量与结转成本数量是否匹配，量差异常是否已查明并调整。"
+        @change="saveConclusion" />
     </el-card>
   </div>
 </template>
@@ -192,6 +204,7 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const NOTE_KEY = 'F5-6-audit-note'
+const CONCLUSION_KEY = 'F5-6-audit-conclusion'
 
 const recon = useF5QuantityRecon({
   allResponses: allResponsesRef,
@@ -199,6 +212,7 @@ const recon = useF5QuantityRecon({
 })
 
 const auditNote = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
 const ocrLoadingId = ref<string | null>(null)
 
 const importExportCtx = computed(() =>
@@ -209,6 +223,13 @@ function saveNote() {
   allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value })
   window.dispatchEvent(new CustomEvent('f5:save-items', {
     detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: auditNote.value }] },
+  }))
+}
+
+function saveConclusion() {
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', {
+    detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value }] },
   }))
 }
 

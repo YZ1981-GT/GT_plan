@@ -6,12 +6,12 @@
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      对分期收款销售形成的长期应收款按实际利率法测算未实现融资收益的摊销，验证各期融资收益与账面确认金额的一致性。
+      审计目标：对分期收款销售形成的长期应收款按实际利率法测算未实现融资收益的摊销，验证各期融资收益与账面确认金额的一致性。
     </el-alert>
 
     <div class="segment-tabs">
       <el-segmented v-model="sales.activeTab.value" :options="tabOptions" size="small" />
-      <div class="tab-actions">
+      <div class="tab-actions tab-toolbar">
         <GtIndexChip value="wp:G5-6" />
         <G5ImportExportDropdown :wp-id="props.wpId" sheet="G5-6" @imported="onImported" />
         <el-button size="small" type="primary" plain @click="sales.addGroup()" :disabled="props.readonly">+ 新增项目</el-button>
@@ -95,6 +95,14 @@
 
     <div class="totals-bar">融资收益合计：{{ fmt(sales.totalIncome.value) }}</div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述实际利率法测算、未实现融资收益摊销、期间连续性校验及与账面利息确认差异分析。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <el-card shadow="never" class="conclusion-card">
       <template #header><div class="section-header"><span>审计结论</span><el-button size="small" type="primary" text>AI 辅助</el-button></div></template>
       <el-input v-model="sales.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="props.readonly" />
@@ -114,13 +122,30 @@
 </template>
 
 <script setup lang="ts">
+import { ref, toRef, onMounted } from 'vue'
 import { useG5InstallmentSales } from '../../composables/useG5InstallmentSales'
 import type { InstallmentSalesGroup, InstallmentPeriod } from '../../composables/useG5InstallmentSales'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const sales = useG5InstallmentSales()
+
+// ─── 审计说明（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const G5_NOTE_KEY = 'G5-6-audit-note'
+function saveAuditNote(val: string): void {
+  if (props.readonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 const tabOptions = [{ label: '初始交易要素', value: 'initial' }, { label: '分期摊销', value: 'amortization' }]
 
 function onRecalcInitial(group: InstallmentSalesGroup) { sales.recalcInitial(group); sales.recalcGroup(group) }
@@ -150,4 +175,6 @@ function fmt(v: number | null | undefined): string {
 .totals-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: 12px; }
 .conclusion-card { margin-top: 12px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

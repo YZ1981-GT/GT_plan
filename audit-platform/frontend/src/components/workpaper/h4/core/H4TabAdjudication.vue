@@ -5,15 +5,22 @@
       <p>科目1605工程物资（借方/资产类）：期末余额 = 期初 + 借方发生(增加) - 贷方发生(减少)；审定数 = 未审数 + AJE + RJE。三段结构：原值 - 减值准备 = 净值。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实工程物资（科目1605）期末余额的存在、完整与计价准确，验证三段结构（原值-减值准备=净值）与三角勾稽（期末=期初+借-贷）成立，为报表列报提供审定依据。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H4-1" :context-project-id="props.projectId" /></span>
+      <el-tag size="small" type="info">共 {{ originalDisplayRows.length + impairmentDisplayRows.length }} 行</el-tag>
+    </div>
+
     <!-- Section 1: 原值（Original Cost） -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
           <span>一、原值（Original Cost）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('original')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-1-original')">💬</el-button>
           </div>
         </div>
@@ -102,9 +109,6 @@
         <div class="section-header">
           <span>二、减值准备（Impairment）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('impairment')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-1-impairment')">💬</el-button>
           </div>
         </div>
@@ -291,9 +295,6 @@
         <div class="section-header">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-note')">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-1-note')">💬</el-button>
           </div>
         </div>
@@ -309,9 +310,6 @@
         <div class="section-header">
           <span>审计结论</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-conclusion')">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-1-conclusion')">💬</el-button>
           </div>
         </div>
@@ -360,6 +358,7 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { useH4Adjudication, type H4AdjudicationRow } from '../../composables/useH4Adjudication'
 import { useH4CrossSheet } from '../../composables/useH4CrossSheet'
 import { calcTriangleReconciliation } from '../../composables/useH4FormulaEngine'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -519,9 +518,6 @@ async function handlePublish() {
   }
 }
 
-function handleAiGenerate(section: string) {
-  console.log('[H4-1] AI generate:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -540,6 +536,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

@@ -11,6 +11,16 @@
 
     <GCycleGuideStrip :steps="['H10A 程序', 'H10-1 审定', 'H10-2 明细', 'H10-3 调整', 'H10-4 检查', '附注披露']" />
 
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：确认资产处置损益（6115 发生额）的完整性与准确性，验证处置损益确认时点恰当、分类列报正确，为财务报表列报提供审定依据。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H10-1" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <el-alert v-if="adj.detailCrossValidation.value" type="warning" :closable="false" class="cross-alert">
       {{ adj.detailCrossValidation.value }}
       <GtIndexChip v-if="jumpToSection" label="H10-2" :prevent-navigate="true" :validate="false"
@@ -219,6 +229,11 @@ function fmtRate(rate: number | null): string {
 .h10-title { margin: 0; font-size: 15px; }
 .h10-actions { display: flex; gap: 8px; }
 .cross-alert { margin-bottom: 8px; }
+.objective-alert { margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
 .group-block { margin-bottom: 8px; }
 .group-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f5f7fa; cursor: pointer; border-radius: 4px; }

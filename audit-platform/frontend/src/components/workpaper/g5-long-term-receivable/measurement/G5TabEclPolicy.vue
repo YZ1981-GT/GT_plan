@@ -1,12 +1,12 @@
 <template>
   <div class="g5-ecl-policy">
-    <div class="section-head">
+    <div class="section-head tab-toolbar">
       <h3 class="sheet-title">G5-8 会计政策检查</h3>
       <GtIndexChip value="wp:G5-8" />
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      检查长期应收款预期信用损失（ECL）会计政策及关键参数是否符合准则要求，评价政策一致性与合规性。
+      审计目标：检查长期应收款预期信用损失（ECL）会计政策及关键参数是否符合准则要求，评价政策一致性与合规性。
     </el-alert>
 
     <el-card shadow="never" class="section-card">
@@ -66,6 +66,21 @@
       <el-input v-model="policy.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="props.readonly" />
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述 ECL 会计政策核对情况、关键参数（PD/LGD/EAD）及前瞻性信息合理性评价。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="props.readonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、会计政策合规、参数合理。B、除下述事项外未见异常。C、存在重大不合规或参数不当事项。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
+
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
       <ul>
@@ -79,10 +94,36 @@
 </template>
 
 <script setup lang="ts">
+import { ref, toRef, onMounted } from 'vue'
 import { useG5EclPolicy } from '../../composables/useG5EclPolicy'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const policy = useG5EclPolicy()
+
+// ─── 审计说明 / 审计结论（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const auditConclusion = ref('')
+const G5_NOTE_KEY = 'G5-8-audit-note'
+const G5_CONCLUSION_KEY = 'G5-8-audit-conclusion'
+function saveAuditNote(val: string): void {
+  if (props.readonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.readonly) return
+  auditConclusion.value = val
+  void g5Notes.saveImmediate(G5_CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 </script>
 
 <style scoped>
@@ -95,4 +136,6 @@ const policy = useG5EclPolicy()
 .prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .section-card { margin-bottom: 12px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

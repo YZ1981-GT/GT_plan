@@ -1,11 +1,13 @@
 <template>
   <div class="h5-tab-disclosure-listed">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：复核油气资产附注披露(上市公司版)的完整性与准确性，确保符合 CAS27 披露要求（储量信息、折耗方法、弃置费用）。" class="objective-alert" />
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>附注披露 — 上市公司版</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-disc-L')">💬 复核</el-button>
           </div>
         </div>
@@ -61,6 +63,20 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNoteText" :autosize="{ minRows: 5 }"
+        placeholder="填写附注披露审计说明..." :disabled="isReadonly" @change="savePolishNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusionText" :autosize="{ minRows: 3 }"
+        placeholder="填写附注披露审计结论..." :disabled="isReadonly" @change="savePolishConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -73,12 +89,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
+import { useH5FormData } from '../../composables/useH5FormData'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+
+// 审计说明/结论（component-local，沿用 useH5FormData 契约，conclusion:null）
+const NOTE_KEY = 'H5-disc-L-audit-note'
+const CONCLUSION_KEY = 'H5-disc-L-audit-conclusion'
+const auditNoteText = ref('')
+const auditConclusionText = ref('')
+function savePolishNote(val: string): void {
+  if (props.isReadonly) return
+  auditNoteText.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void formData.saveResponse(NOTE_KEY, val)
+}
+function savePolishConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusionText.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void formData.saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusionText.value = c.remark
+})
 
 const disclosureText = ref('')
 const adjudicatedData = ref<{ costAudited: number; depletionAudited: number; netValue: number } | null>(null)
@@ -138,13 +181,15 @@ const depletionNoteRows = computed(() => {
   return [{ item: '累计折耗合计', beginBalance: 0, provision: 0, endBalance: 0 }]
 })
 
-function handleAiGenerate() {}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string { return val == null ? '-' : val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>
 
 <style scoped>
 .h5-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

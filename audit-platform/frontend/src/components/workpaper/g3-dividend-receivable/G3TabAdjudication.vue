@@ -15,11 +15,22 @@
   <div class="g3-adjudication">
     <div class="section-head">
       <h3 class="sheet-title">G3-1 应收股利审定表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" :disabled="isReadonly" @click="adj.addRow()">＋ 新增被投资方</el-button>
         <el-button size="small" @click="openReviewDialog('G3-1-adjudication')">💬复核</el-button>
+        <GtIndexChip value="wp:G3-1" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ adj.dataRows.value.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实应收股利各被投资方期初/期末审定金额的准确性与完整性，验证与调整分录、试算平衡表的勾稽一致，为报表列报提供审定依据。"
+    />
 
     <el-table
       :data="tableData"
@@ -262,6 +273,19 @@
       </span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：概述审定程序执行情况、各被投资方勾稽核对及差异分析结果、拟调整及未调整事项及其影响。"
+        @change="persistNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
@@ -273,11 +297,23 @@
         placeholder="对应收股利审定表的复核结论..."
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示（CAS 依据）</summary>
+      <div class="guidance-content">
+        <p>1. 借方科目 1131 应收股利：期初审定 = 期初未审 + AJE + RJE。</p>
+        <p>2. 期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)；期末审定 = 期末未审 + AJE + RJE。</p>
+        <p>3. 灰色底纹/虚线下划线列为自动计算列，不可手动编辑。</p>
+        <p>4. 合计行审定金额应与试算平衡表数(1131)核对一致，差异不为零时以红色高亮。</p>
+        <p class="cas-basis">CAS 依据：应就财务报表项目金额获取充分、适当的审计证据（《中国注册会计师审计准则第 1301 号——审计证据》、《企业会计准则第 2 号——长期股权投资》）。</p>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, inject } from 'vue'
+import { ref, computed, toRef, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { useG3Adjudication } from '../composables/useG3Adjudication'
 import type { G3AdjudicationRow } from '../composables/useG3Adjudication'
@@ -300,6 +336,14 @@ const adj = useG3Adjudication({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
+
+// ─── 审计说明（conclusion=null，文本存 remark，走白名单豁免路径） ───
+const NOTE_KEY = 'G3-1-adjudication-audit-note'
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+function persistNote() {
+  if (props.isReadonly) return
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: auditNote.value })
+}
 
 // ─── Table data: data rows + subtotal + trial balance + variance ───
 interface DisplayRow extends G3AdjudicationRow {
@@ -469,5 +513,49 @@ function fmtNum(v: unknown): string {
 /* 结论卡片 */
 .conclusion-card {
   margin-top: 12px;
+}
+
+/* 审计目标 */
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 审计说明卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+}
+
+/* 编制提示（guidance-details gold 样式） */
+.guidance-details {
+  margin-top: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #409eff;
+}
+.guidance-content {
+  margin-top: 8px;
+  font-size: var(--wp-font-size, 13px);
+  color: #606266;
+  line-height: 1.6;
+}
+.guidance-content p {
+  margin: 2px 0;
+}
+.guidance-content .cas-basis {
+  margin-top: 6px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

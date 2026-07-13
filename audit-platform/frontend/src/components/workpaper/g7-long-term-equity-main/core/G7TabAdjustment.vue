@@ -201,6 +201,28 @@
       <span v-else class="footer-status err">❌ 不平衡</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="note-card" shadow="never">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea"
+        :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写调整分录的审计说明：调整事项依据、错报性质、AJE/RJE 判断过程等。"
+        @change="saveNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="note-card" shadow="never">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea"
+        :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：调整分录经复核借贷平衡、依据充分，已回写 G7-1 审定表。"
+        @change="saveConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="g7-guide-details">
       <summary>📋 编制提示</summary>
@@ -233,6 +255,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
 import type { G7MainImportableSheet } from '../../composables/useG7ImportExport'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -262,6 +285,35 @@ interface G7AdjustmentEntry {
 const entries = ref<G7AdjustmentEntry[]>([])
 const isDirty = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+
+// ═══ 审计说明/结论 持久化（checklist_responses）══════════════════════════════
+const NOTE_KEY = 'G7-3-adjustment-audit-note'
+const CONCLUSION_KEY = 'G7-3-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(itemId: string, val: string): void {
+  if (props.isReadonly || !props.wpId) return
+  api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+    project_id: props.projectId || undefined,
+    items: [{ item_id: itemId, conclusion: null, remark: val }],
+  }, { _silent: true } as any).catch(() => {})
+}
+
+function saveNote(): void { persistAudit(NOTE_KEY, auditNote.value) }
+function saveConclusion(): void { persistAudit(CONCLUSION_KEY, auditConclusion.value) }
+
+async function loadAuditResponses(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+    const items = Array.isArray(res) ? res : (res as any)?.data || []
+    for (const it of items) {
+      if (it.item_id === NOTE_KEY && it.remark) auditNote.value = it.remark
+      else if (it.item_id === CONCLUSION_KEY && it.remark) auditConclusion.value = it.remark
+    }
+  } catch { /* silent */ }
+}
 
 // ═══ 导入导出 ═══
 const ie = useG7ImportExport({
@@ -323,6 +375,7 @@ function loadFromHtmlData(): void {
 
 onMounted(() => {
   loadFromHtmlData()
+  loadAuditResponses()
 })
 
 // ═══ 操作方法 ═══
@@ -564,6 +617,10 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
   color: #f56c6c;
   font-weight: 700;
 }
+
+/* 审计说明/结论卡片 */
+.note-card { margin-top: 12px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 
 /* RJE行浅色区分 */
 :deep(.rje-row) {

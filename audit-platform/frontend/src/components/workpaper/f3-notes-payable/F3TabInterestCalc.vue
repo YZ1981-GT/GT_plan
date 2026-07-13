@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabInterestCalc — F3-4 带息票据利息测算 | Task 6.3, 9.3 */
-import { ref, toRef, inject, type Ref } from 'vue'
+import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useF3InterestCalc, type F3NoteOcrFields } from '../composables/useF3InterestCalc'
@@ -31,6 +31,18 @@ const { rows, totals, auditConclusion, addRow, removeRow, updateCell, rowClassNa
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF3AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+// ─── 审计说明（无匹配 AI section → 纯 textarea；F3 约定持久化） ───
+const NOTE_KEY = 'F3-4-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
 
 async function generateAiConclusion() {
   if (props.isReadonly) return
@@ -161,6 +173,21 @@ async function handleNoteOcr(rowId: string, file: File) {
     </el-table>
 
     <div class="subtotal">合计 — 面值 {{ fmt(totals.faceValue) }} | 应付利息 {{ fmt(totals.payableInterest) }} | 计提 {{ fmt(totals.bookInterest) }} | 差异 {{ fmt(totals.variance) }}</div>
+
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：利息测算方法、测算数与企业计提数差异及原因、拟调整事项。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
 
     <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">

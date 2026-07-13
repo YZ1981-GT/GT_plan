@@ -81,14 +81,19 @@
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
-          <span>审计说明 / 结论</span>
+          <span>审计说明</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi('fv-review')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" link @click="handleReview('H7-13')">💬 复核</el-button>
           </div>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请填写公允价值复核说明（估值技术、关键参数、市场数据来源、差异原因等）..." :disabled="isReadonly" @blur="persist('H7-13-note', auditNote)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-13-conclusion', auditConclusion)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -117,7 +122,6 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7FairValueReview } from '../../composables/useH7FairValueReview'
@@ -149,6 +153,7 @@ function blankRow(name: string): FvRow {
 
 const rows = ref<FvRow[]>([])
 const auditNote = ref('')
+const auditConclusion = ref('')
 
 function fvTotal(r: FvRow): number { return r.isSubtotal ? num((r as any).fvTotal) : num(r.quantity) * num(r.unitFv) }
 function diffVal(r: FvRow): number { return r.isSubtotal ? num((r as any).diff) : fvTotal(r) - num(r.bookValue) }
@@ -173,6 +178,7 @@ async function loadOwn() {
   const raw = getString('H7-13-rows')
   if (raw) { try { const arr = JSON.parse(raw); if (Array.isArray(arr)) rows.value = arr } catch { /* ignore */ } }
   auditNote.value = getString('H7-13-note') || ''
+  auditConclusion.value = getString('H7-13-conclusion') || ''
   void getNum
 }
 
@@ -201,9 +207,6 @@ function removeRow(rowId: string) {
   onUpdate()
 }
 
-function handleAi(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
-}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   if (v == null) return '-'

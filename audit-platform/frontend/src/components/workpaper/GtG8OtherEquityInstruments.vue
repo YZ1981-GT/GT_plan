@@ -84,16 +84,18 @@
         @imported="reloadAll"
       />
 
-      <G8TabDisclosureListed
+      <G8TabDisclosureBase
         v-else-if="currentSheet === '附注上市'"
+        variant="listed"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
 
-      <G8TabDisclosureSOE
+      <G8TabDisclosureBase
         v-else-if="currentSheet === '附注国企'"
+        variant="soe"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
@@ -156,8 +158,7 @@ const G8TabAdjustment = defineAsyncComponent(() => import('./g8-other-equity-ins
 const G8TabFairValueTest = defineAsyncComponent(() => import('./g8-other-equity-instruments/valuation/G8TabFairValueTest.vue'))
 const G8TabDesignationCheck = defineAsyncComponent(() => import('./g8-other-equity-instruments/valuation/G8TabDesignationCheck.vue'))
 const G8TabVoucherCheck = defineAsyncComponent(() => import('./g8-other-equity-instruments/voucher/G8TabVoucherCheck.vue'))
-const G8TabDisclosureListed = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDisclosureListed.vue'))
-const G8TabDisclosureSOE = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDisclosureSOE.vue'))
+const G8TabDisclosureBase = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDisclosureBase.vue'))
 const G8TabDirectory = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))

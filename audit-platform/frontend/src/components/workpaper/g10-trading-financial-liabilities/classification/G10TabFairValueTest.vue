@@ -12,6 +12,17 @@
       <GtReviewTrigger section-id="G10-5-fv-test" />
     </div>
 
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实交易性金融负债期末公允价值计量的准确性，验证公允价值层次划分与估值技术的恰当性，Level3 不可观察输入值的充分披露。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-5" /></span>
+        <el-tag size="small" type="info">共 {{ fv.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-alert v-if="fv.level3Violations.value.length" type="warning" :closable="false" class="l3-alert">
       Level3 必填缺失：{{ fv.level3Violations.value.map(v => v.liabilityName).join('、') }}
     </el-alert>
@@ -159,6 +170,13 @@
         :disabled="isReadonly" @update:model-value="fv.updateConclusion" />
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述公允价值测试的程序执行情况、估值方法与来源核实、Level3 输入值合理性及与 G10-6 调节表勾稽结果。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -171,11 +189,12 @@
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useG10FairValueTest } from '../../composables/useG10FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -191,6 +210,18 @@ const fv = useG10FairValueTest({
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
   wpId: toRef(props, 'wpId'),
+})
+
+// ─── 审计说明（自由文本，conclusion:null 落库）───────────────────────────────
+const NOTE_KEY = 'G10-5-fv-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
 })
 
 const tabOptions = [
@@ -215,4 +246,10 @@ function fmt(v: number) {
 :deep(.l3-required .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .guidance-content p { margin: 4px 0; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

@@ -15,6 +15,14 @@
       </div>
     </details>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：按上市公司财务报表列报要求（CAS30），完整、准确披露预付账款（科目1123）按性质分类、按账龄分类及重大变动情况，确保附注披露与 F1-1 审定表勾稽一致。"
+      class="objective-alert"
+    />
+
     <!-- 子节一：按性质分类 -->
     <div class="disclosure-card">
       <h4 class="card-title">
@@ -181,6 +189,32 @@
           placeholder="重大变动的附注披露说明..." />
       </div>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述附注披露各分类的数据来源与勾稽核对情况、披露完整性与准确性的复核结论。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：预付账款附注披露是否符合企业会计准则列报要求，与审定表是否勾稽一致。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </template>
 </div>
 </template>
@@ -190,7 +224,7 @@
  * F1TabDisclosureListed.vue — 附注披露（上市公司）
  * 3子节卡片 + 跨sheet取数 + 动态行 + 合计 + 说明 + 编制提示
  */
-import { computed, ref, toRef, type Ref } from 'vue'
+import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF1DisclosureListed } from '../composables/useF1DisclosureListed'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -236,6 +270,33 @@ const {
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,
 })
 
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const NOTE_KEY = 'F1-disclosure-listed-audit-note'
+const CONCLUSION_KEY = 'F1-disclosure-listed-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void props.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = allResponsesRef.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = allResponsesRef.value.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
@@ -253,6 +314,11 @@ function fmtAmount(val: number | null | undefined): string {
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 
 .disclosure-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }

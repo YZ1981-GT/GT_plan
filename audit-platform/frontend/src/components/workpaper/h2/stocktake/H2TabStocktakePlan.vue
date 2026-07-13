@@ -1,14 +1,23 @@
 <template>
   <div class="h2-tab-stocktake-plan">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：制定在建工程现场监盘计划，明确踏勘日期/地点/范围与工程选取依据（金额重大/异常/随机），确保监盘程序覆盖充分、执行有序。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-12" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">选取 {{ state.plan.value.selectedProjects.length }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- 区域1: 基本信息 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
           <span>一、监盘基本信息</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('plan-info')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-12')">💬</el-button>
           </div>
         </div>
@@ -106,6 +115,26 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述监盘计划的编制依据、工程选取的抽样考虑、人员安排与资料准备。" :disabled="isReadonly"
+        @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写结论：如监盘计划已充分覆盖重大与异常项目、经项目负责人审批，可据以实施。" :disabled="isReadonly"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -125,10 +154,11 @@
  * 3区域(基本信息+工程选取+时间安排)
  * Spec: Task 4.15 | Requirements: 11.1
  */
-import { inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Stocktake } from '../../composables/useH2Stocktake'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -138,6 +168,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Stocktake({
   wpId: toRef(props, 'wpId'),
@@ -145,9 +176,34 @@ const state = useH2Stocktake({
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
   phase: 'plan',
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const isReadonly = computed(() => props.isReadonly)
+
+// H2-12 审计说明/结论：本 sheet 独立 item_id（plan/check/summary 共用同一 composable）。
+const NOTE_KEY = 'H2-12-audit-note'
+const CONCLUSION_KEY = 'H2-12-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  saveResponse(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function onFieldChange(field: string, value: any) {
   state.updatePlan(field as any, value)
@@ -172,9 +228,6 @@ function handleRemoveProject(rowId: string) {
   state.removePlanProject(rowId)
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate H2-12:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -183,6 +236,11 @@ function openReview(id: string) {
 
 <style scoped>
 .h2-tab-stocktake-plan { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

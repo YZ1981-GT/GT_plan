@@ -27,6 +27,15 @@
       <p><strong>CAS8 减值分摊规则：</strong>含商誉的资产组发生减值时，减值损失金额应当先抵减分摊至资产组或者资产组组合中商誉的账面价值，再根据资产组或者资产组组合中除商誉之外的其他各项资产的账面价值所占比重，按比例抵减其他各项资产的账面价值。商誉减值损失一经确认，在以后会计期间不得转回。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：按资产组(CGU)对含商誉的资产组进行减值测试，验证可收回金额确定的合理性；减值损失 = MAX(资产组账面价值 − 可收回金额, 0)，并按“先冲商誉、再按比例分摊其他资产”的两步法处理；商誉减值不可转回（CAS8 第十七、十八条）。"
+    />
+
     <!-- 主表区域 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -43,13 +52,19 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('I3-6')">💬</el-button>
           </div>
         </div>
       </template>
+
+      <!-- 工具栏：索引 chip + 行数 -->
+      <div class="tab-toolbar">
+        <div class="toolbar-left"></div>
+        <div class="toolbar-right">
+          <GtIndexChip value="wp:I3-6" :context-project-id="projectId" />
+          <el-tag size="small" type="info">共 {{ cguRows.length }} 行</el-tag>
+        </div>
+      </div>
 
       <!-- CGU 表格 -->
       <el-table
@@ -258,23 +273,37 @@
       </template>
     </el-alert>
 
-    <!-- 审计说明与结论 -->
+    <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
-          <span>审计说明与结论</span>
-          <el-button size="small" type="primary" link @click="handleAiConclusion">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
+          <span>审计说明</span>
         </div>
       </template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写商誉减值测试结论（如：经对各资产组进行减值测试，商誉所在资产组的可收回金额均高于/低于其账面价值…）"
+        :autosize="{ minRows: 5 }"
+        placeholder="记录减值测试执行过程的审计说明（如：各资产组账面价值构成、可收回金额来源(I3-7 DCF/公允减处置费)、分摊方法等）"
         :disabled="isReadonly"
         @blur="handleSaveConclusion"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span>审计结论</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusionText"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        placeholder="商誉减值测试的审计结论（如：经对各资产组进行减值测试，商誉所在资产组可收回金额均高于/低于其账面价值，应/无需计提减值…）"
+        :disabled="isReadonly"
+        @blur="handleSaveAuditConclusion"
       />
     </el-card>
 
@@ -307,9 +336,8 @@
  * Task: 4.7
  * Requirements: 5.1-5.5
  */
-import { ref, inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useI3Impairment, type CguRow } from '../../composables/useI3Impairment'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -355,7 +383,22 @@ const {
 
 // ─── Local State ─────────────────────────────────────────────────────────────
 
+const CONCLUSION_KEY = 'I3-6-conclusion'
+const AUDIT_CONCLUSION_KEY = 'I3-6-audit-conclusion'
 const auditConclusion = ref('')
+const auditConclusionText = ref('')
+
+// 恢复已保存的审计说明/结论
+watch(
+  () => props.allResponses,
+  () => {
+    const n = props.allResponses.get(CONCLUSION_KEY)
+    if (n?.remark != null) auditConclusion.value = n.remark
+    const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+    if (c?.remark != null) auditConclusionText.value = c.remark
+  },
+  { immediate: true },
+)
 
 // ─── Row Highlight: impaired rows get light red background (Req 5) ───────────
 
@@ -475,20 +518,14 @@ function handleExportImport(command: string) {
   }
 }
 
-// ─── AI ──────────────────────────────────────────────────────────────────────
-
-function handleAiGenerate() {
-  console.log('[I3-6] AI generate impairment test')
-}
-
-function handleAiConclusion() {
-  console.log('[I3-6] AI generate conclusion')
-}
-
 // ─── Save & Review ───────────────────────────────────────────────────────────
 
 function handleSaveConclusion() {
-  emit('save', 'I3-6-conclusion', auditConclusion.value)
+  emit('save', CONCLUSION_KEY, auditConclusion.value)
+}
+
+function handleSaveAuditConclusion() {
+  emit('save', AUDIT_CONCLUSION_KEY, auditConclusionText.value)
 }
 
 function openReview(id: string) {
@@ -556,6 +593,22 @@ function fmtAmt(val: number | null | undefined): string {
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-title { font-weight: 600; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
+
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 16px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 
 /* 主表格 */
 .impairment-table { font-size: var(--wp-font-size, 13px); }

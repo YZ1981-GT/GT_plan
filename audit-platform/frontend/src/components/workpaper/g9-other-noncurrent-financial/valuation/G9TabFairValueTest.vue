@@ -1,6 +1,6 @@
 <template>
   <div class="g9-fv" data-testid="g9-fv-test">
-    <div class="toolbar">
+    <div class="toolbar tab-toolbar">
       <div class="methodology">公允价值三层次：Level1 活跃市场报价 / Level2 可观察输入值 / Level3 不可观察输入值（估值技术）</div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:G9-4" />
@@ -8,6 +8,15 @@
         <G9ImportExportDropdown :wp-id="wpId" sheet="G9-4" @imported="onImported" />
       </div>
     </div>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标：验证其他非流动金融资产公允价值计量的恰当性，核实公允价值层次划分、估值技术与不可观察输入值的合理性。"
+    />
+
     <el-segmented v-model="fv.activeTab.value" :options="[{ label: '基础+审定', value: 'basic' }, { label: '估值详情', value: 'detail' }]" size="small" />
     <el-button v-if="!isReadonly" size="small" style="margin:8px 0" @click="fv.addRow()">+ 新增</el-button>
     <el-table :data="fv.rows.value" border size="small" style="font-size:13px" max-height="480">
@@ -151,6 +160,13 @@
       </template>
     </el-table>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述公允价值取数来源、层次划分依据、估值技术与不可观察输入值的核对情况及差异分析。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <el-card shadow="never" class="conclusion-card">
       <template #header>
         <div class="conclusion-head">
@@ -171,7 +187,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, toRef, ref, onMounted } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9FairValueTest } from '../../composables/useG9FairValueTest'
@@ -194,6 +210,18 @@ const fv = useG9FairValueTest({
 })
 
 function onImported() { emit('imported') }
+
+// ─── 审计说明（持久化 checklist_responses）────────────────────────────────
+const NOTE_KEY = 'G9-fairvalue-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+})
 </script>
 
 <style scoped>
@@ -206,4 +234,7 @@ function onImported() { emit('imported') }
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .methodology-hint { margin-top: 8px; font-size: 12px; color: #909399; }
+.audit-objective { margin-bottom: 10px; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

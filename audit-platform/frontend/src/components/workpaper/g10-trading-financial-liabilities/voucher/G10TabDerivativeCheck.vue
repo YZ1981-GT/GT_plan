@@ -11,6 +11,17 @@
       <GtReviewTrigger section-id="G10-8-derivative" />
     </div>
 
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实衍生金融工具的确认与计量是否符合 CAS 22 定义（五要素），验证嵌入衍生的拆分判断、公允价值计量及套期关系认定的恰当性与披露完整性。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-8" /></span>
+        <el-tag size="small" type="info">共 {{ dc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <div v-if="dc.useVirtualScroll.value" class="virtual-toolbar">
       <el-alert type="info" :closable="false">行数较多（{{ dc.rows.value.length }} 行）· 虚拟滚动速览模式</el-alert>
     </div>
@@ -102,20 +113,28 @@
         :disabled="isReadonly" @update:model-value="dc.updateOverallConclusion" />
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述衍生工具五要素核查、嵌入衍生拆分判断、公允价值计量及套期关系认定的测试情况与发现。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
-      <p>五区段问卷覆盖衍生工具定义、嵌入衍生、公允价值、套期关系及披露完整性。</p>
+      <p>五区段问卷覆盖衍生工具定义、嵌入衍生、公允价值、套期关系及披露完整性。不合规项须在结论中说明审计应对。</p>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, h } from 'vue'
+import { ref, computed, toRef, onMounted, h } from 'vue'
 import type { Column } from 'element-plus'
 import { useG10DerivativeCheck } from '../../composables/useG10DerivativeCheck'
 import { G10_COMPLIANCE_OPTIONS, G10_RISK_LEVEL_OPTIONS } from '../../composables/g10Constants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -132,6 +151,18 @@ const dc = useG10DerivativeCheck({
 })
 
 const expandedSections = ref<string[]>([])
+
+// ─── 审计说明（自由文本，conclusion:null 落库）───────────────────────────────
+const NOTE_KEY = 'G10-8-derivative-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+})
 const browseMode = ref(true)
 const tableWidth = 1100
 
@@ -156,4 +187,10 @@ const virtualColumns = computed<Column<any>[]>(() => [
 .conclusion-card { margin-top: 12px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

@@ -88,6 +88,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
         />
 
         <!-- I6-5 截止测试（账→单据） -->
@@ -117,6 +118,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
         />
 
         <!-- 附注披露（国企） -->
@@ -126,6 +128,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->

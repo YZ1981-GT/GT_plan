@@ -1,6 +1,6 @@
 <template>
   <div class="g14-detail" data-testid="g14-detail">
-    <div class="g14-toolbar">
+    <div class="g14-toolbar tab-toolbar">
       <h3 class="g14-title">G14-2 信用减值损失明细表</h3>
       <div class="g14-actions">
         <GtIndexChip value="wp:G14-2" />
@@ -149,6 +149,17 @@
       </template>
     </el-table>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计说明</template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="录入本期各减值来源计提/转回的审计说明…" @update:model-value="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计结论</template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="录入审计结论…" @update:model-value="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <p>1. 13 列拆为「本期数 / 减值准备滚动」两 Tab；固定 9 类行 + 合计，与 G14-1 一一对应。</p>
@@ -160,7 +171,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, onMounted } from 'vue'
 import { useG14Detail } from '../composables/useG14Detail'
 import { useG14ExternalCross } from '../composables/useG14ExternalCross'
 import { G14_ECL_CROSS_REF } from '../composables/g14Constants'
@@ -199,6 +210,30 @@ const extCross = useG14ExternalCross({
 
 const displayRows = computed(() => [...detail.rows.value, detail.totalRow.value])
 
+const NOTE_KEY = 'G14-2-detail-audit-note'
+const CONCLUSION_KEY = 'G14-2-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 function rowClassName({ row }: { row: { rowKey: string; reconciled?: boolean; rollForwardBalanced?: boolean } }): string {
   if (row.rowKey === 'total') return 'g14-row-total'
   if (row.reconciled === false || row.rollForwardBalanced === false) return 'g14-row-warn'
@@ -223,6 +258,7 @@ function eclRef(rowKey: string): string {
 .g14-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .g14-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .g14-title { margin: 0; font-size: 15px; font-weight: 600; }
+.audit-note-card { margin-top: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 .cell-error { color: #f56c6c; font-weight: 600; }
 :deep(.g14-row-total) { font-weight: 700; background: #f5f7fa; }

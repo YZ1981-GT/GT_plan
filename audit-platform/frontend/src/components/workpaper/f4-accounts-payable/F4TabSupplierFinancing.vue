@@ -127,7 +127,7 @@ function fmtAmount(v: number): string {
       title="审计目标：检查保理、票据融资及供应链融资是否满足终止确认条件(IFRS 9/CAS 23)，评估是否应重分类为金融负债，防止负债表外化。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left"></div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click">

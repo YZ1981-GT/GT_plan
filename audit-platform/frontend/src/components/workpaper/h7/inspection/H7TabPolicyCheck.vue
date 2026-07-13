@@ -6,6 +6,11 @@
       </template>
     </el-alert>
 
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H7-4" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ items.length }} 项</el-tag>
+    </div>
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
@@ -18,7 +23,6 @@
             <el-tag size="small" type="info" class="row-tag">共 {{ items.length }} 项</el-tag>
           </span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" type="default" link @click="handleReview('H7-4')">💬 复核</el-button>
           </div>
         </div>
@@ -61,10 +65,14 @@
     </el-card>
 
     <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录本表审计程序的实施情况、核对过程与发现。" @blur="persist('H7-4-note', auditNote)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
           <span>审计结论</span>
-          <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI说明</el-button>
         </div>
       </template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="记录会计政策适当性与一贯性的整体评价" @blur="persist('H7-4-conclusion', conclusion)" />
@@ -84,14 +92,12 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7PolicyCheck } from '../../composables/useH7PolicyCheck'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; measurementModel?: 'cost' | 'fair_value'; isReadonly?: boolean }>()
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const generateAiText = inject<((section: string, ctx: string, existing: string) => Promise<string>) | null>('generateAiText', null)
 
 const allResponsesRef = computed(() => props.allResponses)
 const check = useH7PolicyCheck(allResponsesRef as any, { wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
@@ -116,6 +122,7 @@ const DEFAULT_ITEMS: Omit<PolicyItem, 'policy' | 'result' | 'remark'>[] = [
 
 const items = ref<PolicyItem[]>([])
 const conclusion = ref('')
+const auditNote = ref('')
 
 function applicable(row: PolicyItem): boolean {
   if (row.mode === 'both') return true
@@ -145,6 +152,7 @@ function seed(): void {
     remark: saved[d.key]?.remark ?? '',
   }))
   conclusion.value = check.getString('H7-4-conclusion')
+  auditNote.value = check.getString('H7-4-note') || ''
 }
 onMounted(seed)
 
@@ -160,18 +168,14 @@ function resultTag(r: string): 'success' | 'danger' | 'info' {
   if (r === '不符合') return 'danger'
   return 'info'
 }
-async function handleAi(): Promise<void> {
-  if (!generateAiText) return
-  const ctx = `会计政策检查：计量模式=${measurementModel.value === 'fair_value' ? '公允价值' : '成本'}，合规${complianceStat.value.符合}项，不符合${complianceStat.value.不符合}项。`
-  const text = await generateAiText('h7-policy', ctx, conclusion.value)
-  if (text) { conclusion.value = text; persist('H7-4-conclusion', conclusion.value) }
-}
 function handleReview(id: string): void { openReviewDialog(id) }
 </script>
 
 <style scoped>
 .h7-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

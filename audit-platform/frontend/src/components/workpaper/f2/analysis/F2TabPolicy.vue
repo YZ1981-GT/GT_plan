@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F2TabPolicy — F2-16 会计政策 | Task 17.1 */
-import { toRef, type Ref } from 'vue'
+import { ref, toRef, onMounted, type Ref } from 'vue'
 import { useF2Policy } from '../../composables/useF2Policy'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -13,6 +13,34 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const NOTE_KEY = 'F2-policy-audit-note'
+const CONCLUSION_KEY = 'F2-policy-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 const { sections, policyConclusion, changedCount, updateSection } = useF2Policy({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
@@ -109,6 +137,32 @@ async function generatePolicyConclusion() {
       </template>
       <el-input v-model="policyConclusion" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly" placeholder="总体政策评价结论..." />
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述存货计价与跌价准备会计政策的核查程序、适当性与前后期一贯性的测试情况与结果，以及政策变更的核查与拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -138,4 +192,6 @@ async function generatePolicyConclusion() {
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 .opinion-actions { display: flex; gap: 6px; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

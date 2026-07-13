@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-stocktake-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：通过现场盘点核实在建工程的存在性与形象进度，核对账面进度与实际施工状态的差异，识别停工/异常项目并关注其减值迹象。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-13" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.checkRows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 盘点检查表 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -16,9 +28,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-13')">💬</el-button>
           </div>
         </div>
@@ -136,6 +145,26 @@
       </template>
     </el-alert>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述盘点范围/方法、形象进度与账面核对情况、停工与异常项目的处理。" :disabled="isReadonly"
+        @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如现场盘点结果与账面一致、工程真实存在，未见异常；或说明停工/进度异常事项及其对减值的影响。" :disabled="isReadonly"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -155,10 +184,11 @@
  * 盘点检查表 + 停工红色高亮 + 导入导出
  * Spec: Task 4.16 | Requirements: 11.2, 11.5
  */
-import { inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Stocktake } from '../../composables/useH2Stocktake'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -168,6 +198,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Stocktake({
   wpId: toRef(props, 'wpId'),
@@ -175,9 +206,35 @@ const state = useH2Stocktake({
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
   phase: 'check',
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const isReadonly = computed(() => props.isReadonly)
+
+// H2-13 审计说明/结论：本 sheet 独立 item_id（plan/check/summary 共用同一 composable，
+// 其 NOTE_KEY 为共享单键，故此处用本地键避免串写）。
+const NOTE_KEY = 'H2-13-audit-note'
+const CONCLUSION_KEY = 'H2-13-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  saveResponse(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function checkRowClass({ row }: any) {
   if (row.constructionStatus === '停工') return 'stop-row'
@@ -206,9 +263,6 @@ function handleExportCmd(cmd: string) {
   console.log('export command:', cmd)
 }
 
-function handleAiGenerate() {
-  console.log('AI generate H2-13')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -217,6 +271,11 @@ function openReview(id: string) {
 
 <style scoped>
 .h2-tab-stocktake-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

@@ -18,6 +18,14 @@
       </ul>
     </div>
 
+    <!-- 工具栏索引 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-11" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <!-- ═══ Section(一) ECL计量方法评价 ═══ -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -277,6 +285,23 @@
       </el-table>
     </el-card>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">审计说明</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：ECL计量方法测试的执行情况、组合与参数验证结果、拟调整/未调整事项及其影响等。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ Section(四) 审计结论 ═══ -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -335,6 +360,7 @@
 import { ref, inject, computed, watch, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useG4EclFormData } from '../../composables/useG4EclFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import type {
   MethodEvalRow,
   GroupBasisRow,
@@ -411,10 +437,21 @@ const groupBasis = ref<GroupBasisRow[]>([])
 const parameterEvaluation = ref<ParameterEvalRow[]>([])
 const conclusion = ref('')
 
+// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
+const NOTE_KEY = 'G4-11-ecl-measurement-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
 // ─── 数据加载 ───
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const note = formData.allResponses.value.get(NOTE_KEY)
+  if (note?.remark) auditNote.value = note.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -597,6 +634,19 @@ defineExpose({
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
 }
+
+/* 工具栏索引 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
 .methodology-context {

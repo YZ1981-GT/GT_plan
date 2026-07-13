@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabDisclosureListed — 附注披露（上市）| Task 9.2 */
-import { toRef, type Ref } from 'vue'
+import { ref, watch, toRef, type Ref } from 'vue'
 import { useF3DisclosureListed } from '../composables/useF3DisclosureListed'
 import GtIndexChip from '../GtIndexChip.vue'
 
@@ -24,6 +24,21 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   applicableStandards: toRef(props, 'applicableStandards') as Ref<string[]>,
 })
+
+// ─── 审计说明 / 审计结论（F3 约定：写入 allResponses + f3:save-items 事件持久化） ───
+const NOTE_KEY = 'F3-note-listed-note'
+const CONCLUSION_KEY = 'F3-note-listed-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void { if (props.isReadonly) return; auditNote.value = val; persistAudit(NOTE_KEY, val) }
+function saveAuditConclusion(val: string): void { if (props.isReadonly) return; auditConclusion.value = val; persistAudit(CONCLUSION_KEY, val) }
+watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
+watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof v === 'string') auditConclusion.value = v }, { immediate: true })
 </script>
 
 <template>
@@ -41,6 +56,14 @@ const {
           <p>4. 分类合计应与 F3-1 审定表、资产负债表"应付票据"项目核对一致（浅蓝为跨sheet取数）。</p>
         </div>
       </details>
+
+      <!-- 审计目标 -->
+      <el-alert
+        type="info"
+        :closable="false"
+        title="审计目标：应付票据按种类披露完整准确，到期未兑付、保证金受限及关联方票据充分披露，分类合计与审定表核对一致。"
+        class="objective-alert"
+      />
 
       <div class="disclosure-card">
         <h4 class="card-title">
@@ -112,6 +135,32 @@ const {
         <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
           placeholder="应付票据附注披露说明（到期未兑付、保证金受限、关联方票据等）..." />
       </div>
+
+      <!-- 审计说明 -->
+      <el-card shadow="never" class="audit-note-card">
+        <template #header><div class="card-header"><span>审计说明</span></div></template>
+        <el-input
+          type="textarea"
+          :model-value="auditNote"
+          :disabled="isReadonly"
+          :autosize="{ minRows: 5 }"
+          placeholder="填写审计说明：披露项目的取数与核对、分类披露完整性、到期未兑付及受限情况的审计过程。"
+          @change="(v: string) => saveAuditNote(v)"
+        />
+      </el-card>
+
+      <!-- 审计结论 -->
+      <el-card shadow="never" class="audit-note-card">
+        <template #header><div class="card-header"><span>审计结论</span></div></template>
+        <el-input
+          type="textarea"
+          :model-value="auditConclusion"
+          :disabled="isReadonly"
+          :autosize="{ minRows: 3 }"
+          placeholder="填写审计结论：附注披露是否真实、完整、准确，是否符合企业会计准则列报要求。"
+          @change="(v: string) => saveAuditConclusion(v)"
+        />
+      </el-card>
     </template>
   </div>
 </template>
@@ -175,5 +224,17 @@ const {
   font-weight: 600;
   display: block;
   margin-bottom: 4px;
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

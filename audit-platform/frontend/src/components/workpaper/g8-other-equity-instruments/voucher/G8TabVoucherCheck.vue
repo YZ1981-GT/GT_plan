@@ -1,5 +1,21 @@
 <template>
   <div class="g8-voucher" data-testid="g8-voucher-check">
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表抽取其他权益工具投资（科目1503）相关记账凭证，逐笔核对原始单据完整性、授权、账务处理及公允价值/OCI 计量正确性。</p>
+        <p>2. 借贷合计应平衡；异常凭证须填列风险等级与异常说明。</p>
+        <p>3. 可用抽凭引擎按方法（随机/系统/MUS 等）抽样；附件支持 OCR 识别自动填列业务内容。</p>
+      </div>
+    </details>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：通过凭证检查核实其他权益工具投资（科目1503）交易的真实性、完整性与计量准确性，验证公允价值变动计入其他综合收益（OCI）的会计处理正确。"
+    />
+
     <div class="section-head">
       <h3 class="sheet-title">G8-6 凭证检查表</h3>
       <div class="head-actions">
@@ -11,6 +27,14 @@
     <div class="summary-bar" :class="{ 'summary-error': !vc.balanceOk.value }">
       借方合计 {{ fmt(debitTotal) }} | 贷方合计 {{ fmt(creditTotal) }} | 差额 {{ fmt(vc.balanceDiff.value) }}
     </div>
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-6" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-segmented v-model="vc.activeTab.value" :options="tabOptions" size="small" class="segment-tabs" />
 
     <el-table-v2
@@ -183,11 +207,23 @@
       <el-input :model-value="vc.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly" @update:model-value="vc.updateConclusion" />
     </el-card>
+
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：凭证抽样方法、样本量、逐笔核对结果及发现的异常事项。" />
+    </el-card>
+
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>审计结论</template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：凭证检查是否发现异常，交易真实性、完整性与计量准确性是否得到验证。" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, h, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, toRef, h, onMounted, onBeforeUnmount } from 'vue'
 import type { Column } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -221,6 +257,17 @@ const vc = useG8VoucherCheck({
   allResponses: computed(() => props.allResponses),
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
+})
+
+const AUDIT_NOTE_KEY = 'G8-6-audit-note'
+const AUDIT_CONCLUSION_KEY = 'G8-6-audit-conclusion'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+})
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
 })
 
 const debitTotal = computed(() => calcSubtotal(vc.rows.value.map((r) => r.debitAmount)))
@@ -336,6 +383,14 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .g8-voucher { font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 10px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 .section-head { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

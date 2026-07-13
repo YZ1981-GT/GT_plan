@@ -36,25 +36,50 @@ const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEM_PREFIX = 'E1-account-commit'
-const DEFAULT_CONTENT = `本公司承诺：截至资产负债表日，本公司已在贵所提供的银行账户清单中完整列示了所有银行账户信息，不存在未列示的银行账户。
+const NOTE_KEY = 'E1-commit-audit-note'
+const CONCLUSION_KEY = 'E1-commit-audit-conclusion'
+const DEFAULT_CONTENT = `致：致同会计师事务所
 
-上述银行账户信息完整、真实，如有遗漏或虚假，本公司愿承担由此造成的一切后果。`
+我们确认，截至____年____月____日，我公司已向贵所提供了所有银行账户的完整信息，包括但不限于：
+1. 所有已开立的银行账户清单
+2. 所有银行账户的对账单
+3. 所有银行账户的余额调节表
+4. 所有银行账户的函证回函
+5. 所有银行账户的质押、冻结等限制情况
+
+我们承诺：
+1. 上述信息真实、完整、准确；
+2. 不存在未向贵所披露的银行账户；
+3. 不存在隐瞒银行账户信息的情况；
+4. 如有违反上述承诺，我们愿意承担相应的法律责任。`
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
+const commitUnit = ref('')
+const commitLegalRep = ref('')
+const commitFinanceHead = ref('')
 const commitDate = ref('')
-const commitPerson = ref('')
 const commitContent = ref(DEFAULT_CONTENT)
 const signConfirm = ref<'Y' | 'N' | ''>('')
+
+// 审计说明 / 审计结论
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 // ─── Load from allResponses ──────────────────────────────────────────────────
 
 function loadFromResponses(): void {
   const responses = props.allResponses
+  commitUnit.value = responses.get(`${ITEM_PREFIX}-unit`)?.remark || ''
+  // 兼容旧字段 -person（承诺人）→ 法定代表人
+  commitLegalRep.value = responses.get(`${ITEM_PREFIX}-legalrep`)?.remark
+    || responses.get(`${ITEM_PREFIX}-person`)?.remark || ''
+  commitFinanceHead.value = responses.get(`${ITEM_PREFIX}-finance`)?.remark || ''
   commitDate.value = responses.get(`${ITEM_PREFIX}-date`)?.remark || ''
-  commitPerson.value = responses.get(`${ITEM_PREFIX}-person`)?.remark || ''
   commitContent.value = responses.get(`${ITEM_PREFIX}-content`)?.remark || DEFAULT_CONTENT
   signConfirm.value = (responses.get(`${ITEM_PREFIX}-sign`)?.conclusion || '') as 'Y' | 'N' | ''
+  auditNote.value = responses.get(NOTE_KEY)?.remark || ''
+  auditConclusion.value = responses.get(CONCLUSION_KEY)?.remark || ''
 }
 
 loadFromResponses()
@@ -73,8 +98,10 @@ function scheduleSave(): void {
 
 function persistAll(): void {
   const items = [
+    { item_id: `${ITEM_PREFIX}-unit`, conclusion: null, remark: commitUnit.value },
+    { item_id: `${ITEM_PREFIX}-legalrep`, conclusion: null, remark: commitLegalRep.value },
+    { item_id: `${ITEM_PREFIX}-finance`, conclusion: null, remark: commitFinanceHead.value },
     { item_id: `${ITEM_PREFIX}-date`, conclusion: null, remark: commitDate.value },
-    { item_id: `${ITEM_PREFIX}-person`, conclusion: null, remark: commitPerson.value },
     { item_id: `${ITEM_PREFIX}-content`, conclusion: null, remark: commitContent.value },
     { item_id: `${ITEM_PREFIX}-sign`, conclusion: signConfirm.value || null, remark: null },
   ]
@@ -87,15 +114,27 @@ function persistAll(): void {
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function onDateChange(val: string): void {
+function onUnitChange(val: string): void {
   if (props.isReadonly) return
-  commitDate.value = val || ''
+  commitUnit.value = val
   scheduleSave()
 }
 
-function onPersonChange(val: string): void {
+function onLegalRepChange(val: string): void {
   if (props.isReadonly) return
-  commitPerson.value = val
+  commitLegalRep.value = val
+  scheduleSave()
+}
+
+function onFinanceChange(val: string): void {
+  if (props.isReadonly) return
+  commitFinanceHead.value = val
+  scheduleSave()
+}
+
+function onDateChange(val: string): void {
+  if (props.isReadonly) return
+  commitDate.value = val || ''
   scheduleSave()
 }
 
@@ -109,6 +148,23 @@ function onSignChange(val: string): void {
   if (props.isReadonly) return
   signConfirm.value = val as 'Y' | 'N'
   scheduleSave()
+}
+
+// 审计说明 / 审计结论 — 即时保存
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  props.saveImmediate([item]).catch(() => { /* silent */ })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  props.saveImmediate([item]).catch(() => { /* silent */ })
 }
 
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
@@ -139,7 +195,7 @@ onBeforeUnmount(() => {
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：取得管理层对银行账户完整性的书面承诺，支持货币资金完整性认定。"
+      title="审计目标：获取管理层关于已向本所提供全部银行账户信息（含账户清单、对账单、余额调节表、函证回函及受限情况）的书面声明，支持货币资金完整性认定。"
       class="objective-alert"
     />
 
@@ -156,54 +212,116 @@ onBeforeUnmount(() => {
 
     <el-card shadow="never" class="commit-card">
       <template #header>
-        <span class="card-title">银行账户情况承诺书</span>
+        <span class="card-title">银行账户情况承诺书（被审计单位声明）</span>
       </template>
 
+      <!-- 承诺书正文 -->
       <el-form label-width="100px" size="default">
-        <el-form-item label="承诺日期">
-          <el-date-picker
-            :model-value="commitDate"
-            :disabled="isReadonly"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
-            style="width: 220px"
-            @update:model-value="onDateChange"
-          />
-        </el-form-item>
-
-        <el-form-item label="承诺人">
+        <el-form-item label="被审计单位">
           <el-input
-            :model-value="commitPerson"
+            :model-value="commitUnit"
             :disabled="isReadonly"
-            placeholder="填写承诺人姓名"
-            style="width: 220px"
-            @change="onPersonChange"
+            placeholder="填写被审计单位全称"
+            style="width: 320px"
+            @change="onUnitChange"
           />
         </el-form-item>
 
-        <el-form-item label="承诺内容">
+        <el-form-item label="声明内容">
           <el-input
             :model-value="commitContent"
             :disabled="isReadonly"
             type="textarea"
-            :autosize="{ minRows: 4, maxRows: 12 }"
-            placeholder="填写承诺内容"
+            :autosize="{ minRows: 10, maxRows: 20 }"
+            placeholder="填写承诺书声明内容"
             @change="onContentChange"
           />
-        </el-form-item>
-
-        <el-form-item label="签字确认">
-          <el-radio-group
-            :model-value="signConfirm"
-            :disabled="isReadonly"
-            @change="onSignChange"
-          >
-            <el-radio value="Y">已确认签字</el-radio>
-            <el-radio value="N">未签字</el-radio>
-          </el-radio-group>
+          <div class="field-hint">
+            由被审计单位签署盖章确认已向本所提供全部银行账户信息，声明内容默认引用标准承诺函模板，可按实际情况调整。
+          </div>
         </el-form-item>
       </el-form>
+
+      <!-- 签署栏 -->
+      <div class="sign-block">
+        <div class="sign-block-title">签署栏</div>
+        <el-form label-width="100px" size="default">
+          <el-form-item label="被审计单位">
+            <span class="seal-hint">（加盖公章）</span>
+          </el-form-item>
+          <el-form-item label="法定代表人">
+            <el-input
+              :model-value="commitLegalRep"
+              :disabled="isReadonly"
+              placeholder="法定代表人签字"
+              style="width: 220px"
+              @change="onLegalRepChange"
+            />
+            <span class="seal-hint">（签字）</span>
+          </el-form-item>
+          <el-form-item label="财务负责人">
+            <el-input
+              :model-value="commitFinanceHead"
+              :disabled="isReadonly"
+              placeholder="财务负责人签字"
+              style="width: 220px"
+              @change="onFinanceChange"
+            />
+            <span class="seal-hint">（签字）</span>
+          </el-form-item>
+          <el-form-item label="声明日期">
+            <el-date-picker
+              :model-value="commitDate"
+              :disabled="isReadonly"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="选择声明日期"
+              style="width: 220px"
+              @update:model-value="onDateChange"
+            />
+          </el-form-item>
+          <el-form-item label="签署盖章确认">
+            <el-radio-group
+              :model-value="signConfirm"
+              :disabled="isReadonly"
+              @change="onSignChange"
+            >
+              <el-radio value="Y">已签字盖章确认</el-radio>
+              <el-radio value="N">未签署</el-radio>
+            </el-radio-group>
+          </el-form-item>
+        </el-form>
+      </div>
+    </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明（如承诺函取得过程、与账户清单/征信报告的印证情况等）..."
+        @change="(val: string) => saveAuditNote(val)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论（如是否已取得管理层完整性书面承诺、账户完整性认定是否满足等）..."
+        @change="(val: string) => saveAuditConclusion(val)"
+      />
     </el-card>
   </div>
 </template>
@@ -267,5 +385,43 @@ onBeforeUnmount(() => {
 .card-title {
   font-weight: 600;
   font-size: 15px;
+}
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+/* 签署栏 */
+.sign-block {
+  margin-top: 12px;
+  padding: 12px 16px;
+  border-top: 1px dashed #dcdfe6;
+  background: #fafafa;
+  border-radius: 4px;
+}
+.sign-block-title {
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 12px;
+  font-size: var(--wp-font-size, 13px);
+}
+.seal-hint {
+  margin-left: 8px;
+  color: #c0392b;
+  font-size: 12px;
+}
+
+/* 审计说明 / 审计结论 */
+.audit-note-card {
+  margin-top: 16px;
+  max-width: 800px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

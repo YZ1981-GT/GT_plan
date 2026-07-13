@@ -39,7 +39,8 @@ interface DigitalRow {
   auditedRmb: number     // readonly: auditedFc×fxRate
   queryBalance: number   // 查询余额
   diff: number           // readonly: queryBalance-auditedFc
-  indexNo: string
+  indexNo: string        // 银行余额索引号
+  confirmationIndexNo: string // 银行询证函索引号
   note: string
 }
 
@@ -67,7 +68,7 @@ const CROSS_KEY_ENDING = 'E1-digital-total-unaudited'
 const NOTE_KEY = 'E1-digital-audit-note'
 const CONCLUSION_KEY = 'E1-digital-audit-conclusion'
 
-const USER_FIELDS = ['id', 'seq', 'bankName', 'currency', 'fxRate', 'opening', 'increase', 'decrease', 'adjustment', 'queryBalance', 'indexNo', 'note']
+const USER_FIELDS = ['id', 'seq', 'bankName', 'currency', 'fxRate', 'opening', 'increase', 'decrease', 'adjustment', 'queryBalance', 'indexNo', 'confirmationIndexNo', 'note']
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function createEmptyRow(seq: number): DigitalRow {
     id: generateId(), seq, bankName: '', currency: '人民币', fxRate: 1,
     opening: 0, increase: 0, decrease: 0, endingFc: 0, endingRmb: 0,
     adjustment: 0, auditedFc: 0, auditedRmb: 0, queryBalance: 0, diff: 0,
-    indexNo: '', note: '',
+    indexNo: '', confirmationIndexNo: '', note: '',
   })
 }
 
@@ -114,7 +115,7 @@ function loadFromResponses(): void {
       opening: parseNum(r.opening), increase: parseNum(r.increase), decrease: parseNum(r.decrease),
       endingFc: 0, endingRmb: 0, adjustment: parseNum(r.adjustment),
       auditedFc: 0, auditedRmb: 0, queryBalance: parseNum(r.queryBalance), diff: 0,
-      indexNo: String(r.indexNo || ''), note: String(r.note || ''),
+      indexNo: String(r.indexNo || ''), confirmationIndexNo: String(r.confirmationIndexNo || ''), note: String(r.note || ''),
     }))
   } catch { rows.value = [createEmptyRow(1)] }
 
@@ -234,7 +235,7 @@ function onConclusionChange(val: string): void {
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实数字货币期末余额的存在与准确，通过查询余额验证真实性，为 E1-1 审定表提供其他货币资金审定依据。"
+      title="审计目标：确定数字货币在资产负债表日确实存在且已恰当记录（存在、完整、计价与列报）；通过查询余额验证真实性，为 E1-1 审定表提供其他货币资金审定依据。"
       class="objective-alert"
     />
 
@@ -312,9 +313,14 @@ function onConclusionChange(val: string): void {
               <span :class="{ 'red-text': Math.abs(row.diff) > 0.005 }">{{ displayPrefs.fmtAmount(row.diff) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="索引号" width="100">
+          <el-table-column label="银行余额索引号" width="120">
             <template #default="{ row }">
               <el-input :model-value="row.indexNo" :disabled="isReadonly" size="small" @change="(v: string) => updateCell(row.id, 'indexNo', v)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="银行询证函索引号" width="130">
+            <template #default="{ row }">
+              <el-input :model-value="row.confirmationIndexNo" :disabled="isReadonly" size="small" @change="(v: string) => updateCell(row.id, 'confirmationIndexNo', v)" />
             </template>
           </el-table-column>
           <el-table-column label="备注" min-width="120">

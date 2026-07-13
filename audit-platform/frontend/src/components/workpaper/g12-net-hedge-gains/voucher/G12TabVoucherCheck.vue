@@ -18,6 +18,14 @@
       description="抽取净敞口套期收益（6103）相关凭证，核对原始凭证完整性、授权批准、账务处理、套期指定文档与公允价值估值依据，识别异常凭证并评估风险等级。支持抽凭引擎选样与 📎 附件 OCR 自动填充。"
     />
 
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G12-6" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <div class="stats">
       借贷：{{ vc.debitTotal.value.toFixed(2) }} / {{ vc.creditTotal.value.toFixed(2) }} ·
       <span :class="vc.isBalanced.value ? 'ok' : 'bad'">{{ vc.isBalanced.value ? '平衡' : '不平衡' }}</span> ·
@@ -195,6 +203,19 @@
     </el-table>
     </template>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：抽样凭证核对情况、异常凭证及处理，抽凭方法与覆盖率。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：凭证检查是否发现异常，账务处理是否恰当。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="methodology-hint">
       <summary>📋 编制提示（CAS24 套期会计）</summary>
       <p>凭证检查分「凭证基础 / 核对内容 / 结论」三区段。核对 5 要素：原始凭证完整、授权批准、账务处理正确、套期指定文档齐备、公允价值估值依据充分；任一未通过标记为异常。可通过抽凭引擎按科目 6103 选样，或截止测试一键取数（基准日 ±N 天）回写并跨期标注。</p>
@@ -233,6 +254,22 @@ const vc = useG12VoucherCheck({
   isReadonly: toRef(props, 'isReadonly'),
   debouncedSave: props.debouncedSave,
 })
+
+const NOTE_KEY = 'G12-voucher-audit-note'
+const CONCLUSION_KEY = 'G12-voucher-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
 
 const tabOptions = [
   { label: '凭证基础', value: 'basic' },
@@ -275,6 +312,10 @@ function onCutoffFilled(e: Event) {
 
 onMounted(() => {
   window.addEventListener(GCYCLE_CUTOFF_EVENT.g12, onCutoffFilled as EventListener)
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 onBeforeUnmount(() => {
@@ -314,6 +355,12 @@ function rowClassName({ row }: { row: { isAbnormal: boolean } }): string {
 <style scoped>
 .g12-vc { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .audit-objective { margin-bottom: 8px; }
 .methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
 .methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }

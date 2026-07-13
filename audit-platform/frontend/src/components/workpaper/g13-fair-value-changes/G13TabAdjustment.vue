@@ -91,6 +91,19 @@
       </span>
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计说明</template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：可概述调整分录的测试情况、借贷平衡核对结果、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>审计结论</template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应予调整外，其余未见异常。C、由于存在重大未调整事项，不可确认。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <p>1. AJE=审计调整分录，RJE=重分类调整分录；每笔分录借贷必须平衡后方可「同步至明细表」。</p>
@@ -101,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, onMounted, onBeforeUnmount } from 'vue'
+import { ref, toRef, onMounted, onBeforeUnmount } from 'vue'
 import { useG13Adjustment } from '../composables/useG13Adjustment'
 import { useG13Detail } from '../composables/useG13Detail'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -120,6 +133,26 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
+
+// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null，remark 存文本） ───
+const NOTE_KEY = 'G13-adjustment-audit-note'
+const CONCLUSION_KEY = 'G13-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val } as ChecklistResponse)
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val } as ChecklistResponse)
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
 
 const detailHelper = useG13Detail({
   allResponses: toRef(props, 'allResponses'),
@@ -146,6 +179,10 @@ function onCutoffFilled(e: Event) {
 }
 
 onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
   window.addEventListener(GCYCLE_CUTOFF_EVENT.g13, onCutoffFilled as EventListener)
 })
 
@@ -162,6 +199,7 @@ function fmtAmount(val: number): string {
 <style scoped>
 .g13-adjustment { padding: 16px; }
 .audit-objective { margin-bottom: 12px; }
+.audit-note-card { margin-top: 12px; }
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266; }
 .compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 .adj-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }

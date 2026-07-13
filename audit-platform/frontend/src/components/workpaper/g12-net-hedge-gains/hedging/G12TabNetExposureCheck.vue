@@ -20,7 +20,22 @@
 
     </div>
 
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="audit-objective"
+      title="审计目标"
+      description="按 5 区段核查净敞口套期的合规性（净敞口定义、套期会计三要素、有效性条件、公允价值与文档、损益列报），识别未合规项并评估风险等级。"
+    />
 
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G12-5" /></span>
+        <el-tag size="small" type="info">共 {{ ne.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
 
     <div v-if="ne.useVirtualScroll.value" class="virtual-toolbar">
 
@@ -206,6 +221,13 @@
 
     </el-card>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：各区段合规检查情况、未合规项及处理措施。"
+        @change="saveAuditNote" />
+    </el-card>
+
     <details class="methodology-hint">
 
       <summary>📋 编制提示（CAS24 套期会计）</summary>
@@ -222,7 +244,7 @@
 
 <script setup lang="ts">
 
-import { ref, toRef, watch, computed } from 'vue'
+import { ref, toRef, watch, computed, onMounted } from 'vue'
 
 import { useG12NetExposure } from '../../composables/useG12NetExposure'
 
@@ -265,6 +287,34 @@ const ne = useG12NetExposure({
   isReadonly: toRef(props, 'isReadonly'),
 
   debouncedSave: props.debouncedSave,
+
+})
+
+
+
+const NOTE_KEY = 'G12-net-exposure-audit-note'
+
+const auditNote = ref('')
+
+
+
+function saveAuditNote(val: string): void {
+
+  if (props.isReadonly) return
+
+  auditNote.value = val
+
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+
+}
+
+
+
+onMounted(() => {
+
+  const n = props.allResponses.get(NOTE_KEY)
+
+  if (n?.remark) auditNote.value = n.remark
 
 })
 
@@ -359,6 +409,20 @@ function rowClassName({ row }: { row: { compliance: string } }): string {
 .methodology { border-left: 3px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; }
 
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+
+.chip-wrap { display: inline-flex; align-items: center; }
+
+.audit-objective { margin-bottom: 8px; }
+
+.audit-note-card { margin-top: 8px; }
+
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 

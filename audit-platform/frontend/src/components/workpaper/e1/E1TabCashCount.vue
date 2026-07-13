@@ -11,7 +11,7 @@
  *
  * Requirements: 7.1-7.5
  */
-import { inject, toRef, computed, type Ref } from 'vue'
+import { inject, ref, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useE1CashCount,
@@ -95,6 +95,134 @@ async function handleImport(file: File): Promise<boolean> {
   return false // 阻止 el-upload 自动上传
 }
 
+// ─── FX 折算合计 / 差异 ───────────────────────────────────────────────────────
+
+/** FX 模式实盘折算合计 = SUM(rmbAmount) */
+const fxActualTotal = computed(() =>
+  variant.value === 'fx'
+    ? rows.value.reduce((sum, r) => sum + Number((r as FxCountRow).rmbAmount || 0), 0)
+    : 0,
+)
+/** FX 模式盘点差异 = 实盘折算合计 - 账面余额 */
+const fxCountDiff = computed(() => fxActualTotal.value - (fxSummary.value.bookBalance || 0))
+function fxHasDiff(): boolean {
+  return Math.abs(fxCountDiff.value) > 0.005
+}
+
+// ─── 持久化键（按 variant 区分，避免 E1-7/E1-8 同工作簿共享时冲突） ───────────
+
+const ELEMENTS_KEY = computed(() => `E1-cashcount-elements-${variant.value}`)
+const FX_SUMMARY_KEY = computed(() => `E1-cashcount-fx-summary-${variant.value}`)
+const NOTE_KEY = computed(() => `E1-cashcount-audit-note-${variant.value}`)
+const CONCLUSION_KEY = computed(() => `E1-cashcount-audit-conclusion-${variant.value}`)
+
+// ─── 监盘要素（盘点日期/时间/地点/参加人员/会计主管/出纳/监盘人） ─────────────
+
+interface CountElements {
+  countDate: string
+  countTime: string
+  countPlace: string
+  participants: string
+  accountant: string   // 会计主管人员
+  cashier: string       // 出纳
+  supervisor: string    // 监盘人（审计人员）
+}
+const countElements = ref<CountElements>({
+  countDate: '',
+  countTime: '',
+  countPlace: '',
+  participants: '',
+  accountant: '',
+  cashier: '',
+  supervisor: '',
+})
+
+function saveElements(): void {
+  if (props.isReadonly) return
+  const json = JSON.stringify(countElements.value)
+  const item = { item_id: ELEMENTS_KEY.value, conclusion: null, remark: json }
+  props.allResponses.set(ELEMENTS_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
+function updateElement(field: keyof CountElements, val: string): void {
+  if (props.isReadonly) return
+  countElements.value = { ...countElements.value, [field]: val ?? '' }
+  saveElements()
+}
+
+// ─── FX 汇总（账面余额 / 差异原因） ───────────────────────────────────────────
+
+interface FxSummary { bookBalance: number; diffReason: string }
+const fxSummary = ref<FxSummary>({ bookBalance: 0, diffReason: '' })
+
+function saveFxSummary(): void {
+  if (props.isReadonly) return
+  const json = JSON.stringify(fxSummary.value)
+  const item = { item_id: FX_SUMMARY_KEY.value, conclusion: null, remark: json }
+  props.allResponses.set(FX_SUMMARY_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
+function updateFxBookBalance(val: number | undefined): void {
+  if (props.isReadonly) return
+  fxSummary.value = { ...fxSummary.value, bookBalance: val ?? 0 }
+  saveFxSummary()
+}
+
+function updateFxDiffReason(val: string): void {
+  if (props.isReadonly) return
+  fxSummary.value = { ...fxSummary.value, diffReason: val ?? '' }
+  saveFxSummary()
+}
+
+// ─── 审计说明 / 审计结论 ──────────────────────────────────────────────────────
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY.value, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY.value, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
+// ─── Hydration ─────────────────────────────────────────────────────────────
+
+onMounted(() => {
+  const elemResp = props.allResponses.get(ELEMENTS_KEY.value)
+  if (elemResp?.remark) {
+    try {
+      const parsed = JSON.parse(elemResp.remark)
+      countElements.value = { ...countElements.value, ...parsed }
+    } catch { /* keep defaults */ }
+  }
+  const fxResp = props.allResponses.get(FX_SUMMARY_KEY.value)
+  if (fxResp?.remark) {
+    try {
+      const parsed = JSON.parse(fxResp.remark)
+      fxSummary.value = {
+        bookBalance: Number(parsed.bookBalance) || 0,
+        diffReason: String(parsed.diffReason || ''),
+      }
+    } catch { /* keep defaults */ }
+  }
+  const noteResp = props.allResponses.get(NOTE_KEY.value)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY.value)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function asRmb(row: any): RmbCountRow { return row }
@@ -105,12 +233,14 @@ function asFx(row: any): FxCountRow { return row }
   <div class="e1-tab-cash-count">
     <!-- 编制提示 -->
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制提示（现金监盘要点）</summary>
       <div class="guidance-content">
-        <p>1. 库存现金盘点应由审计人员现场监盘，出纳当面清点，会计主管在场见证。</p>
-        <p>2. 盘点日与资产负债表日不一致时，应通过盘点日至资产负债表日的收付记录倒轧至资产负债表日余额。</p>
-        <p>3. 人民币按面值×张数汇总；外币按原币金额×期末汇率折算人民币。</p>
-        <p>4. 盘点差异应查明原因，关注白条抵库、坐支现金等异常，差异≠0时须在差异原因中说明。</p>
+        <p>1. <b>突击监盘</b>：应选择恰当日期（通常为资产负债表日或临近日）对现金实施突击监盘，事先不通知出纳，由审计人员全程控制盘点过程直至结束，出纳当面清点、会计主管在场见证。</p>
+        <p>2. <b>两处以上同时监盘</b>：存在两个及以上现金存放地点（含备用金、门店零用金等）时，应同时监盘或封存后逐一盘点，防止资金调剂掩盖短缺。</p>
+        <p>3. <b>盘点金额与日记账核对</b>：将盘点实有数与现金日记账（盘点日上一日）余额核对，加减未记账收付凭证倒轧出应有数，与实有数比较得出长（短）款。</p>
+        <p>4. <b>非资产负债表日盘点须调整至基准日</b>：盘点日与资产负债表日不一致时，通过"报表日至盘点日上一日累计收入数、累计支出数"倒轧回推至资产负债表日账面余额。</p>
+        <p>5. <b>充抵库存现金的借条/未提现支票须注明</b>：列出冲抵库存现金的借条（日期、付款人、金额）及未做报销的费用凭证清单；关注白条抵库、坐支现金、以票充库等异常，差异≠0时须在差异原因中说明。</p>
+        <p>6. 人民币按面值×张数汇总；外币按原币金额×期末汇率折算本位币，并执行汇率折算测试。</p>
       </div>
     </details>
 
@@ -154,6 +284,81 @@ function asFx(row: any): FxCountRow { return row }
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 监盘要素 -->
+    <el-card class="elements-card" shadow="never">
+      <template #header>
+        <div class="card-header"><span>监盘要素</span></div>
+      </template>
+      <el-descriptions :column="2" border size="small">
+        <el-descriptions-item label="盘点日期">
+          <el-date-picker
+            :model-value="countElements.countDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择盘点日期"
+            :disabled="isReadonly"
+            size="small"
+            style="width: 100%"
+            @update:model-value="(val: string) => updateElement('countDate', val)"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="盘点时间">
+          <el-input
+            :model-value="countElements.countTime"
+            :disabled="isReadonly"
+            placeholder="如 14:30"
+            size="small"
+            @change="(val: string) => updateElement('countTime', val)"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="盘点地点">
+          <el-input
+            :model-value="countElements.countPlace"
+            :disabled="isReadonly"
+            placeholder="如 财务部保险柜"
+            size="small"
+            @change="(val: string) => updateElement('countPlace', val)"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="参加人员">
+          <el-input
+            :model-value="countElements.participants"
+            :disabled="isReadonly"
+            placeholder="盘点参加人员"
+            size="small"
+            @change="(val: string) => updateElement('participants', val)"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="会计主管人员">
+          <el-input
+            :model-value="countElements.accountant"
+            :disabled="isReadonly"
+            placeholder="会计主管签字确认"
+            size="small"
+            @change="(val: string) => updateElement('accountant', val)"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="出纳">
+          <el-input
+            :model-value="countElements.cashier"
+            :disabled="isReadonly"
+            placeholder="现金出纳签字确认"
+            size="small"
+            @change="(val: string) => updateElement('cashier', val)"
+          />
+        </el-descriptions-item>
+        <el-descriptions-item label="监盘人（审计人员）">
+          <el-input
+            :model-value="countElements.supervisor"
+            :disabled="isReadonly"
+            placeholder="现场监盘审计人员"
+            size="small"
+            @change="(val: string) => updateElement('supervisor', val)"
+          />
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-card>
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
@@ -308,7 +513,69 @@ function asFx(row: any): FxCountRow { return row }
               </template>
             </el-table-column>
           </el-table>
+
+          <!-- FX 盘盈盘亏汇总 -->
+          <el-card class="summary-card" shadow="never">
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="实盘折算合计（本位币）">
+                <span class="auto-calc-value">{{ displayPrefs.fmtAmount(fxActualTotal) }}</span>
+              </el-descriptions-item>
+              <el-descriptions-item label="账面余额（本位币）">
+                <el-input-number
+                  :model-value="fxSummary.bookBalance"
+                  :disabled="isReadonly"
+                  :controls="false"
+                  size="small"
+                  @change="updateFxBookBalance"
+                />
+              </el-descriptions-item>
+              <el-descriptions-item label="盘盈盘亏差异">
+                <span :class="['auto-calc-value', { 'orange-text': fxHasDiff() }]">
+                  {{ displayPrefs.fmtAmount(fxCountDiff) }}
+                </span>
+              </el-descriptions-item>
+              <el-descriptions-item label="差异原因">
+                <el-input
+                  :model-value="fxSummary.diffReason"
+                  :disabled="isReadonly"
+                  placeholder="差异≠0时必填（含汇兑损益、长短款等）"
+                  size="small"
+                  @change="updateFxDiffReason"
+                />
+              </el-descriptions-item>
+            </el-descriptions>
+          </el-card>
         </template>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：可概述（1）现金监盘程序的实施情况与结果；（2）长（短）款原因、白条抵库/坐支等异常事项；（3）非资产负债表日盘点倒轧至基准日的调整过程；（4）外币汇率折算测试结果。"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、库存现金账实相符，未见异常。B、除上述长（短）款差异应作调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或监盘范围受到限制无法获取充分、适当证据），不可确认。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -387,5 +654,20 @@ function asFx(row: any): FxCountRow { return row }
 }
 .summary-card {
   margin-top: 16px;
+}
+.elements-card {
+  margin-bottom: 12px;
+}
+.elements-card :deep(.el-descriptions__label) {
+  width: 140px;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

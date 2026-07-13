@@ -75,6 +75,19 @@
       <p>• 同控合并<strong>不确认商誉</strong></p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：验证同一控制下企业合并的长期股权投资初始投资成本按被合并方净资产账面价值份额确定（CAS20），支付对价与初始成本的差额调整资本公积/留存收益处理恰当，未确认商誉。" />
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-8" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 52行×9列数据表格 -->
     <el-table
       :data="rows"
@@ -282,6 +295,21 @@
       </el-button>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <div class="conclusion-head">
+        <span class="conclusion-title">审计说明</span>
+      </div>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :readonly="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-head">
@@ -296,7 +324,7 @@
         :autosize="{ minRows: 3, maxRows: 8 }"
         :readonly="isReadonly"
         placeholder="根据同控合并初始计量测试结果，总结各被投资单位入账金额是否准确..."
-        @change="emitSave"
+        @change="saveAuditConclusion"
       />
     </el-card>
 
@@ -332,8 +360,10 @@ import { ref, reactive, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { calcSameControlCost, parseNum } from '../../composables/useG7SubFormulaEngine'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
+import { useG7SubFormData } from '../../composables/useG7SubFormData'
 import type { G7SameControlRow } from '../../composables/useG7SubFormData'
 import { fmtAmount } from '@/utils/formatters'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 // ═══ Props ═══
@@ -372,6 +402,28 @@ const isReadonly = computed(() => !!props.readonly)
 const rows = reactive<G7SameControlRow[]>([])
 const conclusion = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const rowCount = computed(() => rows.length)
+
+// ═══ 审计说明/结论持久化（checklist_responses，conclusion:null） ═══
+const auditFormData = useG7SubFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G7-8-same-control-audit-note'
+const CONCLUSION_KEY = 'G7-8-same-control-audit-conclusion'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  conclusion.value = val
+  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+  emitSave()
+}
 
 // ═══ 公式自动计算 ═══
 
@@ -501,6 +553,7 @@ async function handleAiConclusion(): Promise<void> {
     const text = res?.data?.data?.conclusion || res?.data?.conclusion || res?.data?.text || ''
     if (text) {
       conclusion.value = String(text)
+      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: String(text), conclusion: null })
       emitSave()
       ElMessage.success('AI结论生成完成')
     }
@@ -593,10 +646,15 @@ defineExpose({ getData, loadFromHtmlData })
 
 // ═══ Lifecycle ═══
 
-onMounted(() => {
+onMounted(async () => {
   if (props.htmlData) {
     hydrateData()
   }
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(CONCLUSION_KEY)
+  if (c?.remark) conclusion.value = c.remark
 })
 </script>
 
@@ -729,7 +787,16 @@ onMounted(() => {
   color: #9ca3af;
 }
 
-/* ═══ 审计结论卡片 ═══ */
+/* ═══ 审计目标 / 工具栏 ═══ */
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; }
+
+/* ═══ 审计说明/结论卡片 ═══ */
+.audit-note-card {
+  margin-top: 16px;
+}
 .conclusion-card {
   margin-top: 16px;
 }

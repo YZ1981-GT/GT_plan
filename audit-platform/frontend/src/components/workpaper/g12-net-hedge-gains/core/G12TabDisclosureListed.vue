@@ -62,6 +62,19 @@
         @update:model-value="dis.updateNoteText" />
     </el-card>
 
+    <el-card shadow="never" class="note-card">
+      <template #header>审计说明</template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：披露口径核对、与 G12-1 审定数勾稽情况及差异说明。"
+        @change="saveAuditNote" />
+    </el-card>
+    <el-card shadow="never" class="note-card">
+      <template #header>审计结论</template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：披露内容是否恰当、完整，是否符合准则要求。"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <GCycleDisclosureExtras
       cycle-label="G12 净敞口套期"
       :account-code="G12_ACCOUNT_CODE"
@@ -80,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, computed } from 'vue'
+import { ref, toRef, computed, onMounted } from 'vue'
 import { useG12Disclosure } from '../../composables/useG12Disclosure'
 import { G12_ACCOUNT_CODE, G12_DISCLOSURE_FORMULA_MAP } from '../../composables/g12Constants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -100,6 +113,29 @@ const dis = useG12Disclosure({
   wpId: toRef(props, 'wpId'),
   isReadonly: computed(() => props.isReadonly),
   debouncedSave: props.debouncedSave,
+})
+
+const NOTE_KEY = 'G12-disclosure-listed-audit-note'
+const CONCLUSION_KEY = 'G12-disclosure-listed-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 function rowClassName({ row }: { row: { rowKey: string } }): string {

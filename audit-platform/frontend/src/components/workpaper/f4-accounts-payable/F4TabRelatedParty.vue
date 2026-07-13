@@ -108,7 +108,7 @@ function fmtAmount(v: number): string {
       title="审计目标：检查关联方应付账款(2202)的真实性、定价公允性与集中度，评估是否存在通过关联方粉饰负债或利益输送的风险。"
     />
 
-    <div class="section-toolbar">
+    <div class="section-toolbar tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
       </div>

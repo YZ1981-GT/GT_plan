@@ -16,6 +16,23 @@
       <p>• 关注异常变动，作为权益法测算(G7-14)净利润调整的基础数据来源</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实被投资单位财务信息（资产/负债/净资产/收入/利润）的完整性与准确性，为权益法测算(G7-14)提供可靠的基础数据。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-5" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 57行分组虚拟滚动容器 -->
     <div class="financial-scroll-container">
       <template v-for="group in groups" :key="group.investeeName">
@@ -201,6 +218,36 @@
       <el-button type="primary" size="small" @click="addNewGroup">+ 新增被投资单位分组</el-button>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <span>审计说明</span>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、核对情况及结果，异常变动分析及数据来源核实情况。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <span>审计结论</span>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除已调整事项外未见异常。C、存在重大未调整事项或审计范围受限，不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>编制提示</summary>
@@ -236,11 +283,13 @@
  * Spec: .kiro/specs/g7-long-term-equity-method/
  * Requirements: 3.1, 3.3, 7.5
  */
-import { reactive, computed, inject, onMounted } from 'vue'
+import { reactive, ref, computed, inject, onMounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { parseNum } from '../../composables/useG7EquityMethodFormulaEngine'
 import { fmtAmount } from '@/utils/formatters'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { FinancialInfoRow } from '../../composables/useG7EquityMethodFormData'
 
 // ═══ Props ═══════════════════════════════════════════════════════════════════
@@ -286,6 +335,38 @@ interface FinancialGroup {
 const groups = reactive<FinancialGroup[]>([])
 const expandedMap = reactive<Record<string, boolean>>({})
 const isReadonly = computed(() => !!props.readonly)
+const rowCount = computed(() => groups.reduce((n, g) => n + g.rows.length, 0))
+
+// ═══ 审计说明 / 审计结论持久化（checklist_responses，conclusion:null） ═════════
+
+const auditFormData = useG7EquityMethodFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const AUDIT_NOTE_KEY = 'G7-5-audit-note'
+const AUDIT_CONCLUSION_KEY = 'G7-5-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  auditConclusion.value = val
+  auditFormData.debouncedSave(AUDIT_CONCLUSION_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 // ═══ 折叠状态持久化 ═══════════════════════════════════════════════════════
 
@@ -538,6 +619,29 @@ onMounted(() => {
 .g7-tab-financial-info {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.conclusion-card {
+  margin-top: 16px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tab-toolbar .chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Section 标题栏 */

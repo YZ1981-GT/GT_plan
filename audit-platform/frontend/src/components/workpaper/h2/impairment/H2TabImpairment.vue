@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-impairment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：判断在建工程是否存在减值迹象（CAS8 六项），对存在迹象的项目测算可收回金额与减值金额，确认减值计提充分且不得转回。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-15" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">测算 {{ state.calcRows.value.length }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- 区域1: 减值迹象判断 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -7,9 +19,6 @@
           <span>一、减值迹象判断（CAS8六项）</span>
           <div class="section-header-actions">
             <GtIndexChip value="H2-13" label="→ H2-13盘点" />
-            <el-button size="small" type="primary" link @click="handleAiGenerate('impairment-sign')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-15')">💬</el-button>
           </div>
         </div>
@@ -62,9 +71,6 @@
           <span>二、减值测算</span>
           <div class="section-header-actions">
             <GtIndexChip value="H2-16" label="→ H2-16可收回" />
-            <el-button size="small" type="primary" link @click="handleAiGenerate('impairment-calc')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
           </div>
         </div>
       </template>
@@ -126,14 +132,21 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述减值迹象判断依据（CAS8 六项）、测算方法（可收回金额确定）及数据来源、复核情况。" :disabled="isReadonly"
+        @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
           <span>减值结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('impairment-conclusion')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="state.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
@@ -175,6 +188,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Impairment({
   wpId: toRef(props, 'wpId'),
@@ -182,6 +196,7 @@ const state = useH2Impairment({
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
   section: 'impairment',
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 function onSignChange(rowId: string, field: string, value: any) {
@@ -200,9 +215,6 @@ function handleRemoveCalc(rowId: string) {
   state.removeCalcRow(rowId)
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate H2-15:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -216,6 +228,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-impairment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

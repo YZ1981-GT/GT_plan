@@ -5,13 +5,20 @@
       <p>H4-5减少检查：核查本期工程物资减少的合规性。分"基础信息"和"证据信息"两区块展示29列。减少原因为"领用出库"时必须填写对应H2编号（跳转H2在建工程），未填时黄色警告。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核查本期工程物资减少（领用/退货/报废等）的合规性与准确性，验证领用出库与在建工程（H2）的对应关系，确保减少发生额记录完整。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H4-5" :context-project-id="props.projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- Section Title -->
     <div class="section-header">
       <span>减少检查表 H4-5</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-5-disposal')">💬</el-button>
       </div>
     </div>
@@ -192,9 +199,6 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-5-note')">💬</el-button>
           </div>
         </div>
@@ -202,6 +206,21 @@
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请填写审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H4-5-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -230,11 +249,12 @@
  * Task: 4.6
  * Requirements: 6.1-6.6
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH4DisposalCheck, DISPOSAL_REASON_OPTIONS, type H4DisposalCheckRow } from '../../composables/useH4DisposalCheck'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -272,11 +292,22 @@ const importExport = useH4ImportExport({
 
 const reasonOptions = DISPOSAL_REASON_OPTIONS
 
-// ─── Audit Note ──────────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion（inject saveResponse 落库 + onMounted 恢复） ──────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const auditNote = ref('')
+const auditConclusion = ref('')
 function saveAuditNote() {
   props.allResponses.set('H4-5-note', { item_id: 'H4-5-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-5-note', auditNote.value)
 }
+function saveAuditConclusion() {
+  props.allResponses.set('H4-5-conclusion', { item_id: 'H4-5-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-5-conclusion', auditConclusion.value)
+}
+onMounted(() => {
+  const n = props.allResponses.get('H4-5-note'); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get('H4-5-conclusion'); if (c?.remark) auditConclusion.value = c.remark
+})
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -332,9 +363,6 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[H4-5] AI generate')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -353,6 +381,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-disposal-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

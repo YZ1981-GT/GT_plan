@@ -218,11 +218,24 @@
       <el-input v-model="up.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="汇总未披露关联方识别过程、比对结果及审计结论…" />
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="audit-card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNoteText"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述所执行的未披露关联方识别核查程序、测试范围与结果，以及发现的异常事项及其处理。"
+        @change="saveAuditNote"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, onMounted, toRef } from 'vue'
 import { useF2UndisclosedParty, type EnrichedUndisclosedRow } from '../../composables/useF2UndisclosedParty'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
@@ -246,6 +259,24 @@ function rowClass({ row }: { row: EnrichedUndisclosedRow }): string {
   if (row.highlightLevel === 'orange') return 'row-orange'
   return ''
 }
+
+// ─── 审计说明（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────────────────
+const NOTE_KEY = 'F2-67-audit-note'
+const auditNoteText = ref('')
+function persistSpeAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNoteText.value = val
+  persistSpeAudit(NOTE_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNoteText.value = n.remark
+})
 </script>
 
 <style scoped>
@@ -277,4 +308,7 @@ function rowClass({ row }: { row: EnrichedUndisclosedRow }): string {
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.audit-note-card { margin-top: 16px; border-radius: 8px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.audit-card-header { font-weight: 600; font-size: 14px; color: #303133; }
 </style>

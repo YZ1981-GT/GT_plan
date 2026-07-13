@@ -18,6 +18,14 @@
       </ul>
     </div>
 
+    <!-- 工具栏索引 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-9" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <!-- Section标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-9 债权投资三阶段划分</h3>
@@ -262,6 +270,19 @@
         <span class="summary-total">合计: {{ stageLogic.summary.value.total }} 项</span>
       </div>
 
+      <!-- 审计说明 el-card -->
+      <el-card class="note-card" shadow="never">
+        <template #header><div class="card-header"><span>审计说明</span></div></template>
+        <el-input
+          v-model="auditNote"
+          type="textarea"
+          :autosize="{ minRows: 5 }"
+          :disabled="isReadonly"
+          placeholder="填写审计说明：三阶段划分测试的执行情况、企业与审计判断差异、拟调整/未调整事项及其影响等。"
+          @change="saveAuditNote"
+        />
+      </el-card>
+
       <!-- 审计结论 el-card + AI按钮 -->
       <el-card class="conclusion-card" shadow="never">
         <template #header>
@@ -322,6 +343,7 @@
 import { ref, computed, inject, watch, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useG4EclStageClassification } from '../../composables/useG4EclStageClassification'
+import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -342,9 +364,25 @@ const stageLogic = useG4EclStageClassification({
   isReadonly: isReadonlyRef,
 })
 
+// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
+const formData = useG4EclFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G4-9-stage-classification-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
 // ─── 从htmlData初始化数据 ───
-onMounted(() => {
+onMounted(async () => {
   stageLogic.init(props.htmlData)
+  await formData.loadAll()
+  const note = formData.allResponses.value.get(NOTE_KEY)
+  if (note?.remark) auditNote.value = note.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -437,6 +475,30 @@ function fillAiConclusion(): void {
 .g4-tab-stage-classification {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+/* 工具栏索引 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明卡片 */
+.note-card {
+  margin-top: 12px;
+}
+.note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */

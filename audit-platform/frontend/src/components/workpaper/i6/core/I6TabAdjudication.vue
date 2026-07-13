@@ -7,6 +7,14 @@
       <p>I6↔I2联动：费用化(I6)+资本化(I2)=研发总额(VR-I6-01)。变动率超±30%黄色高亮。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实研发费用（6602）本期发生额的完整性与准确性，验证费用化与资本化划分（VR-I6-01）恰当，为研发费用列报及后续加计扣除税务处理提供审定依据。"
+      class="objective-alert"
+    />
+
     <!-- VR-I6-01 校验警告 -->
     <el-alert
       v-if="vrStatus && !vrStatus.isBalanced"
@@ -22,10 +30,16 @@
       <div class="block-header">
         <span class="block-title">研发费用审定表（I6-1）</span>
         <div class="block-actions">
-          <el-button size="small" type="primary" text @click="handleAiGenerate('adjudication')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
           <el-button size="small" type="default" text @click="handleReview">复核</el-button>
+        </div>
+      </div>
+
+      <!-- 工具栏 -->
+      <div class="tab-toolbar">
+        <div class="toolbar-left"></div>
+        <div class="toolbar-right">
+          <span class="chip-wrap"><GtIndexChip value="wp:I6-1" :context-project-id="projectId" /></span>
+          <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         </div>
       </div>
 
@@ -177,12 +191,9 @@
       <template #header>
         <div class="card-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('note')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }"
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }"
         placeholder="请填写审计说明（研发费用归集完整性、与I2划分一致性等）..."
         :disabled="isReadonly" @blur="onNoteBlur" />
     </el-card>
@@ -192,9 +203,6 @@
       <template #header>
         <div class="card-header">
           <span>审计结论</span>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('conclusion')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <el-select v-model="auditConclusion" placeholder="请选择审计结论" :disabled="isReadonly" class="conclusion-select" @change="onConclusionChange">
@@ -234,7 +242,6 @@
  * Task: 4.2
  */
 import { ref, reactive, computed, watch, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -397,20 +404,7 @@ async function handleWritebackTB(): Promise<void> {
   } catch { ElMessage.error('TB回写失败') }
 }
 
-// ─── AI / Review / Navigation ────────────────────────────────────────────────
-async function handleAiGenerate(section: string): Promise<void> {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section, prompt: `I6研发费用审定表${section}`,
-      context: { wpCode: 'I6-1', rule: '6602损益类借方,取发生额', auditedTotal: linkageData.expense },
-    })
-    if (res.data?.data?.content) {
-      if (section === 'note') { auditNote.value = res.data.data.content; onNoteBlur() }
-      else if (section === 'conclusion') { auditConclusion.value = res.data.data.content; onConclusionChange(auditConclusion.value) }
-    }
-  } catch { /* ignore */ }
-}
-
+// ─── Review / Navigation ─────────────────────────────────────────────────────
 function handleReview(): void { openReviewDialog('I6-1 审定表') }
 function navigateTo(code: string): void { emit('navigate-sheet', code) }
 

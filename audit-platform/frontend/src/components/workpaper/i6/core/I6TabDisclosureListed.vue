@@ -16,13 +16,20 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实研发费用附注披露（上市公司版）分类明细完整、本期与上期发生额勾稽一致，费用化与资本化及重大研发项目披露充分、恰当。"
+      class="objective-alert"
+    />
+
     <!-- 分类汇总表 -->
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="section-title-row">
           <span class="section-title">研发费用分类明细</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('category')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" type="default" link @click="handleReview('category')">💬</el-button>
           </div>
         </div>
@@ -70,7 +77,6 @@
         <div class="section-title-row">
           <span class="section-title">费用化与资本化说明</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('capitalization')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" type="default" link @click="handleReview('capitalization')">💬</el-button>
           </div>
         </div>
@@ -84,7 +90,6 @@
         <div class="section-title-row">
           <span class="section-title">重大研发项目进展</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('projects')"><el-icon><MagicStick /></el-icon> AI生成</el-button>
             <el-button size="small" type="default" link @click="handleReview('projects')">💬</el-button>
           </div>
         </div>
@@ -92,7 +97,19 @@
       <el-input v-model="projectsNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="列示重大研发项目名称、投入金额、完成进度..." @blur="onNoteBlur('projects')" />
     </el-card>
 
-    <details class="compile-hint"><summary>编制提示</summary><ul>
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="disclosure-card audit-note-card">
+      <template #header><span class="section-title">审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="请填写审计说明（披露分类与审定表/明细表勾稽、披露完整性核对等）..." @blur="onAuditNoteBlur" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="disclosure-card audit-note-card">
+      <template #header><span class="section-title">审计结论</span></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="请填写审计结论（附注披露完整、准确、符合信息披露编报规则）..." @blur="onAuditConclusionBlur" />
+    </el-card>
+
+    <details class="guidance-details compile-hint"><summary>编制提示</summary><ul>
       <li>上市公司版：19行×7列（费用类别/本期/上期/变动额/变动率/说明/占比）</li>
       <li>数据从审定表I6-1/明细表I6-2自动汇总(SUMIF)</li>
       <li>EventBus: subscribe 'substantive:adjudicated' 刷新, publish 'disclosure:note-text-updated'</li>
@@ -102,8 +119,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
-import http from '@/utils/http'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const emit = defineEmits<{ 'save': [itemId: string, value: any] }>()
@@ -112,11 +127,15 @@ const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', 
 interface CategoryRow { rowId: string; item: string; currentAmount: number; priorAmount: number; remark: string; isAutoFilled: boolean }
 
 const ITEM_ID = 'I6-disc-L-categories'
+const NOTE_KEY = 'I6-disc-L-audit-note'
+const CONCLUSION_KEY = 'I6-disc-L-audit-conclusion'
 const DEFAULT_CATEGORIES = ['人工费', '材料费', '折旧费', '无形资产摊销', '设计费', '装备调试费', '委外研发费', '其他费用']
 
 const categoryRows = ref<CategoryRow[]>([])
 const capitalizationNote = ref('')
 const projectsNote = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 const totalCurrent = computed(() => categoryRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0))
 const totalPrior = computed(() => categoryRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
@@ -131,6 +150,8 @@ function _load(): void {
 function _loadNotes(): void {
   capitalizationNote.value = _str('I6-disc-L-capitalization')
   projectsNote.value = _str('I6-disc-L-projects')
+  auditNote.value = _str(NOTE_KEY)
+  auditConclusion.value = _str(CONCLUSION_KEY)
 }
 function _str(id: string): string { const item = props.allResponses.get(id); return (item?.remark ?? (typeof item === 'string' ? item : '')) as string }
 watch(() => props.allResponses, () => _load(), { immediate: true })
@@ -149,15 +170,8 @@ function onNoteBlur(section: string): void {
   window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', { detail: { wpCode: 'I6-附注上市', section } }))
 }
 
-async function handleAiGenerate(section: string): Promise<void> {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, { section, prompt: `I6研发费用附注上市-${section}`, context: { wpCode: 'I6-附注上市', totalCurrent: totalCurrent.value } })
-    if (res.data?.data?.content) {
-      if (section === 'capitalization') { capitalizationNote.value = res.data.data.content; onNoteBlur('capitalization') }
-      else if (section === 'projects') { projectsNote.value = res.data.data.content; onNoteBlur('projects') }
-    }
-  } catch { /* */ }
-}
+function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
+function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
 
 function handleReview(section: string): void { openReviewDialog(`I6 附注上市-${section}`) }
 
@@ -169,6 +183,8 @@ function fmtPctOfTotal(val: number): string { if (!totalCurrent.value || !val) r
 
 <style scoped>
 .i6-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }

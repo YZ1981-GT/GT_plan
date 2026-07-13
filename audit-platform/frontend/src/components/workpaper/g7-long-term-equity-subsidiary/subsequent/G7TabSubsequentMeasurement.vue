@@ -75,6 +75,19 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：验证子公司投资成本法后续计量的准确性（CAS2）——被投资方宣告分派现金股利时按持股比例确认投资收益，长投账面除追加投资/减值外不调整，期末账面余额与企业账列一致。" />
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-10" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 表格（48行×11列，max-height虚拟滚动） -->
     <el-table
       :data="rows"
@@ -200,6 +213,21 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部：审计结论 el-card + AI辅助按钮 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -216,6 +244,7 @@
         :autosize="{ minRows: 2, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="对子公司投资后续计量测试结果的综合评价（投资收益确认是否合理、账面价值增减是否准确）..."
+        @change="saveAuditConclusion"
       />
     </el-card>
 
@@ -263,6 +292,8 @@ import {
   parseNum,
 } from '../../composables/useG7SubFormulaEngine'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
+import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
@@ -313,6 +344,27 @@ const { exportTemplate, exportData, importData } = useG7SubImportExport({ wpId: 
 const rows = reactive<G7SubsequentRow[]>([])
 const conclusion = ref<string>('')
 const materialityLevel = ref<number>(0)
+const rowCount = computed(() => rows.length)
+
+// ─── 审计说明/结论持久化（checklist_responses，conclusion:null） ───
+const auditFormData = useG7SubFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G7-10-subsequent-audit-note'
+const CONCLUSION_KEY = 'G7-10-subsequent-audit-conclusion'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  conclusion.value = val
+  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+}
 
 function createEmptyRow(seq: number, investeeName: string): G7SubsequentRow {
   return {
@@ -422,6 +474,7 @@ async function handleAiConclusion() {
     const text = res?.data?.data?.conclusion || res?.data?.conclusion || res?.data?.text || ''
     if (text) {
       conclusion.value = text
+      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: text, conclusion: null })
       ElMessage.success('AI结论已生成')
     } else {
       ElMessage.warning('AI未能生成有效结论')
@@ -505,8 +558,13 @@ function getData(): { rows: G7SubsequentRow[]; materialityLevel: number; conclus
 
 defineExpose({ getData, loadFromHtmlData })
 
-onMounted(() => {
+onMounted(async () => {
   loadFromHtmlData(props.htmlData)
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(CONCLUSION_KEY)
+  if (c?.remark) conclusion.value = c.remark
 })
 </script>
 
@@ -592,7 +650,14 @@ onMounted(() => {
 .variance-warning { color: #f56c6c; font-weight: 600; }
 .variance-exists { color: #e6a23c; font-weight: 500; }
 
-/* 审计结论卡片 */
+/* 审计目标 / 工具栏 */
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-top: 16px; }
 .conclusion-card { margin-top: 16px; }
 .conclusion-header { display: flex; justify-content: space-between; align-items: center; }
 

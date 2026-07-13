@@ -332,6 +332,40 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
             elif item.item_id.startswith(("K6-", "K6A-")):
                 # K6 持有待售资产和负债：自由格式（审定数/减值/分类结论等均存 remark，conclusion 偶有 Y/N/分类状态）
                 pass
+            elif item.item_id.startswith("G5-"):
+                # G5 长期应收款：审计说明/审计结论等自由格式（remark 存文本，conclusion 恒为 null）
+                pass
+            elif item.item_id.startswith("G8-"):
+                # G8 其他权益工具投资：审计说明/审计结论/明细行/审定数等自由格式
+                # （remark 存文本或 JSON，conclusion 恒为 null 或审定数字符串），跳过白名单校验
+                pass
+            elif item.item_id.startswith(("G10-", "G10-adj")):
+                # G10 交易性金融负债：审计说明/审计结论/明细行/审定数/分类/衍生等自由格式
+                # （审定表 composable 将说明/结论/审定数存入 conclusion 字段[item_id 如
+                #  G10-adj-note/G10-adj-conclusion/G10-1-adjudicated-amount]，其余存 remark，
+                #  conclusion 为自由文本或审定数字符串），跳过白名单校验
+                pass
+            elif item.item_id.startswith("G11-"):
+                # G11 投资收益：审计说明/审计结论/明细行/审定数/收益率/凭证检查等自由格式
+                # （remark 存文本或 JSON，审计说明/结论 conclusion 恒为 null，审定数 composable
+                #  可能存审定数/文本字符串到 conclusion），跳过白名单校验
+                pass
+            elif item.item_id.startswith("G12-"):
+                # G12 净敞口套期收益：审计说明/审计结论/明细行/审定数等自由格式
+                # （remark 存文本或 JSON，conclusion 恒为 null 或审定数/文本字符串），跳过白名单校验
+                pass
+            elif item.item_id.startswith("G13-"):
+                # G13 公允价值变动损益：审计说明/审计结论/明细行/审定数/披露等自由格式
+                # （remark 存文本或 JSON，审计说明/结论 conclusion 恒为 null 或自由文本，审定表
+                #  composable 将说明/结论/审定数存入 conclusion 字段[如 G13-adj-note/
+                #  G13-adj-conclusion/G13-1-adjudicated-amount]），跳过白名单校验
+                pass
+            elif item.item_id.startswith("G14-"):
+                # G14 信用减值损失：审计说明/审计结论/明细行/审定数等自由格式
+                # （审定表 composable 将说明/结论/审定数存入 conclusion 字段[如 G14-adj-note/
+                #  G14-adj-conclusion/G14-1-adjudicated-amount]；逐 sheet 打磨的审计说明/结论
+                #  存 remark、conclusion 恒为 null），跳过白名单校验
+                pass
             elif item.item_id.startswith("D1-"):
                 # D1 应收票据：程序表状态 + 业务模式 + 终止确认 + 披露结论 + 检查结论 + ECL方法 + 标记
                 allowed = (

@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-related-party">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表核查投资性房地产相关的关联方交易（出租/购入/处置/转换），关注定价公允性与商业实质。</p>
+        <p>2. 差异率 =（交易金额 − 市场价参考）/ 市场价 × 100%，&gt;10% 红色高亮需重点关注与解释。</p>
+        <p>3. 核对定价方式、审批文件与市场价依据；关注是否存在利益输送或非公允关联交易。</p>
+        <p>4. 关联交易结果应与附注关联方披露一致（CAS36）。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：识别并核查投资性房地产相关关联方交易的完整性、定价公允性与商业实质，评估对财务报表及披露的影响。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-13" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- 操作栏 -->
     <div class="toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增关联交易</el-button>
@@ -86,17 +111,25 @@
     </el-table>
 
     <!-- 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-13')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-13')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：关联方及关联关系识别、定价公允性核查、市场价对比及异常事项。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、关联交易完整披露、定价公允。B、除下列事项外未见异常。C、存在非公允关联交易，需关注并披露。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -106,9 +139,10 @@
  * H3TabRelatedParty.vue — H3-13 关联交易
  * el-table 11列+差异率>10%红色+合计行
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH3RelatedParty } from '../../composables/useH3RelatedParty'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -137,7 +171,29 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-const auditConclusion = ref(getValue('H3-13-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-13-audit-note'
+const CONCLUSION_KEY = 'H3-13-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function onCellChange(index: number, row: any) { updateRow(index, row) }
 
@@ -171,6 +227,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.row-danger) { background-color: #fef0f0 !important; }

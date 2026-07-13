@@ -18,6 +18,14 @@
 -->
 <template>
   <div class="g6-voucher-check">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：通过抽样检查其他债权投资相关记账凭证，验证会计记录的真实性、授权充分性、账务处理与分类正确性、金额准确性，评价内部控制有效性。"
+      class="objective-alert"
+    />
+
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G6-15 凭证检查表</h3>
@@ -297,6 +305,21 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header>
+        <div class="audit-note-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述凭证抽样检查执行的审计程序、核对情况与结果、异常凭证处理、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -358,7 +381,7 @@ import { useG6EclVoucherCheck } from '@/composables/useG6EclVoucherCheck'
 import { useG6EclImportExport } from '../../composables/useG6EclImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
-import type { VoucherCheckRow } from '../../composables/useG6EclFormData'
+import { useG6EclFormData, type VoucherCheckRow } from '../../composables/useG6EclFormData'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -380,6 +403,16 @@ const vc = useG6EclVoucherCheck(
 const conclusion = ref('')
 const showSampling = ref(false)
 const importFileRef = ref<HTMLInputElement | null>(null)
+
+// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
+const noteFormData = useG6EclFormData({ wpId: wpIdRef, projectId: projectIdRef })
+const NOTE_KEY = 'G6-15-voucher-check-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
 
 // ─── 导入导出 ────────────────────────────────────────────────────────────────
 
@@ -501,12 +534,15 @@ function fmtNum(v: unknown): string {
 
 // ─── 数据加载 ───────────────────────────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   if (props.htmlData?.voucherCheck) {
     const data = props.htmlData.voucherCheck
     vc.loadRows(data.rows || [])
     if (data.conclusion) conclusion.value = data.conclusion
   }
+  await noteFormData.loadAll()
+  const n = noteFormData.allResponses.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -523,6 +559,20 @@ defineExpose({
 .g6-voucher-check {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 .section-head {

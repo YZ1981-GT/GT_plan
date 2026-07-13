@@ -1,5 +1,14 @@
 <template>
   <div class="h6-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实固定资产清理相关审计调整分录（AJE）与重分类调整分录（RJE）借贷平衡、依据充分，确认调整已正确联动 H6-1 审定表 AJE/RJE 列并汇总至 A13 错报，保证清理事项列报恰当。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H6-3调整分录：记录固定资产清理审计过程中发现的审计调整分录(AJE)和重分类调整分录(RJE)。调整分录必须借贷平衡，保存后自动联动H6-1审定表AJE/RJE列，并通过EventBus发布'adjustment:created'供A13错报汇总消费。</p>
@@ -9,9 +18,6 @@
     <div class="section-header">
       <span>调整分录汇总 H6-3</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H6-3-adjustment')">💬</el-button>
       </div>
     </div>
@@ -134,16 +140,28 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-3-note')">💬</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
         placeholder="请填写审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H6-3-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -175,7 +193,6 @@
  * Requirements: 4.1-4.2
  */
 import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useH6Adjustment } from '../../composables/useH6Adjustment'
 import { useH6ImportExport } from '../../composables/useH6ImportExport'
 
@@ -225,14 +242,20 @@ const importExport = useH6ImportExport({
 
 // ─── Audit Note ──────────────────────────────────────────────────────────────
 const auditNote = ref('')
+const auditConclusion = ref('')
 
 onMounted(() => {
   const noteItem = props.allResponses.get('H6-3-note')
   if (noteItem?.remark) auditNote.value = noteItem.remark
+  const concItem = props.allResponses.get('H6-3-conclusion')
+  if (concItem?.remark) auditConclusion.value = concItem.remark
 })
 
 function saveAuditNote() {
   saveResponse('H6-3-note', auditNote.value)
+}
+function saveAuditConclusion() {
+  saveResponse('H6-3-conclusion', auditConclusion.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -270,10 +293,6 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[H6-3] AI generate — adjustment entry')
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
@@ -291,6 +310,8 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h6-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

@@ -1,8 +1,26 @@
 <template>
   <div class="h9-tab-finance-cost">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：核实未确认融资费用（负债备抵科目）期末余额及本期实际利率法分摊的准确、完整，验证与 H9-2 明细表及 H9 摊销表利息费用的勾稽一致。"
+    />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS21第20条：未确认融资费用为负债备抵科目（借方余额），按实际利率法分期转入利息费用。期末=期初+借方增加-贷方确认。21列按3区段Tab展示，行联动H9-2出租方。</p>
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-3" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
     </div>
 
     <!-- 区段切换 + 工具栏 -->
@@ -20,7 +38,6 @@
           </template>
         </el-dropdown>
         <el-button v-if="!isReadonly" size="small" type="primary" @click="handleAddRow">+ 新增行</el-button>
-        <el-button size="small" type="primary" plain @click="$emit('open-ai', 'finance-cost')">AI 辅助</el-button>
         <el-button size="small" @click="$emit('open-review', 'finance-cost')">复核</el-button>
       </div>
     </div>
@@ -208,7 +225,6 @@
       <template #header>
         <div class="note-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" plain @click="$emit('open-ai', 'finance-cost-note')">AI 辅助</el-button>
         </div>
       </template>
       <el-input
@@ -226,7 +242,6 @@
       <template #header>
         <div class="note-header">
           <span>审计结论</span>
-          <el-button size="small" type="primary" plain @click="$emit('open-ai', 'finance-cost-conclusion')">AI 辅助</el-button>
         </div>
       </template>
       <el-input
@@ -238,6 +253,18 @@
         @change="onSaveNote('H9-3-audit-conclusion', auditConclusion)"
       />
     </el-card>
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>未确认融资费用为负债备抵科目（借方余额）：期末 E = 期初 B + 本期增加 C（借）− 本期确认 D（贷）</li>
+        <li>本期确认（转入利息费用）按实际利率法计算，应与 H9 摊销表各期利息一致</li>
+        <li>出租方名称自 H9-2 明细表联动，保持合同口径一致</li>
+        <li>审定期末 M = 审定期初 J + 审定增加 K − 审定确认 L；最终审定 O = M − 重分类 N</li>
+        <li>CAS21 下租赁利息费用一般不资本化（租赁期开始日已达预定可使用状态）</li>
+      </ul>
+    </details>
 
     <!-- 隐藏文件上传(导入) -->
     <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleFileImport" />
@@ -259,6 +286,7 @@ import { ref, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH9FinanceCost, type H9FinanceCostRow } from '../../composables/useH9FinanceCost'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -385,10 +413,26 @@ function getSummaryAdjustment({ columns }: any) {
 <style scoped>
 .h9-tab-finance-cost { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
   border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
 }
+
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; flex-wrap: wrap; gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+.guidance-details {
+  margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff;
+  border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-details ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
 .segment-bar {
   display: flex; align-items: center; justify-content: space-between;

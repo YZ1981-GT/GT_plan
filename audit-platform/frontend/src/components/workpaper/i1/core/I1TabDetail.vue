@@ -10,6 +10,25 @@
       <p>④ 减值：减值期初/本期计提/本期转回/减值期末（公式自动计算）</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产各项目分类、原值、摊销、减值明细登记的完整、准确，并与审定表 I1 三科目小计勾稽一致。"
+      class="objective-alert"
+    />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 逐项登记无形资产明细，资产分类与摊销方法应与被审计单位会计政策一致（CAS6）。</p>
+        <p>2. 原值期末=期初+增加-减少；累计摊销期末=期初+本期摊销-转出；减值期末=期初+计提-转回；净值=原值期末-摊销期末-减值期末（灰底列自动计算）。</p>
+        <p>3. "摊销原值"列即原值期末，作为摊销测算(I1-10/I1-11)的计算基数，来源"原值变动"区段。</p>
+        <p>4. 明细合计应与审定表 I1 原值/摊销/减值小计勾稽一致，差异超过阈值将黄色告警。</p>
+      </div>
+    </details>
+
     <!-- 交叉验证警告 -->
     <div v-if="crossValidation.hasAnyWarning" class="cross-validation-warning">
       <el-icon class="warning-icon"><WarningFilled /></el-icon>
@@ -26,7 +45,7 @@
     </div>
 
     <!-- 工具栏：新增行 + 导入导出 -->
-    <div class="toolbar">
+    <div class="tab-toolbar">
       <el-button
         v-if="!isReadonly"
         type="primary"
@@ -47,6 +66,7 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <span class="chip-wrap"><GtIndexChip value="wp:I1-2" :context-project-id="projectId" /></span>
       <span class="row-count">共 {{ rows.length }} 行</span>
     </div>
 
@@ -198,13 +218,40 @@
         </div>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：明细取数与登记情况、与审定表勾稽核对结果、异常项处理等。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除下列事项应予调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, type Ref } from 'vue'
+import { ref, computed, toRef, onMounted, watch, type Ref } from 'vue'
 import { ArrowDown, WarningFilled } from '@element-plus/icons-vue'
 import { useI1Detail, type I1DetailTab, type I1DetailRow } from '../../composables/useI1Detail'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -224,6 +271,35 @@ const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
   'save': [itemId: string, value: any]
 }>()
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+
+const NOTE_KEY = 'I1-2-audit-note'
+const CONCLUSION_KEY = 'I1-2-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', CONCLUSION_KEY, val)
+}
+
+function loadAuditText(): void {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n) auditNote.value = (n.remark ?? n.conclusion ?? '') as string
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c) auditConclusion.value = (c.remark ?? c.conclusion ?? '') as string
+}
+
+onMounted(loadAuditText)
+watch(() => props.allResponses, loadAuditText, { deep: true })
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -319,7 +395,7 @@ function summaryDisplayRow(tabKey: I1DetailTab): Record<string, any> {
     case 'cost':
       return { name: '合计', costBegin: s.costBegin, costIncrease: s.costIncrease, costDecrease: s.costDecrease, costEnd: s.costEnd }
     case 'amort':
-      return { name: '合计', accAmortBegin: s.accAmortBegin, amortProvision: s.amortProvision, amortTransferOut: s.amortTransferOut, accAmortEnd: s.accAmortEnd, netValue: s.netValue }
+      return { name: '合计', costEnd: s.costEnd, accAmortBegin: s.accAmortBegin, amortProvision: s.amortProvision, amortTransferOut: s.amortTransferOut, accAmortEnd: s.accAmortEnd, netValue: s.netValue }
     case 'impairment':
       return { name: '合计', impairmentBegin: s.impairmentBegin, impairmentProvision: s.impairmentProvision, impairmentReversal: s.impairmentReversal, impairmentEnd: s.impairmentEnd }
     default:
@@ -368,6 +444,28 @@ function fmtAmount(value: number | null | undefined): string {
   color: #78350f;
 }
 
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 12px; }
+
+/* 编制提示 details */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+
+/* 索引 chip */
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+
 /* 交叉验证警告（黄色） */
 .cross-validation-warning {
   display: flex;
@@ -395,7 +493,7 @@ function fmtAmount(value: number | null | undefined): string {
 }
 
 /* 工具栏 */
-.toolbar {
+.tab-toolbar {
   display: flex;
   align-items: center;
   gap: 12px;

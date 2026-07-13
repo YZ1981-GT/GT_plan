@@ -5,15 +5,16 @@
       <p>附注披露信息（国有企业）：按照国资委和财政部要求，披露工程物资变动情况及相关管控信息。数据从H4-1审定表自动取数，重点关注国有资产保值增值和重大物资采购合规性。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实工程物资附注披露完整准确，重点关注重大采购合规性、关联采购商业合理性与国有资产保值增值披露，符合国资委产权管理要求。" />
+
     <!-- Section Title -->
     <div class="section-header">
       <span>附注披露信息（国有企业）</span>
       <div class="section-header-actions">
         <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions"
           size="small" @change="dualMode.onModeChange" />
-        <el-button size="small" type="primary" link @click="handleAiGenerate" style="margin-left: 8px">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-disclosure-soe')">💬</el-button>
       </div>
     </div>
@@ -88,9 +89,6 @@
           <div class="section-header" style="margin-bottom:0">
             <span>附注披露文本</span>
             <div class="section-header-actions">
-              <el-button size="small" type="primary" link @click="handleAiGenerate">
-                <el-icon><MagicStick /></el-icon> AI生成
-              </el-button>
             </div>
           </div>
         </template>
@@ -99,6 +97,26 @@
           @blur="saveNoteText" />
       </el-card>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }"
+        placeholder="请填写附注披露核对的审计说明..." :disabled="props.isReadonly"
+        @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
+    </el-card>
 
     <!-- 编制提示 -->
     <details class="edit-tips">
@@ -177,6 +195,7 @@ const soeData = computed(() => {
 })
 
 // ─── Note Text ───────────────────────────────────────────────────────────────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const noteText = ref('')
 const noteResp = props.allResponses.get('H4-disclosure-soe-text')
 if (noteResp?.remark) noteText.value = noteResp.remark
@@ -185,6 +204,23 @@ function saveNoteText() {
   props.allResponses.set('H4-disclosure-soe-text', {
     item_id: 'H4-disclosure-soe-text', remark: noteText.value, conclusion: null,
   })
+  saveResponse('H4-disclosure-soe-text', noteText.value)
+}
+
+// ─── 审计说明 / 审计结论（inject saveResponse 落库 + setup 恢复） ──────────────
+const auditNote = ref('')
+const auditConclusion = ref('')
+const _anResp = props.allResponses.get('H4-disclosure-soe-note')
+if (_anResp?.remark) auditNote.value = _anResp.remark
+const _acResp = props.allResponses.get('H4-disclosure-soe-conclusion')
+if (_acResp?.remark) auditConclusion.value = _acResp.remark
+function saveAuditNote() {
+  props.allResponses.set('H4-disclosure-soe-note', { item_id: 'H4-disclosure-soe-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-disclosure-soe-note', auditNote.value)
+}
+function saveAuditConclusion() {
+  props.allResponses.set('H4-disclosure-soe-conclusion', { item_id: 'H4-disclosure-soe-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-disclosure-soe-conclusion', auditConclusion.value)
 }
 
 // ─── EventBus Subscribe ──────────────────────────────────────────────────────
@@ -206,9 +242,6 @@ onUnmounted(() => {
 })
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
-function handleAiGenerate() {
-  console.log('[H4-Disclosure-SOE] AI generate')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -226,6 +259,9 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

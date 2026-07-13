@@ -111,11 +111,19 @@
       <el-input v-model="lb.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="直接人工分析审计说明..." />
     </el-card>
+
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, onMounted, toRef } from 'vue'
 import { useF2DirectLaborAnalysis } from '../../composables/useF2DirectLaborAnalysis'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -129,6 +137,21 @@ const props = defineProps<{
 const lb = useF2DirectLaborAnalysis({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计结论（独立持久化，F2 计价组事件） ───────────────────────────────
+const CONCLUSION_KEY = 'F2-42-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 </script>
 

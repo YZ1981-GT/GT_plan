@@ -23,9 +23,6 @@
     <div class="section-header">
       <span class="section-title">I3-4 入账价值测算表</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiSuggest">
-          <el-icon><MagicStick /></el-icon> AI建议
-        </el-button>
         <el-button size="small" type="default" text @click="handleReview">
           💬复核
         </el-button>
@@ -70,8 +67,17 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：验证商誉初始入账价值的准确性——合并成本（对价+或有对价+交易费用）与被购方可辨认净资产公允价值份额的计量是否恰当；商誉 = 合并成本 − 净资产公允价值份额；与 I3-2 明细表入账金额勾稽一致（CAS20 非同一控制下企业合并）。"
+    />
+
     <!-- 被投资单位动态选择 + 新增 -->
-    <div class="investee-toolbar">
+    <div class="investee-toolbar tab-toolbar">
       <span class="toolbar-label">被投资单位：</span>
       <el-select
         v-model="selectedInvestee"
@@ -94,6 +100,8 @@
         删除
       </el-button>
       <GtIndexChip value="I3-2" style="margin-left: 12px" @click="emit('navigate-sheet', 'I3-2 明细表')" />
+      <GtIndexChip value="wp:I3-4" :context-project-id="projectId" style="margin-left: 8px" />
+      <el-tag size="small" type="info" style="margin-left: 8px">共 {{ investeeList.length }} 项</el-tag>
     </div>
 
     <!-- 入账测算主表（当选中被投资单位时） -->
@@ -420,23 +428,37 @@
       <el-empty description="请选择或新增被投资单位以查看入账价值测算" />
     </div>
 
-    <!-- 审计说明/结论 -->
+    <!-- 审计说明 -->
     <el-card class="conclusion-card" shadow="never" style="margin-top: 16px">
       <template #header>
         <div class="conclusion-header">
           <span>审计说明</span>
-          <el-button size="small" :disabled="isReadonly" @click="handleAiConclusion">
-            🤖 AI辅助
-          </el-button>
         </div>
       </template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        :autosize="{ minRows: 5 }"
         :disabled="isReadonly"
-        placeholder="对入账价值测算的审计说明与结论..."
+        placeholder="对入账价值测算过程的审计说明（合并成本构成、净资产公允价值评估、持股比例等）..."
         @change="persistConclusion"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="conclusion-card" shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="conclusion-header">
+          <span>审计结论</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusionText"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="对入账价值测算的审计结论（如：商誉初始确认金额计量准确，与明细表勾稽一致）..."
+        @change="persistAuditConclusion"
       />
     </el-card>
 
@@ -458,7 +480,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled } from '@element-plus/icons-vue'
 import { calcInitialGoodwill, calcSubtotal } from '../../composables/useI3FormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -518,6 +540,7 @@ const openReviewDialog = inject<(section: string) => void>('openReviewDialog', (
 
 const STORAGE_KEY = 'I3-4-initial-value'
 const CONCLUSION_KEY = 'I3-4-conclusion'
+const AUDIT_CONCLUSION_KEY = 'I3-4-audit-conclusion'
 
 const formulaTooltips = {
   mergerCost: '合并成本 = 对价 + 或有对价 + 交易费用 [F1]',
@@ -532,6 +555,7 @@ const formulaTooltips = {
 
 const selectedInvestee = ref('')
 const auditConclusion = ref('')
+const auditConclusionText = ref('')
 
 /** All investee data: Map<investeeName, InvesteeData> */
 const dataMap = ref<Map<string, InvesteeData>>(new Map())
@@ -560,6 +584,13 @@ function loadData() {
     auditConclusion.value = typeof concRaw === 'string'
       ? concRaw
       : (concRaw.conclusion ?? concRaw.remark ?? '')
+  }
+  // Load audit conclusion (审计结论)
+  const auditConcRaw = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (auditConcRaw) {
+    auditConclusionText.value = typeof auditConcRaw === 'string'
+      ? auditConcRaw
+      : (auditConcRaw.remark ?? auditConcRaw.conclusion ?? '')
   }
 }
 
@@ -721,37 +752,8 @@ function persistConclusion() {
   emit('save', CONCLUSION_KEY, auditConclusion.value)
 }
 
-// ─── AI Suggest ──────────────────────────────────────────────────────────────
-
-function handleAiSuggest() {
-  if (!selectedInvestee.value) {
-    ElMessage.warning('请先选择被投资单位')
-    return
-  }
-  ElMessage.info(`AI正在为"${selectedInvestee.value}"生成入账测算建议...`)
-}
-
-function handleAiConclusion() {
-  if (!selectedInvestee.value) {
-    ElMessage.warning('请先选择被投资单位')
-    return
-  }
-  const d = currentData.value!
-  const draft =
-    `经测算，"${selectedInvestee.value}"商誉初始确认：` +
-    `合并成本 ${fmtNum(mergerCost.value)} 元` +
-    `（对价 ${fmtNum(d.consideration)} + 或有对价 ${fmtNum(d.contingentConsideration)} + 交易费用 ${fmtNum(d.transactionCost)}），` +
-    `被购方可辨认净资产公允价值份额 ${fmtNum(netAssetFVShare.value)} 元` +
-    `（净资产FV ${fmtNum(netAssetFV.value)} × 持股 ${d.equityRatio}%），` +
-    `商誉 = ${fmtNum(goodwillAmount.value)} 元。` +
-    (reconciliationDiff.value === 0
-      ? '与I3-2明细表一致，入账金额正确。'
-      : `与I3-2明细表存在差异 ${fmtNum(reconciliationDiff.value)} 元，需进一步核实。`)
-
-  auditConclusion.value = auditConclusion.value
-    ? `${auditConclusion.value}\n${draft}`
-    : draft
-  persistConclusion()
+function persistAuditConclusion() {
+  emit('save', AUDIT_CONCLUSION_KEY, auditConclusionText.value)
 }
 
 // ─── Review ──────────────────────────────────────────────────────────────────
@@ -860,6 +862,11 @@ function handleReview() {
   font-weight: 600;
   color: #374151;
   white-space: nowrap;
+}
+
+/* 审计目标 alert */
+.objective-alert {
+  margin-bottom: 16px;
 }
 
 /* 入账测算主表 */

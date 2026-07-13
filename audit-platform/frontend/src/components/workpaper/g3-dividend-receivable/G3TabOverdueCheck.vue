@@ -14,7 +14,7 @@
   <div class="g3-overdue-check">
     <div class="section-head">
       <h3 class="sheet-title">G3-5 长期未收回检查</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" :disabled="isReadonly" @click="overdue.addRow()">＋ 新增</el-button>
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
@@ -176,6 +176,19 @@
       <span class="summary-item">高风险笔数：{{ overdue.summary.value.highRiskCount }}</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：概述长期未收回应收股利的检查程序、逾期与风险评估结果、拟调整及未调整事项及其影响。"
+        @change="persistNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -246,6 +259,14 @@ function persistConclusion() {
   if (!props.isReadonly) {
     props.debouncedSave(CONCLUSION_KEY, { conclusion: auditConclusion.value })
   }
+}
+
+// ─── 审计说明（conclusion=null，文本存 remark，走白名单豁免路径） ───
+const NOTE_KEY = 'G3-5-overdue-audit-note'
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+function persistNote() {
+  if (props.isReadonly) return
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: auditNote.value })
 }
 
 // ─── Row class for risk highlighting ───
@@ -395,6 +416,17 @@ function handleImportData() { ElMessage.info('导入数据功能将在导入导�
   margin-top: 6px;
   color: #909399;
   font-size: 12px;
+}
+
+/* 审计说明卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>
 

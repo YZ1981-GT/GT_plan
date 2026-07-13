@@ -45,6 +45,19 @@
       </div>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：验证非同一控制下企业合并的长期股权投资初始投资成本按支付对价公允价值加直接相关费用确定（CAS20），商誉/廉价购买利得计算准确，合并对价及被购买方可辨认净资产公允价值确认恰当。" />
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-9" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 53行×9列数据表格 -->
     <el-table :data="rows" border size="small" max-height="600" style="font-size: 13px">
       <el-table-column label="序号" width="55" align="center" fixed>
@@ -167,6 +180,16 @@
       商誉 {{ fmtNum(totals.goodwill) }}
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <span>审计说明</span>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        :disabled="isReadonly" placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote" />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -175,7 +198,7 @@
       </template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly" placeholder="请填写非同控合并初始计量审计结论..."
-        @change="handleConclusionChange" />
+        @change="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -213,12 +236,14 @@
  * Spec: .kiro/specs/g7-long-term-equity-subsidiary/
  * Requirements: 3.2, 3.4, 3.5
  */
-import { ref, computed, watch, inject, toRef } from 'vue'
+import { ref, computed, watch, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { calcNotSameControlCost, calcGoodwill, parseNum } from '../../composables/useG7SubFormulaEngine'
 import { useG7SubImportExport, type G7SubImportableSheet } from '../../composables/useG7SubImportExport'
+import { useG7SubFormData } from '../../composables/useG7SubFormData'
 import type { G7NotSameControlRow } from '../../composables/useG7SubFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -241,6 +266,36 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 const rows = ref<G7NotSameControlRow[]>([])
 const conclusion = ref('')
+const rowCount = computed(() => rows.value.length)
+
+// ─── 审计说明/结论持久化（checklist_responses，conclusion:null） ───
+const auditFormData = useG7SubFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G7-9-not-same-control-audit-note'
+const CONCLUSION_KEY = 'G7-9-not-same-control-audit-conclusion'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  auditFormData.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+function saveAuditConclusion(val: string): void {
+  if (isReadonly.value) return
+  conclusion.value = val
+  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+  emitSave()
+}
+
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = auditFormData.data.value.get(CONCLUSION_KEY)
+  if (c?.remark) conclusion.value = c.remark
+})
 
 /** 从htmlData初始化数据 */
 function initFromHtmlData(): void {
@@ -402,6 +457,7 @@ async function handleAI(): Promise<void> {
     const generated = res?.data?.data?.conclusion ?? res?.data?.conclusion ?? ''
     if (generated) {
       conclusion.value = generated
+      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: generated, conclusion: null })
       emitSave()
       ElMessage.success('AI结论已生成')
     }
@@ -527,7 +583,16 @@ watch(() => props.htmlData, () => {
   margin-right: 8px;
 }
 
-/* 审计结论卡片 */
+/* 审计目标 / 工具栏 */
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
 .conclusion-card {
   margin-top: 12px;
 }

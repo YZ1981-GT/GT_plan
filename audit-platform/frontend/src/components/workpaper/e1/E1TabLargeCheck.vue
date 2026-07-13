@@ -11,7 +11,7 @@
  *
  * Requirements: 10.6
  */
-import { inject, toRef, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, type Ref } from 'vue'
 import {
   useE1IpoSpecial,
   type IpoSheetCode,
@@ -74,6 +74,36 @@ function formatCellValue(row: any, col: ColumnDef): string {
   }
   if (col.type === 'boolean') return val ? '是' : '否'
   return String(val || '')
+}
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+const NOTE_KEY = 'E1-largecheck-audit-note'
+const CONCLUSION_KEY = 'E1-largecheck-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
 }
 </script>
 
@@ -171,6 +201,36 @@ function formatCellValue(row: any, col: ColumnDef): string {
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：可概述（1）大额及异常货币资金收支抽查的样本与检查内容（凭证、合同、审批手续齐全性）；（2）大额现金交易、频繁整数收支、无商业理由资金往来等异常事项的核查；（3）与关联方、疑似虚构对手方的大额往来及资金体外循环迹象。"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、货币资金收支真实、完整，原始凭证齐全，账务处理恰当，未见异常。B、除上述异常事项已查明原因并记录外，其余未见异常。C、由于存在以下疑似舞弊或体外循环迹象（或资料受限），需进一步核查。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -242,5 +302,14 @@ function formatCellValue(row: any, col: ColumnDef): string {
 }
 .auto-calc-value {
   color: #606266;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

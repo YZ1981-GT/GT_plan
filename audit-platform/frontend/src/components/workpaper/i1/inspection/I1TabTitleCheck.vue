@@ -18,6 +18,23 @@
       注意：土地使用权需单独检查出让/划拨性质及剩余年限。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产权属证书的真实、完整与法律效力，验证权利人与被审计单位一致，账面价值与权证记载金额勾稽一致，关注质押/受限及续展情况。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-8" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 表头操作区 -->
     <el-card shadow="never" class="main-card">
       <template #header>
@@ -41,7 +58,6 @@
               </template>
             </el-dropdown>
             <el-button size="small" type="default" link @click="handleReview('I1-8')">💬 复核</el-button>
-            <el-button size="small" link @click="handleAiConclusion" :disabled="isReadonly">🤖 AI辅助</el-button>
           </div>
         </div>
       </template>
@@ -232,15 +248,16 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }" :disabled="isReadonly" placeholder="填写审计说明：权属证书核验方式与范围、权利人一致性核对、账面与权证差异分析、质押/受限及续展情况等。" @blur="saveAuditNote" />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header>
-        <div class="section-title">
-          <span>审计结论</span>
-          <el-button size="small" link @click="handleAiConclusion" :disabled="isReadonly">🤖 AI辅助</el-button>
-        </div>
-      </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="经逐项核查，无形资产权属情况…" @blur="persist" />
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="经逐项核查，无形资产权属真实完整、权利人一致、与账面勾稽一致，未见异常…" @blur="saveConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -262,6 +279,7 @@
 import { ref, computed, inject, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { calcTitleDiff } from '../../composables/useI1FormulaEngine'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -275,7 +293,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
-  'save': []
+  'save': [itemId?: string, value?: any]
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -324,6 +342,7 @@ interface TitleRow {
 
 const rows = ref<TitleRow[]>([])
 const auditConclusion = ref('')
+const auditNote = ref('')
 const filterType = ref('')
 
 // ─── Load from allResponses ──────────────────────────────────────────────────
@@ -339,6 +358,9 @@ function loadData() {
 
   const conclusionItem = props.allResponses.get(`${ITEM_PREFIX}-conclusion`)
   auditConclusion.value = (conclusionItem?.remark ?? conclusionItem?.conclusion ?? '') as string
+
+  const noteItem = props.allResponses.get(`${ITEM_PREFIX}-audit-note`)
+  auditNote.value = (noteItem?.remark ?? noteItem?.conclusion ?? '') as string
 }
 
 function normalizeRow(raw: any): TitleRow {
@@ -512,29 +534,6 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-// ─── AI Conclusion ───────────────────────────────────────────────────────────
-
-async function handleAiConclusion() {
-  try {
-    const types = [...new Set(rows.value.map((r) => r.type).filter(Boolean))].join('、')
-    const context = `权属检查共${rows.value.length}项，类型包括：${types || '未分类'}。` +
-      `账面价值合计${fmtAmt(totalBookValue.value)}元，差异合计${fmtAmt(totalDiff.value)}元。` +
-      `不一致${inconsistentCount.value}项，需补办${needRenewalCount.value}项。`
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'title-check-conclusion',
-      prompt: '请根据以下无形资产权属检查结果，生成审计结论（简洁专业，关注权属完整性和差异说明）',
-      context,
-      existingContent: auditConclusion.value,
-    })
-    const generated = res.data?.data?.content ?? res.data?.content ?? ''
-    if (generated) {
-      await ElMessageBox.confirm(generated, 'AI生成结论预览', { confirmButtonText: '采用', cancelButtonText: '取消', type: 'info' })
-      auditConclusion.value = generated
-      persist()
-    }
-  } catch { /* cancelled */ }
-}
-
 // ─── Review / Navigation ─────────────────────────────────────────────────────
 
 function handleReview(id: string) { openReviewDialog(id) }
@@ -542,7 +541,17 @@ function handleReview(id: string) { openReviewDialog(id) }
 // ─── Persist ─────────────────────────────────────────────────────────────────
 
 function persist() {
-  emit('save')
+  emit('save', `${ITEM_PREFIX}-rows`, JSON.stringify(rows.value))
+}
+
+function saveConclusion() {
+  if (props.isReadonly) return
+  emit('save', `${ITEM_PREFIX}-conclusion`, auditConclusion.value)
+}
+
+function saveAuditNote() {
+  if (props.isReadonly) return
+  emit('save', `${ITEM_PREFIX}-audit-note`, auditNote.value)
 }
 
 // ─── Summary Method ──────────────────────────────────────────────────────────

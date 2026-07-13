@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-adjudication-cost">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表为投资性房地产审定表（成本模式），列示原值与累计折旧双区块，净值 = 原值期末 − 折旧期末。</p>
+        <p>2. 期初数应与上年末审定数一致；未审数取自试算表（科目 1503 投资性房地产 / 1504 累计折旧），审定数 = 未审 + AJE + RJE。</p>
+        <p>3. 计量模式在成本模式与公允价值模式之间选择（CAS3）：成本模式计提折旧与减值；公允价值模式不计提折旧、以公允价值调整账面价值，请切换至公允价值版本。</p>
+        <p>4. 关注三角勾稽是否平衡（期初 + 增加 − 减少 ± 转换 = 期末）。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实投资性房地产（成本模式：原值 1503 + 累计折旧 1504）期末余额的存在、准确与完整，确认调整分录恰当，为报表及附注披露提供审定依据。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-1" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ originalRows.length }} 行</el-tag>
+    </div>
+
     <!-- 一、投资性房地产 — 原值 -->
     <el-card shadow="never" class="section-card">
       <template #header>
@@ -121,18 +146,26 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 / 结论 -->
-    <el-card shadow="never" class="conclusion-card">
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-1-cost')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-1-cost')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明/结论..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：程序执行情况、成本模式下原值/累计折旧勾稽核对、拟调整与未调整事项及其影响。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、未见异常。B、除上述调整事项外未见异常。C、存在重大未调整事项（或审计范围受限），不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
       <div class="chip-row">
         <span class="chip-label">跳转：</span>
         <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'H3-6 互转审核')">H3-6 互转审核</el-tag>
@@ -146,10 +179,11 @@
  * H3TabAdjudicationCost.vue — H3-1 审定表（成本模式）
  * 双区块(原值+折旧)+三角勾稽+TB回写+AI+💬复核+GtIndexChip→H3-6
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH3AdjudicationCost } from '../../composables/useH3AdjudicationCost'
 import type { H3CostOriginalRow, H3CostDepRow } from '../../composables/useH3AdjudicationCost'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -180,7 +214,29 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-const conclusion = ref(getValue('H3-1-cost-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-1-cost-audit-note'
+const CONCLUSION_KEY = 'H3-1-cost-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function onOrigCellChange(row: H3CostOriginalRow, field: keyof H3CostOriginalRow) {
   updateOriginalCell(row.rowId, field, (row as any)[field])
@@ -216,6 +272,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-adjudication-cost { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .triangle-warn { color: var(--el-color-danger); font-size: 12px; font-weight: 600; }

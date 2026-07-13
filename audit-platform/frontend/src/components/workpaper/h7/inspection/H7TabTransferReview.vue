@@ -6,6 +6,11 @@
       </template>
     </el-alert>
 
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H7-14" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
@@ -16,7 +21,6 @@
             <el-tag v-if="diffCount > 0" size="small" type="danger" class="row-tag">差额异常 {{ diffCount }}</el-tag>
           </span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" type="default" link @click="handleReview('H7-14')">💬 复核</el-button>
           </div>
         </div>
@@ -95,11 +99,15 @@
     <el-card shadow="never" class="note-card">
       <template #header>
         <div class="section-title">
-          <span>互转审核说明与结论</span>
-          <el-button size="small" type="primary" link @click="handleAi"><el-icon><MagicStick /></el-icon> AI说明</el-button>
+          <span>审计说明（互转审核）</span>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="记录互转事项的商业实质、审批合规性与会计处理正确性" @blur="persist('H7-14-note', auditNote)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-14-conclusion', auditConclusion)" />
     </el-card>
 
     <!-- 产量记录（H7 独有，集成于 H7-14） -->
@@ -127,7 +135,6 @@
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import H7TabProductionRecord from '../production/H7TabProductionRecord.vue'
 import { useH7TransferReview } from '../../composables/useH7TransferReview'
@@ -137,7 +144,6 @@ import { calcSubtotal } from '../../composables/useH7FormulaEngine'
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly?: boolean }>()
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const generateAiText = inject<((section: string, ctx: string, existing: string) => Promise<string>) | null>('generateAiText', null)
 
 const allResponsesRef = computed(() => props.allResponses)
 const review = useH7TransferReview(allResponsesRef as any, { wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
@@ -160,6 +166,7 @@ interface Row {
 
 const rows = ref<Row[]>([])
 const auditNote = ref('')
+const auditConclusion = ref('')
 
 function diff(r: Row): number { return calcTransferDiff(Number(r.transferOut) || 0, Number(r.transferIn) || 0) }
 const totalOut = computed(() => calcSubtotal(rows.value.map((r) => Number(r.transferOut) || 0)))
@@ -183,6 +190,7 @@ function seed(): void {
   const raw = review.getString('H7-14-rows')
   if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) rows.value = p.map(normalize) } catch { /* ignore */ } }
   auditNote.value = review.getString('H7-14-note')
+  auditConclusion.value = review.getString('H7-14-conclusion') || ''
 }
 onMounted(seed)
 
@@ -199,12 +207,6 @@ function removeRow(rowId: string): void {
   const i = rows.value.findIndex((r) => r.rowId === rowId)
   if (i >= 0) { rows.value.splice(i, 1); persistRows() }
 }
-async function handleAi(): Promise<void> {
-  if (!generateAiText) return
-  const ctx = `生物资产互转 ${rows.value.length} 项，转出合计 ${fmtAmt(totalOut.value)}，差额异常 ${diffCount.value} 项。`
-  const text = await generateAiText('h7-transfer', ctx, auditNote.value)
-  if (text) { auditNote.value = text; persist('H7-14-note', auditNote.value) }
-}
 function handleReview(id: string): void { openReviewDialog(id) }
 function fmtAmt(v: number | null | undefined): string {
   return v == null ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -214,6 +216,8 @@ function fmtAmt(v: number | null | undefined): string {
 <style scoped>
 .h7-tab-transfer-review { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

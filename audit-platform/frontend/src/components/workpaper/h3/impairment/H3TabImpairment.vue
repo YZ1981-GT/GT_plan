@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-impairment">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表为投资性房地产减值测算（H3-10），仅成本模式适用；公允价值模式不计提减值。</p>
+        <p>2. 先判断减值迹象（CAS8），存在迹象时测算：减值 = MAX(账面价值 − 可收回金额, 0)。</p>
+        <p>3. 可收回金额取公允价值减处置费用与预计未来现金流量现值（DCF）孰高，详见 H3-11。</p>
+        <p>4. 减值损失一经确认不得转回；减值结果应与 H3-1 审定表、附注披露勾稽。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实投资性房地产（成本模式）减值迹象判断的充分性与减值测算的准确性，确认减值损失确认恰当。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-10" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ impairmentCalcRows.length }} 行</el-tag>
+    </div>
+
     <!-- 仅成本模式提示 -->
     <el-alert title="减值测算（H3-10）— 仅成本模式适用" type="info" :closable="false" show-icon class="mode-alert" />
 
@@ -67,17 +92,25 @@
     </el-card>
 
     <!-- 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-10')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-10')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：减值迹象判断依据、可收回金额确定方法、减值测算与确认情况。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、减值迹象判断充分、测算准确。B、除下列事项外未见异常。C、减值确认存在重大问题，不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -87,9 +120,10 @@
  * H3TabImpairment.vue — H3-10 减值测算（仅成本模式）
  * 减值迹象+测算表+GtIndexChip→H3-11
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH3Impairment } from '../../composables/useH3Impairment'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -118,7 +152,29 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-const auditConclusion = ref(getValue('H3-10-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-10-audit-note'
+const CONCLUSION_KEY = 'H3-10-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function onSignChange(index: number, row: any) { updateSign(index, row) }
 function onCalcChange(index: number, row: any) { updateCalcRow(index, row) }
@@ -135,6 +191,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-impairment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .mode-alert { margin-bottom: 16px; }
 .section-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }

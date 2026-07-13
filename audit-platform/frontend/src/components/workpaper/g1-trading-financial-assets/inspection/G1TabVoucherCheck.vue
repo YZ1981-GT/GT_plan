@@ -2,7 +2,7 @@
   <div class="g1-voucher-check">
     <div class="section-head">
       <h3 class="sheet-title">G1-13 交易性金融资产检查表（凭证核对）</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="vc.addRow()">新增检查行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 笔</el-tag>
@@ -95,6 +95,12 @@
     </el-table>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）抽凭范围、方法及逐笔核对结果；（2）合同/结算单/报价/授权/账务处理核对的异常事项。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="vc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly" placeholder="对凭证核对检查的复核结论..." />
@@ -112,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, computed, ref, inject } from 'vue'
+import { toRef, computed, ref, inject, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useG1VoucherCheck } from '../../composables/useG1VoucherCheck'
@@ -136,6 +142,12 @@ const vc = useG1VoucherCheck({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+const AUDIT_NOTE_KEY = 'G1-13-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
 const year = computed(() => {

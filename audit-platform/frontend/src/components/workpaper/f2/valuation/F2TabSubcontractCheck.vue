@@ -94,18 +94,27 @@
         </template>
       </el-table-column>
     </el-table>
-    <!-- 审计意见区（卡片式） -->
+    <!-- 审计说明 -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
-        <div class="opinion-header"><span class="opinion-title">检查结论</span></div>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
       </template>
-      <el-input v-model="ic.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="请输入委外加工检查结论..." />
+      <el-input v-model="ic.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly" placeholder="填写审计说明：概述委外加工物资发出、收回及加工费归集核查程序、样本覆盖率与核对结果，以及异常事项处理。" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, onMounted, toRef } from 'vue'
 import { useF2SubcontractCheck } from '../../composables/useF2InspectionCheck'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -117,6 +126,21 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 const ic = useF2SubcontractCheck({ allResponses: toRef(props, 'allResponses'), isReadonly: toRef(props, 'isReadonly') })
+
+// ─── 审计结论（独立持久化，F2 计价组事件；检查说明沿用 composable auditNote） ──
+const CONCLUSION_KEY = 'F2-35-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 </script>
 
 <style scoped src="./f2ValSheetStyles.css"></style>

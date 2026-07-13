@@ -13,6 +13,14 @@
       </div>
     </details>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：汇总监盘现场抽盘结果，比对账面与实盘数量差异，评价抽样充分性，为存货存在性与状况认定提供监盘证据。"
+      class="objective-alert"
+    />
+
     <F2StocktakeSheetAttachments :project-id="projectId" :wp-id="wpId" sheet-code="F2-25" />
     <F2StocktakeSectionForm
       sheet-code="F2-25"
@@ -151,11 +159,24 @@
       <el-input v-model="sheet.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="抽盘结果汇总说明（差异原因、抽样充分性、风险提示与结论等）..." />
     </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeOcr } from '../../composables/useF2StocktakeOcr'
@@ -200,6 +221,21 @@ function onOcr(rowId: string, file?: File) {
   if (!file) return
   void uploadAndMerge('F2-25', rowId, file, (id, patch) => sheet.updateRow(id, patch))
 }
+
+// ─── 审计结论（标准打磨项，独立持久化） ───────────────────────────────────────
+const CONCLUSION_KEY = 'F2-25-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item: ChecklistResponse = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 async function runDiffAi() {
   const differences = enriched.value
@@ -257,4 +293,9 @@ async function runDiffAi() {
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 .opinion-chips { display: flex; gap: 6px; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 审计说明 / 审计结论卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

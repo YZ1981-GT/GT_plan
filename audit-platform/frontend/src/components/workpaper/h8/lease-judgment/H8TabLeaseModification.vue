@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-lease-modification">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实租赁变更类型判定（单独租赁/范围减少/其他变更）及重新计量的准确性，确认使用权资产调整符合 CAS21 第28-30条。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS21第28-30条：租赁变更会计处理——①增加范围+价格合理→单独租赁 ②减少范围→按比例终止 ③其他变更→重新计量租赁负债+调整使用权资产(calcRemeasurement)。</p>
@@ -113,6 +117,20 @@
       <span>变更调整合计：{{ fmtAmt(totalAdjustment) }}元</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -133,7 +151,7 @@
  * CAS21第28-30条变更类型判断+重新计量
  * Spec: Task 4.4 | Requirements: 4.3, 4.4
  */
-import { toRef } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8LeaseModification } from '../../composables/useH8LeaseModification'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -161,6 +179,30 @@ const {
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-lease-modification-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-lease-modification-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
+
 function fmtAmt(v: number): string {
   if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -185,6 +227,10 @@ function handleDelete(rowId: string) { deleteRow(rowId) }
 
 <style scoped>
 .h8-tab-lease-modification { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

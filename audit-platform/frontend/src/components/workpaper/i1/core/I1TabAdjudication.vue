@@ -13,6 +13,33 @@
       <p>净值合计 = 原值小计 - 摊销小计 - 减值小计。任一行勾稽差额≠0将红色高亮提示。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产原值(1701)、累计摊销(1702)、减值准备(1703)期末审定余额的准确、完整，确认三角勾稽及与 TB、明细表勾稽一致。"
+      class="objective-alert"
+    />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 审定表按原值(1701借方/资产类)、累计摊销(1702贷方/备抵类)、减值准备(1703贷方/备抵类)三区块分别列示。</p>
+        <p>2. 资产类：期末=期初+本期增加-本期减少；备抵类：期末=期初+贷方发生(计提/摊销)-借方发生(转回/转出)。</p>
+        <p>3. 审定数=未审数+AJE+RJE，应与 TB 未审数核对差异；净值=原值小计-摊销小计-减值小计。</p>
+        <p>4. 审定完成后回写 TB 科目 1701/1702/1703，并与明细表 I1-2 小计交叉验证（差额红色/黄色高亮）。</p>
+      </div>
+    </details>
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-1" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <!-- 交叉验证警告 -->
     <div v-if="hasCrossWarning" class="cross-validation-warning">
       <el-badge :value="crossWarningCount" type="warning" class="cross-badge">
@@ -25,9 +52,6 @@
       <div class="block-header">
         <span class="block-title">一、无形资产-原值（1701借方/资产类）</span>
         <div class="block-actions">
-          <el-button size="small" type="primary" text @click="handleAiGenerate('cost')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
           <el-button size="small" type="default" text @click="handleReview('cost')">
             复核
           </el-button>
@@ -151,9 +175,6 @@
       <div class="block-header">
         <span class="block-title">二、累计摊销（1702贷方/备抵类）</span>
         <div class="block-actions">
-          <el-button size="small" type="primary" text @click="handleAiGenerate('amort')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
           <el-button size="small" type="default" text @click="handleReview('amort')">
             复核
           </el-button>
@@ -277,9 +298,6 @@
       <div class="block-header">
         <span class="block-title">三、减值准备（1703贷方/备抵类）</span>
         <div class="block-actions">
-          <el-button size="small" type="primary" text @click="handleAiGenerate('impairment')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
           <el-button size="small" type="default" text @click="handleReview('impairment')">
             复核
           </el-button>
@@ -506,9 +524,6 @@
       <template #header>
         <div class="card-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('note')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <el-input
@@ -526,9 +541,6 @@
       <template #header>
         <div class="card-header">
           <span>审计结论</span>
-          <el-button size="small" type="primary" text @click="handleAiGenerate('conclusion')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <el-input
@@ -545,7 +557,6 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useI1Adjudication, type I1BlockType, type I1AdjudicationRow } from '../../composables/useI1Adjudication'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -684,12 +695,7 @@ function onConclusionBlur(): void {
   saveConclusion(auditConclusion.value)
 }
 
-// ─── AI / Review ─────────────────────────────────────────────────────────────
-
-function handleAiGenerate(section: string): void {
-  // 由主入口 provide 的 openAiGenerate 处理
-  console.log('[I1-Adjudication] AI generate:', section)
-}
+// ─── Review ──────────────────────────────────────────────────────────────────
 
 function handleReview(section: string): void {
   // 由主入口 provide 的 openReviewDialog 处理
@@ -739,6 +745,34 @@ function fmtAmount(value: number | null | undefined): string {
 .methodology-context strong {
   color: #78350f;
 }
+
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 12px; }
+
+/* 编制提示 details */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 /* 交叉验证警告 */
 .cross-validation-warning {

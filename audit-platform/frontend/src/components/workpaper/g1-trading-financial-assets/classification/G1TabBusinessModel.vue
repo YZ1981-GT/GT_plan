@@ -2,7 +2,7 @@
   <div class="g1-biz-model">
     <div class="section-head">
       <h3 class="sheet-title">G1-8 业务模式分析（CAS22）</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增投资项目</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
@@ -64,6 +64,12 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）执行的业务模式判定程序及结果；（2）持有目的、交易频率、管理层意图的核实情况及关键判断。" />
+    </el-card>
 
     <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
@@ -151,6 +157,12 @@ function loadRows(): BusinessModelRow[] {
 
 const rows = ref<BusinessModelRow[]>(loadRows())
 const conclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.conclusion ?? '')
+
+const AUDIT_NOTE_KEY = 'G1-8-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+})
 
 function persist() {
   if (props.isReadonly) return

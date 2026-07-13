@@ -79,8 +79,8 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "金额", "利率", "备注",
     ],
     "E1-10": [
-        "开户银行", "账号", "账户性质", "开户日期",
-        "是否征信核实", "是否审定表一致", "核对结果",
+        "开户银行", "账号", "账户性质", "开户日期", "开户目的",
+        "本期新开", "本期注销", "账面有记录", "清单核对一致", "差异说明",
     ],
     "E1-20": [
         "账户名称", "开户银行", "币种", "本金金额",
@@ -263,10 +263,11 @@ _FIELD_MAPS: dict[str, dict[str, str]] = {
         "利率": "interestRate", "备注": "remark",
     },
     "E1-10": {
-        "开户银行": "bankName", "账号": "accountNo",
+        "开户银行": "bank", "账号": "accountNo",
         "账户性质": "accountType", "开户日期": "openDate",
-        "是否征信核实": "creditChecked", "是否审定表一致": "consistent",
-        "核对结果": "checkResult",
+        "开户目的": "openPurpose", "本期新开": "isNewThisPeriod",
+        "本期注销": "isClosedThisPeriod", "账面有记录": "hasBookRecord",
+        "清单核对一致": "checkResult", "差异说明": "reason",
     },
     "E1-20": {
         "账户名称": "accountName", "开户银行": "bankName",

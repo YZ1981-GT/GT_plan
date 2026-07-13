@@ -1,5 +1,24 @@
 <template>
   <div class="h3-tab-adjustment">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表登记投资性房地产相关的调整分录（AJE 审计调整 / RJE 重分类调整），每笔借贷必须平衡。</p>
+        <p>2. 成本模式常见调整涉及科目 1503 投资性房地产、1504 累计折旧、1505 减值准备；公允价值模式涉及 1503 及公允价值变动损益。</p>
+        <p>3. 借贷平衡后方可「发布至 H3-1」审定表并「推送 A13」未更正错报汇总。</p>
+        <p>4. 索引列填写支持性底稿索引号，便于交叉引用与复核追溯。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：完整、准确地记录投资性房地产的审计调整与重分类分录，确保借贷平衡并恰当反映至审定表与错报汇总。"
+    />
+
     <!-- 操作栏 -->
     <div class="toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增调整分录</el-button>
@@ -78,6 +97,22 @@
         {{ isBalanced ? '借贷平衡 ✓' : '借贷不平衡 ✗' }}
       </el-tag>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：各笔调整/重分类的事由、依据、涉及科目及影响金额。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：调整分录借贷平衡、依据充分、已发布至审定表并推送错报汇总。" :disabled="isReadonly" @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
@@ -86,7 +121,7 @@
  * H3TabAdjustment.vue — H3-3 调整分录
  * el-table 10列+借贷平衡+推送A13
  */
-import { computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useH3Adjustment } from '../../composables/useH3Adjustment'
 import { useH3FormData } from '../../composables/useH3FormData'
 
@@ -121,10 +156,41 @@ const {
 function fmtNum(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-3-audit-note'
+const CONCLUSION_KEY = 'H3-3-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 </script>
 
 <style scoped>
 .h3-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .audit-table { font-size: var(--wp-font-size, 13px); }
 .balance-row { display: flex; align-items: center; gap: 16px; margin-top: 12px; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; }

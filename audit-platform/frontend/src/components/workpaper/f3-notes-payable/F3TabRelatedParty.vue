@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabRelatedParty — F3-6 关联方检查 | Task 6.4 */
-import { toRef, inject, type Ref } from 'vue'
+import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3RelatedParty } from '../composables/useF3RelatedParty'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
@@ -29,6 +29,18 @@ const { rows, summary, auditNote, addRow, removeRow, updateCell, rowClassName } 
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF3AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+// ─── 审计结论（无匹配 AI section → 纯 textarea；F3 约定持久化） ───
+const CONCLUSION_KEY = 'F3-6-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof v === 'string') auditConclusion.value = v }, { immediate: true })
 
 async function generateAiNote() {
   if (props.isReadonly) return
@@ -121,6 +133,26 @@ const fairnessOptions = ['公允', '基本公允', '不公允', '无法判断']
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="请输入关联方应付票据评价..." />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计结论</span>
+          <div class="opinion-actions">
+            <el-button size="small" @click="openReviewDialog?.('F3-6-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：关联方票据交易是否具有商业实质、定价是否公允、披露是否充分完整。"
+        @change="(v: string) => saveAuditConclusion(v)"
+      />
     </el-card>
   </div>
 </template>

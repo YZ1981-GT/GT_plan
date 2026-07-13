@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-transfer-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核查在建工程达到预定可使用状态后是否及时、准确转入固定资产（CAS4 五条件），评估转固时点合理性与延迟转固对折旧计提的影响，并与 H1 固定资产联动核对。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-5" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 方法论上下文区域 -->
     <div class="methodology-context">
       <p><strong>CAS4转固五条件（均须满足）：</strong></p>
@@ -19,9 +31,6 @@
           <span>转固时点检查表（H2-5）</span>
           <div class="section-header-actions">
             <GtIndexChip value="H1-1" label="→ H1固定资产" />
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-5')">💬</el-button>
           </div>
         </div>
@@ -138,14 +147,21 @@
       <template #header>
         <div class="section-header">
           <span>审计说明</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
-      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
         placeholder="请填写审计说明..." :disabled="isReadonly"
         @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如各项工程转固时点符合 CAS4 五条件、转固金额与 H1 入账一致，未见异常；或说明延迟转固/差异事项及其影响。" :disabled="isReadonly"
+        @blur="state.saveConclusion(state.auditConclusion.value)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -182,12 +198,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2TransferCheck({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onPublishEvent(event: string, payload: any) {
     // Task 6.6 — publish 'h2:transfer-to-h1' 转固联动H1
     console.log('[H2-5] publish', event, payload)
@@ -227,9 +245,6 @@ function handlePublishToH1() {
   state.publishTransferToH1()
 }
 
-function handleAiGenerate() {
-  console.log('AI generate H2-5')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -243,6 +258,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-transfer-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
   padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);

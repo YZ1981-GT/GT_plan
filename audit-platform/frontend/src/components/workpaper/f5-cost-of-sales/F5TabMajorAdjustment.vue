@@ -1,14 +1,38 @@
 <template>
   <div class="f5-major-adj">
-    <div class="f5-ma-toolbar">
-      <span class="f5-ma-title">F5-8 重大调整核查表</span>
-      <div class="f5-ma-actions">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表核查营业成本（科目6401）本期发生的重大调整事项，逐笔记录调整日期、事项、金额、原因、审批依据与凭证编号。</p>
+        <p>2. 可用抽凭引擎按 6401 科目抽取样本凭证一键填入；调整金额超过重要性水平自动标橙，须重点评价。</p>
+        <p>3. 每笔重大调整须核对审批依据与凭证的完整性、恰当性，评价其对营业成本列报的影响。</p>
+        <p>4. 核查结论应与 F5-1 审定表、F5-4 调整分录相互印证。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：识别并核查营业成本本期重大调整事项的真实性、准确性与审批合规性，评价其对营业成本列报的影响。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="toolbar-hint">科目6401 · 重大调整核查</span>
         <GtVoucherSamplingEngine :project-id="projectId" :account-codes="['6401']" dialog-mode :phase="'final'"
           @filled="handleSamplingFilled" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
         <CycleImportExportDropdown v-if="ieCtx" :wp-id="wpId" :api-prefix="ieCtx.apiPrefix" :sheet="ieCtx.sheet"
           :disabled="isReadonly" @imported="$emit('imported')" />
+      </div>
+      <div class="toolbar-right">
         <el-button size="small" @click="openReview">💬 复核</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -71,9 +95,17 @@
 
     <el-card class="f5-ma-note" shadow="never">
       <template #header>
+        <div class="f5-card-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="重大调整核查说明（重大调整事项的性质、审批依据与凭证核查情况、对营业成本的影响等）..." @change="saveNote" />
+    </el-card>
+
+    <el-card class="f5-ma-note" shadow="never">
+      <template #header>
         <div class="f5-card-header"><span>审计结论</span></div>
       </template>
-      <el-input v-model="conclusion" type="textarea" autosize :disabled="isReadonly" placeholder="重大调整核查结论..." @change="saveConclusion" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="重大调整核查结论..." @change="saveConclusion" />
     </el-card>
   </div>
 </template>
@@ -85,6 +117,7 @@ import { parseNum, calcSubtotal } from '../composables/useF5CosOfFormulaEngine'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../GtIndexChip.vue'
 import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
@@ -104,6 +137,7 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const STORAGE_KEY = 'F5-8-rows'
 const CONCLUSION_KEY = 'F5-8-conclusion'
+const NOTE_KEY = 'F5-8-audit-note'
 
 interface MajorAdjRow {
   rowId: string; seq: number; adjustmentDate: string; adjustmentItem: string
@@ -119,6 +153,7 @@ function emptyRow(seq: number): MajorAdjRow {
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 const rows = ref<MajorAdjRow[]>([emptyRow(1)])
 const conclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
+const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
 
 function loadRows(): void {
   const raw = allResponsesRef.value.get(STORAGE_KEY)?.remark
@@ -202,6 +237,10 @@ function saveConclusion() {
   allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value })
   window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value }] } }))
 }
+function saveNote() {
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] } }))
+}
 
 function rowClass({ row }: { row: any }): string { return exceedsMateriality(row) ? 'f5-row-orange' : '' }
 function fmt(v: number | null | undefined): string { return v == null || v === 0 ? '-' : v.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }
@@ -210,9 +249,20 @@ function openReview() { openReviewDialog('F5-8-conclusion') }
 
 <style scoped>
 .f5-major-adj { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f5-ma-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.f5-ma-title { font-weight: 600; }
-.f5-ma-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* 编制提示 */
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.toolbar-hint { font-size: var(--wp-font-size, 13px); color: #909399; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .f5-ma-summary { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; }
 .f5-ma-summary .is-warn { color: #e6a23c; }
 .is-warn { color: #e6a23c; font-weight: 600; }

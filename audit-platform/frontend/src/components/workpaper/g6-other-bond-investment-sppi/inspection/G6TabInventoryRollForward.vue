@@ -1,5 +1,19 @@
 <template>
   <div class="g6-tab-inventory-roll-forward">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：将盘点日实际持有数量倒轧至资产负债表日（基准日），验证期末其他债权投资对应有价证券的存在性与完整性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:G6-10" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ reconciliation.items.value.length }} 行</el-tag>
+    </div>
+
     <!-- ═══ 2区段Tab切换（行同步） ═══ -->
     <div class="tab-bar">
       <button
@@ -339,6 +353,21 @@
       </el-dropdown>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header"><span class="section-title">审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="props.isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述倒轧计算的执行情况及结果、盘点日至基准日增减明细的核对情况、差异原因追查、拟调整与未调整事项及其影响。"
+        @update:model-value="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ 审计结论 ═══ -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -390,13 +419,14 @@
  *
  * Props 对齐父级 GtG6OtherBondSppi 传入的 html-data / is-readonly（自加载走 useG6SppiFormData）
  */
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useG6SppiReconciliation,
   TRANSACTION_TYPE_OPTIONS,
 } from '../../composables/useG6SppiReconciliation'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import type { ReconciliationItem, ReconciliationData } from '../../composables/useG6SppiReconciliation'
 
 const props = defineProps<{
@@ -441,10 +471,22 @@ function handleTab1RowChange(row: ReconciliationItem | null): void {
   if (idx >= 0) reconciliation.selectRow(idx)
 }
 
+// ─── 审计说明（独立持久化 checklist_responses） ───
+const NOTE_KEY = 'G6-10-inventory-rollforward-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
 // ─── 数据加载 ───
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -508,6 +550,22 @@ defineExpose({
 .g6-tab-inventory-roll-forward {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+/* ─── 审计目标 / 工具栏 ─── */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ─── Tab切换按钮 ─── */

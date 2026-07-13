@@ -8,6 +8,14 @@
       title="审计目标：通过监盘确认有价证券的存在性与数量准确性，为债权投资账面记录提供实物证据。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏（索引 chip） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ items.length }} 行</el-tag>
+      </div>
+    </div>
     <!-- Section标题 + 复核按钮 -->
     <div class="section-header">
       <h3 class="section-title">G4-7 有价证券盘点表</h3>
@@ -218,6 +226,7 @@
  */
 import { inject, toRef, computed } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useG4SppiInventory } from '@/composables/useG4SppiInventory'
 import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
 
@@ -286,6 +295,18 @@ function getSummary({ columns }: { columns: any[]; data: any[] }) {
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .section-actions { display: flex; gap: 6px; align-items: center; }
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .inventory-header-form { margin-bottom: 16px; }
 

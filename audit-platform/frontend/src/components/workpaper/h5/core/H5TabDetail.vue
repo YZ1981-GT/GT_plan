@@ -1,5 +1,16 @@
 <template>
   <div class="h5-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：核实油气资产原值、累计折耗及净值的明细构成，确认与审定表(H5-1)勾稽一致。" class="objective-alert" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H5-2" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 区段Tab切换 -->
     <el-segmented v-model="state.activeSegment.value" :options="segmentOptions" class="segment-bar" />
 
@@ -9,9 +20,6 @@
         <div class="section-title">
           <span>H5-2 油气资产明细表</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-2')">
               💬 复核
             </el-button>
@@ -146,13 +154,17 @@
       <template #header>
         <div class="section-title">
           <span>审计说明</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
         </div>
       </template>
       <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
         placeholder="请填写审计说明..." :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }"
+        placeholder="填写审计结论..." :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -173,7 +185,9 @@
 import { computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useH5Detail, SEGMENT_CONFIGS } from '../../composables/useH5Detail'
+import { useH5FormData } from '../../composables/useH5FormData'
 
 const props = defineProps<{
   wpId: string
@@ -185,11 +199,13 @@ const props = defineProps<{
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 
+const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+
 const state = useH5Detail({
   allResponses: allResponsesRef as any,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  onSave: (itemId, value) => { /* persist via parent */ },
+  onSave: (itemId, value) => formData.setResponse(itemId, value),
 })
 
 const segmentOptions = SEGMENT_CONFIGS.map((s) => ({ label: s.label, value: s.key }))
@@ -211,7 +227,6 @@ async function handleAddRow() {
   if (value) state.addRow(value)
 }
 
-function handleAiGenerate() { /* AI generate */ }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
@@ -221,6 +236,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h5-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .segment-bar { margin-bottom: 16px; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }

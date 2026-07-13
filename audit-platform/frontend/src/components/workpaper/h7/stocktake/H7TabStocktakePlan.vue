@@ -6,6 +6,11 @@
       </template>
     </el-alert>
 
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H7-8" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ samples.length }} 项样本</el-tag>
+    </div>
+
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 确定盘点时间、地点、生物资产范围</div>
@@ -119,6 +124,16 @@
       <el-input v-model="schedule" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly" placeholder="具体时间安排（如：8:00集合→8:30分区清点→称重→标识核对→17:00汇总）" @change="persist('H7-8-schedule', schedule)" />
     </el-card>
 
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录本表审计程序的实施情况、核对过程与发现。" @blur="persist('H7-8-note', auditNote)" />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="A、未见异常。B、除上述调整事项外，其余未见异常。C、存在重大未调整事项或范围受限，不可确认。" @blur="persist('H7-8-conclusion', auditConclusion)" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -148,6 +163,8 @@ const MEASURE_OPTIONS = ['清点数量', '称重估算', '抽样折算', '产量
 
 const planInfo = reactive({ stocktakeDate: '', location: '', participants: '', method: '抽样盘点', measureWay: '清点数量', identityCheck: '', scope: '' })
 const schedule = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 interface Sample { rowId: string; category: string; criteria: string; sampleSize: number; coverageAmount: number; coverageRate: number }
 const samples = ref<Sample[]>([])
@@ -169,6 +186,8 @@ function seed(): void {
   const rawSamples = stk.getString('H7-8-samples')
   if (rawSamples) { try { const p = JSON.parse(rawSamples); if (Array.isArray(p)) samples.value = p.map(normalizeSample) } catch { /* ignore */ } }
   schedule.value = stk.getString('H7-8-schedule')
+  auditNote.value = stk.getString('H7-8-note') || ''
+  auditConclusion.value = stk.getString('H7-8-conclusion') || ''
 }
 onMounted(seed)
 
@@ -190,6 +209,9 @@ function fmtAmt(v: number | null | undefined): string {
 <style scoped>
 .h7-tab-stocktake-plan { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .audit-goal { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; }
+.note-card { margin-bottom: 16px; }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; }

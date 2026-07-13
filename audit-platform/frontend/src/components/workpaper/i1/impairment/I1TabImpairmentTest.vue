@@ -5,6 +5,23 @@
       <p><strong>CAS8 资产减值</strong>：企业应当在资产负债表日判断资产是否存在减值迹象。资产存在减值迹象的，应当估计其可收回金额。可收回金额应当根据资产的公允价值减去处置费用后的净额与资产预计未来现金流量的现值两者之间较高者确定。资产的账面价值超过其可收回金额的，应当将资产的账面价值减记至可收回金额，减记的金额确认为资产减值损失。无形资产减值损失一经确认，在以后会计期间不得转回。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产减值测试的完整性与减值准备计提的充分性（账面净值与可收回金额比较），确认减值损失一经确认不得转回。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-12" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ impairmentRows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 主表区域 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -21,9 +38,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('I1-12')">💬</el-button>
           </div>
         </div>
@@ -173,19 +187,24 @@
       </div>
     </el-card>
 
-    <!-- 审计说明与结论 -->
+    <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-header">
-          <span>审计说明与结论</span>
-          <el-button size="small" type="primary" link @click="handleAiConclusion">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
-        </div>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
+        placeholder="填写减值测试审计说明：减值迹象识别、测试方法与假设、可收回金额来源(I1-13)及核对情况等。"
+        :disabled="isReadonly" @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
       </template>
       <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写减值测试结论（如：经减值测试，各项无形资产可收回金额均高于其账面价值，无需计提减值准备…）"
-        :disabled="isReadonly" @blur="handleSaveConclusion" />
+        placeholder="填写审计结论：如经减值测试，各项无形资产可收回金额均高于其账面价值，无需计提减值准备…"
+        :disabled="isReadonly" @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -210,9 +229,8 @@
  * + 合计行(4 SUM) + 红色高亮(差额≠0)
  * Spec: .kiro/specs/i1-intangible-assets/ | Requirements: 12.1-12.4
  */
-import { ref, inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useI1Impairment } from '../../composables/useI1Impairment'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -225,7 +243,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
-  (e: 'save'): void
+  (e: 'save', itemId?: string, value?: any): void
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
@@ -247,13 +265,37 @@ const {
   toRef(props, 'wpId'),
   allResponsesRef as any,
   {
-    onSave: () => emit('save'),
+    onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
 
-// ─── Local State ─────────────────────────────────────────────────────────────
+// ─── Local State: 审计说明 / 审计结论 ─────────────────────────────────────────
 
+const auditNote = ref('')
 const auditConclusion = ref('')
+
+const NOTE_KEY = 'I1-12-audit-note'
+const CONCLUSION_KEY = 'I1-12-audit-conclusion'
+
+function loadAuditText(): void {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n) auditNote.value = (n.remark ?? n.conclusion ?? '') as string
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c) auditConclusion.value = (c.remark ?? c.conclusion ?? '') as string
+}
+
+onMounted(loadAuditText)
+watch(() => props.allResponses, loadAuditText, { deep: true })
+
+function saveAuditNote(): void {
+  if (props.isReadonly) return
+  emit('save', NOTE_KEY, auditNote.value)
+}
+
+function saveAuditConclusion(): void {
+  if (props.isReadonly) return
+  emit('save', CONCLUSION_KEY, auditConclusion.value)
+}
 
 // ─── Row Highlight (Req 12.4) ────────────────────────────────────────────────
 
@@ -306,18 +348,6 @@ function handleExportImport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[I1-12] AI generate impairment test')
-}
-
-function handleAiConclusion() {
-  console.log('[I1-12] AI generate conclusion')
-}
-
-function handleSaveConclusion() {
-  emit('save')
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
@@ -343,6 +373,20 @@ function fmtAmt(val: number | null | undefined): string {
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
+
+.objective-alert { margin-bottom: 12px; }
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

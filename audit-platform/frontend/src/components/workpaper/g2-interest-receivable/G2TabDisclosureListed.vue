@@ -35,6 +35,24 @@
       <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 8, maxRows: 30 }"
         :disabled="isReadonly" placeholder="上市公司应收利息附注披露内容..." />
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述（1）程序的测试情况、结果；（2）披露项完整性与列报格式合规性核对情况、拟调整事项及其影响。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
   </div>
 </template>
 
@@ -53,6 +71,22 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 
 const STORAGE_KEY = 'G2-disclosure-listed-text'
 const noteText = ref('')
+
+// ─── 审计说明 / 审计结论（持久化）───────────────────────────────────────────
+const NOTE_KEY = 'G2-disclosure-listed-audit-note'
+const CONCLUSION_KEY = 'G2-disclosure-listed-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+}
 
 // Load from allResponses
 watch(() => props.allResponses.get(STORAGE_KEY)?.remark, (v) => {
@@ -78,7 +112,11 @@ function handleAdjudicated(e: Event): void {
   }
 }
 
-onMounted(() => { window.addEventListener('substantive:adjudicated', handleAdjudicated) })
+onMounted(() => {
+  window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+})
 onBeforeUnmount(() => { window.removeEventListener('substantive:adjudicated', handleAdjudicated) })
 
 function fillAiDraft() {
@@ -100,4 +138,6 @@ function fillAiDraft() {
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

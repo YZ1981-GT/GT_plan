@@ -1,5 +1,9 @@
 <template>
   <div class="h1-tab-disclosure-soe">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：确认固定资产附注披露（原值/累计折旧/减值变动、闲置、融资租入、经营租出、所有权受限、已提足固定资产）完整，与审定表(H1-1)/明细表(H1-2)勾稽一致，符合国有企业财务披露要求。" />
+
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 固定资产总表（跨sheet自动取数）</div>
@@ -13,9 +17,6 @@
           <div class="section-title">
             <span>{{ section.title }}</span>
             <div class="title-actions">
-              <el-button size="small" type="primary" link @click="handleAiGenerate(section.key)">
-                <el-icon><MagicStick /></el-icon> AI
-              </el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-soe-${section.key}`)">💬</el-button>
             </div>
           </div>
@@ -72,7 +73,15 @@
 
     <el-card shadow="never" class="note-card">
       <template #header><span>附注披露审计说明</span></template>
-      <el-input v-model="disclosureNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" />
+      <el-input v-model="disclosureNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写附注披露审计说明..." @change="saveDisclosureNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写附注披露审计结论..." @change="saveAuditConclusion" />
     </el-card>
 
     <details class="compile-hint">
@@ -86,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Disclosure, SOE_SECTIONS } from '../../composables/useH1Disclosure'
 
@@ -98,8 +107,18 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const disclosureNote = ref('')
+const auditConclusionText = ref('')
+const NOTE_KEY = 'H1-note-soe-audit-note'
+const CONCLUSION_KEY = 'H1-note-soe-audit-conclusion'
+function saveDisclosureNote() { saveResponse(NOTE_KEY, disclosureNote.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) disclosureNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 const sections = SOE_SECTIONS
 
 const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow: _addDynamic } = useH1Disclosure(
@@ -114,7 +133,6 @@ function getDynamicSubtotal(key: string): number {
   return getDynamicRows(key).reduce((s: number, r: any) => s + (Number(r.amount) || 0), 0)
 }
 function addDynamicRow(key: string) { _addDynamic(key) }
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'

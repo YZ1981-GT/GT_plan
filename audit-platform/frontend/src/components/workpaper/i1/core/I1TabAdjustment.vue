@@ -12,6 +12,23 @@
       </ul>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产审计调整分录(AJE/RJE)的恰当性与借贷平衡，确认调整已同步审定表 I1 并推送 A13 错报汇总。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-3" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 操作栏 -->
     <el-card shadow="never">
       <template #header>
@@ -174,6 +191,18 @@
       />
     </el-card>
 
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="填写调整分录审计结论：如已就调整事项与管理层沟通并取得认可、调整后借贷平衡、已推送A13等（保存后与审计说明一并落库）。"
+      />
+    </el-card>
+
     <!-- 跨底稿跳转 -->
     <div class="cross-ref-bar">
       <span class="cross-ref-label">跨底稿联动：</span>
@@ -246,6 +275,7 @@ interface AdjustmentRow {
 const ITEM_ID = 'I1-3-rows'
 const rows = ref<AdjustmentRow[]>([])
 const auditNote = ref('')
+const auditConclusion = ref('')
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // ─── Load from allResponses ────────────────────────────────────────────────
@@ -262,6 +292,9 @@ function loadRows(): void {
   // Load audit note
   const noteItem = props.allResponses.get('I1-3-audit-note')
   auditNote.value = noteItem?.remark ?? noteItem?.value ?? ''
+  // Load audit conclusion
+  const conclItem = props.allResponses.get('I1-3-audit-conclusion')
+  auditConclusion.value = conclItem?.remark ?? conclItem?.value ?? ''
 }
 
 function normalizeRow(raw: any): AdjustmentRow {
@@ -331,6 +364,7 @@ async function handleSave(): Promise<void> {
       items: [
         { item_id: ITEM_ID, remark: JSON.stringify(rows.value) },
         { item_id: 'I1-3-audit-note', remark: auditNote.value },
+        { item_id: 'I1-3-audit-conclusion', remark: auditConclusion.value },
       ],
     })
 
@@ -559,6 +593,22 @@ function fmtAmt(val: number | null | undefined): string {
   padding-left: 18px;
   line-height: 1.8;
 }
+
+/* 审计目标 alert */
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 /* section标题栏 */
 .section-title {

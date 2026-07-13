@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-review-record">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：复核在建工程施工/监理相关审核事项，核对合同约定与实际执行的差异，识别异常事项并形成审核意见与结论。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-6" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.reviewItems.value.length }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- 工程筛选 -->
     <div class="filter-bar">
       <el-select v-model="selectedProject" placeholder="按工程项目筛选审核事项" size="small" clearable
@@ -63,9 +75,6 @@
         <div class="section-header">
           <span>审核事项（共 {{ state.reviewItems.value.length }} 项 / 异常 {{ state.abnormalCount.value }} 项）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('items')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-6-items')">💬</el-button>
           </div>
         </div>
@@ -138,14 +147,21 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="review-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述审核范围、所审核事项的合同依据与实际执行核对情况、异常事项的进一步程序。" :disabled="isReadonly"
+        @change="saveAuditNote" />
+    </el-card>
+
     <!-- 结论 + 签章 -->
     <el-card shadow="never" class="review-card">
       <template #header>
         <div class="section-header">
-          <span>审核结论与签章</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('conclusion')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
+          <span>审计结论（审核结论与签章）</span>
         </div>
       </template>
       <el-input v-model="state.conclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
@@ -184,9 +200,10 @@
  * 签章式（基本信息+审核事项逐条+结论签名）+ 工程筛选el-select + AI + 💬复核
  * Spec: Task 4.8 | Requirements: 7.1-7.5
  */
-import { ref, inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2ReviewRecord } from '../../composables/useH2ReviewRecord'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -196,6 +213,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const selectedProject = ref('')
 
 const state = useH2ReviewRecord({
@@ -203,6 +221,21 @@ const state = useH2ReviewRecord({
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
+})
+
+// H2-6 审计说明：composable 仅含审核结论（conclusion），此处补本地审计说明 item_id。
+const NOTE_KEY = 'H2-6-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  saveResponse(NOTE_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 function handleProjectFilter() {
@@ -229,9 +262,6 @@ function onSignChange() {
   state.saveSignature(state.signature.value)
 }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate review:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -245,6 +275,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-review-record { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .filter-bar { margin-bottom: 16px; }
 .review-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

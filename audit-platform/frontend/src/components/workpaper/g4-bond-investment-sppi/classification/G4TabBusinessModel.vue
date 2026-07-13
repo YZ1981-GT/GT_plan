@@ -8,6 +8,13 @@
       title="审计目标：确认管理债权投资的业务模式判断恰当（以收取合同现金流量为目标），作为金融资产分类计量的基础。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏（索引 chip） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-1" :context-project-id="projectId" /></span>
+      </div>
+    </div>
     <!-- Section标题 + 复核按钮 -->
     <div class="section-header">
       <h3 class="section-title">G4-5 业务模式分析</h3>
@@ -198,6 +205,22 @@
       </el-button>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-divider />
+    <el-card shadow="never" class="audit-conclusion-card">
+      <div class="section-header">
+        <span class="field-label">审计说明</span>
+      </div>
+      <el-input
+        :model-value="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        placeholder="请输入审计说明..."
+        :disabled="props.isReadonly"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- ═══ 审计结论 ═══ -->
     <el-divider />
     <el-card shadow="never" class="audit-conclusion-card">
@@ -243,8 +266,9 @@
  * + 审计评价 + 结论chip(动态变色) + 次级组合(ElMessageBox.prompt新增)
  * + 审计结论textarea(AI按钮) + 编制提示details折叠
  */
-import { inject, computed } from 'vue'
+import { inject, computed, ref, watch } from 'vue'
 import { ChatDotRound } from '@element-plus/icons-vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
 import { useG4SppiBusinessModel, CONCLUSION_CHIP_MAP, type ConclusionChipStyle } from '@/composables/useG4SppiBusinessModel'
 import type { BusinessModelResult } from '@/composables/useG4SppiFormulaEngine'
@@ -283,6 +307,20 @@ const bm = useG4SppiBusinessModel({
 function getChipStyle(conclusion: BusinessModelResult): ConclusionChipStyle {
   return CONCLUSION_CHIP_MAP[conclusion]
 }
+
+// ─── 审计说明（纯 textarea，无 AI；持久化 checklist_responses，conclusion:null） ──
+const NOTE_KEY = 'G4-5-businessmodel-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  void formData.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
+}
+watch(
+  () => formData.allResponses.value.get(NOTE_KEY)?.remark,
+  (v) => { if (v != null) auditNote.value = v },
+  { immediate: true },
+)
 </script>
 
 <style scoped>
@@ -442,6 +480,19 @@ function getChipStyle(conclusion: BusinessModelResult): ConclusionChipStyle {
 .audit-conclusion-card {
   margin-bottom: 16px;
 }
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 /* 编制提示 */
 .preparation-tips {

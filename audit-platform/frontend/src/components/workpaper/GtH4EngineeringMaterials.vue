@@ -313,6 +313,30 @@ const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToo
 provide('h4VersionTrailRef', versionTrailRef)
 provide('h4OpenVersionHistory', openVersionHistory)
 
+// ─── 子组件 save 持久化（entry 此前未接持久化 → 补 H2/H7 范式 persistResponse+provide） ──
+// 子组件契约：inject('saveResponse')(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
+// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).then(() => { scheduleAutoSnapshot() })
+      .catch((err: unknown) => console.warn('[GtH4] persistResponse failed:', itemId, err))
+  }, 800))
+}
+provide('saveResponse', persistResponse)
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()

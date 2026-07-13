@@ -5,15 +5,21 @@
       <p>H4-7减值测算：对存在减值迹象的工程物资，比较账面价值与可收回金额（资产组法/预计未来现金流量现值），确认减值损失。31行31列15公式，复杂矩阵计算以OnlyOffice渲染为主。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：评估工程物资是否存在减值迹象，比较账面价值与可收回金额，核实减值损失计提的充分与恰当（CAS8 资产减值）。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H4-7" :context-project-id="props.projectId" /></span>
+    </div>
+
     <!-- Section Title -->
     <div class="section-header">
       <span>减值测算表 H4-7</span>
       <div class="section-header-actions">
         <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions"
           size="small" @change="dualMode.onModeChange" />
-        <el-button size="small" type="primary" link @click="handleAiGenerate" style="margin-left: 8px">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-7-impairment')">💬</el-button>
       </div>
     </div>
@@ -60,6 +66,26 @@
       </el-card>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }"
+        placeholder="请填写减值测算的审计说明..." :disabled="props.isReadonly"
+        @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -85,9 +111,10 @@
  * Task: 4.8
  * Requirements: 7.4-7.6
  */
-import { computed, defineAsyncComponent, inject, toRef } from 'vue'
+import { ref, computed, defineAsyncComponent, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH4DualMode } from '../../composables/useH4DualMode'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../../GtOnlyOfficeSheet.vue'))
 
@@ -122,10 +149,24 @@ const summaryData = computed(() => {
   return { bookValue, recoverableAmount, impairmentLoss, provisionBalance }
 })
 
-// ─── Actions ─────────────────────────────────────────────────────────────────
-function handleAiGenerate() {
-  console.log('[H4-7] AI generate')
+// ─── 审计说明 / 审计结论（inject saveResponse 落库 + onMounted 恢复） ──────────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote() {
+  props.allResponses.set('H4-7-note', { item_id: 'H4-7-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-7-note', auditNote.value)
 }
+function saveAuditConclusion() {
+  props.allResponses.set('H4-7-conclusion', { item_id: 'H4-7-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-7-conclusion', auditConclusion.value)
+}
+onMounted(() => {
+  const n = props.allResponses.get('H4-7-note'); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get('H4-7-conclusion'); if (c?.remark) auditConclusion.value = c.remark
+})
+
+// ─── Actions ─────────────────────────────────────────────────────────────────
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -143,6 +184,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-impairment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

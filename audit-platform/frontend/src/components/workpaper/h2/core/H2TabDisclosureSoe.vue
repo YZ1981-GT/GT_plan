@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-disclosure-soe">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：按国企（国资委）披露要求核实在建工程附注的完整性与准确性，含资金来源/政府补助/责任人等额外披露，确保与 H2-1 审定表勾稽一致。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.sections.value.length }} 节</el-tag>
+      </div>
+    </div>
+
     <!-- 多子节卡片 -->
     <el-card v-for="(section, idx) in state.sections.value" :key="section.id"
       shadow="never" class="disclosure-card" :class="{ 'cross-sheet-card': section.isCrossSheet }">
@@ -8,9 +20,6 @@
           <span>{{ idx + 1 }}. {{ section.title }}</span>
           <div class="section-header-actions">
             <el-tag v-if="section.isCrossSheet" type="info" size="small">跨sheet取数</el-tag>
-            <el-button size="small" type="primary" link @click="handleAiGenerate(section.id)">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview(`H2-disc-S-${section.id}`)">💬</el-button>
           </div>
         </div>
@@ -97,6 +106,26 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述附注各子节取数来源、资金来源/政府补助/责任人等额外披露的核查情况。" :disabled="isReadonly"
+        @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如附注披露完整、额外披露事项齐全、与审定表勾稽一致，符合国企披露要求，未见异常。" :disabled="isReadonly"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -116,9 +145,10 @@
  * 多子节卡片 + 跨sheet浅蓝色 + 动态行 + 合计
  * Spec: Task 4.6 | Requirements: 14.6
  */
-import { inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Disclosure } from '../../composables/useH2Disclosure'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -129,6 +159,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Disclosure({
   wpId: toRef(props, 'wpId'),
@@ -136,6 +167,7 @@ const state = useH2Disclosure({
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
   variant: computed(() => 'soe' as const) as any,
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onPublishEvent(event: string, payload: any) {
     // Task 6.8 — publish 'disclosure:note-text-updated' 通知外部
     console.log('[H2-DiscSoe] publish', event, payload)
@@ -144,6 +176,32 @@ const state = useH2Disclosure({
       payload,
     }, { _silent: true } as any).catch(() => { /* best effort */ })
   },
+})
+
+const isReadonly = computed(() => props.isReadonly)
+
+// H2 附注(国企)审计说明/结论：本地变体键（listed/soe 共用同一 composable，避免串写）。
+const NOTE_KEY = 'H2-disc-soe-audit-note'
+const CONCLUSION_KEY = 'H2-disc-soe-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  saveResponse(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 function onCellChange(sectionId: string, rowId: string, field: string, value: any) {
@@ -162,9 +220,6 @@ function handleRemoveRow(sectionId: string, rowId: string) {
   state.removeRow(sectionId, rowId)
 }
 
-function handleAiGenerate(sectionId: string) {
-  console.log('AI generate disclosure soe:', sectionId)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -178,6 +233,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .disclosure-card { margin-bottom: 16px; }
 .cross-sheet-card { background: #f0f7ff; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

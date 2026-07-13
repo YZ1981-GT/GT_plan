@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：登记在建工程相关审计调整（AJE）与重分类调整（RJE）分录，确保借贷平衡，并推送至 A13 汇总以更新 H2-1 审定表的账项调整。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-3" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 条分录</el-tag>
+      </div>
+    </div>
+
     <!-- 调整分录表 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -9,9 +21,6 @@
             <el-tag :type="isBalanced ? 'success' : 'danger'" size="small">
               {{ isBalanced ? '✓ 借贷平衡' : '✗ 借贷不平衡' }}
             </el-tag>
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-3')">💬</el-button>
           </div>
         </div>
@@ -106,6 +115,26 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述各笔调整分录的调整依据、性质（AJE/RJE）与影响科目、金额。" :disabled="isReadonly"
+        @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如调整分录已借贷平衡、依据充分并经复核推送 A13，未见异常。" :disabled="isReadonly"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -125,9 +154,10 @@
  * el-table 10列 + 借贷平衡(✓平衡/✗不平衡) + 推送A13
  * Spec: Task 4.4 | Requirements: 4.1-4.8
  */
-import { computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2Adjustment } from '../../composables/useH2Adjustment'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -137,15 +167,31 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2Adjustment({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const isBalanced = computed(() => state.isBalanced.value)
+
+// H2-3 审计结论：composable 仅含审计说明（note），此处补本地审计结论 item_id。
+const CONCLUSION_KEY = 'H2-3-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function onCellChange(rowId: string, field: string, value: any) {
   state.updateCell(rowId, field, value)
@@ -163,9 +209,6 @@ function handlePushA13() {
   state.pushToA13(state.rows.value.map(r => r.rowId))
 }
 
-function handleAiGenerate() {
-  console.log('AI generate H2-3')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -179,6 +222,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

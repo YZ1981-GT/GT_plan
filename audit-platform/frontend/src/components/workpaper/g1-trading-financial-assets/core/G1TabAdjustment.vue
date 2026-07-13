@@ -95,6 +95,12 @@
     </div>
 
     <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：（1）调整分录的编制依据及事项说明；（2）AJE/RJE 对科目1501及相关损益的影响。" />
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
       <template #header>审计结论</template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
         placeholder="对调整分录的复核结论..." />
@@ -169,6 +175,12 @@ function loadRows(): AdjustmentRow[] {
 
 const rows = ref<AdjustmentRow[]>(loadRows())
 const conclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.conclusion ?? '')
+
+const AUDIT_NOTE_KEY = 'G1-3-audit-note'
+const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+})
 
 const totalDebit = computed(() => rows.value.reduce((s, r) => s + parseNum(r.debit), 0))
 const totalCredit = computed(() => rows.value.reduce((s, r) => s + parseNum(r.credit), 0))

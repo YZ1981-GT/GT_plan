@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F2TabCostComparison — F2-20 成本比较 | Task 17.4 */
-import { inject, toRef, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, type Ref } from 'vue'
 import { useF2CostComparison } from '../../composables/useF2Analysis'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -10,12 +10,41 @@ import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
+  projectId: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 async function onImported() { await reloadWorkpaperData?.() }
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const NOTE_KEY = 'F2-cost-comparison-audit-note'
+const CONCLUSION_KEY = 'F2-cost-comparison-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function fmtRate(r: number | '' | 'N/A'): string {
   if (r === '' || r === 'N/A') return String(r)
@@ -81,7 +110,7 @@ const segmentOptions = [
           :disabled="isReadonly"
           @imported="onImported"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ enrichedRows.length }} 行</el-tag>
       </div>
     </div>
@@ -167,6 +196,32 @@ const segmentOptions = [
       </template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="请输入成本比较分析结论..." />
     </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述所执行的成本比较程序、测试情况与结果，以及成本异常波动的核查与拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -197,4 +252,6 @@ const segmentOptions = [
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 .opinion-actions { display: flex; gap: 6px; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

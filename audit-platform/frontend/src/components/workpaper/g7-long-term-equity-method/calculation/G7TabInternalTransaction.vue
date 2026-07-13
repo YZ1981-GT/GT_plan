@@ -26,6 +26,14 @@
       </ul>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证投资方与合营/联营企业之间顺流、逆流内部交易未实现利润的抵销是否完整，抵销方向及金额是否恰当。"
+      class="objective-alert"
+    />
+
     <!-- section标题 + 操作按钮 -->
     <div class="section-head">
       <h3 class="sheet-title">G7-15 内部交易抵销测算表</h3>
@@ -43,6 +51,15 @@
         </el-dropdown>
         <el-button size="small" @click="handleAiConclusion">🤖AI辅助</el-button>
         <el-button size="small" @click="openReviewDialog('G7-15-internal-transaction')">💬复核</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-15" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -281,6 +298,23 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header">
+          <span>审计说明</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 审计结论（AI辅助） -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -340,6 +374,7 @@ import {
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { InternalTransactionRow } from '../../composables/useG7EquityMethodFormData'
 import { api } from '@/services/apiProxy'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -361,12 +396,22 @@ const formData = useG7EquityMethodFormData({
 
 const SECTION_KEY = 'G7-15-internal-transaction'
 const CONCLUSION_KEY = 'G7-15-conclusion'
+const AUDIT_NOTE_KEY = 'G7-15-audit-note'
 
 /** 行数据(响应式) */
 const rows = ref<InternalTransactionRow[]>([])
 
 /** 审计结论 */
 const conclusion = ref('')
+
+/** 审计说明（持久化 checklist_responses，conclusion:null） */
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (isReadonly.value) return
+  auditNote.value = val
+  formData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+}
 
 // ─── Initialize ──────────────────────────────────────────────────────────────
 
@@ -390,6 +435,12 @@ onMounted(async () => {
   const savedConclusion = formData.data.value.get(CONCLUSION_KEY)
   if (savedConclusion?.conclusion) {
     conclusion.value = savedConclusion.conclusion
+  }
+
+  // 恢复审计说明
+  const savedNote = formData.data.value.get(AUDIT_NOTE_KEY)
+  if (savedNote?.remark) {
+    auditNote.value = savedNote.remark
   }
 })
 
@@ -627,6 +678,26 @@ function fmtNum(v: unknown): string {
 .g7-tab-internal-transaction {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.tab-toolbar .chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* 方法论上下文：琥珀色左边线+浅黄背景 */

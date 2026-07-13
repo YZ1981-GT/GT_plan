@@ -21,14 +21,42 @@
     <div class="section-header">
       <span class="section-title">I3-5 针对性检查表</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiAssist">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
         <el-button size="small" type="default" text @click="handleReview">
           💬复核
         </el-button>
       </div>
     </div>
+
+    <!-- 工具栏：索引 chip -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:I3-5" :context-project-id="projectId" />
+      </div>
+    </div>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：识别商誉是否存在减值迹象（外部+内部）；评价商誉分摊至资产组(CGU)的合理性；核实 CGU 划分与上年、与管理层内部报告的一致性（CAS8 第六条、第十八条）。"
+    />
+
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <ul>
+          <li>因企业合并形成的商誉，无论是否存在减值迹象，每年均须进行减值测试（CAS8 第十八条）。</li>
+          <li>减值迹象包括外部（市价大幅下跌、经济/技术/法律环境不利、市场利率提高等）与内部（资产闲置、经营绩效低于预期、重组处置计划等）。</li>
+          <li>商誉须分摊至预期受益的资产组(CGU)，分摊层级为内部监控商誉的最低层级、且不大于经营分部。</li>
+          <li>CGU 划分应与上年、与管理层内部报告口径保持一致，变更须有合理依据并充分披露。</li>
+          <li>逐项检查后给出结论（合理/不合理/需调整/待确认），并综合形成检查结论。</li>
+        </ul>
+      </div>
+    </details>
 
     <!-- 琥珀色方法论上下文 -->
     <div class="methodology-context">
@@ -45,9 +73,6 @@
       <template #header>
         <div class="check-section-header">
           <span class="check-section-title">一、减值迹象识别</span>
-          <el-button size="small" type="primary" text @click="handleAiSection('impairmentIndicators')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <div class="check-section-body">
@@ -113,9 +138,6 @@
       <template #header>
         <div class="check-section-header">
           <span class="check-section-title">二、商誉分摊至资产组(CGU)合理性</span>
-          <el-button size="small" type="primary" text @click="handleAiSection('cguAllocation')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <div class="check-section-body">
@@ -208,9 +230,6 @@
       <template #header>
         <div class="check-section-header">
           <span class="check-section-title">三、CGU划分一致性</span>
-          <el-button size="small" type="primary" text @click="handleAiSection('cguConsistency')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
         </div>
       </template>
       <div class="check-section-body">
@@ -312,6 +331,30 @@
       />
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><span style="font-weight:600">审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="记录针对性检查执行过程的审计说明（如减值迹象识别依据、CGU 划分核对的证据来源等）..."
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><span style="font-weight:600">审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="针对性检查的审计结论（如：未发现减值迹象/商誉分摊与CGU划分合理，减值测试结论可依赖）..."
+      />
+    </el-card>
+
     <!-- 保存 -->
     <div class="table-actions" v-if="!isReadonly">
       <el-button size="small" type="success" @click="handleSave">保存</el-button>
@@ -322,8 +365,7 @@
 <script setup lang="ts">
 import { ref, watch, inject, reactive } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import http from '@/utils/http'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -378,6 +420,8 @@ const remarks = reactive({
 })
 
 const overallConclusion = ref('')
+const auditNote = ref('')
+const auditConclusion = ref('')
 
 // --- Load/Save ---
 function loadData() {
@@ -396,6 +440,8 @@ function loadData() {
         if (parsed.remarks?.[k]) (remarks as any)[k] = parsed.remarks[k]
       })
       overallConclusion.value = parsed.overallConclusion || ''
+      auditNote.value = parsed.auditNote || ''
+      auditConclusion.value = parsed.auditConclusion || ''
     }
   } catch { /* ignore parse errors */ }
 }
@@ -408,59 +454,11 @@ async function handleSave() {
     conclusions: { ...conclusions },
     remarks: { ...remarks },
     overallConclusion: overallConclusion.value,
+    auditNote: auditNote.value,
+    auditConclusion: auditConclusion.value,
   }
   emit('save', STORAGE_KEY, JSON.stringify(payload))
   ElMessage.success('针对性检查表已保存')
-}
-
-// --- AI辅助 ---
-async function handleAiAssist() {
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'I3-5-targeted-all',
-      prompt: '商誉针对性检查表：请根据CAS8减值迹象识别要求，综合分析商誉减值迹象（外部+内部）、商誉分摊至CGU合理性、CGU划分一致性三大维度',
-      context: JSON.stringify({ sections, conclusions }),
-    })
-    if (res.data?.data?.content) {
-      ElMessage.success('AI内容已生成，请查看各检查项')
-      applyAiResult(res.data.data.content, null)
-    }
-  } catch {
-    ElMessage.warning('AI辅助暂不可用，请手动填写')
-  }
-}
-
-async function handleAiSection(sectionKey: string) {
-  const sectionNameMap: Record<string, string> = {
-    impairmentIndicators: '减值迹象识别——外部迹象(市场/技术/经济/利率) + 内部迹象(经营/报告/重组/决策)',
-    cguAllocation: '商誉分摊至资产组(CGU)合理性——合并对价分配/协同效应/管理层考虑',
-    cguConsistency: 'CGU划分一致性——与上年一致性/与管理层内部报告一致性/是否变更',
-  }
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `I3-5-targeted-${sectionKey}`,
-      prompt: `商誉针对性检查：${sectionNameMap[sectionKey] || sectionKey}`,
-      context: JSON.stringify({ sections, conclusions }),
-    })
-    if (res.data?.data?.content) {
-      applyAiResult(res.data.data.content, sectionKey)
-      ElMessage.success('AI内容已生成')
-    }
-  } catch {
-    ElMessage.warning('AI辅助暂不可用，请手动填写')
-  }
-}
-
-function applyAiResult(content: string, targetSection: string | null) {
-  if (targetSection === 'impairmentIndicators') {
-    // 外部+内部合并写入外部（可人工分拆）
-    sections.externalIndicators = content
-  } else if (targetSection === 'cguAllocation') {
-    sections.mergerCostAllocation = content
-  } else if (targetSection === 'cguConsistency') {
-    sections.priorYearConsistency = content
-  }
-  // 全量模式不自动填充（避免覆盖已有内容），只提示用户查看
 }
 
 // --- 复核对话 ---
@@ -563,6 +561,45 @@ function handleReview() {
 /* 综合结论 */
 .overall-conclusion {
   margin-top: 8px;
+}
+
+/* 审计说明/结论卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
+
+/* 审计目标 alert */
+.objective-alert {
+  margin-bottom: 12px;
+}
+
+/* 编制提示 details */
+.guidance-details {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.guidance-details .guidance-content ul {
+  padding-left: 20px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
+/* 工具栏 */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.tab-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* 保存 */

@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-analysis">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：通过结构占比与期间变动的分析性程序，识别固定资产异常波动（变动率超±20%）及成新率偏低项目并追踪合理原因。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-6" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ structureRows.length }} 类</el-tag>
+    </div>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>分析性程序：对固定资产结构占比及期间变动进行量化分析，识别异常波动项目并追踪原因。重点关注变动率超过阈值(±20%)的分类。</p>
@@ -11,9 +21,6 @@
         <div class="section-title">
           <span>一、结构分析（各类占比）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('analysis-change')">
-              <el-icon><MagicStick /></el-icon> AI分析
-            </el-button>
             <el-button size="small" type="default" link @click="handleReview('H1-6-struct')">💬 复核</el-button>
           </div>
         </div>
@@ -78,8 +85,16 @@
 
     <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>分析性程序结论</span></template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="分析性程序总体结论..." />
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：所实施的分析程序（结构占比/期间变动）、数据来源、异常项识别及跟进。" @change="saveAnalysisNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论（分析性程序）</span></template>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="分析性程序总体结论..." @change="saveAnalysisConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -96,9 +111,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH1Analysis } from '../../composables/useH1Analysis'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -108,8 +124,18 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const conclusion = ref('')
+const auditNoteText = ref('')
+const NOTE_KEY = 'H1-6-audit-note'
+const CONCLUSION_KEY = 'H1-6-audit-conclusion'
+function saveAnalysisNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAnalysisConclusion() { saveResponse(CONCLUSION_KEY, conclusion.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) conclusion.value = c.remark
+})
 
 const { structureRows, changeRows } = useH1Analysis(
   toRef(props, 'wpId'),
@@ -124,7 +150,6 @@ function isAbnormal(rate: number | null): boolean {
 }
 
 function onExplanationChange(_row: any) { /* debounce save */ }
-function handleAiGenerate(section: string) { console.log('AI:', section) }
 function handleReview(id: string) { openReviewDialog(id) }
 
 function fmtAmt(val: number | null | undefined): string {

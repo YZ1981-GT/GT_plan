@@ -11,7 +11,7 @@
  *
  * Requirements: 9.4-9.6
  */
-import { inject, toRef, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, type Ref } from 'vue'
 import {
   useE1InterestCalc,
   type MonthlyInterestRow,
@@ -64,6 +64,36 @@ function asMonthly(row: any): MonthlyInterestRow { return row }
 
 function isMaterial(): boolean {
   return Math.abs(monthlySummary.value.diff) > 0.005
+}
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+const NOTE_KEY = 'E1-interest-audit-note'
+const CONCLUSION_KEY = 'E1-interest-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
 }
 </script>
 
@@ -160,6 +190,36 @@ function isMaterial(): boolean {
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：可概述（1）利息收入月度测算的方法与利率来源；（2）测算合计与账面利息收入的差异及成因分析；（3）利息收入与存款规模的匹配性；（4）是否存在高息资金拆借、体外资金循环等异常迹象。"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、利息收入测算数与账面记录基本相符，未见异常。B、除上述差异事项外，利息收入合理、完整。C、由于存在以下重大未解释差异（或资料受限无法测算），需进一步核查。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -232,5 +292,14 @@ function isMaterial(): boolean {
 }
 .summary-card {
   margin-top: 16px;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

@@ -12,6 +12,21 @@
     <GCycleGuideStrip :steps="['G11A 程序', 'G11-1 审定', 'G11-2 明细', 'G11-3 调整', 'G11-4 收益率', '附注披露']" />
 
     <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：确认投资收益的发生真实、金额准确、期间归属恰当，核实权益法/成本法核算及公允价值变动列报正确，为 G11-1 审定表提供审定依据。"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G11-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ adj.groupedRows.value.length }} 组</el-tag>
+      </div>
+    </div>
+
+    <el-alert
       v-if="adj.detailCrossValidation.value"
       type="warning"
       :closable="false"
@@ -241,6 +256,11 @@ function fmtRate(rate: number | null): string {
 .g11-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .g11-title { margin: 0; font-size: 15px; }
 .g11-actions { display: flex; gap: 8px; }
+.objective-alert { margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .cross-alert { margin-bottom: 8px; }
 .guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
 .group-block { margin-bottom: 8px; }

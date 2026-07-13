@@ -91,6 +91,38 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
   if (hasConfirmDiff(row)) return 'e1-bank-confirm-diff'
   return ''
 }
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+// 对照源模板 E1-3「五、审计说明」「六、审计结论」。本组件 composable 无 AI 生成
+// 能力，故使用纯 textarea（不臆造 AI 按钮）。
+
+const NOTE_KEY = 'E1-bank-audit-note'
+const CONCLUSION_KEY = 'E1-bank-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
 </script>
 
 <template>
@@ -300,6 +332,32 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
               </template>
             </el-table-column>
 
+            <!-- 银行对账单余额 (源模板E1-3列) -->
+            <el-table-column label="银行对账单余额" width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.statementBalance"
+                  :disabled="isReadonly"
+                  :controls="false"
+                  size="small"
+                  @change="(val: number | undefined) => updateCell(row.id, 'statementBalance', val ?? 0)"
+                />
+              </template>
+            </el-table-column>
+
+            <!-- 是否受限 (源模板E1-3列：受限金额+受限原因) -->
+            <el-table-column label="是否受限/受限说明" width="150">
+              <template #default="{ row }">
+                <el-input
+                  :model-value="row.restrictedReason"
+                  :disabled="isReadonly"
+                  size="small"
+                  placeholder="无受限则留空"
+                  @change="(val: string) => updateCell(row.id, 'restrictedReason', val)"
+                />
+              </template>
+            </el-table-column>
+
             <!-- 询证函索引号 -->
             <el-table-column label="询证函索引号" width="130">
               <template #default="{ row }">
@@ -350,6 +408,40 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
             <span>审定 {{ displayPrefs.fmtAmount(groupTotals[group].audited) }}</span>
           </div>
         </div>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header">
+              <span>审计说明</span>
+            </div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：概述程序测试情况及结果、拟调整/未调整事项及其影响、审计范围受限情况及其影响..."
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header">
+              <span>审计结论</span>
+            </div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A.未见异常；B.除上述重大不符事项调整外，其余未见异常；C.存在重大未调整事项或审计范围受限，不可确认..."
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -448,6 +540,15 @@ function getRowClass({ row }: { row: BankDetailRow }): string {
 .orange-text {
   color: #e6a23c;
   font-weight: 600;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 
 :deep(.e1-bank-confirm-diff) {

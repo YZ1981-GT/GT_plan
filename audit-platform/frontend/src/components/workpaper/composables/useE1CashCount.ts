@@ -44,12 +44,17 @@ export interface CertCountRow {
   id: string
   certNo: string         // 存单编号
   bank: string           // 开户银行
-  certType: string       // 存单类型
+  depositor: string      // 存款人/户名
+  account: string        // 账号
+  certType: string       // 存单类型（定期存款/大额存单/开户证实书等）
   depositDate: string    // 存入日期
   maturityDate: string   // 到期日期
   amount: number         // 金额
   interestRate: number   // 利率
+  pledged: '是' | '否' | ''     // 是否质押/受限
+  pledgeMatter: string   // 质押/受限事项描述
   result: '已见' | '未见' | ''  // 盘点结果
+  note: string           // 备注
 }
 
 export type CashCountRow = RmbCountRow | FxCountRow | CertCountRow
@@ -70,7 +75,7 @@ function getStorageKey(variant: CashCountVariant): string {
 
 const RMB_USER_FIELDS = ['id', 'denomination', 'quantity']
 const FX_USER_FIELDS = ['id', 'currency', 'denomination', 'quantity', 'fcAmount', 'fxRate']
-const CERT_USER_FIELDS = ['id', 'certNo', 'bank', 'certType', 'depositDate', 'maturityDate', 'amount', 'interestRate', 'result']
+const CERT_USER_FIELDS = ['id', 'certNo', 'bank', 'depositor', 'account', 'certType', 'depositDate', 'maturityDate', 'amount', 'interestRate', 'pledged', 'pledgeMatter', 'result', 'note']
 
 const TOLERANCE = 0.005
 
@@ -100,7 +105,7 @@ function createEmptyFxRow(): FxCountRow {
 }
 
 function createEmptyCertRow(): CertCountRow {
-  return { id: generateRowId('cert'), certNo: '', bank: '', certType: '', depositDate: '', maturityDate: '', amount: 0, interestRate: 0, result: '' }
+  return { id: generateRowId('cert'), certNo: '', bank: '', depositor: '', account: '', certType: '', depositDate: '', maturityDate: '', amount: 0, interestRate: 0, pledged: '', pledgeMatter: '', result: '', note: '' }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -190,12 +195,17 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
           id: String(r.id || generateRowId('cert')),
           certNo: String(r.certNo || ''),
           bank: String(r.bank || ''),
+          depositor: String(r.depositor || ''),
+          account: String(r.account || ''),
           certType: String(r.certType || ''),
           depositDate: String(r.depositDate || ''),
           maturityDate: String(r.maturityDate || ''),
           amount: parseNum(r.amount),
           interestRate: parseNum(r.interestRate),
+          pledged: (['是', '否'].includes(String(r.pledged)) ? String(r.pledged) : '') as CertCountRow['pledged'],
+          pledgeMatter: String(r.pledgeMatter || ''),
           result: (['已见', '未见'].includes(String(r.result)) ? String(r.result) : '') as CertCountRow['result'],
+          note: String(r.note || ''),
         }
     }
   }

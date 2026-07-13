@@ -11,6 +11,21 @@
     <GCycleGuideStrip :steps="['G13A 程序', 'G13-1 审定', 'G13-2 明细', 'G13-3 调整', '附注披露']" />
 
     <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实公允价值变动收益（6101）的完整性与准确性，验证本期审定数与 G13-2 明细及试算平衡表勾稽一致，为财务报表列报提供审定依据（CAS 39 公允价值计量）。"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G13-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ adj.dataRows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
+    <el-alert
       v-if="adj.detailCrossValidation.value"
       type="warning"
       :closable="false"
@@ -216,6 +231,11 @@ function fmtRate(rate: number | null): string {
 .g13-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .g13-actions { display: flex; gap: 8px; align-items: center; }
 .g13-title { margin: 0; font-size: 15px; font-weight: 600; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #fafafa; display: inline-block; width: 100%; }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 .reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }

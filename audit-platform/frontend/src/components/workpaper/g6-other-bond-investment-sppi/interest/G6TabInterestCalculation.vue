@@ -1,5 +1,19 @@
 <template>
   <div class="g6-tab-interest-calculation">
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证其他债权投资按实际利率法确认利息收入的准确性，核实实际利率确定的合理性与摊余成本逐期结转的正确性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:G6-6" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ interest.groups.value.length }} 个投资项目</el-tag>
+    </div>
+
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p><strong>实际利率法确认利息收入：</strong></p>
@@ -229,6 +243,21 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header"><span class="section-title">审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述实际利率法测算的测试情况及结果、与审定表（G6-1）利息收入的交叉验证、拟调整与未调整事项及其影响。"
+        @update:model-value="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -282,10 +311,11 @@
  * - 底部交叉验证: 利息合计 vs G6-1审定表利息调整
  * - 审计结论textarea + AI按钮 + 编制提示折叠
  */
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG6SppiInterest } from '../../composables/useG6SppiInterest'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -308,10 +338,22 @@ const formData = useG6SppiFormData({
 })
 const interest = useG6SppiInterest()
 
+// ─── 审计说明（独立持久化 checklist_responses） ───
+const NOTE_KEY = 'G6-6-interest-calc-audit-note'
+const auditNote = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
+
 // ─── 数据加载 ───
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -369,6 +411,22 @@ defineExpose({
 .g6-tab-interest-calculation {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
+}
+
+/* ─── 审计目标 / 工具栏 ─── */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */

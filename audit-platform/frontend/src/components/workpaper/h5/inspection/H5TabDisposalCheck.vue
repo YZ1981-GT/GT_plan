@@ -1,11 +1,21 @@
 <template>
   <div class="h5-tab-disposal-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：检查本期油气资产减少(处置)的损益计算准确性，并联动 H10 资产处置收益。" class="objective-alert" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H5-8" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
           <span>H5-8 减少检查（联动H10）— 处置损益合计 {{ fmtAmt(state.totalGainLoss.value) }}</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI说明</el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-8')">💬 复核</el-button>
           </div>
         </div>
@@ -83,6 +93,12 @@
       <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
+    <el-card shadow="never" class="note-card">
+      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }"
+        placeholder="填写减少检查审计结论..." :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -99,28 +115,33 @@ import { computed, defineAsyncComponent, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH5DisposalCheck } from '../../composables/useH5DisposalCheck'
+import { useH5FormData } from '../../composables/useH5FormData'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
+const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const state = useH5DisposalCheck({
   allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
-  onSave: () => {}, onNavigateSheet: (s) => emit('navigate-sheet', s),
+  onSave: (itemId: string, value: any) => formData.setResponse(itemId, value), onNavigateSheet: (s) => emit('navigate-sheet', s),
 })
 
 async function handleAddRow() {
   const { value } = await ElMessageBox.prompt('请输入资产名称', '新增减少项', { confirmButtonText: '确定', cancelButtonText: '取消' })
   if (value) state.addRow(value)
 }
-function handleAiGenerate() {}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string { return val == null ? '-' : val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>
 
 <style scoped>
 .h5-tab-disposal-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }

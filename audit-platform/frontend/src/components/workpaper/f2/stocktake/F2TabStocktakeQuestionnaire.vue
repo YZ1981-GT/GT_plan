@@ -11,6 +11,22 @@
       </div>
     </details>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：评价被审计单位存货盘点计划的健全性，确认盘点组织、程序、截止控制与差异处理足以保证盘点结果的准确与完整。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"><span class="hint">盘点计划问卷 F2-21</span></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-21" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <div v-if="showMigrationBtn" class="migration-banner">
       <el-alert type="info" :closable="false" show-icon>
         <template #title>
@@ -33,12 +49,39 @@
       ai-title="AI 生成 · 盘点问卷结论"
       audit-note-label="问卷结论"
     />
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述对盘点计划问卷的评价程序、盘点组织与截止控制的核查情况及结果。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import F2StocktakeSectionForm from './F2StocktakeSectionForm.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { F2_21_FIELDS } from './f2StocktakeConfigs'
 import { migrateF21RowsToFields } from '../../composables/useF2StocktakeSheet'
 import type { ChecklistResponse } from '../../composables/useF2StocktakeFormData'
@@ -50,6 +93,33 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
+
+// ─── 审计说明 / 审计结论（标准打磨项，独立持久化） ─────────────────────────────
+const NOTE_KEY = 'F2-21-audit-note'
+const CONCLUSION_KEY = 'F2-21-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function persistAudit(key: string, val: string): void {
+  const item: ChecklistResponse = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 /**
  * 首次迁移条件：
@@ -102,6 +172,18 @@ function doMigrateWrite() {
 .f2-questionnaire-wrapper { font-size: var(--wp-font-size, 13px); padding: 12px; }
 .migration-banner { margin-bottom: 12px; }
 .migration-banner .el-button { margin-top: 6px; }
+.objective-alert { margin-bottom: 12px; }
+
+/* 工具栏 */
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.hint { font-size: 12px; color: #909399; }
+
+/* 审计说明 / 审计结论卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 
 /* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }

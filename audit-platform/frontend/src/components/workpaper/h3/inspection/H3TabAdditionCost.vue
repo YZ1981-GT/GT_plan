@@ -1,5 +1,30 @@
 <template>
   <div class="h3-tab-addition-cost">
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表为投资性房地产增减检查表（成本模式），逐笔核查购入/转入/处置/转出的真实性与入账准确性。</p>
+        <p>2. 核对合同、发票、评估报告、产权证、审批文件等支持性证据是否齐全；净值 = 原值 − 累计折旧。</p>
+        <p>3. 可用「抽凭」按需抽取凭证，📎列上传附件 OCR 识别自动填充金额/日期/对方。</p>
+        <p>4. 成本模式关注入账原值与折旧；若采用公允价值模式请切换公允版本。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实投资性房地产（成本模式）本期增减变动的真实、准确、完整及入账恰当，支持性证据充分。"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H3-5" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">共 {{ costRows.length }} 行</el-tag>
+    </div>
+
     <!-- 操作栏 -->
     <div class="toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增检查行</el-button>
@@ -119,17 +144,25 @@
     </div>
 
     <!-- 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
+    <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-title">
-          <span>审计说明 / 结论</span>
+        <div class="card-header">
+          <span>审计说明</span>
           <span class="action-btns">
             <el-button size="small" @click="generateAI('H3-5-cost')">AI</el-button>
             <el-button size="small" circle @click="openReview('H3-5-cost')">💬</el-button>
           </span>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请输入审计说明..." :disabled="isReadonly" />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：增减变动检查范围、证据核对情况、异常事项及处理。" :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、增减变动真实准确、证据充分。B、除下列事项外未见异常。C、存在重大问题，不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -139,10 +172,11 @@
  * H3TabAdditionCost.vue — H3-5 增减检查表（成本模式）
  * el-table 21列成本模式+抽凭+OCR+汇总
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH3AdditionCheck } from '../../composables/useH3AdditionCheck'
 import { useH3FormData } from '../../composables/useH3FormData'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -174,7 +208,29 @@ const {
   measurementModel: ref('cost') as any,
 })
 
-const conclusion = ref(getValue('H3-5-cost-conclusion') ?? '')
+// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
+const NOTE_KEY = 'H3-5-cost-audit-note'
+const CONCLUSION_KEY = 'H3-5-cost-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void saveImmediate(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void saveImmediate(CONCLUSION_KEY, val)
+}
 
 function addRow() { addCostRow() }
 function onCellChange(index: number, field: string, value: any) { updateCostCell(index, field, value) }
@@ -240,6 +296,15 @@ function openReview(section: string) { openReviewDialog(section) }
 
 <style scoped>
 .h3-tab-addition-cost { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .audit-table { font-size: var(--wp-font-size, 13px); }
 .audit-table :deep(.formula-col) { background: var(--el-fill-color-lighter); }

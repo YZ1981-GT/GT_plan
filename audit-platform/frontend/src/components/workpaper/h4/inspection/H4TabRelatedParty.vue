@@ -5,13 +5,20 @@
       <p>H4-9关联交易检查：核查工程物资采购中的关联交易定价公允性。价差率=（交易金额-市场价格）/市场价格×100%，|价差率|>10%时红色高亮标记为异常。需评估关联采购的商业合理性、审批流程和信息披露完整性。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核查工程物资采购中关联交易的定价公允性、审批合规性与披露完整性，评估价差率异常事项，符合关联方披露要求（CAS36）。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H4-9" :context-project-id="props.projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- Section Title -->
     <div class="section-header">
       <span>关联交易检查表 H4-9</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-9-related-party')">💬</el-button>
       </div>
     </div>
@@ -169,9 +176,6 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-9-note')">💬</el-button>
           </div>
         </div>
@@ -179,6 +183,21 @@
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请填写关联交易审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H4-9-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -214,6 +233,7 @@ import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH4RelatedParty, type H4RelatedPartyRow } from '../../composables/useH4RelatedParty'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -245,14 +265,23 @@ const importExport = useH4ImportExport({
   projectId: toRef(props, 'projectId'),
 })
 
-// ─── Audit Note ──────────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion（inject saveResponse 落库 + setup 恢复） ──────────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const auditNote = ref('')
-// Load audit note from allResponses
+const auditConclusion = ref('')
+// Load audit note/conclusion from allResponses（子组件挂载晚于 entry selfLoad，setup 读取安全）
 const noteResp = props.allResponses.get('H4-9-note')
 if (noteResp?.remark) auditNote.value = noteResp.remark
+const conclusionResp = props.allResponses.get('H4-9-conclusion')
+if (conclusionResp?.remark) auditConclusion.value = conclusionResp.remark
 
 function saveAuditNote() {
   props.allResponses.set('H4-9-note', { item_id: 'H4-9-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-9-note', auditNote.value)
+}
+function saveAuditConclusion() {
+  props.allResponses.set('H4-9-conclusion', { item_id: 'H4-9-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-9-conclusion', auditConclusion.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -293,9 +322,6 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[H4-9] AI generate')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -314,6 +340,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

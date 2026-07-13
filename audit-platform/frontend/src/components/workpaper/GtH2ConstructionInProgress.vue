@@ -391,12 +391,37 @@ async function selfLoad(): Promise<void> {
   }
 }
 
+// ─── 子组件 save 持久化（Bug C 修复：子 tab 此前 composable 未接 onSave → 从不落库） ──
+// 子组件契约：inject('saveResponse')(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
+// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).then(() => { scheduleAutoSnapshot() })
+      .catch((err: unknown) => console.warn('[GtH2] persistResponse failed:', itemId, err))
+  }, 800))
+}
+
 // ─── provide for child components ────────────────────────────────────────────
 function openReviewDialog(sectionId: string, sectionLabel?: string): void {
   console.log('[H2] openReviewDialog:', sectionId, sectionLabel)
   // Integrated with audit-review-dialog module — real impl delegates to parent via emit
 }
 provide('openReviewDialog', openReviewDialog)
+provide('allResponses', allResponses)
+provide('saveResponse', persistResponse)
 
 // ─── EventBus 订阅（Task 6.8 + 6.9） ────────────────────────────────────────
 /**

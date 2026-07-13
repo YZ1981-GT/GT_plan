@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-depreciation-alloc">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实使用权资产本期折旧在各费用类型间分配的合理性，确认分配比例合计为100%、分配金额合计与 H8-8 折旧总额一致。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>折旧分配分析表H8-9：将使用权资产本期折旧按费用类型分配（管理费用/销售费用/制造费用等）。分配比例合计应=100%，分配金额合计应=折旧总额。</p>
@@ -106,6 +110,20 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -125,7 +143,7 @@
  * 24行10列11公式
  * Spec: Task 4.6 | Requirements: 6.4-6.6
  */
-import { ref, toRef, defineAsyncComponent } from 'vue'
+import { ref, toRef, watch, defineAsyncComponent } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8Depreciation } from '../../composables/useH8Depreciation'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -148,6 +166,30 @@ const emit = defineEmits<{
 }>()
 
 const showOO = ref(true)
+
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-dep-alloc-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-dep-alloc-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
 
 const {
   allocRows, depTotal, allocTotal, allocRatioTotal,
@@ -183,6 +225,10 @@ function getAllocSummary({ columns }: { columns: any[] }) {
 
 <style scoped>
 .h8-tab-depreciation-alloc { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

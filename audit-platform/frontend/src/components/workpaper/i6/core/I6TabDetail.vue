@@ -7,6 +7,14 @@
       <p>顶部ECharts折线图(可折叠)显示月度趋势。动态行(新增研发项目)需先弹窗输入名称。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实研发费用各项目按 6 类费用（人工/材料/折旧/摊销/设计/委外/其他）逐月归集的完整性与准确性，识别异常月度波动，为审定表 I6-1 提供明细支撑。"
+      class="objective-alert"
+    />
+
     <!-- ECharts月度趋势图(可折叠) -->
     <details class="chart-details" open>
       <summary>月度趋势图</summary>
@@ -14,9 +22,8 @@
     </details>
 
     <!-- 操作栏 -->
-    <div class="toolbar-row">
-      <span class="row-count">共 {{ rows.length }} 个研发项目</span>
-      <div class="toolbar-right">
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
         <el-button v-if="!isReadonly" type="primary" size="small" @click="handleAddRow">+ 新增项目</el-button>
         <el-dropdown v-if="!isReadonly" trigger="click">
           <el-button size="small">导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
@@ -28,10 +35,11 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" type="primary" text @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" type="default" text @click="handleReview">复核</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I6-2" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 个研发项目</el-tag>
       </div>
     </div>
 
@@ -86,8 +94,20 @@
       <span class="subtotal-item subtotal-total">全年: {{ fmtAmount(grandTotal) }}</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="请填写审计说明（研发费用各项目月度归集情况、异常月份分析等）..." @blur="onAuditNoteBlur" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="请填写审计结论（明细归集完整、准确、与审定表一致）..." @blur="onAuditConclusionBlur" />
+    </el-card>
+
     <!-- 编制提示 -->
-    <details class="compile-hint">
+    <details class="guidance-details compile-hint">
       <summary>编制提示</summary>
       <ul>
         <li>固定前2列(项目名称/编号)+12月横滚+合计列，44行×65列</li>
@@ -114,8 +134,9 @@
  * Task: 4.3
  */
 import { ref, computed, watch, onMounted, inject, nextTick } from 'vue'
-import { ArrowDown, MagicStick } from '@element-plus/icons-vue'
+import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -141,7 +162,11 @@ interface DetailRow {
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const ITEM_ID = 'I6-2-rows'
+const NOTE_KEY = 'I6-2-audit-note'
+const CONCLUSION_KEY = 'I6-2-audit-conclusion'
 const rows = ref<DetailRow[]>([])
+const auditNote = ref('')
+const auditConclusion = ref('')
 const chartRef = ref<HTMLElement>()
 
 const monthlyTotals = computed(() => {
@@ -155,7 +180,11 @@ const monthlyTotals = computed(() => {
 const grandTotal = computed(() => monthlyTotals.value.reduce((s, v) => s + v, 0))
 
 // ─── Load / Save ─────────────────────────────────────────────────────────────
+function _str(id: string): string { const it = props.allResponses.get(id); return (it?.remark ?? (typeof it === 'string' ? it : '')) as string }
+
 function _load(): void {
+  auditNote.value = _str(NOTE_KEY)
+  auditConclusion.value = _str(CONCLUSION_KEY)
   const item = props.allResponses.get(ITEM_ID)
   const raw = item?.remark ?? (typeof item === 'string' ? item : null)
   if (raw) {
@@ -243,10 +272,9 @@ async function handleImport(): Promise<void> {
   input.click()
 }
 
-// ─── AI / Review ─────────────────────────────────────────────────────────────
-async function handleAiGenerate(): Promise<void> {
-  try { await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, { section: 'detail', prompt: 'I6研发费用明细表月度分析', context: { wpCode: 'I6-2', rowCount: rows.value.length } }) } catch { /* */ }
-}
+// ─── Audit note / conclusion / Review ────────────────────────────────────────
+function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
+function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
 function handleReview(): void { openReviewDialog('I6-2 明细表') }
 
 // ─── Chart (lazy init) ───────────────────────────────────────────────────────
@@ -276,6 +304,12 @@ function fmtAmount(v: number | null | undefined): string {
 
 <style scoped>
 .i6-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .methodology-context { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.8; }
 .methodology-context p { margin: 0; }
 .methodology-context strong { color: #78350f; }

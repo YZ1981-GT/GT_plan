@@ -19,7 +19,7 @@
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G5-10 长期应收款坏账准备测算表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <GtIndexChip value="wp:G5-10" />
         <el-segmented v-model="activeTab" :options="segmentOptions" size="small" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
@@ -30,7 +30,7 @@
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      测算长期应收款坏账准备（ECL）：按 Stage 分组验证信用损失率、坏账准备、账面价值及本年计提/转回的计算准确性。
+      审计目标：测算长期应收款坏账准备（ECL）：按 Stage 分组验证信用损失率、坏账准备、账面价值及本年计提/转回的计算准确性。
     </el-alert>
 
     <!-- Stage分组表格 -->
@@ -272,6 +272,15 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述 ECL 三阶段测算、信用损失率合理性、坏账计提/转回及与明细表勾稽情况。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -318,11 +327,12 @@
  * - Stage1/Stage2/Stage3分组 + 小计行 + 总计行
  * - 公式列tooltip显示来源
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG5ImpairmentCalc } from '../../composables/useG5ImpairmentCalc'
 import type { G5ImpairmentCalcRow } from '../../composables/useG5ImpairmentCalc'
+import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -337,6 +347,21 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 const calc = useG5ImpairmentCalc()
 const conclusion = ref('')
 const activeTab = ref<'tab1' | 'tab2'>('tab1')
+
+// ─── 审计说明（持久化 checklist_responses，item_id 前缀 G5-）───
+const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const auditNote = ref('')
+const G5_NOTE_KEY = 'G5-10-audit-note'
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
+}
+onMounted(async () => {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+})
 
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
 const segmentOptions = [
@@ -583,6 +608,17 @@ defineExpose({
 }
 .delete-icon:hover {
   color: #f56c6c;
+}
+
+/* 审计说明卡片 */
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 
 /* 审计结论卡片 */

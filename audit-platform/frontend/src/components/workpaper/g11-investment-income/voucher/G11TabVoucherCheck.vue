@@ -1,5 +1,21 @@
 <template>
   <div class="g11-voucher-check">
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表对投资收益（6111，损益类）贷方发生额抽取凭证进行检查，验证发生、准确、期间归属及账务处理正确。</p>
+        <p>2. 可用抽凭引擎按金额/系统/MUS 等方法抽样，样本贷方合计与检查内容逐笔核对（完整/授权/金额正确/期间恰当/账务正确）。</p>
+        <p>3. 异常凭证须标注风险等级与异常说明，必要时扩大样本或追加程序。</p>
+      </div>
+    </details>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：通过凭证抽查证实投资收益的发生真实、金额准确、期间归属恰当及账务处理正确。"
+    />
+
     <div class="section-head">
       <h3 class="sheet-title">G11-5 投资收益凭证检查表</h3>
       <div class="head-actions">
@@ -9,6 +25,15 @@
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="vc.addRow()">+ 新增</el-button>
       </div>
     </div>
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G11-5" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <div class="summary-bar" :class="{ 'summary-error': !vc.isBalanced.value }">
       贷方合计 {{ fmt(vc.creditTotal.value) }} · 异常 {{ vc.abnormalCount.value }} 条
     </div>
@@ -134,11 +159,35 @@
         @update:model-value="vc.updateConclusion"
       />
     </div>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述凭证抽查程序的执行情况、样本范围、异常事项及处理。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：凭证抽查未见异常（或列明发现的异常事项及后续程序结论）。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useG11VoucherCheck, type G11VoucherCheckRow } from '../../composables/useG11VoucherCheck'
@@ -164,6 +213,33 @@ const vc = useG11VoucherCheck({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计说明 / 审计结论（独立于抽查结论）───
+const NOTE_KEY = 'G11-voucher-audit-note'
+const CONCLUSION_KEY = 'G11-voucher-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  props.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  props.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 const tabOptions = [
@@ -224,6 +300,17 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 
 <style scoped>
 .g11-voucher-check { font-size: var(--wp-font-size, 13px); }
+.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content p { margin: 2px 0; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

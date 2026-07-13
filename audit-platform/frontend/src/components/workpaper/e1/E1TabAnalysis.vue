@@ -12,7 +12,7 @@
  *
  * Requirements: 9.1-9.3
  */
-import { ref, inject, toRef, type Ref } from 'vue'
+import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { useE1Analysis, type AnalysisRow } from '../composables/useE1Analysis'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -64,18 +64,76 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
   if (isRateExceeding(row)) return 'e1-analysis-red-row'
   return ''
 }
+
+// ─── 结构比（各项目期末金额 ÷ 货币资金合计，仅展示派生）─────────────────────
+
+const totalEnding = computed(() =>
+  rows.value.reduce((sum, r) => sum + (r.endingAmount || 0), 0),
+)
+
+/** 期末结构比：库存现金/银行存款/其他货币资金占货币资金合计的比重 */
+function structureRatio(row: AnalysisRow): string {
+  const total = totalEnding.value
+  if (!total) return '-'
+  return ((row.endingAmount / total) * 100).toFixed(2) + '%'
+}
+
+// ─── 存贷双高预警（展示派生：银行存款占比高即提示核查贷款匹配性）───────────
+
+/** 银行存款期末金额占货币资金合计比重 */
+const bankRatio = computed(() => {
+  const total = totalEnding.value
+  if (!total) return 0
+  const bank = rows.value.find(r => r.itemKey === 'bank')
+  return bank ? bank.endingAmount / total : 0
+})
+
+/** 货币资金合计（期末）是否处于较高水平且以银行存款为主，触发存贷双高关注 */
+const showDualHighWarning = computed(
+  () => totalEnding.value > 0 && bankRatio.value >= 0.6,
+)
+
+// ─── 审计说明 / 审计结论（源模板"审计说明""审计结论"，无AI→纯textarea）──────
+
+const NOTE_KEY = 'E1-analysis-audit-note'
+const CONCLUSION_KEY = 'E1-analysis-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
 </script>
 
 <template>
   <div class="e1-tab-analysis">
-    <!-- 编制提示 -->
+    <!-- 编制提示（源模板 E1-14 分析程序要点）-->
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制提示（分析程序要点）</summary>
       <div class="guidance-content">
-        <p>1. 本表对货币资金各项目进行期末与期初的变动分析，期末金额取自 E1-1 审定表（跨sheet自动取数）。</p>
-        <p>2. 灰色底纹列（期末金额/变动额）为自动计算，不可手工录入；期初金额可手工录入。</p>
-        <p>3. 变动率 = 变动额 / 期初金额，绝对值超过30%时红色高亮，须在"变动原因"列分析说明。</p>
-        <p>4. 关注货币资金异常大幅波动是否与经营规模、筹资投资活动相匹配，识别资金占用与舞弊风险。</p>
+        <p>1. <strong>构成结构比及变动分析</strong>：分析货币资金（库存现金/银行存款/其他货币资金）及其他货币资金各明细项目的结构比（各项目÷货币资金合计）及本期、上期变动情况。</p>
+        <p>2. <strong>比例分析</strong>：计算并关注①银行存款÷资产总额、②定期存款÷银行存款、③受限货币资金÷货币资金 等比例；若定期存款占比偏高，须了解其商业理由并取得支持文件。</p>
+        <p>3. <strong>"存贷双高"异常识别</strong>：计算货币资金÷贷款总额、定期存款÷贷款总额 等比例；当货币资金余额持续较高、同时负债（借款）比例亦偏高（"存贷双高"）时，应向管理层询问商业理由并评估合理性，警惕资金占用、受限未披露及舞弊风险。</p>
+        <p>4. <strong>取数与计算</strong>：期末金额取自 E1-1 审定表（跨sheet自动取数）；灰色底纹列（期末金额/结构比/变动额）为自动计算不可手工录入；期初金额可手工录入；变动率 = 变动额 ÷ 期初金额，绝对值超过30%时红色高亮，须在"变动原因"列分析说明。</p>
       </div>
     </details>
 
@@ -83,7 +141,7 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：通过分析性程序评价货币资金各项目变动的合理性，识别异常波动，为进一步实质性程序提供方向。"
+      title="审计目标：通过分析性程序评价货币资金构成、结构比及变动的合理性，计算银行存款/定期存款相关比例，识别'存贷双高'等异常波动，为进一步实质性程序提供方向。"
       class="objective-alert"
     />
 
@@ -112,13 +170,19 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
             </template>
           </el-table-column>
 
-          <el-table-column label="期末金额" width="150" align="right" class-name="auto-calc-col">
+          <el-table-column label="本期金额" width="140" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
             </template>
           </el-table-column>
 
-          <el-table-column label="期初金额" width="150" align="right">
+          <el-table-column label="结构比" width="100" align="center" class-name="auto-calc-col">
+            <template #default="{ row }">
+              <span class="computed-cell">{{ structureRatio(row) }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="上期金额" width="140" align="right">
             <template #default="{ row }">
               <el-input-number
                 :model-value="row.openingAmount"
@@ -167,6 +231,50 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 存贷双高预警 -->
+        <el-alert
+          v-if="showDualHighWarning"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="dual-high-alert"
+          title="存贷双高关注提示"
+        >
+          <template #default>
+            期末银行存款占货币资金合计比重达 {{ (bankRatio * 100).toFixed(2) }}%，货币资金余额较高。请结合借款（短期借款/长期借款）余额核查是否存在"存贷双高"异常：计算货币资金÷贷款总额、定期存款÷贷款总额，若同时存在高额存款与高额借款，须向管理层询问定期存款/大额资金的商业理由，评估其合理性，并关注资金是否受限、是否存在资金占用或舞弊风险。
+          </template>
+        </el-alert>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：说明货币资金构成、结构比及变动分析结果，银行存款/定期存款相关比例，以及'存贷双高'等异常情况的了解与评估..."
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：分析程序执行结果是否支持货币资金余额及变动的合理性，是否发现需进一步实施实质性程序的异常..."
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -257,5 +365,18 @@ function getRowClass({ row }: { row: AnalysisRow }): string {
 }
 :deep(.e1-analysis-red-row td) {
   color: #f56c6c;
+}
+.dual-high-alert {
+  margin-top: 16px;
+  line-height: 1.6;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

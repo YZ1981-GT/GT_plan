@@ -1,4 +1,5 @@
 <template>
+  <!-- 审计目标(objective-alert)/编制提示(guidance-details)/审计说明(-audit-note)/审计结论(-audit-conclusion) 均由 G9TabDisclosureBase 按 variant=soe 统一渲染 -->
   <G9TabDisclosureBase variant="soe" v-bind="$props" />
 </template>
 

@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-decrease-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：对本期在建工程减少（报废/毁损/转出等）抽样检查，核实减少的真实性与损失计量准确性，验证审批文件、残值与保险理赔的完整性。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-9" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 区域1: 抽样参数 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -43,9 +55,6 @@
         <div class="section-header">
           <span>本期减少检查明细（H2-9）</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-9')">💬</el-button>
           </div>
         </div>
@@ -164,6 +173,26 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述抽样与逐项检查（减少原因/审批/损失计量/保险理赔）情况及发现的异常。" :disabled="isReadonly"
+        @blur="state.saveNote(state.auditNote.value)" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如所抽减少真实、损失计量准确、审批齐全，未见异常；或说明需调整事项（→ H2-3 调整分录）。" :disabled="isReadonly"
+        @blur="state.saveConclusion(state.auditConclusion.value)" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -199,6 +228,7 @@ import { ref, inject, toRef, computed } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2DecreaseCheck } from '../../composables/useH2DecreaseCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -208,6 +238,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const showSamplingDialog = ref(false)
 
 const state = useH2DecreaseCheck({
@@ -215,6 +246,7 @@ const state = useH2DecreaseCheck({
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
 const isReadonly = computed(() => props.isReadonly)
@@ -262,9 +294,6 @@ function handleRemove(rowId: string) {
   state.removeRow(rowId)
 }
 
-function handleAiGenerate() {
-  console.log('AI generate H2-9')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -278,6 +307,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-decrease-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }

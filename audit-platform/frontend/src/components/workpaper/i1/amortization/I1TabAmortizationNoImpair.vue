@@ -5,6 +5,23 @@
       <p><b>CAS6剩余年限法（不含减值）：</b>月摊销 = (原值 - 残值 - 累计摊销) ÷ 剩余月数。逐资产逐月计算1~28月摊销额横向矩阵，与账面核对差异。适用于不存在减值情况的无形资产。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产本期摊销额（剩余年限法，不含减值）计算的准确性，验证摊销基数、剩余月数与账面一致，为费用列报及审定表提供依据。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-10" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ currentRows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
@@ -12,9 +29,6 @@
           <div class="title-actions">
             <el-button size="small" type="primary" :disabled="isReadonly" @click="handleSyncFromDetail">
               同步I1-2参数
-            </el-button>
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI
             </el-button>
             <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
           </div>
@@ -138,14 +152,27 @@
 
     <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>摊销测算审计说明</span></template>
+      <template #header><span>审计说明</span></template>
       <el-input
         v-model="auditNote"
         type="textarea"
+        :autosize="{ minRows: 5, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：摊销测算方法、剩余月数与账面核对情况、差异原因分析等。"
+        @blur="handleSaveNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="note-card">
+      <template #header><span>审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="说明摊销测算差异原因及审计结论..."
-        @blur="handleSaveNote"
+        placeholder="填写审计结论：本期摊销测算（剩余年限法，不含减值）准确，与账面核对一致，未见异常等。"
+        @blur="handleSaveConclusion"
       />
     </el-card>
 
@@ -166,8 +193,8 @@
 <script setup lang="ts">
 import { ref, computed, toRef, inject, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useI1Amortization, type I1AmortizationRow, type I1AssetParams } from '../../composables/useI1Amortization'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -203,12 +230,17 @@ const {
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const auditNote = ref('')
+const auditConclusion = ref('')
 
-// Load note from allResponses
+// Load note / conclusion from allResponses
 watch(() => props.allResponses, (responses) => {
   const item = responses.get('I1-10-note')
   if (item) {
     auditNote.value = (item as any).remark ?? (item as any).conclusion ?? ''
+  }
+  const conc = responses.get('I1-10-conclusion')
+  if (conc) {
+    auditConclusion.value = (conc as any).remark ?? (conc as any).conclusion ?? ''
   }
 }, { immediate: true })
 
@@ -267,16 +299,16 @@ async function handleSyncFromDetail() {
   }
 }
 
-function handleAiGenerate() {
-  console.log('AI generate: I1-10 amortization summary')
-}
-
 function handleReview() {
   openReviewDialog('I1-10')
 }
 
 function handleSaveNote() {
   emit('save', 'I1-10-note', auditNote.value)
+}
+
+function handleSaveConclusion() {
+  emit('save', 'I1-10-conclusion', auditConclusion.value)
 }
 
 // ─── Summary method for el-table ─────────────────────────────────────────────
@@ -356,6 +388,20 @@ function fmtAmt(val: number | null | undefined): string {
   font-size: 12px;
   line-height: 1.6;
 }
+
+.objective-alert { margin-bottom: 12px; }
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .section-title {
   display: flex;

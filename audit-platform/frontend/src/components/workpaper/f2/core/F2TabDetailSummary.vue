@@ -143,11 +143,37 @@
         </el-table-column>
       </el-table>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述存货各类别明细汇总的复核情况、数量单价金额勾稽关系及库龄划分核查结果。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
+import { ref, toRef, onMounted } from 'vue'
 import { useF2DetailSummary } from '../../composables/useF2DetailSummary'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { F2SummaryRow } from '../../composables/useF2DetailSummary'
@@ -157,9 +183,41 @@ import F2ReviewChip from '../shared/F2ReviewChip.vue'
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   projectId?: string
+  isReadonly?: boolean
 }>()
 
 const summary = useF2DetailSummary(toRef(props, 'allResponses'))
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const NOTE_KEY = 'F2-detail-summary-audit-note'
+const CONCLUSION_KEY = 'F2-detail-summary-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
+}
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  persistAudit(NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  persistAudit(CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 function fmtAmt(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -210,4 +268,6 @@ function rowClassName({ row }: { row: F2SummaryRow }): string {
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 :deep(.warn-row) { background: #fdf6ec; }
 :deep(.total-row) { background: #f5f7fa; font-weight: 600; }
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

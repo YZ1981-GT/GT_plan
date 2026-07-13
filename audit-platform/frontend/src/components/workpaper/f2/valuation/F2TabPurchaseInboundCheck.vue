@@ -7,6 +7,35 @@
       </span>
     </header>
 
+    <!-- 编制提示 -->
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 抽取样本核查采购入库业务，逐笔核对供应商、单号、品名、金额与入库凭证（CAS 1 号存货）。</p>
+        <p>2. 覆盖率＝已查金额 ÷ 账面总额，覆盖率偏低（＜50%）自动橙色提示，应扩大样本或说明抽样理由。</p>
+        <p>3. 关注采购入库是否与验收单、发票三单匹配，是否存在暂估入库跨期、价格异常或未入账采购。</p>
+        <p>4. 可用抽凭引擎按存货科目抽取入库凭证，📎附件 OCR 可自动识别单据信息辅助核对。</p>
+      </div>
+    </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="审计目标：验证采购入库业务的真实性、完整性与计价准确性，确认入库记录与供应商发票、验收单勾稽一致，防止存货成本错报或跨期。"
+    />
+
+    <!-- 工具栏（索引联动 + 计数） -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
+        <el-tag size="small" type="info">共 {{ ic.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <div class="meta-bar">
       <span>{{ ic.partyLabel }}检查</span>
       <span>账面总额
@@ -110,21 +139,35 @@
       </el-table-column>
     </el-table>
 
-    <footer class="footer">
-      <h4>检查结论</h4>
-      <el-input v-model="ic.auditNote.value" type="textarea" :rows="2" :disabled="isReadonly" />
-    </footer>
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input v-model="ic.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计说明：概述采购入库核查程序、样本覆盖率、三单匹配与截止核对情况及核对结果，以及异常事项处理。" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, type Ref } from 'vue'
+import { ref, onMounted, toRef, type Ref } from 'vue'
 import { useF2PurchaseInboundCheck } from '../../composables/useF2InspectionCheck'
 import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
 import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import type { SampledVoucher, FillMode, SamplingMethod } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 const props = defineProps<{
@@ -138,6 +181,21 @@ const props = defineProps<{
 const ic = useF2PurchaseInboundCheck({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计结论（独立持久化，F2 计价组事件；检查说明沿用 composable auditNote） ──
+const CONCLUSION_KEY = 'F2-33-audit-conclusion'
+const auditConclusion = ref('')
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
+}
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 const { ocrLoadingId, uploadAndMerge } = useF2PurchaseOcr(

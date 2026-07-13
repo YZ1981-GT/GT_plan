@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabAdjustment — F3-3 调整分录 | Task 6 (比照 D4TabAdjustment) */
-import { toRef, inject, type Ref } from 'vue'
+import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Adjustment } from '../composables/useF3Adjustment'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -25,6 +25,23 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+// ─── 审计说明 / 审计结论（F3 约定：写入 allResponses + f3:save-items 事件持久化） ───
+const NOTE_KEY = 'F3-3-note'
+const CONCLUSION_KEY = 'F3-3-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(key: string, val: string): void {
+  const item = { item_id: key, conclusion: null, remark: val }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+function saveAuditNote(val: string): void { if (props.isReadonly) return; auditNote.value = val; persistAudit(NOTE_KEY, val) }
+function saveAuditConclusion(val: string): void { if (props.isReadonly) return; auditConclusion.value = val; persistAudit(CONCLUSION_KEY, val) }
+
+watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
+watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof v === 'string') auditConclusion.value = v }, { immediate: true })
 </script>
 
 <template>
@@ -39,6 +56,14 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
         <p>4. 确认后的调整分录同步更新 F3-1 审定表的账项调整/重分类列，并可推送至 A13 错报汇总。</p>
       </div>
     </details>
+
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：应付票据（2201）相关审计调整分录借贷平衡、账项调整与重分类划分恰当，同步更新审定表及错报汇总。"
+      class="objective-alert"
+    />
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -105,6 +130,32 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
       借方合计 {{ fmt(debitTotal) }} | 贷方合计 {{ fmt(creditTotal) }} | 差额 {{ fmt(balanceDiff) }}
       <span v-if="!isBalanced"> — 借贷不平衡</span>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：调整分录的依据、账项调整/重分类事项及其对科目余额与报表列报的影响。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：调整分录是否已全部入账、借贷是否平衡、是否存在未调整事项及其影响。"
+        @change="(v: string) => saveAuditConclusion(v)"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -176,4 +227,16 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
   font-weight: 600;
 }
 .balance-bar.unbalanced { color: #f56c6c; }
+.objective-alert {
+  margin-bottom: 12px;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+}
 </style>

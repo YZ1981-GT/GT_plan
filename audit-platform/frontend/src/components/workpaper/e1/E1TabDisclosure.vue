@@ -62,6 +62,7 @@ interface DisclosureRow {
   openingAmount: number
 }
 
+// 上市公司披露项目（对照源模板"附注披露信息(上市公司)"）
 const LISTED_ITEMS = [
   { key: 'cash', label: '库存现金', crossKey: 'E1-adj-total-1001' },
   { key: 'bank', label: '银行存款', crossKey: 'E1-adj-total-1002' },
@@ -72,6 +73,28 @@ const LISTED_ITEMS = [
   { key: 'total', label: '合计', crossKey: '' },
   { key: 'overseas', label: '其中：存放境外', crossKey: '' },
 ]
+
+// 国企披露项目（对照源模板"附注披露信息(国企)"：现金/银行存款/其他货币资金/数字货币/合计）
+const SOE_ITEMS = [
+  { key: 'cash', label: '现金', crossKey: 'E1-adj-total-1001' },
+  { key: 'bank', label: '银行存款', crossKey: 'E1-adj-total-1002' },
+  { key: 'other_mf', label: '其他货币资金', crossKey: 'E1-adj-total-1012' },
+  { key: 'digital', label: '数字货币', crossKey: '' },
+  { key: 'total', label: '合计', crossKey: '' },
+]
+
+const disclosureItems = computed(() => (variant.value === 'soe' ? SOE_ITEMS : LISTED_ITEMS))
+
+// 列标签（上市：期末数/期初数；国企：期末余额/年初余额）
+const endingLabel = computed(() => (variant.value === 'soe' ? '期末余额' : '期末数'))
+const openingLabel = computed(() => (variant.value === 'soe' ? '年初余额' : '期初数'))
+
+// 审计目标（按版本）
+const objective = computed(() =>
+  variant.value === 'soe'
+    ? '审计目标：确认货币资金附注披露（含受限资金）完整、准确，与审定表及报表勾稽一致。'
+    : '审计目标：确认货币资金附注披露完整、准确，境外及受限款项披露充分，与审定表及报表勾稽一致。',
+)
 
 // ─── Cross-Sheet + Opening Data ──────────────────────────────────────────────
 
@@ -87,7 +110,8 @@ function loadOpenings(): void {
 loadOpenings()
 
 const disclosureRows = computed<DisclosureRow[]>(() => {
-  return LISTED_ITEMS.map(item => {
+  const items = disclosureItems.value
+  return items.map(item => {
     let endingAmount = 0
     if (item.crossKey) {
       const resp = props.allResponses.get(item.crossKey)
@@ -95,7 +119,7 @@ const disclosureRows = computed<DisclosureRow[]>(() => {
     }
     // Total row: sum of above items (excluding overseas)
     if (item.key === 'total') {
-      endingAmount = LISTED_ITEMS
+      endingAmount = items
         .filter(i => !['total', 'overseas'].includes(i.key))
         .reduce((sum, i) => {
           if (!i.crossKey) return sum
@@ -141,7 +165,20 @@ function loadRestricted(): void {
       }
     } catch {}
   }
-  restrictedRows.value = [{ id: `restr-${Date.now()}`, item: '', amount: 0, reason: '' }]
+  // 无持久化数据时，按源模板"受限制的货币资金明细"预置标准项目行
+  const defaults = [
+    '银行承兑汇票保证金',
+    '信用证保证金',
+    '履约保证金',
+    '用于担保的定期存款或通知存款',
+    '存放境外且资金汇回受到限制的款项',
+  ]
+  restrictedRows.value = defaults.map((item, i) => ({
+    id: `restr-${Date.now()}-${i}`,
+    item,
+    amount: 0,
+    reason: '',
+  }))
 }
 if (variant.value === 'soe') loadRestricted()
 
@@ -155,6 +192,25 @@ function loadNote(): void {
   noteText.value = resp?.remark || ''
 }
 loadNote()
+
+// ─── 审计说明 / 审计结论（按版本分别存储） ────────────────────────────────────
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function loadAuditText(): void {
+  auditNote.value = props.allResponses.get(`${storagePrefix.value}-audit-note`)?.remark || ''
+  auditConclusion.value = props.allResponses.get(`${storagePrefix.value}-audit-conclusion`)?.remark || ''
+}
+loadAuditText()
+
+// 版本切换时重新载入全部数据（sheetName 变更场景）
+watch(variant, () => {
+  loadOpenings()
+  loadNote()
+  loadAuditText()
+  if (variant.value === 'soe') loadRestricted()
+})
 
 // ─── Debounce Save ───────────────────────────────────────────────────────────
 
@@ -178,6 +234,16 @@ function persistAll(): void {
   items.push({ item_id: noteKey, conclusion: null, remark: noteText.value })
   props.allResponses.set(noteKey, items[items.length - 1])
 
+  // 审计说明
+  const auditNoteKey = `${storagePrefix.value}-audit-note`
+  items.push({ item_id: auditNoteKey, conclusion: null, remark: auditNote.value })
+  props.allResponses.set(auditNoteKey, items[items.length - 1])
+
+  // 审计结论
+  const auditConcKey = `${storagePrefix.value}-audit-conclusion`
+  items.push({ item_id: auditConcKey, conclusion: null, remark: auditConclusion.value })
+  props.allResponses.set(auditConcKey, items[items.length - 1])
+
   // SOE restricted
   if (variant.value === 'soe') {
     const rKey = `${storagePrefix.value}-restricted`
@@ -200,6 +266,18 @@ function updateOpening(key: string, val: number): void {
 function updateNote(val: string): void {
   if (props.isReadonly) return
   noteText.value = val
+  scheduleSave()
+}
+
+function updateAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  scheduleSave()
+}
+
+function updateAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
   scheduleSave()
 }
 
@@ -245,6 +323,14 @@ onBeforeUnmount(() => {
       </div>
     </details>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      :title="objective"
+      class="objective-alert"
+    />
+
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
@@ -272,12 +358,12 @@ onBeforeUnmount(() => {
             <span :class="{ 'font-bold': row.key === 'total' }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末数" width="180" align="right" class-name="auto-calc-col">
+        <el-table-column :label="endingLabel" width="180" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
             <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初数" width="180" align="right">
+        <el-table-column :label="openingLabel" width="180" align="right">
           <template #default="{ row }">
             <el-input-number
               :model-value="row.openingAmount"
@@ -342,6 +428,36 @@ onBeforeUnmount(() => {
           @change="updateNote"
         />
       </el-card>
+
+      <!-- 审计说明 -->
+      <el-card shadow="never" class="audit-note-card">
+        <template #header>
+          <div class="card-header"><span>审计说明</span></div>
+        </template>
+        <el-input
+          type="textarea"
+          :model-value="auditNote"
+          :disabled="isReadonly"
+          :autosize="{ minRows: 5 }"
+          placeholder="填写审计说明：（1）各项目期末数与 E1-1 审定表审定数勾稽核对情况；（2）期初数与上期审定报表核对情况；（3）受限/质押/冻结及存放境外款项的核查与列报依据；（4）外币折算率及汇率中间价来源。"
+          @change="(val: string) => updateAuditNote(val)"
+        />
+      </el-card>
+
+      <!-- 审计结论 -->
+      <el-card shadow="never" class="audit-note-card">
+        <template #header>
+          <div class="card-header"><span>审计结论</span></div>
+        </template>
+        <el-input
+          type="textarea"
+          :model-value="auditConclusion"
+          :disabled="isReadonly"
+          :autosize="{ minRows: 3 }"
+          placeholder="填写审计结论：A、货币资金附注披露完整、准确，与审定表及报表勾稽一致，受限及境外款项披露充分。B、除下列事项外披露恰当。C、披露存在不完整/不准确，已提请管理层更正。"
+          @change="(val: string) => updateAuditConclusion(val)"
+        />
+      </el-card>
     </template>
   </div>
 </template>
@@ -377,6 +493,9 @@ onBeforeUnmount(() => {
 }
 .guidance-content p {
   margin: 2px 0;
+}
+.objective-alert {
+  margin-bottom: 12px;
 }
 .tab-toolbar {
   display: flex;
@@ -442,5 +561,15 @@ onBeforeUnmount(() => {
 .opinion-chips {
   display: flex;
   gap: 6px;
+}
+.audit-note-card {
+  margin-top: 16px;
+  max-width: 700px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

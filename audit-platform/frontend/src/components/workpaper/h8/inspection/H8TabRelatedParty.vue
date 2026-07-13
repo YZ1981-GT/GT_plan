@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-related-party">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：识别关联方租赁并评估租赁定价的公允性，确认关联租金与市场租金差异的合理性及关联交易披露的完整性。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>H8-14关联交易检查：识别关联方租赁并评估公允性。价差率=(关联租金-市场租金)/市场租金×100%。价差率>10%需重点关注定价合理性。</p>
@@ -109,6 +113,20 @@
       </el-table>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -194,6 +212,30 @@ function load() {
 load()
 watch(() => props.allResponses, () => load())
 
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-related-party-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-related-party-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
+
 function addRow(contractNo: string) {
   if (!contractNo?.trim()) return
   rows.value.push(_normalizeRow({ contractNo: contractNo.trim() }))
@@ -247,6 +289,10 @@ function getRowClassName({ row }: { row: RelatedPartyRow }) {
 
 <style scoped>
 .h8-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

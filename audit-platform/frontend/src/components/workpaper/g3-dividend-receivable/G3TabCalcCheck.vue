@@ -15,7 +15,7 @@
   <div class="g3-calc-check">
     <div class="section-head">
       <h3 class="sheet-title">G3-4 测算及检查表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <el-button size="small" :disabled="isReadonly" @click="calcCheck.addRow()">＋ 新增</el-button>
         <el-button size="small" type="success" :disabled="isReadonly" @click="openSamplingEngine">使用抽凭引擎</el-button>
         <el-dropdown trigger="click" size="small">
@@ -159,6 +159,19 @@
       <span class="total-item">凭证金额：{{ fmtNum(calcCheck.totals.value.amount) }}</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：概述股利测算与凭证检查程序执行情况、测算差异及抽凭核对结果、拟调整及未调整事项及其影响。"
+        @change="persistNote"
+      />
+    </el-card>
+
     <!-- 审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
@@ -260,6 +273,14 @@ function persistConclusion() {
   if (!props.isReadonly) {
     props.debouncedSave(CONCLUSION_KEY, { conclusion: auditConclusion.value })
   }
+}
+
+// ─── 审计说明（conclusion=null，文本存 remark，走白名单豁免路径） ───
+const NOTE_KEY = 'G3-4-calccheck-audit-note'
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+function persistNote() {
+  if (props.isReadonly) return
+  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: auditNote.value })
 }
 
 // ─── 当前区段可见列（排除seq和investeeName，已作固定列） ───
@@ -497,5 +518,16 @@ function handleImportData() {
   margin-top: 6px;
   color: #909399;
   font-size: 12px;
+}
+
+/* 审计说明卡片 */
+.audit-note-card {
+  margin-top: 12px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

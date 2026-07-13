@@ -95,6 +95,17 @@
 
 <script setup lang="ts">
 /**
+ * ⚠️ 死代码标注（fghi-sheet-content-completion Task 13.2，2026-07-13）：
+ *   htmlRendererRegistry.ts 将 componentType `g6-other-bond-investment-ecl`
+ *   映射到 `GtG6OtherBondEcl.vue`（根目录同名简版：仅 GtGridSheet + OO 兜底），
+ *   而非本文件。本文件（真正 v-if 分发 5 个子组件 StageClassification/
+ *   ImpairmentCalc/EclMeasurement/ReversalWriteOff/VoucherCheck 的调度器）
+ *   未在任何 registry / wp_code_overrides 中被引用 → 当前为孤立/死代码。
+ *   与 main/sppi 组（短名 GtG6OtherBondMain/GtG6OtherBondSppi 即调度器且已注册）
+ *   命名约定相反：ECL 的短名文件是简版桩、长名文件是调度器。
+ *   注意：本 spec 打磨的 5 个 ECL 子组件仅经本（未注册）调度器可达。
+ *   按任务要求仅标注不删除、不改注册表（重接属独立决策，需人工确认）。
+ *
  * GtG6OtherBondInvestmentEcl.vue — G6 其他债权投资底稿(ECL组)主入口
  *
  * Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 3.1

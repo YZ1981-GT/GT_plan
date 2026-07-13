@@ -5,13 +5,20 @@
       <p>H4-4增加检查：对本期新增工程物资逐项检查，核验入库单/发票/合同三方一致性。差异列自动计算（=金额-发票金额），差异>0时红色高亮。支持行级抽凭验证和附件OCR识别。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核验本期新增工程物资的真实性与计价准确，通过入库单/发票/合同三方核对确认增加发生额的存在与准确。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <span class="chip-wrap"><GtIndexChip value="wp:H4-4" :context-project-id="props.projectId" /></span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    </div>
+
     <!-- Section Title -->
     <div class="section-header">
       <span>增加检查表 H4-4</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H4-4-addition')">💬</el-button>
       </div>
     </div>
@@ -182,9 +189,6 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H4-4-note')">💬</el-button>
           </div>
         </div>
@@ -192,6 +196,21 @@
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="请填写审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H4-4-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -221,11 +240,12 @@
  * Task: 4.5
  * Requirements: 5.1-5.7
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH4AdditionCheck, type H4AdditionCheckRow } from '../../composables/useH4AdditionCheck'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -257,11 +277,22 @@ const importExport = useH4ImportExport({
   projectId: toRef(props, 'projectId'),
 })
 
-// ─── Audit Note ──────────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion（inject saveResponse 落库 + onMounted 恢复） ──────
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const auditNote = ref('')
+const auditConclusion = ref('')
 function saveAuditNote() {
   props.allResponses.set('H4-4-note', { item_id: 'H4-4-note', remark: auditNote.value, conclusion: null })
+  saveResponse('H4-4-note', auditNote.value)
 }
+function saveAuditConclusion() {
+  props.allResponses.set('H4-4-conclusion', { item_id: 'H4-4-conclusion', remark: auditConclusion.value, conclusion: null })
+  saveResponse('H4-4-conclusion', auditConclusion.value)
+}
+onMounted(() => {
+  const n = props.allResponses.get('H4-4-note'); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get('H4-4-conclusion'); if (c?.remark) auditConclusion.value = c.remark
+})
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
@@ -311,9 +342,6 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAiGenerate() {
-  console.log('[H4-4] AI generate')
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -332,6 +360,10 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h4-tab-addition-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

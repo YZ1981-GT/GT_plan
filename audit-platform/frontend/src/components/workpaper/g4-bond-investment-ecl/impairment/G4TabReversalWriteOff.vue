@@ -23,6 +23,13 @@
       title="审计目标：确认债权投资减值准备转回（收回）与核销的依据充分、程序合规，转回不超过累计计提，关注核销中的关联交易。"
       style="margin-bottom: 12px"
     />
+    <!-- 工具栏索引 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-12" :context-project-id="projectId" /></span>
+      </div>
+    </div>
     <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G4-12 减值准备转回（收回）、核销检查表</h3>
@@ -275,6 +282,19 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="note-card" shadow="never">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：程序执行情况、测试结果、拟调整/未调整事项及其影响、审计范围受限情况等。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -322,6 +342,7 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG4EclReversalWriteOff } from '../../composables/useG4EclReversalWriteOff'
+import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -335,6 +356,19 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 
 const rw = useG4EclReversalWriteOff()
 const conclusion = ref('')
+
+// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
+const formData = useG4EclFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const NOTE_KEY = 'G4-12-reversal-writeoff-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { remark: val })
+}
 
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
 
@@ -456,7 +490,7 @@ function fmtNum(v: unknown): string {
 
 // ─── 数据加载 ───────────────────────────────────────────────────────────────
 
-onMounted(() => {
+onMounted(async () => {
   if (props.htmlData?.reversalWriteOff) {
     const data = props.htmlData.reversalWriteOff
     rw.loadData({
@@ -465,6 +499,9 @@ onMounted(() => {
     })
     if (data.conclusion) conclusion.value = data.conclusion
   }
+  await formData.loadAll()
+  const note = formData.allResponses.value.get(NOTE_KEY)
+  if (note?.remark) auditNote.value = note.remark
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -500,6 +537,30 @@ defineExpose({
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+/* 工具栏索引 */
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明卡片 */
+.note-card {
+  margin-top: 16px;
+}
+.note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* 表格 */

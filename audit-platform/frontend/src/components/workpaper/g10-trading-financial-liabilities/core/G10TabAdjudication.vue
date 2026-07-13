@@ -8,6 +8,17 @@
       </div>
     </div>
 
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核实交易性金融负债（2101）期末余额的完整、准确与列报正确，验证审定数与试算平衡表、G10-2 明细表勾稽一致，为报表提供审定依据。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-1" /></span>
+        <el-tag size="small" type="info">共 {{ adj.dataRows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -163,6 +174,13 @@
       <el-input v-if="!isReadonly" v-model="noteProxy" type="textarea" :rows="3" placeholder="审定分析说明" />
       <p v-else class="note-text">{{ adj.auditNote.value || '—' }}</p>
     </el-card>
+
+    <el-card shadow="never" class="g10-note-card">
+      <template #header>审计结论</template>
+      <el-input v-if="!isReadonly" v-model="conclusionProxy" type="textarea" :rows="3"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" />
+      <p v-else class="note-text">{{ adj.auditConclusion.value || '—' }}</p>
+    </el-card>
   </div>
 </template>
 
@@ -200,6 +218,11 @@ const noteProxy = computed({
   set: (v: string) => adj.updateAuditNote(v),
 })
 
+const conclusionProxy = computed({
+  get: () => adj.auditConclusion.value,
+  set: (v: string) => adj.updateAuditConclusion(v),
+})
+
 function fmt(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -221,6 +244,10 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
 .g10-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .g10-title { margin: 0; font-size: 15px; }
 .g10-actions { display: flex; gap: 8px; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .guidance-details { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .group-block { margin-bottom: 8px; }
 .group-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #f5f7fa; cursor: pointer; border-radius: 4px; }

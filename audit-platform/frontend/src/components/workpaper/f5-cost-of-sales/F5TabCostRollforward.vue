@@ -95,6 +95,18 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">审计说明</span>
+        </div>
+      </template>
+      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="成本倒轧审计说明（材料流转、成本构成、成本结转链条验证情况，与 F5-1 审定营业成本差异分析等）..."
+        @change="saveNote" />
+    </el-card>
+
     <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
@@ -105,7 +117,7 @@
           </div>
         </div>
       </template>
-      <el-input v-model="roll.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+      <el-input v-model="roll.auditConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }"
         :disabled="isReadonly" placeholder="成本倒轧审计结论..." @change="saveConclusion" />
     </el-card>
 
@@ -127,7 +139,7 @@
  * F5TabCostRollforward.vue — F5-7 成本倒轧表（4区结构化验证）
  * 蓝色引导区 + 4区el-card(公式行虚线+tooltip) + TB取数只读/可编辑高亮 + 校验区(绿/红) + 审计结论(AI) + 编制提示折叠
  */
-import { computed, inject, toRef, watch, h, type Ref, type VNode } from 'vue'
+import { ref, computed, inject, toRef, watch, h, type Ref, type VNode } from 'vue'
 import { ElInput } from 'element-plus'
 import { useF5CostRollforward } from '../composables/useF5CostRollforward'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -148,7 +160,17 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const CONCLUSION_KEY = 'F5-7-conclusion'
+const NOTE_KEY = 'F5-7-audit-note'
 const ROLL_KEY = 'F5-7-cost-rollforward'
+
+const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
+
+function saveNote() {
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
+  window.dispatchEvent(new CustomEvent('f5:save-items', {
+    detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] },
+  }))
+}
 
 const roll = useF5CostRollforward({
   allResponses: allResponsesRef,

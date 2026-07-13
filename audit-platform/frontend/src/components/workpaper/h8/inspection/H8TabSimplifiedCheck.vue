@@ -1,5 +1,9 @@
 <template>
   <div class="h8-tab-simplified-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert"
+      title="审计目标：核实短期租赁(≤12月)及低价值资产租赁(≤4万)简化处理的适用性，确认不符合简化条件的租赁已确认使用权资产与租赁负债（CAS21第32条）。" />
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p>CAS21第32条简化处理：短期租赁(≤12月)或低价值资产租赁(≤4万)可选择不确认使用权资产和租赁负债，直接计入当期费用。不符合条件的应确认使用权资产。</p>
@@ -143,6 +147,20 @@
       </template>
     </el-alert>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
+        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
+        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -163,7 +181,7 @@
  * 99行18列12公式，自动判断短期/低价值，不合规红色高亮，底部统计
  * Spec: Task 4.9 | Requirements: 8.1-8.4
  */
-import { toRef } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH8SimplifiedCheck } from '../../composables/useH8SimplifiedCheck'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -190,6 +208,30 @@ const {
   allResponses: toRef(props, 'allResponses'),
   onSave: (itemId, value) => emit('save', itemId, value),
 })
+
+// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
+const AUDIT_NOTE_KEY = 'H8-simplified-audit-note'
+const AUDIT_CONCLUSION_KEY = 'H8-simplified-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function _hydrateAudit() {
+  const n = props.allResponses.get(AUDIT_NOTE_KEY)
+  if (n?.remark != null) auditNote.value = n.remark
+  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+  if (c?.remark != null) auditConclusion.value = c.remark
+}
+_hydrateAudit()
+watch(() => props.allResponses, _hydrateAudit)
+function saveAuditNote(val: string) {
+  if (props.isReadonly) return
+  auditNote.value = val
+  emit('save', AUDIT_NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', AUDIT_CONCLUSION_KEY, val)
+}
 
 function fmtAmt(v: number): string {
   if (v === 0) return '-'
@@ -219,6 +261,10 @@ function getSummary({ columns }: { columns: any[] }) {
 
 <style scoped>
 .h8-tab-simplified-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+.objective-alert { margin-bottom: 12px; }
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

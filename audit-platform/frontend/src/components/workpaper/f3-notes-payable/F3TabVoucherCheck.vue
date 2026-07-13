@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabVoucherCheck — F3-7 借方/贷方检查 | Task 6.5, 9.3, 14.5 */
-import { computed, toRef, inject, type Ref } from 'vue'
+import { ref, computed, watch, toRef, inject, type Ref } from 'vue'
 import { useF3VoucherCheck } from '../composables/useF3VoucherCheck'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
@@ -57,6 +57,20 @@ async function generateAiConclusion(side: 'credit' | 'debit') {
 const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
 const currentPhase = computed<Phase>(() => 'final')
 
+const totalRowCount = computed(() => creditRows.value.length + debitRows.value.length)
+
+// ─── 审计说明（无匹配 AI section → 纯 textarea；F3 约定持久化） ───
+const NOTE_KEY = 'F3-7-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+}
+watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
   applySamplingResults(payload.samples, payload.fillMode)
 }
@@ -87,6 +101,15 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
       class="objective-alert"
     />
 
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F3-2" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ totalRowCount }} 行</el-tag>
+      </div>
+    </div>
+
     <el-collapse class="sampling-engine-collapse">
       <el-collapse-item title="自动抽凭（科目 2201 应付票据）" name="auto-sampling">
         <GtVoucherSamplingEngine
@@ -115,6 +138,8 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
       side="credit"
       :rows="creditRows"
       :is-readonly="isReadonly"
+      :project-id="projectId"
+      :all-responses="allResponses"
       @update-cell="(id, f, v) => onUpdateCell('credit', id, f, v)"
       @remove-row="(id) => removeRow('credit', id)"
     />
@@ -138,6 +163,8 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
       side="debit"
       :rows="debitRows"
       :is-readonly="isReadonly"
+      :project-id="projectId"
+      :all-responses="allResponses"
       @update-cell="(id, f, v) => onUpdateCell('debit', id, f, v)"
       @remove-row="(id) => removeRow('debit', id)"
     />
@@ -146,6 +173,21 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
       <el-tag v-if="debitAbnormal > 0" type="danger" size="small">异常 {{ debitAbnormal }} 笔</el-tag>
       <el-tag v-else type="success" size="small">无异常</el-tag>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写审计说明：抽凭范围与方法、借贷双向凭证核对情况、异常凭证及追加程序。"
+        @change="(v: string) => saveAuditNote(v)"
+      />
+    </el-card>
 
     <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">
@@ -202,6 +244,13 @@ function onUpdateCell(side: 'credit' | 'debit', rowId: string, field: string, va
 .sampling-engine-collapse {
   margin-bottom: 12px;
 }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-title {
   margin: 12px 0 8px;
   font-size: 14px;

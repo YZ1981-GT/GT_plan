@@ -18,10 +18,16 @@
     <div class="section-header">
       <span>固定资产清理明细表 H6-2</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H6-2-detail')">💬</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：底稿索引 + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H6-2" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -259,16 +265,28 @@
         <div class="section-header">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-2-note')">💬</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
         placeholder="请填写审计说明..." :disabled="props.isReadonly"
         @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H6-2-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="请填写审计结论..." :disabled="props.isReadonly"
+        @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -310,7 +328,6 @@
  */
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useH6Detail, type H6DetailTab } from '../../composables/useH6Detail'
 import { useH6ImportExport } from '../../composables/useH6ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -350,9 +367,11 @@ const registerDetailCreateFn = inject<(fn: (payload: any) => void) => void>('reg
 onMounted(() => {
   // 注册创建函数到主入口，供EventBus subscription使用
   registerDetailCreateFn(createFromH1Disposal)
-  // 加载审计说明
+  // 加载审计说明/结论
   const noteItem = props.allResponses.get('H6-2-note')
   if (noteItem?.remark) auditNote.value = noteItem.remark
+  const concItem = props.allResponses.get('H6-2-conclusion')
+  if (concItem?.remark) auditConclusion.value = concItem.remark
 })
 
 const importExport = useH6ImportExport({
@@ -374,10 +393,14 @@ const hasTransferWarning = computed(() => {
   return rows.value.some(r => r.status === '已结转' && r.gainLoss !== 0)
 })
 
-// ─── Audit Note ──────────────────────────────────────────────────────────────
+// ─── Audit Note / Conclusion ─────────────────────────────────────────────────
 const auditNote = ref('')
 function saveAuditNote() {
   saveResponse('H6-2-note', auditNote.value)
+}
+const auditConclusion = ref('')
+function saveAuditConclusion() {
+  saveResponse('H6-2-conclusion', auditConclusion.value)
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
@@ -418,10 +441,6 @@ function handleImportExport(command: string) {
     }
     input.click()
   }
-}
-
-function handleAiGenerate() {
-  console.log('[H6-2] AI generate')
 }
 
 function openReview(id: string) {
@@ -506,6 +525,13 @@ function fmtAmt(val: number | null | undefined): string {
 .section-header-actions { display: flex; gap: 4px; align-items: center; }
 
 .status-summary { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+
+.tab-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 10px;
+}
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 .segment-bar { margin-bottom: 12px; }
 

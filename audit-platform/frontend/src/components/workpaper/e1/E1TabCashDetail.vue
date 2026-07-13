@@ -15,7 +15,7 @@
  *
  * Requirements: 3.1-3.6
  */
-import { inject, toRef, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, type Ref } from 'vue'
 import {
   useE1CashDetail,
   type CashDetailRow,
@@ -61,10 +61,53 @@ const {
   updateCell,
 } = useE1CashDetail(options)
 
+// ─── 审计说明 / 审计结论 / 存放境外款项 ───────────────────────────────────────
+
+const NOTE_KEY = 'E1-cash-audit-note'
+const CONCLUSION_KEY = 'E1-cash-audit-conclusion'
+const OVERSEAS_KEY = 'E1-cash-overseas-amount'
+const auditNote = ref('')
+const auditConclusion = ref('')
+const overseasAmount = ref<number>(0)
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveOverseasAmount(val: number | undefined): void {
+  if (props.isReadonly) return
+  const amount = val ?? 0
+  overseasAmount.value = amount
+  const item = { item_id: OVERSEAS_KEY, conclusion: null, remark: String(amount) }
+  props.allResponses.set(OVERSEAS_KEY, item)
+  void props.saveImmediate([item])
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
   // hydration done inside composable
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+  const overseasResp = props.allResponses.get(OVERSEAS_KEY)
+  if (overseasResp?.remark) {
+    const parsed = Number(overseasResp.remark)
+    overseasAmount.value = Number.isFinite(parsed) ? parsed : 0
+  }
 })
 </script>
 
@@ -74,10 +117,12 @@ onMounted(() => {
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表按币种列示库存现金（科目1001）明细，外币现金须折算为人民币列报。</p>
-        <p>2. 灰色底纹列（期末原币/折算人民币/审定人民币）为自动计算：期末原币=期初+增加-减少，折算人民币=期末原币×汇率。</p>
-        <p>3. 外币汇率采用资产负债表日中间价，人民币行汇率固定为1，不可编辑。</p>
-        <p>4. 期末现金应与库存现金监盘表（现金盘点）核对一致，大额现金留存关注资金真实性。</p>
+        <p>1. 本科目核算企业的库存现金。企业有内部周转使用备用金的，可以单独设置"备用金"科目。</p>
+        <p>2. 若公司仅有一种币种的现金，可不填列本表（用盘点表代替）。</p>
+        <p>3. 期初余额应与上年末审定数一致。</p>
+        <p>4. 审计说明可以概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。</p>
+        <p>5. 审计结论可参考：A、未见异常。 B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。 C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。</p>
+        <p class="calc-hint">计算说明：灰色底纹列（期末原币/折算人民币/审定人民币）为自动计算——期末原币=期初+增加-减少，折算人民币=期末原币×汇率；外币汇率采用资产负债表日中间价，人民币行汇率固定为1。</p>
       </div>
     </details>
 
@@ -249,6 +294,48 @@ onMounted(() => {
           <span class="total-val">折算人民币: {{ displayPrefs.fmtAmount(totalRow.endingRmb) }}</span>
           <span class="total-val">审定人民币: {{ displayPrefs.fmtAmount(totalRow.auditedRmb) }}</span>
         </div>
+
+        <!-- 其中：存放在境外的款项总额 -->
+        <div class="overseas-row">
+          <span class="overseas-label">其中：存放在境外的款项总额（人民币）</span>
+          <el-input-number
+            :model-value="overseasAmount"
+            :disabled="isReadonly"
+            :controls="false"
+            size="small"
+            @change="saveOverseasAmount"
+          />
+        </div>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            placeholder="填写审计说明：可概述（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -338,5 +425,34 @@ onMounted(() => {
 }
 .total-val {
   color: #606266;
+}
+.calc-hint {
+  margin-top: 6px;
+  color: #909399;
+  font-style: italic;
+}
+.overseas-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+  border-radius: 4px;
+  font-size: var(--wp-font-size, 13px);
+}
+.overseas-label {
+  color: #303133;
+  font-weight: 500;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

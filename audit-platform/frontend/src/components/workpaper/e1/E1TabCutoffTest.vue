@@ -12,7 +12,7 @@
  *
  * Requirements: 10.4-10.5
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, onMounted, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useE1CutoffTest,
@@ -98,6 +98,39 @@ async function handleImport(file: File): Promise<boolean> {
 function getRowClass({ row }: { row: CutoffTestRow }): string {
   if (row.isCrossover) return 'e1-cutoff-red-row'
   return ''
+}
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+const NOTE_KEY = computed(() => `E1-cutoff-audit-note-${variant.value}`)
+const CONCLUSION_KEY = computed(() => `E1-cutoff-audit-conclusion-${variant.value}`)
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function loadAuditText(): void {
+  const noteResp = props.allResponses.get(NOTE_KEY.value)
+  auditNote.value = noteResp?.remark || ''
+  const concResp = props.allResponses.get(CONCLUSION_KEY.value)
+  auditConclusion.value = concResp?.remark || ''
+}
+
+onMounted(loadAuditText)
+watch(variant, loadAuditText)
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY.value, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY.value, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY.value, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY.value, item)
+  void props.saveImmediate([item])
 }
 </script>
 
@@ -206,6 +239,38 @@ function getRowClass({ row }: { row: CutoffTestRow }): string {
             </template>
           </el-table-column>
         </el-table>
+
+        <!-- 审计说明 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计说明</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditNote"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 5 }"
+            :placeholder="variant === 'other'
+              ? '填写审计说明：可概述（1）其他货币资金截止测试抽取的期间（资产负债表日前后±3~5天）与样本；（2）跨期收支事项的判定及对往来科目的影响；（3）如发现跨期是否已扩大测试范围。'
+              : '填写审计说明：可概述（1）银行存款截止测试抽取的期间（资产负债表日前后±3~5天）与样本；（2）跨期收支事项的判定及对货币资金/往来科目的影响；（3）结合银行对账单与余额调节表（E1-6）核查未达账项。'"
+            @change="(val: string) => saveAuditNote(val)"
+          />
+        </el-card>
+
+        <!-- 审计结论 -->
+        <el-card shadow="never" class="audit-note-card">
+          <template #header>
+            <div class="card-header"><span>审计结论</span></div>
+          </template>
+          <el-input
+            type="textarea"
+            :model-value="auditConclusion"
+            :disabled="isReadonly"
+            :autosize="{ minRows: 3 }"
+            placeholder="填写审计结论：A、货币资金收支已记入正确会计期间，未见跨期错报。B、除上述跨期事项应提请调整外，其余未见异常。C、由于发现跨期舞弊迹象（或样本受限），已扩大测试期间并作进一步核查。"
+            @change="(val: string) => saveAuditConclusion(val)"
+          />
+        </el-card>
       </template>
     </el-skeleton>
   </div>
@@ -283,5 +348,14 @@ function getRowClass({ row }: { row: CutoffTestRow }): string {
 }
 :deep(.e1-cutoff-red-row td) {
   color: #f56c6c;
+}
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 </style>

@@ -47,6 +47,15 @@
     <!-- 5区段Tab切换 -->
     <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
 
+    <!-- 工具栏：索引 chip + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-2" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 明细表格（单一实例，列定义按Tab切换） -->
     <el-table
       :data="displayRows"
@@ -689,6 +698,28 @@
         <li>5区段Tab切换保持当前选中行索引不变</li>
       </ul>
     </details>
+
+    <!-- 审计说明 -->
+    <el-card class="note-card" shadow="never">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea"
+        :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：各被投资单位明细的测试情况、成本法/权益法核算适当性、减值测试及与审定表勾稽结果。"
+        @change="saveNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card class="note-card" shadow="never">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input v-model="auditConclusion" type="textarea"
+        :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：长期股权投资明细期末余额经测试完整准确，核算方法适当，与 G7-1 审定表一致。"
+        @change="saveConclusion" />
+    </el-card>
   </div>
 </template>
 
@@ -719,6 +750,7 @@ import {
   parseNum,
 } from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -1025,6 +1057,36 @@ function fmtPercent(v: unknown): string {
 
 // ─── 数据加载（从htmlData或导入后刷新） ─────────────────────────────────────
 
+// ─── 审计说明/结论 持久化（checklist_responses） ────────────────────────────
+
+const NOTE_KEY = 'G7-2-detail-audit-note'
+const CONCLUSION_KEY = 'G7-2-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function persistAudit(itemId: string, val: string): void {
+  if (props.isReadonly || !props.wpId) return
+  api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+    project_id: props.projectId || undefined,
+    items: [{ item_id: itemId, conclusion: null, remark: val }],
+  }, { _silent: true } as any).catch(() => {})
+}
+
+function saveNote(): void { persistAudit(NOTE_KEY, auditNote.value) }
+function saveConclusion(): void { persistAudit(CONCLUSION_KEY, auditConclusion.value) }
+
+async function loadAuditResponses(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+    const items = Array.isArray(res) ? res : (res as any)?.data || []
+    for (const it of items) {
+      if (it.item_id === NOTE_KEY && it.remark) auditNote.value = it.remark
+      else if (it.item_id === CONCLUSION_KEY && it.remark) auditConclusion.value = it.remark
+    }
+  } catch { /* silent */ }
+}
+
 function loadFromHtmlData(data: Record<string, any> | null): void {
   if (!data) return
   rows.length = 0
@@ -1050,12 +1112,19 @@ function loadFromHtmlData(data: Record<string, any> | null): void {
 
 onMounted(() => {
   loadFromHtmlData(props.htmlData)
+  loadAuditResponses()
 })
 </script>
 
 <style scoped>
 .g7-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .audit-objective { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.note-card { margin-top: 12px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; align-items: center; }

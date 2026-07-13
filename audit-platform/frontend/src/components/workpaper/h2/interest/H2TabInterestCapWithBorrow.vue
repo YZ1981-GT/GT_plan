@@ -1,5 +1,17 @@
 <template>
   <div class="h2-tab-interest-cap-with-borrow">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：核算有专门借款情形下在建工程的资本化利息（专门借款资本化＋一般借款补充资本化），验证闲置资金收益扣减与资本化上限，确认资本化金额不超过当期实际利息总额。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H2-11" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">一般借款 {{ state.loansWithBorrow.value.length }} 笔</el-tag>
+      </div>
+    </div>
+
     <!-- 方法论上下文 -->
     <div class="methodology-context">
       <p><strong>有专门借款利息资本化：</strong></p>
@@ -14,9 +26,6 @@
         <div class="section-header">
           <span>一、专门借款</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('special-loan')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('H2-11')">💬</el-button>
           </div>
         </div>
@@ -148,6 +157,26 @@
       </div>
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述专门借款资本化金额（利息扣减闲置收益）、一般借款补充资本化的计算及资本化上限复核。" :disabled="isReadonly"
+        @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：如资本化利息合计计算准确、未超过实际利息总额，未见异常。" :disabled="isReadonly"
+        @change="saveAuditConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -168,9 +197,10 @@
  * 专门借款(汇总)+一般借款补充(动态行)+合计
  * Spec: Task 4.14 | Requirements: 10.1, 10.3, 10.5-10.10
  */
-import { inject, toRef, computed } from 'vue'
+import { ref, inject, toRef, computed, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH2InterestCap } from '../../composables/useH2InterestCap'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -181,12 +211,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const state = useH2InterestCap({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: computed(() => props.allResponses),
   isReadonly: toRef(props, 'isReadonly'),
+  onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onPublishEvent(event: string, payload: any) {
     // Task 6.7 — publish 'h2:interest-capitalized' 利息资本化联动L(财务费用)
     console.log('[H2-11] publish', event, payload)
@@ -199,6 +231,31 @@ const state = useH2InterestCap({
 
 const isReadonly = computed(() => props.isReadonly)
 
+// H2-11 审计说明/结论：本 sheet 独立 item_id（H2-10/H2-11 共用同一 composable，
+// 其 NOTE_KEY/CONCLUSION_KEY 固定为 H2-10，故此处用本地键避免串写）。
+const NOTE_KEY = 'H2-11-audit-note'
+const CONCLUSION_KEY = 'H2-11-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  saveResponse(NOTE_KEY, val)
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  saveResponse(CONCLUSION_KEY, val)
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 function onSpecialChange(field: string, value: any) {
   state.updateSpecialLoanData(field as any, Number(value) || 0)
 }
@@ -210,9 +267,6 @@ function onGeneralChange(rowId: string, field: string, value: any) {
 function handleAddGeneral() { state.addLoanWithBorrow() }
 function handleRemoveGeneral(rowId: string) { state.removeLoanWithBorrow(rowId) }
 
-function handleAiGenerate(section: string) {
-  console.log('AI generate H2-11:', section)
-}
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -226,6 +280,11 @@ function fmtAmt(val: number | null | undefined): string {
 
 <style scoped>
 .h2-tab-interest-cap-with-borrow { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-bottom: 12px; }
 .methodology-context {
   border-left: 3px solid #f0a020; background: #fdf8e8;
   padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px);

@@ -57,7 +57,7 @@ inclusion: always
 - **模板预填优先于AI生成**：有固定骨架的章节用CHAPTER_TEMPLATE+变量替换做预填，AI仅用于复杂章节
 - **🔴 D~N专属组件开发标准模板**：Phase0双源输入(openpyxl脚本读xlsx+底稿模板库md交叉验证)→Phase1三件套→Phase2开发8步(①registry+yaml ②composable分层useXFormulaEngine纯函数 ③主入口sheetName v-if分发defineAsyncComponent lazy ④后端3-4py ⑤注册四件套 ⑥联动TB回写+EventBus+GtIndexChip ⑦UI铁律 ⑧功能方向:联动/美观/溯源/易操作/导入导出/AI/双三模式)
 - **🔴 宽表拆分策略**：>15列宽表必须拆分提升可操作性。方案按场景选择：①区段Tab(明细表32列→3区段Tab切换,行同步) ②借方/贷方独立区块(检查表→两区块el-table) ③固定列+滚动列(凭证基础列固定,证据列横滚) ④左右视觉分组(记账凭证|检查证据)。优先减少横滚,让用户单屏看到关键信息
-- **🟢 宽表列自定义显示(2026-07-12)**：D2-2明细表已加`useD2DetailColumnPrefs`列配置器(⚙列设置popover+预设方案全部/核心/审定账龄+一键隐藏空列+按组/单列checkbox+偏好存D2-detail-column-prefs)。后续推广到所有>15列宽表(D3/F1/K1明细)
+- **🟢 宽表列自定义显示(2026-07-12)**：D2-2明细表已加`useD2DetailColumnPrefs`列配置器(⚙列设置popover+预设方案全部/核心/审定账龄+一键隐藏空列+按组/单列checkbox+偏好存D2-detail-column-prefs)。**D2-7凭证检查表矩阵视图已改固定列+列分组(2026-07-12)**:左5列fixed(序号/凭证号/日期/借方/贷方)+右侧5组可折叠(基础信息/科目信息/核对结果/证据附件/检查结论)+⚙列设置popover+空列组自动折叠+max-height 500内滚。后续推广到所有>15列宽表(D3/F1/K1明细)
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **OO sheet-name必须与源xlsx tab名完全一致**；**多sheet workbook OO隐藏非目标tab**
 - **D~N循环全sheet HTML组件化**：OnlyOffice仅为降级/偏好切换
@@ -113,7 +113,7 @@ inclusion: always
 | A/B | ✅ | Dashboard/bundle/风险等已落地 |
 | C | ✅ | C1 向导+C2~C15+C22~C26 完成；**Cx 弹窗增强完成✅**(c-control-test-popup-enhance 33/33含optional：28 guidance JSON C2~C15+C2-2~C15-2/后端_load_guidance纯函数+render注入guidance/guidance_cx2/前端琥珀块L1+Cx-2/OcrAttachmentPicker+useOcrAttachmentCache/AI按钮OCR上下文;7属性全覆盖) |
 | D | ✅ | D1~D7全部完成✅；**D5/D6/D7精美化打磨✅**(比照D4 gold标准:23内容tab全上编制提示details+审计目标el-alert+tab-toolbar(导入导出▾dropdown+GtIndexChip canonical value="wp:X"+共N行tag)+opinion-card(说明/结论 AI辅助primary-plain+💬)+autosize textarea+13px表+auto-calc-col灰底+核对行tag;presentation-only保留全部composable/save/AI/review接线;get_diagnostics全清)；D2-refactor完成✅(49/49)；**D3修复✅**(9内容tab ref解包全崩bug修复+审计目标/编制提示/异常点选/GtReviewDot打磨,Playwright 9tab全0错误) |
-| E | ✅ | E1 货币资金完成；**E1 18tab精美化打磨✅**(比照D4:编制提示+审计目标alert+tab-toolbar+auto-calc-col+13px+canonical GtIndexChip;无useE1AiGenerate/无entry review provide→不臆造AI/💬;导入导出▾仅E1-7/8/9/10/20/21/22有后端端点处加;修复broken GtIndexChip :index-no/target-wp-code→value="wp:X";get_diagnostics全清)；**E1 save noop已修(2026-07-12)**:原saveImmediate/debouncedSave是空函数→子tab数据从未落库+版本快照从不触发;改为主入口PUT+scheduleAutoSnapshot,子composable无自有http(全靠props.saveImmediate) |
+| E | ✅ | E1 货币资金完成；**E1 18tab精美化打磨✅**(比照D4:编制提示+审计目标alert+tab-toolbar+auto-calc-col+13px+canonical GtIndexChip;无useE1AiGenerate/无entry review provide→不臆造AI/💬;导入导出▾仅E1-7/8/9/10/20/21/22有后端端点处加;修复broken GtIndexChip :index-no/target-wp-code→value="wp:X";get_diagnostics全清)；**E1 save noop+selfLoad双修(2026-07-13)**:①saveImmediate从noop改为PUT+scheduleAutoSnapshot ②onMounted加载htmlData.responses_snapshot→allResponses Map(此前从未解析→审定表全显示-);子composable无自有http全靠props回调；**E1 sheet内容补全完成✅(e1-sheet-content-completion,2026-07-13,tasks-only 7任务/5波)**:逐sheet对照源模板E货币资金底稿模板库.md核对,系统性补全12组件缺失的审计说明+审计结论el-card(minRows5/3);多变体(信用报告E1-18/19/截止测试E1-21/22/舞弊E1-26~32/附注上市国企)按变体computed key+watch分别存储;附注E1TabDisclosure补披露项版本化(上市8项/国企5项)+SOE受限明细预置5项;AI铁律:composable无aiGenerateNote全部只加纯textarea不臆造;12组件get_diagnostics全清+Vite transform全200+Playwright实测E1-21/E1-26渲染0error |
 | F | ✅ | F1/F2/F3/F4/F5/F0 全部完成✅；**F类~80tab精美化打磨✅**(比照D4 gold;保留抽凭引擎/OCR/EventBus原样;get_diagnostics全清) |
 | G | ✅ | G1~G14全部完成✅；G0函证完成✅；G5完成✅(含Task11三阶段+ECL) |
 | H | ✅为主 | ref-unwrap全清:H5修14文件(.value)+H1嵌套ref解构(前期未提交)已Playwright验证审定表渲染;H0/H1~H4/H6/H8~H10 完成；**H5完成✅**(40任务/24sheet/10PBT/行业守卫oil_gas+mining/折耗单位产量法/四区块审定表/EventBus 3事件/TB回写1631+1632)；**H7完成✅**(44任务/26sheet/12PBT/行业守卫agriculture+forestry+livestock+fishery/双计量模式cost+fair_value/产量记录H7独有/互转三方向/直线法折旧/TB回写1621) |
@@ -126,6 +126,10 @@ inclusion: always
 | S | ✅ | S3~S6/S12~S15/S20/S21/S32/S33/S34/S35全部完成✅ |
 
 ### 活跃待办（排期优先）
+
+- **🟢 e1-sheet-content-completion 已完成(25/25)**：E1 18tab逐sheet深度打磨(审计目标alert/编制提示details/主表字段/审计说明+结论textarea/tab-toolbar)，作为逐sheet打磨质量标杆
+- **🟡 fghi-sheet-content-completion 新建(requirements-first)**：把E1逐sheet打磨标准推广到F/G/H/I全循环每个sheet(实测512个sheet组件,仅7个全达标,505待打磨)。**三件套齐全**:requirements.md(9条EARS)+design.md(打磨配方+Sheet 5类处置矩阵ABCDE+8属性P1-P8+新增check_fghi_sheet_completion.py扫描脚本)+tasks.md(42任务组/23波:Wave0基础设施→F 6entry→G 14entry→H 10entry→I 6entry,每循环Playwright,Wave22全局验证;每entry任务体列全部sheet及现状标记OA·GD·AN·AC·TT,只补缺项)。**待用户说"执行"后run-all-tasks**(Wave0起=建check_fghi_sheet_completion.py)。关键决策:①仅F循环有AiGenerate composable→F接🤖AI,G/H/I纯textarea不臆造 ②E类(Index/Directory/Procedure/Ref静态文档)豁免主表补列+审计说明结论 ③i2研发支出17/19空壳需从零补 ④最大共性缺口=审计结论AC全循环缺+tab-toolbar在G/H/I广泛缺。范围排除E,不改架构/算法/后端契约
+- **🟡 workpaper-bulk-tab-import-export tasks.md 有陈旧[-]/[~]标记但memory记为"待实现"**：run-all-tasks侦测到但本会话无关,未自动执行(避免大范围后端实现的意外动作),待用户确认是否恢复
 - **✅ 全部完成**：A~N全部循环底稿+函证+D2-refactor+G5 / S全部 / F循环全部 / L循环全部 / 基础设施(版本链/复核/抽凭/截止测试) — **无活跃待办**
 - **✅ C2~C15 弹窗增强已完成**：编制提示琥珀块 + 附件 OCR 作 AI context（c-control-test-popup-enhance 33/33）
 - **✅ ref-unwrap全循环清扫完成(2026-07-11)**：H/I/J/L/M/N/S/A/B/C 全审计;仅H5有真bug(14文件.value)已修,其余全安全(解构到顶层/显式.value范式)。guard exit 0。**🟡 N5TabIndex目录跳转接线遗漏**(emit('navigate')但父GtN5未绑@navigate→点击目录无法切sheet,非ref-unwrap,待修)
@@ -181,7 +185,7 @@ inclusion: always
 - **project_assignments列名是staff_id不是user_id**
 - **结构化章节数据不能存到textarea content**（用独立item_id分别存checklist_responses）
 - **CREATE TABLE IF NOT EXISTS 遇旧表列不同不报错但 CREATE INDEX 会炸**：迁移必须用 DO $$ + information_schema 检测列存在性再 ALTER 补齐/RENAME
-- **🔴 render策略SQL列漂移致500（2026-07-11）**：17个render策略(_h1~_h5/_i1~_i6/_k8~_k13)查`p.applicable_standards`(已改名`applicable_standard_v2`)→asyncpg查询失败中止事务→级联render-config 500→阻断H1-H5/I1-I6/K8-K13全部HTML渲染。修复`p.applicable_standard_v2 AS applicable_standards`(保语义,前端消费不变)。**教训:render策略里的裸SQL(sa.text)不受ORM/契约测试保护,列改名会静默漏;Playwright实测render-config才暴露**。Playwright验证H1-1/H5-1审定表渲染全绿。工作正确的策略(K5/K7/L/M)只查client_name/audit_year/business_category不含applicable
+- **🔴 render策略SQL列漂移致500（2026-07-11）**：17个render策略(_h1~_h5/_i1~_i6/_k8~_k13)查`p.applicable_standards`(已改名`applicable_standard_v2`)→asyncpg查询失败中止事务→级联render-config 500→阻断H1-H5/I1-I6/K8-K13全部HTML渲染。修复`p.applicable_standard_v2 AS applicable_standards`(保语义,前端消费不变)。**D5也中招(2026-07-13 merge后发现,同修)**。**追加:applicable_standard_v2实际存JSONB(dict)非string→.lower()崩AttributeError,D5追加isinstance防御+dict时取.get("type","")**。**教训:render策略里的裸SQL(sa.text)不受ORM/契约测试保护,列改名会静默漏;Playwright实测render-config才暴露**。Playwright验证H1-1/H5-1审定表渲染全绿。工作正确的策略(K5/K7/L/M)只查client_name/audit_year/business_category不含applicable
 - **schema漂移修复模式**：`db_extra`类型漂移=DB有列/表但ORM未定义→在ORM模型中补齐列声明即可（不需要新迁移）；V033遗留列(`is_locked`/`bound_dataset_id`)已补入WorkpaperSnapshot；V095 `review_threads`表+`review_messages.thread_id`/`sender_role`已补入phase10_models；V099 `target_user_id`/`target_user_name`/`target_role`已补入ReviewMessage；**V100 formula-management-library**(迁移已跑但功能未实现)遗留10项db_extra已补入`workpaper_models.py`：WpFormula 7列(formula_type/last_computed_at/refs JSONB/issue_description/hint_text/formula_source/reference_formula_id)+3新ORM模型(DraftMarker/DraftRefreshAudit/DraftRefreshSnapshot)，`SchemaDriftDetector.scan()`验证 total drift=0
 
 ### 前端

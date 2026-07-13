@@ -10,7 +10,7 @@
  *
  * Requirements: 8.1-8.2
  */
-import { inject, toRef, computed, type Ref } from 'vue'
+import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useE1AccountList, type AccountListRow } from '../composables/useE1AccountList'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
@@ -51,12 +51,45 @@ const options: UseE1BaseOptions = {
 const {
   rows,
   isLoading,
+  summary,
   isInconsistent,
   isMissingReason,
+  isSuspectedOffBook,
   addRow,
   removeRow,
   updateCell,
 } = useE1AccountList(options)
+
+// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+// 组件无 AI composable → 纯 textarea（不臆造 AI 按钮）
+
+const NOTE_KEY = 'E1-acctlist-audit-note'
+const CONCLUSION_KEY = 'E1-acctlist-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+onMounted(() => {
+  const noteResp = props.allResponses.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = props.allResponses.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+})
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  void props.saveImmediate([item])
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  void props.saveImmediate([item])
+}
 
 // ─── 导入导出（E1-10） ────────────────────────────────────────────────────────
 
@@ -80,7 +113,7 @@ async function handleImport(file: File): Promise<boolean> {
 // ─── Row Class ───────────────────────────────────────────────────────────────
 
 function getRowClass({ row }: { row: AccountListRow }): string {
-  if (isInconsistent(row)) return 'e1-acct-red-row'
+  if (isInconsistent(row) || isSuspectedOffBook(row)) return 'e1-acct-red-row'
   return ''
 }
 </script>
@@ -91,10 +124,10 @@ function getRowClass({ row }: { row: AccountListRow }): string {
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 取得被审计单位全部银行账户清单，与开户许可证、征信报告（E1-18）核对账户完整性。</p>
-        <p>2. 关注是否存在账外账户、久悬未用账户及未纳入审定表的账户。</p>
-        <p>3. 核对结果为"不一致"时，须在原因栏说明差异内容（红色高亮提示）。</p>
-        <p>4. 每个银行账户均应取得银行询证函回函予以支持，并与审定表勾稽一致。</p>
+        <p>1. 获取被审计单位<strong>本期所有银行账户清单</strong>（含沿用、本期新开、本期注销及零余额账户），并询问办理货币资金业务的相关人员（如出纳），了解账户的开立、使用、注销情况。</p>
+        <p>2. 对完整性存有疑虑时，应<strong>亲自到中国人民银行或基本存款账户开户行打印《已开立银行结算账户清单》</strong>与账面记录核对，识别是否存在账外账户。</p>
+        <p>3. 检查账户完整性：清单中每一账户均应在账面有记录（"账面是否有记录"=N 时红色高亮，为疑似账外账户）；并结合企业信用报告（E1-18）分析各账户<strong>开户目的的合理性</strong>。</p>
+        <p>4. 核对结果为"不一致"时须在"差异说明"栏说明差异内容；必要时（首次承接 / IPO / 上市公司 / 存在舞弊风险项目）取得管理层关于银行账户完整性的<strong>书面声明</strong>（见 E1-11）。</p>
       </div>
     </details>
 
@@ -102,7 +135,7 @@ function getRowClass({ row }: { row: AccountListRow }): string {
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实被审计单位银行账户的完整性，确认不存在账外账户及未入账资金往来。"
+      title="审计目标：确认被审计单位银行账户开立的完整性（不存在账外账户及未入账资金往来），并评价各账户开户目的的合理性。"
       class="objective-alert"
     />
 
@@ -132,8 +165,22 @@ function getRowClass({ row }: { row: AccountListRow }): string {
           </template>
         </el-dropdown>
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-11" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-18" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
+    </div>
+
+    <!-- 完整性核对小结 -->
+    <div class="completeness-bar">
+      <span class="cb-label">完整性核对：</span>
+      <el-tag size="small" type="info">账户 {{ summary.total }} 个</el-tag>
+      <el-tag size="small" type="success">本期新开 {{ summary.newCount }}</el-tag>
+      <el-tag size="small" type="warning">本期注销 {{ summary.closedCount }}</el-tag>
+      <el-tag v-if="summary.offBookCount > 0" size="small" type="danger">疑似账外 {{ summary.offBookCount }}</el-tag>
+      <el-tag v-else size="small" type="success">无疑似账外账户</el-tag>
+      <el-tag v-if="summary.inconsistentCount > 0" size="small" type="danger">核对不一致 {{ summary.inconsistentCount }}</el-tag>
+      <el-tag v-else size="small" type="success">清单与账面核对一致</el-tag>
     </div>
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
@@ -169,12 +216,21 @@ function getRowClass({ row }: { row: AccountListRow }): string {
           </el-table-column>
           <el-table-column label="账户性质" width="120">
             <template #default="{ row }">
-              <el-input
+              <el-select
                 :model-value="row.accountType"
                 :disabled="isReadonly"
                 size="small"
+                filterable
+                allow-create
+                default-first-option
+                placeholder="选择"
                 @change="(val: string) => updateCell(row.id, 'accountType', val)"
-              />
+              >
+                <el-option label="基本存款账户" value="基本存款账户" />
+                <el-option label="一般存款账户" value="一般存款账户" />
+                <el-option label="专用存款账户" value="专用存款账户" />
+                <el-option label="临时存款账户" value="临时存款账户" />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="开户日期" width="130">
@@ -190,35 +246,72 @@ function getRowClass({ row }: { row: AccountListRow }): string {
               />
             </template>
           </el-table-column>
-          <el-table-column label="是否征信" width="90" align="center">
+          <el-table-column label="开户目的" min-width="140">
+            <template #header>
+              <span>开户目的</span>
+              <el-tooltip content="说明该账户的用途，评价开户目的的合理性（如：日常结算 / 工资代发 / 募集资金专户 / 项目专用等）" placement="top">
+                <span class="hint-mark">?</span>
+              </el-tooltip>
+            </template>
+            <template #default="{ row }">
+              <el-input
+                :model-value="row.openPurpose"
+                :disabled="isReadonly"
+                size="small"
+                placeholder="账户用途"
+                @change="(val: string) => updateCell(row.id, 'openPurpose', val)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="本期新开" width="90" align="center">
             <template #default="{ row }">
               <el-select
-                :model-value="row.inCreditReport"
+                :model-value="row.isNewThisPeriod"
                 :disabled="isReadonly"
                 size="small"
                 placeholder="-"
-                @change="(val: string) => updateCell(row.id, 'inCreditReport', val)"
+                @change="(val: string) => updateCell(row.id, 'isNewThisPeriod', val)"
               >
-                <el-option label="Y" value="Y" />
-                <el-option label="N" value="N" />
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="是否审定表" width="100" align="center">
+          <el-table-column label="本期注销" width="90" align="center">
             <template #default="{ row }">
               <el-select
-                :model-value="row.inAdjudication"
+                :model-value="row.isClosedThisPeriod"
                 :disabled="isReadonly"
                 size="small"
                 placeholder="-"
-                @change="(val: string) => updateCell(row.id, 'inAdjudication', val)"
+                @change="(val: string) => updateCell(row.id, 'isClosedThisPeriod', val)"
               >
-                <el-option label="Y" value="Y" />
-                <el-option label="N" value="N" />
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="核对结果" width="110" align="center">
+          <el-table-column label="账面有记录" width="100" align="center">
+            <template #header>
+              <span>账面有记录</span>
+              <el-tooltip content="清单中该账户是否在账面（总账/明细账）有记录。选择'否'即清单有而账面无，为疑似账外账户，行标红" placement="top">
+                <span class="hint-mark">?</span>
+              </el-tooltip>
+            </template>
+            <template #default="{ row }">
+              <el-select
+                :model-value="row.hasBookRecord"
+                :disabled="isReadonly"
+                size="small"
+                placeholder="-"
+                @change="(val: string) => updateCell(row.id, 'hasBookRecord', val)"
+              >
+                <el-option label="有" value="Y" />
+                <el-option label="无" value="N" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="清单核对一致" width="120" align="center">
             <template #default="{ row }">
               <el-select
                 :model-value="row.checkResult"
@@ -232,7 +325,7 @@ function getRowClass({ row }: { row: AccountListRow }): string {
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="原因" min-width="150">
+          <el-table-column label="差异说明" min-width="150">
             <template #default="{ row }">
               <el-input
                 :model-value="row.reason"
@@ -258,6 +351,36 @@ function getRowClass({ row }: { row: AccountListRow }): string {
         </el-table>
       </template>
     </el-skeleton>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="说明银行账户清单的获取途径（企业提供 / 人行《已开立银行结算账户清单》打印）、与账面核对情况、各账户开户目的合理性分析，以及是否存在账外账户、久悬未用或零余额账户等..."
+        @change="(val: string) => saveAuditNote(val)"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="对银行账户开立完整性发表结论（如：已开立银行账户清单与账面核对一致，未发现账外账户，各账户开户目的合理）..."
+        @change="(val: string) => saveAuditConclusion(val)"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -321,8 +444,50 @@ function getRowClass({ row }: { row: AccountListRow }): string {
 }
 .chip-wrap { display: inline-flex; align-items: center; }
 
+/* 完整性核对小结 */
+.completeness-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: var(--wp-font-size, 13px);
+}
+.cb-label {
+  color: #909399;
+}
+
+/* 表头提示标记 */
+.hint-mark {
+  display: inline-block;
+  margin-left: 4px;
+  width: 14px;
+  height: 14px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 50%;
+  background: #c0c4cc;
+  color: #fff;
+  font-size: 11px;
+  cursor: help;
+}
+
 .required-field :deep(.el-input__wrapper) {
   box-shadow: 0 0 0 1px #f56c6c inset;
+}
+
+/* 审计说明 / 审计结论 */
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 :deep(.e1-acct-red-row) {
   background-color: #fef0f0 !important;

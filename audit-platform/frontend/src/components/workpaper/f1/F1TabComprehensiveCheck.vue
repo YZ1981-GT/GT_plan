@@ -65,6 +65,7 @@
       <el-tag size="small" type="warning" effect="plain">抽凭引擎</el-tag>
     </div>
     <div class="toolbar-right">
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
       <el-dropdown size="small" trigger="click" :disabled="isReadonly">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown>
@@ -334,6 +335,32 @@
     style="margin: 12px 0"
   />
 
+  <!-- 审计说明 -->
+  <el-card shadow="never" class="audit-note-card">
+    <template #header><div class="card-header"><span>审计说明</span></div></template>
+    <el-input
+      type="textarea"
+      :model-value="auditNote"
+      :disabled="isReadonly"
+      :autosize="{ minRows: 5 }"
+      placeholder="填写审计说明：概述抽样测试情况、本期增减与期后结转检查结果、发现的异常事项及其影响。"
+      @change="saveAuditNote"
+    />
+  </el-card>
+
+  <!-- 审计结论 -->
+  <el-card shadow="never" class="audit-note-card">
+    <template #header><div class="card-header"><span>审计结论</span></div></template>
+    <el-input
+      type="textarea"
+      :model-value="auditConclusion"
+      :disabled="isReadonly"
+      :autosize="{ minRows: 3 }"
+      placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+      @change="saveAuditConclusion"
+    />
+  </el-card>
+
   <!-- 复核入口 -->
   <div class="review-actions">
     <el-button size="small" @click="openReview">💬 复核</el-button>
@@ -346,10 +373,13 @@
  * F1TabComprehensiveCheck.vue — F1-7 综合检查表
  * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF1VoucherCheck } from '../composables/useF1ComprehensiveCheck'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+
+// @ts-ignore - GtIndexChip may not have type declarations
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -382,6 +412,33 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+})
+
+// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const NOTE_KEY = 'F1-vc-audit-note'
+const CONCLUSION_KEY = 'F1-vc-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+  void props.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
+}
+
+onMounted(() => {
+  const n = allResponsesRef.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = allResponsesRef.value.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
 })
 
 const progressPct = computed(() => {
@@ -445,6 +502,11 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明/结论卡片 */
+.audit-note-card { margin-top: 16px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 
 .sampling-params-card { padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }

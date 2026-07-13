@@ -27,6 +27,23 @@
       </p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实其他债权投资减值准备转回、核销及收回的真实性与合规性，验证转回不超过原计提额、核销经恰当审批，评价各项操作的合理性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏：索引 + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-14" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
     <!-- 顶部标题+操作 -->
     <div class="section-head">
       <h3 class="sheet-title">G6-14 减值准备转回（收回）、核销检查表</h3>
@@ -175,6 +192,21 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card class="audit-note-card" shadow="never">
+      <template #header>
+        <div class="audit-note-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：概述转回/核销/收回检查执行的审计程序、审批程序核查情况与结果、拟调整/未调整事项及其影响。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
     <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
@@ -259,6 +291,15 @@ const formData = useG6EclFormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
 })
+
+// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
+const NOTE_KEY = 'G6-14-reversal-writeoff-audit-note'
+const auditNote = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
 
 // ─── 导入导出 ───────────────────────────────────────────────────────────────
 
@@ -453,8 +494,11 @@ async function loadData(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 
-onMounted(() => {
-  loadData()
+onMounted(async () => {
+  await loadData()
+  await formData.loadAll()
+  const n = formData.allResponses.value.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
 })
 
 // ─── 暴露序列化接口 ─────────────────────────────────────────────────────────
@@ -490,6 +534,33 @@ defineExpose({
 }
 .methodology-context strong {
   color: #303133;
+}
+
+/* 审计目标 / 工具栏 */
+.objective-alert {
+  margin-bottom: 12px;
+}
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left { display: flex; gap: 8px; align-items: center; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+
+/* 审计说明卡片 */
+.audit-note-card {
+  margin-top: 16px;
+}
+.audit-note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
 }
 
 /* 标题栏 */

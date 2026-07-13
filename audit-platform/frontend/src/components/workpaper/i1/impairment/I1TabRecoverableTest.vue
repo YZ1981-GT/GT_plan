@@ -5,6 +5,23 @@
       <p><strong>CAS8 可收回金额确定</strong>：可收回金额应当根据资产的公允价值减去处置费用后的净额与资产预计未来现金流量的现值（使用价值）两者之间较高者确定。预计资产未来现金流量的现值，应当按照资产在持续使用过程中和最终处置时所产生的预计未来现金流量，选择恰当的折现率对其进行折现后的金额加以确定。折现率应当反映货币时间价值和资产特定风险的当前市场评价。</p>
     </div>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实无形资产可收回金额（使用价值DCF与公允价值减处置费用净额孰高）测算的合理性，验证折现率、增长率及现金流假设的恰当性。"
+      class="objective-alert"
+    />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-13" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ recoverableRows.length }} 项</el-tag>
+      </div>
+    </div>
+
     <!-- 资产选择 -->
     <el-card shadow="never" class="block-card">
       <template #header>
@@ -24,9 +41,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button size="small" type="primary" link @click="handleAiGenerate('dcf')">
-              <el-icon><MagicStick /></el-icon> AI
-            </el-button>
             <el-button size="small" circle @click="openReview('I1-13')">💬</el-button>
           </div>
         </div>
@@ -161,19 +175,24 @@
       </div>
     </el-card>
 
-    <!-- 审计说明与结论 -->
+    <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="section-header">
-          <span>审计说明与结论</span>
-          <el-button size="small" type="primary" link @click="handleAiGenerate('conclusion')">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
-        </div>
+        <div class="section-header"><span>审计说明</span></div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
+        placeholder="填写审计说明：DCF模型选取的折现率/增长率/现金流预测依据、公允价值净额来源、敏感性分析结论等。"
+        :disabled="isReadonly" @blur="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header"><span>审计结论</span></div>
       </template>
       <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写可收回金额测算结论（如：采用折现现金流模型测算各资产使用价值，选取的折现率为…，经测算各资产可收回金额均高于账面净值…）"
-        :disabled="isReadonly" @blur="handleSaveConclusion" />
+        placeholder="填写审计结论：如经测算各资产可收回金额均高于账面净值，减值计提充分/无需计提减值…"
+        :disabled="isReadonly" @blur="saveAuditConclusion" />
     </el-card>
 
     <!-- 编制提示 -->
@@ -200,9 +219,8 @@
  * + 敏感性分析(r±1%, g±0.5%) + 联动I1-12
  * Spec: .kiro/specs/i1-intangible-assets/ | Requirements: 13.1-13.5
  */
-import { ref, reactive, inject, toRef, computed } from 'vue'
+import { ref, reactive, inject, toRef, computed, onMounted, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useI1Impairment, DCF_FORECAST_YEARS } from '../../composables/useI1Impairment'
 import type { I1RecoverableTestRow, SensitivityResult } from '../../composables/useI1Impairment'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -216,7 +234,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
-  (e: 'save'): void
+  (e: 'save', itemId?: string, value?: any): void
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
@@ -239,14 +257,38 @@ const {
   toRef(props, 'wpId'),
   allResponsesRef as any,
   {
-    onSave: () => emit('save'),
+    onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
 
-// ─── Local State ─────────────────────────────────────────────────────────────
+// ─── Local State: 审计说明 / 审计结论 ─────────────────────────────────────────
 
+const auditNote = ref('')
 const auditConclusion = ref('')
 const sensitivityVisible = reactive<Record<number, boolean>>({})
+
+const NOTE_KEY = 'I1-13-audit-note'
+const CONCLUSION_KEY = 'I1-13-audit-conclusion'
+
+function loadAuditText(): void {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n) auditNote.value = (n.remark ?? n.conclusion ?? '') as string
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c) auditConclusion.value = (c.remark ?? c.conclusion ?? '') as string
+}
+
+onMounted(loadAuditText)
+watch(() => props.allResponses, loadAuditText, { deep: true })
+
+function saveAuditNote(): void {
+  if (props.isReadonly) return
+  emit('save', NOTE_KEY, auditNote.value)
+}
+
+function saveAuditConclusion(): void {
+  if (props.isReadonly) return
+  emit('save', CONCLUSION_KEY, auditConclusion.value)
+}
 
 // ─── Cash Flow Table Helper ──────────────────────────────────────────────────
 
@@ -336,14 +378,6 @@ function handleExportImport(command: string) {
   }
 }
 
-function handleAiGenerate(section: string) {
-  console.log('[I1-13] AI generate:', section)
-}
-
-function handleSaveConclusion() {
-  emit('save')
-}
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
@@ -369,6 +403,20 @@ function fmtAmt(val: number | null | undefined): string {
   color: var(--el-text-color-regular);
   line-height: 1.6;
 }
+
+.objective-alert { margin-bottom: 12px; }
+
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .block-card { margin-bottom: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

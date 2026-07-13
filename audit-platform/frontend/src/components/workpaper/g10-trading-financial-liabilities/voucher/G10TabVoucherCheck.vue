@@ -9,6 +9,18 @@
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="vc.addRow()">+ 新增</el-button>
       </div>
     </div>
+
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：通过凭证抽查核实交易性金融负债相关业务的真实性、完整性与准确性，验证原始凭证完整、授权恰当、账务处理及公允价值计量正确。" />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-7" /></span>
+        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
+      </div>
+    </div>
+
     <div class="summary-bar" :class="{ 'summary-error': !vc.isBalanced.value }">
       借方 {{ fmt(vc.debitTotal.value) }} · 贷方 {{ fmt(vc.creditTotal.value) }} · 差额 {{ fmt(vc.balanceDiff.value) }} · 异常 {{ vc.abnormalCount.value }} 条
     </div>
@@ -151,6 +163,20 @@
         placeholder="汇总凭证抽查结论、异常事项及后续程序" :disabled="isReadonly" @update:model-value="vc.updateConclusion" />
     </div>
 
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述凭证抽查的样本范围、抽样方法、逐笔核对结果、发现的异常凭证及其处理。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -163,7 +189,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, h } from 'vue'
+import { ref, computed, toRef, onMounted, h } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Column } from 'element-plus'
 import http from '@/utils/http'
@@ -190,6 +216,26 @@ const vc = useG10VoucherCheck({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 审计说明 / 审计结论（自由文本，conclusion:null 落库）────────────────────
+const NOTE_KEY = 'G10-7-voucher-audit-note'
+const CONCLUSION_KEY = 'G10-7-voucher-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
 })
 
 const tabOptions = [
@@ -287,4 +333,10 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .guidance-content p { margin: 4px 0; }
+.objective-alert { margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

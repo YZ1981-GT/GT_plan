@@ -1,5 +1,15 @@
 <template>
   <div class="h1-tab-stocktake-plan">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
+      title="审计目标：制定固定资产监盘计划，明确盘点时间/地点/范围/方法与样本选取标准，确保盘点覆盖率充分、程序有效以证实资产存在性。" />
+
+    <!-- 工具栏 -->
+    <div class="tab-toolbar" style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+      <GtIndexChip value="wp:H1-9" :context-project-id="projectId" />
+      <el-tag size="small" type="info">共 {{ state.sampleSelections.value.length }} 类样本</el-tag>
+    </div>
+
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 确定盘点时间、地点、范围</div>
@@ -80,6 +90,20 @@
         placeholder="具体时间安排（如：9:00集合→9:30开始→12:00午休→17:00结束清点）" />
     </el-card>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="plan-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNoteText" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
+        placeholder="填写审计说明：监盘范围确定依据、样本选取方法与覆盖率、人员安排等。" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="plan-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写监盘计划审计结论..." @change="saveAuditConclusion" />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -92,13 +116,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, inject, toRef } from 'vue'
+import { ref, reactive, computed, inject, toRef, onMounted } from 'vue'
 import { useH1Stocktake } from '../../composables/useH1Stocktake'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const scheduleNote = ref('')
+const auditNoteText = ref('')
+const auditConclusionText = ref('')
+const NOTE_KEY = 'H1-9-audit-note'
+const CONCLUSION_KEY = 'H1-9-audit-conclusion'
+function saveAuditNote() { saveResponse(NOTE_KEY, auditNoteText.value) }
+function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNoteText.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
+})
 
 const state = useH1Stocktake(toRef(props, 'wpId'), toRef(props, 'projectId'), allResponsesRef as any)
 

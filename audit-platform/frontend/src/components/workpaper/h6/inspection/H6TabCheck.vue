@@ -18,10 +18,16 @@
     <div class="section-header">
       <span>检查表 H6-4</span>
       <div class="section-header-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button size="small" circle @click="openReview('H6-4-check')">💬</el-button>
+      </div>
+    </div>
+
+    <!-- 工具栏：底稿索引 + 行数 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H6-4" :context-project-id="props.projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
@@ -153,9 +159,6 @@
         <div class="section-header" style="margin-bottom:0">
           <span>审计说明</span>
           <div class="section-header-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate">
-              <el-icon><MagicStick /></el-icon> AI生成
-            </el-button>
             <el-button size="small" circle @click="openReview('H6-4-note')">💬</el-button>
           </div>
         </div>
@@ -163,10 +166,30 @@
       <el-input
         v-model="auditNote"
         type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
+        :autosize="{ minRows: 5, maxRows: 10 }"
         placeholder="请填写审计说明..."
         :disabled="props.isReadonly"
         @blur="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header" style="margin-bottom:0">
+          <span>审计结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" circle @click="openReview('H6-4-conclusion')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="请填写审计结论..."
+        :disabled="props.isReadonly"
+        @blur="saveAuditConclusion"
       />
     </el-card>
 
@@ -201,8 +224,8 @@
  */
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
 import { useH6Check, type H6CheckRow, type CheckField, type ComplianceOption } from '../../composables/useH6Check'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId: string
@@ -269,6 +292,15 @@ function saveAuditNote() {
   saveResponse('H6-4-note', auditNote.value)
 }
 
+const auditConclusion = ref<string>('')
+const existingConclusion = props.allResponses.get('H6-4-conclusion')
+if (existingConclusion) {
+  auditConclusion.value = existingConclusion.remark || existingConclusion.conclusion || ''
+}
+function saveAuditConclusion() {
+  saveResponse('H6-4-conclusion', auditConclusion.value)
+}
+
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
 function handleUpdateCell(rowId: string, field: string, value: any) {
@@ -326,10 +358,6 @@ function handleJumpH6_2(linkedDetailRowId: string) {
   emit('navigate-sheet', '明细表H6-2')
 }
 
-function handleAiGenerate() {
-  console.log('[H6-4] AI generate')
-}
-
 function openReview(id: string) {
   openReviewDialog(id, 'H6-4 检查表')
 }
@@ -383,6 +411,13 @@ function optionShort(opt: ComplianceOption): string {
   font-size: 14px; font-weight: 600; margin-bottom: 12px;
 }
 .section-header-actions { display: flex; align-items: center; gap: 4px; }
+
+.tab-toolbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 12px;
+}
+.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
 .non-compliant-alert { margin-bottom: 12px; }
 

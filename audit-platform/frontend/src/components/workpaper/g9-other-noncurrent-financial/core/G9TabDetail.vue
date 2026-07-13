@@ -1,6 +1,6 @@
 <template>
   <div class="g9-detail" data-testid="g9-detail-table">
-    <div class="toolbar">
+    <div class="toolbar tab-toolbar">
       <h3>G9-2 明细表</h3>
       <div class="head-actions">
         <GtIndexChip value="wp:G9-2" />
@@ -215,11 +215,25 @@
         <p>Level3 层次资产须在 G9-4 补充估值技术与不可观察输入值。</p>
       </div>
     </details>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
+        placeholder="填写审计说明：可概述明细核对情况、分类计量恰当性、与 G9-1 审定表合计勾稽情况及拟调整事项。"
+        @change="(val: string) => saveAuditNote(val)" />
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
+        @change="(val: string) => saveAuditConclusion(val)" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9Detail } from '../../composables/useG9Detail'
@@ -248,6 +262,26 @@ const detail = useG9Detail({
 
 function onImported() { emit('imported') }
 
+// ─── 审计说明 / 审计结论（持久化 checklist_responses）─────────────────────
+const NOTE_KEY = 'G9-detail-audit-note'
+const CONCLUSION_KEY = 'G9-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
+}
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
+}
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+})
+
 function onRowChange(r: any) {
   if (r) detail.activeRowIndex.value = detail.rows.value.findIndex((x) => x.rowId === r.rowId)
 }
@@ -267,4 +301,6 @@ function fmt(n: number) {
 .audit-objective { margin: 8px 0; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .guidance-content p { margin: 4px 0; }
+.audit-note-card { margin-top: 12px; }
+.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

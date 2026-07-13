@@ -18,6 +18,21 @@
     </details>
 
     <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：核实其他权益工具投资（科目1503）期末余额的存在与计价，验证以公允价值计量且变动计入其他综合收益（OCI）分类的恰当性，确认审定数与试算表、明细表勾稽一致。"
+      class="objective-alert"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left"></div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-1" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+      </div>
+    </div>
+
+    <el-alert
       v-if="adj.hasMissingReasons.value"
       type="warning"
       :closable="false"
@@ -160,11 +175,17 @@
       <el-input v-if="!isReadonly" v-model="noteProxy" type="textarea" :rows="3" placeholder="审定分析说明" />
       <p v-else class="note-text">{{ adj.auditNote.value || '—' }}</p>
     </el-card>
+
+    <el-card shadow="never" class="g8-note-card">
+      <template #header>审计结论</template>
+      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+        placeholder="填写审计结论：审定数是否准确、分类（OCI）是否恰当，是否与试算表及明细表勾稽一致。" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
@@ -182,6 +203,12 @@ const props = defineProps<{
 
 const validateLoading = ref(false)
 
+const AUDIT_CONCLUSION_KEY = 'G8-1-audit-conclusion'
+const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
+})
+
 const adj = useG8Adjudication({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
@@ -194,6 +221,10 @@ const noteProxy = computed({
   get: () => adj.auditNote.value,
   set: (v: string) => adj.updateAuditNote(v),
 })
+
+const rowCount = computed(() =>
+  adj.groupedRows.value.reduce((n, g) => n + (g.rows?.length ?? 0), 0),
+)
 
 function fmt(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return '—'
@@ -224,6 +255,10 @@ async function runValidate() {
 
 <style scoped>
 .g8-adjudication { font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 .g8-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .g8-title { margin: 0; font-size: 15px; }
 .g8-actions { display: flex; gap: 8px; }
