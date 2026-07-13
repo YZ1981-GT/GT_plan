@@ -60,6 +60,9 @@
       <!-- 附注（国有企业） -->
       <J1TabDisclosureSoe v-else-if="currentSheet === 'J1附注(国企)'"
         :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+      <!-- IPO企业薪酬审计提示（只读注意事项） -->
+      <J1TabIpoTips v-else-if="currentSheet === 'IPO-tips'"
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
       <!-- 兜底 OnlyOffice -->
       <div v-else class="j1-sheet-placeholder">
         <el-empty :description="`J1 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
@@ -99,6 +102,7 @@ const J1TabNonMonetaryCheck = defineAsyncComponent(() => import('./inspection/J1
 const J1TabSeveranceCheck = defineAsyncComponent(() => import('./inspection/J1TabSeveranceCheck.vue'))
 const J1TabDisclosureListed = defineAsyncComponent(() => import('./core/J1TabDisclosureListed.vue'))
 const J1TabDisclosureSoe = defineAsyncComponent(() => import('./core/J1TabDisclosureSoe.vue'))
+const J1TabIpoTips = defineAsyncComponent(() => import('./J1TabIpoTips.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -122,6 +126,7 @@ const isLoading = ref(true)
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
   if (/\bJ1A\b/.test(sn) || sn.includes('实质性程序表')) return 'J1A'
+  if (sn.includes('IPO')) return 'IPO-tips'
   const mCode = sn.match(/(J1-\d+)/)
   if (mCode) return mCode[1]
   if (sn.includes('上市')) return 'J1附注(上市)'
