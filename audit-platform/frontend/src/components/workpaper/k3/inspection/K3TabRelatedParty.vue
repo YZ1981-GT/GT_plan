@@ -65,12 +65,63 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="往来金额" min-width="110" align="right">
+      <el-table-column label="期初余额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.amount" size="small"
+          <el-input-number v-if="!isReadonly" v-model="row.beginBalance" size="small"
             :controls="false" class="amount-input"
             @change="handleRowChange(row)" />
-          <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
+          <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="借方发生额" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.debitAmount" size="small"
+            :controls="false" class="amount-input"
+            @change="handleRowChange(row)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="贷方发生额" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.creditAmount" size="small"
+            :controls="false" class="amount-input"
+            @change="handleRowChange(row)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期末余额" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-tooltip content="期初+贷方-借方（负债类）" placement="top">
+            <span class="formula-cell">{{ fmtAmt((row.beginBalance || 0) + (row.creditAmount || 0) - (row.debitAmount || 0)) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="发生时间/账龄" min-width="110">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.transactionTime" size="small" placeholder="如：2024-06/2年"
+            @change="handleRowChange(row)" />
+          <span v-else>{{ row.transactionTime || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="发生原因(款项性质)" min-width="130">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.transactionReason" size="small" placeholder="款项性质"
+            @change="handleRowChange(row)" />
+          <span v-else>{{ row.transactionReason || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期后付款" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.postPayment" size="small"
+            :controls="false" class="amount-input"
+            @change="handleRowChange(row)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.postPayment) }}</span>
         </template>
       </el-table-column>
 
@@ -122,6 +173,14 @@
           <el-tag v-else :type="conclusionTagType(row.conclusion)" size="small">
             {{ row.conclusion || '未判定' }}
           </el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="索引号" min-width="90">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.indexNo" size="small" placeholder="索引"
+            @change="handleRowChange(row)" />
+          <span v-else>{{ row.indexNo || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -261,7 +320,14 @@ async function handleAddRow() {
       seqNo: relatedPartyRows.value.length + 1,
       counterparty: value.trim(),
       relationship: '',
+      beginBalance: 0,
+      debitAmount: 0,
+      creditAmount: 0,
+      endBalance: 0,
       amount: 0,
+      transactionTime: '',
+      transactionReason: '',
+      postPayment: 0,
       isFair: '待评估',
       isDisclosed: '不适用',
       capitalOccupation: '否',
@@ -388,6 +454,7 @@ function handleReview(id: string) { openReviewDialog(id) }
 .related-party-table { font-size: var(--wp-font-size, 13px); }
 .amount-cell { font-variant-numeric: tabular-nums; }
 .amount-input { width: 100%; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }

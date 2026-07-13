@@ -99,6 +99,50 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="未偿还/未结转原因" min-width="150">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.nonPaymentReason" size="small" placeholder="未偿还或未结转的原因"
+            @change="handleRowChange(row)" />
+          <span v-else>{{ row.nonPaymentReason || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="是否无法支付" min-width="100" align="center">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" v-model="row.cannotPay" size="small" @change="handleRowChange(row)">
+            <el-option label="是" value="是" /><el-option label="否" value="否" />
+          </el-select>
+          <el-tag v-else :type="row.cannotPay === '是' ? 'danger' : 'success'" size="small">{{ row.cannotPay || '-' }}</el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="是否诉讼" min-width="90" align="center">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" v-model="row.hasLitigation" size="small" @change="handleRowChange(row)">
+            <el-option label="是" value="是" /><el-option label="否" value="否" />
+          </el-select>
+          <el-tag v-else :type="row.hasLitigation === '是' ? 'warning' : 'info'" size="small">{{ row.hasLitigation || '-' }}</el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="审定余额" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.auditedBalance" size="small"
+            :controls="false" class="amount-input"
+            @change="handleRowChange(row)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.auditedBalance) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期后付款" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.postPayment" size="small"
+            :controls="false" class="amount-input"
+            @change="handleRowChange(row)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.postPayment) }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="是否需转营业外收入" min-width="150" align="center">
         <template #default="{ row }">
           <el-select v-if="!isReadonly" v-model="row.needTransfer" size="small"

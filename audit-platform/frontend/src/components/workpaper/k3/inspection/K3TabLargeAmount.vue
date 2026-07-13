@@ -133,6 +133,23 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="协议/合同索引" min-width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" v-model="row.contractIndex" size="small" placeholder="索引号"
+            @change="handleRowChange(row)" />
+          <span v-else>{{ row.contractIndex || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期后付款" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.postPayment" size="small"
+            :controls="false" class="amount-input"
+            @change="handleRowChange(row)" />
+          <span v-else class="amount-cell">{{ fmtAmt(row.postPayment) }}</span>
+        </template>
+      </el-table-column>
+
       <!-- 操作列 -->
       <el-table-column v-if="!isReadonly" label="操作" width="60" align="center" fixed="right">
         <template #default="{ row }">

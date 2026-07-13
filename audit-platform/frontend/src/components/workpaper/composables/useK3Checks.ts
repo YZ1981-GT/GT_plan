@@ -43,11 +43,19 @@ export interface K3RelatedPartyRow {
   seqNo: number
   counterparty: string         // 关联方名称
   relationship: string         // 关联关系
-  amount: number               // 往来金额
+  beginBalance: number         // 期初余额
+  debitAmount: number          // 借方发生额
+  creditAmount: number         // 贷方发生额
+  endBalance: number           // 期末余额（公式：期初+贷-借，负债类）
+  amount: number               // 往来金额（兼容旧数据 → endBalance）
+  transactionTime: string      // 发生时间及账龄
+  transactionReason: string    // 发生原因（款项性质）
+  postPayment: number          // 期后付款金额
   isFair: '是' | '否' | '待评估'       // 是否公允
   isDisclosed: '是' | '否' | '不适用'  // 是否披露
   capitalOccupation: '是' | '否'       // 资金占用
   conclusion: ComplianceState | null
+  indexNo: string              // 索引号
   remark: string
 }
 
