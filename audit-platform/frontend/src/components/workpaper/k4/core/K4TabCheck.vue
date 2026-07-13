@@ -1,355 +1,353 @@
+<!--
+  K4TabCheck.vue — K4-4 其他流动负债检查表（凭证级测试）
+
+  忠实反映致同源模板 K4-4（镜像 K1-12）：
+    一、审计目标（存在/偿还义务/计价分摊 三认定）
+    二、样本选取标准与规模（测试总体/特定样本/抽样总体/样本量/抽样方法/抽样过程）
+    三、测试（本期发生额检查，凭证级明细 + 抽凭引擎 + 核对内容勾选）
+    四、审计说明（检查比例表：本期借方/本期贷方 → 账面/检查/比例）
+    五、审计结论
+
+  复用 useK1VoucherCheck（通用凭证检查状态）。科目 2245 其他流动负债（贷方/负债类）。
+  注：源模板 K4-4 仅"本期发生额检查"单表（无期后检查段）。
+-->
 <template>
   <div class="k4-tab-check">
-    <!-- Section标题栏 -->
+    <div class="guide-banner">
+      <div class="guide-step"><span class="gs-no">1</span>确认审计目标（三认定）</div>
+      <div class="guide-step"><span class="gs-no">2</span>填写样本选取标准与规模</div>
+      <div class="guide-step"><span class="gs-no">3</span>抽凭执行凭证级测试</div>
+      <div class="guide-step"><span class="gs-no">4</span>核对检查比例，形成结论</div>
+    </div>
+
     <div class="section-head">
       <h3 class="sheet-title">K4-4 其他流动负债检查表</h3>
       <div class="head-actions">
-        <el-button size="small" @click="openReview('K4-4-check')">💬复核</el-button>
+        <el-button size="small" type="primary" link @click="handleAiGenerate">
+          <el-icon><MagicStick /></el-icon> AI辅助
+        </el-button>
+        <el-button size="small" @click="handleReview">💬 复核</el-button>
       </div>
     </div>
 
-    <!-- 审计目标（认定） -->
-    <el-alert type="info" :closable="false" style="margin-bottom:12px">
-      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
-      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
-        <li><b>存在与义务：</b>记录的其他流动负债存在且为被审计单位应履行的偿还义务；</li>
-        <li><b>完整性：</b>所有应记录的其他流动负债均已记录，不存在少计；</li>
-        <li><b>列报与披露：</b>分类正确、以恰当金额列示、披露充分。</li>
+    <!-- 一、审计目标 -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">一、审计目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>资产负债表中记录的其他流动负债是存在的，且已记录在恰当的账户中；</li>
+        <li><b>义务：</b>记录的其他流动负债是被审计单位应当履行的偿还义务；</li>
+        <li><b>计价和分摊：</b>其他流动负债以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。</li>
       </ol>
     </el-alert>
 
-    <!-- 不合规红色警告 -->
-    <el-alert
-      v-if="nonComplianceSummary.hasNonCompliant"
-      type="error"
-      :closable="false"
-      style="margin-bottom:10px"
-    >
-      ⚠️ 存在 {{ nonComplianceSummary.count }} 项"不合规"：
-      <span v-for="(nc, idx) in nonComplianceSummary.items" :key="nc.id">
-        {{ nc.label }}<span v-if="idx < nonComplianceSummary.items.length - 1">、</span>
-      </span>
-    </el-alert>
-
-    <!-- 琥珀色方法论块 -->
-    <div class="methodology-block">
-      <div class="methodology-title">K4-4 检查要求（完整性认定为主）</div>
-      <div class="methodology-content">
-        其他流动负债（2245）负债类科目，完整性认定为关注重点。检查内容涵盖：
-        ①分类正确性（是否混入合同负债/其他应付等）②流动性判断（是否应重分类至非流动）
-        ③完整性反向截止（期后偿付/到期倒查确认不存在少计）④合规性（预提依据/代扣代缴）。
+    <!-- 二、样本选取标准与规模 -->
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">二、样本选取标准与规模</span></template>
+      <div class="criteria-grid">
+        <div class="cg-item">
+          <label>测试总体（借方）</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.populationDebitCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.populationDebitAmount" :controls="false" :disabled="isReadonly" size="small" placeholder="金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>测试总体（贷方）</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.populationCreditCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.populationCreditAmount" :controls="false" :disabled="isReadonly" size="small" placeholder="金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item cg-full">
+          <label>特定样本</label>
+          <el-input v-model="criteria.specificSample" :disabled="isReadonly" size="small"
+            placeholder="大额（XX金额以上）、关联方/关联交易形成的款项、异常款项全部测试" @change="persist" />
+        </div>
+        <div class="cg-item">
+          <label>抽样总体</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.samplingPopulationCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.samplingPopulationAmount" :controls="false" :disabled="isReadonly" size="small" placeholder="金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>抽样样本量</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.sampleSize" :controls="false" :disabled="isReadonly" size="small" placeholder="样本量" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>抽样方法</label>
+          <el-select v-model="criteria.samplingMethod" :disabled="isReadonly" size="small" @change="persist">
+            <el-option label="随机选样" value="随机选样" />
+            <el-option label="系统选样" value="系统选样" />
+            <el-option label="货币单元抽样" value="货币单元抽样" />
+            <el-option label="随意选样（非统计抽样）" value="随意选样" />
+          </el-select>
+        </div>
+        <div class="cg-item cg-full">
+          <label>抽样过程</label>
+          <el-input v-model="criteria.samplingProcess" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" size="small"
+            placeholder="使用IDEA（XX抽样工具）选择XX数量、金额XX的样本进行测试，抽样过程和结果见相关底稿" @change="persist" />
+        </div>
       </div>
+    </el-card>
+
+    <!-- 三、测试 — 本期发生额检查 -->
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">三、测试 — 本期发生额检查</span>
+          <div>
+            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="openSampling"><el-icon><MagicStick /></el-icon> 抽凭</el-button>
+            <el-button v-if="!isReadonly" size="small" @click="addOccurrenceRow(); persist()">＋ 手工新增</el-button>
+          </div>
+        </div>
+      </template>
+      <el-table :data="occurrenceRows" border size="small" :max-height="420" class="voucher-table" :row-class-name="abnormalRowClass">
+        <el-table-column label="#" type="index" width="42" align="center" />
+        <el-table-column label="明细项目" min-width="130">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.debtorName" size="small" @change="persist" /><span v-else>{{ row.debtorName || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="日期" width="120">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" /><span v-else>{{ row.date || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="凭证编号" width="110">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.voucherNo" size="small" @change="persist" /><span v-else>{{ row.voucherNo || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="业务内容" min-width="150">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.businessContent" size="small" @change="persist" /><span v-else>{{ row.businessContent || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="对方科目" min-width="110">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetAccount" size="small" @change="persist" /><span v-else>{{ row.offsetAccount || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="借方金额" min-width="110" align="right">
+          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="贷方金额" min-width="110" align="right">
+          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="核对内容" width="180" align="center">
+          <template #header>
+            <el-tooltip placement="top">
+              <template #content><div v-for="(lbl, i) in checkLabels" :key="i">{{ i + 1 }}. {{ lbl }}</div></template>
+              <span class="col-help">核对内容 ⓘ</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-checkbox-group :model-value="checkedValues(row)" :disabled="isReadonly" class="check-group" @update:model-value="(v: any) => setChecks(row, v as number[])">
+              <el-checkbox v-for="(lbl, i) in checkLabels" :key="i" :value="i" :label="i + 1" />
+            </el-checkbox-group>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否异常" width="80" align="center">
+          <template #default="{ row }"><el-switch v-model="row.abnormal" :disabled="isReadonly" size="small" @change="persist" /></template>
+        </el-table-column>
+        <el-table-column label="索引号" width="90">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.indexNo" size="small" @change="persist" /><span v-else>{{ row.indexNo || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="备注说明" min-width="120">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" /><span v-else>{{ row.remark || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }"><el-button size="small" type="danger" link @click="removeOccurrenceRow(row.id); persist()">删除</el-button></template>
+        </el-table-column>
+        <template #append><div class="table-total">合计　借方：{{ fmtAmt(occurrenceDebitChecked) }}　贷方：{{ fmtAmt(occurrenceCreditChecked) }}</div></template>
+      </el-table>
+    </el-card>
+
+    <!-- 四、审计说明（检查比例表：本期借方/本期贷方）-->
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">四、审计说明 — 检查比例</span></template>
+      <el-table :data="k4CheckRatios" border size="small" class="ratio-table">
+        <el-table-column label="方向" prop="direction" width="120" />
+        <el-table-column label="账面金额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.bookAmount) }}</span></template></el-table-column>
+        <el-table-column label="检查金额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.checkedAmount) }}</span></template></el-table-column>
+        <el-table-column label="检查比例" width="130" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.ratio != null" :type="row.ratio < 0.3 ? 'danger' : row.ratio < 0.6 ? 'warning' : 'success'" size="small" effect="plain">{{ (row.ratio * 100).toFixed(1) }}%</el-tag>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-alert v-if="lowRatioWarnings.length > 0" type="warning" :closable="false" show-icon class="ratio-warn">
+        <template #title>检查比例偏低（&lt;30%）：{{ lowRatioWarnings.map(r => r.direction).join('、') }}，应扩大检查样本量或说明原因</template>
+      </el-alert>
+      <div class="note-block">
+        <label>审计说明</label>
+        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="概述测试情况、结果；拟调整事项及分录、未调整事项及其影响等" @change="persist" />
+      </div>
+    </el-card>
+
+    <div v-if="abnormalRows.length > 0" class="abnormal-summary">
+      <div class="as-header">⚠️ 异常凭证摘要（{{ abnormalRows.length }} 笔）</div>
+      <ul class="as-list">
+        <li v-for="r in abnormalRows" :key="r.id"><b>{{ r.debtorName || '（未填明细项目）' }}</b> — 凭证 {{ r.voucherNo || '-' }}：{{ r.remark || '未说明' }}</li>
+      </ul>
     </div>
 
-    <!-- 检查项卡片列表 -->
-    <div v-for="item in checkItems" :key="item.id" class="check-item-card">
-      <el-card shadow="never">
-        <template #header>
-          <div class="check-item-header">
-            <span class="check-seq">{{ item.seq }}.</span>
-            <span class="check-label">{{ item.label }}</span>
-            <el-tag v-if="item.compliance === '合规'" type="success" size="small">合规</el-tag>
-            <el-tag v-else-if="item.compliance === '不合规'" type="danger" size="small">不合规</el-tag>
-            <el-tag v-else-if="item.compliance === '不适用'" type="info" size="small">不适用</el-tag>
-            <el-tag v-else type="warning" size="small">未判定</el-tag>
-          </div>
-        </template>
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="card-title">五、审计结论</span></template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select" placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述重大不符事项作为调整事项予以调整外，其余未见异常" value="B" />
+        <el-option label="C、由于存在重大未调整事项（或审计范围受限），不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" placeholder="基于上述检查情况，形成综合审计结论..." @change="persist" />
+    </el-card>
 
-        <!-- 检查描述 -->
-        <p class="check-description">{{ item.description }}</p>
-
-        <!-- 合规判定radio -->
-        <div class="check-field-row">
-          <span class="field-label">合规判定：</span>
-          <el-radio-group
-            :model-value="item.compliance"
-            :disabled="isReadonly"
-            @change="(v: string) => handleComplianceChange(item.id, v as any)"
-          >
-            <el-radio value="合规">合规</el-radio>
-            <el-radio value="不合规">不合规</el-radio>
-            <el-radio value="不适用">不适用</el-radio>
-          </el-radio-group>
-        </div>
-
-        <!-- 审计证据 -->
-        <div class="check-field-row">
-          <span class="field-label">审计证据：</span>
-          <el-input
-            :model-value="item.evidence"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }"
-            :disabled="isReadonly"
-            placeholder="记录检查过程、审计证据及发现..."
-            @change="(v: string) => handleEvidenceChange(item.id, v)"
-          />
-        </div>
-
-        <!-- 凭证号 + 抽凭 + OCR -->
-        <div class="check-action-row">
-          <div class="voucher-field">
-            <span class="field-label">凭证号：</span>
-            <el-input
-              :model-value="item.voucherRef"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="如：记-001"
-              style="width:140px"
-              @change="(v: string) => handleVoucherRefChange(item.id, v)"
-            />
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleVoucherSampling(item.id)">
-              🎲 抽凭
-            </el-button>
-          </div>
-          <div class="ocr-field">
-            <el-button size="small" type="default" link :disabled="isReadonly" @click="handleOcrUpload(item.id)">
-              📎 OCR识别
-            </el-button>
-            <span v-if="item.ocrAttachment" class="ocr-indicator">✓ 已附</span>
-          </div>
-        </div>
-
-        <!-- 备注 -->
-        <div class="check-field-row">
-          <span class="field-label">备注：</span>
-          <el-input
-            :model-value="item.remark"
-            size="small"
-            :disabled="isReadonly"
-            placeholder="补充说明..."
-            @change="(v: string) => handleRemarkChange(item.id, v)"
-          />
-        </div>
-      </el-card>
-    </div>
-
-    <!-- 抽凭引擎 Dialog（科目 2245，wrap el-dialog + @filled 范式，对齐 K8/G6） -->
-    <el-dialog
-      v-model="voucherDialogVisible"
-      title="⚡ 抽凭引擎（科目 2245 其他流动负债）"
-      width="720px"
-      :close-on-click-modal="false"
-      destroy-on-close
-    >
-      <GtVoucherSamplingEngine
-        v-if="voucherDialogVisible && wpId && projectId"
-        :project-id="projectId"
-        :workpaper-id="wpId"
-        account-code="2245"
-        phase="substantive"
-        :year="currentYear"
-        @filled="handleSampleFilled"
-      />
-    </el-dialog>
-
-    <!-- OCR file input -->
-    <input ref="ocrFileInput" type="file" accept="image/*,.pdf" style="display:none" @change="handleOcrFileSelected" />
-
-    <!-- 编制提示 -->
     <details class="compile-hint">
-      <summary>📋 编制提示</summary>
-      <div class="compile-content">
-        <p>1. 其他流动负债（2245）为负债类科目，完整性认定为主（负债易少计）。</p>
-        <p>2. 四项检查：分类正确性→确认科目归属；流动性→非流动应重分类；完整性→反向截止测试；合规性→预提/代扣合法合规。</p>
-        <p>3. 行级抽凭：点击"🎲抽凭"打开抽凭引擎Dialog，选择样本后自动填入凭证号。</p>
-        <p>4. 行级OCR：点击"📎OCR识别"上传凭证影像，调用OCR识别后确认填入证据字段。</p>
-        <p>5. 存在任何"不合规"项时，顶部红色警告提示，需在审计说明中解释并建议调整。</p>
-      </div>
+      <summary>编制提示（CAS 1314）</summary>
+      <ul>
+        <li>审计目标对应三项认定：存在、义务、计价和分摊（其他流动负债完整性认定为重点）</li>
+        <li>样本选取：测试总体扣除特定样本得抽样总体；大额、关联方、异常款项应全部测试</li>
+        <li>本期发生额检查：逐笔核对记账凭证与原始凭证，检查会计处理与披露是否正确</li>
+        <li>检查比例 = 检查金额 / 账面金额；比例偏低（&lt;30%）须扩样或说明</li>
+        <li>抽凭引擎复用序时账，科目 2245 其他流动负债（贷方/负债类）</li>
+      </ul>
     </details>
+
+    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 其他流动负债(2245)" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2245" phase="current" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * K4TabCheck.vue — K4-4 其他流动负债检查表
+ * K4TabCheck.vue — K4-4 其他流动负债检查表（凭证级测试，复用 useK1VoucherCheck）
  *
- * Spec: k4-other-current-liabilities Task 4.4
- * Requirements: 4.1-4.3
- *
- * 功能：
- * - 逐项检查：分类正确性/流动性判断/完整性(反向截止)/合规性
- * - Per-item: compliance radio (合规/不合规/不适用) + evidence + 凭证号 + 📎OCR + 备注
- * - Red banner when any "不合规" exists
- * - 行级抽凭: GtVoucherSamplingEngine dialog
- * - 行级OCR: 📎 upload → POST contract-ocr → ElMessageBox confirm → merge
- *
- * 科目：2245 其他流动负债（负债类，完整性认定为主）
+ * Spec: k4-other-current-liabilities Task 4.4（源模板对齐重建）
+ * 科目 2245 其他流动负债（贷方/负债类）。源模板仅本期发生额单表。
  */
-import { ref, computed, inject, defineAsyncComponent, toRef } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { useK4Check, type K4ComplianceState } from '@/components/workpaper/composables/useK4Check'
-import http from '@/utils/http'
+import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { MagicStick } from '@element-plus/icons-vue'
+import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
-// Lazy import voucher sampling engine
-const GtVoucherSamplingEngine = defineAsyncComponent(
-  () => import('@/components/workpaper/voucher-sampling/GtVoucherSamplingEngine.vue'),
-)
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
-
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
-
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ═══ useK4Check composable ═══
-function saveResponse(itemId: string, value: any): void {
-  emit('save', itemId, value)
-}
+const year = computed(() => props.year ?? new Date().getFullYear())
+const allResponsesRef = computed(() => props.allResponses)
 
 const {
-  checkItems,
-  nonComplianceSummary,
-  updateCompliance,
-  updateEvidence,
-  updateRemark,
-  setVoucherRef,
-  setOcrAttachment,
-} = useK4Check({
-  allResponses: toRef(props, 'allResponses'),
-  saveResponse,
-})
+  itemId, checkLabels,
+  criteria, occurrenceRows, auditNote, conclusion, conclusionOption,
+  checkRatios, lowRatioWarnings, abnormalRows,
+  occurrenceDebitChecked, occurrenceCreditChecked,
+  load, addOccurrenceRow, removeOccurrenceRow,
+  fillFromSamples, serialize,
+} = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: 'K4-4-voucher-check' })
 
-// ═══ 抽凭引擎 ═══
-const voucherDialogVisible = ref(false)
-const currentYear = computed(() => new Date().getFullYear())
-let currentVoucherItemId = ''
+// 源模板 K4-4 检查比例仅 本期借方/本期贷方（无期末余额行）
+const k4CheckRatios = computed(() => checkRatios.value.filter(r => r.direction !== '期末余额'))
 
-function handleVoucherSampling(itemId: string): void {
-  currentVoucherItemId = itemId
-  voucherDialogVisible.value = true
+onMounted(() => load())
+
+function checkedValues(row: K1VoucherRow): number[] {
+  return row.checks.map((c, i) => (c ? i : -1)).filter(i => i >= 0)
+}
+function setChecks(row: K1VoucherRow, vals: number[]): void {
+  row.checks = checkLabels.map((_, i) => vals.includes(i))
+  persist()
 }
 
-/**
- * 抽凭引擎 @filled 回调（payload: { samples, phase, fillMode, method }）
- * 将选取的凭证号映射回当前检查项的凭证号字段（K4 行模型）。
- */
-function handleSampleFilled(payload: { samples?: any[] } | any): void {
-  voucherDialogVisible.value = false
-  const samples: any[] = payload?.samples ?? []
-  if (!currentVoucherItemId || samples.length === 0) return
-  const refs = samples
-    .map((s) => s.voucherNo || s.voucher_no || s.ref || '')
-    .filter((r: string) => !!r)
-  if (refs.length) {
-    setVoucherRef(currentVoucherItemId, refs.join('、'))
-    ElMessage.success(`已选取 ${refs.length} 笔凭证：${refs.join('、')}`)
+const samplingVisible = ref(false)
+function openSampling() { samplingVisible.value = true }
+function onSamplesFilled(payload: { samples: any[] }) {
+  fillFromSamples('occurrence', payload?.samples ?? [])
+  samplingVisible.value = false
+  persist()
+}
+
+function persist() {
+  const data = serialize()
+  props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: data })
+  emit('save', itemId, { remark: data })
+}
+function onConclusionOption(val: string) {
+  const map: Record<string, string> = {
+    A: '未见异常。',
+    B: '除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。',
+    C: '由于存在重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。',
   }
+  if (map[val] && !conclusion.value) conclusion.value = map[val]
+  persist()
 }
-
-// ═══ 行级OCR ═══
-const ocrFileInput = ref<HTMLInputElement | null>(null)
-let currentOcrItemId = ''
-
-function handleOcrUpload(itemId: string): void {
-  currentOcrItemId = itemId
-  ocrFileInput.value?.click()
+function fmtAmt(val: number | null | undefined): string {
+  if (val == null) return '-'
+  return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-async function handleOcrFileSelected(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  input.value = '' // reset
-
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    ElMessage.info('正在OCR识别...')
-    const res = await http.post('/api/d4/contract-ocr', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    const ocrText = res.data?.data?.text || res.data?.text || ''
-
-    if (!ocrText) {
-      ElMessage.warning('OCR未识别到文字内容')
-      return
-    }
-
-    // 确认弹窗
-    await ElMessageBox.confirm(
-      `OCR识别结果：\n\n${ocrText.slice(0, 500)}${ocrText.length > 500 ? '...' : ''}`,
-      'OCR识别确认',
-      { confirmButtonText: '填入证据', cancelButtonText: '取消', type: 'info' },
-    )
-
-    // merge到evidence
-    const item = checkItems.value.find(i => i.id === currentOcrItemId)
-    if (item) {
-      const merged = item.evidence ? `${item.evidence}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
-      updateEvidence(currentOcrItemId, merged)
-      setOcrAttachment(currentOcrItemId, file.name)
-      ElMessage.success('OCR内容已填入审计证据')
-    }
-  } catch (err: any) {
-    if (err !== 'cancel' && err?.message !== 'cancel') {
-      ElMessage.error('OCR识别失败：' + (err?.response?.data?.detail || err.message || '未知错误'))
-    }
-  }
-}
-
-// ═══ 字段更新 ═══
-function handleComplianceChange(itemId: string, value: K4ComplianceState): void {
-  updateCompliance(itemId, value)
-}
-
-function handleEvidenceChange(itemId: string, value: string): void {
-  updateEvidence(itemId, value)
-}
-
-function handleRemarkChange(itemId: string, value: string): void {
-  updateRemark(itemId, value)
-}
-
-function handleVoucherRefChange(itemId: string, value: string): void {
-  setVoucherRef(itemId, value)
-}
-
-// ═══ 复核 ═══
-function openReview(id: string): void {
-  openReviewDialog(id)
-}
+function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
+function handleAiGenerate() { emit('save', 'K4-4-ai-trigger', { remark: 'voucher-check' }) }
+function handleReview() { openReviewDialog('K4-4-check') }
 </script>
 
 <style scoped>
-.k4-tab-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
+.k4-tab-check { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+.guide-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: linear-gradient(135deg, #eef4ff 0%, #e0ecff 100%); border: 1px solid #c6dbff; border-radius: 6px; padding: 7px 12px; margin-bottom: 10px; }
+.guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #1e40af; }
+.gs-no { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.sheet-title { font-size: 15px; font-weight: 600; margin: 0; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
-
-/* 琥珀色方法论 */
-.methodology-block { border-left: 4px solid #f59e0b; background: #fffbeb; border-radius: 4px; padding: 12px 16px; margin-bottom: 14px; }
-.methodology-title { font-weight: 600; color: #92400e; margin-bottom: 4px; font-size: 12px; }
-.methodology-content { font-size: 12px; color: #78350f; line-height: 1.6; }
-
-/* 检查项卡片 */
-.check-item-card { margin-bottom: 10px; }
-.check-item-header { display: flex; align-items: center; gap: 8px; }
-.check-seq { font-weight: 700; color: var(--el-color-primary); }
-.check-label { font-weight: 600; font-size: 14px; flex: 1; }
-.check-description { font-size: 12px; color: var(--el-text-color-secondary); margin: 0 0 12px 0; line-height: 1.6; }
-
-/* 字段行 */
-.check-field-row { margin-bottom: 10px; }
-.field-label { display: inline-block; width: 72px; font-size: 12px; color: #606266; font-weight: 500; vertical-align: top; }
-
-/* 操作行（凭证+OCR） */
-.check-action-row { display: flex; align-items: center; gap: 24px; margin-bottom: 10px; flex-wrap: wrap; }
-.voucher-field { display: flex; align-items: center; gap: 6px; }
-.ocr-field { display: flex; align-items: center; gap: 6px; }
-.ocr-indicator { font-size: 11px; color: #67c23a; }
-
-/* 编制提示 */
-.compile-hint { margin-top: 16px; }
-.compile-hint summary { cursor: pointer; font-weight: 500; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-content { padding: 8px 12px; background: #fffbeb; border-left: 3px solid #f59e0b; margin-top: 6px; font-size: 12px; line-height: 1.8; }
-.compile-content p { margin: 0; }
+.audit-objective { margin-bottom: 10px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.55; font-size: 12px; }
+.section-card { margin-bottom: 10px; }
+.section-card :deep(.el-card__header) { padding: 8px 14px; }
+.section-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-title { font-weight: 600; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; }
+.criteria-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 18px; }
+.cg-item { display: flex; flex-direction: column; gap: 4px; }
+.cg-item.cg-full { grid-column: 1 / -1; }
+.cg-item label { font-size: 12px; color: var(--el-text-color-secondary); }
+.cg-inline { display: flex; align-items: center; gap: 5px; }
+.cg-unit { font-size: 12px; color: var(--el-text-color-secondary); }
+.num-sm { width: 78px; }
+.num-md { width: 130px; }
+.voucher-table { font-size: var(--wp-font-size, 13px); }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.amount-input { width: 100%; }
+.col-help { cursor: help; border-bottom: 1px dashed var(--el-border-color); }
+.check-group { display: flex; flex-wrap: wrap; gap: 0 4px; }
+.check-group :deep(.el-checkbox) { margin-right: 4px; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; color: var(--el-text-color-regular); font-weight: 600; }
+.voucher-table :deep(.abnormal-row td) { background-color: #fef2f2 !important; }
+.ratio-table { max-width: 640px; }
+.ratio-warn { margin-top: 12px; }
+.muted { color: var(--el-text-color-placeholder); }
+.note-block { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
+.note-block label { font-size: 12px; color: var(--el-text-color-secondary); }
+.abnormal-summary { margin-bottom: 10px; padding: 10px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #fecaca; }
+.as-header { font-weight: 600; color: var(--el-color-danger); margin-bottom: 6px; }
+.as-list { padding-left: 18px; margin: 0; line-height: 1.7; color: var(--el-color-danger-dark-2); }
+.conclusion-card { margin-bottom: 10px; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
+.compile-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 18px; margin-top: 8px; line-height: 1.7; }
 </style>

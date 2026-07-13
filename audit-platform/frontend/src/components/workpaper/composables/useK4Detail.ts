@@ -30,10 +30,20 @@ export interface K4DetailRow {
   seqNo: number
   projectName: string          // 项目名称
   nature: string               // 性质（预提/待转/代扣/其他）
-  beginBalance: number         // 期初余额
-  increase: number             // 本期增加（贷方发生）
-  decrease: number             // 本期减少（借方发生）
-  endBalance: number           // 期末余额（公式：期初+贷-借，负债类）
+  beginBalance: number         // 未审期初余额
+  increase: number             // 未审本期增加（贷方发生）
+  decrease: number             // 未审本期减少（借方发生）
+  endBalance: number           // 未审期末余额（公式：期初+贷-借，负债类）
+  // 区段2 调整（对齐源模板 K4-2：期初调整/账项调整增减/重分类调整增减/审定）
+  openingAdjust: number        // 期初调整
+  ajeIncrease: number          // 账项调整-本期增加
+  ajeDecrease: number          // 账项调整-本期减少
+  rjeIncrease: number          // 重分类调整-本期增加
+  rjeDecrease: number          // 重分类调整-本期减少
+  auditedBegin: number         // 审定期初（=未审期初+期初调整）
+  auditedIncrease: number      // 审定本期增加
+  auditedDecrease: number      // 审定本期减少
+  auditedEnd: number           // 审定期末
   // 区段1 检查
   increaseReason: string       // 增减原因
   voucherRef: string           // 凭证号
@@ -41,15 +51,21 @@ export interface K4DetailRow {
   remark: string               // 备注
 }
 
-export type K4DetailSection = 0 | 1
+export type K4DetailSection = 0 | 1 | 2
 
-export const K4_DETAIL_SECTION_LABELS = ['基础', '检查'] as const
+export const K4_DETAIL_SECTION_LABELS = ['基础', '检查', '调整'] as const
 
 export interface K4DetailSubtotals {
   beginBalance: number
   increase: number
   decrease: number
   endBalance: number
+  openingAdjust: number
+  ajeIncrease: number
+  ajeDecrease: number
+  rjeIncrease: number
+  rjeDecrease: number
+  auditedEnd: number
   count: number
 }
 
@@ -131,6 +147,15 @@ export function useK4Detail(params: {
       increase: Number(raw.increase) || 0,
       decrease: Number(raw.decrease) || 0,
       endBalance: Number(raw.endBalance) || 0,
+      openingAdjust: Number(raw.openingAdjust) || 0,
+      ajeIncrease: Number(raw.ajeIncrease) || 0,
+      ajeDecrease: Number(raw.ajeDecrease) || 0,
+      rjeIncrease: Number(raw.rjeIncrease) || 0,
+      rjeDecrease: Number(raw.rjeDecrease) || 0,
+      auditedBegin: 0,
+      auditedIncrease: 0,
+      auditedDecrease: 0,
+      auditedEnd: 0,
       increaseReason: raw.increaseReason ?? '',
       voucherRef: raw.voucherRef ?? '',
       checkConclusion: raw.checkConclusion ?? '',
@@ -143,6 +168,11 @@ export function useK4Detail(params: {
   function _recalcRow(row: K4DetailRow): void {
     // 负债类期末=期初+贷方(增加)-借方(减少)
     row.endBalance = calcLiabilityEndBalance(row.beginBalance, row.increase, row.decrease)
+    // 审定列（对齐源模板：未审 + 期初调整 + 账项调整 + 重分类调整）
+    row.auditedBegin = row.beginBalance + row.openingAdjust
+    row.auditedIncrease = row.increase + row.ajeIncrease + row.rjeIncrease
+    row.auditedDecrease = row.decrease + row.ajeDecrease + row.rjeDecrease
+    row.auditedEnd = row.auditedBegin + row.auditedIncrease - row.auditedDecrease
   }
 
   function recalcAll(): void {
@@ -158,6 +188,12 @@ export function useK4Detail(params: {
       increase: calcSubtotal(r.map(x => x.increase)),
       decrease: calcSubtotal(r.map(x => x.decrease)),
       endBalance: calcSubtotal(r.map(x => x.endBalance)),
+      openingAdjust: calcSubtotal(r.map(x => x.openingAdjust)),
+      ajeIncrease: calcSubtotal(r.map(x => x.ajeIncrease)),
+      ajeDecrease: calcSubtotal(r.map(x => x.ajeDecrease)),
+      rjeIncrease: calcSubtotal(r.map(x => x.rjeIncrease)),
+      rjeDecrease: calcSubtotal(r.map(x => x.rjeDecrease)),
+      auditedEnd: calcSubtotal(r.map(x => x.auditedEnd)),
       count: r.length,
     }
   })
@@ -218,6 +254,15 @@ export function useK4Detail(params: {
       increase: 0,
       decrease: 0,
       endBalance: 0,
+      openingAdjust: 0,
+      ajeIncrease: 0,
+      ajeDecrease: 0,
+      rjeIncrease: 0,
+      rjeDecrease: 0,
+      auditedBegin: 0,
+      auditedIncrease: 0,
+      auditedDecrease: 0,
+      auditedEnd: 0,
       increaseReason: '',
       voucherRef: '',
       checkConclusion: '',

@@ -186,6 +186,56 @@
         </el-table-column>
       </template>
 
+      <!-- ═══ 区段2 调整（未审→期初调整/账项调整/重分类调整→审定，对齐源模板）═══ -->
+      <template v-if="activeSegmentIdx === 2">
+        <el-table-column label="项目" min-width="140" fixed>
+          <template #default="{ row }"><span>{{ row.projectName }}</span></template>
+        </el-table-column>
+        <el-table-column label="未审期末" min-width="110" align="right">
+          <template #default="{ row }"><span class="formula-cell">{{ fmtAmt(row.endBalance) }}</span></template>
+        </el-table-column>
+        <el-table-column label="期初调整" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.openingAdjust" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'openingAdjust', v ?? 0)" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.openingAdjust) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整-增" min-width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.ajeIncrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'ajeIncrease', v ?? 0)" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.ajeIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整-减" min-width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.ajeDecrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'ajeDecrease', v ?? 0)" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.ajeDecrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类-增" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.rjeIncrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'rjeIncrease', v ?? 0)" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.rjeIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类-减" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.rjeDecrease" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'rjeDecrease', v ?? 0)" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.rjeDecrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定期初" min-width="110" align="right">
+          <template #default="{ row }"><span class="formula-cell">{{ fmtAmt(row.auditedBegin) }}</span></template>
+        </el-table-column>
+        <el-table-column label="审定期末" min-width="120" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="审定期初 + 审定增加 − 审定减少" placement="top">
+              <span class="formula-cell">{{ fmtAmt(row.auditedEnd) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+      </template>
+
       <!-- 操作列（所有区段共享） -->
       <el-table-column v-if="!isReadonly" label="操作" width="60" align="center" fixed="right">
         <template #default="{ $index }">
@@ -197,8 +247,9 @@
     <!-- 底部统计卡片 (Req 3.4: 项目数/期末合计) -->
     <div class="stats-bar">
       <el-tag type="info" effect="plain">项目数: {{ detail.subtotals.value.count }}</el-tag>
-      <el-tag type="primary" effect="plain">期末合计: {{ fmtAmt(detail.subtotals.value.endBalance) }}</el-tag>
+      <el-tag type="primary" effect="plain">未审期末合计: {{ fmtAmt(detail.subtotals.value.endBalance) }}</el-tag>
       <el-tag type="success" effect="plain">期初合计: {{ fmtAmt(detail.subtotals.value.beginBalance) }}</el-tag>
+      <el-tag type="warning" effect="plain">审定期末合计: {{ fmtAmt(detail.subtotals.value.auditedEnd) }}</el-tag>
     </div>
 
     <!-- 编制提示 -->
@@ -269,6 +320,7 @@ const conclusionOptions = ['正常', '异常', '需关注', '待确认']
 const segmentOptions = [
   { label: '基础', value: 0 },
   { label: '检查', value: 1 },
+  { label: '调整', value: 2 },
 ]
 
 // ─── Composables ─────────────────────────────────────────────────────────────
