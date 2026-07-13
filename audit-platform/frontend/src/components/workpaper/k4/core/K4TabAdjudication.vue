@@ -5,6 +5,18 @@
       <p>K4-1审定表审定其他流动负债(2245贷方/<strong>负债类</strong>)。负债类期末=期初+贷方-借方（与资产类方向相反）。增加=贷方发生，减少=借方发生。审计重点为<strong>完整性认定</strong>（负债易少计）。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性（负债重点）：</b>所有应当记录的其他流动负债均已记录，不存在少计负债；</li>
+        <li><b>存在：</b>记录的其他流动负债是存在的，且已记录在恰当的账户中；</li>
+        <li><b>义务：</b>记录的其他流动负债是被审计单位应当履行的偿还义务；</li>
+        <li><b>计价和分摊：</b>其他流动负债以恰当金额包括在报表中，相关计价或分摊调整已恰当记录；</li>
+        <li><b>列报与披露：</b>已按企业会计准则规定作出恰当列报。</li>
+      </ol>
+    </el-alert>
+
     <!-- ═══ 审定表主表 ═══ -->
     <el-card shadow="never" class="block-card">
       <template #header>

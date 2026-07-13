@@ -5,6 +5,16 @@
       <p>K4-2明细表按项目逐笔列示其他流动负债余额。<strong>负债类科目</strong>：期末=期初+贷方(增加)-借方(减少)。明细合计应与K4-1审定表审定数一致。</p>
     </div>
 
+    <!-- 审计目标（认定） -->
+    <el-alert type="info" :closable="false" style="margin-bottom:12px">
+      <template #title><span style="font-weight:600">审计目标（认定）</span></template>
+      <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
+        <li><b>完整性：</b>所有应当记录的其他流动负债均已记录（负债完整性重点）；</li>
+        <li><b>存在：</b>资产负债表中记录的其他流动负债是存在的，且已记录在恰当的账户中；</li>
+        <li><b>计价和分摊：</b>其他流动负债以恰当的金额包括在财务报表中，相关计价或分摊调整已恰当记录。</li>
+      </ol>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K4-2 其他流动负债明细表</h3>
