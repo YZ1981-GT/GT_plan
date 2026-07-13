@@ -27,6 +27,7 @@ from fastapi.responses import StreamingResponse
 import sqlalchemy as sa
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 from app.core.database import get_db
 from app.deps import get_current_user
@@ -119,6 +120,63 @@ VOUCHER_SHEET_NAMES = {
     "post": "期后支付检查",
 }
 
+# 两行合并表头分组定义（对齐源模板：第一行合并分组，第二行子列名）
+# 元素：(标签, spec)。spec=list 表示分组(第1行合并跨这些子列)；spec=None 表示单列(第1/2行纵向合并)
+# 列顺序必须与 VOUCHER_*_COLUMNS 及 _excel_to_voucher_row 的位置索引严格一致
+VOUCHER_CREDIT_GROUPS = [
+    ("序号", None),
+    ("记账凭证", ["薪酬项目", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "贷方金额"]),
+    ("人数", None),
+    ("审批人", None),
+    ("职工薪酬计算表", ["月份", "金额", "是否经过恰当审批"]),
+    ("核对内容", ["①原始凭证齐全", "②记账相符", "③科目正确", "④计算准确", "⑤截止正确"]),
+    ("索引号", None),
+    ("是否异常", None),
+    ("备注", None),
+]
+VOUCHER_DEBIT_GROUPS = [
+    ("序号", None),
+    ("记账凭证", ["薪酬项目", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "借方金额"]),
+    ("人数", None),
+    ("审批人", None),
+    ("付款审批单", ["日期/编号", "是否经过恰当审批"]),
+    ("银行回单", ["日期", "摘要/说明", "金额"]),
+    ("核对内容", ["①付款审批单齐全", "②银行回单", "③代扣代缴", "④发放表相符", "⑤金额一致"]),
+    ("索引号", None),
+    ("是否异常", None),
+    ("备注", None),
+]
+
+
+def _style_one(cell):
+    """单个表头单元格样式."""
+    cell.font = HEADER_FONT
+    cell.fill = HEADER_FILL
+    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    cell.border = THIN_BORDER
+
+
+def _write_voucher_header(ws, groups) -> int:
+    """写两行合并表头（第1行分组合并/单列纵向合并，第2行子列名），返回总列数."""
+    col = 1
+    for label, spec in groups:
+        if isinstance(spec, list):
+            n = len(spec)
+            ws.merge_cells(start_row=1, start_column=col, end_row=1, end_column=col + n - 1)
+            _style_one(ws.cell(row=1, column=col, value=label))
+            # 合并区其余首行单元格也需描边
+            for k in range(1, n):
+                _style_one(ws.cell(row=1, column=col + k))
+            for j, sub in enumerate(spec):
+                _style_one(ws.cell(row=2, column=col + j, value=sub))
+            col += n
+        else:
+            ws.merge_cells(start_row=1, start_column=col, end_row=2, end_column=col)
+            _style_one(ws.cell(row=1, column=col, value=label))
+            _style_one(ws.cell(row=2, column=col))
+            col += 1
+    return col - 1
+
 
 def _bool_cell(v) -> bool:
     """Excel 单元格 → 布尔（是/√/true/1 视为 True）."""
@@ -197,18 +255,17 @@ def _build_voucher_template_wb(vc_data: dict | None = None, post_rows: list | No
     wb.remove(wb.active)
 
     sections = [
-        ("credit", VOUCHER_CREDIT_COLUMNS, (vc_data or {}).get("occurrenceRows") or []),
-        ("debit", VOUCHER_DEBIT_COLUMNS, (vc_data or {}).get("postCollectionRows") or []),
-        ("post", VOUCHER_DEBIT_COLUMNS, post_rows or []),
+        ("credit", VOUCHER_CREDIT_GROUPS, (vc_data or {}).get("occurrenceRows") or []),
+        ("debit", VOUCHER_DEBIT_GROUPS, (vc_data or {}).get("postCollectionRows") or []),
+        ("post", VOUCHER_DEBIT_GROUPS, post_rows or []),
     ]
-    for direction, columns, rows in sections:
+    for direction, groups, rows in sections:
         ws = wb.create_sheet(title=VOUCHER_SHEET_NAMES[direction])
-        ws.append(columns)
-        _style_header(ws, 1, len(columns))
+        col_count = _write_voucher_header(ws, groups)  # 两行表头
         for i, r in enumerate(rows, start=1):
-            ws.append([i, *_voucher_row_to_excel(r, direction)])
-        for col_idx in range(1, len(columns) + 1):
-            ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = 14
+            ws.append([i, *_voucher_row_to_excel(r, direction)])  # 数据自第3行起
+        for col_idx in range(1, col_count + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = 14
 
     # 编制说明
     ws_note = wb.create_sheet(title="编制说明")
@@ -842,7 +899,7 @@ async def import_data(
                 continue
             ws = wb[sheet_name]
             seq = 0
-            for row in ws.iter_rows(min_row=2, values_only=True):
+            for row in ws.iter_rows(min_row=3, values_only=True):  # 跳过两行合并表头
                 if not row:
                     continue
                 vals = list(row[1:])  # 跳过序号列
