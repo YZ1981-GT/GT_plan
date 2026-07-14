@@ -229,6 +229,36 @@
       </template>
     </el-table-column>
 
+    <el-table-column label="是否公允" width="100" align="center">
+      <template #default="{ row }">
+        <el-select
+          v-if="!isReadonly"
+          :model-value="row.isFairValue || ''"
+          size="small"
+          placeholder="选择"
+          @change="(v: string) => updateCell(row.rowId, 'isFairValue', v)"
+        >
+          <el-option label="是" value="是" />
+          <el-option label="否" value="否" />
+          <el-option label="待定" value="待定" />
+        </el-select>
+        <span v-else>{{ row.isFairValue || '-' }}</span>
+      </template>
+    </el-table-column>
+
+    <el-table-column label="判断依据" min-width="140">
+      <template #default="{ row }">
+        <el-input
+          v-if="!isReadonly"
+          :model-value="row.fairValueBasis || ''"
+          size="small"
+          placeholder="公允价值判断依据..."
+          @change="(v: string) => updateCell(row.rowId, 'fairValueBasis', v)"
+        />
+        <span v-else>{{ row.fairValueBasis || '-' }}</span>
+      </template>
+    </el-table-column>
+
     <el-table-column label="备注" min-width="100">
       <template #default="{ row }">
         <el-input
@@ -309,6 +339,25 @@
         placeholder="关联方交易结论..."
       />
     </div>
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">3. 关联方交易公允性总结</span>
+        <div class="opinion-actions">
+          <el-tooltip :content="aiTip" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoading"
+              :disabled="isReadonly || !aiAvailable" @click="genFairValueSummary">🤖 AI辅助</el-button>
+          </el-tooltip>
+        </div>
+      </div>
+      <el-input
+        v-model="fairValueSummary"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 7 }"
+        :disabled="isReadonly"
+        placeholder="总结关联方交易公允性判断结果..."
+      />
+    </div>
   </el-card>
 </div>
 </template>
@@ -317,7 +366,7 @@
 /**
  * D6TabRelatedParty.vue — 关联关系及交易检查 D6-5
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import { useD6RelatedParty, RELATIONSHIP_OPTIONS } from '../composables/useD6RelatedParty'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
@@ -383,6 +432,28 @@ async function genRelatedPartyNote() {
     bookValueTotal: totalRow.value.bookValue,
   }, 'AI · 关联方审计说明')
   if (text) auditNotes.value.explanation = text
+}
+
+// --- 关联方交易公允性总结 ---
+const fairValueSummary = ref('')
+
+watch(
+  () => allResponsesRef.value.get('D6-5-fair-value-summary')?.remark,
+  (val) => { fairValueSummary.value = val || '' },
+  { immediate: true },
+)
+
+watch(fairValueSummary, (val) => {
+  props.debouncedSave('D6-5-fair-value-summary', { remark: val })
+})
+
+async function genFairValueSummary() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('related-party-fairvalue', fairValueSummary.value, {
+    task: '关联方交易公允性总结',
+    rowCount: rows.value.length,
+  }, 'AI · 公允性总结')
+  if (text) fairValueSummary.value = text
 }
 
 function fmtAmount(val: number | null | undefined): string {

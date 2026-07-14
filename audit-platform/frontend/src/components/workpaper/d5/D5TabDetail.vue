@@ -48,11 +48,43 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-popover trigger="click" :width="260" placement="bottom-end">
+          <template #reference>
+            <el-button size="small" circle><el-icon><Setting /></el-icon></el-button>
+          </template>
+          <div class="col-prefs-popover">
+            <div class="col-prefs-header">
+              <span>列显示设置</span>
+              <el-button size="small" text type="primary" @click="resetDefaults">重置默认</el-button>
+            </div>
+            <div v-for="group in columnGroups" :key="group.label" class="col-prefs-group">
+              <div class="col-prefs-group-label">{{ group.label }}</div>
+              <div v-for="key in group.keys" :key="key" class="col-prefs-item">
+                <el-checkbox
+                  :model-value="isColVisible(key)"
+                  :disabled="group.alwaysShow"
+                  size="small"
+                  @change="toggleCol(key)"
+                >{{ getColLabel(key) }}</el-checkbox>
+              </div>
+            </div>
+          </div>
+        </el-popover>
         <span class="chip-wrap"><GtIndexChip value="wp:D1-6" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:D2-13" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 勾稽校验提示 -->
+    <el-alert
+      v-if="crossCheckInfo"
+      :type="crossCheckInfo.type"
+      :title="crossCheckInfo.message"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 8px"
+    />
 
     <div v-if="useVirtualScroll" class="virtual-toolbar">
       <el-alert type="info" :closable="false" class="virtual-hint">
@@ -126,7 +158,7 @@
       </el-table-column>
 
       <!-- C: 期初未审 -->
-      <el-table-column label="期初未审" width="110" align="right">
+      <el-table-column v-if="isColVisible('priorUnadjusted')" label="期初未审" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorUnadjusted) }}</span>
@@ -144,7 +176,7 @@
       </el-table-column>
 
       <!-- D: 期初AJE -->
-      <el-table-column label="期初AJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('priorAje')" label="期初AJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorAje) }}</span>
@@ -162,7 +194,7 @@
       </el-table-column>
 
       <!-- E: 期初RJE -->
-      <el-table-column label="期初RJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('priorRje')" label="期初RJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorRje) }}</span>
@@ -180,14 +212,14 @@
       </el-table-column>
 
       <!-- F: 期初审定 (自动) -->
-      <el-table-column label="期初审定" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('priorAudited')" label="期初审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span>
         </template>
       </el-table-column>
 
       <!-- G: OCI减值准备余额 -->
-      <el-table-column label="OCI减值" width="110" align="right">
+      <el-table-column v-if="isColVisible('ociImpairment')" label="OCI减值" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.ociImpairment) }}</span>
@@ -205,7 +237,7 @@
       </el-table-column>
 
       <!-- H: 本期增加 -->
-      <el-table-column label="本期增加" width="110" align="right">
+      <el-table-column v-if="isColVisible('periodIncrease')" label="本期增加" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.periodIncrease) }}</span>
@@ -223,7 +255,7 @@
       </el-table-column>
 
       <!-- I: 本期减少 -->
-      <el-table-column label="本期减少" width="110" align="right">
+      <el-table-column v-if="isColVisible('periodDecrease')" label="本期减少" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.periodDecrease) }}</span>
@@ -241,14 +273,14 @@
       </el-table-column>
 
       <!-- J: 期末余额 (自动) -->
-      <el-table-column label="期末余额" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('endBalance')" label="期末余额" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endBalance) }}</span>
         </template>
       </el-table-column>
 
       <!-- K: 被审计单位重分类 -->
-      <el-table-column label="重分类" width="110" align="right">
+      <el-table-column v-if="isColVisible('entityReclass')" label="重分类" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.entityReclass) }}</span>
@@ -266,14 +298,14 @@
       </el-table-column>
 
       <!-- L: 期末未审余额 (自动) -->
-      <el-table-column label="期末未审" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('endUnadjusted')" label="期末未审" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endUnadjusted) }}</span>
         </template>
       </el-table-column>
 
       <!-- M: 期末账项调整 -->
-      <el-table-column label="期末AJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('endAje')" label="期末AJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endAje) }}</span>
@@ -291,7 +323,7 @@
       </el-table-column>
 
       <!-- N: 期末重分类调整 -->
-      <el-table-column label="期末RJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('endRje')" label="期末RJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endRje) }}</span>
@@ -316,7 +348,7 @@
       </el-table-column>
 
       <!-- P: 期末OCI减值 -->
-      <el-table-column label="期末OCI减值" width="110" align="right">
+      <el-table-column v-if="isColVisible('endOciImpairment')" label="期末OCI减值" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endOciImpairment) }}</span>
@@ -395,6 +427,26 @@
           placeholder="对明细表本期变动的分析说明..."
         />
       </div>
+
+      <div class="opinion-section">
+        <div class="opinion-section-header">
+          <span class="opinion-section-label">审计结论</span>
+          <div class="opinion-actions">
+            <el-tooltip :content="aiTip" placement="top">
+              <el-button size="small" type="primary" plain :loading="aiLoading"
+                :disabled="isReadonly || !aiAvailable" @click="genDetailConclusion">🤖 AI辅助</el-button>
+            </el-tooltip>
+            <el-button size="small" @click="openReview('D5-detail-conclusion')">💬</el-button>
+          </div>
+        </div>
+        <el-input
+          v-model="auditConclusion"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 7 }"
+          :disabled="isReadonly"
+          placeholder="对应收款项融资明细表的审计结论..."
+        />
+      </div>
     </el-card>
 </div>
 </template>
@@ -412,7 +464,9 @@
  * Requirements: 4.1-4.9, 5.1-5.7, 10.9
  */
 import { ref, computed, inject, watch, toRef, type Ref } from 'vue'
+import { Setting } from '@element-plus/icons-vue'
 import { useD5Detail } from '../composables/useD5Detail'
+import { useD5DetailColumnPrefs } from '../composables/useD5DetailColumnPrefs'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 import { useD5ImportExport } from '../composables/useD5ImportExport'
 import { useD5AiGenerate } from '../composables/useD5AiGenerate'
@@ -435,6 +489,20 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const { columnGroups, hiddenKeys, isColVisible, toggleCol, resetDefaults } = useD5DetailColumnPrefs()
+
+const COL_LABELS: Record<string, string> = {
+  category: '类别', itemName: '明细项目', priorUnadjusted: '期初未审',
+  priorAje: '期初AJE', priorRje: '期初RJE', priorAudited: '期初审定',
+  ociImpairment: 'OCI减值', periodIncrease: '本期增加', periodDecrease: '本期减少',
+  endBalance: '期末余额', entityReclass: '重分类', endUnadjusted: '期末未审',
+  endAje: '期末AJE', endRje: '期末RJE', endAudited: '期末审定',
+  endOciImpairment: '期末OCI减值', remark: '备注',
+}
+function getColLabel(key: string): string { return COL_LABELS[key] || key }
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
@@ -473,6 +541,32 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+const crossCheckInfo = computed(() => {
+  const d5NotesTotal = subtotalByCategory.value['应收票据']?.endAudited ?? 0
+  const d5AccTotal = subtotalByCategory.value['应收账款']?.endAudited ?? 0
+
+  const d1SoldTotal = parseFloat(allResponsesRef.value.get('D1-6-sold-total')?.remark || '') || 0
+  const d2SoldTotal = parseFloat(allResponsesRef.value.get('D2-13-sold-total')?.remark || '') || 0
+
+  // If no D1/D2 data available, show info
+  if (d1SoldTotal === 0 && d2SoldTotal === 0) {
+    return { type: 'info' as const, message: '勾稽校验：D1-6/D2-13 暂无出售模式数据，无法核对' }
+  }
+
+  const notesDiff = d5NotesTotal - d1SoldTotal
+  const accDiff = d5AccTotal - d2SoldTotal
+
+  if (Math.abs(notesDiff) < 0.01 && Math.abs(accDiff) < 0.01) {
+    return { type: 'success' as const, message: `勾稽校验通过：应收票据 ${fmtAmount(d5NotesTotal)} = D1-6 ${fmtAmount(d1SoldTotal)}，应收账款 ${fmtAmount(d5AccTotal)} = D2-13 ${fmtAmount(d2SoldTotal)}` }
+  }
+
+  const parts: string[] = []
+  if (Math.abs(notesDiff) >= 0.01) parts.push(`应收票据差异 ${fmtAmount(notesDiff)}（D5: ${fmtAmount(d5NotesTotal)} vs D1-6: ${fmtAmount(d1SoldTotal)}）`)
+  if (Math.abs(accDiff) >= 0.01) parts.push(`应收账款差异 ${fmtAmount(accDiff)}（D5: ${fmtAmount(d5AccTotal)} vs D2-13: ${fmtAmount(d2SoldTotal)}）`)
+
+  return { type: 'warning' as const, message: `勾稽校验：${parts.join('；')}` }
+})
+
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
@@ -507,6 +601,7 @@ const {
 // ─── Audit Notes ─────────────────────────────────────────────────────────────
 
 const auditExplanation = ref('')
+const auditConclusion = ref('')
 
 watch(
   () => allResponsesRef.value.get('D5-2-note-explanation')?.remark,
@@ -516,6 +611,16 @@ watch(
 
 watch(auditExplanation, (val) => {
   props.debouncedSave('D5-2-note-explanation', { remark: val })
+})
+
+watch(
+  () => allResponsesRef.value.get('D5-2-note-conclusion')?.remark,
+  (val) => { auditConclusion.value = val || '' },
+  { immediate: true },
+)
+
+watch(auditConclusion, (val) => {
+  props.debouncedSave('D5-2-note-conclusion', { remark: val })
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
@@ -529,6 +634,15 @@ async function genDetailNote() {
     rowCount: rows.value.length,
   }, 'AI · 明细变动分析')
   if (text) auditExplanation.value = text
+}
+
+async function genDetailConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('detail-conclusion', auditConclusion.value, {
+    task: '应收款项融资明细表审计结论',
+    rowCount: rows.value.length,
+  }, 'AI · 审计结论')
+  if (text) auditConclusion.value = text
 }
 
 // ─── Display Rows (含小计行+合计行) ──────────────────────────────────────────
@@ -734,4 +848,11 @@ function openReview(sectionId: string) {
   display: flex;
   gap: 6px;
 }
+
+/* 列设置 popover */
+.col-prefs-popover { max-height: 320px; overflow-y: auto; }
+.col-prefs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+.col-prefs-group { margin-bottom: 8px; }
+.col-prefs-group-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+.col-prefs-item { margin-left: 8px; }
 </style>

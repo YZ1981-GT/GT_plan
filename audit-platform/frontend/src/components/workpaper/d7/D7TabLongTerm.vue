@@ -45,6 +45,8 @@
       </div>
     </div>
 
+    <el-alert v-if="longTermCrossCheck" :type="longTermCrossCheck.type" :title="longTermCrossCheck.message" :closable="false" show-icon style="margin-bottom: 8px" />
+
     <div v-if="useVirtualScroll" class="virtual-toolbar">
       <el-alert type="info" :closable="false" class="virtual-hint">
         行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
@@ -271,6 +273,39 @@ function fmtAmt(val: number | null | undefined): string {
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+const longTermCrossCheck = computed<{ type: 'info' | 'success' | 'warning'; message: string } | null>(() => {
+  const responses = allResponsesRef.value
+  if (!responses || responses.size === 0) return null
+
+  // Read D7-2 rows and sum aging > 1 year
+  const d72RowsRaw = responses.get('D7-2-rows')?.remark
+  if (!d72RowsRaw) {
+    return { type: 'info', message: '勾稽校验：D7-2 明细表数据尚未填写，无法核对' }
+  }
+
+  let d72LongTermTotal = 0
+  try {
+    const d72Rows = JSON.parse(d72RowsRaw)
+    if (Array.isArray(d72Rows)) {
+      for (const row of d72Rows) {
+        // Sum aging columns > 1 year (aging2 + aging3 + aging4 or endAging2 + endAging3 + endAging4)
+        d72LongTermTotal += (parseFloat(row.endAging2 || row.aging1to2 || 0) || 0)
+          + (parseFloat(row.endAging3 || row.aging2to3 || 0) || 0)
+          + (parseFloat(row.endAging4 || row.aging3plus || 0) || 0)
+      }
+    }
+  } catch { /* ignore parse errors */ }
+
+  // D7-5 local rows total
+  const d75Total = rows.value.reduce((s, r) => s + (r.endBalance || 0), 0)
+
+  const diff = Math.abs(d75Total - d72LongTermTotal)
+  if (diff < 0.01) {
+    return { type: 'success', message: `勾稽校验通过：D7-5 长期挂账 ${fmtAmt(d75Total)} = D7-2 账龄>1年 ${fmtAmt(d72LongTermTotal)}` }
+  }
+  return { type: 'warning', message: `勾稽校验：D7-5 长期挂账 ${fmtAmt(d75Total)} vs D7-2 账龄>1年 ${fmtAmt(d72LongTermTotal)}，差异 ${fmtAmt(d75Total - d72LongTermTotal)}` }
+})
 
 const browseRows = computed(() => rows.value)
 const browseRowCount = computed(() => rows.value.length)

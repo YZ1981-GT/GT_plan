@@ -43,6 +43,16 @@
     </div>
   </div>
 
+  <!-- 勾稽校验：ECL损失率 ↔ D6-7政策评价 -->
+  <el-alert
+    v-if="eclPolicyCheck"
+    :type="eclPolicyCheck.type"
+    :title="eclPolicyCheck.message"
+    :closable="false"
+    show-icon
+    style="margin-bottom: 8px"
+  />
+
   <div v-if="useVirtualScroll" class="virtual-toolbar">
     <el-alert type="info" :closable="false" class="virtual-hint">
       行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
@@ -284,6 +294,84 @@ const {
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+})
+
+/** 勾稽校验：ECL组合损失率 ↔ D6-7政策检查评价损失率 */
+const eclPolicyCheck = computed<{ type: 'info' | 'success' | 'warning'; message: string } | null>(() => {
+  const responses = allResponsesRef.value
+  if (!responses || responses.size === 0) return null
+
+  // 查找 D6-7 相关数据
+  const d67Keys = [...responses.keys()].filter(k => k.startsWith('D6-7'))
+  if (d67Keys.length === 0) {
+    return { type: 'info', message: '勾稽校验：D6-7 政策检查尚未填写损失率评价数据' }
+  }
+
+  // 尝试从 D6-7-eval-loss-rate-{groupId} 或 D6-7-evaluations 读取政策评价损失率
+  const policyRates = new Map<string, number>()
+
+  for (const key of d67Keys) {
+    if (key.startsWith('D6-7-eval-loss-rate')) {
+      const resp = responses.get(key)
+      const remark = resp?.remark
+      if (remark != null) {
+        const rate = typeof remark === 'string' ? parseFloat(remark) : Number(remark)
+        if (!isNaN(rate)) {
+          // groupId 从 key 末段提取
+          const groupId = key.replace('D6-7-eval-loss-rate-', '').replace('D6-7-eval-loss-rate', '')
+          policyRates.set(groupId || key, rate)
+        }
+      }
+    }
+  }
+
+  // 尝试从 D6-7-evaluations 的 remark JSON 解析
+  const evalResp = responses.get('D6-7-evaluations')
+  if (evalResp?.remark) {
+    try {
+      const parsed = typeof evalResp.remark === 'string' ? JSON.parse(evalResp.remark) : evalResp.remark
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (item.groupId && item.lossRate != null) {
+            policyRates.set(String(item.groupId), Number(item.lossRate))
+          }
+        }
+      } else if (parsed && typeof parsed === 'object') {
+        for (const [gId, rate] of Object.entries(parsed)) {
+          if (rate != null) policyRates.set(gId, Number(rate))
+        }
+      }
+    } catch { /* JSON解析失败忽略 */ }
+  }
+
+  // 如无可比对的政策损失率数据，显示 info
+  if (policyRates.size === 0) {
+    return { type: 'info', message: '勾稽校验：D6-7 政策检查尚未填写损失率评价数据' }
+  }
+
+  // 比对每个 agingGroup 的 lossRate 与政策评价率
+  const diffs: string[] = []
+  const groups = agingGroups.value
+  for (const group of groups) {
+    const policyRate = policyRates.get(group.groupId) ?? policyRates.get(group.groupName)
+    if (policyRate == null) continue
+    for (const row of group.rows) {
+      const eclRate = row.lossRate ?? 0
+      const diff = Math.abs(eclRate - policyRate)
+      if (diff > 0.01) {
+        diffs.push(`${group.groupName}-${row.agingBand}(ECL ${fmtPct(eclRate)} vs 政策 ${fmtPct(policyRate)})`)
+      }
+    }
+  }
+
+  if (diffs.length === 0) {
+    return { type: 'success', message: '勾稽校验通过：ECL 组合损失率与政策检查评价一致' }
+  }
+
+  return {
+    type: 'warning',
+    message: `勾稽校验：以下组合损失率与D6-7政策评价差异超过1%：${diffs.join('、')}`,
+  }
 })
 
 function fmtAmt(val: number | null | undefined): string {

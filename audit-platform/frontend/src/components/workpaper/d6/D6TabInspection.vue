@@ -319,6 +319,21 @@
           <el-button size="small" @click="openReview('D6-6-note-conclusion')">💬</el-button>
         </div>
       </div>
+      <el-select
+        v-if="!isReadonly"
+        :model-value="undefined"
+        placeholder="选择结论模板..."
+        size="small"
+        style="width: 100%; margin-bottom: 8px"
+        @change="onConclusionTemplateSelect"
+      >
+        <el-option
+          v-for="tpl in CONCLUSION_TEMPLATES"
+          :key="tpl.value"
+          :label="tpl.label"
+          :value="tpl.label"
+        />
+      </el-select>
       <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="检查结论..." />
     </div>
   </el-card>
@@ -389,6 +404,18 @@ const {
 })
 
 const sampleCount = computed(() => block1Rows.value.length + block2Rows.value.length)
+
+const CONCLUSION_TEMPLATES = [
+  { value: 'no-issue', label: '经检查，所抽取样本未发现重大异常，合同资产增减变动真实准确。' },
+  { value: 'adjusted', label: '经检查，发现差异已提请被审计单位调整，调整后合同资产列报恰当。' },
+  { value: 'expand', label: '检查比例不足，建议扩大样本量后重新评估。' },
+  { value: 'major-diff', label: '发现重大差异，建议提出审计调整分录。' },
+  { value: 'other', label: '其他（请手动编写结论）。' },
+]
+
+function onConclusionTemplateSelect(val: string) {
+  if (val) auditNotes.value.conclusion = val
+}
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'

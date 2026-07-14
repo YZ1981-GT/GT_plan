@@ -42,6 +42,9 @@
       </div>
     </div>
 
+    <!-- TB 勾稽校验 -->
+    <el-alert v-if="tbCrossCheck" :type="tbCrossCheck.type" :title="tbCrossCheck.message" :closable="false" show-icon style="margin-bottom: 8px" />
+
     <!-- (一) 借方发生额分析 -->
     <div class="analysis-card">
       <h4 class="card-title">(一) 借方发生额分析</h4>
@@ -253,6 +256,33 @@ const {
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+})
+
+const tbCrossCheck = computed<{ type: 'info' | 'success' | 'warning'; message: string } | null>(() => {
+  const responses = allResponsesRef.value
+  if (!responses || responses.size === 0) return null
+
+  const tbDebitRaw = responses.get('D7-4-tb-debit-total')?.remark
+  const tbCreditRaw = responses.get('D7-4-tb-credit-total')?.remark
+
+  const tbDebit = parseFloat(tbDebitRaw || '') || 0
+  const tbCredit = parseFloat(tbCreditRaw || '') || 0
+
+  if (!tbDebitRaw && !tbCreditRaw) {
+    return { type: 'info', message: '勾稽校验：试算平衡表2205科目发生额数据尚未加载' }
+  }
+
+  const debitDiffAmt = Math.abs(debitTotal.value - tbDebit)
+  const creditDiffAmt = Math.abs(creditTotal.value - tbCredit)
+
+  if (debitDiffAmt < 0.01 && creditDiffAmt < 0.01) {
+    return { type: 'success', message: `勾稽校验通过：借方 ${fmtAmt(debitTotal.value)} = TB ${fmtAmt(tbDebit)}，贷方 ${fmtAmt(creditTotal.value)} = TB ${fmtAmt(tbCredit)}` }
+  }
+
+  const parts: string[] = []
+  if (debitDiffAmt >= 0.01) parts.push(`借方差异 ${fmtAmt(debitTotal.value - tbDebit)}`)
+  if (creditDiffAmt >= 0.01) parts.push(`贷方差异 ${fmtAmt(creditTotal.value - tbCredit)}`)
+  return { type: 'warning', message: `勾稽校验：${parts.join('；')}` }
 })
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)

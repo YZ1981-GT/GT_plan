@@ -274,6 +274,9 @@
             <el-button size="small" @click="openReview('D7-7-note-conclusion')">💬</el-button>
           </div>
         </div>
+        <el-select v-if="!isReadonly" :model-value="undefined" placeholder="选择结论模板..." size="small" style="width: 100%; margin-bottom: 8px" @change="onConclusionTemplateSelect">
+          <el-option v-for="tpl in CONCLUSION_TEMPLATES" :key="tpl.value" :label="tpl.label" :value="tpl.label" />
+        </el-select>
         <el-input
           v-model="auditNotes.conclusion"
           type="textarea"
@@ -343,6 +346,18 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
 })
+
+const CONCLUSION_TEMPLATES = [
+  { value: 'no-issue', label: '经抽查，所选样本凭证与合同/收款记录一致，合同负债增减变动真实准确。' },
+  { value: 'adjusted', label: '经抽查，发现差异已提请调整，调整后合同负债列报恰当。' },
+  { value: 'expand', label: '检查比例不足，建议扩大样本量后重新评估。' },
+  { value: 'cutoff-issue', label: '发现收入确认时点不当，期后结转存在截止差异，建议调整。' },
+  { value: 'other', label: '其他（请手动编写结论）。' },
+]
+
+function onConclusionTemplateSelect(val: string) {
+  if (val) auditNotes.value.conclusion = val
+}
 
 function toggleCheck(block: 'period' | 'post', rowId: string, idx: number, val: boolean) {
   const rows = block === 'period' ? periodChangeRows.value : postTransferRows.value

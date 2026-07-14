@@ -44,7 +44,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
         />
@@ -55,7 +55,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
         />
 
@@ -65,7 +65,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
         />
 
@@ -75,7 +75,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
         />
@@ -86,7 +86,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
         />
 
@@ -96,7 +96,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
         />
 
@@ -106,7 +106,7 @@
           :project-id="props.projectId"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
-          :save-immediate="saveImmediate"
+          :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
         />
@@ -228,6 +228,11 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
 })
+
+async function saveImmediateWithSnapshot(...args: Parameters<typeof saveImmediate>): Promise<void> {
+  await saveImmediate(...args)
+  scheduleAutoSnapshot()
+}
 
 const currentSheet = computed(() => resolveD7SheetCode(props.sheetName || 'D7'))
 const d7ReviewSection = computed(() => resolveCycleReviewSection('D7', currentSheet.value))

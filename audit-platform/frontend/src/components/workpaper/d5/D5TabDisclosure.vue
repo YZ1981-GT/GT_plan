@@ -186,24 +186,75 @@
           </details>
         </template>
 
-        <!-- Section 3: 说明 -->
+        <!-- Section 3: 风险敞口 + 说明 -->
         <template v-if="section.sectionKey === 'listed-notes'">
+          <!-- 金融资产风险敞口表 -->
+          <el-table :data="exposureData" size="small" border style="margin-bottom: 12px">
+            <el-table-column prop="category" label="项目" width="140" />
+            <el-table-column label="账面金额" width="140" align="right">
+              <template #default="{ row, $index }">
+                <el-input-number
+                  v-if="!isReadonly"
+                  :model-value="row.bookAmount"
+                  :controls="false"
+                  size="small"
+                  style="width:100%"
+                  @change="(val: number) => updateExposure($index, 'bookAmount', val ?? 0)"
+                />
+                <span v-else>{{ fmtAmount(row.bookAmount) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="信用风险最大敞口" width="160" align="right">
+              <template #default="{ row, $index }">
+                <el-input-number
+                  v-if="!isReadonly"
+                  :model-value="row.maxExposure"
+                  :controls="false"
+                  size="small"
+                  style="width:100%"
+                  @change="(val: number) => updateExposure($index, 'maxExposure', val ?? 0)"
+                />
+                <span v-else>{{ fmtAmount(row.maxExposure) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="前五名集中度(%)" width="140" align="right">
+              <template #default="{ row, $index }">
+                <el-input-number
+                  v-if="!isReadonly"
+                  :model-value="row.top5Ratio"
+                  :controls="false"
+                  :min="0"
+                  :max="100"
+                  :precision="1"
+                  size="small"
+                  style="width:100%"
+                  @change="(val: number) => updateExposure($index, 'top5Ratio', val ?? 0)"
+                />
+                <span v-else>{{ row.top5Ratio }}%</span>
+              </template>
+            </el-table-column>
+          </el-table>
+          <!-- 合计行 -->
+          <div class="total-summary" style="margin-bottom: 12px">
+            合计 — 账面：{{ fmtAmount(exposureTotal.bookAmount) }}，最大敞口：{{ fmtAmount(exposureTotal.maxExposure) }}
+          </div>
+          <!-- 保留原说明textarea -->
           <div class="note-block">
-            <div class="note-label">披露说明：</div>
+            <div class="note-label">补充说明：</div>
             <el-input
               v-model="noteTexts['listed-3']"
               type="textarea"
               :autosize="{ minRows: 3, maxRows: 7 }"
               :disabled="isReadonly"
-              placeholder="其他需要披露的说明事项..."
+              placeholder="金融资产风险敞口补充披露说明..."
             />
           </div>
           <!-- 编制提示 -->
           <details class="guidance-hint">
             <summary>📋 编制提示</summary>
             <div class="hint-content">
-              根据准则要求，需补充披露金融资产风险敞口、信用风险最大暴露等信息。
-              说明内容将双向回写至附注模块。
+              根据CAS37金融工具列报，需披露金融资产信用风险最大敞口（不考虑持有担保品和信用增级的情况下）
+              和集中度分析。前五名客户占比可参考D2应收账款前五名汇总。
             </div>
           </details>
         </template>
@@ -274,7 +325,7 @@
  * Task: 17.1
  * Requirements: 8.1-8.8
  */
-import { ref, computed, toRef, type Ref } from 'vue'
+import { ref, computed, watch, toRef, type Ref } from 'vue'
 import { useD5Disclosure } from '../composables/useD5Disclosure'
 import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
@@ -312,6 +363,47 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   crossSheet: props.crossSheet,
 })
+
+// ─── 风险敞口表（Section 3 结构化） ─────────────────────────────────────────
+
+const exposureData = ref<{ category: string; bookAmount: number; maxExposure: number; top5Ratio: number }[]>([
+  { category: '应收票据', bookAmount: 0, maxExposure: 0, top5Ratio: 0 },
+  { category: '应收账款', bookAmount: 0, maxExposure: 0, top5Ratio: 0 },
+])
+
+// Load from allResponses
+watch(
+  () => allResponsesRef.value.get('D5-note-listed-exposure-data')?.remark,
+  (val) => {
+    if (val) {
+      try {
+        const parsed = JSON.parse(val)
+        if (Array.isArray(parsed) && parsed.length > 0) exposureData.value = parsed
+      } catch { /* ignore */ }
+    }
+  },
+  { immediate: true },
+)
+
+// Save on change
+watch(
+  exposureData,
+  (val) => {
+    props.debouncedSave('D5-note-listed-exposure-data', { remark: JSON.stringify(val) })
+  },
+  { deep: true },
+)
+
+function updateExposure(idx: number, field: string, value: number) {
+  const arr = [...exposureData.value]
+  ;(arr[idx] as any)[field] = value
+  exposureData.value = arr
+}
+
+const exposureTotal = computed(() => ({
+  bookAmount: exposureData.value.reduce((s, r) => s + r.bookAmount, 0),
+  maxExposure: exposureData.value.reduce((s, r) => s + r.maxExposure, 0),
+}))
 
 // ─── Variant Options ─────────────────────────────────────────────────────────
 

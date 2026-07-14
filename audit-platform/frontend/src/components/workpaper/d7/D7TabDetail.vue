@@ -41,6 +41,28 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <el-popover trigger="click" :width="260" placement="bottom-end">
+        <template #reference>
+          <el-button size="small" circle><el-icon><Setting /></el-icon></el-button>
+        </template>
+        <div class="col-prefs-popover">
+          <div class="col-prefs-header">
+            <span>列显示设置</span>
+            <el-button size="small" text type="primary" @click="resetDefaults">重置默认</el-button>
+          </div>
+          <div v-for="group in columnGroups" :key="group.label" class="col-prefs-group">
+            <div class="col-prefs-group-label">{{ group.label }}</div>
+            <div v-for="key in group.keys" :key="key" class="col-prefs-item">
+              <el-checkbox
+                :model-value="isColVisible(key)"
+                :disabled="group.alwaysShow"
+                size="small"
+                @change="toggleCol(key)"
+              >{{ getColLabel(key) }}</el-checkbox>
+            </div>
+          </div>
+        </div>
+      </el-popover>
       <span class="chip-wrap"><GtIndexChip value="wp:D7-1" :context-project-id="projectId" /></span>
       <span class="chip-wrap"><GtIndexChip value="wp:D7-5" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
@@ -103,7 +125,7 @@
       </el-table-column>
 
       <!-- 关联关系 -->
-      <el-table-column label="关联关系" width="140">
+      <el-table-column v-if="isColVisible('relatedPartyType')" label="关联关系" width="140">
         <template #default="{ row }">
           <el-select v-if="isDataRow(row) && !isReadonly" :model-value="row.relatedPartyType" size="small" placeholder="请选择" @change="(v: string) => updateCell(row.rowId, 'relatedPartyType', v)">
             <el-option v-for="t in RELATED_PARTY_TYPES" :key="t" :label="t" :value="t" />
@@ -113,25 +135,25 @@
       </el-table-column>
 
       <!-- 期初 -->
-      <el-table-column label="期初未审" width="110" align="right">
+      <el-table-column v-if="isColVisible('priorUnadjusted')" label="期初未审" width="110" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorUnadjusted) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期初AJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('priorAje')" label="期初AJE" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorAje) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期初RJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('priorRje')" label="期初RJE" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorRje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorRje) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期初审定" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('priorAudited')" label="期初审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="auto-calc">{{ fmtAmt(row.priorAudited) }}</span></template>
       </el-table-column>
 
@@ -162,13 +184,13 @@
       </el-table-column>
 
       <!-- 借贷发生 -->
-      <el-table-column label="借方发生" width="110" align="right">
+      <el-table-column v-if="isColVisible('debitAmount')" label="借方发生" width="110" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="贷方发生" width="110" align="right">
+      <el-table-column v-if="isColVisible('creditAmount')" label="贷方发生" width="110" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
@@ -185,16 +207,16 @@
           <span v-else>{{ fmtAmt(row.entityReclass) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期末未审" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('endUnadjusted')" label="期末未审" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="auto-calc">{{ fmtAmt(row.endUnadjusted) }}</span></template>
       </el-table-column>
-      <el-table-column label="期末AJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('endAje')" label="期末AJE" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endAje) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期末RJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('endRje')" label="期末RJE" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endRje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endRje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endRje) }}</span>
@@ -205,25 +227,25 @@
       </el-table-column>
 
       <!-- 期末账龄 -->
-      <el-table-column label="1年以内" width="100" align="right">
+      <el-table-column v-if="isColVisible('endAging1')" label="1年以内" width="100" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging1" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging1', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endAging1) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="1~2年" width="90" align="right">
+      <el-table-column v-if="isColVisible('endAging2')" label="1~2年" width="90" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging2" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging2', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endAging2) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="2~3年" width="90" align="right">
+      <el-table-column v-if="isColVisible('endAging3')" label="2~3年" width="90" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging3" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging3', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endAging3) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="3年以上" width="90" align="right">
+      <el-table-column v-if="isColVisible('endAging4')" label="3年以上" width="90" align="right">
         <template #default="{ row }">
           <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging4" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging4', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endAging4) }}</span>
@@ -337,7 +359,9 @@
  * Requirements: 5.1-5.12, 6.1-6.7, 7.1-7.5, 17.2, 19.3, 20.1, 22.1-22.5
  */
 import { ref, computed, watch, inject, toRef, type Ref } from 'vue'
+import { Setting } from '@element-plus/icons-vue'
 import { useD7Detail, NATURE_TYPES, RELATED_PARTY_TYPES, type DetailRow } from '../composables/useD7Detail'
+import { useD7DetailColumnPrefs } from '../composables/useD7DetailColumnPrefs'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useD7AiGenerate } from '../composables/useD7AiGenerate'
@@ -347,6 +371,20 @@ import type { VirtualColumn } from '@/composables/useVirtualTable'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+
+const { columnGroups, isColVisible, toggleCol, resetDefaults } = useD7DetailColumnPrefs()
+
+const COL_LABELS: Record<string, string> = {
+  customerName: '单位名称', contractName: '合同名称', natureType: '类型(款项性质)',
+  priorUnadjusted: '期初未审', priorAje: '期初AJE', priorRje: '期初RJE', priorAudited: '期初审定',
+  creditAmount: '贷方发生', debitAmount: '借方发生', endUnadjusted: '期末未审',
+  endAje: '期末AJE', endRje: '期末RJE', endAudited: '期末审定',
+  endAging1: '1年以内', endAging2: '1~2年', endAging3: '2~3年', endAging4: '3年以上',
+  relatedPartyType: '关联关系', remark: '备注',
+}
+function getColLabel(key: string): string { return COL_LABELS[key] || key }
 
 const props = defineProps<{
   wpId: string
@@ -554,4 +592,11 @@ async function genDetailChange() {
 }
 .opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
 .opinion-actions { display: flex; gap: 6px; align-items: center; }
+
+/* 列设置 popover */
+.col-prefs-popover { max-height: 320px; overflow-y: auto; }
+.col-prefs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+.col-prefs-group { margin-bottom: 8px; }
+.col-prefs-group-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+.col-prefs-item { margin-left: 8px; }
 </style>

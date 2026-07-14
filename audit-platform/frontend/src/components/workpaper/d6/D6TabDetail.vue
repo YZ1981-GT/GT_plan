@@ -55,6 +55,28 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <el-popover trigger="click" :width="260" placement="bottom-end">
+        <template #reference>
+          <el-button size="small" circle><el-icon><Setting /></el-icon></el-button>
+        </template>
+        <div class="col-prefs-popover">
+          <div class="col-prefs-header">
+            <span>列显示设置</span>
+            <el-button size="small" text type="primary" @click="resetDefaults">重置默认</el-button>
+          </div>
+          <div v-for="group in columnGroups" :key="group.label" class="col-prefs-group">
+            <div class="col-prefs-group-label">{{ group.label }}</div>
+            <div v-for="key in group.keys" :key="key" class="col-prefs-item">
+              <el-checkbox
+                :model-value="isColVisible(key)"
+                :disabled="group.alwaysShow"
+                size="small"
+                @change="toggleCol(key)"
+              >{{ getColLabel(key) }}</el-checkbox>
+            </div>
+          </div>
+        </div>
+      </el-popover>
       <span class="chip-wrap"><GtIndexChip value="wp:D6-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ filteredRows.length }} 行</el-tag>
     </div>
@@ -168,7 +190,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期初未审" width="110" align="right">
+      <el-table-column v-if="isColVisible('priorUnadjusted')" label="期初未审" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorUnadjusted) }}</span>
@@ -185,7 +207,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期初AJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('priorAje')" label="期初AJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorAje) }}</span>
@@ -202,7 +224,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期初RJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('priorRje')" label="期初RJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorRje) }}</span>
@@ -219,15 +241,14 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期初审定" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('priorAudited')" label="期初审定" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.priorAudited) }}</span>
         </template>
       </el-table-column>
 
-      <template v-if="showAgingCols">
+      <template v-if="showAgingCols && isColVisible('aging1y')">
         <el-table-column label="期初≤1年" width="100" align="right">
-          <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal">
               <span class="subtotal-amount">{{ fmtAmount(row.agePrior1y) }}</span>
             </template>
@@ -292,7 +313,7 @@
         </el-table-column>
       </template>
 
-      <el-table-column label="借方发生" width="110" align="right">
+      <el-table-column v-if="isColVisible('debitAmount')" label="借方发生" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.debitAmount) }}</span>
@@ -309,7 +330,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="贷方发生" width="110" align="right">
+      <el-table-column v-if="isColVisible('creditAmount')" label="贷方发生" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.creditAmount) }}</span>
@@ -326,13 +347,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期末未审" width="110" align="right" class-name="auto-calc-col">
+      <el-table-column v-if="isColVisible('endUnadjusted')" label="期末未审" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }">
           <span class="auto-calc">{{ fmtAmount(row.endUnadjusted) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="期末AJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('endAje')" label="期末AJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endAje) }}</span>
@@ -349,7 +370,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期末RJE" width="100" align="right">
+      <el-table-column v-if="isColVisible('endRje')" label="期末RJE" width="100" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endRje) }}</span>
@@ -372,7 +393,7 @@
         </template>
       </el-table-column>
 
-      <template v-if="showAgingCols">
+      <template v-if="showAgingCols && isColVisible('aging1y')">
         <el-table-column label="期末≤1年" width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal">
@@ -513,7 +534,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期后结转" width="110" align="right">
+      <el-table-column v-if="isColVisible('postPeriodSettlement')" label="期后结转" width="110" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.postPeriodSettlement) }}</span>
@@ -585,6 +606,7 @@
  * D6TabDetail.vue — 明细表 D6-2（30列69公式）
  */
 import { ref, computed, inject, watch, toRef, type Ref } from 'vue'
+import { Setting } from '@element-plus/icons-vue'
 import {
   useD6Detail,
   CONTRACT_TYPES,
@@ -596,6 +618,7 @@ import {
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
 import { useD6AiGenerate } from '../composables/useD6AiGenerate'
+import { useD6DetailColumnPrefs } from '../composables/useD6DetailColumnPrefs'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import { calcSubtotal } from '../composables/useD6FormulaEngine'
@@ -617,6 +640,20 @@ const props = defineProps<{
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+
+// ─── Column Preferences ──────────────────────────────────────────────────────
+const { columnGroups, isColVisible, toggleCol, resetDefaults } = useD6DetailColumnPrefs()
+
+const COL_LABELS: Record<string, string> = {
+  seqNo: '序号', contractType: '合同类型', customerName: '客户名称',
+  contractName: '合同名称', endAudited: '期末审定', remark: '备注',
+  priorUnadjusted: '期初未审', priorAje: '期初AJE', priorRje: '期初RJE',
+  priorAudited: '期初审定', debitAmount: '借方发生', creditAmount: '贷方发生',
+  endUnadjusted: '期末未审', endAje: '期末AJE', endRje: '期末RJE',
+  aging1y: '≤1年', aging1to2: '1~2年', aging2to3: '2~3年', aging3plus: '3年以上',
+  postPeriodSettlement: '期后结转', postPeriodDate: '期后日期',
+}
+function getColLabel(key: string): string { return COL_LABELS[key] || key }
 
 const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
 const { importing, exportTemplate, exportData, importData } = useD6ImportExport({
@@ -885,4 +922,11 @@ function fmtAmount(val: number | null | undefined): string {
   gap: 6px;
   align-items: center;
 }
+
+/* 列设置 popover */
+.col-prefs-popover { max-height: 320px; overflow-y: auto; }
+.col-prefs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }
+.col-prefs-group { margin-bottom: 8px; }
+.col-prefs-group-label { font-size: 12px; color: #909399; margin-bottom: 4px; }
+.col-prefs-item { margin-left: 8px; }
 </style>

@@ -19,6 +19,16 @@
       class="objective-alert"
     />
 
+    <!-- 方法论上下文 -->
+    <details class="amber-context">
+      <summary>📖 方法论上下文：CAS22 FVOCI 公允价值计量</summary>
+      <div class="amber-content">
+        <p><strong>FVOCI 分类条件（CAS22第18条）：</strong>金融资产同时满足：①合同现金流量特征仅为对本金和以未偿付本金金额为基础的利息的支付（SPPI测试）；②管理金融资产的业务模式为既以收取合同现金流量为目标又以出售金融资产为目标（出售模式）。</p>
+        <p><strong>贴现法估值依据：</strong>采用市场贴现利率对票面金额进行贴现，计算公允价值。贴现利息 = 票面金额 × 市场贴现利率 × 剩余天数 ÷ 360；公允价值 = 票面金额 − 贴现利息。利率选取应基于可观察市场数据。</p>
+        <p><strong>公允价值层次判定：</strong>第二层次 — 使用可观察市场数据（如银行间市场贴现利率、同业报价）；第三层次 — 使用不可观察输入值（如内部模型估计）。层次判定应在附注中披露。</p>
+      </div>
+    </details>
+
     <!-- OCI差异提示 -->
     <el-alert
       v-if="ociDiffMessage"
@@ -73,6 +83,25 @@
         </el-dropdown>
         <span class="chip-wrap"><GtIndexChip value="wp:D5-1" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      </div>
+    </div>
+
+    <!-- 到期预警统计 -->
+    <div v-if="showMaturityStats" class="maturity-stats">
+      <div class="stat-card stat-expired">
+        <div class="stat-value">{{ maturityStats.expired.count }}</div>
+        <div class="stat-label">已逾期</div>
+        <div class="stat-amount">{{ fmtAmount(maturityStats.expired.amount) }}</div>
+      </div>
+      <div class="stat-card stat-near">
+        <div class="stat-value">{{ maturityStats.nearExpiry.count }}</div>
+        <div class="stat-label">30天内到期</div>
+        <div class="stat-amount">{{ fmtAmount(maturityStats.nearExpiry.amount) }}</div>
+      </div>
+      <div class="stat-card stat-normal">
+        <div class="stat-value">{{ maturityStats.normal.count }}</div>
+        <div class="stat-label">正常</div>
+        <div class="stat-amount">{{ fmtAmount(maturityStats.normal.amount) }}</div>
       </div>
     </div>
 
@@ -293,6 +322,103 @@
         </div>
       </template>
 
+      <!-- 利率参考 -->
+      <details class="guidance-details" style="margin-bottom: 16px">
+        <summary>📊 利率参考（评价贴现利率合理性）</summary>
+        <div class="rate-reference-grid">
+          <div class="rate-item">
+            <span class="rate-item-label">央行LPR(1Y)</span>
+            <el-input-number
+              v-model="rateRefs.lpr1y"
+              :precision="4"
+              :step="0.001"
+              :min="0"
+              :max="1"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100px"
+            />
+            <span class="rate-item-pct">{{ ((rateRefs.lpr1y || 0) * 100).toFixed(2) }}%</span>
+          </div>
+          <div class="rate-item">
+            <span class="rate-item-label">SHIBOR(3M)</span>
+            <el-input-number
+              v-model="rateRefs.shibor3m"
+              :precision="4"
+              :step="0.001"
+              :min="0"
+              :max="1"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100px"
+            />
+            <span class="rate-item-pct">{{ ((rateRefs.shibor3m || 0) * 100).toFixed(2) }}%</span>
+          </div>
+          <div class="rate-item">
+            <span class="rate-item-label">同业贴现率</span>
+            <el-input-number
+              v-model="rateRefs.interbank"
+              :precision="4"
+              :step="0.001"
+              :min="0"
+              :max="1"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100px"
+            />
+            <span class="rate-item-pct">{{ ((rateRefs.interbank || 0) * 100).toFixed(2) }}%</span>
+          </div>
+          <div class="rate-item">
+            <span class="rate-item-label">城商行贴现率</span>
+            <el-input-number
+              v-model="rateRefs.cityBank"
+              :precision="4"
+              :step="0.001"
+              :min="0"
+              :max="1"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100px"
+            />
+            <span class="rate-item-pct">{{ ((rateRefs.cityBank || 0) * 100).toFixed(2) }}%</span>
+          </div>
+          <div class="rate-item">
+            <span class="rate-item-label">国股银票贴现率</span>
+            <el-input-number
+              v-model="rateRefs.nationalBill"
+              :precision="4"
+              :step="0.001"
+              :min="0"
+              :max="1"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100px"
+            />
+            <span class="rate-item-pct">{{ ((rateRefs.nationalBill || 0) * 100).toFixed(2) }}%</span>
+          </div>
+          <div class="rate-item">
+            <span class="rate-item-label">被审计单位采用率</span>
+            <el-input-number
+              v-model="rateRefs.entityRate"
+              :precision="4"
+              :step="0.001"
+              :min="0"
+              :max="1"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly"
+              style="width: 100px"
+            />
+            <span class="rate-item-pct">{{ ((rateRefs.entityRate || 0) * 100).toFixed(2) }}%</span>
+          </div>
+        </div>
+      </details>
+
       <div class="opinion-section">
         <div class="opinion-section-header">
           <span class="opinion-section-label">1. 审计说明（评价贴现利率合理性 + 层次判定依据）</span>
@@ -344,7 +470,7 @@
  * Task: 15.1
  * Requirements: 6.1-6.10, 10.7
  */
-import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, watch, type Ref } from 'vue'
 import { useD5FairValue, FV_HIERARCHY_TOOLTIP } from '../composables/useD5FairValue'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 import { useD5ImportExport } from '../composables/useD5ImportExport'
@@ -419,6 +545,62 @@ async function genFairValueNote() {
   }, 'AI · 公允价值说明')
   if (text) auditNotes.value.explanation = text
 }
+
+// ─── Rate References ─────────────────────────────────────────────────────────
+
+interface RateRefs {
+  lpr1y: number
+  shibor3m: number
+  interbank: number
+  cityBank: number
+  nationalBill: number
+  entityRate: number
+}
+
+const rateRefs = ref<RateRefs>({
+  lpr1y: 0, shibor3m: 0, interbank: 0, cityBank: 0, nationalBill: 0, entityRate: 0,
+})
+
+// Load from allResponses
+watch(
+  () => allResponsesRef.value.get('D5-4-rate-references')?.remark,
+  (val) => {
+    if (val) {
+      try {
+        const parsed = JSON.parse(val)
+        if (parsed && typeof parsed === 'object') {
+          rateRefs.value = { ...rateRefs.value, ...parsed }
+        }
+      } catch { /* ignore */ }
+    }
+  },
+  { immediate: true },
+)
+
+// Save on change
+watch(
+  rateRefs,
+  (val) => {
+    props.debouncedSave('D5-4-rate-references', { remark: JSON.stringify(val) })
+  },
+  { deep: true },
+)
+
+// ─── 到期预警统计 ─────────────────────────────────────────────────────────────
+
+const maturityStats = computed(() => {
+  const dataRows = rows.value.filter(r => r.maturityDate)
+  const expired = dataRows.filter(r => r.remainingDays <= 0)
+  const nearExpiry = dataRows.filter(r => r.remainingDays > 0 && r.remainingDays <= 30)
+  const normal = dataRows.filter(r => r.remainingDays > 30)
+  return {
+    expired: { count: expired.length, amount: expired.reduce((s, r) => s + (r.faceValue || 0), 0) },
+    nearExpiry: { count: nearExpiry.length, amount: nearExpiry.reduce((s, r) => s + (r.faceValue || 0), 0) },
+    normal: { count: normal.length, amount: normal.reduce((s, r) => s + (r.faceValue || 0), 0) },
+  }
+})
+
+const showMaturityStats = computed(() => rows.value.some(r => r.maturityDate))
 
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
 
@@ -582,5 +764,68 @@ function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
 .opinion-actions {
   display: flex;
   gap: 6px;
+}
+/* 利率参考 grid */
+.rate-reference-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 24px;
+  margin-top: 8px;
+}
+.rate-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rate-item-label {
+  font-size: 12px;
+  color: #606266;
+  min-width: 100px;
+}
+.rate-item-pct {
+  font-size: 12px;
+  color: #909399;
+}
+/* 到期预警统计 */
+.maturity-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.stat-card {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 6px;
+  border: 1px solid #ebeef5;
+  text-align: center;
+}
+.stat-expired { border-left: 3px solid #f56c6c; background: #fef0f0; }
+.stat-near { border-left: 3px solid #e6a23c; background: #fdf6ec; }
+.stat-normal { border-left: 3px solid #67c23a; background: #f0f9eb; }
+.stat-value { font-size: 20px; font-weight: 700; color: #303133; }
+.stat-label { font-size: 12px; color: #909399; margin: 4px 0; }
+.stat-amount { font-size: 12px; color: #606266; }
+
+/* 方法论琥珀块 */
+.amber-context {
+  margin-bottom: 12px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.amber-context summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #e6a23c;
+}
+.amber-content {
+  margin-top: 8px;
+  font-size: var(--wp-font-size, 13px);
+  color: #606266;
+  line-height: 1.7;
+}
+.amber-content p {
+  margin: 4px 0;
 }
 </style>

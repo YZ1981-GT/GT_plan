@@ -56,6 +56,16 @@
     </div>
   </div>
 
+  <!-- 勾稽校验：D6-9 ↔ D6-3 -->
+  <el-alert
+    v-if="writeoffCrossCheck"
+    :type="writeoffCrossCheck.type"
+    :title="writeoffCrossCheck.message"
+    :closable="false"
+    show-icon
+    style="margin-bottom: 8px"
+  />
+
   <div v-if="useVirtualScroll" class="virtual-toolbar">
     <el-alert type="info" :closable="false" class="virtual-hint">
       行数较多（{{ browseRowCount }} 行）· {{ browseMode ? '虚拟滚动速览' : '表格编辑' }}模式
@@ -321,6 +331,51 @@ function fmtAmt(val: number | null | undefined): string {
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// 勾稽校验：D6-9 转回/核销 ↔ D6-3 减值明细转回/核销列
+const writeoffCrossCheck = computed<{ type: 'info' | 'success' | 'warning'; message: string } | null>(() => {
+  const responses = allResponsesRef.value
+  if (!responses || responses.size === 0) return null
+
+  // 读取 D6-3 减值明细行数据，汇总转回/核销
+  const d63RowsRaw = responses.get('D6-3-rows')?.remark
+  let d63ReversalTotal = 0
+  let d63WriteoffTotal = 0
+
+  if (d63RowsRaw) {
+    try {
+      const d63Rows = JSON.parse(d63RowsRaw)
+      if (Array.isArray(d63Rows)) {
+        for (const row of d63Rows) {
+          d63ReversalTotal += parseFloat(row.reversal || row.reversalAmount || 0) || 0
+          d63WriteoffTotal += parseFloat(row.writeOff || row.writeOffAmount || row.writeoffAmount || 0) || 0
+        }
+      }
+    } catch { /* ignore parse errors */ }
+  }
+
+  // D6-3 尚无数据
+  if (!d63RowsRaw) {
+    return { type: 'info', message: '勾稽校验：D6-3 减值明细数据尚未填写，无法核对' }
+  }
+
+  // D6-9 本表合计
+  const d69ReversalTotal = reversalTotal.value
+  const d69WriteoffTotal = writeoffTotal.value
+
+  const reversalDiff = Math.abs(d69ReversalTotal - d63ReversalTotal)
+  const writeoffDiff = Math.abs(d69WriteoffTotal - d63WriteoffTotal)
+
+  if (reversalDiff < 0.01 && writeoffDiff < 0.01) {
+    return { type: 'success', message: `勾稽校验通过：转回 ${fmtAmt(d69ReversalTotal)} = D6-3 ${fmtAmt(d63ReversalTotal)}，核销 ${fmtAmt(d69WriteoffTotal)} = D6-3 ${fmtAmt(d63WriteoffTotal)}` }
+  }
+
+  const parts: string[] = []
+  if (reversalDiff >= 0.01) parts.push(`转回差异 ${fmtAmt(d69ReversalTotal - d63ReversalTotal)}（D6-9: ${fmtAmt(d69ReversalTotal)} vs D6-3: ${fmtAmt(d63ReversalTotal)}）`)
+  if (writeoffDiff >= 0.01) parts.push(`核销差异 ${fmtAmt(d69WriteoffTotal - d63WriteoffTotal)}（D6-9: ${fmtAmt(d69WriteoffTotal)} vs D6-3: ${fmtAmt(d63WriteoffTotal)}）`)
+
+  return { type: 'warning', message: `勾稽校验：${parts.join('；')}` }
+})
 
 const browseRows = computed(() => [
   ...reversalRows.value.map(r => ({

@@ -11,6 +11,14 @@
       </div>
     </details>
 
+    <!-- 审计目标 -->
+    <el-alert
+      type="info"
+      :closable="false"
+      title="审计目标：验证调整分录的准确性与完整性，确认借贷平衡且调整事由充分合理。"
+      class="objective-alert"
+    />
+
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
@@ -193,6 +201,9 @@ function fmtAmt(val: number | null | undefined): string {
 .d7-adjustment :deep(.el-table .cell) {
   font-size: var(--wp-font-size, 13px) !important;
 }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 12px; }
 
 /* 编制提示 */
 .guidance-details {
