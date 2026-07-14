@@ -7,6 +7,24 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- 双模式切换工具栏 -->
+      <div v-if="showModeToolbar" class="j3-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <!-- OnlyOffice 模式 -->
+      <GtOnlyOfficeSheet
+        v-if="renderMode === 'onlyoffice'"
+        :key="ooSheetName"
+        :wp-id="props.wpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="onOoFallback"
+      />
+
+      <template v-else>
       <!-- 底稿目录（默认页） -->
       <J3TabIndex
         v-if="!currentSheet || currentSheet === 'J3'"
@@ -55,6 +73,8 @@
         <el-empty :description="`J3 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
       </div>
 
+      </template><!-- end HTML mode -->
+
       <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
@@ -71,7 +91,9 @@
  */
 import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
+import { useJ3EntryDualMode, type J3RenderMode } from '../composables/useJ3EntryDualMode'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
+import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import http from '@/utils/http'
 
 // defineAsyncComponent 懒加载
@@ -153,6 +175,41 @@ const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToo
 provide('j3VersionTrailRef', versionTrailRef)
 provide('j3OpenVersionHistory', openVersionHistory)
 
+// ─── 双模式切换（HTML ↔ OnlyOffice） ─────────────────────────────────────────
+const KNOWN_HTML_SHEETS = new Set(['J3', 'J3A', 'J3-1', 'J3-2'])
+
+const showModeToolbar = computed(() =>
+  KNOWN_HTML_SHEETS.has(currentSheet.value) || !currentSheet.value,
+)
+
+const dualMode = useJ3EntryDualMode({
+  wpId: toRef(props, 'wpId'),
+  currentSheet,
+  reloadAllResponses: selfLoad,
+})
+
+const ooSheetName = computed(() =>
+  dualMode.resolveOoSheetName() || props.sheetName || 'J3-1',
+)
+
+const renderMode = computed({
+  get: () => dualMode.mode.value,
+  set: (v: J3RenderMode) => { void dualMode.switchMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
+
+function onOoFallback(): void {
+  void dualMode.switchMode('html')
+}
+
 function handleNavigateSheet(sheetName: string) {
   emit('navigate-sheet', sheetName)
 }
@@ -170,6 +227,12 @@ onMounted(async () => {
 }
 .loading-container {
   padding: 24px;
+}
+.j3-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .j3-sheet-placeholder {
   display: flex;

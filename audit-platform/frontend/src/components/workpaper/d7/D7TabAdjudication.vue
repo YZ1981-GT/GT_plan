@@ -412,7 +412,8 @@ function cellClass(row: AdjudicationRow): Record<string, boolean> {
   return { 'cross-sheet-cell': row.isFromCrossSheet }
 }
 
-function getRowClassName({ row }: { row: AdjudicationRow }): string {
+function getRowClassName(row: AdjudicationRow): string {
+  if (!row) return ''
   if (row.isDeductionRow) return 'deduction-row'
   if (row.rowType === 'total') return 'total-row'
   if (row.rowType === 'diff' && (row.priorAudited !== 0 || row.currentAudited !== 0)) return 'diff-highlight-row'

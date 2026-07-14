@@ -7,6 +7,24 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- 双模式切换工具栏 -->
+      <div v-if="showModeToolbar" class="j1-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+
+      <!-- OnlyOffice 模式 -->
+      <GtOnlyOfficeSheet
+        v-if="renderMode === 'onlyoffice'"
+        :key="ooSheetName"
+        :wp-id="props.wpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="onOoFallback"
+      />
+
+      <template v-else>
       <!-- 底稿目录 -->
       <J1TabIndex v-if="currentSheet === 'J1-index'" />
       <!-- J1A 程序表（整册专属组件内分发，对齐 H1A/L1A） -->
@@ -68,6 +86,8 @@
         <el-empty :description="`J1 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
       </div>
 
+      </template><!-- end HTML mode -->
+
       <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
@@ -84,7 +104,9 @@
  */
 import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
+import { useJ1EntryDualMode, type J1RenderMode } from '../composables/useJ1EntryDualMode'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
+import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 import http from '@/utils/http'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
@@ -201,6 +223,45 @@ const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToo
 provide('j1VersionTrailRef', versionTrailRef)
 provide('j1OpenVersionHistory', openVersionHistory)
 
+// ─── 双模式切换（HTML ↔ OnlyOffice） ─────────────────────────────────────────
+const KNOWN_HTML_SHEETS = new Set([
+  'J1-index', 'J1A', 'J1-1', 'J1-2', 'J1-3', 'J1-4', 'J1-5',
+  'J1-6', 'J1-7', 'J1-8', 'J1-9', 'J1-10',
+  'J1附注(上市)', 'J1附注(国企)', 'IPO-tips',
+])
+
+const showModeToolbar = computed(() =>
+  KNOWN_HTML_SHEETS.has(currentSheet.value),
+)
+
+const dualMode = useJ1EntryDualMode({
+  wpId: toRef(props, 'wpId'),
+  currentSheet,
+  reloadAllResponses: selfLoad,
+})
+
+const ooSheetName = computed(() =>
+  dualMode.resolveOoSheetName() || props.sheetName || 'J1-1',
+)
+
+const renderMode = computed({
+  get: () => dualMode.mode.value,
+  set: (v: J1RenderMode) => { void dualMode.switchMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: '结构化视图', value: 'html' as const },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
+
+function onOoFallback(): void {
+  void dualMode.switchMode('html')
+}
+
 onMounted(async () => {
   await selfLoad()
   isLoading.value = false
@@ -214,6 +275,12 @@ onMounted(async () => {
 }
 .loading-container {
   padding: 24px;
+}
+.j1-mode-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .j1-sheet-placeholder {
   display: flex;

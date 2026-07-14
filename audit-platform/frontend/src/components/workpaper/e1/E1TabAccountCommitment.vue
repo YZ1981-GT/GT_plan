@@ -12,8 +12,15 @@
  *
  * Requirements: 8.3
  */
-import { ref, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { ref, inject, toRef, onBeforeUnmount, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
+import {
+  E1_ACCOUNT_COMMIT_SNAPSHOT_KEY,
+  E1_ACCOUNT_LIST_STORAGE_KEY,
+  type AccountCommitSnapshotRow,
+} from '../composables/useE1AccountList'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -38,6 +45,7 @@ const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 const ITEM_PREFIX = 'E1-account-commit'
 const NOTE_KEY = 'E1-commit-audit-note'
 const CONCLUSION_KEY = 'E1-commit-audit-conclusion'
+const CHECK_SUMMARY_KEY = 'E1-account-commit-check-summary'
 const DEFAULT_CONTENT = `致：致同会计师事务所
 
 我们确认，截至____年____月____日，我公司已向贵所提供了所有银行账户的完整信息，包括但不限于：
@@ -62,9 +70,13 @@ const commitDate = ref('')
 const commitContent = ref(DEFAULT_CONTENT)
 const signConfirm = ref<'Y' | 'N' | ''>('')
 
-// 审计说明 / 审计结论
+// 审计说明 / 审计结论 / AI核对摘要
 const auditNote = ref('')
 const auditConclusion = ref('')
+const checkSummary = ref('')
+const snapshotRows = ref<AccountCommitSnapshotRow[]>([])
+const snapshotGeneratedAt = ref('')
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
 
 // ─── Load from allResponses ──────────────────────────────────────────────────
 
@@ -80,6 +92,18 @@ function loadFromResponses(): void {
   signConfirm.value = (responses.get(`${ITEM_PREFIX}-sign`)?.conclusion || '') as 'Y' | 'N' | ''
   auditNote.value = responses.get(NOTE_KEY)?.remark || ''
   auditConclusion.value = responses.get(CONCLUSION_KEY)?.remark || ''
+  checkSummary.value = responses.get(CHECK_SUMMARY_KEY)?.remark || ''
+  const snapshotRaw = responses.get(E1_ACCOUNT_COMMIT_SNAPSHOT_KEY)?.remark
+  if (snapshotRaw) {
+    try {
+      const parsed = JSON.parse(snapshotRaw)
+      snapshotRows.value = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.rows) ? parsed.rows : []
+      snapshotGeneratedAt.value = Array.isArray(parsed) ? '' : String(parsed?.generatedAt || '')
+    } catch {
+      snapshotRows.value = []
+      snapshotGeneratedAt.value = ''
+    }
+  }
 }
 
 loadFromResponses()
@@ -138,10 +162,106 @@ function onDateChange(val: string): void {
   scheduleSave()
 }
 
-function onContentChange(val: string): void {
+function restoreStandardContent(): void {
   if (props.isReadonly) return
-  commitContent.value = val
+  commitContent.value = DEFAULT_CONTENT
   scheduleSave()
+  ElMessage.success('已恢复标准承诺正文')
+}
+
+async function generateSnapshot(): Promise<void> {
+  if (props.isReadonly) return
+  const raw = props.allResponses.get(E1_ACCOUNT_LIST_STORAGE_KEY)?.remark
+  let sourceRows: Record<string, unknown>[] = []
+  try {
+    const parsed = raw ? JSON.parse(raw) : []
+    sourceRows = Array.isArray(parsed) ? parsed : []
+  } catch {
+    ElMessage.warning('E1-10 账户清单数据格式异常，无法生成快照')
+    return
+  }
+  const rows = sourceRows
+    .filter(row => String(row.bank || '').trim() || String(row.accountNo || '').trim())
+    .map(row => ({
+      bank: String(row.bank || ''),
+      accountNo: String(row.accountNo || ''),
+      accountType: String(row.accountType || ''),
+      openDate: String(row.openDate || ''),
+      closeDate: String(row.closeDate || ''),
+      accountStatus: String(row.accountStatus || (row.isClosedThisPeriod === 'Y' ? '已注销' : '正常')),
+      restrictionStatus: String(row.restrictionStatus || '无'),
+    }))
+  if (!rows.length) {
+    ElMessage.warning('E1-10 尚无可用于签署的账户数据')
+    return
+  }
+  if (snapshotRows.value.length) {
+    try {
+      await ElMessageBox.confirm('重新生成将覆盖当前签署快照；已保存快照不会随 E1-10 自动变化。', '覆盖签署快照', {
+        confirmButtonText: '确认覆盖',
+        cancelButtonText: '取消',
+        type: 'warning',
+      })
+    } catch {
+      return
+    }
+  }
+  const generatedAt = new Date().toISOString()
+  const item = {
+    item_id: E1_ACCOUNT_COMMIT_SNAPSHOT_KEY,
+    conclusion: null,
+    remark: JSON.stringify({ generatedAt, rows }),
+  }
+  snapshotRows.value = rows
+  snapshotGeneratedAt.value = generatedAt
+  props.allResponses.set(E1_ACCOUNT_COMMIT_SNAPSHOT_KEY, item)
+  await props.saveImmediate([item])
+  ElMessage.success(`已生成 ${rows.length} 个账户的签署快照`)
+}
+
+function aiContext(): Record<string, unknown> {
+  return {
+    snapshotGeneratedAt: snapshotGeneratedAt.value,
+    snapshotRows: snapshotRows.value,
+    signConfirm: signConfirm.value,
+    commitDate: commitDate.value,
+  }
+}
+
+async function generateAiText(target: 'summary' | 'note' | 'conclusion'): Promise<void> {
+  if (props.isReadonly) return
+  const config = {
+    summary: {
+      section: 'account-commitment-check-summary',
+      prompt: '请根据签署账户快照生成账户核对摘要，说明账户数量、账户状态、销户及冻结、抵押或质押情况。不要修改或引用固定承诺正文，不要虚构未提供事实。',
+      existingContent: checkSummary.value,
+      confirmTitle: 'AI 生成账户核对摘要',
+    },
+    note: {
+      section: 'account-commitment-audit-note',
+      prompt: '请根据签署账户快照、签署状态和声明日期生成审计说明，说明承诺函取得过程及与账户清单、征信报告的印证情况。不要修改或引用固定承诺正文，不要虚构未提供事实。',
+      existingContent: auditNote.value,
+      confirmTitle: 'AI 生成审计说明',
+    },
+    conclusion: {
+      section: 'account-commitment-audit-conclusion',
+      prompt: '请根据签署账户快照、签署状态和核对结果生成审计结论，明确是否已取得完整性书面承诺及账户完整性认定是否满足。不要修改或引用固定承诺正文，不要虚构未提供事实。',
+      existingContent: auditConclusion.value,
+      confirmTitle: 'AI 生成审计结论',
+    },
+  } as const
+  const current = config[target]
+  const text = await generateText({
+    section: current.section,
+    prompt: current.prompt,
+    context: aiContext(),
+    existingContent: current.existingContent,
+    confirmTitle: current.confirmTitle,
+  })
+  if (!text) return
+  if (target === 'summary') saveCheckSummary(text)
+  else if (target === 'note') saveAuditNote(text)
+  else saveAuditConclusion(text)
 }
 
 function onSignChange(val: string): void {
@@ -150,7 +270,15 @@ function onSignChange(val: string): void {
   scheduleSave()
 }
 
-// 审计说明 / 审计结论 — 即时保存
+// AI 核对摘要 / 审计说明 / 审计结论 — 即时保存
+function saveCheckSummary(val: string): void {
+  if (props.isReadonly) return
+  checkSummary.value = val
+  const item = { item_id: CHECK_SUMMARY_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CHECK_SUMMARY_KEY, item)
+  props.saveImmediate([item]).catch(() => { /* silent */ })
+}
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
@@ -203,6 +331,8 @@ onBeforeUnmount(() => {
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-tag size="small" type="success">银行账户情况承诺书 (E1-11)</el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="generateSnapshot">一键从 E1-10 生成签署快照</el-button>
+        <el-tag v-if="snapshotRows.length" size="small" type="info">快照 {{ snapshotRows.length }} 个账户</el-tag>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -228,19 +358,42 @@ onBeforeUnmount(() => {
         </el-form-item>
 
         <el-form-item label="声明内容">
+          <div class="content-toolbar">
+            <el-tag size="small" type="info">固定标准正文 · 只读</el-tag>
+            <el-button size="small" :disabled="isReadonly || commitContent === DEFAULT_CONTENT" @click="restoreStandardContent">恢复标准正文</el-button>
+          </div>
           <el-input
             :model-value="commitContent"
-            :disabled="isReadonly"
+            readonly
             type="textarea"
             :autosize="{ minRows: 10, maxRows: 20 }"
-            placeholder="填写承诺书声明内容"
-            @change="onContentChange"
           />
           <div class="field-hint">
-            由被审计单位签署盖章确认已向本所提供全部银行账户信息，声明内容默认引用标准承诺函模板，可按实际情况调整。
+            承诺正文禁止 AI 生成和自由修改；历史自定义正文仅只读展示，可恢复为标准正文。
           </div>
         </el-form-item>
       </el-form>
+
+      <div class="snapshot-section">
+        <div class="section-title-row">
+          <div>
+            <span class="section-title">签署账户快照（只读）</span>
+            <span v-if="snapshotGeneratedAt" class="snapshot-time">生成于 {{ new Date(snapshotGeneratedAt).toLocaleString() }}</span>
+          </div>
+          <el-tag size="small" type="warning">保存后不随 E1-10 自动变化</el-tag>
+        </div>
+        <el-empty v-if="!snapshotRows.length" description="尚未生成签署快照" :image-size="70" />
+        <el-table v-else :data="snapshotRows" border size="small" max-height="360" style="width: 100%">
+          <el-table-column type="index" label="序号" width="55" align="center" />
+          <el-table-column prop="bank" label="开户银行/账户名称" min-width="170" show-overflow-tooltip />
+          <el-table-column prop="accountNo" label="账号" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="accountType" label="账户性质" min-width="120" />
+          <el-table-column prop="openDate" label="开户日期" width="110" />
+          <el-table-column prop="closeDate" label="销户日期" width="110" />
+          <el-table-column prop="accountStatus" label="账户状态" width="100" />
+          <el-table-column prop="restrictionStatus" label="冻结/抵押/质押说明" min-width="180" show-overflow-tooltip />
+        </el-table>
+      </div>
 
       <!-- 签署栏 -->
       <div class="sign-block">
@@ -294,10 +447,31 @@ onBeforeUnmount(() => {
       </div>
     </el-card>
 
+    <!-- AI 核对摘要（不修改固定承诺正文） -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header">
+          <span>账户核对摘要</span>
+          <el-button size="small" type="primary" plain :loading="isGenerating('account-commitment-check-summary')" :disabled="isReadonly || !snapshotRows.length" @click="generateAiText('summary')">🤖 AI核对</el-button>
+        </div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="checkSummary"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 4 }"
+        placeholder="基于签署快照核对账户数量、状态、销户及冻结/抵押/质押情况；AI 仅辅助生成摘要。"
+        @change="(val: string) => saveCheckSummary(val)"
+      />
+    </el-card>
+
     <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="card-header"><span>审计说明</span></div>
+        <div class="card-header">
+          <span>审计说明</span>
+          <el-button size="small" type="primary" plain :loading="isGenerating('account-commitment-audit-note')" :disabled="isReadonly" @click="generateAiText('note')">🤖 AI辅助</el-button>
+        </div>
       </template>
       <el-input
         type="textarea"
@@ -312,7 +486,10 @@ onBeforeUnmount(() => {
     <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="card-header"><span>审计结论</span></div>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button size="small" type="primary" plain :loading="isGenerating('account-commitment-audit-conclusion')" :disabled="isReadonly" @click="generateAiText('conclusion')">🤖 AI辅助</el-button>
+        </div>
       </template>
       <el-input
         type="textarea"
@@ -380,7 +557,38 @@ onBeforeUnmount(() => {
 .chip-wrap { display: inline-flex; align-items: center; }
 
 .commit-card {
-  max-width: 800px;
+  max-width: 1100px;
+}
+.content-toolbar {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.snapshot-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed #dcdfe6;
+}
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.section-title {
+  font-weight: 600;
+  color: #303133;
+}
+.snapshot-time {
+  margin-left: 10px;
+  color: #909399;
+  font-size: 12px;
+}
+.snapshot-section :deep(.el-table) {
+  font-size: var(--wp-font-size, 13px);
 }
 .card-title {
   font-weight: 600;

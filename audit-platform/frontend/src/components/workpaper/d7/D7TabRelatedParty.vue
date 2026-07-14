@@ -12,12 +12,19 @@
     </details>
 
     <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：核实关联方合同负债的真实性与商业实质，评价关联交易定价公允性及长期挂账的合理性，确认披露完整。"
-      class="objective-alert"
-    />
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        <span class="ao-title">一、审计目标</span>
+      </template>
+      <template #default>
+        <ol class="ao-list">
+          <li>资产负债表中记录的合同负债是存在的，且已经记录在恰当的账户中；</li>
+          <li>记录的合同负债由被审计单位拥有或控制；</li>
+          <li>记录的合同负债是被审计单位应当履行的短期义务；</li>
+          <li>负债以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。</li>
+        </ol>
+      </template>
+    </el-alert>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -400,7 +407,12 @@ const {
   line-height: 1.6;
 }
 .guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+
+/* 审计目标 */
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { padding-left: 18px; line-height: 1.55; font-size: 12px; margin: 4px 0 0; }
 
 /* 工具栏 */
 .tab-toolbar {

@@ -22,7 +22,6 @@ import {
   calcChange,
   calcChangeRate,
   exceedsThreshold,
-  sumField,
 } from './useE1FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -66,6 +65,7 @@ export interface AdjRow {
   varianceNote: string
   isSubtotal?: boolean
   isReadonly?: boolean
+  sourceWpCode?: string
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -77,6 +77,7 @@ interface RowConfig {
   accountCode?: '1001' | '1002' | '1012'
   isSubtotal?: boolean
   isReadonly?: boolean
+  sourceWpCode?: string
 }
 
 const ROW_MATRIX: RowConfig[] = [
@@ -86,7 +87,11 @@ const ROW_MATRIX: RowConfig[] = [
   { itemKey: 'bank_institution', itemName: '银行机构存款' },
   { itemKey: 'other_mf', itemName: '其他货币资金（本金）', accountCode: '1012' },
   { itemKey: 'digital', itemName: '数字货币（本金）' },
-  { itemKey: 'accrued_interest', itemName: '应计利息（小计）', isSubtotal: true },
+  { itemKey: 'accrued_interest', itemName: '应计利息', isSubtotal: true, isReadonly: true, sourceWpCode: 'E1-20' },
+  { itemKey: 'accrued_finance', itemName: '其中：财务公司存款', isReadonly: true, sourceWpCode: 'E1-20' },
+  { itemKey: 'accrued_bank', itemName: '银行机构存款', isReadonly: true, sourceWpCode: 'E1-20' },
+  { itemKey: 'accrued_other', itemName: '其他货币资金', isReadonly: true, sourceWpCode: 'E1-20' },
+  { itemKey: 'accrued_digital', itemName: '数字货币', isReadonly: true, sourceWpCode: 'E1-20' },
   { itemKey: 'total', itemName: '合计', isSubtotal: true, isReadonly: true },
   { itemKey: 'overseas', itemName: '其中：存放在境外的款项总额' },
   { itemKey: 'tb_amount', itemName: '试算平衡表数', isReadonly: true },
@@ -112,7 +117,7 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useE1Adjudication(options: UseE1BaseOptions) {
-  const { wpId, projectId, allResponses, saveImmediate, debouncedSave, isReadonly } = options
+  const { projectId, allResponses, debouncedSave, isReadonly } = options
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
@@ -175,6 +180,41 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     ending: parseNum(getVal('E1-digital-total-unaudited').remark),
   }))
 
+  /** E1-20 应计利息按 E1-1 源模板四类分项汇总。 */
+  const accruedInterestRows = computed(() => safeParseRows<Record<string, unknown>>(
+    getVal('E1-accrued-interest-rows').remark,
+  ))
+  const accruedInterestByCategory = computed(() => {
+    const totals = { finance: 0, bank: 0, other: 0, digital: 0 }
+    for (const row of accruedInterestRows.value) {
+      const category = String(row.category || 'bank') as keyof typeof totals
+      if (category in totals) totals[category] += parseNum(row.accruedRmb)
+    }
+    return totals
+  })
+
+  function accruedCategoryValues(itemKey: string): { opening: number; ending: number } {
+    const category = itemKey.replace('accrued_', '') as keyof typeof accruedInterestByCategory.value
+    return {
+      opening: parseNum(getVal(`E1-adj-${itemKey}-opening-unadj`).remark),
+      ending: accruedInterestRows.value.length
+        ? accruedInterestByCategory.value[category] || 0
+        : parseNum(getVal(`E1-adj-${itemKey}-ending-unadj`).remark),
+    }
+  }
+
+  function accruedTotalValues(): { opening: number; ending: number } {
+    const categoryKeys = ['accrued_finance', 'accrued_bank', 'accrued_other', 'accrued_digital']
+    const categoryValues = categoryKeys.map(accruedCategoryValues)
+    const openingByCategory = categoryValues.reduce((sum, value) => sum + value.opening, 0)
+    const endingByCategory = categoryValues.reduce((sum, value) => sum + value.ending, 0)
+    const legacyOpening = parseNum(getVal('E1-adj-accrued_interest-opening-unadj').remark)
+    return {
+      opening: categoryValues.every(value => value.opening === 0) ? legacyOpening : openingByCategory,
+      ending: endingByCategory,
+    }
+  }
+
   /**
    * 从 E1-5 调整分录按项目归集账项调整
    * keys: 'E1-adjustment-by-item-{itemKey}'
@@ -217,15 +257,35 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
         openingUnaudited = digitalUnaudited.value.opening
         endingUnaudited = digitalUnaudited.value.ending
         break
+      case 'accrued_interest': {
+        const accrued = accruedTotalValues()
+        openingUnaudited = accrued.opening
+        endingUnaudited = accrued.ending
+        break
+      }
+      case 'accrued_finance':
+      case 'accrued_bank':
+      case 'accrued_other':
+      case 'accrued_digital': {
+        const accrued = accruedCategoryValues(itemKey)
+        openingUnaudited = accrued.opening
+        endingUnaudited = accrued.ending
+        break
+      }
       default:
-        // For accrued_interest, overseas, etc. — read from stored
+        // For overseas and other manual supplementary rows — read from stored
         openingUnaudited = parseNum(getVal(`E1-adj-${itemKey}-opening-unadj`).remark)
         endingUnaudited = parseNum(getVal(`E1-adj-${itemKey}-ending-unadj`).remark)
     }
 
-    // Adjustments from E1-5 cross-sheet
-    const openingAdjustment = getAdjustment(itemKey, 'opening')
-    const endingAdjustment = getAdjustment(itemKey, 'ending')
+    // Adjustments from E1-5 cross-sheet. 应计利息总行严格汇总四个子项，避免与子项重复或口径不一致。
+    const accruedChildKeys = ['accrued_finance', 'accrued_bank', 'accrued_other', 'accrued_digital']
+    const openingAdjustment = itemKey === 'accrued_interest'
+      ? accruedChildKeys.reduce((sum, key) => sum + getAdjustment(key, 'opening'), 0)
+      : getAdjustment(itemKey, 'opening')
+    const endingAdjustment = itemKey === 'accrued_interest'
+      ? accruedChildKeys.reduce((sum, key) => sum + getAdjustment(key, 'ending'), 0)
+      : getAdjustment(itemKey, 'ending')
 
     // Computed: 审定数 = 未审数 + 账项调整
     const openingAudited = calcAudited(openingUnaudited, openingAdjustment)
@@ -253,6 +313,7 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
       varianceNote,
       isSubtotal: cfg.isSubtotal,
       isReadonly: cfg.isReadonly,
+      sourceWpCode: cfg.sourceWpCode,
     }
   }
 
@@ -346,10 +407,12 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     }
   })
 
-  /** 完整行列表（供模板渲染） */
+  /** 完整行列表（严格按源模板：应计利息四子项后立即为合计，再列境外/TB/差异） */
   const rows: ComputedRef<AdjRow[]> = computed(() => {
     const detail = detailRows.value
-    return [...detail, totalRow.value, tbAmountRow.value, diffRow.value]
+    const overseas = detail.find(row => row.itemKey === 'overseas')
+    const beforeTotal = detail.filter(row => row.itemKey !== 'overseas')
+    return [...beforeTotal, totalRow.value, ...(overseas ? [overseas] : []), tbAmountRow.value, diffRow.value]
   })
 
   // ─── Highlight Helpers ───────────────────────────────────────────────
@@ -498,25 +561,6 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     }
   }
 
-  // ─── AI Generate Note ────────────────────────────────────────────────
-
-  async function aiGenerateNote(itemKey: string): Promise<string> {
-    try {
-      const { api } = await import('@/services/apiProxy')
-      const row = rows.value.find(r => r.itemKey === itemKey)
-      const context = row
-        ? `${row.itemName}: 期初审定=${row.openingAudited}, 期末审定=${row.endingAudited}, 变动额=${row.changeAmount}, 变动率=${typeof row.changeRate === 'number' ? (row.changeRate * 100).toFixed(2) + '%' : '—'}`
-        : ''
-      const res = await api.post(`/api/workpapers/${wpId.value}/review-dialog/ai-generate`, {
-        section: 'variance-note',
-        context,
-      })
-      return (res as any)?.text || (res as any)?.data?.text || ''
-    } catch {
-      return ''
-    }
-  }
-
   // ─── Event Registration ──────────────────────────────────────────────
 
   function registerHandler(event: string, handler: (e: Event) => void): void {
@@ -556,7 +600,6 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     saveVarianceNote,
     writebackTrialBalance,
     publishAdjudicated,
-    aiGenerateNote,
     hydrate,
   }
 }

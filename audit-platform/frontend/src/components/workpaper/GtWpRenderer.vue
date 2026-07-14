@@ -334,12 +334,17 @@ const redirectHint = computed(() => {
 function handleRedirectNavigation() {
   const targetPath = renderConfig.value?.target_path
   const projectId = renderConfig.value?.project_id
-  if (targetPath && projectId) {
-    router.push(`/projects/${projectId}${targetPath}`)
-  } else if (targetPath) {
-    router.push(targetPath)
+  if (targetPath) {
+    // target_path may already contain full route (e.g. /projects/{id}/confirmation)
+    // or relative path (e.g. /materiality) needing project prefix
+    if (targetPath.startsWith('/projects/')) {
+      router.push(targetPath)
+    } else if (projectId) {
+      router.push(`/projects/${projectId}${targetPath}`)
+    } else {
+      router.push(targetPath)
+    }
   } else {
-    // fallback: go back
     router.back()
   }
 }

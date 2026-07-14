@@ -16,9 +16,11 @@ import { ElMessage } from 'element-plus'
 import {
   useE1CashCount,
   type CashCountVariant,
+  type CashRollForwardSummary,
   type RmbCountRow,
   type FxCountRow,
 } from '../composables/useE1CashCount'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -36,6 +38,7 @@ const props = defineProps<{
   isReadonly: boolean
   sheetName?: string
   bsDate?: string
+  variant?: Extract<CashCountVariant, 'rmb' | 'fx'>
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -47,6 +50,7 @@ const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpape
 // ─── Variant Detection ───────────────────────────────────────────────────────
 
 const variant = computed<CashCountVariant>(() => {
+  if (props.variant) return props.variant
   const name = props.sheetName || ''
   if (name.includes('E1-8') || name.includes('外币')) return 'fx'
   return 'rmb'
@@ -68,6 +72,7 @@ const {
   rows,
   rmbSummary,
   rmbTotal,
+  actualTotal,
   isLoading,
   hasDiff,
   addRow,
@@ -95,24 +100,13 @@ async function handleImport(file: File): Promise<boolean> {
   return false // 阻止 el-upload 自动上传
 }
 
-// ─── FX 折算合计 / 差异 ───────────────────────────────────────────────────────
+// ─── Formula aliases / persistence keys ─────────────────────────────────────
 
-/** FX 模式实盘折算合计 = SUM(rmbAmount) */
-const fxActualTotal = computed(() =>
-  variant.value === 'fx'
-    ? rows.value.reduce((sum, r) => sum + Number((r as FxCountRow).rmbAmount || 0), 0)
-    : 0,
-)
-/** FX 模式盘点差异 = 实盘折算合计 - 账面余额 */
-const fxCountDiff = computed(() => fxActualTotal.value - (fxSummary.value.bookBalance || 0))
-function fxHasDiff(): boolean {
-  return Math.abs(fxCountDiff.value) > 0.005
-}
-
-// ─── 持久化键（按 variant 区分，避免 E1-7/E1-8 同工作簿共享时冲突） ───────────
+const fxActualTotal = computed(() => (variant.value === 'fx' ? actualTotal.value : 0))
+const fxCountDiff = computed(() => rmbSummary.value.overShort)
+function fxHasDiff(): boolean { return hasDiff() }
 
 const ELEMENTS_KEY = computed(() => `E1-cashcount-elements-${variant.value}`)
-const FX_SUMMARY_KEY = computed(() => `E1-cashcount-fx-summary-${variant.value}`)
 const NOTE_KEY = computed(() => `E1-cashcount-audit-note-${variant.value}`)
 const CONCLUSION_KEY = computed(() => `E1-cashcount-audit-conclusion-${variant.value}`)
 
@@ -123,9 +117,12 @@ interface CountElements {
   countTime: string
   countPlace: string
   participants: string
-  accountant: string   // 会计主管人员
-  cashier: string       // 出纳
-  supervisor: string    // 监盘人（审计人员）
+  accountant: string
+  accountantDate: string
+  cashier: string
+  cashierDate: string
+  supervisor: string
+  supervisorDate: string
 }
 const countElements = ref<CountElements>({
   countDate: '',
@@ -133,8 +130,11 @@ const countElements = ref<CountElements>({
   countPlace: '',
   participants: '',
   accountant: '',
+  accountantDate: '',
   cashier: '',
+  cashierDate: '',
   supervisor: '',
+  supervisorDate: '',
 })
 
 function saveElements(): void {
@@ -151,32 +151,11 @@ function updateElement(field: keyof CountElements, val: string): void {
   saveElements()
 }
 
-// ─── FX 汇总（账面余额 / 差异原因） ───────────────────────────────────────────
+// ─── 倒轧链 / 审计说明 / 审计结论 ─────────────────────────────────────────────
 
-interface FxSummary { bookBalance: number; diffReason: string }
-const fxSummary = ref<FxSummary>({ bookBalance: 0, diffReason: '' })
-
-function saveFxSummary(): void {
-  if (props.isReadonly) return
-  const json = JSON.stringify(fxSummary.value)
-  const item = { item_id: FX_SUMMARY_KEY.value, conclusion: null, remark: json }
-  props.allResponses.set(FX_SUMMARY_KEY.value, item)
-  void props.saveImmediate([item])
+function updateRollForward(field: keyof CashRollForwardSummary, val: number | string | undefined): void {
+  updateSummary(field, val ?? (field === 'diffReason' ? '' : 0))
 }
-
-function updateFxBookBalance(val: number | undefined): void {
-  if (props.isReadonly) return
-  fxSummary.value = { ...fxSummary.value, bookBalance: val ?? 0 }
-  saveFxSummary()
-}
-
-function updateFxDiffReason(val: string): void {
-  if (props.isReadonly) return
-  fxSummary.value = { ...fxSummary.value, diffReason: val ?? '' }
-  saveFxSummary()
-}
-
-// ─── 审计说明 / 审计结论 ──────────────────────────────────────────────────────
 
 const auditNote = ref('')
 const auditConclusion = ref('')
@@ -197,6 +176,40 @@ function saveAuditConclusion(val: string): void {
   void props.saveImmediate([item])
 }
 
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+function buildAiContext(): Record<string, unknown> {
+  return {
+    sheet: sheetCode.value,
+    variant: variant.value,
+    monitoring: countElements.value,
+    rollForward: rmbSummary.value,
+    countRows: rows.value,
+  }
+}
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-audit-note',
+    prompt: '请根据盘点过程、倒轧链、差异及证据索引生成专业、可追溯的审计说明。',
+    context: buildAiContext(),
+    existingContent: auditNote.value,
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-audit-conclusion',
+    prompt: '请根据盘点结果生成审计结论，说明账实是否相符及是否存在需调整事项。',
+    context: buildAiContext(),
+    existingContent: auditConclusion.value,
+  })
+  if (text) saveAuditConclusion(text)
+}
+
 // ─── Hydration ─────────────────────────────────────────────────────────────
 
 onMounted(() => {
@@ -205,16 +218,6 @@ onMounted(() => {
     try {
       const parsed = JSON.parse(elemResp.remark)
       countElements.value = { ...countElements.value, ...parsed }
-    } catch { /* keep defaults */ }
-  }
-  const fxResp = props.allResponses.get(FX_SUMMARY_KEY.value)
-  if (fxResp?.remark) {
-    try {
-      const parsed = JSON.parse(fxResp.remark)
-      fxSummary.value = {
-        bookBalance: Number(parsed.bookBalance) || 0,
-        diffReason: String(parsed.diffReason || ''),
-      }
     } catch { /* keep defaults */ }
   }
   const noteResp = props.allResponses.get(NOTE_KEY.value)
@@ -330,32 +333,65 @@ function asFx(row: any): FxCountRow { return row }
             @change="(val: string) => updateElement('participants', val)"
           />
         </el-descriptions-item>
-        <el-descriptions-item label="会计主管人员">
-          <el-input
-            :model-value="countElements.accountant"
-            :disabled="isReadonly"
-            placeholder="会计主管签字确认"
-            size="small"
-            @change="(val: string) => updateElement('accountant', val)"
-          />
+        <el-descriptions-item label="会计主管签字">
+          <div class="signature-field">
+            <el-input
+              :model-value="countElements.accountant"
+              :disabled="isReadonly"
+              placeholder="会计主管姓名/签字"
+              size="small"
+              @change="(val: string) => updateElement('accountant', val)"
+            />
+            <el-date-picker
+              :model-value="countElements.accountantDate"
+              :disabled="isReadonly"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="签字日期"
+              size="small"
+              @update:model-value="(val: string) => updateElement('accountantDate', val || '')"
+            />
+          </div>
         </el-descriptions-item>
-        <el-descriptions-item label="出纳">
-          <el-input
-            :model-value="countElements.cashier"
-            :disabled="isReadonly"
-            placeholder="现金出纳签字确认"
-            size="small"
-            @change="(val: string) => updateElement('cashier', val)"
-          />
+        <el-descriptions-item label="出纳签字">
+          <div class="signature-field">
+            <el-input
+              :model-value="countElements.cashier"
+              :disabled="isReadonly"
+              placeholder="出纳姓名/签字"
+              size="small"
+              @change="(val: string) => updateElement('cashier', val)"
+            />
+            <el-date-picker
+              :model-value="countElements.cashierDate"
+              :disabled="isReadonly"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="签字日期"
+              size="small"
+              @update:model-value="(val: string) => updateElement('cashierDate', val || '')"
+            />
+          </div>
         </el-descriptions-item>
-        <el-descriptions-item label="监盘人（审计人员）">
-          <el-input
-            :model-value="countElements.supervisor"
-            :disabled="isReadonly"
-            placeholder="现场监盘审计人员"
-            size="small"
-            @change="(val: string) => updateElement('supervisor', val)"
-          />
+        <el-descriptions-item label="监盘人签字">
+          <div class="signature-field">
+            <el-input
+              :model-value="countElements.supervisor"
+              :disabled="isReadonly"
+              placeholder="监盘人姓名/签字"
+              size="small"
+              @change="(val: string) => updateElement('supervisor', val)"
+            />
+            <el-date-picker
+              :model-value="countElements.supervisorDate"
+              :disabled="isReadonly"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="签字日期"
+              size="small"
+              @update:model-value="(val: string) => updateElement('supervisorDate', val || '')"
+            />
+          </div>
         </el-descriptions-item>
       </el-descriptions>
     </el-card>
@@ -405,37 +441,6 @@ function asFx(row: any): FxCountRow { return row }
             </el-table-column>
           </el-table>
 
-          <!-- Summary Card -->
-          <el-card class="summary-card" shadow="never">
-            <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="实盘合计">
-                <span class="auto-calc-value">{{ displayPrefs.fmtAmount(rmbTotal) }}</span>
-              </el-descriptions-item>
-              <el-descriptions-item label="账面余额">
-                <el-input-number
-                  :model-value="rmbSummary.bookBalance"
-                  :disabled="isReadonly"
-                  :controls="false"
-                  size="small"
-                  @change="(val: number) => updateSummary('bookBalance', val ?? 0)"
-                />
-              </el-descriptions-item>
-              <el-descriptions-item label="盘点差异">
-                <span :class="['auto-calc-value', { 'orange-text': hasDiff() }]">
-                  {{ displayPrefs.fmtAmount(rmbSummary.countDiff) }}
-                </span>
-              </el-descriptions-item>
-              <el-descriptions-item label="差异原因">
-                <el-input
-                  :model-value="rmbSummary.diffReason"
-                  :disabled="isReadonly"
-                  placeholder="差异≠0时必填"
-                  size="small"
-                  @change="(val: string) => updateSummary('diffReason', val)"
-                />
-              </el-descriptions-item>
-            </el-descriptions>
-          </el-card>
         </template>
 
         <!-- FX 模式 -->
@@ -514,43 +519,159 @@ function asFx(row: any): FxCountRow { return row }
             </el-table-column>
           </el-table>
 
-          <!-- FX 盘盈盘亏汇总 -->
-          <el-card class="summary-card" shadow="never">
-            <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="实盘折算合计（本位币）">
-                <span class="auto-calc-value">{{ displayPrefs.fmtAmount(fxActualTotal) }}</span>
-              </el-descriptions-item>
-              <el-descriptions-item label="账面余额（本位币）">
+        </template>
+
+        <!-- E1-7/8 完整倒轧链 -->
+        <el-card class="summary-card" shadow="never">
+          <template #header>
+            <div class="card-header">
+              <span>盘点倒轧及账实核对</span>
+              <el-tag size="small" type="info">金额单位：元</el-tag>
+            </div>
+          </template>
+          <el-descriptions :column="2" border size="small" class="roll-forward-grid">
+            <el-descriptions-item label="报表日现金账面余额">
+              <el-input-number
+                :model-value="rmbSummary.reportDateBookBalance"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('reportDateBookBalance', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="报表日至盘点日前一日累计收入">
+              <el-input-number
+                :model-value="rmbSummary.cumulativeIncome"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('cumulativeIncome', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="报表日至盘点日前一日累计支出">
+              <el-input-number
+                :model-value="rmbSummary.cumulativeExpense"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('cumulativeExpense', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="盘点日前一日账面余额（公式）" class-name="formula-item">
+              <span class="formula-value" title="报表日现金账面余额 + 累计收入 - 累计支出">
+                {{ displayPrefs.fmtAmount(rmbSummary.priorDayBookBalance) }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="收入凭证未记账">
+              <el-input-number
+                :model-value="rmbSummary.receiptVoucherUnposted"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('receiptVoucherUnposted', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="支出凭证未记账">
+              <el-input-number
+                :model-value="rmbSummary.paymentVoucherUnposted"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('paymentVoucherUnposted', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="未做凭证收入">
+              <el-input-number
+                :model-value="rmbSummary.unvoucheredIncome"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('unvoucheredIncome', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="未做凭证支出">
+              <el-input-number
+                :model-value="rmbSummary.unvoucheredExpense"
+                :disabled="isReadonly"
+                :controls="false"
+                size="small"
+                @change="(val: number) => updateRollForward('unvoucheredExpense', val)"
+              />
+            </el-descriptions-item>
+            <el-descriptions-item label="盘点日应有数（公式）" class-name="formula-item">
+              <span class="formula-value" title="盘点日前一日账面余额 + 收入凭证未记账 - 支出凭证未记账 + 未做凭证收入 - 未做凭证支出">
+                {{ displayPrefs.fmtAmount(rmbSummary.expectedCountAmount) }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="实有数（公式）" class-name="formula-item">
+              <span class="formula-value" title="盘点明细金额合计">
+                {{ displayPrefs.fmtAmount(variant === 'fx' ? fxActualTotal : rmbTotal) }}
+              </span>
+            </el-descriptions-item>
+            <el-descriptions-item label="长（短）款（公式）" class-name="formula-item">
+              <span
+                :class="['formula-value', { 'orange-text': variant === 'fx' ? fxHasDiff() : hasDiff() }]"
+                title="实有数 - 盘点日应有数；正数为长款，负数为短款"
+              >{{ displayPrefs.fmtAmount(variant === 'fx' ? fxCountDiff : rmbSummary.overShort) }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="差异原因">
+              <el-input
+                :model-value="rmbSummary.diffReason"
+                :disabled="isReadonly"
+                :class="{ 'required-input': hasDiff() && !rmbSummary.diffReason.trim() }"
+                placeholder="长（短）款不为0时必填"
+                size="small"
+                @change="(val: string) => updateRollForward('diffReason', val)"
+              />
+            </el-descriptions-item>
+            <template v-if="variant === 'fx'">
+              <el-descriptions-item label="期末汇率">
                 <el-input-number
-                  :model-value="fxSummary.bookBalance"
+                  :model-value="rmbSummary.closingFxRate"
+                  :disabled="isReadonly"
+                  :controls="false"
+                  :precision="6"
+                  size="small"
+                  @change="(val: number) => updateRollForward('closingFxRate', val)"
+                />
+              </el-descriptions-item>
+              <el-descriptions-item label="报表日原币账面">
+                <el-input-number
+                  :model-value="rmbSummary.reportDateForeignBookBalance"
                   :disabled="isReadonly"
                   :controls="false"
                   size="small"
-                  @change="updateFxBookBalance"
+                  @change="(val: number) => updateRollForward('reportDateForeignBookBalance', val)"
                 />
               </el-descriptions-item>
-              <el-descriptions-item label="盘盈盘亏差异">
-                <span :class="['auto-calc-value', { 'orange-text': fxHasDiff() }]">
-                  {{ displayPrefs.fmtAmount(fxCountDiff) }}
+              <el-descriptions-item label="应有本位币（公式）" class-name="formula-item">
+                <span class="formula-value" title="报表日原币账面 × 期末汇率">
+                  {{ displayPrefs.fmtAmount(rmbSummary.expectedFunctionalCurrency) }}
                 </span>
               </el-descriptions-item>
-              <el-descriptions-item label="差异原因">
-                <el-input
-                  :model-value="fxSummary.diffReason"
-                  :disabled="isReadonly"
-                  placeholder="差异≠0时必填（含汇兑损益、长短款等）"
-                  size="small"
-                  @change="updateFxDiffReason"
-                />
+              <el-descriptions-item label="汇兑差异（公式）" class-name="formula-item">
+                <span class="formula-value" title="应有本位币 - 报表日现金账面余额">
+                  {{ displayPrefs.fmtAmount(rmbSummary.exchangeDifference) }}
+                </span>
               </el-descriptions-item>
-            </el-descriptions>
-          </el-card>
-        </template>
+            </template>
+          </el-descriptions>
+        </el-card>
 
         <!-- 审计说明 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计说明</span></div>
+            <div class="card-header">
+              <span>审计说明</span>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :loading="isGenerating('e1-audit-note')"
+                :disabled="isReadonly"
+                @click="generateAuditNote"
+              >🤖 AI辅助</el-button>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -565,7 +686,17 @@ function asFx(row: any): FxCountRow { return row }
         <!-- 审计结论 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计结论</span></div>
+            <div class="card-header">
+              <span>审计结论</span>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :loading="isGenerating('e1-audit-conclusion')"
+                :disabled="isReadonly"
+                @click="generateAuditConclusion"
+              >🤖 AI辅助</el-button>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -660,6 +791,26 @@ function asFx(row: any): FxCountRow { return row }
 }
 .elements-card :deep(.el-descriptions__label) {
   width: 140px;
+}
+.signature-field {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) 150px;
+  gap: 8px;
+  width: 100%;
+}
+.roll-forward-grid :deep(.el-descriptions__label) {
+  min-width: 210px;
+}
+.formula-value {
+  color: #606266;
+  border-bottom: 1px dashed #909399;
+  cursor: help;
+}
+:deep(.formula-item) {
+  background: #f5f7fa !important;
+}
+.required-input :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
 }
 .audit-note-card {
   margin-top: 16px;

@@ -15,7 +15,7 @@
  *
  * Requirements: 1.1-1.7, 12.1-12.5
  */
-import { ref, inject, computed, toRef, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, watch, type Ref } from 'vue'
 import {
   useE1Adjudication,
   type UseE1BaseOptions,
@@ -24,6 +24,7 @@ import {
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -60,24 +61,30 @@ const {
   isRateExceeding,
   hasDifference,
   saveVarianceNote,
-  aiGenerateNote,
 } = useE1Adjudication(options)
+
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const { generateText, isGenerating } = useE1AiGenerate(wpIdRef)
 
 // ─── AI Generation ───────────────────────────────────────────────────────────
 
-const aiLoadingKey = ref<string | null>(null)
-
 async function handleAiGenerate(row: AdjRow): Promise<void> {
   if (props.isReadonly) return
-  aiLoadingKey.value = row.itemKey
-  try {
-    const text = await aiGenerateNote(row.itemKey)
-    if (text) {
-      saveVarianceNote(row.itemKey, text)
-    }
-  } finally {
-    aiLoadingKey.value = null
-  }
+  const text = await generateText({
+    section: `e1-adjudication-variance-${row.itemKey}`,
+    prompt: '根据该项目期初、期末审定数和变动情况，生成简洁、风险导向且可追溯的原因分析；超过30%的变动需说明主要驱动因素和已执行程序。',
+    context: {
+      项目: row.itemName,
+      期初审定数: row.openingAudited,
+      期末审定数: row.endingAudited,
+      变动额: row.changeAmount,
+      变动率: row.changeRate,
+      当前说明: row.varianceNote,
+    },
+    existingContent: row.varianceNote,
+    confirmTitle: '确认填入原因分析',
+  })
+  if (text) saveVarianceNote(row.itemKey, text)
 }
 
 // ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
@@ -86,15 +93,19 @@ const NOTE_KEY = 'E1-adj-audit-note'
 const CONCLUSION_KEY = 'E1-adj-audit-conclusion'
 const auditNote = ref('')
 const auditConclusion = ref('')
-const aiLoadingNote = ref(false)
-const aiLoadingConclusion = ref(false)
+const selectedConclusionTemplate = ref('')
+const conclusionTemplates = [
+  { value: 'A', label: 'A—核对一致', text: '经审计，货币资金在资产负债表日存在，应当记录的货币资金已完整、准确记录，审定数与试算平衡表核对一致。' },
+  { value: 'B', label: 'B—调整后认可', text: '除已提请调整并经被审计单位处理的事项外，货币资金在资产负债表日存在，应当记录的货币资金已完整、准确记录，调整后审定数可以认定。' },
+  { value: 'C', label: 'C—需进一步核查', text: '由于存在尚未解决的重大差异或审计证据受限，目前尚不能确认货币资金已完整、准确记录，需进一步执行审计程序并评价相关影响。' },
+]
 
-onMounted(() => {
-  const noteResp = props.allResponses.get(NOTE_KEY)
-  if (noteResp?.remark) auditNote.value = noteResp.remark
-  const concResp = props.allResponses.get(CONCLUSION_KEY)
-  if (concResp?.remark) auditConclusion.value = concResp.remark
-})
+function hydrateNarratives(): void {
+  auditNote.value = props.allResponses.get(NOTE_KEY)?.remark || ''
+  auditConclusion.value = props.allResponses.get(CONCLUSION_KEY)?.remark || ''
+}
+onMounted(hydrateNarratives)
+watch(() => props.allResponses, hydrateNarratives)
 
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
@@ -112,26 +123,33 @@ function saveAuditConclusion(val: string): void {
   void props.saveImmediate([item])
 }
 
+function applyConclusionTemplate(code: string): void {
+  const template = conclusionTemplates.find(item => item.value === code)
+  if (template) saveAuditConclusion(template.text)
+}
+
 async function generateAuditNote(): Promise<void> {
   if (props.isReadonly) return
-  aiLoadingNote.value = true
-  try {
-    const text = await aiGenerateNote('adj-note')
-    if (text) saveAuditNote(text)
-  } finally {
-    aiLoadingNote.value = false
-  }
+  const text = await generateText({
+    section: 'e1-adjudication-note',
+    prompt: '结合货币资金审定表各项目期初期末变动、应计利息分项及试算平衡表差异，生成专业审计说明，说明数据来源、核对程序、异常及处理。',
+    context: { 审定表: rows.value, 试算平衡差异: diffRow.value.endingAudited },
+    existingContent: auditNote.value,
+    confirmTitle: '确认填入审计说明',
+  })
+  if (text) saveAuditNote(text)
 }
 
 async function generateAuditConclusion(): Promise<void> {
   if (props.isReadonly) return
-  aiLoadingConclusion.value = true
-  try {
-    const text = await aiGenerateNote('adj-conclusion')
-    if (text) saveAuditConclusion(text)
-  } finally {
-    aiLoadingConclusion.value = false
-  }
+  const text = await generateText({
+    section: 'e1-adjudication-conclusion',
+    prompt: '根据审定表核对结果、未解决差异和审计说明，生成审慎的审计结论；不得在存在未解决重大差异时给出无保留式结论。',
+    context: { 是否存在差异: hasDifference(), 差异金额: diffRow.value.endingAudited, 审计说明: auditNote.value },
+    existingContent: auditConclusion.value,
+    confirmTitle: '确认填入审计结论',
+  })
+  if (text) saveAuditConclusion(text)
 }
 
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
@@ -176,7 +194,7 @@ function getRowClass({ row }: { row: AdjRow }): string {
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：确认货币资金期初、期末余额的存在、完整与准确，评价账项调整的恰当性，并与试算平衡表（科目1001/1002/1012）核对一致。"
+      title="审计目标：确认货币资金在资产负债表日存在，应当记录的货币资金均已完整、准确记录，并与试算平衡表核对一致。"
       class="objective-alert"
     />
 
@@ -187,6 +205,7 @@ function getRowClass({ row }: { row: AdjRow }): string {
         <span class="chip-wrap"><GtIndexChip value="wp:E1-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:E1-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:E1-4" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:E1-20" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
@@ -207,12 +226,16 @@ function getRowClass({ row }: { row: AdjRow }): string {
             prop="itemName"
             label="项目名称"
             fixed="left"
-            width="200"
+            width="240"
           >
             <template #default="{ row }">
               <span :class="{ 'font-bold': row.isSubtotal || row.isReadonly }">
                 {{ row.itemName }}
               </span>
+              <div v-if="row.sourceWpCode" class="source-hint">
+                <el-tag size="small" type="info" effect="plain">来自 {{ row.sourceWpCode }}</el-tag>
+                <GtIndexChip :value="`wp:${row.sourceWpCode}`" :context-project-id="projectId" />
+              </div>
             </template>
           </el-table-column>
 
@@ -281,7 +304,7 @@ function getRowClass({ row }: { row: AdjRow }): string {
           <!-- 原因分析 -->
           <el-table-column label="原因分析" min-width="220">
             <template #default="{ row }">
-              <div v-if="row.isReadonly && row.itemKey !== 'diff'" class="readonly-cell">
+              <div v-if="['total', 'tb_amount'].includes(row.itemKey)" class="readonly-cell">
                 {{ row.varianceNote || '-' }}
               </div>
               <div v-else class="note-cell">
@@ -295,7 +318,7 @@ function getRowClass({ row }: { row: AdjRow }): string {
                 />
                 <el-button
                   v-if="!isReadonly"
-                  :loading="aiLoadingKey === row.itemKey"
+                  :loading="isGenerating(`e1-adjudication-variance-${row.itemKey}`)"
                   size="small"
                   type="primary"
                   text
@@ -326,7 +349,7 @@ function getRowClass({ row }: { row: AdjRow }): string {
                 size="small"
                 type="primary"
                 text
-                :loading="aiLoadingNote"
+                :loading="isGenerating('e1-adjudication-note')"
                 @click="generateAuditNote"
               >🤖 AI辅助</el-button>
             </div>
@@ -346,14 +369,27 @@ function getRowClass({ row }: { row: AdjRow }): string {
           <template #header>
             <div class="card-header">
               <span>审计结论</span>
-              <el-button
-                v-if="!isReadonly"
-                size="small"
-                type="primary"
-                text
-                :loading="aiLoadingConclusion"
-                @click="generateAuditConclusion"
-              >🤖 AI辅助</el-button>
+              <div class="conclusion-actions">
+                <el-select
+                  v-if="!isReadonly"
+                  v-model="selectedConclusionTemplate"
+                  size="small"
+                  clearable
+                  placeholder="套用结论模板"
+                  style="width: 150px"
+                  @change="applyConclusionTemplate"
+                >
+                  <el-option v-for="item in conclusionTemplates" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+                <el-button
+                  v-if="!isReadonly"
+                  size="small"
+                  type="primary"
+                  text
+                  :loading="isGenerating('e1-adjudication-conclusion')"
+                  @click="generateAuditConclusion"
+                >🤖 AI辅助</el-button>
+              </div>
             </div>
           </template>
           <el-input
@@ -466,6 +502,8 @@ function getRowClass({ row }: { row: AdjRow }): string {
 .font-bold {
   font-weight: 700;
 }
+.source-hint { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+.conclusion-actions { display: flex; align-items: center; gap: 8px; }
 
 .audit-note-card {
   margin-top: 16px;

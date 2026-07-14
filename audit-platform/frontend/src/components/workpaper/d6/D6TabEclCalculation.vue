@@ -8,16 +8,19 @@
       <p>2. 灰色底纹列为自动计算列：应计提 = 审定余额 × 损失率；差异 = 应计提 − 账面余额，差异≥0.01 时高亮提示。</p>
       <p>3. 损失率应结合历史损失经验、当前状况及前瞻性信息确定，并与 D6-7 政策检查评价一致。</p>
       <p>4. 合计应计提与账面的总差异应查明原因，测算结果回填 D6-3 减值准备明细，为审定表坏账准备提供依据。</p>
+      <p>5. CAS22第63条：对于不含重大融资成分的应收账款和合同资产，企业应当始终按照整个存续期的预期信用损失计量其损失准备。</p>
     </div>
   </details>
 
   <!-- 审计目标 -->
-  <el-alert
-    type="info"
-    :closable="false"
-    title="审计目标：独立测算合同资产预期信用损失，评价被审计单位坏账准备计提的充分性与损失率选取的合理性。"
-    class="objective-alert"
-  />
+  <el-alert type="info" :closable="false" show-icon class="audit-objective">
+    <template #title>
+      <span class="ao-title">审计目标</span>
+    </template>
+    <template #default>
+      <div class="ao-text">合同资产以恰当的金额包括在财务报表中，与之相关的计价调整已恰当记录。</div>
+    </template>
+  </el-alert>
 
   <!-- 工具栏 -->
   <div class="tab-toolbar">
@@ -157,7 +160,11 @@
         <el-button v-if="!isReadonly" type="danger" text size="small" @click="removeAgingGroup(group.groupId)">删除组合</el-button>
       </div>
       <el-table :data="group.rows" size="small" border stripe>
-        <el-table-column prop="agingBand" label="账龄" width="100" />
+        <el-table-column prop="agingBand" label="账龄" width="100">
+          <template #default="{ row }">
+            <span :class="{ 'aging-overdue': isOverdueAging(row.agingBand) }">{{ row.agingBand }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="审定余额①" width="120" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)" />
@@ -204,6 +211,15 @@
     {{ diffAlert }}
   </el-alert>
 
+  <!-- 源模板底部方法论提示（琥珀块） -->
+  <div class="amber-context" style="margin-top:14px">
+    <span class="amber-icon">📌</span>
+    <div class="amber-text">
+      <p><strong>提示：</strong>预期信用损失以客户的违约风险为基础，同一客户的违约风险相同，上市公司对于同一客户的合同资产与应收账款，采用不同计提比例计量预期信用损失时，应充分分析两者存在不同违约风险损失的原因及合理性。由于现金流缺口要基于预期能收到的现金流量进行计算，因此在计量合同资产的预期信用损失时考虑的期限应截止于预期收取现金流量之日，即需要考虑合同资产转为应收款项后可能发生的信用违约事件造成的损失。</p>
+      <p><strong>提示2：</strong>预期信用损失计量测试可参考应收账款预期信用损失计量示例。</p>
+    </div>
+  </div>
+
   <!-- 审计意见区（卡片式） -->
   <el-card class="opinion-card" shadow="never">
     <template #header>
@@ -218,22 +234,34 @@
 
     <div class="opinion-section">
       <div class="opinion-section-header">
-        <span class="opinion-section-label">1. 审计说明</span>
+        <span class="opinion-section-label">三、审计说明</span>
         <div class="opinion-actions">
+          <el-button size="small" type="primary" plain @click="aiGenerateNote('explanation')">🤖 AI辅助</el-button>
           <el-button size="small" @click="openReview('D6-8-note-explanation')">💬</el-button>
         </div>
       </div>
-      <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="ECL模型参数及损失率选取依据..." />
+      <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 5, maxRows: 12 }" :disabled="isReadonly" placeholder="ECL模型参数及损失率选取依据、单项计提判断理由、与D6-7政策检查的一致性分析..." />
     </div>
 
     <div class="opinion-section">
       <div class="opinion-section-header">
-        <span class="opinion-section-label">2. 审计结论</span>
+        <span class="opinion-section-label">四、审计结论</span>
         <div class="opinion-actions">
+          <el-select
+            v-model="selectedConclusionTemplate"
+            placeholder="快速选择结论模板"
+            size="small"
+            clearable
+            style="width: 200px; margin-right: 8px"
+            @change="onConclusionTemplateSelect"
+          >
+            <el-option v-for="t in ECL_CONCLUSION_TEMPLATES" :key="t.label" :label="t.label" :value="t.value" />
+          </el-select>
+          <el-button size="small" type="primary" plain @click="aiGenerateNote('conclusion')">🤖 AI辅助</el-button>
           <el-button size="small" @click="openReview('D6-8-note-conclusion')">💬</el-button>
         </div>
       </div>
-      <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="减值准备计提充分性结论..." />
+      <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }" :disabled="isReadonly" placeholder="减值准备计提充分性结论..." />
     </div>
   </el-card>
   </template>
@@ -244,7 +272,7 @@
 /**
  * D6TabEclCalculation.vue — 减值准备测算 D6-8
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { useD6EclCalculation } from '../composables/useD6EclCalculation'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -252,6 +280,7 @@ import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpe
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
+import http from '@/utils/http'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -428,6 +457,75 @@ function fmtPct(rate: number): string {
   if (!rate) return '-'
   return `${(rate * 100).toFixed(2)}%`
 }
+
+// ─── 结论模板 ─────────────────────────────────────────────────────────────────
+const ECL_CONCLUSION_TEMPLATES = [
+  {
+    label: 'A-计提充分',
+    value: '经独立测算，被审计单位合同资产预期信用损失的计量方法符合CAS22要求，损失率选取与历史经验及前瞻性信息一致，单项计提判断合理，账龄组合计提金额与独立测算结果无重大差异，坏账准备计提充分。',
+  },
+  {
+    label: 'B-基本充分需关注',
+    value: '经独立测算，被审计单位合同资产坏账准备整体计提基本充分，但存在以下需关注事项：（1）______组合损失率与测算值差异____万元。经分析，该差异原因为______，在可接受范围内/已建议调整。',
+  },
+  {
+    label: 'C-计提不足需调整',
+    value: '经独立测算，被审计单位合同资产坏账准备存在计提不足____万元，主要原因：（1）______。已提请管理层补提坏账准备（详见审计调整分录D6-4）。',
+  },
+]
+
+const selectedConclusionTemplate = ref('')
+function onConclusionTemplateSelect(val: string) {
+  if (val) {
+    auditNotes.value = { ...auditNotes.value, conclusion: val }
+    selectedConclusionTemplate.value = ''
+  }
+}
+
+// ─── 账龄风险标识（3年+标红） ──────────────────────────────────────────────────
+function isOverdueAging(band: string): boolean {
+  if (!band) return false
+  return /[3-9]年|[4-9]年|5年以上|[三四五六七八九十]年/.test(band)
+}
+
+// ─── AI辅助生成 ──────────────────────────────────────────────────────────────
+async function aiGenerateNote(section: 'explanation' | 'conclusion') {
+  try {
+    const context: Record<string, string> = {
+      '底稿编号': 'D6-8',
+      '单项计提行数': String(singleRows.value.length),
+      '单项合计应计提': fmtAmt(singleTotal.value.provision),
+      '单项合计差异': fmtAmt(singleTotal.value.diff),
+      '账龄组合数': String(agingGroups.value.length),
+      '合计应计提': fmtAmt(grandTotal.value.expectedProvision),
+      '合计账面': fmtAmt(grandTotal.value.bookBalance),
+      '总差异': fmtAmt(grandTotal.value.totalDiff),
+    }
+    if (section === 'conclusion' && auditNotes.value.explanation) {
+      context['审计说明'] = auditNotes.value.explanation
+    }
+    const promptMap = {
+      explanation: '根据合同资产减值准备测算数据（单项计提+账龄组合），生成审计说明，包括：ECL模型参数选取依据、损失率与D6-7政策检查的一致性分析、差异原因说明。',
+      conclusion: '根据测算结果和审计说明，生成审计结论，明确判断坏账准备计提是否充分、损失率是否合理、是否需要调整。',
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `d6-8-${section}`,
+      prompt: promptMap[section],
+      context,
+      existingContent: section === 'explanation' ? auditNotes.value.explanation : auditNotes.value.conclusion,
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) {
+      if (section === 'explanation') {
+        auditNotes.value = { ...auditNotes.value, explanation: text }
+      } else {
+        auditNotes.value = { ...auditNotes.value, conclusion: text }
+      }
+    }
+  } catch {
+    // silent - vLLM可能不可用
+  }
+}
 </script>
 
 <style scoped>
@@ -460,7 +558,6 @@ function fmtPct(rate: number): string {
   line-height: 1.6;
 }
 .guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
 
 /* 工具栏 */
 .tab-toolbar {
@@ -508,6 +605,31 @@ function fmtPct(rate: number): string {
 }
 .auto-calc { background: #f5f7fa; padding: 2px 6px; border-radius: 2px; color: #909399; }
 .diff-warn { color: #e6a23c; font-weight: 600; }
+
+/* 账龄风险标红（3年+） */
+.aging-overdue { color: #f56c6c; font-weight: 500; }
+
+/* 方法论琥珀块 */
+.amber-context {
+  padding: 10px 14px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a6d3b;
+  display: flex;
+  gap: 8px;
+}
+.amber-context .amber-icon { flex-shrink: 0; }
+.amber-context .amber-text { flex: 1; }
+.amber-context .amber-text p { margin: 4px 0; }
+
+/* 审计目标 */
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-text { font-size: 12px; line-height: 1.5; margin-top: 2px; }
 
 /* 审计意见卡片 */
 .opinion-card {

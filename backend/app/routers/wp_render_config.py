@@ -608,6 +608,9 @@ async def _get_render_config_impl(
         # 隐藏"原版/原"历史遗留程序表（如 "J1A-原版"、"L1A-原"）
         if cls.sheet_name and (cls.sheet_name.endswith("-原版") or cls.sheet_name.endswith("-原")):
             continue
+        # 隐藏"原版本备份"、"参考用-"前缀、以"（原）"结尾的历史遗留 sheet
+        if cls.sheet_name and ("原版本备份" in cls.sheet_name or cls.sheet_name.startswith("参考用-") or cls.sheet_name.endswith("（原）")):
+            continue
         # 隐藏含"删除"关键字的历史遗留sheet（如 "股份支付检查表J1-10-删除"/"IPO企业股权激励工具-删除"）
         if cls.sheet_name and "删除" in cls.sheet_name:
             continue

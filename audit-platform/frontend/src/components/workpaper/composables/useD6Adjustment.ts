@@ -12,7 +12,6 @@
  * Requirements: 9.1-9.7
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal } from './useD6FormulaEngine'
 import type { ChecklistResponse } from './useD6FormData'
 
@@ -64,7 +63,7 @@ function normalizeRow(raw: any): AdjustmentRow {
   return {
     rowId: raw.rowId || generateRowId(),
     description: raw.description || '',
-    category: raw.category || 'AJE',
+    category: raw.category || '账项调整',
     reportItem: raw.reportItem || '',
     accountName: raw.accountName || '',
     noteItem: raw.noteItem || '',
@@ -80,7 +79,7 @@ function createEmptyRow(): AdjustmentRow {
   return {
     rowId: generateRowId(),
     description: '',
-    category: 'AJE',
+    category: '账项调整',
     reportItem: '',
     accountName: '',
     noteItem: '',
@@ -164,33 +163,48 @@ export function useD6Adjustment(options: UseD6AdjustmentOptions) {
   // ─── EventBus Actions ────────────────────────────────────────────────
 
   /**
-   * 发布调整分录事件 → D6-1 监听更新 AJE/RJE
+   * 发布 'adjustment:created' 事件（遍历全部行）
+   * → D6-1 监听更新 AJE/RJE
    */
-  function publishAdjustment(row: AdjustmentRow): void {
-    eventBus.emit('adjustment:created' as any, {
-      wpCode: 'D6',
-      entryType: row.category as 'AJE' | 'RJE',
-      amount: row.debitAmount || row.creditAmount,
-      accountCode: '1402',
-    })
+  function publishAdjustment(): void {
+    for (const row of rows.value) {
+      if (row.debitAmount === 0 && row.creditAmount === 0) continue
+      const payload = {
+        wpCode: 'D6',
+        entryType: row.category === '报表调整' ? 'RJE' : 'AJE',
+        amount: Math.max(row.debitAmount, row.creditAmount),
+        accountCode: row.accountName || '1402',
+        description: row.description,
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
+      } catch { /* silent */ }
+    }
   }
 
   /**
    * 推送选中分录至 A13 错报汇总
    */
   function pushToA13(rowIds: string[]): void {
-    const selectedRows = rows.value.filter(r => rowIds.includes(r.rowId))
-    for (const row of selectedRows) {
-      eventBus.emit('misstatement:push' as any, {
-        wpCode: 'D6',
-        source: 'D6-4',
-        description: row.description,
-        accountName: row.accountName,
-        debitAmount: row.debitAmount,
-        creditAmount: row.creditAmount,
-        category: row.category,
-      })
-    }
+    const selected = rows.value.filter(r => rowIds.includes(r.rowId))
+    if (selected.length === 0) return
+
+    const misstatements = selected.map(row => ({
+      wpCode: 'D6',
+      entryType: row.category === '报表调整' ? 'RJE' : 'AJE',
+      description: row.description,
+      reportItem: row.reportItem,
+      accountName: row.accountName,
+      debitAmount: row.debitAmount,
+      creditAmount: row.creditAmount,
+      indexRef: row.indexRef,
+    }))
+
+    try {
+      window.dispatchEvent(new CustomEvent('a13:push-misstatement', {
+        detail: { items: misstatements },
+      }))
+    } catch { /* silent */ }
   }
 
   // ─── Return ──────────────────────────────────────────────────────────

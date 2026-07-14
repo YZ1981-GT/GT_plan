@@ -410,7 +410,7 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
                 # 跳过白名单校验
                 pass
             else:
-                allowed = ("Y", "X/I", "X/W", "N/A")
+                allowed = ("Y", "N", "X/I", "X/W", "N/A")
                 if item.item_id.endswith("-sign-status"):
                     allowed = ("pending", "sent", "signed")
                 elif item.item_id.startswith(("A17-1-ch", "A18-2")):

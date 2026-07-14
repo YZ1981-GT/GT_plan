@@ -15,7 +15,7 @@
  *
  * Requirements: 7.1-7.5
  */
-import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum, calcCountDiff, calcFxConvert, sumField } from './useE1FormulaEngine'
 
@@ -47,25 +47,51 @@ export interface CertCountRow {
   depositor: string      // 存款人/户名
   account: string        // 账号
   certType: string       // 存单类型（定期存款/大额存单/开户证实书等）
+  currency: string       // 币种
   depositDate: string    // 存入日期
   maturityDate: string   // 到期日期
   amount: number         // 金额
   interestRate: number   // 利率
-  pledged: '是' | '否' | ''     // 是否质押/受限
-  pledgeMatter: string   // 质押/受限事项描述
-  result: '已见' | '未见' | ''  // 盘点结果
-  note: string           // 备注
+  bookConsistent: '是' | '否' | '' // 是否与账面一致
+  inconsistencyReason: string       // 不一致原因
+  pledged: '是' | '否' | ''        // 是否质押/受限
+  pledgeMatter: string              // 质押/受限事项描述
+  result: '已见' | '未见' | ''     // 盘点结果
+  certificateIndex: string          // 存单/开户证实书索引
+  openingProofIndex: string         // 开户证明索引
+  custodyProofIndex: string         // 保管/质押证明索引
+  note: string                      // 备注
 }
 
 export type CashCountRow = RmbCountRow | FxCountRow | CertCountRow
 
-/** RMB variant 汇总 */
-export interface RmbSummary {
-  totalActual: number    // 实盘合计
-  bookBalance: number    // 账面余额
-  countDiff: number      // 盘点差异 = actual - book
-  diffReason: string     // 差异原因
+/** E1-7/8 完整倒轧链汇总；末尾三个旧字段仅用于旧 JSON 兼容。 */
+export interface CashRollForwardSummary {
+  reportDateBookBalance: number
+  cumulativeIncome: number
+  cumulativeExpense: number
+  priorDayBookBalance: number
+  receiptVoucherUnposted: number
+  paymentVoucherUnposted: number
+  unvoucheredIncome: number
+  unvoucheredExpense: number
+  expectedCountAmount: number
+  actualCountAmount: number
+  overShort: number
+  diffReason: string
+  closingFxRate: number
+  reportDateForeignBookBalance: number
+  expectedFunctionalCurrency: number
+  exchangeDifference: number
+  /** @deprecated 旧版字段，序列化时继续保留。 */
+  totalActual: number
+  /** @deprecated 旧版字段，等同 reportDateBookBalance。 */
+  bookBalance: number
+  /** @deprecated 旧版字段，等同 overShort。 */
+  countDiff: number
 }
+
+export type RmbSummary = CashRollForwardSummary
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -75,11 +101,63 @@ function getStorageKey(variant: CashCountVariant): string {
 
 const RMB_USER_FIELDS = ['id', 'denomination', 'quantity']
 const FX_USER_FIELDS = ['id', 'currency', 'denomination', 'quantity', 'fcAmount', 'fxRate']
-const CERT_USER_FIELDS = ['id', 'certNo', 'bank', 'depositor', 'account', 'certType', 'depositDate', 'maturityDate', 'amount', 'interestRate', 'pledged', 'pledgeMatter', 'result', 'note']
+const CERT_USER_FIELDS = [
+  'id', 'certNo', 'bank', 'depositor', 'account', 'certType', 'currency',
+  'depositDate', 'maturityDate', 'amount', 'interestRate', 'bookConsistent',
+  'inconsistencyReason', 'pledged', 'pledgeMatter', 'result', 'certificateIndex',
+  'openingProofIndex', 'custodyProofIndex', 'note',
+]
 
 const TOLERANCE = 0.005
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function createEmptySummary(): CashRollForwardSummary {
+  return {
+    reportDateBookBalance: 0,
+    cumulativeIncome: 0,
+    cumulativeExpense: 0,
+    priorDayBookBalance: 0,
+    receiptVoucherUnposted: 0,
+    paymentVoucherUnposted: 0,
+    unvoucheredIncome: 0,
+    unvoucheredExpense: 0,
+    expectedCountAmount: 0,
+    actualCountAmount: 0,
+    overShort: 0,
+    diffReason: '',
+    closingFxRate: 0,
+    reportDateForeignBookBalance: 0,
+    expectedFunctionalCurrency: 0,
+    exchangeDifference: 0,
+    totalActual: 0,
+    bookBalance: 0,
+    countDiff: 0,
+  }
+}
+
+function recalculateSummary(summary: CashRollForwardSummary, actual: number): CashRollForwardSummary {
+  const priorDayBookBalance = summary.reportDateBookBalance + summary.cumulativeIncome - summary.cumulativeExpense
+  const expectedCountAmount = priorDayBookBalance
+    + summary.receiptVoucherUnposted
+    - summary.paymentVoucherUnposted
+    + summary.unvoucheredIncome
+    - summary.unvoucheredExpense
+  const expectedFunctionalCurrency = summary.reportDateForeignBookBalance * summary.closingFxRate
+  const overShort = calcCountDiff(actual, expectedCountAmount)
+  return {
+    ...summary,
+    priorDayBookBalance,
+    expectedCountAmount,
+    actualCountAmount: actual,
+    overShort,
+    expectedFunctionalCurrency,
+    exchangeDifference: expectedFunctionalCurrency - summary.reportDateBookBalance,
+    totalActual: actual,
+    bookBalance: summary.reportDateBookBalance,
+    countDiff: overShort,
+  }
+}
 
 function generateRowId(prefix: string): string {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -105,7 +183,28 @@ function createEmptyFxRow(): FxCountRow {
 }
 
 function createEmptyCertRow(): CertCountRow {
-  return { id: generateRowId('cert'), certNo: '', bank: '', depositor: '', account: '', certType: '', depositDate: '', maturityDate: '', amount: 0, interestRate: 0, pledged: '', pledgeMatter: '', result: '', note: '' }
+  return {
+    id: generateRowId('cert'),
+    certNo: '',
+    bank: '',
+    depositor: '',
+    account: '',
+    certType: '',
+    currency: '人民币',
+    depositDate: '',
+    maturityDate: '',
+    amount: 0,
+    interestRate: 0,
+    bookConsistent: '',
+    inconsistencyReason: '',
+    pledged: '',
+    pledgeMatter: '',
+    result: '',
+    certificateIndex: '',
+    openingProofIndex: '',
+    custodyProofIndex: '',
+    note: '',
+  }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -119,8 +218,18 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
   const rows = ref<CashCountRow[]>([])
   const isLoading = ref(false)
 
-  // RMB-specific summary (separate item for summary data)
-  const rmbSummary = ref<RmbSummary>({ totalActual: 0, bookBalance: 0, countDiff: 0, diffReason: '' })
+  // E1-7/8 shared roll-forward summary; rmbSummary name is retained for caller compatibility.
+  const rmbSummary = ref<CashRollForwardSummary>(createEmptySummary())
+
+  function currentActualTotal(): number {
+    if (variant === 'rmb') {
+      return sumField(rows.value as unknown as Array<Record<string, unknown>>, 'subtotal')
+    }
+    if (variant === 'fx') {
+      return sumField(rows.value as unknown as Array<Record<string, unknown>>, 'rmbAmount')
+    }
+    return 0
+  }
 
   // ─── Deserialization ───────────────────────────────────────────────────
 
@@ -129,37 +238,56 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
     const raw = response?.remark
     if (!raw) {
       rows.value = [createDefaultRow()]
-      loadRmbSummary()
+      loadSummary()
       return
     }
     try {
       const parsed = JSON.parse(raw)
       if (!Array.isArray(parsed) || parsed.length === 0) {
         rows.value = [createDefaultRow()]
-        loadRmbSummary()
+        loadSummary()
         return
       }
       rows.value = parsed.map((r: Record<string, unknown>) => deserializeRow(r))
-      loadRmbSummary()
+      loadSummary()
     } catch {
       console.warn(`[useE1CashCount:${variant}] JSON parse failed, fallback to empty`)
       rows.value = [createDefaultRow()]
+      loadSummary()
     }
   }
 
-  function loadRmbSummary(): void {
-    if (variant !== 'rmb') return
+  /**
+   * New E1-7/8 summary uses `${storageKey}-summary`.
+   * E1-8 previously stored `{bookBalance,diffReason}` under a component-local key;
+   * read it as a fallback so historical workpapers remain usable.
+   */
+  function loadSummary(): void {
+    if (variant === 'cert') return
     const summaryResp = allResponses.value.get(`${storageKey}-summary`)
-    if (summaryResp?.remark) {
-      try {
-        const s = JSON.parse(summaryResp.remark)
-        rmbSummary.value = {
-          totalActual: parseNum(s.totalActual),
-          bookBalance: parseNum(s.bookBalance),
-          countDiff: calcCountDiff(parseNum(s.totalActual), parseNum(s.bookBalance)),
-          diffReason: String(s.diffReason || ''),
-        }
-      } catch { /* use defaults */ }
+      || (variant === 'fx' ? allResponses.value.get('E1-cashcount-fx-summary-fx') : undefined)
+    if (!summaryResp?.remark) {
+      rmbSummary.value = recalculateSummary(createEmptySummary(), currentActualTotal())
+      return
+    }
+    try {
+      const s = JSON.parse(summaryResp.remark)
+      const normalized: CashRollForwardSummary = {
+        ...createEmptySummary(),
+        reportDateBookBalance: parseNum(s.reportDateBookBalance ?? s.bookBalance),
+        cumulativeIncome: parseNum(s.cumulativeIncome),
+        cumulativeExpense: parseNum(s.cumulativeExpense),
+        receiptVoucherUnposted: parseNum(s.receiptVoucherUnposted),
+        paymentVoucherUnposted: parseNum(s.paymentVoucherUnposted),
+        unvoucheredIncome: parseNum(s.unvoucheredIncome),
+        unvoucheredExpense: parseNum(s.unvoucheredExpense),
+        diffReason: String(s.diffReason || ''),
+        closingFxRate: parseNum(s.closingFxRate),
+        reportDateForeignBookBalance: parseNum(s.reportDateForeignBookBalance),
+      }
+      rmbSummary.value = recalculateSummary(normalized, currentActualTotal())
+    } catch {
+      rmbSummary.value = recalculateSummary(createEmptySummary(), currentActualTotal())
     }
   }
 
@@ -198,13 +326,19 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
           depositor: String(r.depositor || ''),
           account: String(r.account || ''),
           certType: String(r.certType || ''),
+          currency: String(r.currency || '人民币'),
           depositDate: String(r.depositDate || ''),
           maturityDate: String(r.maturityDate || ''),
           amount: parseNum(r.amount),
           interestRate: parseNum(r.interestRate),
+          bookConsistent: (['是', '否'].includes(String(r.bookConsistent)) ? String(r.bookConsistent) : '') as CertCountRow['bookConsistent'],
+          inconsistencyReason: String(r.inconsistencyReason || ''),
           pledged: (['是', '否'].includes(String(r.pledged)) ? String(r.pledged) : '') as CertCountRow['pledged'],
           pledgeMatter: String(r.pledgeMatter || ''),
           result: (['已见', '未见'].includes(String(r.result)) ? String(r.result) : '') as CertCountRow['result'],
+          certificateIndex: String(r.certificateIndex || ''),
+          openingProofIndex: String(r.openingProofIndex || ''),
+          custodyProofIndex: String(r.custodyProofIndex || ''),
           note: String(r.note || ''),
         }
     }
@@ -262,9 +396,11 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
     ]
     allResponses.value.set(storageKey, { item_id: storageKey, conclusion: null, remark: serialized })
 
-    // Persist RMB summary separately
-    if (variant === 'rmb') {
+    // Persist E1-7/8 roll-forward summary separately.  The JSON still carries
+    // totalActual/bookBalance/countDiff aliases for older readers.
+    if (variant !== 'cert') {
       const summaryKey = `${storageKey}-summary`
+      rmbSummary.value = recalculateSummary(rmbSummary.value, currentActualTotal())
       const summaryJson = JSON.stringify(rmbSummary.value)
       allResponses.value.set(summaryKey, { item_id: summaryKey, conclusion: null, remark: summaryJson })
       items.push({ item_id: summaryKey, conclusion: null, remark: summaryJson })
@@ -275,25 +411,22 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
 
   // ─── Computed ──────────────────────────────────────────────────────────
 
-  /** RMB: 实盘合计 = SUM(subtotal) */
-  const rmbTotal = computed(() => {
-    if (variant !== 'rmb') return 0
-    return sumField(rows.value as unknown as Array<Record<string, unknown>>, 'subtotal')
-  })
+  /** E1-7/8: 实盘本位币合计。 */
+  const actualTotal = computed(() => currentActualTotal())
+  /** RMB alias retained for the existing template/API. */
+  const rmbTotal = computed(() => (variant === 'rmb' ? actualTotal.value : 0))
 
-  // Auto-sync rmbSummary.totalActual from computed total
-  if (variant === 'rmb') {
-    watch(rmbTotal, (newTotal) => {
-      rmbSummary.value.totalActual = newTotal
-      rmbSummary.value.countDiff = calcCountDiff(newTotal, rmbSummary.value.bookBalance)
-    })
+  if (variant !== 'cert') {
+    watch(actualTotal, (newTotal) => {
+      rmbSummary.value = recalculateSummary(rmbSummary.value, newTotal)
+    }, { immediate: true })
   }
 
   // ─── Validation Helpers ────────────────────────────────────────────────
 
   function hasDiff(): boolean {
-    if (variant !== 'rmb') return false
-    return Math.abs(rmbSummary.value.countDiff) > TOLERANCE
+    if (variant === 'cert') return false
+    return Math.abs(rmbSummary.value.overShort) > TOLERANCE
   }
 
   function isMissingReason(): boolean {
@@ -347,16 +480,16 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
     scheduleSave()
   }
 
-  /** Update RMB summary fields (bookBalance, diffReason) */
-  function updateSummary(field: keyof RmbSummary, value: number | string): void {
-    if (isReadonly.value) return
-    if (variant !== 'rmb') return
-    if (field === 'bookBalance') {
-      rmbSummary.value.bookBalance = parseNum(value)
-      rmbSummary.value.countDiff = calcCountDiff(rmbSummary.value.totalActual, rmbSummary.value.bookBalance)
-    } else if (field === 'diffReason') {
-      rmbSummary.value.diffReason = String(value)
+  /** Update E1-7/8 user-entered roll-forward fields, then refresh all formulas. */
+  function updateSummary(field: keyof CashRollForwardSummary, value: number | string): void {
+    if (isReadonly.value || variant === 'cert') return
+    const next = { ...rmbSummary.value }
+    if (field === 'diffReason') {
+      next.diffReason = String(value ?? '')
+    } else {
+      Object.assign(next, { [field]: parseNum(value) })
     }
+    rmbSummary.value = recalculateSummary(next, currentActualTotal())
     scheduleSave()
   }
 
@@ -387,6 +520,7 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
     rows,
     rmbSummary,
     rmbTotal,
+    actualTotal,
     isLoading,
     hasDiff,
     isMissingReason,
@@ -397,3 +531,4 @@ export function useE1CashCount(options: UseE1BaseOptions & { variant: CashCountV
     hydrate,
   }
 }
+

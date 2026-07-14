@@ -15,15 +15,16 @@
  *
  * Requirements: 3.1-3.6
  */
-import { ref, inject, toRef, onMounted, type Ref } from 'vue'
-import {
-  useE1CashDetail,
-  type CashDetailRow,
-} from '../composables/useE1CashDetail'
+import { ref, inject, toRef, onMounted, computed, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useE1CashDetail } from '../composables/useE1CashDetail'
+import { useE1ImportExport } from '../composables/useE1ImportExport'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { Setting } from '@element-plus/icons-vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,8 @@ const props = defineProps<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -60,6 +63,50 @@ const {
   removeRow,
   updateCell,
 } = useE1CashDetail(options)
+
+const sheetCode = computed(() => 'E1-2')
+const { exportTemplate, exportData, importData, isImporting } = useE1ImportExport({
+  wpId: wpIdRef,
+  sheet: sheetCode,
+})
+const { generateText, isGenerating } = useE1AiGenerate(wpIdRef)
+
+async function handleImport(file: File): Promise<boolean> {
+  const result = await importData(file)
+  if (result.success) {
+    ElMessage.success(result.message || '导入成功')
+    await reloadWorkpaperData?.()
+  } else ElMessage.warning(result.message || '导入失败')
+  return false
+}
+
+// ─── 列设置（⚙） ─────────────────────────────────────────────────────────────
+
+const CASH_COL_STORAGE_KEY = 'e1-cash-detail-column-prefs'
+const CASH_TOGGLEABLE_COLS = ['adjustment', 'auditedRmb', 'remark']
+const CASH_COL_LABELS: Record<string, string> = {
+  adjustment: '审计调整', auditedRmb: '审定人民币', remark: '备注',
+}
+const CASH_DEFAULT_HIDDEN: string[] = []
+const cashHiddenCols = ref<Set<string>>(new Set())
+;(() => {
+  try {
+    const stored = localStorage.getItem(CASH_COL_STORAGE_KEY)
+    if (stored) { cashHiddenCols.value = new Set(JSON.parse(stored)); return }
+  } catch {}
+  cashHiddenCols.value = new Set(CASH_DEFAULT_HIDDEN)
+})()
+function isCashColVisible(key: string): boolean { return !cashHiddenCols.value.has(key) }
+function toggleCashCol(key: string): void {
+  const s = new Set(cashHiddenCols.value)
+  if (s.has(key)) s.delete(key); else s.add(key)
+  cashHiddenCols.value = s
+  localStorage.setItem(CASH_COL_STORAGE_KEY, JSON.stringify([...s]))
+}
+function resetCashColDefaults(): void {
+  cashHiddenCols.value = new Set(CASH_DEFAULT_HIDDEN)
+  localStorage.setItem(CASH_COL_STORAGE_KEY, JSON.stringify(CASH_DEFAULT_HIDDEN))
+}
 
 // ─── 审计说明 / 审计结论 / 存放境外款项 ───────────────────────────────────────
 
@@ -93,6 +140,33 @@ function saveOverseasAmount(val: number | undefined): void {
   const item = { item_id: OVERSEAS_KEY, conclusion: null, remark: String(amount) }
   props.allResponses.set(OVERSEAS_KEY, item)
   void props.saveImmediate([item])
+}
+
+function buildAiContext(): Record<string, unknown> {
+  return {
+    明细: rows.value,
+    合计: totalRow.value,
+    存放境外款项: overseasAmount.value,
+    异常币种: rows.value.filter(row => row.adjustment !== 0 || row.fxRate <= 0),
+  }
+}
+
+async function generateNarrative(kind: 'note' | 'conclusion' | 'anomaly'): Promise<void> {
+  if (props.isReadonly) return
+  const isConclusion = kind === 'conclusion'
+  const target = isConclusion ? auditConclusion : auditNote
+  const text = await generateText({
+    section: `e1-cash-${kind}`,
+    prompt: kind === 'anomaly'
+      ? '分析币种余额变动、异常汇率、审计调整、现金长短款及境外存放风险，形成可追溯的异常分析和后续程序。'
+      : isConclusion
+        ? '根据现金明细、外币折算、审计调整、境外存放款项及审计说明形成审慎审计结论。'
+        : '根据现金明细、外币折算、监盘及截止测试结果生成专业审计说明，突出异常及证据索引。',
+    context: { ...buildAiContext(), 审计说明: auditNote.value },
+    existingContent: target.value,
+    confirmTitle: kind === 'anomaly' ? '确认填入异常分析' : `确认填入审计${isConclusion ? '结论' : '说明'}`,
+  })
+  if (text) isConclusion ? saveAuditConclusion(text) : saveAuditNote(text)
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -144,6 +218,34 @@ onMounted(() => {
             </el-button>
           </div>
           <div class="toolbar-right">
+            <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+              <el-button size="small">导入导出 ▾</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item @click="exportTemplate()">导出模板</el-dropdown-item>
+                  <el-dropdown-item @click="exportData()">导出数据</el-dropdown-item>
+                  <el-dropdown-item>
+                    <el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImport" :disabled="isImporting">
+                      <span>导入数据</span>
+                    </el-upload>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <el-popover trigger="click" :width="240" placement="bottom-end">
+              <template #reference>
+                <el-button size="small" circle><el-icon><Setting /></el-icon></el-button>
+              </template>
+              <div class="col-prefs-popover">
+                <div class="col-prefs-header">
+                  <span>列显示设置</span>
+                  <el-button size="small" text type="primary" @click="resetCashColDefaults">重置</el-button>
+                </div>
+                <div v-for="key in CASH_TOGGLEABLE_COLS" :key="key" class="col-prefs-item">
+                  <el-checkbox :model-value="isCashColVisible(key)" size="small" @change="toggleCashCol(key)">{{ CASH_COL_LABELS[key] || key }}</el-checkbox>
+                </div>
+              </div>
+            </el-popover>
             <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
             <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
           </div>
@@ -237,7 +339,7 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 审计调整 -->
-          <el-table-column label="审计调整" width="130" align="right">
+          <el-table-column v-if="isCashColVisible('adjustment')" label="审计调整" width="130" align="right">
             <template #default="{ row }">
               <el-input-number
                 :model-value="row.adjustment"
@@ -250,14 +352,14 @@ onMounted(() => {
           </el-table-column>
 
           <!-- 审定人民币 (readonly) -->
-          <el-table-column label="审定人民币" width="140" align="right" class-name="auto-calc-col">
+          <el-table-column v-if="isCashColVisible('auditedRmb')" label="审定人民币" width="140" align="right" class-name="auto-calc-col">
             <template #default="{ row }">
               <span class="readonly-val">{{ displayPrefs.fmtAmount(row.auditedRmb) }}</span>
             </template>
           </el-table-column>
 
           <!-- 备注 -->
-          <el-table-column label="备注" min-width="150">
+          <el-table-column v-if="isCashColVisible('remark')" label="备注" min-width="150">
             <template #default="{ row }">
               <el-input
                 :model-value="row.note"
@@ -310,7 +412,13 @@ onMounted(() => {
         <!-- 审计说明 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计说明</span></div>
+            <div class="card-header">
+              <span>审计说明</span>
+              <div class="card-actions">
+                <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="isGenerating('e1-cash-anomaly')" @click="generateNarrative('anomaly')">🤖 异常分析</el-button>
+                <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="isGenerating('e1-cash-note')" @click="generateNarrative('note')">🤖 AI辅助</el-button>
+              </div>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -325,7 +433,10 @@ onMounted(() => {
         <!-- 审计结论 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计结论</span></div>
+            <div class="card-header">
+              <span>审计结论</span>
+              <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="isGenerating('e1-cash-conclusion')" @click="generateNarrative('conclusion')">🤖 AI辅助</el-button>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -336,6 +447,19 @@ onMounted(() => {
             @change="(val: string) => saveAuditConclusion(val)"
           />
         </el-card>
+
+        <!-- 源模板底部红字提示（琥珀块） -->
+        <div class="amber-context" style="margin-top:16px">
+          <span class="amber-icon">📌</span>
+          <div class="amber-text">
+            <p><strong>提示：</strong></p>
+            <p>1. 本科目核算企业的库存现金。企业有内部周转使用备用金的，可以单独设置"备用金"科目。</p>
+            <p>2. 若公司仅有一种币种的现金，可不填列本表（用盘点表代替）。</p>
+            <p>3. 期初余额应与上年末审定数一致。</p>
+            <p>4. 审计说明可以概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。</p>
+            <p>5. 审计结论可参考：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。</p>
+          </div>
+        </div>
       </template>
     </el-skeleton>
   </div>
@@ -455,4 +579,24 @@ onMounted(() => {
   align-items: center;
   font-weight: 500;
 }
+.card-actions { display: flex; gap: 6px; }
+/* 方法论琥珀块 */
+.amber-context {
+  padding: 10px 14px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a6d3b;
+  display: flex;
+  gap: 8px;
+}
+.amber-context .amber-icon { flex-shrink: 0; }
+.amber-context .amber-text { flex: 1; }
+.amber-context .amber-text p { margin: 2px 0; }
+/* 列设置 popover */
+.col-prefs-popover { max-height: 280px; overflow-y: auto; }
+.col-prefs-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+.col-prefs-item { margin-bottom: 4px; }
 </style>

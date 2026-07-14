@@ -12,12 +12,26 @@
   </details>
 
   <!-- 审计目标 -->
-  <el-alert
-    type="info"
-    :closable="false"
-    title="审计目标：验证合同资产减值准备转回与核销的真实性、合理性及审批合规性，识别是否存在利用转回核销操纵损益或掩盖关联交易的情形。"
-    class="objective-alert"
-  />
+  <el-alert type="info" :closable="false" show-icon class="audit-objective">
+    <template #title>
+      <span class="ao-title">一、审计目标</span>
+    </template>
+    <template #default>
+      <div class="ao-text">合同资产以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。</div>
+    </template>
+  </el-alert>
+
+  <!-- 审计过程（源模板红字步骤） -->
+  <div class="amber-context" style="margin-bottom:12px">
+    <span class="amber-icon">📌</span>
+    <div class="amber-text">
+      <p><strong>二、审计过程：</strong></p>
+      <p>1. 取得被审计单位大额合同资产减值准备金及合同资产核销清单；</p>
+      <p>2. 了解大额减值准备转回（收回）、核销的原因、方式，判断其合理性；</p>
+      <p>3. 对于实际发生减值损失的，检查转销依据是否符合有关规定，会计处理是否正确；</p>
+      <p>4. 已经确认并核销的减值重新收回的，检查其会计处理是否正确。</p>
+    </div>
+  </div>
 
   <!-- 工具栏 -->
   <div class="tab-toolbar">
@@ -236,22 +250,34 @@
 
     <div class="opinion-section">
       <div class="opinion-section-header">
-        <span class="opinion-section-label">1. 审计说明</span>
+        <span class="opinion-section-label">三、审计说明</span>
         <div class="opinion-actions">
+          <el-button size="small" type="primary" plain @click="aiGenerateNote('explanation')">🤖 AI辅助</el-button>
           <el-button size="small" @click="openReview('D6-9-note-explanation')">💬</el-button>
         </div>
       </div>
-      <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="转回核销检查过程及发现..." />
+      <el-input v-model="auditNotes.explanation" type="textarea" :autosize="{ minRows: 5, maxRows: 12 }" :disabled="isReadonly" placeholder="转回核销检查过程、重大项目判断依据、关联交易核查结果..." />
     </div>
 
     <div class="opinion-section">
       <div class="opinion-section-header">
-        <span class="opinion-section-label">2. 审计结论</span>
+        <span class="opinion-section-label">四、审计结论</span>
         <div class="opinion-actions">
+          <el-select
+            v-model="selectedConclusionTemplate"
+            placeholder="快速选择结论模板"
+            size="small"
+            clearable
+            style="width: 200px; margin-right: 8px"
+            @change="onConclusionTemplateSelect"
+          >
+            <el-option v-for="t in CONCLUSION_TEMPLATES" :key="t.label" :label="t.label" :value="t.value" />
+          </el-select>
+          <el-button size="small" type="primary" plain @click="aiGenerateNote('conclusion')">🤖 AI辅助</el-button>
           <el-button size="small" @click="openReview('D6-9-note-conclusion')">💬</el-button>
         </div>
       </div>
-      <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="转回核销结论..." />
+      <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }" :disabled="isReadonly" placeholder="转回核销合理性、合规性结论..." />
     </div>
   </el-card>
 </div>
@@ -261,7 +287,7 @@
 /**
  * D6TabWriteoffCheck.vue — 减值准备转回核销检查 D6-9
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, ref, type Ref } from 'vue'
 import {
   useD6WriteoffCheck,
   RECOVERY_METHODS,
@@ -273,6 +299,7 @@ import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD6FormData'
+import http from '@/utils/http'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -406,6 +433,67 @@ const {
   virtualColumns,
   tableWidth: 720,
 })
+
+// ─── 结论模板 ─────────────────────────────────────────────────────────────────
+const CONCLUSION_TEMPLATES = [
+  {
+    label: 'A-转回核销合理',
+    value: '经检查，被审计单位本期合同资产减值准备转回及核销事项均具有充分合理依据，转回系原减值迹象消除且已实际收回款项，核销已履行内部审批程序并取得相关证明文件，未发现利用转回核销操纵损益或掩盖关联交易的情形，会计处理正确。',
+  },
+  {
+    label: 'B-基本合理需关注',
+    value: '经检查，被审计单位本期合同资产减值准备转回及核销整体合理，但存在以下需关注事项：（1）______。已与管理层沟通确认，该事项不影响财务报表公允列报。',
+  },
+  {
+    label: 'C-存在问题需调整',
+    value: '经检查，被审计单位本期合同资产减值准备转回/核销存在以下不当：（1）______核销____万元缺乏充分审批依据。已提请管理层调整（详见审计调整分录D6-4）。',
+  },
+]
+
+const selectedConclusionTemplate = ref('')
+function onConclusionTemplateSelect(val: string) {
+  if (val) {
+    auditNotes.value = { ...auditNotes.value, conclusion: val }
+    selectedConclusionTemplate.value = ''
+  }
+}
+
+// ─── AI辅助生成 ──────────────────────────────────────────────────────────────
+async function aiGenerateNote(section: 'explanation' | 'conclusion') {
+  try {
+    const context: Record<string, string> = {
+      '底稿编号': 'D6-9',
+      '转回笔数': String(reversalRows.value.length),
+      '转回合计': fmtAmt(reversalTotal.value),
+      '核销笔数': String(writeoffRows.value.length),
+      '核销合计': fmtAmt(writeoffTotal.value),
+      '涉及关联交易': String(writeoffRows.value.filter(r => r.isRelatedParty === '是').length) + '笔',
+    }
+    if (section === 'conclusion' && auditNotes.value.explanation) {
+      context['审计说明'] = auditNotes.value.explanation
+    }
+    const promptMap = {
+      explanation: '根据合同资产减值准备转回核销检查数据，生成审计说明，包括：重大转回事项原因分析、核销审批合规性验证、关联交易核查结论、与D6-3勾稽结果。',
+      conclusion: '根据转回核销检查结果和审计说明，生成审计结论，明确判断转回核销的合理性、合规性，是否存在操纵损益或掩盖关联交易的情形。',
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: `d6-9-${section}`,
+      prompt: promptMap[section],
+      context,
+      existingContent: section === 'explanation' ? auditNotes.value.explanation : auditNotes.value.conclusion,
+    })
+    const text = res.data?.data?.content || res.data?.content
+    if (text) {
+      if (section === 'explanation') {
+        auditNotes.value = { ...auditNotes.value, explanation: text }
+      } else {
+        auditNotes.value = { ...auditNotes.value, conclusion: text }
+      }
+    }
+  } catch {
+    // silent - vLLM可能不可用
+  }
+}
 </script>
 
 <style scoped>
@@ -438,7 +526,28 @@ const {
   line-height: 1.6;
 }
 .guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+
+/* 审计目标 */
+.audit-objective { margin-bottom: 12px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-text { font-size: 12px; line-height: 1.5; margin-top: 2px; }
+
+/* 方法论琥珀块 */
+.amber-context {
+  padding: 10px 14px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8a6d3b;
+  display: flex;
+  gap: 8px;
+}
+.amber-context .amber-icon { flex-shrink: 0; }
+.amber-context .amber-text { flex: 1; }
+.amber-context .amber-text p { margin: 2px 0; }
 
 /* 工具栏 */
 .tab-toolbar {

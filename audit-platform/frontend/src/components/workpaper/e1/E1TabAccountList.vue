@@ -11,8 +11,12 @@
  * Requirements: 8.1-8.2
  */
 import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { useE1AccountList, type AccountListRow } from '../composables/useE1AccountList'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  useE1AccountList,
+  type AccountListRow,
+} from '../composables/useE1AccountList'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -57,11 +61,79 @@ const {
   isSuspectedOffBook,
   addRow,
   removeRow,
-  updateCell,
+  updateRow,
 } = useE1AccountList(options)
 
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+// ─── 新增 / 编辑对话框 ──────────────────────────────────────────────────────
+
+const editVisible = ref(false)
+const editingRowId = ref('')
+const editForm = ref<AccountListRow | null>(null)
+
+function openEdit(row: AccountListRow): void {
+  editingRowId.value = row.id
+  editForm.value = { ...row }
+  editVisible.value = true
+}
+
+async function promptAndAdd(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入开户银行或账户名称，确认后创建账户行。', '新增账户', {
+      confirmButtonText: '创建并完善',
+      cancelButtonText: '取消',
+      inputPlaceholder: '例如：中国工商银行北京分行',
+      inputValidator: value => Boolean(value?.trim()) || '银行/账户名称不能为空',
+    })
+    const row = addRow(value.trim())
+    if (row) openEdit(row)
+  } catch {
+    // 用户取消不提示错误。
+  }
+}
+
+function saveEdit(): void {
+  if (!editForm.value || props.isReadonly) return
+  if (!editForm.value.bank.trim()) {
+    ElMessage.warning('开户银行/账户名称不能为空')
+    return
+  }
+  if (editForm.value.companyInfoConsistent === '不一致' && !editForm.value.inconsistencyReason.trim()) {
+    ElMessage.warning('企业信息不一致时必须填写不一致原因')
+    return
+  }
+  updateRow(editingRowId.value, editForm.value)
+  editVisible.value = false
+  ElMessage.success('账户信息已更新')
+}
+
+function accountAiContext(): Record<string, unknown> {
+  return {
+    summary: summary.value,
+    accounts: rows.value.filter(row => row.bank.trim() || row.accountNo.trim()),
+  }
+}
+
+async function generateAiContent(target: 'note' | 'conclusion'): Promise<void> {
+  if (props.isReadonly) return
+  const isNote = target === 'note'
+  const text = await generateText({
+    section: isNote ? 'account-list-audit-note' : 'account-list-audit-conclusion',
+    prompt: isNote
+      ? '请根据银行账户清单完整性核对结果生成审计说明，说明清单获取途径、与账面及企业信息核对情况、开户目的合理性、受限账户及疑似账外账户的核查与应对。不要虚构未提供事实。'
+      : '请根据银行账户清单核对结果生成审计结论，明确账户完整性、账外账户、开户目的合理性、受限或不一致事项及是否需要追加程序。不要虚构未提供事实。',
+    context: accountAiContext(),
+    existingContent: isNote ? auditNote.value : auditConclusion.value,
+    confirmTitle: isNote ? 'AI 生成审计说明' : 'AI 生成审计结论',
+  })
+  if (!text) return
+  if (isNote) saveAuditNote(text)
+  else saveAuditConclusion(text)
+}
+
 // ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
-// 组件无 AI composable → 纯 textarea（不臆造 AI 按钮）
 
 const NOTE_KEY = 'E1-acctlist-audit-note'
 const CONCLUSION_KEY = 'E1-acctlist-audit-conclusion'
@@ -113,7 +185,7 @@ async function handleImport(file: File): Promise<boolean> {
 // ─── Row Class ───────────────────────────────────────────────────────────────
 
 function getRowClass({ row }: { row: AccountListRow }): string {
-  if (isInconsistent(row) || isSuspectedOffBook(row)) return 'e1-acct-red-row'
+  if (isInconsistent(row) || isSuspectedOffBook(row) || row.companyInfoConsistent === '不一致') return 'e1-acct-red-row'
   return ''
 }
 </script>
@@ -142,7 +214,7 @@ function getRowClass({ row }: { row: AccountListRow }): string {
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="promptAndAdd">+ 新增账户</el-button>
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -181,6 +253,8 @@ function getRowClass({ row }: { row: AccountListRow }): string {
       <el-tag v-else size="small" type="success">无疑似账外账户</el-tag>
       <el-tag v-if="summary.inconsistentCount > 0" size="small" type="danger">核对不一致 {{ summary.inconsistentCount }}</el-tag>
       <el-tag v-else size="small" type="success">清单与账面核对一致</el-tag>
+      <el-tag v-if="summary.restrictedCount > 0" size="small" type="warning">受限账户 {{ summary.restrictedCount }}</el-tag>
+      <el-tag v-if="summary.companyInconsistentCount > 0" size="small" type="danger">企业信息不一致 {{ summary.companyInconsistentCount }}</el-tag>
     </div>
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
@@ -194,151 +268,49 @@ function getRowClass({ row }: { row: AccountListRow }): string {
           style="width: 100%"
           :row-class-name="getRowClass"
         >
-          <el-table-column label="开户银行" width="150">
+          <el-table-column label="开户银行/账户名称" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.bank || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="账号" min-width="170" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.accountNo || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="账户性质" min-width="130" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.accountType || '-' }}</template>
+          </el-table-column>
+          <el-table-column label="账户状态" width="105" align="center">
             <template #default="{ row }">
-              <el-input
-                :model-value="row.bank"
-                :disabled="isReadonly"
-                size="small"
-                @change="(val: string) => updateCell(row.id, 'bank', val)"
-              />
+              <el-tag size="small" :type="row.accountStatus === '已注销' ? 'info' : row.accountStatus === '正常' ? 'success' : 'warning'">
+                {{ row.accountStatus || '未填写' }}
+              </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="账号" width="180">
+          <el-table-column label="开户/销户日期" min-width="180">
             <template #default="{ row }">
-              <el-input
-                :model-value="row.accountNo"
-                :disabled="isReadonly"
-                size="small"
-                @change="(val: string) => updateCell(row.id, 'accountNo', val)"
-              />
+              <div>{{ row.openDate || '-' }}</div>
+              <div v-if="row.closeDate" class="minor-text">销户：{{ row.closeDate }}</div>
             </template>
           </el-table-column>
-          <el-table-column label="账户性质" width="120">
+          <el-table-column label="受限状态" min-width="180" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-select
-                :model-value="row.accountType"
-                :disabled="isReadonly"
-                size="small"
-                filterable
-                allow-create
-                default-first-option
-                placeholder="选择"
-                @change="(val: string) => updateCell(row.id, 'accountType', val)"
-              >
-                <el-option label="基本存款账户" value="基本存款账户" />
-                <el-option label="一般存款账户" value="一般存款账户" />
-                <el-option label="专用存款账户" value="专用存款账户" />
-                <el-option label="临时存款账户" value="临时存款账户" />
-              </el-select>
+              <el-tag v-if="row.restrictionStatus && row.restrictionStatus !== '无'" size="small" type="warning">
+                {{ row.restrictionStatus }}
+              </el-tag>
+              <span v-else>无</span>
             </template>
           </el-table-column>
-          <el-table-column label="开户日期" width="130">
+          <el-table-column label="企业信息" width="110" align="center">
             <template #default="{ row }">
-              <el-date-picker
-                :model-value="row.openDate"
-                :disabled="isReadonly"
-                type="date"
-                value-format="YYYY-MM-DD"
-                size="small"
-                style="width: 100%"
-                @update:model-value="(val: string) => updateCell(row.id, 'openDate', val || '')"
-              />
+              <el-tag v-if="row.companyInfoConsistent" size="small" :type="row.companyInfoConsistent === '一致' ? 'success' : 'danger'">
+                {{ row.companyInfoConsistent }}
+              </el-tag>
+              <span v-else>-</span>
             </template>
           </el-table-column>
-          <el-table-column label="开户目的" min-width="140">
-            <template #header>
-              <span>开户目的</span>
-              <el-tooltip content="说明该账户的用途，评价开户目的的合理性（如：日常结算 / 工资代发 / 募集资金专户 / 项目专用等）" placement="top">
-                <span class="hint-mark">?</span>
-              </el-tooltip>
-            </template>
+          <el-table-column label="操作" width="120" align="center" fixed="right">
             <template #default="{ row }">
-              <el-input
-                :model-value="row.openPurpose"
-                :disabled="isReadonly"
-                size="small"
-                placeholder="账户用途"
-                @change="(val: string) => updateCell(row.id, 'openPurpose', val)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="本期新开" width="90" align="center">
-            <template #default="{ row }">
-              <el-select
-                :model-value="row.isNewThisPeriod"
-                :disabled="isReadonly"
-                size="small"
-                placeholder="-"
-                @change="(val: string) => updateCell(row.id, 'isNewThisPeriod', val)"
-              >
-                <el-option label="是" value="Y" />
-                <el-option label="否" value="N" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="本期注销" width="90" align="center">
-            <template #default="{ row }">
-              <el-select
-                :model-value="row.isClosedThisPeriod"
-                :disabled="isReadonly"
-                size="small"
-                placeholder="-"
-                @change="(val: string) => updateCell(row.id, 'isClosedThisPeriod', val)"
-              >
-                <el-option label="是" value="Y" />
-                <el-option label="否" value="N" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="账面有记录" width="100" align="center">
-            <template #header>
-              <span>账面有记录</span>
-              <el-tooltip content="清单中该账户是否在账面（总账/明细账）有记录。选择'否'即清单有而账面无，为疑似账外账户，行标红" placement="top">
-                <span class="hint-mark">?</span>
-              </el-tooltip>
-            </template>
-            <template #default="{ row }">
-              <el-select
-                :model-value="row.hasBookRecord"
-                :disabled="isReadonly"
-                size="small"
-                placeholder="-"
-                @change="(val: string) => updateCell(row.id, 'hasBookRecord', val)"
-              >
-                <el-option label="有" value="Y" />
-                <el-option label="无" value="N" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="清单核对一致" width="120" align="center">
-            <template #default="{ row }">
-              <el-select
-                :model-value="row.checkResult"
-                :disabled="isReadonly"
-                size="small"
-                placeholder="选择"
-                @change="(val: string) => updateCell(row.id, 'checkResult', val)"
-              >
-                <el-option label="一致" value="一致" />
-                <el-option label="不一致" value="不一致" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="差异说明" min-width="150">
-            <template #default="{ row }">
-              <el-input
-                :model-value="row.reason"
-                :disabled="isReadonly"
-                :class="{ 'required-field': isMissingReason(row) }"
-                :placeholder="isInconsistent(row) ? '不一致时必填' : ''"
-                size="small"
-                @change="(val: string) => updateCell(row.id, 'reason', val)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="70" align="center" fixed="right">
-            <template #default="{ row }">
+              <el-button text type="primary" size="small" @click="openEdit(row)">
+                {{ isReadonly ? '查看' : '编辑' }}
+              </el-button>
               <el-button
                 v-if="!isReadonly"
                 type="danger"
@@ -352,10 +324,107 @@ function getRowClass({ row }: { row: AccountListRow }): string {
       </template>
     </el-skeleton>
 
+    <el-dialog
+      v-model="editVisible"
+      :title="isReadonly ? '查看账户完整信息' : '新增/编辑账户完整信息'"
+      width="820px"
+      destroy-on-close
+    >
+      <el-form v-if="editForm" :model="editForm" label-width="120px" class="account-edit-form">
+        <div class="form-grid">
+          <el-form-item label="开户银行/账户名称" required>
+            <el-input v-model="editForm.bank" :disabled="isReadonly" />
+          </el-form-item>
+          <el-form-item label="银行账号">
+            <el-input v-model="editForm.accountNo" :disabled="isReadonly" />
+          </el-form-item>
+          <el-form-item label="账户性质">
+            <el-select v-model="editForm.accountType" :disabled="isReadonly" filterable allow-create style="width: 100%">
+              <el-option label="基本存款账户" value="基本存款账户" />
+              <el-option label="一般存款账户" value="一般存款账户" />
+              <el-option label="专用存款账户" value="专用存款账户" />
+              <el-option label="临时存款账户" value="临时存款账户" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="账户状态">
+            <el-select v-model="editForm.accountStatus" :disabled="isReadonly" style="width: 100%">
+              <el-option label="正常" value="正常" />
+              <el-option label="已注销" value="已注销" />
+              <el-option label="久悬" value="久悬" />
+              <el-option label="休眠" value="休眠" />
+              <el-option label="其他" value="其他" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="开户日期">
+            <el-date-picker v-model="editForm.openDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="销户日期">
+            <el-date-picker v-model="editForm.closeDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="本期新开（兼容）">
+            <el-select v-model="editForm.isNewThisPeriod" :disabled="isReadonly" style="width: 100%">
+              <el-option label="是" value="Y" /><el-option label="否" value="N" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="本期注销（兼容）">
+            <el-select v-model="editForm.isClosedThisPeriod" :disabled="isReadonly" style="width: 100%">
+              <el-option label="是" value="Y" /><el-option label="否" value="N" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="账面有记录（兼容）">
+            <el-select v-model="editForm.hasBookRecord" :disabled="isReadonly" style="width: 100%">
+              <el-option label="有" value="Y" /><el-option label="无" value="N" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="清单与账面核对">
+            <el-select v-model="editForm.checkResult" :disabled="isReadonly" style="width: 100%">
+              <el-option label="一致" value="一致" /><el-option label="不一致" value="不一致" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="企业信息一致性">
+            <el-select v-model="editForm.companyInfoConsistent" :disabled="isReadonly" style="width: 100%">
+              <el-option label="一致" value="一致" /><el-option label="不一致" value="不一致" />
+            </el-select>
+          </el-form-item>
+        </div>
+        <el-form-item label="开户原因">
+          <el-input v-model="editForm.openReason" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 2 }" />
+        </el-form-item>
+        <el-form-item label="开户目的（兼容）">
+          <el-input v-model="editForm.openPurpose" :disabled="isReadonly" placeholder="保留旧 JSON 字段，可与开户原因一致" />
+        </el-form-item>
+        <el-form-item label="销户原因">
+          <el-input v-model="editForm.closeReason" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 2 }" />
+        </el-form-item>
+        <el-form-item label="受限状态说明">
+          <el-input
+            v-model="editForm.restrictionStatus"
+            :disabled="isReadonly"
+            type="textarea"
+            :autosize="{ minRows: 2 }"
+            placeholder="填写无，或说明冻结/抵押/质押类型、金额、期限及权利人"
+          />
+        </el-form-item>
+        <el-form-item label="企业信息不一致原因" :required="editForm.companyInfoConsistent === '不一致'">
+          <el-input v-model="editForm.inconsistencyReason" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 2 }" />
+        </el-form-item>
+        <el-form-item label="账面核对差异说明" :required="editForm.checkResult === '不一致'">
+          <el-input v-model="editForm.reason" :disabled="isReadonly" type="textarea" :autosize="{ minRows: 2 }" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">{{ isReadonly ? '关闭' : '取消' }}</el-button>
+        <el-button v-if="!isReadonly" type="primary" @click="saveEdit">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="card-header"><span>审计说明</span></div>
+        <div class="card-header">
+          <span>审计说明</span>
+          <el-button size="small" type="primary" plain :loading="isGenerating('account-list-audit-note')" :disabled="isReadonly" @click="generateAiContent('note')">🤖 AI辅助</el-button>
+        </div>
       </template>
       <el-input
         type="textarea"
@@ -370,7 +439,10 @@ function getRowClass({ row }: { row: AccountListRow }): string {
     <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="card-header"><span>审计结论</span></div>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button size="small" type="primary" plain :loading="isGenerating('account-list-audit-conclusion')" :disabled="isReadonly" @click="generateAiContent('conclusion')">🤖 AI辅助</el-button>
+        </div>
       </template>
       <el-input
         type="textarea"
@@ -477,6 +549,17 @@ function getRowClass({ row }: { row: AccountListRow }): string {
 
 .required-field :deep(.el-input__wrapper) {
   box-shadow: 0 0 0 1px #f56c6c inset;
+}
+
+.minor-text {
+  margin-top: 2px;
+  color: #909399;
+  font-size: 12px;
+}
+.account-edit-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 12px;
 }
 
 /* 审计说明 / 审计结论 */

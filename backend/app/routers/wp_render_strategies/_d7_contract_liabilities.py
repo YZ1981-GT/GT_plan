@@ -97,6 +97,10 @@ async def render(ctx: RenderContext) -> dict | None:
             }
     except Exception as e:  # noqa: BLE001
         logger.warning("D7 render: checklist_responses 查询失败 wp_id=%s: %s", wp_id, e)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     # ─── 项目上下文 + 适用性判断 ─────────────────────────────────────────
     project_context: dict = {
@@ -109,7 +113,8 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year, business_category, applicable_standards "
+                "SELECT client_name, audit_year, business_category, "
+                "applicable_standard_v2 AS applicable_standards "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(ctx.project_id)},
@@ -119,12 +124,20 @@ async def render(ctx: RenderContext) -> dict | None:
             project_context["client_name"] = proj_row.client_name or ""
             project_context["audit_year"] = str(proj_row.audit_year or "")
             project_context["business_category"] = proj_row.business_category or ""
-            project_context["applicable_standards"] = proj_row.applicable_standards or ""
+            raw_standards = proj_row.applicable_standards
+            if isinstance(raw_standards, dict):
+                project_context["applicable_standards"] = raw_standards.get("type", "")
+            else:
+                project_context["applicable_standards"] = str(raw_standards or "")
     except Exception as e:  # noqa: BLE001
         logger.warning("D7 render: project context 查询失败: %s", e)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     # 附注适用性
-    standards = project_context["applicable_standards"].lower()
+    standards = str(project_context.get("applicable_standards", "")).lower()
     disclosure_visibility = {
         "listed": "listed" in standards,
         "soe": "soe" in standards,

@@ -1,6 +1,6 @@
 <template>
-  <div class="e1-monetary-fund">
-    <!-- 加载状态 -->
+  <div class="e1-monetary-fund" v-loading="isReloading">
+    <!-- 首次加载状态 -->
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
     </div>
@@ -49,7 +49,7 @@
       <!-- E1-2 现金明细 -->
       <E1TabCashDetail v-else-if="currentSheet === 'E1-2'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-3 银行存款明细(双variant) -->
-      <E1TabBankDetail v-else-if="currentSheet === 'E1-3'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :variant="e13Variant" />
+      <E1TabBankDetail v-else-if="currentSheet === 'E1-3'" :key="e13Variant" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :variant="e13Variant" />
       <!-- E1-4 数字货币明细 -->
       <E1TabDigitalCurrency v-else-if="currentSheet === 'E1-4'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-5 调整分录 -->
@@ -114,7 +114,7 @@
  *
  * 科目覆盖：1001 库存现金 / 1002 银行存款 / 1012 其他货币资金
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, watch } from 'vue'
 import type { Ref } from 'vue'
 import http from '@/utils/http'
 import { useG1DualMode } from './composables/useG1DualMode'
@@ -163,11 +163,13 @@ defineEmits<{
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const isLoading = ref(false)
 const isReadonly = computed(() => !!props.readonly)
 const wpIdRef = computed(() => props.wpId)
-const bsDate = ref('')
+const bsDate = ref(String(props.htmlData?.projectContext?.bs_date || ''))
 const allResponses: Ref<Map<string, any>> = ref(new Map())
+mergeResponsePayload(allResponses.value, props.htmlData)
+const isLoading = ref(!allResponses.value.size)
+const isReloading = ref(false)
 
 // Save functions (passed to children; children call these for persistence + auto snapshot)
 async function saveImmediate(items: any[]) {
@@ -193,6 +195,72 @@ const {
 
 provide('e1VersionTrailRef', versionTrailRef)
 provide('e1OpenVersionHistory', openVersionHistory)
+
+function mergeResponses(target: Map<string, any>, source: unknown): void {
+  if (!source) return
+  if (Array.isArray(source)) {
+    for (const raw of source) {
+      const entry = raw as Record<string, unknown>
+      const key = String(entry.item_id ?? '')
+      if (!key) continue
+      target.set(key, {
+        item_id: key,
+        conclusion: (entry.conclusion as string | null) ?? null,
+        remark: (entry.remark as string | null) ?? null,
+      })
+    }
+    return
+  }
+  if (typeof source === 'object') {
+    for (const [key, raw] of Object.entries(source as Record<string, unknown>)) {
+      const entry = (raw ?? {}) as Record<string, unknown>
+      target.set(key, {
+        item_id: String(entry.item_id ?? key),
+        conclusion: (entry.conclusion as string | null) ?? null,
+        remark: (entry.remark as string | null) ?? null,
+      })
+    }
+  }
+}
+
+function mergeResponsePayload(target: Map<string, any>, payload: any): string {
+  if (!payload) return ''
+  mergeResponses(target, payload.responses_snapshot)
+  mergeResponses(target, payload.checklist_responses)
+  let nextBsDate = String(payload?.projectContext?.bs_date || '')
+  for (const sheet of payload?.sheets ?? []) {
+    mergeResponses(target, sheet?.html_data?.responses_snapshot)
+    mergeResponses(target, sheet?.html_data?.checklist_responses)
+    if (!nextBsDate && sheet?.html_data?.projectContext?.bs_date) {
+      nextBsDate = String(sheet.html_data.projectContext.bs_date)
+    }
+  }
+  return nextBsDate
+}
+
+let reloadSequence = 0
+async function reloadWorkpaperData(): Promise<void> {
+  if (!props.wpId) return
+  const sequence = ++reloadSequence
+  const requestedWpId = props.wpId
+  isReloading.value = true
+  try {
+    const response = await http.get(`/api/workpapers/${requestedWpId}/render-config`, { _silent: true } as any)
+    const payload = (response as any)?.data?.data ?? (response as any)?.data ?? response
+    const nextResponses = new Map<string, any>()
+    const nextBsDate = mergeResponsePayload(nextResponses, payload)
+    if (sequence !== reloadSequence || requestedWpId !== props.wpId) return
+    // 成功后一次替换，导入重载不切换顶层 v-if，也不会触发旧子组件卸载保存。
+    allResponses.value = nextResponses
+    if (nextBsDate) bsDate.value = nextBsDate
+  } catch (error) {
+    if (sequence === reloadSequence) console.warn('[GtE1MonetaryFund] reloadWorkpaperData failed:', error)
+  } finally {
+    if (sequence === reloadSequence) isReloading.value = false
+  }
+}
+
+provide('reloadWorkpaperData', reloadWorkpaperData)
 
 // ─── Sheet 分发逻辑 ─────────────────────────────────────────────────────────
 
@@ -242,23 +310,33 @@ const ipoSheetCode = computed<string | null>(() => {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
-onMounted(() => {
-  if (props.htmlData?.projectContext) {
-    bsDate.value = props.htmlData.projectContext.bs_date || ''
-  }
-  // 从 render-config 返回的 responses_snapshot 加载已持久化数据
-  const snapshot = props.htmlData?.responses_snapshot
-  if (snapshot && typeof snapshot === 'object') {
-    for (const [key, val] of Object.entries(snapshot)) {
-      const entry = val as Record<string, unknown>
-      allResponses.value.set(key, {
-        item_id: String(entry?.item_id ?? key),
-        conclusion: (entry?.conclusion as string | null) ?? null,
-        remark: (entry?.remark as string | null) ?? null,
-      })
-    }
+onMounted(async () => {
+  if (!allResponses.value.size) {
+    try { await reloadWorkpaperData() } finally { isLoading.value = false }
   }
 })
+
+watch(() => props.wpId, async (next, previous) => {
+  if (!next || next === previous) return
+  // 不清空旧 Map、不切换 skeleton；保持子组件挂载，由 loading 遮罩覆盖后原子换入新底稿数据。
+  await reloadWorkpaperData()
+})
+
+watch(() => props.htmlData, async (htmlData) => {
+  if (!htmlData) {
+    if (!allResponses.value.size) {
+      isLoading.value = true
+      try { await reloadWorkpaperData() } finally { isLoading.value = false }
+    }
+    return
+  }
+  const nextResponses = new Map(allResponses.value)
+  const nextBsDate = mergeResponsePayload(nextResponses, htmlData)
+  if (nextResponses.size !== allResponses.value.size || nextResponses.size > 0) {
+    allResponses.value = nextResponses
+  }
+  if (nextBsDate) bsDate.value = nextBsDate
+}, { deep: false })
 </script>
 
 <style scoped>

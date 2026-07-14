@@ -12,12 +12,18 @@
     </details>
 
     <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：通过凭证抽查验证合同负债本期发生额及期后结转的真实性、准确性与截止恰当性，识别异常交易及收入确认时点风险。"
-      class="objective-alert"
-    />
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        <span class="ao-title">一、审计目标</span>
+      </template>
+      <template #default>
+        <ol class="ao-list">
+          <li>资产负债表中记录的合同负债是存在的，且已经记录在恰当的账户中；</li>
+          <li>记录的合同负债的金额包括在财务报表中是恰当的，与之相关的计价调整已恰当记录；</li>
+          <li>合同负债以恰当的金额包括在财务报表中，与之相关的分摊调整已恰当记录，相关披露已得到恰当计量和描述。</li>
+        </ol>
+      </template>
+    </el-alert>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -444,7 +450,12 @@ const {
   line-height: 1.6;
 }
 .guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+
+/* 审计目标 */
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-list { padding-left: 18px; line-height: 1.55; font-size: 12px; margin: 4px 0 0; }
 
 /* 工具栏 */
 .tab-toolbar {

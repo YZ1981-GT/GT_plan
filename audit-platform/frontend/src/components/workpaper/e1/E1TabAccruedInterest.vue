@@ -12,12 +12,14 @@
  *
  * Requirements: 10.3-10.4
  */
-import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
+import { ref, computed, inject, toRef, onMounted, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useE1InterestCalc,
   type AccruedInterestRow,
+  type AccruedInterestCategory,
 } from '../composables/useE1InterestCalc'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -60,7 +62,16 @@ const {
   addRow,
   removeRow,
   updateCell,
+  accruedCategoryTotals,
 } = useE1InterestCalc(options)
+
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const categoryOptions: Array<{ value: AccruedInterestCategory; label: string }> = [
+  { value: 'finance', label: '财务公司存款' },
+  { value: 'bank', label: '银行机构存款' },
+  { value: 'other', label: '其他货币资金' },
+  { value: 'digital', label: '数字货币' },
+]
 
 // ─── 导入导出（E1-20） ────────────────────────────────────────────────────────
 
@@ -95,13 +106,19 @@ const NOTE_KEY = 'E1-accrued-audit-note'
 const CONCLUSION_KEY = 'E1-accrued-audit-conclusion'
 const auditNote = ref('')
 const auditConclusion = ref('')
+const selectedConclusionTemplate = ref('')
+const conclusionTemplates = [
+  { value: 'A', label: 'A—测算相符', text: '经测算，应计利息与账面计提金额相符，利息收入及相关应收利息记录完整、准确，未见重大异常。' },
+  { value: 'B', label: 'B—调整后认可', text: '除已识别并提请调整的应计利息差异外，其余账户测算结果未见重大异常；相关调整入账后可以认定。' },
+  { value: 'C', label: 'C—需进一步核查', text: '部分账户利率、计息期间或外币折算依据尚未取得充分适当的审计证据，应进一步核查并评价对利息收入及货币资金余额的影响。' },
+]
 
-onMounted(() => {
-  const noteResp = props.allResponses.get(NOTE_KEY)
-  if (noteResp?.remark) auditNote.value = noteResp.remark
-  const concResp = props.allResponses.get(CONCLUSION_KEY)
-  if (concResp?.remark) auditConclusion.value = concResp.remark
-})
+function hydrateNarratives(): void {
+  auditNote.value = props.allResponses.get(NOTE_KEY)?.remark || ''
+  auditConclusion.value = props.allResponses.get(CONCLUSION_KEY)?.remark || ''
+}
+onMounted(hydrateNarratives)
+watch(() => props.allResponses, hydrateNarratives)
 
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
@@ -117,6 +134,43 @@ function saveAuditConclusion(val: string): void {
   const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
   props.allResponses.set(CONCLUSION_KEY, item)
   void props.saveImmediate([item])
+}
+
+function applyConclusionTemplate(code: string): void {
+  const template = conclusionTemplates.find(item => item.value === code)
+  if (template) saveAuditConclusion(template.text)
+}
+
+function buildAiContext(): Record<string, unknown> {
+  return {
+    明细: rows.value,
+    分类合计: accruedCategoryTotals.value,
+    应计利息人民币总额: totalAccruedRmb.value,
+  }
+}
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-accrued-interest-note',
+    prompt: '根据各账户应计利息测算、四类分项合计、利率和外币折算信息，生成专业审计说明，突出异常利率、异常期间和证据缺口。',
+    context: buildAiContext(),
+    existingContent: auditNote.value,
+    confirmTitle: '确认填入审计说明',
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-accrued-interest-conclusion',
+    prompt: '根据应计利息测算结果和审计说明形成审慎结论；若存在资料缺失或重大异常，不得直接表述为未见异常。',
+    context: { ...buildAiContext(), 审计说明: auditNote.value },
+    existingContent: auditConclusion.value,
+    confirmTitle: '确认填入审计结论',
+  })
+  if (text) saveAuditConclusion(text)
 }
 </script>
 
@@ -192,6 +246,14 @@ function saveAuditConclusion(val: string): void {
                 @change="(val: string) => updateCell(row.id, 'usage', val)" />
             </template>
           </el-table-column>
+          <el-table-column label="应计利息类别" width="150">
+            <template #default="{ row }">
+              <el-select :model-value="asAccrued(row).category" :disabled="isReadonly" size="small"
+                @change="(val: AccruedInterestCategory) => updateCell(row.id, 'category', val)">
+                <el-option v-for="item in categoryOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </template>
+          </el-table-column>
           <el-table-column label="币种" width="80">
             <template #default="{ row }">
               <el-input :model-value="asAccrued(row).currency" :disabled="isReadonly" size="small"
@@ -262,6 +324,12 @@ function saveAuditConclusion(val: string): void {
           </el-table-column>
         </el-table>
 
+        <div class="category-summary">
+          <div v-for="item in categoryOptions" :key="item.value" class="summary-item">
+            <span>{{ item.label }}</span>
+            <strong>{{ displayPrefs.fmtAmount(accruedCategoryTotals[item.value]) }}</strong>
+          </div>
+        </div>
         <div class="footer-row">
           <span class="total-label">应计利息人民币合计：
             <strong class="total-amount">{{ displayPrefs.fmtAmount(totalAccruedRmb) }}</strong>
@@ -271,7 +339,11 @@ function saveAuditConclusion(val: string): void {
         <!-- 审计说明 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计说明</span></div>
+            <div class="card-header">
+              <span>审计说明</span>
+              <el-button v-if="!isReadonly" size="small" type="primary" text
+                :loading="isGenerating('e1-accrued-interest-note')" @click="generateAuditNote">🤖 AI辅助</el-button>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -286,7 +358,17 @@ function saveAuditConclusion(val: string): void {
         <!-- 审计结论 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计结论</span></div>
+            <div class="card-header">
+              <span>审计结论</span>
+              <div class="conclusion-actions">
+                <el-select v-if="!isReadonly" v-model="selectedConclusionTemplate" size="small" clearable
+                  placeholder="套用结论模板" style="width: 150px" @change="applyConclusionTemplate">
+                  <el-option v-for="item in conclusionTemplates" :key="item.value" :label="item.label" :value="item.value" />
+                </el-select>
+                <el-button v-if="!isReadonly" size="small" type="primary" text
+                  :loading="isGenerating('e1-accrued-interest-conclusion')" @click="generateAuditConclusion">🤖 AI辅助</el-button>
+              </div>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -375,6 +457,23 @@ function saveAuditConclusion(val: string): void {
   justify-content: flex-end;
   margin-top: 10px;
 }
+.category-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  background: #f8fafc;
+  font-size: var(--wp-font-size, 13px);
+}
+.conclusion-actions { display: flex; align-items: center; gap: 8px; }
 .total-label {
   font-size: var(--wp-font-size, 13px);
   color: #303133;

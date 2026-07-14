@@ -13,6 +13,7 @@
 import { ref, inject, toRef, computed, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useE1CashCount, type CertCountRow } from '../composables/useE1CashCount'
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -82,8 +83,34 @@ function asCert(row: any): CertCountRow { return row }
 
 const NOTE_KEY = 'E1-cert-audit-note'
 const CONCLUSION_KEY = 'E1-cert-audit-conclusion'
+const SIGNATURE_KEY = 'E1-cert-signatures'
 const auditNote = ref('')
 const auditConclusion = ref('')
+
+interface SignatureState {
+  cashier: string
+  cashierDate: string
+  accountant: string
+  accountantDate: string
+  supervisor: string
+  supervisorDate: string
+}
+const signatures = ref<SignatureState>({
+  cashier: '',
+  cashierDate: '',
+  accountant: '',
+  accountantDate: '',
+  supervisor: '',
+  supervisorDate: '',
+})
+
+function updateSignature(field: keyof SignatureState, value: string): void {
+  if (props.isReadonly) return
+  signatures.value = { ...signatures.value, [field]: value || '' }
+  const item = { item_id: SIGNATURE_KEY, conclusion: null, remark: JSON.stringify(signatures.value) }
+  props.allResponses.set(SIGNATURE_KEY, item)
+  void props.saveImmediate([item])
+}
 
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
@@ -101,11 +128,55 @@ function saveAuditConclusion(val: string): void {
   void props.saveImmediate([item])
 }
 
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+function buildAiContext(): Record<string, unknown> {
+  return {
+    sheet: 'E1-9',
+    certificateCount: rows.value,
+    signatures: signatures.value,
+    summary: {
+      totalRows: rows.value.length,
+      unseenRows: rows.value.filter(r => asCert(r).result === '未见').length,
+      inconsistentRows: rows.value.filter(r => asCert(r).bookConsistent === '否').length,
+      restrictedRows: rows.value.filter(r => asCert(r).pledged === '是').length,
+    },
+  }
+}
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-audit-note',
+    prompt: '请根据盘点过程、倒轧链、差异及证据索引生成专业、可追溯的审计说明。',
+    context: buildAiContext(),
+    existingContent: auditNote.value,
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-audit-conclusion',
+    prompt: '请根据盘点结果生成审计结论，说明账实是否相符及是否存在需调整事项。',
+    context: buildAiContext(),
+    existingContent: auditConclusion.value,
+  })
+  if (text) saveAuditConclusion(text)
+}
+
 onMounted(() => {
   const noteResp = props.allResponses.get(NOTE_KEY)
   if (noteResp?.remark) auditNote.value = noteResp.remark
   const concResp = props.allResponses.get(CONCLUSION_KEY)
   if (concResp?.remark) auditConclusion.value = concResp.remark
+  const signatureResp = props.allResponses.get(SIGNATURE_KEY)
+  if (signatureResp?.remark) {
+    try {
+      signatures.value = { ...signatures.value, ...JSON.parse(signatureResp.remark) }
+    } catch { /* keep defaults for legacy/invalid JSON */ }
+  }
 })
 </script>
 
@@ -166,6 +237,48 @@ onMounted(() => {
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
         <el-table :data="rows" border stripe size="small" max-height="500" style="width: 100%">
+          <el-table-column type="expand" width="48" fixed="left">
+            <template #default="{ row }">
+              <div class="certificate-detail">
+                <div class="detail-title">存单详情与证据索引</div>
+                <el-descriptions :column="3" border size="small">
+                  <el-descriptions-item label="存款人/户名">
+                    <el-input :model-value="asCert(row).depositor" :disabled="isReadonly" size="small" @change="(val: string) => updateCell(row.id, 'depositor', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="账号">
+                    <el-input :model-value="asCert(row).account" :disabled="isReadonly" size="small" @change="(val: string) => updateCell(row.id, 'account', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="存款类型">
+                    <el-input :model-value="asCert(row).certType" :disabled="isReadonly" size="small" @change="(val: string) => updateCell(row.id, 'certType', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="存入日">
+                    <el-date-picker :model-value="asCert(row).depositDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" size="small" style="width: 100%" @update:model-value="(val: string) => updateCell(row.id, 'depositDate', val || '')" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="利率(%)">
+                    <el-input-number :model-value="asCert(row).interestRate" :disabled="isReadonly" :controls="false" :precision="4" size="small" @change="(val: number) => updateCell(row.id, 'interestRate', val ?? 0)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="不一致原因">
+                    <el-input :model-value="asCert(row).inconsistencyReason" :disabled="isReadonly" size="small" placeholder="账面不一致时说明" @change="(val: string) => updateCell(row.id, 'inconsistencyReason', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="质押/受限事项" :span="3">
+                    <el-input :model-value="asCert(row).pledgeMatter" :disabled="isReadonly" size="small" placeholder="质押合同、借款入账、逾期质权等" @change="(val: string) => updateCell(row.id, 'pledgeMatter', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="存单/开户证实书索引">
+                    <el-input :model-value="asCert(row).certificateIndex" :disabled="isReadonly" size="small" placeholder="如 E1-9-01" @change="(val: string) => updateCell(row.id, 'certificateIndex', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="开户证明索引">
+                    <el-input :model-value="asCert(row).openingProofIndex" :disabled="isReadonly" size="small" placeholder="开户/权属证明" @change="(val: string) => updateCell(row.id, 'openingProofIndex', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="保管/质押证明索引">
+                    <el-input :model-value="asCert(row).custodyProofIndex" :disabled="isReadonly" size="small" placeholder="保管、质押回单/合同" @change="(val: string) => updateCell(row.id, 'custodyProofIndex', val)" />
+                  </el-descriptions-item>
+                  <el-descriptions-item label="备注" :span="3">
+                    <el-input :model-value="asCert(row).note" :disabled="isReadonly" size="small" @change="(val: string) => updateCell(row.id, 'note', val)" />
+                  </el-descriptions-item>
+                </el-descriptions>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column label="存单编号" width="130">
             <template #default="{ row }">
               <el-input
@@ -186,46 +299,13 @@ onMounted(() => {
               />
             </template>
           </el-table-column>
-          <el-table-column label="存款人/户名" width="130">
+          <el-table-column label="币种" width="90" align="center">
             <template #default="{ row }">
               <el-input
-                :model-value="asCert(row).depositor"
+                :model-value="asCert(row).currency"
                 :disabled="isReadonly"
                 size="small"
-                @change="(val: string) => updateCell(row.id, 'depositor', val)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="账号" width="150">
-            <template #default="{ row }">
-              <el-input
-                :model-value="asCert(row).account"
-                :disabled="isReadonly"
-                size="small"
-                @change="(val: string) => updateCell(row.id, 'account', val)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="存款类型" width="110">
-            <template #default="{ row }">
-              <el-input
-                :model-value="asCert(row).certType"
-                :disabled="isReadonly"
-                size="small"
-                @change="(val: string) => updateCell(row.id, 'certType', val)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="存入日" width="130">
-            <template #default="{ row }">
-              <el-date-picker
-                :model-value="asCert(row).depositDate"
-                :disabled="isReadonly"
-                type="date"
-                value-format="YYYY-MM-DD"
-                size="small"
-                style="width: 100%"
-                @update:model-value="(val: string) => updateCell(row.id, 'depositDate', val || '')"
+                @change="(val: string) => updateCell(row.id, 'currency', val)"
               />
             </template>
           </el-table-column>
@@ -253,16 +333,18 @@ onMounted(() => {
               />
             </template>
           </el-table-column>
-          <el-table-column label="利率(%)" width="100" align="center">
+          <el-table-column label="账面一致" width="110" align="center">
             <template #default="{ row }">
-              <el-input-number
-                :model-value="asCert(row).interestRate"
+              <el-select
+                :model-value="asCert(row).bookConsistent"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="4"
                 size="small"
-                @change="(val: number) => updateCell(row.id, 'interestRate', val ?? 0)"
-              />
+                placeholder="选择"
+                @change="(val: string) => updateCell(row.id, 'bookConsistent', val)"
+              >
+                <el-option label="是" value="是" />
+                <el-option label="否" value="否" />
+              </el-select>
             </template>
           </el-table-column>
           <el-table-column label="是否质押/受限" width="120" align="center">
@@ -279,17 +361,7 @@ onMounted(() => {
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="质押/受限事项" min-width="150">
-            <template #default="{ row }">
-              <el-input
-                :model-value="asCert(row).pledgeMatter"
-                :disabled="isReadonly"
-                size="small"
-                placeholder="质押合同/借款入账/逾期质权等"
-                @change="(val: string) => updateCell(row.id, 'pledgeMatter', val)"
-              />
-            </template>
-          </el-table-column>
+
           <el-table-column label="盘点结果" width="110" align="center">
             <template #default="{ row }">
               <el-select
@@ -304,16 +376,7 @@ onMounted(() => {
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="备注" min-width="140">
-            <template #default="{ row }">
-              <el-input
-                :model-value="asCert(row).note"
-                :disabled="isReadonly"
-                size="small"
-                @change="(val: string) => updateCell(row.id, 'note', val)"
-              />
-            </template>
-          </el-table-column>
+
           <el-table-column label="操作" width="80" align="center" fixed="right">
             <template #default="{ row }">
               <el-button
@@ -327,10 +390,34 @@ onMounted(() => {
           </el-table-column>
         </el-table>
 
+        <el-card shadow="never" class="signature-card">
+          <template #header><div class="card-header"><span>盘点签字确认</span></div></template>
+          <div class="signature-grid">
+            <div class="signature-item">
+              <span class="signature-label">出纳</span>
+              <el-input :model-value="signatures.cashier" :disabled="isReadonly" placeholder="姓名/签字" @change="(val: string) => updateSignature('cashier', val)" />
+              <el-date-picker :model-value="signatures.cashierDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" placeholder="签字日期" @update:model-value="(val: string) => updateSignature('cashierDate', val || '')" />
+            </div>
+            <div class="signature-item">
+              <span class="signature-label">会计主管</span>
+              <el-input :model-value="signatures.accountant" :disabled="isReadonly" placeholder="姓名/签字" @change="(val: string) => updateSignature('accountant', val)" />
+              <el-date-picker :model-value="signatures.accountantDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" placeholder="签字日期" @update:model-value="(val: string) => updateSignature('accountantDate', val || '')" />
+            </div>
+            <div class="signature-item">
+              <span class="signature-label">监盘人</span>
+              <el-input :model-value="signatures.supervisor" :disabled="isReadonly" placeholder="姓名/签字" @change="(val: string) => updateSignature('supervisor', val)" />
+              <el-date-picker :model-value="signatures.supervisorDate" :disabled="isReadonly" type="date" value-format="YYYY-MM-DD" placeholder="签字日期" @update:model-value="(val: string) => updateSignature('supervisorDate', val || '')" />
+            </div>
+          </div>
+        </el-card>
+
         <!-- 审计说明 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计说明</span></div>
+            <div class="card-header">
+              <span>审计说明</span>
+              <el-button size="small" type="primary" plain :loading="isGenerating('e1-audit-note')" :disabled="isReadonly" @click="generateAuditNote">🤖 AI辅助</el-button>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -345,7 +432,10 @@ onMounted(() => {
         <!-- 审计结论 -->
         <el-card shadow="never" class="audit-note-card">
           <template #header>
-            <div class="card-header"><span>审计结论</span></div>
+            <div class="card-header">
+              <span>审计结论</span>
+              <el-button size="small" type="primary" plain :loading="isGenerating('e1-audit-conclusion')" :disabled="isReadonly" @click="generateAuditConclusion">🤖 AI辅助</el-button>
+            </div>
           </template>
           <el-input
             type="textarea"
@@ -425,6 +515,39 @@ onMounted(() => {
   margin-top: 6px;
   color: #e6a23c;
   font-style: italic;
+}
+.certificate-detail {
+  padding: 10px 16px 14px 48px;
+  background: #fafafa;
+}
+.detail-title {
+  margin-bottom: 8px;
+  color: #303133;
+  font-weight: 600;
+}
+.signature-card {
+  margin-top: 16px;
+}
+.signature-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
+  gap: 12px;
+}
+.signature-item {
+  display: grid;
+  grid-template-columns: 72px minmax(100px, 1fr) 145px;
+  gap: 8px;
+  align-items: center;
+}
+.signature-label {
+  color: #606266;
+  font-weight: 500;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
 }
 
 /* 审计说明 / 审计结论 */

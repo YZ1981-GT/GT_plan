@@ -12,12 +12,14 @@
     </details>
 
     <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：核实账龄超过1年合同负债未结转的原因及合理性，评价是否存在收入确认时点不当或长期挂账风险。"
-      class="objective-alert"
-    />
+    <el-alert type="info" :closable="false" show-icon class="audit-objective">
+      <template #title>
+        <span class="ao-title">一、审计目标</span>
+      </template>
+      <template #default>
+        <div class="ao-text">资产负债表中记录的合同负债是存在的，且已经记录在恰当的账户中。</div>
+      </template>
+    </el-alert>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -360,7 +362,12 @@ const {
   line-height: 1.6;
 }
 .guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+
+/* 审计目标 */
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; }
+.ao-text { font-size: 12px; line-height: 1.5; margin-top: 2px; }
 
 /* 工具栏 */
 .tab-toolbar {

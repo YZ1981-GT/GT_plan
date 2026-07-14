@@ -474,8 +474,9 @@ function isDataRow(row: DetailRow): boolean {
   return !row.rowId.startsWith('__')
 }
 
-function detailRowClassName({ row }: { row: DetailRow }): string {
-  if (row.rowId.startsWith('__')) return 'total-row'
+function detailRowClassName(row: DetailRow): string {
+  if (!row) return ''
+  if (row.rowId?.startsWith('__')) return 'total-row'
   if (row.relatedPartyType && row.relatedPartyType !== '非关联方' && row.relatedPartyType !== '') return 'related-party-row'
   return ''
 }

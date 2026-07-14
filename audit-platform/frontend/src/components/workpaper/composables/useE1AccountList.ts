@@ -22,26 +22,46 @@ export type YesNoType = 'Y' | 'N' | ''
 
 export interface AccountListRow {
   id: string
-  bank: string                  // 开户银行
-  accountNo: string             // 银行账号
-  accountType: string           // 账户性质（基本户/一般户/专用户/临时户）
-  openDate: string              // 开户日期
-  openPurpose: string           // 开户目的/原因（评价开户目的合理性）
-  isNewThisPeriod: YesNoType    // 是否本期新开
-  isClosedThisPeriod: YesNoType // 是否本期注销
-  hasBookRecord: YesNoType      // 账面是否有记录（完整性认定核心：清单有而账面无=疑似账外账户）
-  checkResult: CheckResultType  // 清单与账面核对结果（一致/不一致）
-  reason: string                // 差异说明 (强制 when checkResult='不一致')
+  bank: string
+  accountNo: string
+  accountType: string
+  openDate: string
+  accountStatus: string
+  closeDate: string
+  openReason: string
+  closeReason: string
+  companyInfoConsistent: CheckResultType
+  inconsistencyReason: string
+  restrictionStatus: string
+  // 旧 JSON 字段继续读写，确保历史数据及导入导出契约兼容。
+  openPurpose: string
+  isNewThisPeriod: YesNoType
+  isClosedThisPeriod: YesNoType
+  hasBookRecord: YesNoType
+  checkResult: CheckResultType
+  reason: string
+}
+
+export interface AccountCommitSnapshotRow {
+  bank: string
+  accountNo: string
+  accountType: string
+  openDate: string
+  closeDate: string
+  accountStatus: string
+  restrictionStatus: string
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'E1-account-list-rows'
+export const E1_ACCOUNT_LIST_STORAGE_KEY = 'E1-account-list-rows'
+export const E1_ACCOUNT_COMMIT_SNAPSHOT_KEY = 'E1-account-commit-snapshot'
 
 const USER_FIELDS: Array<keyof AccountListRow> = [
-  'id', 'bank', 'accountNo', 'accountType', 'openDate',
-  'openPurpose', 'isNewThisPeriod', 'isClosedThisPeriod', 'hasBookRecord',
-  'checkResult', 'reason',
+  'id', 'bank', 'accountNo', 'accountType', 'openDate', 'accountStatus',
+  'closeDate', 'openReason', 'closeReason', 'companyInfoConsistent',
+  'inconsistencyReason', 'restrictionStatus', 'openPurpose',
+  'isNewThisPeriod', 'isClosedThisPeriod', 'hasBookRecord', 'checkResult', 'reason',
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -53,13 +73,20 @@ function generateRowId(): string {
   return `acct-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function createEmptyRow(): AccountListRow {
+function createEmptyRow(bank = ''): AccountListRow {
   return {
     id: generateRowId(),
-    bank: '',
+    bank,
     accountNo: '',
     accountType: '',
     openDate: '',
+    accountStatus: '正常',
+    closeDate: '',
+    openReason: '',
+    closeReason: '',
+    companyInfoConsistent: '',
+    inconsistencyReason: '',
+    restrictionStatus: '无',
     openPurpose: '',
     isNewThisPeriod: '',
     isClosedThisPeriod: '',
@@ -82,7 +109,7 @@ export function useE1AccountList(options: UseE1BaseOptions) {
   // ─── Deserialization ───────────────────────────────────────────────────
 
   function loadFromResponses(): void {
-    const response = allResponses.value.get(STORAGE_KEY)
+    const response = allResponses.value.get(E1_ACCOUNT_LIST_STORAGE_KEY)
     const raw = response?.remark
     if (!raw) {
       rows.value = [createEmptyRow()]
@@ -100,6 +127,13 @@ export function useE1AccountList(options: UseE1BaseOptions) {
         accountNo: String(r.accountNo || ''),
         accountType: String(r.accountType || ''),
         openDate: String(r.openDate || ''),
+        accountStatus: String(r.accountStatus || (r.isClosedThisPeriod === 'Y' ? '已注销' : '正常')),
+        closeDate: String(r.closeDate || ''),
+        openReason: String(r.openReason || r.openPurpose || ''),
+        closeReason: String(r.closeReason || ''),
+        companyInfoConsistent: (['一致', '不一致'].includes(String(r.companyInfoConsistent)) ? String(r.companyInfoConsistent) : '') as CheckResultType,
+        inconsistencyReason: String(r.inconsistencyReason || ''),
+        restrictionStatus: String(r.restrictionStatus || '无'),
         openPurpose: String(r.openPurpose || ''),
         isNewThisPeriod: (['Y', 'N'].includes(String(r.isNewThisPeriod)) ? String(r.isNewThisPeriod) : '') as YesNoType,
         isClosedThisPeriod: (['Y', 'N'].includes(String(r.isClosedThisPeriod)) ? String(r.isClosedThisPeriod) : '') as YesNoType,
@@ -116,7 +150,7 @@ export function useE1AccountList(options: UseE1BaseOptions) {
   loadFromResponses()
 
   watch(
-    () => allResponses.value.get(STORAGE_KEY)?.remark,
+    () => allResponses.value.get(E1_ACCOUNT_LIST_STORAGE_KEY)?.remark,
     (newRemark, oldRemark) => {
       if (newRemark !== oldRemark && newRemark !== serializeRows()) {
         loadFromResponses()
@@ -152,9 +186,9 @@ export function useE1AccountList(options: UseE1BaseOptions) {
   function persistToResponses(): void {
     const serialized = serializeRows()
     const items: ChecklistItem[] = [
-      { item_id: STORAGE_KEY, conclusion: null, remark: serialized },
+      { item_id: E1_ACCOUNT_LIST_STORAGE_KEY, conclusion: null, remark: serialized },
     ]
-    allResponses.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: serialized })
+    allResponses.value.set(E1_ACCOUNT_LIST_STORAGE_KEY, { item_id: E1_ACCOUNT_LIST_STORAGE_KEY, conclusion: null, remark: serialized })
     saveImmediate(items).catch(() => { /* silent */ })
   }
 
@@ -184,15 +218,20 @@ export function useE1AccountList(options: UseE1BaseOptions) {
       closedCount: list.filter(r => r.isClosedThisPeriod === 'Y').length,
       inconsistentCount: list.filter(isInconsistent).length,
       offBookCount: list.filter(isSuspectedOffBook).length,
+      restrictedCount: list.filter(r => r.restrictionStatus.trim() && r.restrictionStatus !== '无').length,
+      closedStatusCount: list.filter(r => r.accountStatus === '已注销').length,
+      companyInconsistentCount: list.filter(r => r.companyInfoConsistent === '不一致').length,
     }
   })
 
   // ─── Row CRUD ──────────────────────────────────────────────────────────
 
-  function addRow(): void {
-    if (isReadonly.value) return
-    rows.value = [...rows.value, createEmptyRow()]
+  function addRow(bank = ''): AccountListRow | null {
+    if (isReadonly.value) return null
+    const row = createEmptyRow(bank)
+    rows.value = [...rows.value, row]
     scheduleSave()
+    return row
   }
 
   function removeRow(rowId: string): void {
@@ -203,18 +242,23 @@ export function useE1AccountList(options: UseE1BaseOptions) {
     scheduleSave()
   }
 
-  function updateCell(rowId: string, field: string, value: string): void {
+  function updateRow(rowId: string, patch: Partial<AccountListRow>): void {
     if (isReadonly.value) return
     const idx = rows.value.findIndex(r => r.id === rowId)
     if (idx === -1) return
-
-    const row = { ...rows.value[idx] }
-    ;(row as any)[field] = value
-
+    const current = rows.value[idx]
+    const next = { ...current, ...patch }
+    // 新旧开户原因字段互补但不删除，保证历史 JSON 可继续被旧导入导出消费。
+    if (!next.openReason && next.openPurpose) next.openReason = next.openPurpose
+    if (!next.openPurpose && next.openReason) next.openPurpose = next.openReason
     const newRows = [...rows.value]
-    newRows[idx] = row
+    newRows[idx] = next
     rows.value = newRows
     scheduleSave()
+  }
+
+  function updateCell(rowId: string, field: string, value: string): void {
+    updateRow(rowId, { [field]: value } as Partial<AccountListRow>)
   }
 
   // ─── Hydration ─────────────────────────────────────────────────────────
@@ -250,6 +294,8 @@ export function useE1AccountList(options: UseE1BaseOptions) {
     addRow,
     removeRow,
     updateCell,
+    updateRow,
     hydrate,
   }
 }
+

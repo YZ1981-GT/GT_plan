@@ -8,6 +8,7 @@ import http from '@/utils/http'
 export type D6ImportableSheet =
   | 'D6-2'
   | 'D6-3'
+  | 'D6-4'
   | 'D6-5'
   | 'D6-6-period'
   | 'D6-6-post'
