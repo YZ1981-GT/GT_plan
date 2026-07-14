@@ -172,9 +172,9 @@
  * Spec: .kiro/specs/h9-lease-liabilities/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -273,7 +273,7 @@ const currentSheet = computed(() => {
   // 关联方检查（筛选视图，无物理sheet）
   if (/关联/.test(name) || /H9-6/.test(name)) return 'H9-6'
   // H9（无后缀，底稿目录）
-  if (/\bH9\b/.test(name) && !/H9-/.test(name) && !/H9A/.test(name)) return 'H9'
+  if (/底稿目录/.test(name) || (/\bH9\b/.test(name) && !/H9-/.test(name) && !/H9A/.test(name))) return 'H9'
   return ''
 })
 
@@ -352,9 +352,11 @@ provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h9VersionTrailRef', versionTrailRef)
 provide('h9OpenVersionHistory', openVersionHistory)
 

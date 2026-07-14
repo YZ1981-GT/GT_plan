@@ -15,7 +15,7 @@
  * Requirements: 6.1-6.5
  */
 import { ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 import type { ActuarialAssumptionChange } from './useJ2CrossSheet'
 
 export interface J2IntegrationOptions {

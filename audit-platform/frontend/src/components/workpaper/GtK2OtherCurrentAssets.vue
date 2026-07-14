@@ -147,8 +147,6 @@
         />
       </template>
     </template>
-
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -167,14 +165,19 @@
  * Spec: .kiro/specs/k2-other-current-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
+import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core
 const K2TabIndex = defineAsyncComponent(() => import('./k2/core/K2TabIndex.vue'))
@@ -211,7 +214,11 @@ const emit = defineEmits<{
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
-const allResponses = ref<Map<string, any>>(new Map())
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)
+const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
+const allResponses = persistence.responses
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const tbData = ref({
   unadjusted1231: 0,
   audited1231: 0,
@@ -278,32 +285,20 @@ const currentSheet = computed(() => {
   const m = name.match(/(K2-\d+)/)
   if (m) return m[1]
   // 底稿目录 K2（无后缀）
-  if (/\bK2\b/.test(name) && !/K2-/.test(name) && !/K2A/.test(name)) return 'K2'
+  if (/底稿目录/.test(name) || (/\bK2\b/.test(name) && !/K2-/.test(name) && !/K2A/.test(name))) return 'K2'
   return ''
 })
 
-// ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
-async function handleChildSave(itemId: string, value: any): Promise<void> {
+// ─── 子组件 save 回调（统一 Persistence Adapter） ─────────────────────────────
+async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   if (!props.wpId) return
-  let remark: string | null = null
-  let conclusion: string | null = null
-  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
-    const r = (value as any).remark
-    remark = r != null ? (typeof r === 'string' ? r : JSON.stringify(r)) : null
-    const c = (value as any).conclusion
-    conclusion = c != null ? (typeof c === 'string' ? c : JSON.stringify(c)) : null
-  } else {
-    remark = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  }
-  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion, remark }],
-    })
-    scheduleAutoSnapshot()
-  } catch {
-    // 静默失败，数据保留在本地
+    await persistence.save(itemId, toChecklistPatch(value))
+    runtime?.version.scheduleAutoSnapshot()
+    emit('save')
+  } catch (error) {
+    ElMessage.error(persistence.stateOf(itemId).lastError || '保存失败，数据已保留在本地，请稍后重试')
+    console.warn(`[GtK2OtherCurrentAssets] save failed: ${itemId}`, error)
   }
 }
 
@@ -331,54 +326,31 @@ async function _loadTbData(): Promise<void> {
   }
 }
 
-// ─── selfLoad 逻辑（bundle 内嵌场景 htmlData 为 null 时） ────────────────────
+// ─── selfLoad（统一 Persistence Adapter） ─────────────────────────────────────
 async function selfLoad(): Promise<void> {
-  if (!props.wpId) {
-    isLoading.value = false
-    return
-  }
-
-  // 加载 checklist_responses
   try {
-    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      params: { project_id: props.projectId },
-      _silent: true,
-    } as any)
-    const items: any[] = Array.isArray(res?.data?.data ?? res?.data)
-      ? (res?.data?.data ?? res?.data)
+    const snapshot = props.htmlData
+      ? collectChecklistResponses(
+          props.htmlData.responses_snapshot,
+          props.htmlData.allResponses,
+          props.htmlData.checklist_responses,
+        )
       : []
-    const map = new Map<string, any>()
-    for (const item of items) {
-      if (item?.item_id) {
-        map.set(item.item_id, item)
-      }
-    }
-    allResponses.value = map
-  } catch {
-    // 静默
+    if (snapshot.length > 0) persistence.hydrate(snapshot)
+    else await persistence.load()
+  } catch (err) {
+    console.warn('[GtK2OtherCurrentAssets] selfLoad failed:', err)
+  } finally {
+    isLoading.value = false
   }
-
-  // TB取数
-  await _loadTbData()
-
-  isLoading.value = false
 }
 
-// ─── 生命周期 ────────────────────────────────────────────────────────────────
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-
-const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-
-provide('versionTrail', versionToolbar)
-provide('k2VersionTrailRef', versionTrailRef)
-provide('k2OpenVersionHistory', openVersionHistory)
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
 
 onMounted(() => {
-  selfLoad()
+  void selfLoad()
+  void _loadTbData()
 })
 </script>
 

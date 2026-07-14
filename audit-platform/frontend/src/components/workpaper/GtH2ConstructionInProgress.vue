@@ -230,7 +230,7 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -250,16 +250,16 @@
  * Spec: .kiro/specs/h2-construction-in-progress/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import useH2DualMode from './composables/useH2DualMode'
 import useH2ImportExport from './composables/useH2ImportExport'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+// 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H2TabIndex 非 lazy（底稿目录轻量，首屏必显）
 import H2TabIndex from './h2/core/H2TabIndex.vue'
@@ -343,7 +343,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H2-\d+)/)
   if (m) return m[1]
   // 底稿目录 H2（无后缀）
-  if (/\bH2\b/.test(name) && !/H2-/.test(name) && !/H2A/.test(name)) return 'H2'
+  if (/底稿目录/.test(name) || (/\bH2\b/.test(name) && !/H2-/.test(name) && !/H2A/.test(name))) return 'H2'
   return ''
 })
 
@@ -415,11 +415,7 @@ function persistResponse(itemId: string, value: any): void {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H2] openReviewDialog:', sectionId, sectionLabel)
-  // Integrated with audit-review-dialog module — real impl delegates to parent via emit
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
@@ -447,8 +443,10 @@ const eventSubscriptions = {
 provide('eventSubscriptions', eventSubscriptions)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h2VersionTrailRef', versionTrailRef)
 provide('h2OpenVersionHistory', openVersionHistory)
 

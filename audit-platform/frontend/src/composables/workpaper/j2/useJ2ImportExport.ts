@@ -8,7 +8,7 @@
  * Requirements: 6.5
  */
 import { ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 
 export interface J2ImportExportOptions {

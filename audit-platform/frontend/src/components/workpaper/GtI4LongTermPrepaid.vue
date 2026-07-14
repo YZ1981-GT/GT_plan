@@ -173,9 +173,9 @@
  * Spec: .kiro/specs/i4-long-term-prepaid/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI4DualMode } from './composables/useI4DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
@@ -244,7 +244,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(I4-\d+)/)
   if (m) return m[1]
   // 底稿目录 I4（无后缀）
-  if (/\bI4\b/.test(name) && !/I4-/.test(name) && !/I4A/.test(name)) return 'I4'
+  if (/底稿目录/.test(name) || (/\bI4\b/.test(name) && !/I4-/.test(name) && !/I4A/.test(name))) return 'I4'
   return ''
 })
 
@@ -329,15 +329,13 @@ function syncAmortizationBranch() {
   else if (sheet === 'I4-7') amortizationMethod.value = 'units'
 }
 
-// ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[I4] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('i4VersionTrailRef', versionTrailRef)
 provide('i4OpenVersionHistory', openVersionHistory)
 

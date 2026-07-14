@@ -147,13 +147,7 @@
         />
       </template>
 
-      <GtWpVersionTrail
-        ref="versionTrailRef"
-        :workpaper-id="props.wpId"
-        :project-id="props.projectId"
-      />
-
-      <GtWpReviewDialogHost />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -162,11 +156,10 @@
 /**
  * GtF2InventoryValuation.vue — F2 计价减值组主入口（比照 GtF2InventoryMain / GtF3）
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useF2ValuationFormData, type ChecklistResponse } from './composables/useF2ValuationFormData'
 import { useF2ValuationDualMode } from './composables/useF2ValuationDualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 // defineAsyncComponent lazy加载所有子组件（性能优化：13个sheet按需加载）
 const F2TabValuationAvg = defineAsyncComponent(() => import('./f2/valuation/F2TabValuationAvg.vue'))
 const F2TabValuationFifo = defineAsyncComponent(() => import('./f2/valuation/F2TabValuationFifo.vue'))
@@ -185,8 +178,6 @@ const F2TabRelatedPurchase = defineAsyncComponent(() => import('./f2/valuation/F
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -208,10 +199,14 @@ const formData = useF2ValuationFormData({
 
 const allResponses = computed(() => formData.allResponses.value)
 
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)

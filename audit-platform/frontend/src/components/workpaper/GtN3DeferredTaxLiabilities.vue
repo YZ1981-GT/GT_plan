@@ -2,16 +2,14 @@
   <div class="n3-deferred-tax-liabilities">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div class="n3-deferred-tax-liabilities-toolbar">
+      <div v-if="isHtmlSheet" class="n3-deferred-tax-liabilities-toolbar">
         <el-segmented
-          v-if="isHtmlSheet"
           v-model="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
@@ -98,8 +96,6 @@
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
-
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -114,14 +110,13 @@
  * 集成：useWorkpaperVersionToolbar(autoSnapshot on save) + provide('openReviewDialog')
  * EventBus：substantive:adjudicated(2901) / deferred-tax:liability-updated → N5
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const N3TabIndex = defineAsyncComponent(() => import('./n3/core/N3TabIndex.vue'))
 const N3TabAdjudication = defineAsyncComponent(() => import('./n3/core/N3TabAdjudication.vue'))
 const N3TabDetail = defineAsyncComponent(() => import('./n3/core/N3TabDetail.vue'))
@@ -159,11 +154,8 @@ const projectIdRef = computed(() => props.projectId)
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-
-provide('n3VersionTrailRef', versionTrailRef)
-provide('n3OpenVersionHistory', () => versionToolbar.openVersionHistory())
+// ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
 // ─── 双模式 ──────────────────────────────────────────────────────────────────
 const dualMode = {
@@ -228,11 +220,7 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
-function openReviewDialog(sectionId: string): void {
-  console.log('[N3] openReviewDialog:', sectionId)
-}
-provide('openReviewDialog', openReviewDialog)
+// 复核对话由 Runtime Boundary 统一 provide('openReviewDialog') + 挂真实 Host（删除 console 桩）。
 provide('reloadWorkpaperData', selfLoad)
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
@@ -263,8 +251,8 @@ function onDisclosureRefresh(): void {
   selfLoad()
 }
 
-// ─── 版本快照：子组件保存后触发自动快照（六大集成标准） ──────────────────────
-provide('scheduleAutoSnapshot', versionToolbar.scheduleAutoSnapshot)
+// ─── 版本快照：子组件保存后触发自动快照（版本链能力来自 Runtime Boundary） ────
+provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 </script>
 
 <style scoped>

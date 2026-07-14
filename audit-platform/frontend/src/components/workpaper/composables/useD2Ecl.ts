@@ -253,7 +253,7 @@ export function useD2Ecl(options: UseD2BaseOptions & { agingBands?: ComputedRef<
       }
     }
     return DEFAULT_AGING_BANDS
-  }) = options
+  })
 
   // ─── State ─────────────────────────────────────────────────────────────
 

@@ -17,7 +17,7 @@
         <el-alert type="info" :closable="true" show-icon style="flex:1">
           提示③：对回函可能性不高的、余额重大的，发函同时执行替代程序。
         </el-alert>
-        <el-button size="small" :icon="Clock" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" :icon="Clock" @click="openVersionHistory()">版本历史</el-button>
       </div>
 
       <!-- 看板 -->
@@ -311,18 +311,19 @@
     <!-- 隐藏文件选择器 -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
 
-    <!-- 版本历史 Drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId || ''" :project-id="props.projectId || ''" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Clock } from '@element-plus/icons-vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeF06Data } from './composables/useAlternativeF06Data'
-import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from '../../composables/useWorkpaperScaffold'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_F06 } from './blockColumnConfigsF06'
 
@@ -333,7 +334,6 @@ import AlternativeD05Master from '../alternativeD05/AlternativeD05Master.vue'
 import CheckBlock from '../alternativeD05/CheckBlock.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   htmlData: any
@@ -365,8 +365,9 @@ const data = useAlternativeF06Data({
 
 const wpIdRef = computed(() => props.wpId || '')
 const projectIdRef = computed(() => props.projectId || '')
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+// ─── Runtime Boundary 统一提供版本链 + 复核（GtWpRenderer scaffold），本组件不再本地接线 ───
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 // ─── 区块配置（D06 专属列定义） ──────────────────────────────────────────────
 
@@ -664,7 +665,7 @@ function handleAiFill() {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
 }
 
 function markDirty() {

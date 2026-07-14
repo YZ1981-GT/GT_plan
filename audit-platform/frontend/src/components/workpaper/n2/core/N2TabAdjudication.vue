@@ -371,8 +371,26 @@ const {
 
 // ─── 审计说明/结论 ───────────────────────────────────────────────────────────
 
-const auditNotes = ref<string>(formData.getField('1', 'audit-notes') ?? '')
-const auditConclusion = ref<string>(formData.getField('1', 'audit-conclusion') ?? '')
+/**
+ * 从父级 selfLoad 注入的 allResponses（render-config responses_snapshot 已含全部
+ * checklist_responses）读取审计说明/结论文本。此前从 useN2FormData 自建实例的
+ * getField 读取，但该实例未 loadResponses → 刷新后审计说明/结论不回显。
+ * 统一改从 props.allResponses 读取（与 useN2Adjudication 行数据同源）。
+ */
+function _readResponseText(itemId: string): string {
+  const r = props.allResponses?.get?.(itemId) as any
+  const v = r?.conclusion ?? r?.remark
+  return typeof v === 'string' ? v : ''
+}
+
+const auditNotes = ref<string>(_readResponseText('N2-1-audit-notes') || (formData.getField('1', 'audit-notes') ?? ''))
+const auditConclusion = ref<string>(_readResponseText('N2-1-audit-conclusion') || (formData.getField('1', 'audit-conclusion') ?? ''))
+
+// selfLoad 异步完成后 allResponses 才填充；在用户未编辑时补齐回显。
+watch(() => props.allResponses, () => {
+  if (!auditNotes.value) auditNotes.value = _readResponseText('N2-1-audit-notes')
+  if (!auditConclusion.value) auditConclusion.value = _readResponseText('N2-1-audit-conclusion')
+}, { deep: true })
 
 // ─── 表格数据 ────────────────────────────────────────────────────────────────
 

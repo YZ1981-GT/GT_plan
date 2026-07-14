@@ -10,7 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -161,24 +161,16 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail
-        ref="versionTrailRef"
-        :workpaper-id="props.wpId"
-        :project-id="props.projectId"
-      />
-
-      <!-- 复核对话（供子组件 inject('openReviewDialog') 触发）-->
-      <GtWpReviewDialogHost />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
 import { useG1TraFinFormData } from './composables/useG1TraFinFormData'
 import { useG1DualMode } from './composables/useG1DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useG1ReviewDialogProvide } from './composables/useG1ReviewDialogProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import G1TabAdjudication from './g1-trading-financial-assets/core/G1TabAdjudication.vue'
 import G1TabFairValueTest from './g1-trading-financial-assets/valuation/G1TabFairValueTest.vue'
@@ -200,8 +192,6 @@ const G1TabDerivativeCheck = defineAsyncComponent(() => import('./g1-trading-fin
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -216,8 +206,11 @@ const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const isReadonly = computed(() => !!props.readonly)
 
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 provide('g1VersionTrailRef', versionTrailRef)
 provide('g1OpenVersionHistory', openVersionHistory)
@@ -226,11 +219,8 @@ provide('g1OpenVersionHistory', openVersionHistory)
 const formData = useG1TraFinFormData({
   wpId: wpIdRef,
   projectId: computed(() => props.projectId),
-  onAfterSave: () => versionToolbar.scheduleAutoSnapshot(),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
-
-// ─── 复核对话 provide（供子组件 section 标题栏复核按钮 inject('openReviewDialog')）───
-useG1ReviewDialogProvide({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

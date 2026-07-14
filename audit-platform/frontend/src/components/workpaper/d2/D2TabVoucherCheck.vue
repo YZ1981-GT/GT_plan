@@ -18,21 +18,20 @@
  *   - useD2VcAuditSummary（统计自动化）
  *   - useD2VcImportExport（双区分 sheet 导入导出）
  *   - GtVoucherSamplingEngine（dialog-mode + @filled → 双区回填）
- *   - useWorkpaperVersionToolbar（版本工具栏）
+ *   - Runtime Boundary（统一版本历史与保存快照）
  *   - GtIndexChip（value="wp:D2-7"）
  *   - PostFillAiReviewDialog（回填后 AI 复核）
  *
  * Requirements: 1.1, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.5, 10.4
  */
-import { ref, toRef, computed, provide, onMounted, type Ref } from 'vue'
+import { ref, toRef, computed, inject, onMounted, type Ref } from 'vue'
 import { useD2VoucherCheckEnhanced } from '../composables/useD2VoucherCheckEnhanced'
 import { useD2VcMethodology } from '../composables/useD2VcMethodology'
 import { useD2VcAuditSummary } from '../composables/useD2VcAuditSummary'
 import { useD2VcImportExport } from '../composables/useD2VcImportExport'
-import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
-import { D2_SAVE_ITEMS_KEY } from '../composables/d2InjectionKeys'
+import { useD2SaveInject } from '../composables/useD2SaveInject'
+import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
-import http from '@/utils/http'
 
 import MatrixView from './D2VcMatrixView.vue'
 import CardView from './D2VcCardView.vue'
@@ -41,11 +40,9 @@ import AuditSummaryPanel from './D2VcAuditSummaryPanel.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import PostFillAiReviewDialog from '../voucher-sampling/PostFillAiReviewDialog.vue'
-import GtWpVersionTrail from '../version-trail/GtWpVersionTrail.vue'
 
 import type { SampledVoucher } from '../composables/useD2VoucherCheckEnhanced'
-import type { Phase, FillMode } from '../composables/useSamplingAlgorithms'
-import type { ChecklistResponse } from '../composables/useD2FormData'
+import type { Phase } from '../composables/useSamplingAlgorithms'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -67,34 +64,10 @@ const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, any>>
 const isReadonlyRef = toRef(props, 'isReadonly') as Ref<boolean>
 const bsDateRef = toRef(props, 'bsDate') as Ref<string>
 
-// ─── Provide: saveItems ──────────────────────────────────────────────────────
-
-let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-async function saveItems(items: ChecklistResponse[]): Promise<void> {
-  if (!props.wpId) return
-  // Update local map immediately
-  for (const item of items) {
-    allResponsesRef.value.set(item.item_id, item)
-  }
-  // Debounced persist
-  if (saveDebounceTimer) clearTimeout(saveDebounceTimer)
-  saveDebounceTimer = setTimeout(async () => {
-    saveDebounceTimer = null
-    try {
-      await http.put(
-        `/api/workpapers/${props.wpId}/checklist-responses`,
-        { items },
-        { _silent: true } as any,
-      )
-      versionToolbar.scheduleAutoSnapshot()
-    } catch (err) {
-      console.warn('[D2TabVoucherCheck] saveItems failed:', err)
-    }
-  }, 2000)
-}
-
-provide(D2_SAVE_ITEMS_KEY, saveItems)
+// D2-7 复用主入口的 Adapter 保存桥和 Renderer Runtime，不再自建 PUT/防抖/版本 Host。
+const { saveItems } = useD2SaveInject()
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version
 
 // ─── Core Composables ────────────────────────────────────────────────────────
 
@@ -142,12 +115,6 @@ const importExport = useD2VcImportExport({
   currentRows,
   postRows,
   saveToResponses,
-})
-
-// 版本工具栏
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: wpIdRef,
-  projectId: projectIdRef,
 })
 
 // AI 生成
@@ -384,7 +351,7 @@ onMounted(() => {
           <!-- GtIndexChip -->
           <GtIndexChip value="wp:D2-7" :context-project-id="projectId" />
           <!-- 版本历史 -->
-          <el-button size="small" text @click="versionToolbar.openVersionHistory()">📋 版本</el-button>
+          <el-button size="small" text :disabled="!versionToolbar" @click="versionToolbar?.openVersionHistory()">📋 版本</el-button>
         </div>
       </div>
 
@@ -480,9 +447,9 @@ onMounted(() => {
           </div>
         </template>
         <el-input
+          v-model="conclusion"
           type="textarea"
           :autosize="{ minRows: 5 }"
-          :model-value="conclusion"
           placeholder="根据凭证抽查结果，对应收账款本期增减变动及期后收款调整的真实性、准确性和截止性作出审计结论..."
           :disabled="isReadonly"
           @change="saveConclusion"
@@ -519,12 +486,6 @@ onMounted(() => {
       @applied="handlePostFillApplied"
     />
 
-    <!-- GtWpVersionTrail Drawer -->
-    <GtWpVersionTrail
-      :ref="(el: any) => { versionToolbar.versionTrailRef.value = el }"
-      :workpaper-id="wpId"
-      :project-id="projectId"
-    />
   </div>
 </template>
 

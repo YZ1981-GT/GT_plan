@@ -7,7 +7,7 @@
       <!-- 双模式切换 -->
       <div class="g5-long-term-receivable-toolbar">
         <el-segmented v-model="viewMode" :options="viewModeOptions" size="small" />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -111,16 +111,16 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent, provide } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
 import { useG5FormData } from './composables/useG5FormData'
 import { useG5DualMode } from './composables/useG5DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ═══ defineAsyncComponent × 16 lazy load ═══
 // core/
@@ -145,7 +145,6 @@ const G5TabReversalWriteoff = defineAsyncComponent(() => import('./g5-long-term-
 const G5TabVoucherCheck = defineAsyncComponent(() => import('./g5-long-term-receivable/voucher/G5TabVoucherCheck.vue'))
 // shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -179,21 +178,15 @@ const formData = useG5FormData({
 })
 const sheetData = computed(() => props.htmlData || formData.data.value)
 
-// ═══ 版本链集成 ═══
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: computed(() => props.wpId),
-  projectId: computed(() => props.projectId),
-})
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ═══ Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ═══
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 
 provide('g5VersionTrailRef', versionTrailRef)
 provide('g5OpenVersionHistory', openVersionHistory)
 
-// ═══ 复核对话 provide ═══
-function openReviewDialog(sectionId: string): void {
-  console.log('[G5] openReviewDialog:', sectionId)
-}
-provide('openReviewDialog', openReviewDialog)
+// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('reloadWorkpaperData', () => formData.load())
 
 onMounted(async () => {

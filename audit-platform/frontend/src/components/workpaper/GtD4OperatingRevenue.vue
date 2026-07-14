@@ -117,10 +117,7 @@
       :section-id="d4ReviewSection.id"
       :section-label="d4ReviewSection.label"
     />
-    <GtWpReviewDialogHost />
-
-    <!-- 版本链 drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+    <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
   </div>
 </template>
 
@@ -136,15 +133,13 @@
  * IPO/舞弊组可见性由 business_category 字段控制。
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD4FormData } from './composables/useD4FormData'
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
-import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
 import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
 import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
@@ -207,7 +202,6 @@ const D4TabOtherMargin = defineAsyncComponent(() => import('./d4/other/D4TabOthe
 const D4TabOtherContract = defineAsyncComponent(() => import('./d4/other/D4TabOtherContract.vue'))
 const D4TabOtherCheck = defineAsyncComponent(() => import('./d4/other/D4TabOtherCheck.vue'))
 const D4TabOtherCutoff = defineAsyncComponent(() => import('./d4/other/D4TabOtherCutoff.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -243,15 +237,11 @@ const crossSheet = useD4CrossSheet({
   projectContext: formData.projectContext,
 })
 
-// ─── 版本链接入 ───────────────────────────────────────────────────────────
-const {
-  versionTrailRef,
-  openVersionHistory,
-  scheduleAutoSnapshot,
-} = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -282,8 +272,6 @@ const availableSheets = computed(() =>
 )
 
 const wpIdRefForReview = toRef(props, 'wpId')
-const projectIdRefForReview = toRef(props, 'projectId')
-useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
 
 const { getThreadDot, getRowDot } = useD4ReviewThreads(wpIdRefForReview)
 provide('getThreadDot', getThreadDot)

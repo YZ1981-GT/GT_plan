@@ -66,6 +66,7 @@ async def lifespan(app: FastAPI):
     await _check_libreoffice_health()
     await _validate_template_manifest()
     await _run_schema_drift_check()
+    await _warm_render_caches()
 
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
@@ -104,6 +105,31 @@ async def lifespan(app: FastAPI):
 
     from app.core.database import dispose_engine
     await dispose_engine()
+
+
+async def _warm_render_caches() -> None:
+    """启动预热：把 render-config 热路径的重量级惰性导入 + 模板缓存在启动时加载完成。
+
+    根因：`_get_render_config_impl` 内部 `from app.routers.wp_render_strategies import
+    RENDERER_DISPATCH` 会一次性导入 100+ 个渲染策略子模块（及其传递依赖 openpyxl/
+    resolvers/services），此前发生在**首个请求**内。首屏打开底稿时前端并发打一批请求，
+    首个 render-config 边导入边被并发请求争抢事件循环 → 冷启动首请求被拖到数秒级
+    （SLOW_REQUEST 7s）。在 lifespan 启动阶段（"Ready" 之前）预热后，首请求不再付导入代价。
+    失败不阻塞启动。
+    """
+    import logging as _warm_log
+    log = _warm_log.getLogger("audit_platform")
+    try:
+        # 1) 渲染策略分发表（最重的惰性导入，~0.4s + 传递依赖）
+        from app.routers import wp_render_strategies  # noqa: F401
+        _ = wp_render_strategies.RENDERER_DISPATCH
+        # 2) 程序表模板 JSON（首次 _load_templates 读盘）
+        from app.services.procedure_table_auto_service import _load_templates
+        _load_templates()
+        log.info("[启动] render 热路径预热完成（RENDERER_DISPATCH=%d）",
+                 len(wp_render_strategies.RENDERER_DISPATCH))
+    except Exception as e:  # noqa: BLE001 — 预热失败不阻塞启动，首请求会自行惰性导入
+        log.warning("[启动] render 热路径预热失败（忽略，改由首请求惰性导入）: %s", e)
 
 
 async def _run_schema_drift_check() -> None:

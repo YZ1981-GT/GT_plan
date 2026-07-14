@@ -138,10 +138,6 @@
         style="height: 100%; min-height: 600px"
       />
     </template>
-
-    <GtWpReviewDialogHost />
-
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -162,15 +158,13 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
+import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
 import { useL1FormData } from '@/composables/useL1FormData'
-import { useL1Adjudication } from '@/composables/useL1Adjudication'
 import { useL1CrossSheet } from '@/composables/useL1CrossSheet'
 import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -194,8 +188,6 @@ const L1TabStLoanCheck = defineAsyncComponent(() => import('./l1/inspection/L1Ta
 
 // Shared
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -278,22 +270,12 @@ const procedureDualMode = useCycleHtmlOoDualMode({
   storagePrefix: 'l1-proc:',
 })
 
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
-useWorkpaperReviewProvide({
-  wpId: toRef(props, 'wpId') as any,
-  projectId: toRef(props, 'projectId') as any,
-})
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-
-const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-
-provide('versionTrail', versionToolbar)
-provide('l1VersionTrailRef', versionTrailRef)
-provide('l1OpenVersionHistory', openVersionHistory)
+// ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
+// 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
+// 本主入口不再本地 useWorkpaperReviewProvide / useWorkpaperVersionToolbar（避免重复 provider/Host）。
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+// 子组件保存后触发自动版本快照（版本链能力来自 Runtime Boundary）。
+provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 

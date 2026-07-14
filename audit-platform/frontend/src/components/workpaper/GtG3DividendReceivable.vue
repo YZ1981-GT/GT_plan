@@ -10,7 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -106,7 +106,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -120,17 +120,16 @@
  * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式
  * EventBus：监听 g3:save-items 持久化 + substantive:adjudicated(1131)
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG3DivRecFormData } from './composables/useG3DivRecFormData'
 import { useG3DualMode } from './composables/useG3DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const G3TabDetail = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabDetail.vue'))
 const G3TabCalcCheck = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabCalcCheck.vue'))
 const G3TabAdjustment = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabAdjustment.vue'))
@@ -152,8 +151,11 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG3DivRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 provide('g3VersionTrailRef', versionTrailRef)
 provide('g3OpenVersionHistory', openVersionHistory)
@@ -179,11 +181,7 @@ const dualMode = useG3DualMode({
   reloadAll: () => formData.loadAll(),
 })
 
-// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
-function openReviewDialog(sectionId: string): void {
-  console.log('[G3] openReviewDialog:', sectionId)
-}
-provide('openReviewDialog', openReviewDialog)
+// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('reloadWorkpaperData', () => formData.loadAll())
 
 // ─── 监听 g3:save-items → 保存 + autoSnapshot ───────────────────────────────
@@ -193,7 +191,7 @@ async function handleG3SaveItems(e: Event): Promise<void> {
     for (const it of items) {
       if (it?.item_id) await formData.saveImmediate(it.item_id, it)
     }
-    versionToolbar.scheduleAutoSnapshot()
+    scheduleAutoSnapshot()
   }
 }
 

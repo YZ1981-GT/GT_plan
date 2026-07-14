@@ -17,6 +17,8 @@ import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import D2ReferenceBlock from './D2ReferenceBlock.vue'
 import { ECL_REFERENCE_SECTIONS, ECL_REFERENCE_SOURCE } from '../composables/d2ReferenceExamples'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -33,9 +35,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 
 const crossSheet = inject('d2CrossSheet') as any
 
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const { saveItems } = useD2SaveInject()
 

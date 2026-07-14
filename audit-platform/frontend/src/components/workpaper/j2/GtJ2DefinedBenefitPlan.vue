@@ -7,29 +7,12 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 双模式切换工具栏 -->
-      <div v-if="showModeToolbar" class="j2-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
-      </div>
-
-      <!-- OnlyOffice 模式 -->
-      <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
-        :key="ooSheetName"
-        :wp-id="props.wpId"
-        :sheet-name="ooSheetName"
-        :project-id="props.projectId"
-        :readonly="isReadonly"
-        @fallback="onOoFallback"
-      />
-
-      <template v-else>
       <!-- 底稿目录 -->
       <J2TabIndex
         v-if="currentSheet === '底稿目录'"
         :wp-id="wpId"
         :project-id="projectId"
+        :all-responses="allResponses"
       />
       <!-- J2A 程序表（整册专属组件内分发，对齐 H1A/L1A） -->
       <CycleTabProcedure
@@ -87,7 +70,9 @@
         :wp-id="wpId"
         :project-id="projectId"
         :html-data="htmlData"
+        :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :save-immediate="handleChildSave"
       />
       <!-- 附注（国有企业） -->
       <J2TabDisclosureSoe
@@ -95,16 +80,14 @@
         :wp-id="wpId"
         :project-id="projectId"
         :html-data="htmlData"
+        :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :save-immediate="handleChildSave"
       />
       <!-- 兜底 -->
       <div v-else class="j2-sheet-placeholder">
         <el-empty :description="`J2 未识别的 sheet: ${currentSheet}`" />
       </div>
-
-      </template><!-- end HTML mode -->
-
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -118,15 +101,16 @@
  *
  * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)
  */
-import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
-import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
-import { useJ2EntryDualMode, type J2RenderMode } from '../composables/useJ2EntryDualMode'
+import { computed, ref, onMounted, defineAsyncComponent, inject, toRef, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
-import http from '@/utils/http'
+import {
+  useChecklistPersistence,
+  type ChecklistResponse,
+} from '@/composables/workpaper/useChecklistPersistence'
+import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 
 // ── defineAsyncComponent lazy loading ───────────────────────────────────────
-const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
 const J2TabIndex = defineAsyncComponent(() => import('./J2TabIndex.vue'))
 const J2TabAdjudication = defineAsyncComponent(() => import('./J2TabAdjudication.vue'))
 const J2TabDetail = defineAsyncComponent(() => import('./J2TabDetail.vue'))
@@ -152,121 +136,75 @@ const emit = defineEmits<{
 }>()
 
 const isLoading = ref(true)
+const runtime = inject(WorkpaperRuntimeContextKey, null)
 
 /** 当前 sheet 名（从 props.sheetName 提取） */
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
   if (/\bJ2A\b/.test(sn) || sn.includes('实质性程序表')) return 'J2A'
   if (sn.includes('底稿目录')) return '底稿目录'
-  if (sn.includes('J2-1') || sn.includes('审定表')) return 'J2-1'
-  if (sn.includes('J2-2') || sn.includes('明细表')) return 'J2-2'
-  if (sn.includes('J2-3') || sn.includes('调整分录')) return 'J2-3'
-  if (sn.includes('J2-4') || sn.includes('计提') || sn.includes('检查表')) return 'J2-4'
+  if (/(?:^|[^A-Z0-9])J2-1(?!\d)/.test(sn) || sn.includes('审定表')) return 'J2-1'
+  if (/(?:^|[^A-Z0-9])J2-2(?!\d)/.test(sn) || sn.includes('明细表')) return 'J2-2'
+  if (/(?:^|[^A-Z0-9])J2-3(?!\d)/.test(sn) || sn.includes('调整分录')) return 'J2-3'
+  if (/(?:^|[^A-Z0-9])J2-4(?!\d)/.test(sn) || sn.includes('计提') || sn.includes('检查表')) return 'J2-4'
   if (sn.includes('上市')) return 'J2附注(上市)'
   if (sn.includes('国有') || sn.includes('国企')) return 'J2附注(国企)'
   const m = sn.match(/^(J2-\d+)/)
   return m ? m[1] : sn
 })
 
-// ─── Persistence: allResponses Map ──────────────────────────────────────────
-const allResponses = ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>(new Map())
+// ─── Persistence Adapter：多 section 按 item 隔离保存 ────────────────────────
+const persistence = useChecklistPersistence({
+  wpId: toRef(props, 'wpId'),
+  projectId: computed(() => props.projectId || undefined),
+  debounceMs: 800,
+  onSaved: () => runtime?.version.scheduleAutoSnapshot(),
+})
+const allResponses = persistence.responses
 
-async function selfLoad() {
+async function selfLoad(): Promise<void> {
+  // render-config 快照作为断网/旧数据兼容基线；GET 成功后以服务端为准，
+  // 再补齐快照中服务端未返回的 section。
+  persistence.hydrate(props.htmlData)
+  const fallback = new Map(allResponses.value)
   try {
-    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const items = res.data?.data || res.data || []
-    if (Array.isArray(items)) {
-      const map = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
-      for (const it of items) {
-        if (it.item_id) map.set(it.item_id, { item_id: it.item_id, conclusion: it.conclusion ?? null, remark: it.remark ?? null })
-      }
-      allResponses.value = map
-    }
-  } catch { /* silent */ }
-  // merge from htmlData
-  _mergeResponses(props.htmlData)
+    await persistence.load()
+  } catch {
+    if (fallback.size === 0) ElMessage.warning('J2 保存数据加载失败，请刷新后重试')
+  }
+  const merged = new Map(allResponses.value)
+  for (const [itemId, item] of fallback) {
+    if (!merged.has(itemId)) merged.set(itemId, item)
+  }
+  persistence.hydrate(merged)
 }
 
-function _mergeResponses(data: Record<string, unknown> | null | undefined) {
-  if (!data) return
-  const snapshot = (data.responses_snapshot || data.checklist_responses) as any
-  if (!snapshot) return
-  if (Array.isArray(snapshot)) {
-    for (const it of snapshot) {
-      if (it.item_id && !allResponses.value.has(String(it.item_id))) {
-        allResponses.value.set(String(it.item_id), { item_id: String(it.item_id), conclusion: it.conclusion ?? null, remark: it.remark ?? null })
-      }
-    }
-  } else if (typeof snapshot === 'object') {
-    for (const [key, val] of Object.entries(snapshot)) {
-      if (!allResponses.value.has(key) && val && typeof val === 'object') {
-        const v = val as Record<string, unknown>
-        allResponses.value.set(key, { item_id: key, conclusion: (v.conclusion as string) ?? null, remark: (v.remark as string) ?? null })
-      }
-    }
+/** 子 tab 已完成业务序列化；统一交给 Adapter 管理逐 item debounce/flush/error state。 */
+function handleChildSave(items: ChecklistResponse[]): void {
+  for (const { item_id, ...patch } of items) {
+    persistence.saveDebounced(item_id, patch)
   }
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-async function handleChildSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
-  for (const it of items) allResponses.value.set(it.item_id, it)
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(async () => {
-    try {
-      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
-      scheduleAutoSnapshot()
-    } catch { /* silent */ }
-  }, 800)
+async function onSave(): Promise<void> {
+  try {
+    await persistence.flush()
+    emit('save')
+  } catch {
+    ElMessage.error('J2 保存失败，数据已保留，可重试')
+  }
 }
 
-// ─── 版本追踪 ────────────────────────────────────────────────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-provide('j2VersionTrailRef', versionTrailRef)
-provide('j2OpenVersionHistory', openVersionHistory)
-
-// ─── 双模式切换（HTML ↔ OnlyOffice） ─────────────────────────────────────────
-const KNOWN_HTML_SHEETS = new Set([
-  '底稿目录', 'J2A', 'J2-1', 'J2-2', 'J2-3', 'J2-4',
-  'J2附注(上市)', 'J2附注(国企)',
-])
-
-const showModeToolbar = computed(() =>
-  KNOWN_HTML_SHEETS.has(currentSheet.value),
-)
-
-const dualMode = useJ2EntryDualMode({
-  wpId: toRef(props, 'wpId'),
-  currentSheet,
-  reloadAllResponses: selfLoad,
+// 整册专属组件在 sheet 切换时不会卸载主入口；主动 flush，避免子 section
+// 已销毁后仍依赖防抖定时器完成保存。
+watch(currentSheet, async (nextSheet, previousSheet) => {
+  if (nextSheet === previousSheet) return
+  try {
+    await persistence.flush()
+  } catch {
+    ElMessage.error('J2 切换底稿时保存失败，数据已保留，可返回后重试')
+  }
 })
-
-const ooSheetName = computed(() =>
-  dualMode.resolveOoSheetName() || props.sheetName || 'J2-1',
-)
-
-const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: J2RenderMode) => { void dualMode.switchMode(v) },
-})
-
-const renderModeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' as const },
-  {
-    label: '在线编辑',
-    value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
-  },
-])
-
-function onOoFallback(): void {
-  void dualMode.switchMode('html')
-}
-
-function onSave() {
-  scheduleAutoSnapshot()
-  emit('save')
-}
 
 onMounted(async () => {
   await selfLoad()
@@ -281,12 +219,6 @@ onMounted(async () => {
 }
 .loading-container {
   padding: 24px;
-}
-.j2-mode-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
 }
 .j2-sheet-placeholder {
   display: flex;

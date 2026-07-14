@@ -282,7 +282,7 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -303,9 +303,9 @@
  * Spec: .kiro/specs/h3-investment-property/ Task 6.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9, 1.11, 16.1-16.2, 16.8, 16.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH3DualMode } from './composables/useH3DualMode'
 import { useH3FormData } from './composables/useH3FormData'
 import { useH3MeasurementModel } from './composables/useH3MeasurementModel'
@@ -313,7 +313,7 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+// 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H3TabIndex 非 lazy（底稿目录轻量，首屏必显）— 骨架阶段先 lazy
 const H3TabIndex = defineAsyncComponent(() => import('./h3/core/H3TabIndex.vue'))
@@ -420,7 +420,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H3-\d+)/)
   if (m) return m[1]
   // 底稿目录 H3（无后缀）
-  if (/\bH3\b/.test(name) && !/H3-/.test(name) && !/H3A/.test(name)) return 'H3'
+  if (/底稿目录/.test(name) || (/\bH3\b/.test(name) && !/H3-/.test(name) && !/H3A/.test(name))) return 'H3'
   return ''
 })
 
@@ -472,17 +472,15 @@ async function selfLoad(): Promise<void> {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H3] openReviewDialog:', sectionId, sectionLabel)
-  // Integrated with audit-review-dialog module — real impl delegates to parent via emit
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('measurementModel', measurementModel)
 provide('allResponses', allResponses)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h3VersionTrailRef', versionTrailRef)
 provide('h3OpenVersionHistory', openVersionHistory)
 

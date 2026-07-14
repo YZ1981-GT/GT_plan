@@ -89,18 +89,6 @@
       />
     </template>
 
-    <!-- 复核对话组件 -->
-    <GtReviewDialog
-      v-if="reviewDialogVisible"
-      :wp-id="props.wpId"
-      :section-id="reviewDialogSectionId"
-      :section-label="reviewDialogSectionLabel"
-      :current-user="currentUser"
-      :related-data="{ wpCode: 'M5', projectId: props.projectId }"
-    />
-
-    <!-- 版本历史抽屉 -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -124,10 +112,9 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useAuthStore } from '@/stores/auth'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -148,8 +135,6 @@ const M5TabReserveCheck = defineAsyncComponent(() => import('./m5/inspection/M5T
 // Shared
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -182,15 +167,6 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
-
-// ─── Auth (for review dialog) ────────────────────────────────────────────────
-
-const authStore = useAuthStore()
-const currentUser = computed(() => ({
-  id: authStore.userId || '',
-  name: authStore.user?.full_name || authStore.username || '',
-  role: (authStore.user?.role || '审计助理') as any,
-}))
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 
@@ -232,41 +208,16 @@ const currentSheet = computed(() => {
   return name
 })
 
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
+// ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
+// 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
+// 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 
-/** 复核对话状态 */
-const reviewDialogVisible = ref(false)
-const reviewDialogSectionId = ref('')
-const reviewDialogSectionLabel = ref('')
-
-/**
- * 子组件 inject 后在 section 标题栏右侧放复核按钮。
- * 点击调用 openReviewDialog(sectionId, sectionLabel?) 打开复核对话面板。
- */
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  reviewDialogSectionId.value = sectionId
-  reviewDialogSectionLabel.value = sectionLabel || sectionId
-  reviewDialogVisible.value = true
-}
-
-provide('openReviewDialog', openReviewDialog)
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-
-const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-
-provide('versionTrail', versionToolbar)
-provide('openVersionHistory', () => versionToolbar.openVersionHistory())
-provide('m5VersionTrailRef', versionTrailRef)
-provide('m5OpenVersionHistory', openVersionHistory)
-
-// ─── 监听 m5:save-items → 保存后自动快照 ────────────────────────────────────
+// ─── 监听 m5:save-items → 保存后自动快照（版本链能力来自 Runtime Boundary） ──
 
 function handleM5SaveItems(_e: Event): void {
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────

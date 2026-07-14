@@ -12,30 +12,27 @@
  * - trial_balance 回写：writebackTrialBalance
  * - 子底稿数据读取：loadSubWorkpaperData（D2-2）
  */
-import { ref, onScopeDispose, type Ref } from 'vue'
+import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { getWpIndex } from '@/services/workpaperApi'
+import {
+  useChecklistPersistence,
+  type ChecklistResponse as PersistenceChecklistResponse,
+} from '@/composables/workpaper/useChecklistPersistence'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface ChecklistItem {
-  item_id: string
-  conclusion: string | null
-  remark: string | null
-}
-
+export type ChecklistItem = PersistenceChecklistResponse
 export type ChecklistResponse = ChecklistItem
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
-  const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+  const persistence = useChecklistPersistence({ wpId, projectId, debounceMs: 2000 })
+  const allResponses = persistence.responses
   const loading = ref(false)
   const saving = ref(false)
-
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-  let pendingSave = false
 
   // ─── Load ────────────────────────────────────────────────────────────────
 
@@ -43,19 +40,13 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     if (!wpId.value) return
     loading.value = true
     try {
-      const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
-      const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
-      const map = new Map<string, ChecklistResponse>()
-      for (const r of responses) {
-        if (r.item_id?.startsWith('D2-')) {
-          map.set(r.item_id, {
-            item_id: r.item_id,
-            conclusion: r.conclusion ?? null,
-            remark: r.remark ?? null,
-          })
-        }
+      await persistence.load()
+      // D2 主入口只暴露本循环 item，避免其他历史响应污染业务 composable。
+      const d2Responses = new Map<string, ChecklistResponse>()
+      for (const [itemId, response] of allResponses.value) {
+        if (itemId.startsWith('D2-')) d2Responses.set(itemId, response)
       }
-      allResponses.value = map
+      persistence.hydrate(d2Responses)
 
       // 自动取试算平衡表 1122 科目余额
       if (projectId?.value) {
@@ -98,21 +89,13 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     if (!wpId.value || items.length === 0) return
     saving.value = true
     try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        // 传真实 projectId；未提供时省略，由服务端从 wp_id 推导（禁止把 wpId 当 project_id，
-        // 否则违反 checklist_responses.project_id 外键 → 500 保存失败）
-        project_id: projectId?.value || undefined,
-        items: items.map((item) => ({
-          item_id: item.item_id,
-          conclusion: item.conclusion || null,
-          remark: item.remark || null,
-        })),
-      })
+      await Promise.all(items.map((item) => persistence.save(item.item_id, item)))
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
         ElMessage.error('保存失败，请稍后重试')
       }
+      throw err
     } finally {
       saving.value = false
     }
@@ -120,54 +103,29 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
 
   /** 立即保存指定 items（结论/状态/选择类字段触发） */
   async function saveImmediate(items: ChecklistItem[]): Promise<void> {
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
-    pendingSave = false
     await doSave(items)
   }
 
-  /** debounce 2000ms 文本字段保存 */
+  /** debounce 2000ms 文本字段保存；Adapter 按 item 独立调度。 */
   function saveDebouncedText(item: ChecklistItem): void {
-    allResponses.value.set(item.item_id, { ...item })
-    pendingSave = true
-
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => {
-      saveTimer = null
-      pendingSave = false
-      const items = Array.from(allResponses.value.values())
-      doSave(items)
-    }, 2000)
+    persistence.saveDebounced(item.item_id, item)
   }
 
-  /** flush 未保存数据（组件卸载时调用） */
-  function flushPendingSave(): void {
-    if (saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
-    }
-    if (pendingSave) {
-      pendingSave = false
-      const items = Array.from(allResponses.value.values())
-      doSave(items)
-    }
+  /** flush 未保存数据（组件卸载或切换 sheet 时调用） */
+  async function flushPendingSave(): Promise<void> {
+    await persistence.flush()
   }
 
-  /** 子 composable 通过 d2:save-items 事件批量保存 */
+  /** 子 composable 通过 D2 注入批量保存。 */
   async function saveItemsFromEvent(items: ChecklistResponse[]): Promise<void> {
-    if (!items.length) return
-    for (const item of items) {
-      if (item?.item_id) {
-        allResponses.value.set(item.item_id, {
-          item_id: item.item_id,
-          conclusion: item.conclusion ?? null,
-          remark: item.remark ?? null,
-        })
-      }
-    }
-    await doSave(items.filter(i => i?.item_id))
+    const validItems = items.filter((item) => item?.item_id)
+    if (!validItems.length) return
+    await doSave(validItems)
+  }
+
+  /** 用 render-config snapshot 初始化 Adapter，保持历史响应格式兼容。 */
+  function hydrate(source: unknown): void {
+    persistence.hydrate(source)
   }
 
   // ─── Helper 方法 ─────────────────────────────────────────────────────────
@@ -186,7 +144,7 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
     }
     allResponses.value.set(itemId, updated)
-    saveImmediate([updated])
+    void saveImmediate([updated]).catch(() => undefined)
   }
 
   // ─── trial_balance 回写 ──────────────────────────────────────────────────
@@ -228,17 +186,12 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     }
   }
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────────
-
-  onScopeDispose(() => {
-    flushPendingSave()
-  })
-
   return {
     allResponses,
     loading,
     saving,
     loadAll,
+    hydrate,
     saveImmediate,
     saveDebouncedText,
     saveItemsFromEvent,
@@ -247,6 +200,8 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     setFieldImmediate,
     writebackTrialBalance,
     loadSubWorkpaperData,
+    stateOf: persistence.stateOf,
+    cancelPendingSave: persistence.cancel,
   }
 }
 

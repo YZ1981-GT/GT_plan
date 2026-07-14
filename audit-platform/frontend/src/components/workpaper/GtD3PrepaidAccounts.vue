@@ -147,10 +147,7 @@
       :section-id="d3ReviewSection.id"
       :section-label="d3ReviewSection.label"
     />
-    <GtWpReviewDialogHost />
-
-    <!-- 版本链 drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+    <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
   </div>
 </template>
 
@@ -160,19 +157,16 @@
  *
  * 由外层 GtWpRenderer 的 sheetName 控制当前 sheet，不再使用内部 el-tabs。
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD3FormData } from './composables/useD3FormData'
 import { useD3CrossSheet } from './composables/useD3CrossSheet'
 import { useD3EntryDualMode, type D3RenderMode } from './composables/useD3EntryDualMode'
 import { resolveD3SheetCode } from './composables/useD3SheetRouting'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
-import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD3ReviewThreads } from './composables/useD3ReviewThreads'
-import { DisplayPrefs_Key } from './composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useD3EventBus } from './composables/useD3EventBus'
 import { resolveD3SheetLabel } from './composables/d3SheetLabels'
@@ -189,7 +183,6 @@ const D3TabRelatedParty = defineAsyncComponent(() => import('./d3/D3TabRelatedPa
 const D3TabVoucherCheck = defineAsyncComponent(() => import('./d3/D3TabVoucherCheck.vue'))
 const D3TabDisclosureListed = defineAsyncComponent(() => import('./d3/D3TabDisclosureListed.vue'))
 const D3TabDisclosureSoe = defineAsyncComponent(() => import('./d3/D3TabDisclosureSoe.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -228,19 +221,13 @@ const {
 const crossSheet = useD3CrossSheet({ allResponses })
 useD3EventBus(allResponses, debouncedSave)
 
-// ─── 版本链接入 ───────────────────────────────────────────────────────────
-const {
-  versionTrailRef,
-  openVersionHistory,
-  scheduleAutoSnapshot,
-} = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 const wpIdRefForReview = toRef(props, 'wpId')
-const projectIdRefForReview = toRef(props, 'projectId')
-useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
 
 const { getThreadDot, getRowDot } = useD3ReviewThreads(wpIdRefForReview)
 provide('d3GetThreadDot', getThreadDot)
@@ -310,9 +297,8 @@ async function saveImmediateBatch(
   scheduleAutoSnapshot()
 }
 
-// 显示偏好收敛到单一真源（useDisplayPrefsStore），全部 tab 已迁移至 DisplayPrefs_Key。
+// 显示偏好由 Runtime Boundary(GtWpRenderer) 统一 provide；此处仅取 store 供根样式使用。
 const displayPrefs = useDisplayPrefsStore()
-provide(DisplayPrefs_Key, displayPrefs)
 
 async function selfLoad(): Promise<void> {
   if (props.htmlData?.responses_snapshot) {

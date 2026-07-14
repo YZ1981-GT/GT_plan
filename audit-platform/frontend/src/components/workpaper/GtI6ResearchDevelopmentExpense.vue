@@ -162,9 +162,9 @@
  * Spec: .kiro/specs/i6-research-development-expense/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI6DualMode } from './composables/useI6DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
@@ -236,7 +236,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(I6-\d+)/)
   if (m) return m[1]
   // 底稿目录 I6（无后缀）
-  if (/\bI6\b/.test(name) && !/I6-/.test(name) && !/I6A/.test(name)) return 'I6'
+  if (/底稿目录/.test(name) || (/\bI6\b/.test(name) && !/I6-/.test(name) && !/I6A/.test(name))) return 'I6'
   return ''
 })
 
@@ -317,15 +317,13 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[I6] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('i6VersionTrailRef', versionTrailRef)
 provide('i6OpenVersionHistory', openVersionHistory)
 

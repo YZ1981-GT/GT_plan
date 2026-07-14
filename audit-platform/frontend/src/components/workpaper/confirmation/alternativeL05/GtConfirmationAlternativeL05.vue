@@ -45,7 +45,7 @@
       <div class="tabs-actions">
         <el-button size="small" type="primary" :icon="Plus" @click="handleAddCompany">新增公司</el-button>
         <el-button size="small" @click="handleImportFromSummary">从L0-1导入未回函</el-button>
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-dropdown v-if="!readonly" trigger="click" @command="handleImportExportCmd">
           <el-button size="small">导入导出▾</el-button>
           <template #dropdown>
@@ -242,23 +242,22 @@
     <!-- 隐藏的文件上传 -->
     <input ref="fileInputRef" type="file" accept=".xlsx" style="display:none" @change="handleFileSelected" />
 
-    <!-- 版本历史 drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, provide, watch, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, watch, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { useAlternativeL05Data } from '../l0-confirmation/composables/useAlternativeL05Data'
 import { calcReconcileDiff } from '../l0-confirmation/composables/useL0FormulaEngine'
 import { useWorkpaperImportExport } from '../../composables/useWorkpaperImportExport'
-import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from '../../composables/useWorkpaperScaffold'
 import http from '@/utils/http'
-
-const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props / Emits ──────────────────────────────────────────────────────────
 
@@ -546,23 +545,18 @@ selfLoad()
 
 // ─── Version Trail / Review ─────────────────────────────────────────────────
 
-const projectIdRef = computed(() => props.projectId)
-const wpIdRefVt = computed(() => props.wpId)
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: wpIdRefVt,
-  projectId: projectIdRef,
-})
-const { versionTrailRef } = versionToolbar
+// ─── Runtime Boundary 统一提供版本链 + 复核（GtWpRenderer scaffold），本组件不再本地接线 ───
+// 原先本地 provide('openReviewDialog', 占位) 会覆盖 Runtime Boundary 的真实复核入口 → 已删除。
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 // autoSnapshot on save
 watch(() => data.isDirty.value, (dirty) => {
   if (!dirty) {
     // just saved → auto snapshot
-    versionToolbar.scheduleAutoSnapshot()
+    runtime?.version.scheduleAutoSnapshot()
   }
 })
-
-provide('openReviewDialog', () => { /* placeholder for review dialog injection */ })
 </script>
 
 <style scoped>

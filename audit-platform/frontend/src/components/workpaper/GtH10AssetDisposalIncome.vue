@@ -10,7 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -127,10 +127,10 @@
  * GtH10AssetDisposalIncome — H10 资产处置损益主入口
  * 科目 6115 损益类；EventBus: disposal:completed(H6) / substantive:adjudicated(6115)
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject} from 'vue'
 import { useH10FormData } from './composables/useH10FormData'
 import { useH10DualMode } from './composables/useH10DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
@@ -165,8 +165,11 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useH10FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h10VersionTrailRef', versionTrailRef)
 provide('h10OpenVersionHistory', openVersionHistory)
 
@@ -190,7 +193,7 @@ const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.valu
 
 function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   formData.debouncedSave(itemId, data)
-  versionToolbar.scheduleAutoSnapshot()
+  scheduleAutoSnapshot()
 }
 
 async function reloadAll() {

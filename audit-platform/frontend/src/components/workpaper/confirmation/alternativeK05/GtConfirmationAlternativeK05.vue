@@ -28,7 +28,7 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
           <GtReviewTrigger section-id="K0-5-alternative" label="复核" />
         </div>
       </div>
@@ -170,13 +170,11 @@
     <!-- 隐藏文件选择器 -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
 
-    <!-- 版本链抽屉 -->
-    <GtWpVersionTrail v-if="wpId" ref="versionTrailRef" :workpaper-id="wpId" :project-id="projectId || ''" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
@@ -187,14 +185,16 @@ import useAlternativeK05Data from '../k0-confirmation/composables/useAlternative
 import { useK0FormulaEngine } from '../k0-confirmation/composables/useK0FormulaEngine'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_K05 } from './blockColumnConfigsK05'
-import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 // Shared D0-5 components
 import CheckBlock from '../alternativeD05/CheckBlock.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
 const props = defineProps<{
@@ -213,8 +213,9 @@ const projectIdRef = computed(() => props.projectId ?? '')
 const prefs = useDisplayPrefsStore()
 const { calcReconcileDiff, parseNum } = useK0FormulaEngine()
 
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+// ─── Runtime Boundary 统一提供版本链 + 复核（GtWpRenderer scaffold），本组件不再本地接线 ───
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 // ─── selfLoad 兜底 ────────────────────────────────────────────────────────
 const selfLoadedData = ref<any>(null)
@@ -443,7 +444,7 @@ function downloadBlob(data: Blob, filename: string) {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
   if (props.projectId) {
     eventBus.emit('confirmation:updated', { projectId: props.projectId, wpCode: 'K0-5', wpId: props.wpId, timestamp: Date.now() })
   }

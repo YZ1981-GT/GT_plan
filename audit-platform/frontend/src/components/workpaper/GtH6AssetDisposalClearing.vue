@@ -150,14 +150,14 @@
  * Spec: .kiro/specs/h6-asset-disposal-clearing/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+// 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 
 // core
@@ -225,7 +225,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H6-\d+)/)
   if (m) return m[1]
   // 底稿目录 H6（无后缀）
-  if (/\bH6\b/.test(name) && !/H6-/.test(name) && !/H6A/.test(name)) return 'H6'
+  if (/底稿目录/.test(name) || (/\bH6\b/.test(name) && !/H6-/.test(name) && !/H6A/.test(name))) return 'H6'
   return ''
 })
 
@@ -290,16 +290,15 @@ function persistResponse(itemId: string, value: any): void {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H6] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h6VersionTrailRef', versionTrailRef)
 provide('h6OpenVersionHistory', openVersionHistory)
 

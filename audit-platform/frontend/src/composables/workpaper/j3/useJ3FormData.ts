@@ -13,7 +13,7 @@
  * Requirements: 1.9, 1.10, 6.1-6.4
  */
 import { ref, computed, type Ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 
 export interface J3FormDataOptions {
   wpId: string

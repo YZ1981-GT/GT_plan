@@ -15,7 +15,7 @@
  * Requirements: 6.1-6.4
  */
 import { computed, type Ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 
 export interface CrossSheetOptions {
   projectId: string

@@ -18,6 +18,7 @@ J3_SHEETS = [
     {"sheet_name": "股份支付实质性程序表 J3A", "component_type": "j3-share-based-payment"},
     {"sheet_name": "股份支付情况表J3-1", "component_type": "j3-share-based-payment"},
     {"sheet_name": "股份支付检查表J3-2", "component_type": "j3-share-based-payment"},
+    {"sheet_name": "IPO企业股权激励工具关注的审计重点", "component_type": "j3-share-based-payment"},
 ]
 
 
@@ -32,26 +33,25 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         result = await ctx.db.execute(
             sa.text(
-                "SELECT item_id, content, conclusion, remark FROM checklist_responses "
+                "SELECT item_id, conclusion, remark FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT 2000"
             ),
             {"wp_id": str(ctx.wp_id), "pfx": "J3-%"},
         )
         for row in result.fetchall():
             responses_snapshot[row.item_id] = {
-                "content": row.content or "",
                 "conclusion": row.conclusion or "",
                 "remark": row.remark or "",
             }
     except Exception as e:  # noqa: BLE001
         logger.warning("J3 render checklist read failed: %s", e)
 
-    # 解析方案数据（JSON打包存储于 J3-plans-data）
-    plans_raw = responses_snapshot.get("J3-plans-data", {})
-    if plans_raw and plans_raw.get("content"):
+    # 解析方案数据（JSON 打包存储于 J3-1-plans 的 remark）
+    plans_raw = responses_snapshot.get("J3-1-plans", {})
+    if plans_raw and plans_raw.get("remark"):
         import json
         try:
-            plans = json.loads(plans_raw["content"])
+            plans = json.loads(plans_raw["remark"])
         except (json.JSONDecodeError, TypeError):
             pass
 

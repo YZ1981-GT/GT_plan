@@ -465,6 +465,43 @@ SheetCellRangePicker → Module_Cell_Resolver (路由器)
 - 乐观锁: X-File-Opened-At vs updated_at → 409 WritebackConflict
 
 
+## 底稿 Runtime Boundary 架构（2026-07-14 落地）
+
+### 设计
+`GtWpRenderer` 作为所有专属底稿的统一运行时边界。在 setup 中基于响应式 `wpId/projectId/wpCode/year` 调用一次 `useWorkpaperScaffold`，通过 Vue provide 向所有子组件提供平台横切能力。
+
+### 提供的能力（8 项）
+| 能力 | 来源 | 说明 |
+|------|------|------|
+| displayPrefs | useDisplayPrefsStore | 全局单位/字号/密度 |
+| agingConfig | useAgingConfig | 账龄段配置 |
+| version | useWorkpaperVersionToolbar | 版本链+自动快照 |
+| review | useWorkpaperReviewProvide | 复核对话 |
+| ai | generateAiText | AI 文本生成 |
+| jumpToSection | Runtime Boundary | sheet 跳转 |
+| reload | Runtime Boundary | 页面重载 |
+| persistence | useChecklistPersistence | 统一持久化适配器 |
+
+### 组件接入模式
+```ts
+// 子组件 inject Runtime Context（不再本地 provide）
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
+provide('openReviewDialog', (opts) => runtime?.review.openReviewDialog(opts))
+```
+
+### Host 挂载
+- `GtWpReviewDialogHost`：复核对话宿主
+- `GtWpVersionTrail`：版本历史抽屉
+- `GtWorkpaperRuntimeHosts`：统一挂载组件
+
+### 防回归
+- Coverage Ledger v2 按 `wp_code × capability` 记录实际接入
+- Legacy Provider 已全部登记到 Ledger，有限期内允许保留
+- CI guard `check_coverage_ledger.py --strict` 阻断明确缺失
+
+---
+
 ## D~N循环专属组件架构模式（2026-07-02 D4定稿）
 
 ### 标准目录结构

@@ -118,7 +118,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -132,15 +132,14 @@
  * 集成：useWorkpaperVersionToolbar(autoSnapshot on save) + provide('openReviewDialog')
  * EventBus：监听 f5:save-items 持久化 + substantive:adjudicated(6401) 供 F5-7 校验区消费
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF5CosSalFormData } from './composables/useF5CosSalFormData'
 import { useF5CosOfDualMode } from './composables/useF5CosOfDualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const F5TabAdjudication = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabAdjudication.vue'))
 const F5TabMonthlyDetail = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabMonthlyDetail.vue'))
 const F5TabOtherCost = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabOtherCost.vue'))
@@ -165,7 +164,14 @@ const projectIdRef = computed(() => props.projectId)
 const formData = useF5CosSalFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f5VersionTrailRef', versionTrailRef)
@@ -196,11 +202,7 @@ async function onImported() {
   await formData.loadAll()
 }
 
-// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
-function openReviewDialog(sectionId: string): void {
-  console.log('[F5] openReviewDialog:', sectionId)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', () => formData.loadAll())
 
 // ─── 监听 f5:save-items → 保存 + autoSnapshot ───────────────────────────────

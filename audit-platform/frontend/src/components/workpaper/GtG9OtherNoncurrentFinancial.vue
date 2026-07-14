@@ -10,7 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
       </div>
 
       <GtOnlyOfficeSheet
@@ -131,7 +131,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链/复核 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -140,11 +140,10 @@
 /**
  * GtG9OtherNoncurrentFinancial — G9 其他非流动金融资产底稿主入口
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG9FormData } from './composables/useG9FormData'
 import { useG9DualMode } from './composables/useG9DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { extractG9SheetCode } from './composables/g9SheetLabels'
 import { G9_ACCOUNT_CODE } from './composables/g9Constants'
 import { parseNum } from './composables/useG9FormulaEngine'
@@ -163,7 +162,6 @@ const G9TabDirectory = defineAsyncComponent(() => import('./g9-other-noncurrent-
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -178,12 +176,13 @@ const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const formData = useG9FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('g9VersionTrailRef', versionTrailRef)
 provide('g9OpenVersionHistory', openVersionHistory)
-const reviewProvide = useWorkpaperReviewProvide({ wpId: wpIdRef })
-provide('openReviewDialog', reviewProvide.openReviewDialog)
 
 const currentSheet = computed(() => extractG9SheetCode(props.sheetName || props.wpCode || ''))
 
@@ -200,7 +199,7 @@ const dualMode = useG9DualMode({ wpId: wpIdRef, reloadAll: () => formData.loadAl
 
 function onDebouncedSave(id: string, d: Partial<ChecklistResponse>) {
   formData.debouncedSave(id, d)
-  versionToolbar.scheduleAutoSnapshot()
+  scheduleAutoSnapshot()
 }
 
 function handleG9Adjudicated(e: Event): void {

@@ -19,7 +19,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -88,7 +88,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链/复核 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -116,14 +116,13 @@
  *
  * Requirements: 1.1, 1.2, 1.3, 1.4, 6.2
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, inject, defineAsyncComponent } from 'vue'
 import { useG6EclDualMode } from './composables/useG6EclDualMode'
 import { useG6EclFormData } from './composables/useG6EclFormData'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const G6TabStageClassification = defineAsyncComponent(
   () => import('./g6-other-bond-investment-ecl/impairment/G6TabStageClassification.vue'),
 )
@@ -199,22 +198,18 @@ const dualMode = useG6EclDualMode({
 })
 
 // ─── useG6EclFormData 用于selfLoad ──────────────────────────────────────────
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
 const formData = useG6EclFormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
-  onAfterSave: () => versionToolbar.scheduleAutoSnapshot(),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
-
-// ─── 版本历史集成 (autoSnapshot on save) ────────────────────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
-
-// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
-function openReviewDialog(sectionId: string): void {
-  console.log('[G6-ecl] openReviewDialog:', sectionId)
-  // TODO: 接入 audit-review-dialog 模块
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
 async function selfLoad(): Promise<void> {

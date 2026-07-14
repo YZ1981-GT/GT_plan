@@ -8,7 +8,7 @@
  * Requirements: 2.7
  */
 import { ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 import { ElMessage } from 'element-plus'
 
 export function useJ3ImportExport(wpId: string) {

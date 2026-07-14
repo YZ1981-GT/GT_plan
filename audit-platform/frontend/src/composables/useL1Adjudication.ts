@@ -141,10 +141,19 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
    * - publish 'substantive:adjudicated'
    */
   async function saveAndWriteback(): Promise<void> {
-    // 序列化审定表行
+    // 序列化审定表行：必须持久化「可编辑输入字段」，否则刷新后公式列
+    // （endBalance/audited 由 computedCategories 重算）会回落为 0（Round_Trip 失败）。
+    // _parseAdjudication 已支持解析全部字段，此处补齐 beginning/credit/debit/unadjusted/aje/rje。
     const items = adjudicationData.value.categories.map((cat, i) => {
       const n = i + 1
       return [
+        { item_id: `L1-adj-${n}-beginning`, conclusion: null, remark: String(cat.beginning) },
+        { item_id: `L1-adj-${n}-creditAmount`, conclusion: null, remark: String(cat.creditAmount) },
+        { item_id: `L1-adj-${n}-debitAmount`, conclusion: null, remark: String(cat.debitAmount) },
+        { item_id: `L1-adj-${n}-unadjusted`, conclusion: null, remark: String(cat.unadjusted) },
+        { item_id: `L1-adj-${n}-aje`, conclusion: null, remark: String(cat.aje) },
+        { item_id: `L1-adj-${n}-rje`, conclusion: null, remark: String(cat.rje) },
+        // 公式列（只读，供跨表勾稽/回读参考）
         { item_id: `L1-adj-${n}-endBalance`, conclusion: null, remark: String(cat.endBalance) },
         { item_id: `L1-adj-${n}-audited`, conclusion: null, remark: String(cat.audited) },
       ]
@@ -167,15 +176,21 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
 
   // ─── 5. 审定数变化监听 → 自动回写 ─────────────────────────────────────
 
-  /** 监听审定数变化，自动触发回写 */
-  watch(
-    () => total.value.audited,
-    async (newVal, oldVal) => {
-      if (oldVal !== undefined && newVal !== oldVal) {
-        await saveAndWriteback()
-      }
-    },
+  /**
+   * 监听全部可编辑字段变化，自动触发保存 + 回写。
+   * 不能只监听 audited：编辑 期初/贷方/借方 只改 endBalance 不改 audited，
+   * 若仅监听 audited 这些字段永不落库（Round_Trip 失败）。
+   */
+  const _editableSignature = computed(() =>
+    adjudicationData.value.categories
+      .map(c => `${c.beginning}|${c.creditAmount}|${c.debitAmount}|${c.unadjusted}|${c.aje}|${c.rje}`)
+      .join(';'),
   )
+  watch(_editableSignature, async (newVal, oldVal) => {
+    if (oldVal !== undefined && newVal !== oldVal) {
+      await saveAndWriteback()
+    }
+  })
 
   // ─── Return ────────────────────────────────────────────────────────────
 

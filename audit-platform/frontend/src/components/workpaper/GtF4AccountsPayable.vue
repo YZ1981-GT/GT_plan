@@ -64,7 +64,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -76,10 +76,10 @@
  * Spec: .kiro/specs/f4-accounts-payable/ Task 1.1, 9.1
  * 集成：useWorkpaperVersionToolbar(autoSnapshot on save) + provide('openReviewDialog')
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF4AccPayFormData } from './composables/useF4AccPayFormData'
 import { useF4DualMode } from './composables/useF4DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import CycleImportExportDropdown from './shared/CycleImportExportDropdown.vue'
@@ -89,7 +89,6 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -104,7 +103,14 @@ const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const formData = useF4AccPayFormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f4VersionTrailRef', versionTrailRef)
@@ -144,11 +150,7 @@ async function onImported() {
   await formData.loadAll()
 }
 
-// ─── provide openReviewDialog 供子组件inject ─────────────────────────────────
-function openReviewDialog(sectionId: string): void {
-  console.log('[F4] openReviewDialog:', sectionId)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', () => formData.loadAll())
 
 // ─── 监听 f4:save-items → 保存 + autoSnapshot ───────────────────────────────

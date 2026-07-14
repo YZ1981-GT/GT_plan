@@ -10,7 +10,7 @@
  * Requirements: 3.4-3.5
  */
 import { ref, type Ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 
 export type DisclosureVersion = 'listed' | 'soe'
 

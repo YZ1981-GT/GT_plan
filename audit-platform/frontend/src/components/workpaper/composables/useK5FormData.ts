@@ -17,9 +17,12 @@
  * 科目：2701 预计负债（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+计提-转销（与资产类方向相反）
  */
-import { ref, onScopeDispose, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
+import { decodeRemark } from '@/composables/workpaper/remarkCodec'
+import { collectK5Responses, toK5PersistencePatch } from '../k5/k5Persistence'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -48,20 +51,23 @@ const ACCOUNT_CODE_2701 = '2701'
 export function useK5FormData(params: {
   wpId: Ref<string>
   projectId: Ref<string>
+  year?: Ref<number | undefined>
   sheetPrefix: string
 }) {
   const { wpId, projectId, sheetPrefix } = params
+  const year = params.year ?? ref<number | undefined>(undefined)
 
   // ─── Reactive state ────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const isSaving = ref(false)
-  const allResponses = ref<Map<string, any>>(new Map())
+  const persistence = useChecklistPersistence({
+    wpId,
+    projectId: computed(() => projectId.value || undefined),
+    debounceMs: DEBOUNCE_MS,
+  })
+  const allResponses = persistence.responses
   const tbData = ref<K5TbData>({ unadjusted2701: 0, audited2701: 0 })
   const renderMeta = ref<Record<string, any>>({})
-
-  // Per-item debounce timers
-  const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  const _pendingItems = new Set<string>()
 
   // ─── selfLoad ──────────────────────────────────────────────────────────────
 
@@ -82,31 +88,27 @@ export function useK5FormData(params: {
       const configData = configRes?.data ?? configRes
       renderMeta.value = configData?.html_data ?? configData ?? {}
 
-      // 2. 从 sheets 数组构建 allResponses Map
+      // 2. 合并 render-config 快照（兼容 responses_snapshot / allResponses / checklist_responses）
       const sheetsArr = configData?.sheets ?? configData?.data?.sheets
-      if (sheetsArr && Array.isArray(sheetsArr)) {
-        const map = new Map<string, any>()
+      const snapshotSources: unknown[] = []
+      if (Array.isArray(sheetsArr)) {
         for (const sheet of sheetsArr) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
+          const htmlData = sheet?.html_data
+          if (htmlData) snapshotSources.push(
+            htmlData.responses_snapshot,
+            htmlData.allResponses,
+            htmlData.checklist_responses,
+          )
         }
-        allResponses.value = map
       }
+      const snapshot = collectK5Responses(...snapshotSources)
 
-      // 3. 加载 checklist_responses（补充已持久化数据）
-      const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
-      const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
-      for (const r of responses) {
-        if (r.item_id?.startsWith('K5-') || r.item_id?.startsWith('K5A-')) {
-          allResponses.value.set(r.item_id, {
-            item_id: r.item_id,
-            conclusion: r.conclusion ?? null,
-            remark: r.remark ?? null,
-          })
-        }
+      // 3. checklist 读取统一经 Adapter；API 数据优先，快照补足未返回项。
+      try {
+        await persistence.load()
+        persistence.hydrate(collectK5Responses(snapshot, allResponses.value))
+      } catch {
+        persistence.hydrate(snapshot)
       }
 
       // 4. 加载 TB 数据
@@ -142,7 +144,7 @@ export function useK5FormData(params: {
 
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '2701' },
+        params: { account_prefix: '2701', year: year.value },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -207,91 +209,38 @@ export function useK5FormData(params: {
     }
   }
 
-  // ─── Save core ─────────────────────────────────────────────────────────────
+  // ─── saveResponse（统一 Persistence Adapter） ───────────────────────────────
 
-  async function _doSave(items: ChecklistItem[]): Promise<boolean> {
-    if (!wpId.value || items.length === 0) return true
+  /** 立即保存单个 checklist item，字段名自动加 K5 sheet 前缀。 */
+  async function saveResponse(field: string, value: unknown): Promise<void> {
+    const itemId = `K5-${sheetPrefix}-${field}`
     isSaving.value = true
     try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: projectId.value,
-        items: items.map((item) => ({
-          item_id: item.item_id,
-          conclusion: item.conclusion || null,
-          remark: item.remark || null,
-        })),
-      })
-      return true
+      await persistence.save(itemId, toK5PersistencePatch(value))
     } catch (err: any) {
-      const msg = err?.message || ''
-      if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
+      if (err?.code !== 'ERR_CANCELED') {
         ElMessage.error('保存失败，数据已保留在本地，请稍后重试')
       }
-      return false
     } finally {
       isSaving.value = false
     }
   }
 
-  // ─── saveResponse（单条立即保存） ──────────────────────────────────────────
-
-  /**
-   * 立即保存单个 checklist item。
-   * @param field 字段名（自动加前缀 "K5-{sheetPrefix}-{field}"）
-   * @param value { conclusion?, remark? } 或简单值
-   */
-  async function saveResponse(field: string, value: any): Promise<void> {
-    const itemId = `K5-${sheetPrefix}-${field}`
-
-    // 取消该 item 的 debounce 定时器
-    const timer = _debounceTimers.get(itemId)
-    if (timer) {
-      clearTimeout(timer)
-      _debounceTimers.delete(itemId)
-    }
-    _pendingItems.delete(itemId)
-
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated: ChecklistItem = {
-      item_id: itemId,
-      conclusion: existing.conclusion ?? null,
-      remark: strVal ?? existing.remark ?? null,
-    }
-    if (typeof value === 'object' && value !== null) {
-      if (value.conclusion !== undefined) updated.conclusion = value.conclusion
-      if (value.remark !== undefined) updated.remark = value.remark
-    }
-    allResponses.value.set(itemId, updated)
-    await _doSave([updated])
-  }
-
-  // ─── saveResponses（批量保存） ─────────────────────────────────────────────
-
-  /**
-   * 批量原子性保存多个 items（如审定表多行回写）。
-   */
+  /** 多 item 复用 Adapter 的独立状态与重试语义。 */
   async function saveResponses(items: Array<{ item_id: string; conclusion?: string | null; remark?: string | null }>): Promise<void> {
-    const checklistItems: ChecklistItem[] = items.map(({ item_id, conclusion, remark }) => {
-      // 取消 debounce
-      const timer = _debounceTimers.get(item_id)
-      if (timer) {
-        clearTimeout(timer)
-        _debounceTimers.delete(item_id)
+    isSaving.value = true
+    try {
+      await Promise.all(items.map(({ item_id, conclusion, remark }) => persistence.save(item_id, {
+        ...(conclusion !== undefined ? { conclusion } : {}),
+        ...(remark !== undefined ? { remark: toK5PersistencePatch({ remark }).remark } : {}),
+      })))
+    } catch (err: any) {
+      if (err?.code !== 'ERR_CANCELED') {
+        ElMessage.error('保存失败，数据已保留在本地，请稍后重试')
       }
-      _pendingItems.delete(item_id)
-
-      const existing = allResponses.value.get(item_id) || { item_id, conclusion: null, remark: null }
-      const updated: ChecklistItem = {
-        item_id,
-        conclusion: conclusion !== undefined ? (conclusion ?? null) : (existing.conclusion ?? null),
-        remark: remark !== undefined ? (remark ?? null) : (existing.remark ?? null),
-      }
-      allResponses.value.set(item_id, updated)
-      return updated
-    })
-
-    await _doSave(checklistItems)
+    } finally {
+      isSaving.value = false
+    }
   }
 
   // ─── getResponse（读取单条） ───────────────────────────────────────────────
@@ -306,11 +255,7 @@ export function useK5FormData(params: {
     if (!item) return undefined
     const raw = item.remark ?? item.conclusion
     if (raw == null) return undefined
-    try {
-      return JSON.parse(raw)
-    } catch {
-      return raw
-    }
+    return decodeRemark(raw)
   }
 
   // ─── debouncedSave（文本字段 debounce 2s） ────────────────────────────────
@@ -320,23 +265,12 @@ export function useK5FormData(params: {
    * 适用于 textarea / 备注等文本字段。
    */
   function debouncedSave(itemId: string, data: Partial<ChecklistItem>): void {
-    const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated: ChecklistItem = {
-      item_id: itemId,
-      conclusion: data.conclusion !== undefined ? (data.conclusion ?? null) : (existing.conclusion ?? null),
-      remark: data.remark !== undefined ? (data.remark ?? null) : (existing.remark ?? null),
-    }
-    allResponses.value.set(itemId, updated)
-    _pendingItems.add(itemId)
-
-    const prev = _debounceTimers.get(itemId)
-    if (prev) clearTimeout(prev)
-
-    _debounceTimers.set(itemId, setTimeout(() => {
-      _debounceTimers.delete(itemId)
-      _pendingItems.delete(itemId)
-      void _doSave([updated])
-    }, DEBOUNCE_MS))
+    persistence.saveDebounced(itemId, {
+      ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
+      ...(data.remark !== undefined
+        ? { remark: toK5PersistencePatch({ remark: data.remark }).remark }
+        : {}),
+    })
   }
 
   // ─── setTbValues（外部设置TB值，render策略seed回读） ────────────────────────
@@ -353,32 +287,7 @@ export function useK5FormData(params: {
     }
   }
 
-  // ─── Flush（组件卸载时确保无数据丢失） ─────────────────────────────────────
-
-  function _flushPending(): void {
-    for (const timer of _debounceTimers.values()) {
-      clearTimeout(timer)
-    }
-    _debounceTimers.clear()
-
-    if (_pendingItems.size > 0) {
-      const items: ChecklistItem[] = []
-      for (const itemId of _pendingItems) {
-        const resp = allResponses.value.get(itemId)
-        if (resp) items.push(resp)
-      }
-      _pendingItems.clear()
-      if (items.length > 0) {
-        void _doSave(items)
-      }
-    }
-  }
-
-  // ─── Lifecycle ─────────────────────────────────────────────────────────────
-
-  onScopeDispose(() => {
-    _flushPending()
-  })
+  // Adapter 在所属 effect scope 释放时自动 flush pending items。
 
   // ─── Return ────────────────────────────────────────────────────────────────
 

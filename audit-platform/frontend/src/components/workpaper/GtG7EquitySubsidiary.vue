@@ -20,7 +20,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -55,12 +55,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- 版本链 drawer -->
-      <GtWpVersionTrail
-        ref="versionTrailRef"
-        :workpaper-id="props.wpId"
-        :project-id="props.projectId"
-      />
+      <!-- 版本链/复核 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -90,10 +85,10 @@
  *
  * Requirements: 1.1, 1.2, 1.4, 7.2
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent, type Component } from 'vue'
+import { ref, computed, onMounted, inject, defineAsyncComponent, type Component } from 'vue'
 import { useG7SubDualMode } from './composables/useG7SubDualMode'
 import { useG7SubFormData } from './composables/useG7SubFormData'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy sub-components (defineAsyncComponent × 7) ────────────────────────
 const G7TabControlJudgment = defineAsyncComponent(() => import('./g7-long-term-equity-subsidiary/initial/G7TabControlJudgment.vue'))
@@ -105,7 +100,6 @@ const G7TabDisposalPackage = defineAsyncComponent(() => import('./g7-long-term-e
 const G7TabVoucherCheck = defineAsyncComponent(() => import('./g7-long-term-equity-subsidiary/voucher/G7TabVoucherCheck.vue'))
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // ─── Sheet code → component mapping ───────────────────────────────────────
 const SHEET_COMPONENT_MAP: Record<string, Component> = {
@@ -165,22 +159,18 @@ const dualMode = useG7SubDualMode({
 })
 
 // ─── useG7SubFormData 用于selfLoad ──────────────────────────────────────────
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
 const formData = useG7SubFormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
-  onAfterSave: () => versionToolbar.scheduleAutoSnapshot(),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
-
-// ─── 版本历史集成 (autoSnapshot on save) ────────────────────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
-
-// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
-function openReviewDialog(sectionId?: string): void {
-  console.log('[G7-subsidiary] openReviewDialog:', sectionId)
-  // TODO: 接入 audit-review-dialog 模块（useReviewDialog）
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
 async function selfLoadInit(): Promise<void> {

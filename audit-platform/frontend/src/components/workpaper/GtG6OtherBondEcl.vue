@@ -3,7 +3,7 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="6" animated /></div>
     <template v-else>
       <div class="g6-other-bond-investment-ecl-toolbar">
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
       </div>
       <GtGridSheet
         v-if="currentSheet || props.htmlData"
@@ -18,24 +18,25 @@
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链/复核 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, inject, defineAsyncComponent } from 'vue'
 import { useG6BonEclFormData } from './composables/useG6BonEclFormData'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const props = defineProps<{ wpId: string; projectId: string; wpCode?: string; sheetName?: string; htmlData?: any; readonly?: boolean }>()
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const formData = useG6BonEclFormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
-const { versionTrailRef } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   const m = name.match(/(G6A|G6-\d+)/)

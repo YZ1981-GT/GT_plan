@@ -10,7 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -132,17 +132,16 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链/复核 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent, provide } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
 import { useG12FormData } from './composables/useG12FormData'
 import { useG12DualMode } from './composables/useG12DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import type { ChecklistResponse } from './composables/useF1FormData'
@@ -160,7 +159,6 @@ const G12TabNetExposureCheck = defineAsyncComponent(() => import('./g12-net-hedg
 const G12TabVoucherCheck = defineAsyncComponent(() => import('./g12-net-hedge-gains/voucher/G12TabVoucherCheck.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -180,8 +178,11 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG12FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('g12VersionTrailRef', versionTrailRef)
 provide('g12OpenVersionHistory', openVersionHistory)
 
@@ -212,7 +213,7 @@ const useGridFallback = computed(() => {
 
 function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   formData.debouncedSave(itemId, data)
-  versionToolbar.scheduleAutoSnapshot()
+  scheduleAutoSnapshot()
 }
 
 async function reloadAll() {
@@ -223,7 +224,7 @@ const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
 )
 
-useWorkpaperReviewProvide({ wpId: wpIdRef, projectId: projectIdRef })
+// 复核对话 provider 由 Runtime Boundary(GtWpRenderer) 统一提供 openReviewDialog
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)

@@ -50,7 +50,7 @@
           <el-button v-if="!readonly" type="success" size="small" :disabled="!data.isDirty.value" @click="handleSave">
             保存
           </el-button>
-          <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
           <GtReviewTrigger section-id="G0-3S-securities-diff" label="复核" />
         </div>
       </div>
@@ -200,32 +200,22 @@
       </details>
     </template>
 
-    <!-- 版本链抽屉 -->
-    <GtWpVersionTrail
-      v-if="wpId"
-      ref="versionTrailRef"
-      :workpaper-id="wpId"
-      :project-id="projectId || ''"
-    />
-
-    <!-- 复核对话 -->
-    <GtWpReviewDialogHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, defineAsyncComponent } from 'vue'
+import { computed, inject, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useDiffSecuritiesData } from './composables/useDiffSecuritiesData'
 import type { SecuritiesDiffRow } from './diffSecuritiesTypes'
-import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
-import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('../../GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   htmlData: any
@@ -242,12 +232,10 @@ const isNewFormat = computed(() => props.htmlData?._format === 'diff-securities-
 const wpIdRef = computed(() => props.wpId ?? '')
 const projectIdRef = computed(() => props.projectId ?? '')
 
-// ─── 版本链集成（autoSnapshot on save + 版本历史抽屉）───────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
-
-// ─── 复核对话 provide（供 section 标题栏 GtReviewTrigger inject）─────────────
-useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
+// ─── Runtime Boundary 统一提供版本链 + 复核（GtWpRenderer scaffold），本组件不再本地接线 ───
+// version/review/displayPrefs/ai 由 GtWpRenderer 一次性 provide + GtWorkpaperRuntimeHosts 挂载。
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 const data = useDiffSecuritiesData({
   htmlData: () => props.htmlData,
@@ -265,7 +253,7 @@ function handleAdd() {
 function handleSave() {
   emit('save', data.buildPayload())
   data.isDirty.value = false
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
   ElMessage.success('已保存')
 }
 

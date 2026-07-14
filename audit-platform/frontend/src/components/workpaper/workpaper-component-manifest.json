@@ -1,0 +1,1266 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-14T08:58:53Z",
+  "sources": {
+    "htmlRendererRegistry": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+    "wpCodeOverrides": "backend/app/data/wp_code_overrides.json",
+    "dedicatedComponentTypes": "backend/app/services/dedicated_component_types.py"
+  },
+  "entries": {
+    "a10-bundle": {
+      "componentType": "a10-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA10Bundle.vue",
+      "wpCodes": [
+        "A10"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "a11-bundle": {
+      "componentType": "a11-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA11Bundle.vue",
+      "wpCodes": [
+        "A11"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "a12-bundle": {
+      "componentType": "a12-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA12Bundle.vue",
+      "wpCodes": [
+        "A12"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "a15-bundle": {
+      "componentType": "a15-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA15Bundle.vue",
+      "wpCodes": [
+        "A15"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "a16-bundle": {
+      "componentType": "a16-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue",
+      "wpCodes": [
+        "A16"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "a17-bundle": {
+      "componentType": "a17-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
+      "wpCodes": [
+        "A17"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b13-bundle": {
+      "componentType": "b13-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB13Bundle.vue",
+      "wpCodes": [
+        "B13"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b19-bundle": {
+      "componentType": "b19-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB19Bundle.vue",
+      "wpCodes": [
+        "B19"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b2-bundle": {
+      "componentType": "b2-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB2Bundle.vue",
+      "wpCodes": [
+        "B2"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "b51-bundle": {
+      "componentType": "b51-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtB51Bundle.vue",
+      "wpCodes": [
+        "B51"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "c-control-test": {
+      "componentType": "c-control-test",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtCControlTest.vue",
+      "wpCodes": [
+        "C2",
+        "C2-2",
+        "C3",
+        "C3-2",
+        "C4",
+        "C4-2",
+        "C5",
+        "C5-2",
+        "C6",
+        "C6-2",
+        "C7",
+        "C7-2",
+        "C8",
+        "C8-2",
+        "C9",
+        "C9-2",
+        "C10",
+        "C10-2",
+        "C11",
+        "C11-2",
+        "C12",
+        "C12-2",
+        "C13",
+        "C13-2",
+        "C14",
+        "C14-2",
+        "C15",
+        "C15-2"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "c1-entity-level-control": {
+      "componentType": "c1-entity-level-control",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtC1EntityControl.vue",
+      "wpCodes": [
+        "C1"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "c22-itgc-bundle": {
+      "componentType": "c22-itgc-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtC22ItgcBundle.vue",
+      "wpCodes": [
+        "C22"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "c23-journal-entry-control": {
+      "componentType": "c23-journal-entry-control",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtC23JournalControl.vue",
+      "wpCodes": [
+        "C23",
+        "C23-1",
+        "C23-2"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "c24-journal-entry-detail": {
+      "componentType": "c24-journal-entry-detail",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtC24JournalDetail.vue",
+      "wpCodes": [
+        "C24",
+        "C24-0",
+        "C24-1",
+        "C24-2",
+        "C24-3",
+        "C24-4",
+        "C24-5"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h1-fixed-assets": {
+      "componentType": "h1-fixed-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
+      "wpCodes": [
+        "H1",
+        "H1-1",
+        "H1-2",
+        "H1-3",
+        "H1-4",
+        "H1-5",
+        "H1-6",
+        "H1-7",
+        "H1-8",
+        "H1-9",
+        "H1-10",
+        "H1-11",
+        "H1-12",
+        "H1-13",
+        "H1-14",
+        "H1-15",
+        "H1-16",
+        "H1-17",
+        "H1-18",
+        "H1-19",
+        "H1-20",
+        "H1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h10-asset-disposal-income": {
+      "componentType": "h10-asset-disposal-income",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
+      "wpCodes": [
+        "H10",
+        "H10-1",
+        "H10-2",
+        "H10-3",
+        "H10-4",
+        "H10A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h2-construction-in-progress": {
+      "componentType": "h2-construction-in-progress",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+      "wpCodes": [
+        "H2",
+        "H2-1",
+        "H2-2",
+        "H2-3",
+        "H2-4",
+        "H2-5",
+        "H2-6",
+        "H2-7",
+        "H2-8",
+        "H2-9",
+        "H2-10",
+        "H2-11",
+        "H2-12",
+        "H2-13",
+        "H2-14",
+        "H2-15",
+        "H2-16",
+        "H2-17",
+        "H2A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h3-investment-property": {
+      "componentType": "h3-investment-property",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
+      "wpCodes": [
+        "H3",
+        "H3-1",
+        "H3-2",
+        "H3-3",
+        "H3-4",
+        "H3-5",
+        "H3-6",
+        "H3-7",
+        "H3-8",
+        "H3-9",
+        "H3-10",
+        "H3-11",
+        "H3-12",
+        "H3-13",
+        "H3-14",
+        "H3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h4-engineering-materials": {
+      "componentType": "h4-engineering-materials",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
+      "wpCodes": [
+        "H4",
+        "H4-1",
+        "H4-2",
+        "H4-3",
+        "H4-4",
+        "H4-5",
+        "H4-6",
+        "H4-7",
+        "H4-8",
+        "H4-9",
+        "H4A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h5-oil-gas-assets": {
+      "componentType": "h5-oil-gas-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
+      "wpCodes": [
+        "H5",
+        "H5-1",
+        "H5-2",
+        "H5-3",
+        "H5-4",
+        "H5-5",
+        "H5-6",
+        "H5-7",
+        "H5-8",
+        "H5-9",
+        "H5-10",
+        "H5-11",
+        "H5-12",
+        "H5-13",
+        "H5-14",
+        "H5-15",
+        "H5-16",
+        "H5-17",
+        "H5-18",
+        "H5-19",
+        "H5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h6-asset-disposal-clearing": {
+      "componentType": "h6-asset-disposal-clearing",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
+      "wpCodes": [
+        "H6",
+        "H6-1",
+        "H6-2",
+        "H6-3",
+        "H6-4",
+        "H6A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h7-biological-assets": {
+      "componentType": "h7-biological-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
+      "wpCodes": [
+        "H7",
+        "H7-1",
+        "H7-2",
+        "H7-3",
+        "H7-4",
+        "H7-5",
+        "H7-6",
+        "H7-7",
+        "H7-8",
+        "H7-9",
+        "H7-10",
+        "H7-11",
+        "H7-12",
+        "H7-13",
+        "H7-14",
+        "H7-15",
+        "H7-16",
+        "H7-17",
+        "H7A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h8-right-of-use-assets": {
+      "componentType": "h8-right-of-use-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+      "wpCodes": [
+        "H8",
+        "H8-1",
+        "H8-2",
+        "H8-3",
+        "H8-4",
+        "H8-5",
+        "H8-6",
+        "H8-7",
+        "H8-8",
+        "H8-9",
+        "H8-10",
+        "H8-11",
+        "H8-12",
+        "H8-13",
+        "H8-14",
+        "H8A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "h9-lease-liabilities": {
+      "componentType": "h9-lease-liabilities",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+      "wpCodes": [
+        "H9",
+        "H9-1",
+        "H9-2",
+        "H9-3",
+        "H9-4",
+        "H9A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "i1-intangible-assets": {
+      "componentType": "i1-intangible-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue",
+      "wpCodes": [
+        "I1",
+        "I1-1",
+        "I1-2",
+        "I1-3",
+        "I1-4",
+        "I1-5",
+        "I1-6",
+        "I1-7",
+        "I1-8",
+        "I1-9",
+        "I1-10",
+        "I1-11",
+        "I1-12",
+        "I1-13",
+        "I1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "i2-development-expenditure": {
+      "componentType": "i2-development-expenditure",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue",
+      "wpCodes": [
+        "I2",
+        "I2-1",
+        "I2-2",
+        "I2-3",
+        "I2-4",
+        "I2-5",
+        "I2-6",
+        "I2-7",
+        "I2-8",
+        "I2-9",
+        "I2-10",
+        "I2-11",
+        "I2-12",
+        "I2-13",
+        "I2-14",
+        "I2-15",
+        "I2-16",
+        "I2A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "i3-goodwill": {
+      "componentType": "i3-goodwill",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue",
+      "wpCodes": [
+        "I3",
+        "I3-1",
+        "I3-2",
+        "I3-3",
+        "I3-4",
+        "I3-5",
+        "I3-6",
+        "I3-7",
+        "I3-8",
+        "I3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "i4-long-term-prepaid": {
+      "componentType": "i4-long-term-prepaid",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue",
+      "wpCodes": [
+        "I4",
+        "I4-1",
+        "I4-2",
+        "I4-3",
+        "I4-4",
+        "I4-5",
+        "I4-6",
+        "I4-7",
+        "I4A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "i5-other-noncurrent-assets": {
+      "componentType": "i5-other-noncurrent-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtI5OtherNoncurrentAssets.vue",
+      "wpCodes": [
+        "I5",
+        "I5-1",
+        "I5-2",
+        "I5-3",
+        "I5-4",
+        "I5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "i6-research-development-expense": {
+      "componentType": "i6-research-development-expense",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue",
+      "wpCodes": [
+        "I6",
+        "I6-1",
+        "I6-2",
+        "I6-3",
+        "I6-4",
+        "I6-5",
+        "I6-6",
+        "I6-7",
+        "I6-8",
+        "I6A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "j1-employee-compensation": {
+      "componentType": "j1-employee-compensation",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
+      "wpCodes": [
+        "J1",
+        "J1-1",
+        "J1-2",
+        "J1-3",
+        "J1-4",
+        "J1-5",
+        "J1-6",
+        "J1-7",
+        "J1-8",
+        "J1-9",
+        "J1-10",
+        "J1A",
+        "J1附注(上市)",
+        "J1附注(国企)"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "j2-defined-benefit-plan": {
+      "componentType": "j2-defined-benefit-plan",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+      "wpCodes": [
+        "J2",
+        "J2-1",
+        "J2-2",
+        "J2-3",
+        "J2-4",
+        "J2A",
+        "J2附注(上市)",
+        "J2附注(国企)"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "j3-share-based-payment": {
+      "componentType": "j3-share-based-payment",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue",
+      "wpCodes": [
+        "J3",
+        "J3-1",
+        "J3-2",
+        "J3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k1-other-receivables": {
+      "componentType": "k1-other-receivables",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
+      "wpCodes": [
+        "K1",
+        "K1-1",
+        "K1-2",
+        "K1-3",
+        "K1-4",
+        "K1-5",
+        "K1-6",
+        "K1-7",
+        "K1-8",
+        "K1-9",
+        "K1-10",
+        "K1-11",
+        "K1-12",
+        "K1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k10-other-income": {
+      "componentType": "k10-other-income",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue",
+      "wpCodes": [
+        "K10",
+        "K10-1",
+        "K10-2",
+        "K10-3",
+        "K10-4",
+        "K10-5",
+        "K10-6",
+        "K10A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k11-asset-impairment-loss": {
+      "componentType": "k11-asset-impairment-loss",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
+      "wpCodes": [
+        "K11",
+        "K11-1",
+        "K11-2",
+        "K11-3",
+        "K11A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k12-non-operating-income": {
+      "componentType": "k12-non-operating-income",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
+      "wpCodes": [
+        "K12",
+        "K12-1",
+        "K12-2",
+        "K12-3",
+        "K12-4",
+        "K12A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k13-non-operating-expense": {
+      "componentType": "k13-non-operating-expense",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
+      "wpCodes": [
+        "K13",
+        "K13-1",
+        "K13-2",
+        "K13-3",
+        "K13-4",
+        "K13A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k2-other-current-assets": {
+      "componentType": "k2-other-current-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
+      "wpCodes": [
+        "K2",
+        "K2-1",
+        "K2-2",
+        "K2-3",
+        "K2-4",
+        "K2-5",
+        "K2-6",
+        "K2A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k3-other-payables": {
+      "componentType": "k3-other-payables",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
+      "wpCodes": [
+        "K3",
+        "K3-1",
+        "K3-2",
+        "K3-3",
+        "K3-4",
+        "K3-5",
+        "K3-6",
+        "K3-7",
+        "K3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k4-other-current-liabilities": {
+      "componentType": "k4-other-current-liabilities",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
+      "wpCodes": [
+        "K4",
+        "K4-1",
+        "K4-2",
+        "K4-3",
+        "K4-4",
+        "K4A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k5-provisions": {
+      "componentType": "k5-provisions",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
+      "wpCodes": [
+        "K5",
+        "K5-1",
+        "K5-2",
+        "K5-3",
+        "K5-4",
+        "K5-5",
+        "K5-6",
+        "K5-7",
+        "K5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k6-held-for-sale": {
+      "componentType": "k6-held-for-sale",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
+      "wpCodes": [
+        "K6",
+        "K6-1",
+        "K6-2",
+        "K6-3",
+        "K6-4",
+        "K6-5",
+        "K6-6",
+        "K6-7",
+        "K6A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k7-deferred-income": {
+      "componentType": "k7-deferred-income",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue",
+      "wpCodes": [
+        "K7",
+        "K7-1",
+        "K7-2",
+        "K7-3",
+        "K7-4",
+        "K7-5",
+        "K7A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k8-selling-expenses": {
+      "componentType": "k8-selling-expenses",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
+      "wpCodes": [
+        "K8",
+        "K8-1",
+        "K8-2",
+        "K8-3",
+        "K8-4",
+        "K8-5",
+        "K8-6",
+        "K8-7",
+        "K8-8",
+        "K8A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "k9-admin-expenses": {
+      "componentType": "k9-admin-expenses",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
+      "wpCodes": [
+        "K9",
+        "K9-1",
+        "K9-2",
+        "K9-3",
+        "K9-4",
+        "K9-5",
+        "K9-6",
+        "K9-7",
+        "K9-8",
+        "K9A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l1-short-term-loans": {
+      "componentType": "l1-short-term-loans",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
+      "wpCodes": [
+        "L1",
+        "L1-1",
+        "L1-2",
+        "L1-3",
+        "L1-4",
+        "L1-5",
+        "L1-6",
+        "L1-7",
+        "L1-8",
+        "L1-9",
+        "L1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l2-interest-payable": {
+      "componentType": "l2-interest-payable",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
+      "wpCodes": [
+        "L2",
+        "L2-1",
+        "L2-2",
+        "L2-3",
+        "L2-4",
+        "L2A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l3-long-term-loans": {
+      "componentType": "l3-long-term-loans",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
+      "wpCodes": [
+        "L3",
+        "L3-1",
+        "L3-2",
+        "L3-3",
+        "L3-4",
+        "L3-5",
+        "L3-6",
+        "L3-7",
+        "L3-8",
+        "L3-9",
+        "L3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l4-bonds-payable": {
+      "componentType": "l4-bonds-payable",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
+      "wpCodes": [
+        "L4",
+        "L4-1",
+        "L4-2",
+        "L4-3",
+        "L4-4",
+        "L4-5",
+        "L4-6",
+        "L4-7",
+        "L4-8",
+        "L4-9",
+        "L4A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l5-long-term-payables": {
+      "componentType": "l5-long-term-payables",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+      "wpCodes": [
+        "L5",
+        "L5-1",
+        "L5-2",
+        "L5-3",
+        "L5-4",
+        "L5-5",
+        "L5-6",
+        "L5-7",
+        "L5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l6-special-payables": {
+      "componentType": "l6-special-payables",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
+      "wpCodes": [
+        "L6",
+        "L6-1",
+        "L6-2",
+        "L6-3",
+        "L6-4",
+        "L6A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l7-other-noncurrent-liabilities": {
+      "componentType": "l7-other-noncurrent-liabilities",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
+      "wpCodes": [
+        "L7",
+        "L7-1",
+        "L7-2",
+        "L7-3",
+        "L7-4",
+        "L7A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "l8-financial-expenses": {
+      "componentType": "l8-financial-expenses",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+      "wpCodes": [
+        "L8",
+        "L8-1",
+        "L8-2",
+        "L8-3",
+        "L8-4",
+        "L8-5",
+        "L8-6",
+        "L8A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m1-dividends-payable": {
+      "componentType": "m1-dividends-payable",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
+      "wpCodes": [
+        "M1",
+        "M1-1",
+        "M1-2",
+        "M1-3",
+        "M1-4",
+        "M1-5",
+        "M1-6",
+        "M1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m10-other-equity-instruments": {
+      "componentType": "m10-other-equity-instruments",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
+      "wpCodes": [
+        "M10",
+        "M10-1",
+        "M10-2",
+        "M10-3",
+        "M10-4",
+        "M10-5",
+        "M10A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m2-paid-in-capital": {
+      "componentType": "m2-paid-in-capital",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue",
+      "wpCodes": [
+        "M2",
+        "M2-1",
+        "M2-2",
+        "M2-3",
+        "M2-4",
+        "M2-5",
+        "M2A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m3-treasury-stock": {
+      "componentType": "m3-treasury-stock",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue",
+      "wpCodes": [
+        "M3",
+        "M3-1",
+        "M3-2",
+        "M3-3",
+        "M3-4",
+        "M3-5",
+        "M3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m4-capital-reserve": {
+      "componentType": "m4-capital-reserve",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue",
+      "wpCodes": [
+        "M4",
+        "M4-1",
+        "M4-2",
+        "M4-3",
+        "M4-4",
+        "M4-5",
+        "M4-6",
+        "M4A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m5-surplus-reserve": {
+      "componentType": "m5-surplus-reserve",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
+      "wpCodes": [
+        "M5",
+        "M5-1",
+        "M5-2",
+        "M5-3",
+        "M5-4",
+        "M5-5",
+        "M5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m6-retained-earnings": {
+      "componentType": "m6-retained-earnings",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue",
+      "wpCodes": [
+        "M6",
+        "M6-1",
+        "M6-2",
+        "M6-3",
+        "M6-4",
+        "M6-5",
+        "M6-6",
+        "M6A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m7-special-reserve": {
+      "componentType": "m7-special-reserve",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
+      "wpCodes": [
+        "M7",
+        "M7-1",
+        "M7-2",
+        "M7-3",
+        "M7-4",
+        "M7-5",
+        "M7A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m8-general-risk-reserve": {
+      "componentType": "m8-general-risk-reserve",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
+      "wpCodes": [
+        "M8",
+        "M8-1",
+        "M8-2",
+        "M8-3",
+        "M8-4",
+        "M8A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "m9-other-comprehensive-income": {
+      "componentType": "m9-other-comprehensive-income",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
+      "wpCodes": [
+        "M9",
+        "M9-1",
+        "M9-2",
+        "M9-3",
+        "M9-4",
+        "M9-5",
+        "M9-6",
+        "M9A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "n1-deferred-tax-assets": {
+      "componentType": "n1-deferred-tax-assets",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue",
+      "wpCodes": [
+        "N1",
+        "N1-1",
+        "N1-2",
+        "N1-3",
+        "N1-4",
+        "N1-5",
+        "N1A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "n2-taxes-payable": {
+      "componentType": "n2-taxes-payable",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue",
+      "wpCodes": [
+        "N2",
+        "N2-1",
+        "N2-2",
+        "N2-3",
+        "N2-4",
+        "N2-5",
+        "N2-6",
+        "N2-7",
+        "N2-8",
+        "N2-9",
+        "N2-10",
+        "N2-11",
+        "N2A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "n3-deferred-tax-liabilities": {
+      "componentType": "n3-deferred-tax-liabilities",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
+      "wpCodes": [
+        "N3",
+        "N3-1",
+        "N3-2",
+        "N3-3",
+        "N3A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "n4-taxes-and-surcharges": {
+      "componentType": "n4-taxes-and-surcharges",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
+      "wpCodes": [
+        "N4",
+        "N4-1",
+        "N4-2",
+        "N4-3",
+        "N4A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "n5-income-tax-expense": {
+      "componentType": "n5-income-tax-expense",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue",
+      "wpCodes": [
+        "N5",
+        "N5-1",
+        "N5-2",
+        "N5-3",
+        "N5-4",
+        "N5-5",
+        "N5-6",
+        "N5-6-1",
+        "N5-6-2",
+        "N5-7",
+        "N5-8",
+        "N5A"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s12-cpa-expert": {
+      "componentType": "s12-cpa-expert",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s12-cpa-expert/GtS12CpaExpert.vue",
+      "wpCodes": [
+        "S12"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s13-mgmt-expert": {
+      "componentType": "s13-mgmt-expert",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s13-mgmt-expert/GtS13MgmtExpert.vue",
+      "wpCodes": [
+        "S13"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s14-accounting-estimate": {
+      "componentType": "s14-accounting-estimate",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s14-accounting-estimate/GtS14AccountingEstimate.vue",
+      "wpCodes": [
+        "S14"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s15-eps-roe": {
+      "componentType": "s15-eps-roe",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s15-eps-roe/GtS15EpsRoe.vue",
+      "wpCodes": [
+        "S15"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s20-revenue-deduction": {
+      "componentType": "s20-revenue-deduction",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s20-revenue-deduction/GtS20RevenueDeduction.vue",
+      "wpCodes": [
+        "S20"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s21-data-asset": {
+      "componentType": "s21-data-asset",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s21-data-asset/GtS21DataAsset.vue",
+      "wpCodes": [
+        "S21"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s3-policy-change": {
+      "componentType": "s3-policy-change",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s3-policy-change/GtS3PolicyChange.vue",
+      "wpCodes": [
+        "S3"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s32-fraud-bundle": {
+      "componentType": "s32-fraud-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s32-fraud-bundle/GtS32Bundle.vue",
+      "wpCodes": [
+        "S32"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s33-ann14-bundle": {
+      "componentType": "s33-ann14-bundle",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s33-ann14-bundle/GtS33Bundle.vue",
+      "wpCodes": [
+        "S33"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s4-nonmonetary-exchange": {
+      "componentType": "s4-nonmonetary-exchange",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue",
+      "wpCodes": [
+        "S4",
+        "S4-1",
+        "S4-2"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s5-debt-restructuring": {
+      "componentType": "s5-debt-restructuring",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s5-debt-restructuring/GtS5DebtRestructuring.vue",
+      "wpCodes": [
+        "S5",
+        "S5-1",
+        "S5-2"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    },
+    "s6-fund-occupation": {
+      "componentType": "s6-fund-occupation",
+      "entryFile": "audit-platform/frontend/src/components/workpaper/s6-fund-occupation/GtS6FundOccupation.vue",
+      "wpCodes": [
+        "S6",
+        "S6-1"
+      ],
+      "contextStrategy": "standard",
+      "viaGtWpRenderer": true
+    }
+  },
+  "diagnostics": {
+    "missingRegistryEntries": [],
+    "missingWpCodeMappings": [],
+    "missingEntryFiles": []
+  },
+  "isComplete": true
+}

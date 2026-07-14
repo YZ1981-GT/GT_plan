@@ -194,9 +194,9 @@
  * Spec: .kiro/specs/i3-goodwill/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI3DualMode } from './composables/useI3DualMode'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(I3-\d+)/)
   if (m) return m[1]
   // 底稿目录 I3（无后缀）
-  if (/\bI3\b/.test(name) && !/I3-/.test(name) && !/I3A/.test(name)) return 'I3'
+  if (/底稿目录/.test(name) || (/\bI3\b/.test(name) && !/I3-/.test(name) && !/I3A/.test(name))) return 'I3'
   return ''
 })
 
@@ -347,15 +347,13 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[I3] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('i3VersionTrailRef', versionTrailRef)
 provide('i3OpenVersionHistory', openVersionHistory)
 

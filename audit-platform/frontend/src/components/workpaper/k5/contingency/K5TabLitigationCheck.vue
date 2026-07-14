@@ -231,11 +231,13 @@ function handleLawyerLetter(rowId: string) {
     formData.append('file', file)
     formData.append('doc_type', 'lawyer_letter')
     try {
-      const res = await http.post('/d4/contract-ocr', formData, {
+      const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
-      })
+        _silent: true,
+      } as any)
       const ocrResult = res?.data?.data ?? res?.data ?? {}
-      const ocrText = ocrResult.text || ocrResult.content || JSON.stringify(ocrResult)
+      const ocrText = ocrResult.extracted_fields?.full_text
+        || ocrResult.text || ocrResult.content || JSON.stringify(ocrResult)
       // 确认弹窗
       await ElMessageBox.confirm(
         `OCR识别结果：\n${ocrText.substring(0, 300)}${ocrText.length > 300 ? '...' : ''}\n\n是否填入律师意见字段？`,

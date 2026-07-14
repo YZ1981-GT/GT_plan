@@ -63,14 +63,13 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         result = await ctx.db.execute(
             sa.text(
-                "SELECT item_id, content, conclusion, remark FROM checklist_responses "
+                "SELECT item_id, conclusion, remark FROM checklist_responses "
                 "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT 5000"
             ),
             {"wp_id": str(ctx.wp_id), "pfx": "J2-%"},
         )
         for row in result.fetchall():
             responses_snapshot[row.item_id] = {
-                "content": row.content or "",
                 "conclusion": row.conclusion or "",
                 "remark": row.remark or "",
             }
@@ -110,11 +109,11 @@ async def render(ctx: RenderContext) -> dict | None:
 
 
 def _extract_json(responses: dict, key: str, default):
-    """从 responses 中解析 JSON 数据."""
+    """从 responses 中解析 JSON 数据（存于 remark 字段，对齐前端持久化）."""
     raw = responses.get(key, {})
-    if raw and raw.get("content"):
+    if raw and raw.get("remark"):
         try:
-            return json.loads(raw["content"])
+            return json.loads(raw["remark"])
         except (json.JSONDecodeError, TypeError):
             pass
     return default

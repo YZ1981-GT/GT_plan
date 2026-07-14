@@ -14,11 +14,33 @@ Feature: platform-global-hardening, Task 3.4
 Requirements: 2.3
 """
 import sys
-import os
 import re
 import json
 import pathlib
+from collections import Counter
 from datetime import datetime, timezone
+
+from capability_ledger import (
+    CAPABILITIES,
+    RUNTIME_CAPABILITIES,
+    SCHEMA_VERSION,
+    capability_record,
+)
+
+try:
+    from .workpaper_component_manifest import (
+        MANIFEST_OUTPUT_PATH,
+        generate_component_manifest,
+        print_component_manifest_summary,
+        write_component_manifest,
+    )
+except ImportError:  # direct script execution
+    from workpaper_component_manifest import (
+        MANIFEST_OUTPUT_PATH,
+        generate_component_manifest,
+        print_component_manifest_summary,
+        write_component_manifest,
+    )
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -32,16 +54,6 @@ WORKPAPER_DIR = PROJECT_ROOT / 'audit-platform' / 'frontend' / 'src' / 'componen
 OUTPUT_PATH = WORKPAPER_DIR / 'coverage-ledger.json'
 
 # ─── Capability detection patterns ───────────────────────────────────────────
-
-CAPABILITIES = [
-    'displayPrefs',
-    'agingConfig',
-    'version',
-    'review',
-    'ai',
-    'importExport',
-    'acnr',
-]
 
 # Regex patterns for each capability detection
 # Each maps to a list of regex patterns; if ANY matches → detected=true
@@ -72,6 +84,10 @@ DETECTION_PATTERNS = {
         re.compile(r'useAcnr'),
         re.compile(r'address_registry|addressRegistry', re.IGNORECASE),
         re.compile(r'GtIndexChip'),
+    ],
+    'persistence': [
+        re.compile(r'useChecklistPersistence'),
+        re.compile(r'checklist-responses'),
     ],
 }
 
@@ -125,93 +141,107 @@ def find_main_entry_files() -> dict:
     return entries
 
 
-def detect_capabilities(file_path: pathlib.Path) -> dict:
-    """
-    Read a main entry .vue file and detect capability wiring via regex.
-    Returns dict: capability → bool
-    """
-    detected = {}
+def _entry_ref(file_path: pathlib.Path) -> str:
+    return file_path.relative_to(PROJECT_ROOT).as_posix()
+
+
+def detect_capabilities(file_path: pathlib.Path) -> dict[str, list[str]]:
+    """Return reproducible source evidence for every detected capability."""
     try:
         content = file_path.read_text(encoding='utf-8')
     except (OSError, UnicodeDecodeError):
-        # fail-open: cannot read → all unknown
-        return {cap: False for cap in CAPABILITIES}
+        return {capability: [] for capability in CAPABILITIES}
 
-    for cap in CAPABILITIES:
-        patterns = DETECTION_PATTERNS.get(cap, [])
-        found = any(p.search(content) for p in patterns)
-        detected[cap] = found
+    source = _entry_ref(file_path)
+    return {
+        capability: [
+            f'{source}:{pattern.pattern}'
+            for pattern in DETECTION_PATTERNS[capability]
+            if pattern.search(content)
+        ]
+        for capability in CAPABILITIES
+    }
 
-    return detected
 
-
-def detect_shell_wrapped(file_path: pathlib.Path) -> bool:
-    """Check if a main entry uses GtWorkpaperShell or useWorkpaperScaffold."""
+def detect_shell_evidence(file_path: pathlib.Path) -> list[str]:
+    """Return source evidence for legacy Shell/Scaffold runtime wiring."""
     try:
         content = file_path.read_text(encoding='utf-8')
     except (OSError, UnicodeDecodeError):
-        return False
+        return []
+    source = _entry_ref(file_path)
+    return [
+        f'{source}:{pattern.pattern}'
+        for pattern in SHELL_WRAPPED_PATTERNS
+        if pattern.search(content)
+    ]
 
-    return any(p.search(content) for p in SHELL_WRAPPED_PATTERNS)
 
-
-def get_distinct_root_codes(overrides: dict) -> set:
-    """
-    Extract distinct root wp_codes from overrides that represent D~N/S cycle entries.
-    Only include codes that have a dedicated componentType (not skip/generic).
-    """
+def get_distinct_root_codes(overrides: dict) -> set[str]:
+    """Extract dedicated root wp_codes from the override source."""
     skip_types = {'skip', 'onlyoffice-sheet', 'word-template', 'redirect-materiality'}
-    root_codes = set()
+    return {
+        match.group(1)
+        for code, component_type in overrides.items()
+        if component_type not in skip_types and (match := WP_ROOT_RE.match(code))
+    }
 
-    for code, comp_type in overrides.items():
-        if comp_type in skip_types:
-            continue
-        # Extract root: D2-1 → D2, G4 → G4
-        m = WP_ROOT_RE.match(code)
-        if m:
-            root_codes.add(m.group(1))
 
-    return root_codes
+def component_type_for(root_code: str, overrides: dict) -> str | None:
+    """Resolve one representative dedicated componentType for a root code."""
+    skip_types = {'skip', 'onlyoffice-sheet', 'word-template', 'redirect-materiality'}
+    exact = overrides.get(root_code)
+    if exact is not None and exact not in skip_types:
+        return exact
+    candidates = [
+        component_type
+        for code, component_type in overrides.items()
+        if component_type not in skip_types
+        and (match := WP_ROOT_RE.match(code))
+        and match.group(1) == root_code
+    ]
+    return Counter(candidates).most_common(1)[0][0] if candidates else None
 
 
 def generate_ledger(check_only: bool = False) -> dict:
-    """Generate the coverage ledger data."""
+    """Generate a complete capability-level v2 ledger."""
     overrides = load_wp_code_overrides()
     root_codes = get_distinct_root_codes(overrides)
     entry_files = find_main_entry_files()
-
     entries = {}
 
     for root_code in sorted(root_codes):
         entry_file = entry_files.get(root_code)
         if entry_file is None:
-            # No main entry found for this root — skip silently
             continue
-
-        shell_wrapped = detect_shell_wrapped(entry_file)
         detected = detect_capabilities(entry_file)
-
-        # Only include detected capabilities that are True (keep object compact)
-        detected_compact = {k: v for k, v in detected.items() if v}
-
-        entry = {
-            'shellWrapped': shell_wrapped,
-            'detected': detected_compact,
+        shell_evidence = detect_shell_evidence(entry_file)
+        records = {}
+        for capability in CAPABILITIES:
+            evidence = list(detected[capability])
+            if shell_evidence and capability in RUNTIME_CAPABILITIES:
+                evidence.extend(shell_evidence)
+            records[capability] = capability_record(
+                'covered' if evidence else 'unknown', evidence
+            )
+        entries[root_code] = {
+            'componentType': component_type_for(root_code, overrides),
+            'entryFile': _entry_ref(entry_file),
+            'capabilities': records,
         }
-        entries[root_code] = entry
 
-    ledger = {
+    return {
+        'schemaVersion': SCHEMA_VERSION,
         'generatedAt': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'capabilities': CAPABILITIES,
+        'capabilities': list(CAPABILITIES),
         'entries': entries,
     }
 
-    return ledger
 
-
-def main():
+def main() -> int:
     check_only = '--check' in sys.argv
-    output_path = OUTPUT_PATH
+    component_manifest_mode = '--component-manifest' in sys.argv
+    output_path = MANIFEST_OUTPUT_PATH if component_manifest_mode else OUTPUT_PATH
 
     # Parse --output flag
     if '--output' in sys.argv:
@@ -219,31 +249,45 @@ def main():
         if idx + 1 < len(sys.argv):
             output_path = pathlib.Path(sys.argv[idx + 1])
 
+    if component_manifest_mode:
+        manifest = generate_component_manifest()
+        print_component_manifest_summary(manifest)
+        if not check_only:
+            write_component_manifest(manifest, output_path)
+            print(f'\n[OK] 已写入: {output_path}')
+        else:
+            print('\n[CHECK] 预演模式，未写入文件。')
+        if '--strict' in sys.argv and not manifest['isComplete']:
+            print('[FAIL] component manifest 存在注册漂移。')
+            return 1
+        return 0
+
     ledger = generate_ledger(check_only=check_only)
 
     # Print summary
     total = len(ledger['entries'])
-    shell_count = sum(1 for e in ledger['entries'].values() if e['shellWrapped'])
-    detected_any = sum(
-        1 for e in ledger['entries'].values()
-        if any(e['detected'].values()) if e['detected']
+    covered_any = sum(
+        any(record['status'] == 'covered' for record in entry['capabilities'].values())
+        for entry in ledger['entries'].values()
     )
 
-    print(f'[Coverage Ledger] 扫描完成: {total} 个底稿根入口')
-    print(f'  shellWrapped: {shell_count}')
-    print(f'  至少一项能力检出: {detected_any}')
+    print(f'[Coverage Ledger v2] 扫描完成: {total} 个底稿根入口')
+    print(f'  至少一项能力有证据: {covered_any}')
     print(f'  能力清单: {", ".join(CAPABILITIES)}')
     print()
 
     # Print per-entry summary
     for code, entry in ledger['entries'].items():
-        caps = ', '.join(entry['detected'].keys()) if entry['detected'] else '(无)'
-        shell = '🛡️' if entry['shellWrapped'] else '  '
-        print(f'  {shell} {code:6s} → {caps}')
+        covered = [
+            capability
+            for capability, record in entry['capabilities'].items()
+            if record['status'] == 'covered'
+        ]
+        print(f"  {code:6s} → {', '.join(covered) if covered else '(无证据)'}")
 
     if check_only:
-        print(f'\n[CHECK] 预演模式，未写入文件。')
-        return
+        print('\n[CHECK] 预演模式，未写入文件。')
+        return 0
 
     # Write output
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -252,7 +296,8 @@ def main():
         f.write('\n')
 
     print(f'\n[OK] 已写入: {output_path}')
+    return 0
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

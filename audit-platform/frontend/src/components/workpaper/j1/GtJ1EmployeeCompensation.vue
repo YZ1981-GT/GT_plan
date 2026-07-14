@@ -7,26 +7,9 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 双模式切换工具栏 -->
-      <div v-if="showModeToolbar" class="j1-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
-      </div>
-
-      <!-- OnlyOffice 模式 -->
-      <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
-        :key="ooSheetName"
-        :wp-id="props.wpId"
-        :sheet-name="ooSheetName"
-        :project-id="props.projectId"
-        :readonly="isReadonly"
-        @fallback="onOoFallback"
-      />
-
-      <template v-else>
       <!-- 底稿目录 -->
-      <J1TabIndex v-if="currentSheet === 'J1-index'" />
+      <J1TabIndex v-if="currentSheet === 'J1-index'"
+        :all-responses="allResponses" :is-readonly="isReadonly ?? false" />
       <!-- J1A 程序表（整册专属组件内分发，对齐 H1A/L1A） -->
       <CycleTabProcedure
         v-else-if="currentSheet === 'J1A'"
@@ -85,10 +68,6 @@
       <div v-else class="j1-sheet-placeholder">
         <el-empty :description="`J1 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
       </div>
-
-      </template><!-- end HTML mode -->
-
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -102,15 +81,17 @@
  *
  * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)
  */
-import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
-import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
-import { useJ1EntryDualMode, type J1RenderMode } from '../composables/useJ1EntryDualMode'
+import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent, provide, toRef, inject, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  useChecklistPersistence,
+  type ChecklistResponse,
+} from '@/composables/workpaper/useChecklistPersistence'
+import { collectChecklistResponses } from '@/composables/workpaper/checklistPersistenceHelpers'
+import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
-import http from '@/utils/http'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
-const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
 const J1TabIndex = defineAsyncComponent(() => import('./core/J1TabIndex.vue'))
 const J1TabAdjudication = defineAsyncComponent(() => import('./core/J1TabAdjudication.vue'))
 const J1TabDetail = defineAsyncComponent(() => import('./core/J1TabDetail.vue'))
@@ -136,11 +117,14 @@ const props = defineProps<{
   isReadonly?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   save: []
   completed: []
   'navigate-sheet': [sheetName: string]
 }>()
+
+/** 目录页跳转（对齐 D4 目录页范式）：J1TabIndex inject 调用 → 切换到目标 sheet */
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
 
 const isLoading = ref(true)
 
@@ -157,110 +141,58 @@ const currentSheet = computed(() => {
   return sn
 })
 
-// ─── Persistence: allResponses Map ──────────────────────────────────────────
-const allResponses = ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>(new Map())
-
-/** selfLoad: 从后端加载已保存数据 */
-async function selfLoad() {
-  try {
-    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const items = res.data?.data || res.data || []
-    if (Array.isArray(items)) {
-      const map = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
-      for (const it of items) {
-        if (it.item_id) map.set(it.item_id, { item_id: it.item_id, conclusion: it.conclusion ?? null, remark: it.remark ?? null })
-      }
-      allResponses.value = map
-    }
-  } catch { /* silent — first open may 404 */ }
-
-  // Also merge from htmlData.responses_snapshot (render-config output)
-  _mergeResponses(props.htmlData)
-}
-
-function _mergeResponses(data: Record<string, unknown> | null | undefined) {
-  if (!data) return
-  // render-config may output responses_snapshot or checklist_responses
-  const snapshot = (data.responses_snapshot || data.checklist_responses) as Array<Record<string, unknown>> | Record<string, unknown> | undefined
-  if (!snapshot) return
-  if (Array.isArray(snapshot)) {
-    for (const it of snapshot) {
-      if (it.item_id && !allResponses.value.has(String(it.item_id))) {
-        allResponses.value.set(String(it.item_id), { item_id: String(it.item_id), conclusion: (it.conclusion as string) ?? null, remark: (it.remark as string) ?? null })
-      }
-    }
-  } else if (typeof snapshot === 'object') {
-    for (const [key, val] of Object.entries(snapshot)) {
-      if (!allResponses.value.has(key) && val && typeof val === 'object') {
-        const v = val as Record<string, unknown>
-        allResponses.value.set(key, { item_id: key, conclusion: (v.conclusion as string) ?? null, remark: (v.remark as string) ?? null })
-      }
-    }
-  }
-}
-
-/** handleChildSave: 子tab调用此函数持久化数据 */
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-
-async function handleChildSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
-  // 写入本地 Map
-  for (const it of items) {
-    allResponses.value.set(it.item_id, it)
-  }
-  // 防抖 PUT
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(async () => {
-    try {
-      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
-      scheduleAutoSnapshot()
-    } catch { /* silent */ }
-  }, 800)
-}
-
-// ─── 版本追踪 ────────────────────────────────────────────────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-provide('j1VersionTrailRef', versionTrailRef)
-provide('j1OpenVersionHistory', openVersionHistory)
-
-// ─── 双模式切换（HTML ↔ OnlyOffice） ─────────────────────────────────────────
-const KNOWN_HTML_SHEETS = new Set([
-  'J1-index', 'J1A', 'J1-1', 'J1-2', 'J1-3', 'J1-4', 'J1-5',
-  'J1-6', 'J1-7', 'J1-8', 'J1-9', 'J1-10',
-  'J1附注(上市)', 'J1附注(国企)', 'IPO-tips',
-])
-
-const showModeToolbar = computed(() =>
-  KNOWN_HTML_SHEETS.has(currentSheet.value),
-)
-
-const dualMode = useJ1EntryDualMode({
+// ─── Runtime Boundary + Persistence Adapter ─────────────────────────────────
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const persistence = useChecklistPersistence({
   wpId: toRef(props, 'wpId'),
-  currentSheet,
-  reloadAllResponses: selfLoad,
+  projectId: computed(() => props.projectId || undefined),
+  debounceMs: 800,
+  onSaved: () => runtime?.version.scheduleAutoSnapshot(),
 })
+const allResponses = persistence.responses
 
-const ooSheetName = computed(() =>
-  dualMode.resolveOoSheetName() || props.sheetName || 'J1-1',
-)
-
-const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: J1RenderMode) => { void dualMode.switchMode(v) },
-})
-
-const renderModeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' as const },
-  {
-    label: '在线编辑',
-    value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
-  },
-])
-
-function onOoFallback(): void {
-  void dualMode.switchMode('html')
+/** selfLoad：render-config 快照兼容基线 + GET 服务端为准，合并快照未返回的 section。 */
+async function selfLoad(): Promise<void> {
+  const snapshot = collectChecklistResponses(
+    (props.htmlData as any)?.responses_snapshot,
+    (props.htmlData as any)?.allResponses,
+    (props.htmlData as any)?.checklist_responses,
+  )
+  if (snapshot.length > 0) persistence.hydrate(snapshot)
+  const fallback = new Map(allResponses.value)
+  try {
+    await persistence.load()
+  } catch {
+    if (fallback.size === 0) ElMessage.warning('J1 保存数据加载失败，请刷新后重试')
+  }
+  const merged = new Map(allResponses.value)
+  for (const [itemId, item] of fallback) {
+    if (!merged.has(itemId)) merged.set(itemId, item)
+  }
+  persistence.hydrate(merged)
 }
+
+/**
+ * 子 tab 已完成业务序列化；统一交给 Adapter 管理逐 item debounce/flush/error。
+ * 返回 Promise 以兼容子 composable 的 `saveImmediate(items).catch(...)` 契约。
+ */
+async function handleChildSave(items: ChecklistResponse[]): Promise<void> {
+  for (const { item_id, ...patch } of items) {
+    persistence.saveDebounced(item_id, patch)
+  }
+}
+
+// 整册专属组件在 sheet 切换时不卸载主入口；主动 flush 待保存 section。
+watch(currentSheet, async (nextSheet, prevSheet) => {
+  if (nextSheet === prevSheet) return
+  try {
+    await persistence.flush()
+  } catch {
+    ElMessage.error('J1 切换底稿时保存失败，数据已保留，可返回后重试')
+  }
+})
+
+onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
 
 onMounted(async () => {
   await selfLoad()
@@ -275,12 +207,6 @@ onMounted(async () => {
 }
 .loading-container {
   padding: 24px;
-}
-.j1-mode-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
 }
 .j1-sheet-placeholder {
   display: flex;

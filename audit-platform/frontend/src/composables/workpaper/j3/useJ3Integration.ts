@@ -13,7 +13,7 @@
  * Requirements: 6.1-6.5
  */
 import { computed, type Ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 import type { J3Plan } from './useJ3FormData'
 
 // ═══ 6.1 EventBus 发布 ═══

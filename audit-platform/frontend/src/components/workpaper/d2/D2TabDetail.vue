@@ -240,7 +240,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
             v-if="!isReadonly"
             :model-value="row.customerName"
             size="small"
-            @change="(v: string) => handleEdit(row, 'customerName', v)"
+            @update:model-value="(v: string) => handleEdit(row, 'customerName', v)"
           />
           <span v-else>{{ row.customerName }}</span>
         </template>

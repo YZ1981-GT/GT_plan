@@ -207,6 +207,13 @@
       </div><!-- /.gt-wp-renderer__content -->
       </template><!-- v-else (non-redirect) -->
     </template>
+
+    <!-- 无布局 Runtime Hosts：统一承载当前底稿的真实复核对话与版本历史。 -->
+    <GtWorkpaperRuntimeHosts
+      :wp-id="wpId"
+      :project-id="runtimeProjectId"
+      @rollback-completed="reload"
+    />
   </div>
 </template>
 
@@ -238,9 +245,11 @@ import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtWpToolbar from '@/components/workpaper/GtWpToolbar.vue'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
+import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
+import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 
 // ─── Types ───
 export interface SavePayload {
@@ -566,6 +575,26 @@ const preparationYear = computed(() => {
     })
   }
 })
+
+// ─── Runtime Boundary ──────────────────────────────────────────────────────────
+// Scaffold 在本 Renderer 实例的 setup 中仅初始化一次；直接传入 computed/ref，
+// 使 render-config 与 props 更新贯穿运行时，同时不引入额外 toolbar 或布局容器。
+const runtimeProjectId = computed(() => renderConfig.value?.project_id ?? '')
+const runtimeWpCode = computed(() => renderConfig.value?.wp_code ?? '')
+const runtimeContextReady = computed(() => !loading.value && (!!renderConfig.value || !!error.value))
+const runtime = useWorkpaperScaffold({
+  wpId: wpIdRef,
+  projectId: runtimeProjectId,
+  wpCode: runtimeWpCode,
+  year: preparationYear,
+  readonly: toRef(props, 'readonly'),
+  onJumpToSection: onChildNavigateSheet,
+  reloadFn: reload,
+  contextReady: runtimeContextReady,
+})
+
+// 外层编辑器的版本按钮委托给 Runtime Boundary，避免同一 HTML 底稿挂载第二个版本 Host。
+defineExpose({ openVersionHistory: runtime.version.openVersionHistory })
 
 /** componentType → 图标（sheet tab 显示），委托给 registry */
 function getSheetIcon(ct: string): string {

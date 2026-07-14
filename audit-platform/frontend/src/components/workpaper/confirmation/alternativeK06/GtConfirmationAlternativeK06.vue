@@ -28,7 +28,7 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
-          <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
           <GtReviewTrigger section-id="K0-6-alternative" label="复核" />
         </div>
       </div>
@@ -324,21 +324,11 @@
     <!-- 隐藏文件选择器 -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
 
-    <!-- 版本链抽屉 -->
-    <GtWpVersionTrail
-      v-if="wpId"
-      ref="versionTrailRef"
-      :workpaper-id="wpId"
-      :project-id="projectId || ''"
-    />
-
-    <!-- 复核对话 -->
-    <GtWpReviewDialogHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
@@ -348,8 +338,10 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import useAlternativeK06Data from '../k0-confirmation/composables/useAlternativeK06Data'
 import { BLOCK_COLUMN_CONFIGS_K06 } from './blockColumnConfigsK06'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
-import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
-import { useG0ReviewDialogProvide } from '../../g0-confirmation/composables/useG0ReviewDialogProvide'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from '../../composables/useWorkpaperScaffold'
 import { useWorkpaperImportExport } from '../../composables/useWorkpaperImportExport'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
@@ -360,8 +352,6 @@ import AlternativeD05Master from '../alternativeD05/AlternativeD05Master.vue'
 import CheckBlock from '../alternativeD05/CheckBlock.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('../../GtWpReviewDialogHost.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
 const props = defineProps<{
@@ -375,9 +365,9 @@ const props = defineProps<{
 const wpIdRef = computed(() => props.wpId ?? '')
 const projectIdRef = computed(() => props.projectId ?? '')
 
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
-useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
+// ─── Runtime Boundary 统一提供版本链 + 复核（GtWpRenderer scaffold），本组件不再本地接线 ───
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 // ─── 导入导出 composable（后端三端点） ────────────────────────────────────────
 const k0Ie = useWorkpaperImportExport({ wpId: wpIdRef, apiPrefix: 'k0' })
@@ -717,7 +707,7 @@ function handleAiFill() {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
   if (props.projectId) {
     eventBus.emit('confirmation:updated', {
       projectId: props.projectId,

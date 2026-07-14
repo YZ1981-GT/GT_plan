@@ -1,58 +1,133 @@
-<template>
-  <div class="j2-tab-index">
-    <h3 class="index-title">长期应付职工薪酬-设定受益计划净资产 底稿目录</h3>
-    <el-table :data="indexItems" border stripe style="width: 100%">
-      <el-table-column prop="seq" label="序号" width="60" align="center" />
-      <el-table-column prop="content" label="内容" min-width="300" />
-      <el-table-column prop="indexCode" label="索引号" width="120" align="center">
-        <template #default="{ row }">
-          <GtIndexChip v-if="row.indexCode" :value="row.indexCode" />
-          <span v-else class="no-print">无需打印</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="note" label="备注" width="150" />
-    </el-table>
-  </div>
-</template>
-
 <script setup lang="ts">
 /**
- * J2TabIndex — J2 底稿目录
+ * J2TabIndex — 长期应付职工薪酬-设定受益计划净资产 底稿目录（对齐 D4/b-index 底稿架构范式）
+ *
+ * 复用 GtBArchitectureTree（4 阶段泳道卡片），由 J2 各 sheet 构造 navigation_rows 喂入。
+ * 点击卡片 → inject('jumpToSection') 切换 sheet（GtJ2 provide → emit navigate-sheet →
+ * GtWpRenderer 按 sheet_name.includes 匹配）。
  */
-import { computed } from 'vue'
-// @ts-ignore - GtIndexChip 全局注册
-const GtIndexChip = resolveComponent('GtIndexChip')
+import { computed, inject } from 'vue'
+import GtBArchitectureTree from '../GtBArchitectureTree.vue'
 
 const props = defineProps<{
   wpId: string
   projectId: string
+  allResponses?: Map<string, { item_id: string; conclusion: string | null; remark: string | null }>
 }>()
 
-const indexItems = computed(() => [
-  { seq: '', content: '长期应付职工薪酬实质性程序表', indexCode: 'J2A', note: '' },
-  { seq: '1', content: '长期应付职工薪酬-设定受益计划净资产审定表', indexCode: 'J2-1', note: '' },
-  { seq: '2', content: '长期应付职工薪酬-设定受益计划净资产附注披露信息（上市公司）', indexCode: '', note: '无需打印' },
-  { seq: '3', content: '长期应付职工薪酬-设定受益计划净资产附注披露信息（国有企业）', indexCode: '', note: '无需打印' },
-  { seq: '4', content: '长期应付职工薪酬-设定受益计划净资产明细表', indexCode: 'J2-2', note: '' },
-  { seq: '5', content: '调整分录汇总表', indexCode: 'J2-3', note: '' },
-  { seq: '6', content: '计提情况检查表', indexCode: 'J2-4', note: '' },
-])
+interface NavRow {
+  content: string
+  index_ref: string
+  component_type: string
+  progressKeys: string[]
+}
 
-import { resolveComponent } from 'vue'
+/** J2 各 sheet → navigation_rows（content=完整 sheet 名，供 jumpToSection includes 匹配）。 */
+const NAV_ROWS: NavRow[] = [
+  { content: '长期应付职工薪酬实质性程序表 J2A', index_ref: 'J2A', component_type: 'a-program-console', progressKeys: [] },
+  { content: '审定表J2-1', index_ref: 'J2-1', component_type: 'd-form-table', progressKeys: ['J2-adjudication', 'J2-1'] },
+  { content: '明细表J2-2', index_ref: 'J2-2', component_type: 'd-form-table', progressKeys: ['J2-detail', 'J2-2'] },
+  { content: '调整分录汇总表J2-3', index_ref: 'J2-3', component_type: 'd-form-table', progressKeys: ['J2-adjustment', 'J2-3'] },
+  { content: '计提情况检查表J2-4', index_ref: 'J2-4', component_type: 'd-form-table', progressKeys: ['J2-accrual', 'J2-4'] },
+  { content: '附注披露信息（上市公司）', index_ref: 'J2-附注上市', component_type: 'c-note-table', progressKeys: ['J2-disclosure-listed'] },
+  { content: '附注披露信息（国有企业）', index_ref: 'J2-附注国企', component_type: 'c-note-table', progressKeys: ['J2-disclosure-soe'] },
+]
+
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
+function rowStatus(row: NavRow): string {
+  if (row.progressKeys.length === 0) return ''
+  const map = props.allResponses
+  if (!map || map.size === 0) return 'pending'
+  const keys = [...map.keys()]
+  const hasData = row.progressKeys.some(pk => map.has(pk) || keys.some(k => k.startsWith(pk)))
+  return hasData ? 'completed' : 'pending'
+}
+
+const archHtmlData = computed(() => ({
+  navigation_rows: NAV_ROWS.map((r, i) => ({
+    seq: i + 1,
+    content: r.content,
+    sheet_name: r.content,
+    index_ref: r.index_ref,
+    component_type: r.component_type,
+    status: rowStatus(r),
+  })),
+}))
+
+// ─── 编制进度 ─────────────────────────────────────────────────────────
+const progressRows = computed(() => NAV_ROWS.filter(r => r.progressKeys.length > 0))
+const completedCount = computed(() => progressRows.value.filter(r => rowStatus(r) === 'completed').length)
+const applicableCount = computed(() => progressRows.value.length)
+const progressPercent = computed(() =>
+  applicableCount.value === 0 ? 0 : Math.round((completedCount.value / applicableCount.value) * 100),
+)
+
+function handleNavigate(sheetName: string) {
+  if (jumpToSection && sheetName) jumpToSection(sheetName)
+}
 </script>
+
+<template>
+  <div class="j2-tab-index">
+    <!-- 编制进度条 -->
+    <div class="progress-bar-section">
+      <div class="progress-info">
+        <span>编制进度</span>
+        <span class="progress-text">{{ completedCount }} / {{ applicableCount }} ({{ progressPercent }}%)</span>
+      </div>
+      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
+    </div>
+
+    <!-- 底稿架构（4 阶段泳道卡片，复用 D4/b-index 范式） -->
+    <div class="index-header">
+      <h4 class="index-title">底稿架构</h4>
+      <span class="index-hint">点击卡片可跳转至对应底稿</span>
+    </div>
+    <GtBArchitectureTree
+      :active-sheet="''"
+      :html-data="archHtmlData"
+      @navigate="handleNavigate"
+    />
+  </div>
+</template>
 
 <style scoped>
 .j2-tab-index {
-  padding: 16px;
+  padding: 12px;
+}
+.progress-bar-section {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border-radius: 6px;
+}
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: var(--wp-font-size, 13px);
+  color: #606266;
+}
+.progress-text {
+  font-weight: 600;
+  color: #303133;
+}
+.index-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 .index-title {
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 16px;
-  text-align: center;
+  color: #303133;
 }
-.no-print {
-  color: #909399;
+.index-hint {
   font-size: 12px;
+  color: #909399;
 }
 </style>

@@ -149,10 +149,7 @@
       :section-id="d7ReviewSection.id"
       :section-label="d7ReviewSection.label"
     />
-    <GtWpReviewDialogHost />
-
-    <!-- 版本链 drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+    <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
   </div>
 </template>
 
@@ -160,17 +157,15 @@
 /**
  * GtD7ContractLiabilities.vue — D7 合同负债底稿主入口（比照 D5）
  */
-import { computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD7FormData } from './composables/useD7FormData'
 import { useD7CrossSheet } from './composables/useD7CrossSheet'
 import { useD7EntryDualMode, type D7RenderMode } from './composables/useD7EntryDualMode'
 import { resolveD7SheetCode } from './composables/useD7SheetRouting'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
-import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD7ReviewThreads } from './composables/useD7ReviewThreads'
 import D7TabIndex from './d7/D7TabIndex.vue'
 import D7TabProcedure from './d7/D7TabProcedure.vue'
@@ -184,7 +179,6 @@ const D7TabLongTerm = defineAsyncComponent(() => import('./d7/D7TabLongTerm.vue'
 const D7TabRelatedParty = defineAsyncComponent(() => import('./d7/D7TabRelatedParty.vue'))
 const D7TabVoucherCheck = defineAsyncComponent(() => import('./d7/D7TabVoucherCheck.vue'))
 const D7TabDisclosure = defineAsyncComponent(() => import('./d7/D7TabDisclosure.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -219,15 +213,11 @@ const {
 
 const crossSheet = useD7CrossSheet({ allResponses })
 
-// ─── 版本链接入 ───────────────────────────────────────────────────────────
-const {
-  versionTrailRef,
-  openVersionHistory,
-  scheduleAutoSnapshot,
-} = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 async function saveImmediateWithSnapshot(...args: Parameters<typeof saveImmediate>): Promise<void> {
   await saveImmediate(...args)
@@ -242,8 +232,6 @@ const availableSheets = computed(() =>
 )
 
 const wpIdRefForReview = toRef(props, 'wpId')
-const projectIdRefForReview = toRef(props, 'projectId')
-useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
 
 const { getThreadDot, getRowDot } = useD7ReviewThreads(wpIdRefForReview)
 provide('getThreadDot', getThreadDot)

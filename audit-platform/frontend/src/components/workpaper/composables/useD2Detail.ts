@@ -21,7 +21,7 @@
  *
  * Requirements: 4.1, 4.2, 4.3, 4.5, 10.2, 10.3, 10.4
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   parseNum,
@@ -36,6 +36,7 @@ import {
   remapRowAgingData,
   type AgingData,
 } from '@/composables/useAgingMigration'
+import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -162,6 +163,7 @@ function sumAgingData(dataList: AgingData[]): AgingData {
 
 export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<string[]> }) {
   const { allResponses, isReadonly, relatedParties, projectId } = options
+  const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
   // ─── 引入 useAgingConfig（subject='D2'） ───────────────────────────────
 
@@ -446,15 +448,19 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
    * 触发保存事件（CustomEvent 'd2:save-items'，由 useD2FormData 监听处理）
    */
   function dispatchSaveEvent(): void {
+    const item = {
+      item_id: 'D2-detail-rows',
+      conclusion: null,
+      remark: serializeRows(),
+    }
+    if (injectedSave) {
+      void injectedSave([item])
+      return
+    }
     try {
-      const item = {
-        item_id: 'D2-detail-rows',
-        conclusion: null,
-        remark: serializeRows(),
-      }
       window.dispatchEvent(new CustomEvent('d2:save-items', { detail: { items: [item] } }))
     } catch {
-      // silent
+      // legacy fallback only
     }
   }
 

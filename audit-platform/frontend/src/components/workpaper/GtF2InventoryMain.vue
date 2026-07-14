@@ -148,13 +148,7 @@
         />
       </template>
 
-      <GtWpVersionTrail
-        ref="versionTrailRef"
-        :workpaper-id="props.wpId"
-        :project-id="props.projectId"
-      />
-
-      <GtWpReviewDialogHost />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -163,12 +157,11 @@
 /**
  * GtF2InventoryMain.vue — F2 存货核心组主入口（比照 GtD4 / GtF3）
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useF2FormData, type ChecklistResponse } from './composables/useF2FormData'
 import { useF2CrossSheet } from './composables/useF2CrossSheet'
 import { useF2DualMode } from './composables/useF2DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { getF2DetailConfig } from './f2/detail/f2DetailSheetConfigs'
 import { getF2CutoffConfig } from './f2/inspection/f2CutoffSheetConfigs'
 
@@ -188,8 +181,6 @@ const F2DetailSheetDev = defineAsyncComponent(() => import('./f2/detail/F2Detail
 const F2CutoffSheet = defineAsyncComponent(() => import('./f2/inspection/F2CutoffSheet.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -216,10 +207,14 @@ const crossSheet = useF2CrossSheet({
   projectContext: formData.projectContext,
 })
 
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)
@@ -261,10 +256,7 @@ const useGridFallback = computed(() => {
     && !detailConfig.value && !cutoffConfig.value
 })
 
-const wpIdRef = toRef(props, 'wpId')
-const projectIdRef = toRef(props, 'projectId')
-useF2ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
-
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', () => formData.loadAll())
 
 async function handleF2SaveItems(e: Event): Promise<void> {

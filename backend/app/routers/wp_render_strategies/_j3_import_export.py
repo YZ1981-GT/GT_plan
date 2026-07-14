@@ -1,7 +1,10 @@
 """J3 股份支付 — 导入导出端点.
 
-三端点：template / export / import
-动态行表格（J3-1 情况表）需要导入导出支持。
+三端点：template / export / import（参照 D4-2 范式：导出模板/导出数据/导入数据）。
+J3-1 股份支付情况表为动态行表格，需要导入导出支持。
+
+对齐源模板「股份支付情况表J3-1」列结构；持久化到 checklist_responses.remark
+（item_id J3-1-plans，JSON 打包），与前端 J3TabDetail 一致。
 
 Spec: .kiro/specs/j3-share-based-payment/
 Requirements: 2.7
@@ -24,46 +27,60 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/workpapers/{wp_id}/import-export", tags=["j3-import-export"])
 
-# ── J3-1 情况表列定义 ──────────────────────────────────────────────────────────
-
-J3_DETAIL_COLUMNS = [
-    "方案名称", "类型(权益/现金)", "授予日", "行权价", "标的股数",
-    "等待期(年)", "可行权日", "有效期截止", "单位公允价值",
-    "已服务年数", "以前累计确认", "本期确认", "累计确认", "剩余待确认", "状态",
+# ── J3-1 情况表列定义（对齐源模板）：(表头, 字段名, 是否数值) ──────────────────────
+# 序号列由导出时自动写入，导入时忽略。
+J3_DETAIL_COLUMNS: list[tuple[str, str, bool]] = [
+    ("股份支付项目名称", "name", False),
+    ("类型", "type", False),
+    ("授予日", "grantDate", False),
+    ("批准部门", "approvalDept", False),
+    ("行权日", "exerciseDate", False),
+    ("权益工具数量", "instrumentQty", True),
+    ("等待期", "vestingPeriod", False),
+    ("公允价值确定方法和数据来源", "fvMethod", False),
+    ("协议变更/取消情况", "agreementChange", False),
+    ("资产负债表日估计更新情况", "bsUpdate", False),
+    ("剩余等待期限", "remainingPeriod", False),
+    ("协议索引号", "agreementIndex", False),
+    ("股份支付计算表索引号", "calcTableIndex", False),
+    ("结论", "conclusion", False),
 ]
+_ITEM_ID = "J3-1-plans"
+
+
+def _headers() -> list[str]:
+    return ["序号"] + [c[0] for c in J3_DETAIL_COLUMNS]
+
+
+def _stream_xlsx(wb, filename: str) -> StreamingResponse:
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    encoded = quote(filename)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"},
+    )
 
 
 @router.get("/template")
 async def export_template(wp_id: str, user=Depends(get_current_user)):
-    """导出空白模板."""
+    """导出空白模板（含表头 + 示例行）."""
     try:
         import openpyxl
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "J3-1 股份支付情况表"
-
-        # 写表头
-        for col_idx, header in enumerate(J3_DETAIL_COLUMNS, 1):
+        ws.title = "股份支付情况表J3-1"
+        for col_idx, header in enumerate(_headers(), 1):
             ws.cell(row=1, column=col_idx, value=header)
-
         # 示例行
-        ws.cell(row=2, column=1, value="（示例）2024年股票期权激励")
-        ws.cell(row=2, column=2, value="权益")
-        ws.cell(row=2, column=3, value="2024-01-15")
-
-        buf = io.BytesIO()
-        wb.save(buf)
-        buf.seek(0)
-
-        filename = f"J3_股份支付_模板_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        encoded_name = quote(filename)
-        return StreamingResponse(
-            buf,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
-            },
-        )
+        example = ["1", "（示例）2024年股票期权激励计划", "以权益工具结算", "2024-01-15",
+                   "董事会/股东大会", "", 1000000, "3 年", "Black-Scholes 期权定价模型",
+                   "无", "按最佳估计更新可行权数量", "2 年", "S12", "J3-2", "条款与工具一致，未见异常"]
+        for col_idx, val in enumerate(example, 1):
+            ws.cell(row=2, column=col_idx, value=val)
+        return _stream_xlsx(wb, f"J3-1_股份支付情况表_模板_{datetime.now().strftime('%Y%m%d')}.xlsx")
     except Exception as e:
         logger.error("J3 template export failed: %s", e)
         raise HTTPException(status_code=500, detail="模板导出失败") from e
@@ -74,62 +91,33 @@ async def export_data(wp_id: str, db=Depends(get_db), user=Depends(get_current_u
     """导出当前数据."""
     try:
         import openpyxl
-
-        # 读取方案数据
         result = await db.execute(
             sa.text(
-                "SELECT content FROM checklist_responses "
-                "WHERE wp_id = :wp_id AND item_id = 'J3-plans-data'"
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id"
             ),
-            {"wp_id": wp_id},
+            {"wp_id": wp_id, "item_id": _ITEM_ID},
         )
         row = result.fetchone()
-        plans = []
-        if row and row.content:
+        plans: list[dict] = []
+        if row and row.remark:
             try:
-                plans = json.loads(row.content)
+                parsed = json.loads(row.remark)
+                if isinstance(parsed, list):
+                    plans = parsed
             except (json.JSONDecodeError, TypeError):
                 pass
 
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.title = "J3-1 股份支付情况表"
-
-        # 表头
-        for col_idx, header in enumerate(J3_DETAIL_COLUMNS, 1):
+        ws.title = "股份支付情况表J3-1"
+        for col_idx, header in enumerate(_headers(), 1):
             ws.cell(row=1, column=col_idx, value=header)
-
-        # 数据行
         for row_idx, plan in enumerate(plans, 2):
-            ws.cell(row=row_idx, column=1, value=plan.get("name", ""))
-            ws.cell(row=row_idx, column=2, value=plan.get("type", ""))
-            ws.cell(row=row_idx, column=3, value=plan.get("grantDate", ""))
-            ws.cell(row=row_idx, column=4, value=plan.get("exercisePrice", 0))
-            ws.cell(row=row_idx, column=5, value=plan.get("sharesCount", 0))
-            ws.cell(row=row_idx, column=6, value=plan.get("vestingPeriod", 0))
-            ws.cell(row=row_idx, column=7, value=plan.get("vestingDate", ""))
-            ws.cell(row=row_idx, column=8, value=plan.get("expiryDate", ""))
-            ws.cell(row=row_idx, column=9, value=plan.get("unitFairValue", 0))
-            ws.cell(row=row_idx, column=10, value=plan.get("serviceYears", 0))
-            ws.cell(row=row_idx, column=11, value=plan.get("priorCumulative", 0))
-            ws.cell(row=row_idx, column=12, value=plan.get("currentExpense", 0))
-            ws.cell(row=row_idx, column=13, value=plan.get("cumulativeExpense", 0))
-            ws.cell(row=row_idx, column=14, value=plan.get("remainingExpense", 0))
-            ws.cell(row=row_idx, column=15, value=plan.get("status", ""))
-
-        buf = io.BytesIO()
-        wb.save(buf)
-        buf.seek(0)
-
-        filename = f"J3_股份支付_数据_{datetime.now().strftime('%Y%m%d')}.xlsx"
-        encoded_name = quote(filename)
-        return StreamingResponse(
-            buf,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={
-                "Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}",
-            },
-        )
+            ws.cell(row=row_idx, column=1, value=row_idx - 1)  # 序号
+            for offset, (_, field, _is_num) in enumerate(J3_DETAIL_COLUMNS, 2):
+                ws.cell(row=row_idx, column=offset, value=plan.get(field, ""))
+        return _stream_xlsx(wb, f"J3-1_股份支付情况表_数据_{datetime.now().strftime('%Y%m%d')}.xlsx")
     except Exception as e:
         logger.error("J3 export failed: %s", e)
         raise HTTPException(status_code=500, detail="数据导出失败") from e
@@ -142,55 +130,64 @@ async def import_data(
     db=Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """导入Excel数据."""
+    """导入 Excel 数据（按位置解析，回写 J3-1-plans）."""
     try:
         import openpyxl
-
         content = await file.read()
         wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
         ws = wb.active
 
-        plans = []
+        # 表头校验（第 2 列应为"股份支付项目名称"）
+        header_cell = str(ws.cell(row=1, column=2).value or "").strip()
+        if header_cell and "股份支付项目名称" not in header_cell and "项目名称" not in header_cell:
+            raise HTTPException(status_code=400, detail="模板列名不匹配，请使用导出的 J3-1 模板")
+
+        plans: list[dict] = []
         for row_idx in range(2, ws.max_row + 1):
-            name = ws.cell(row=row_idx, column=1).value
-            if not name:
+            name = ws.cell(row=row_idx, column=2).value  # 第 2 列 = 项目名称（第 1 列为序号）
+            if not name or not str(name).strip():
                 continue
-            plan = {
-                "id": f"plan-import-{row_idx}",
-                "name": str(name),
-                "type": "equity" if str(ws.cell(row=row_idx, column=2).value or "").startswith("权") else "cash",
-                "grantDate": str(ws.cell(row=row_idx, column=3).value or ""),
-                "exercisePrice": float(ws.cell(row=row_idx, column=4).value or 0),
-                "sharesCount": int(ws.cell(row=row_idx, column=5).value or 0),
-                "vestingPeriod": float(ws.cell(row=row_idx, column=6).value or 3),
-                "vestingDate": str(ws.cell(row=row_idx, column=7).value or ""),
-                "expiryDate": str(ws.cell(row=row_idx, column=8).value or ""),
-                "unitFairValue": float(ws.cell(row=row_idx, column=9).value or 0),
-                "serviceYears": float(ws.cell(row=row_idx, column=10).value or 0),
-                "priorCumulative": float(ws.cell(row=row_idx, column=11).value or 0),
-                "currentExpense": float(ws.cell(row=row_idx, column=12).value or 0),
-                "cumulativeExpense": float(ws.cell(row=row_idx, column=13).value or 0),
-                "remainingExpense": float(ws.cell(row=row_idx, column=14).value or 0),
-                "status": str(ws.cell(row=row_idx, column=15).value or "vesting"),
-            }
+            plan: dict = {"id": row_idx - 1}
+            for offset, (_, field, is_num) in enumerate(J3_DETAIL_COLUMNS, 2):
+                raw = ws.cell(row=row_idx, column=offset).value
+                if is_num:
+                    try:
+                        plan[field] = float(raw) if raw not in (None, "") else 0
+                    except (ValueError, TypeError):
+                        plan[field] = 0
+                else:
+                    plan[field] = str(raw).strip() if raw is not None else ""
+            if not plan.get("type"):
+                plan["type"] = "以权益工具结算"
             plans.append(plan)
 
-        # 存储到 checklist_responses（JSON打包）
+        # 取 project_id（checklist_responses.project_id NOT NULL）
+        pid_res = await db.execute(
+            sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+            {"wp_id": wp_id},
+        )
+        pid_row = pid_res.fetchone()
+        if not pid_row:
+            raise HTTPException(status_code=404, detail="底稿不存在")
+        project_id = pid_row.project_id
+
         await db.execute(
             sa.text(
-                "INSERT INTO checklist_responses (wp_id, item_id, content) "
-                "VALUES (:wp_id, :item_id, :content) "
-                "ON CONFLICT (wp_id, item_id) DO UPDATE SET content = :content"
+                "INSERT INTO checklist_responses (project_id, wp_id, item_id, remark, conclusion) "
+                "VALUES (:project_id, :wp_id, :item_id, :remark, NULL) "
+                "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark, updated_at = now()"
             ),
             {
+                "project_id": project_id,
                 "wp_id": wp_id,
-                "item_id": "J3-plans-data",
-                "content": json.dumps(plans, ensure_ascii=False),
+                "item_id": _ITEM_ID,
+                "remark": json.dumps(plans, ensure_ascii=False),
             },
         )
         await db.commit()
-
         return {"code": 0, "message": f"成功导入 {len(plans)} 个方案", "data": {"count": len(plans)}}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("J3 import failed: %s", e)
         raise HTTPException(status_code=500, detail="数据导入失败") from e

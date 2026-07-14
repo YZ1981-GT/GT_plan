@@ -4,7 +4,7 @@
     <template v-else>
       <div class="toolbar">
         <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions" size="small" @change="dualMode.onModeChange" />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -49,9 +49,7 @@
           />
         </el-tab-pane>
       </el-tabs>
-
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="projectId" />
-      <GtWpReviewDialogHost />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -64,8 +62,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncC
 import { useRoute } from 'vue-router'
 import { useF2StocktakeFormData, type ChecklistResponse } from './composables/useF2StocktakeFormData'
 import { useF2StocktakeDualMode } from './composables/useF2StocktakeDualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import F2TabStocktakeQuestionnaire from './f2/stocktake/F2TabStocktakeQuestionnaire.vue'
 import F2TabStocktakePlan from './f2/stocktake/F2TabStocktakePlan.vue'
 import F2TabStocktakeSummary from './f2/stocktake/F2TabStocktakeSummary.vue'
@@ -75,8 +72,6 @@ import F2TabStocktakeRollforward from './f2/stocktake/F2TabStocktakeRollforward.
 import GtAProgramConsole from './GtAProgramConsole.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -103,17 +98,14 @@ const dualMode = useF2StocktakeDualMode({
   reloadAll: () => formData.loadAll(),
 })
 
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId,
-})
-const { versionTrailRef, openVersionHistory } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 provide('f2VersionTrailRef', versionTrailRef)
 provide('f2OpenVersionHistory', openVersionHistory)
-
-const wpIdRef = toRef(props, 'wpId')
-useF2ReviewDialogProvide({ wpId: wpIdRef, projectId })
 
 provide('reloadWorkpaperData', () => formData.loadAll())
 
@@ -152,7 +144,7 @@ async function handleSave(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length) {
     await formData.saveItemsFromEvent(items)
-    versionToolbar.scheduleAutoSnapshot()
+    scheduleAutoSnapshot()
   }
 }
 

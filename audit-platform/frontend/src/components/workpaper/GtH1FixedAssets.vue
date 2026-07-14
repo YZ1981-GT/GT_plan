@@ -273,7 +273,7 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -290,14 +290,13 @@
  * Spec: .kiro/specs/h1-fixed-assets/ Task 6.1
  * Requirements: 1.2-1.3, 17.1
  */
-import { ref, computed, onMounted, onUnmounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core — H1TabIndex 非 lazy（底稿目录轻量，首屏必显）
 import H1TabIndex from './h1/core/H1TabIndex.vue'
@@ -372,7 +371,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H1-\d+)/)
   if (m) return m[1]
   // 底稿目录 H1（无后缀）
-  if (/\bH1\b/.test(name) && !/H1-/.test(name) && !/H1A/.test(name)) return 'H1'
+  if (/底稿目录/.test(name) || (/\bH1\b/.test(name) && !/H1-/.test(name) && !/H1A/.test(name))) return 'H1'
   return ''
 })
 
@@ -449,17 +448,15 @@ function persistResponse(itemId: string, value: any): void {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H1] openReviewDialog:', sectionId, sectionLabel)
-  // Integrated with audit-review-dialog module — real impl delegates to parent via emit
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ──────────────
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h1VersionTrailRef', versionTrailRef)
 provide('h1OpenVersionHistory', openVersionHistory)
 

@@ -8,6 +8,7 @@ Requirements: 1.2, 3.0.3, 3.0.5
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -77,6 +78,23 @@ _schema_service = WpRenderSchemaService()
 # render-config 每次调用曾用 openpyxl 同步加载整册模板仅为算 tab 排序（J1 等大底稿约 0.4s），
 # 该同步操作阻塞事件循环，并发请求（checklist-responses/active-job）被连累到数秒级。
 # 模板文件运行时不变，按 (path, mtime) 缓存后每个模板只加载一次，消除重复阻塞。
+def _sheet_name_matches(actual: str | None, requested: str | None) -> bool:
+    """sheet_name 过滤匹配：精确优先，回退到"忽略空白"比较。
+
+    根因：前端注册表的 sheetLabel（如「应付职工薪酬实质性程序表J1A」）常与
+    模板 xlsx / classification 里的真实 sheet 名（如「应付职工薪酬实质性程序表 J1A」，
+    含空格）不完全一致，导致 render-config 精确过滤 `!=` 全部落空 → 返回空 sheets →
+    前端程序表兜底去请求不存在的 `/procedure-tables/J1` → 「程序表模板缺失」告警 + 空表。
+    去掉空白后比较可覆盖这类空格/全半角空格差异，且不会误匹配带后缀的 sheet（如 -原版）。
+    """
+    if actual == requested:
+        return True
+    if not actual or not requested:
+        return False
+    _strip = str.maketrans("", "", " \u3000\t")
+    return actual.translate(_strip) == requested.translate(_strip)
+
+
 _TEMPLATE_SHEET_ORDER_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
 
 
@@ -462,8 +480,20 @@ async def get_render_config(
     current_user: User = Depends(get_current_user),
 ):
     """获取底稿渲染 schema + 项目数据 + 跨底稿引用（dispatch 模式）。"""
+    import time as _time
+    from app.services.wp_metrics import wp_metrics
+
+    _t0 = _time.perf_counter()
+    # 判断冷/热：模板 sheet 顺序缓存是否已存在条目
+    _cold = len(_TEMPLATE_SHEET_ORDER_CACHE) == 0
     try:
-        return await _get_render_config_impl(wp_id, sheet_name, db, current_user, force_component_type=component_type)
+        result = await _get_render_config_impl(wp_id, sheet_name, db, current_user, force_component_type=component_type)
+        # 从结果中提取主 componentType（第一个 sheet 的 componentType）
+        _sheets = result.get("sheets", []) if isinstance(result, dict) else []
+        _ct = _sheets[0]["componentType"] if _sheets else "unknown"
+        _elapsed = (_time.perf_counter() - _t0) * 1000
+        wp_metrics.observe_render_config(_ct, _elapsed, cold=_cold)
+        return result
     except Exception as _fatal:
         # 临时：把完整堆栈写到文件方便排查 500
         import traceback
@@ -589,7 +619,9 @@ async def _get_render_config_impl(
     # 注意：pkg_sheets（来自 account_package_registry）的顺序已经是正确的 registry 声明顺序，
     # 不应被模板 xlsx 的 sheet tab 顺序覆盖（registry 名称可能与模板 sheet tab 名不完全匹配）。
     if _is_multi_sheet and not pkg_sheets and _tpl and str(_tpl).endswith((".xlsx", ".xls")):
-        _template_order = _get_template_sheet_order(str(_tpl))  # 带 (path,mtime) 缓存，避免每次同步加载整册
+        # 带 (path,mtime) 缓存，且首次加载放到线程池执行，避免同步 openpyxl 阻塞事件循环
+        # （否则 J1 等多 sheet 底稿首访时会把并发的 checklist-responses/active-job 拖到数秒级）。
+        _template_order = await asyncio.to_thread(_get_template_sheet_order, str(_tpl))
         if _template_order:
             classifications = sorted(
                 classifications,
@@ -597,12 +629,21 @@ async def _get_render_config_impl(
             )
 
     sheets: list[dict] = []
+    # 整册专属组件（_WHOLE_WP_MULTISHEET_DEDICATED）的所有 sheet 路由到同一 renderer，
+    # 且该 renderer 输出与具体 sheet 无关（组件内部按 sheetName 分发同一份 html_data）。
+    # 逐 sheet 重复调用会产生 N 倍冗余 DB 查询（J1 14 sheet=28 次、H7 26 sheet 更甚）。
+    # 按 component_type 在单次请求内 memo，renderer 只跑一次。
+    _dedicated_render_memo: dict[str, dict | None] = {}
     for cls in classifications:
-        if sheet_name and cls.sheet_name != sheet_name:
+        if sheet_name and not _sheet_name_matches(cls.sheet_name, sheet_name):
             continue
         if cls.sheet_name and "GT_Custom" in cls.sheet_name:
             continue
-        # sheet_name 级 skip override（隐藏辅助 sheet，如 A1-11 的文号规则页）
+        # sheet_name 级 skip override（隐藏辅助/遗留 sheet）：
+        #   - A1-11 的文号规则页等辅助 sheet
+        #   - 模板里混入的遗留重复 sheet（如 J2 工作簿中残留的
+        #     「长期应付职工薪酬实质性程序表 L2A」，编码 L2A 不属于 J2，与 J2A 重复）
+        #   注：按完整 sheet_name 精确匹配 skip，不能按提取编码 skip（否则会误伤真实 L2A 应付利息程序表）
         if cls.sheet_name and _WP_CODE_OVERRIDE.get(cls.sheet_name) == "skip":
             continue
         # 隐藏"原版/原"历史遗留程序表（如 "J1A-原版"、"L1A-原"）
@@ -624,12 +665,19 @@ async def _get_render_config_impl(
                 _skip_m2 = re.match(r"([A-Z]\d+(?:-\d+)*)", cls.sheet_name)
                 if _skip_m2 and _WP_CODE_OVERRIDE.get(_skip_m2.group(1)) == "skip":
                     continue
-            # 向导式专属组件隐藏辅助sheet（选项清单/底稿目录/示例/不打印，无标准编码）
+            # 向导式专属组件隐藏辅助sheet（选项清单/示例/不打印，无标准编码）。
+            # 「底稿目录」策略分两类：
+            #  - D~N/S 科目专属组件（J1/H1/K3 等）有 TabIndex 子组件渲染目录页 → 必须保留，
+            #    否则底稿缺少目录页签（用户报 J1 缺少目录）。
+            #  - A/B/S *-bundle 聚合组件自身即为目录（内部列出并打开子 sheet），其 xlsx 里的
+            #    「底稿目录」sheet 冗余（A11/B13/B19/B51/s32/s33）→ 仍隐藏，避免多余空白页签。
             _ovr_check = _WP_CODE_OVERRIDE.get(wp_code)
             if _ovr_check and _ovr_check in _WHOLE_WP_MULTISHEET_DEDICATED:
                 _sn_lower = cls.sheet_name
-                if ("选项清单" in _sn_lower or "不归档" in _sn_lower or "底稿目录" in _sn_lower
-                        or "不打印" in _sn_lower or _sn_lower.startswith("示例")):
+                _is_bundle = _ovr_check.endswith("-bundle")
+                if ("选项清单" in _sn_lower or "不归档" in _sn_lower
+                        or "不打印" in _sn_lower or _sn_lower.startswith("示例")
+                        or (_is_bundle and "底稿目录" in _sn_lower)):
                     continue
         ovr = _WP_CODE_OVERRIDE.get(wp_code)
         # 多 sheet 底稿：按 sheet 级编码查 override（协作者 confirmation-* 精细组件，
@@ -700,7 +748,15 @@ async def _get_render_config_impl(
         if force_component_type and force_component_type in RENDERER_DISPATCH:
             component_type = force_component_type
             renderer = RENDERER_DISPATCH[force_component_type]
-        if renderer:
+        # 整册专属组件：同一 renderer 对所有 sheet 输出一致 → 单请求内 memo，避免 N 倍冗余查询
+        _is_whole_dedicated = (component_type == ovr and ovr in _WHOLE_WP_MULTISHEET_DEDICATED)
+        if renderer and _is_whole_dedicated and component_type in _dedicated_render_memo:
+            _memoized = _dedicated_render_memo[component_type]
+            if _memoized is not None:
+                sheet_html_data = _memoized
+        elif renderer:
+            from app.services.wp_metrics import wp_metrics as _wpm
+            _wpm.inc_renderer_invocation(component_type)
             ctx = RenderContext(
                 db=db, project_id=project_id, wp_id=wp_id, wp_code=wp_code,
                 working_paper=working_paper, classification=cls,
@@ -715,6 +771,8 @@ async def _get_render_config_impl(
                 result = await renderer(ctx)
                 if result is not None:
                     sheet_html_data = result
+                if _is_whole_dedicated:
+                    _dedicated_render_memo[component_type] = result
                 if ctx.sheet_schema is not None and ctx.sheet_schema != sheet_schema:
                     sheet_schema = ctx.sheet_schema
             except Exception as e:  # noqa: BLE001 — 单 sheet 渲染失败不影响其他 sheet

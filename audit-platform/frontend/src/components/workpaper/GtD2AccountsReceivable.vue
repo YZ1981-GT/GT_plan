@@ -219,10 +219,6 @@
       :section-id="d2ReviewSection.id"
       :section-label="d2ReviewSection.label"
     />
-    <GtWpReviewDialogHost />
-
-    <!-- 版本链 drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -230,19 +226,14 @@
 /**
  * GtD2AccountsReceivable.vue — D2 应收账款底稿主入口
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent } from 'vue'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
 import { useD2EntryDualMode, type D2RenderMode } from './composables/useD2EntryDualMode'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
-import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
-import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
-import { DisplayPrefs_Key } from './composables/displayPrefsKey'
-import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { D2_SAVE_ITEMS_KEY, D2_WRITEBACK_KEY } from './composables/d2InjectionKeys'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
@@ -262,7 +253,6 @@ const D2TabWriteoffCheck = defineAsyncComponent(() => import('./d2/D2TabWriteoff
 const D2TabPledgeCheck = defineAsyncComponent(() => import('./d2/D2TabPledgeCheck.vue'))
 const D2TabBizModel = defineAsyncComponent(() => import('./d2/D2TabBizModel.vue'))
 const D2TabCutoff = defineAsyncComponent(() => import('./d2/D2TabCutoff.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -281,6 +271,7 @@ const emit = defineEmits<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+const runtime = inject(WorkpaperRuntimeContextKey, null)
 
 const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'))
 const allResponses = computed(() => formData.allResponses.value)
@@ -288,15 +279,9 @@ const saving = formData.saving
 
 const crossSheet = useD2CrossSheet({ allResponses })
 
-// ─── 版本链接入 ───────────────────────────────────────────────────────────
-const {
-  versionTrailRef,
-  openVersionHistory,
-  scheduleAutoSnapshot,
-} = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// D2 只消费 GtWpRenderer 已初始化的版本能力，不再创建第二个 toolbar/Host。
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 const bsDate = computed(() => {
   const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext
@@ -378,8 +363,6 @@ const useOnlyOfficeFallback = computed(() => {
 })
 
 const wpIdRef = toRef(props, 'wpId')
-const projectIdRef = toRef(props, 'projectId')
-useWorkpaperReviewProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const { getThreadDot, getRowDot } = useD2ReviewThreads(wpIdRef)
 provide('d2GetThreadDot', getThreadDot)
@@ -387,27 +370,21 @@ provide('d2GetRowDot', getRowDot)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
-useWorkpaperEntryInjections({
-  onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
-  reloadFn: () => formData.loadAll(),
-})
 provide('d2CrossSheet', crossSheet)
-provide('d2VersionTrailRef', versionTrailRef)
+provide('d2VersionTrailRef', runtime?.version.versionTrailRef)
 provide('d2OpenVersionHistory', openVersionHistory)
-// 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
-// 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
-const displayPrefs = useDisplayPrefsStore()
-provide(DisplayPrefs_Key, displayPrefs)
-provide('displayPrefs', displayPrefs)
 
 // ─── P0-2: provide/inject 替代 window event ──────────────────────────────
 // 子 tab 通过 inject(D2_SAVE_ITEMS_KEY) 保存数据，不再用全局 window.dispatchEvent。
 // 优势：类型安全、组件隔离（同页面多 D2 实例不冲突）、无需生命周期管理。
 async function d2SaveItems(items: ChecklistResponse[]): Promise<void> {
-  if (Array.isArray(items) && items.length > 0) {
+  if (!Array.isArray(items) || items.length === 0) return
+  try {
     await formData.saveItemsFromEvent(items)
     scheduleAutoSnapshot()
     emit('save')
+  } catch {
+    // Adapter 已保留 dirty/error 状态并由 useD2FormData 给出可见错误；失败时不发保存事件/快照。
   }
 }
 
@@ -440,16 +417,18 @@ async function selfLoad(): Promise<void> {
   const snapshot = props.htmlData?.responses_snapshot
   // P1-4: 仅当 snapshot 非空对象时才使用（避免部分 htmlData 丢失完整数据）
   if (snapshot && typeof snapshot === 'object' && Object.keys(snapshot).length > 0) {
-    const map = new Map<string, ChecklistResponse>()
-    for (const [k, v] of Object.entries(snapshot)) {
-      const entry = v as Record<string, unknown>
-      map.set(k, {
-        item_id: String(entry?.item_id ?? k),
+    const items = Object.entries(snapshot).map(([itemId, raw]) => {
+      const entry = raw as Record<string, unknown>
+      return {
+        item_id: String(entry?.item_id ?? itemId),
         conclusion: (entry?.conclusion as string | null) ?? null,
         remark: (entry?.remark as string | null) ?? null,
-      })
-    }
-    formData.allResponses.value = map
+        wp_ref: (entry?.wp_ref as string | null) ?? null,
+        version: (entry?.version as string | undefined),
+        updated_at: (entry?.updated_at as string | undefined),
+      }
+    })
+    formData.hydrate(items)
     isLoading.value = false
     return
   }
@@ -472,7 +451,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('d2:save-items', handleD2SaveItems)
   window.removeEventListener('d2:writeback-trial-balance', handleD2Writeback)
-  formData.flushPendingSave()
+  void formData.flushPendingSave().catch(() => undefined)
 })
 </script>
 

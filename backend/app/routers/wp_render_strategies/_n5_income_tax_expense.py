@@ -124,18 +124,18 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         rows = (
             await ctx.db.execute(
                 sa.text(
-                    "SELECT item_id, conclusion, evidence, status "
+                    "SELECT item_id, conclusion, remark "
                     "FROM checklist_responses "
-                    "WHERE workpaper_id = :wid"
+                    "WHERE wp_id = :wid"
                 ),
-                {"wid": str(ctx.workpaper_id)},
+                {"wid": str(ctx.wp_id)},
             )
         ).fetchall()
         for r in rows:
             responses_snapshot[r.item_id] = {
+                "item_id": r.item_id,
                 "conclusion": r.conclusion,
-                "evidence": r.evidence,
-                "status": r.status,
+                "remark": r.remark,
             }
         # 提取审定数
         if _ADJUDICATED_ITEM_ID in responses_snapshot:

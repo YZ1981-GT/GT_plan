@@ -11,7 +11,7 @@
  * Requirements: 5.1-5.4, 6.2-6.4
  */
 import { ref, type Ref } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 
 export interface CrossSheetDiscrepancy {
   field: string

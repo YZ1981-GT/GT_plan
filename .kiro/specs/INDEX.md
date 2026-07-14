@@ -1,11 +1,11 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-06-29
+**最后更新**：2026-07-14
 **当前分支**：`work/2026-05-30-wp-specs`
-**Spec 总数**：**240**（active 21 + archived 219）
-**当前 active = 21**（3 全局治理 + 6 D1拆分 + 1 通用复核对话 + 6 S类特定项目程序 + 5 C类控制测试专项）
-**最高迁移**：V094
-**测试总数**：~17500+（含 PBT 40+ properties）
+**统计基线**：2026-06-29 的总数统计尚待批量重算（原记录：240，active 21 + archived 219）
+**本次完成 Spec**：`workpaper-maintainability-convergence`（底稿 Runtime Boundary、统一持久化、能力覆盖真源与防回归）— Wave 0–7 全部完成
+**最高迁移**：以 `migration_status` 实测为准
+**测试总数**：~17500+（含 PBT 40+ properties，旧统计）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---

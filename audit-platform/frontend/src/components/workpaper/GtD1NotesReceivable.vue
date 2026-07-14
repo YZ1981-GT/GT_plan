@@ -417,9 +417,7 @@
       :section-id="d1ReviewSection.id"
       :section-label="d1ReviewSection.label"
     />
-    <GtWpReviewDialogHost />
-
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+    <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
 
   </div>
 
@@ -435,7 +433,7 @@
 
  */
 
-import { ref, computed, defineAsyncComponent, toRef, onMounted, onBeforeUnmount, provide } from 'vue'
+import { ref, computed, defineAsyncComponent, toRef, inject, onMounted, onBeforeUnmount, provide } from 'vue'
 
 import { useD1FormData } from './composables/useD1FormData'
 
@@ -443,11 +441,8 @@ import { useD1Procedure } from './composables/useD1Procedure'
 
 import { useD1Review } from './composables/useD1Review'
 
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { DisplayPrefs_Key } from './composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 import { useD1ReviewThreads } from './composables/useD1ReviewThreads'
@@ -462,7 +457,6 @@ import { resolveD1SheetCode } from './composables/useD1SheetRouting'
 
 import { resolveD1SheetLabel } from './composables/d1SheetLabels'
 import { resolveD1ReviewSection } from './composables/d1ReviewSectionMap'
-import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 
 import D1TabIndex from './d1/D1TabIndex.vue'
@@ -506,8 +500,6 @@ const D1TabSamplingVouching = defineAsyncComponent(() => import('./d1/D1TabSampl
 const D1TabWriteoffCheck = defineAsyncComponent(() => import('./d1/D1TabWriteoffCheck.vue'))
 
 const D1TabAdjustment = defineAsyncComponent(() => import('./d1/D1TabAdjustment.vue'))
-
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 
 
@@ -727,22 +719,17 @@ const projectIdRef = toRef(props, 'projectId')
 
 
 
-const {
-  versionTrailRef,
-  openVersionHistory,
-  scheduleAutoSnapshot,
-} = useWorkpaperVersionToolbar({
-  wpId: wpIdRef,
-  projectId: projectIdRef,
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 // 保存成功后触发版本快照
 const saveImmediateWithSnapshot = async (...args: Parameters<typeof saveImmediate>) => {
   await saveImmediate(...args)
   scheduleAutoSnapshot()
 }
-
-useWorkpaperReviewProvide({ wpId: wpIdRef, projectId: projectIdRef })
 
 const { getThreadDot, getRowDot } = useD1ReviewThreads(wpIdRef)
 provide('d1GetThreadDot', getThreadDot)
@@ -769,8 +756,8 @@ provide('d1OpenVersionHistory', openVersionHistory)
 
 // 显示偏好收敛到单一真源（useDisplayPrefsStore），不再提供硬编码闭包。
 // 过渡期同时保留字符串 key，值改为真 store，使未迁移 tab 立即获得正确单位/字号/负数行为。
+// DisplayPrefs_Key 由 Runtime Boundary 统一 provide；保留字符串 key 供未迁移子 tab 使用。
 const displayPrefs = useDisplayPrefsStore()
-provide(DisplayPrefs_Key, displayPrefs)
 provide('displayPrefs', displayPrefs)
 
 

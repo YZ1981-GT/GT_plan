@@ -5,7 +5,7 @@
  * Requirements: 1.1
  */
 import { ref, computed } from 'vue'
-import { http } from '@/utils/http'
+import http from '@/utils/http'
 
 export type J3RenderMode = 'html' | 'onlyoffice'
 

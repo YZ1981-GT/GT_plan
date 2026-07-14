@@ -268,7 +268,7 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -288,12 +288,12 @@
  */
 import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+// 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H5TabIndex 非 lazy（底稿目录轻量，首屏必显）
 import H5TabIndex from './h5/core/H5TabIndex.vue'
@@ -380,7 +380,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H5-\d+)/)
   if (m) return m[1]
   // 底稿目录 H5（无后缀）
-  if (/\bH5\b/.test(name) && !/H5-/.test(name) && !/H5A/.test(name)) return 'H5'
+  if (/底稿目录/.test(name) || (/\bH5\b/.test(name) && !/H5-/.test(name) && !/H5A/.test(name))) return 'H5'
   return ''
 })
 
@@ -433,14 +433,13 @@ async function selfLoad(): Promise<void> {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H5] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h5VersionTrailRef', versionTrailRef)
 provide('h5OpenVersionHistory', openVersionHistory)
 

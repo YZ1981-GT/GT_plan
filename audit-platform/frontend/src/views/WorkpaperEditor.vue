@@ -45,6 +45,7 @@
 
       <!-- HTML 渲染器路由分发（A/B/C/D/E/H/skip 优先级最高） -->
       <GtWpRenderer
+        ref="wpRendererRef"
         v-if="useHtmlRenderer"
         :wp-id="wpId"
         @save-success="onChildSaved"
@@ -303,8 +304,9 @@
     @jump="onVersionSearchJump"
   />
 
-  <!-- 版本链侧栏（field-level 快照时间线 + diff + 回滚） -->
+  <!-- 非 HTML 编辑器仍使用编辑器级 Host；HTML 路径由 GtWpRenderer Runtime Boundary 唯一承载。 -->
   <GtWpVersionTrail
+    v-if="!useHtmlRenderer"
     ref="versionTrailRef"
     :workpaper-id="wpId"
     :project-id="projectId"
@@ -506,6 +508,7 @@ function onOpenReviewThread(item: { section_id: string }) {
   })
 }
 const univerEditorCoreRef = ref<InstanceType<typeof UniverEditorCore> | null>(null)
+const wpRendererRef = ref<InstanceType<typeof GtWpRenderer> | null>(null)
 const versionTrailRef = ref<InstanceType<typeof GtWpVersionTrail> | null>(null)
 
 function onWpImportEnhanced() {
@@ -739,8 +742,9 @@ function onDialogApplied(_sheet: string) {
 }
 
 function onShowVersions() {
-  // 打开版本链侧栏（field-level 快照时间线）
-  versionTrailRef.value?.openDrawer()
+  // HTML 路径委托 Runtime Boundary，非 HTML 路径保留编辑器级 Host。
+  if (useHtmlRenderer.value) wpRendererRef.value?.openVersionHistory()
+  else versionTrailRef.value?.openDrawer()
 }
 
 /** 版本回滚完成后刷新底稿数据 */
@@ -983,6 +987,18 @@ onBeforeRouteLeave(async (_to, _from, next) => {
 onMounted(() => {
   ;(async () => {
     await fetchComponentType()
+
+    // D0/E0/F0/G0/H0/K0/L0 等函证枢纽不属于底稿编辑器。
+    // confirmation-hub 故意不注册进 HTML_RENDERER_ROUTE_SET；若不在此重定向，
+    // 会错误落入 Univer 路径并显示「加载底稿失败 (canceled)」。
+    if (componentType.value === 'confirmation-hub') {
+      await router.replace({
+        name: 'ConfirmationHub',
+        params: { projectId: projectId.value },
+      })
+      return
+    }
+
     try {
       await wpClassification.load()
     } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }

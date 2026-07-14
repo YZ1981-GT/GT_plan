@@ -181,19 +181,16 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
-
-      <GtWpReviewDialogHost />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useF2SpecialFormData, type ChecklistResponse } from './composables/useF2SpecialFormData'
 import { useF2SpecialDualMode } from './composables/useF2SpecialDualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
-import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useF2SpeExternalAdjudicated } from './composables/useF2SpeExternalAdjudicated'
 
 // defineAsyncComponent lazy loading — 首屏仅加载当前 sheet 组件（对齐D4标准）
@@ -218,8 +215,6 @@ const F2TabInterviewDetail = defineAsyncComponent(() => import('./f2-special/ipo
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -247,10 +242,14 @@ const formData = useF2SpecialFormData({
 
 const allResponses = computed(() => formData.allResponses.value)
 
-const versionToolbar = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f2VersionTrailRef', versionTrailRef)
@@ -294,10 +293,7 @@ const useGridFallback = computed(() => {
   return code && !isHtmlSheet.value && !showIpoBlocked.value
 })
 
-const wpIdRef = toRef(props, 'wpId')
-const projectIdRef = toRef(props, 'projectId')
-useF2ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
-
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 const externalAdjudicated = useF2SpeExternalAdjudicated({
   onRefresh: () => formData.loadAll(),
 })

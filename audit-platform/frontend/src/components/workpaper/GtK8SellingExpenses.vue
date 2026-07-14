@@ -163,7 +163,6 @@
       </template>
     </template>
 
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -181,14 +180,19 @@
  * Spec: .kiro/specs/k8-selling-expenses/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
+import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core
 const K8TabIndex = defineAsyncComponent(() => import('./k8/core/K8TabIndex.vue'))
@@ -232,7 +236,11 @@ const emit = defineEmits<{
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
-const allResponses = ref<Map<string, any>>(new Map())
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)
+const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
+const allResponses = persistence.responses
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const tbData = ref({
   /** 6601 未审发生额 */
   unadjusted6601: 0,
@@ -267,33 +275,21 @@ const currentSheet = computed(() => {
   const m = name.match(/(K8-\d+)/)
   if (m) return m[1]
   // 底稿目录 K8（无后缀）
-  if (/\bK8\b/.test(name) && !/K8-/.test(name) && !/K8A/.test(name)) return 'K8'
+  if (/底稿目录/.test(name) || (/\bK8\b/.test(name) && !/K8-/.test(name) && !/K8A/.test(name))) return 'K8'
   return ''
 })
 
-// ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
-async function handleChildSave(itemId: string, value: any): Promise<void> {
+// ─── 子组件 save 回调（统一 Persistence Adapter） ─────────────────────────────
+async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   if (!props.wpId) return
-  let remark: string | null = null
-  let conclusion: string | null = null
-  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
-    const r = (value as any).remark
-    remark = r != null ? (typeof r === 'string' ? r : JSON.stringify(r)) : null
-    const c = (value as any).conclusion
-    conclusion = c != null ? (typeof c === 'string' ? c : JSON.stringify(c)) : null
-  } else {
-    remark = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  }
-  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion, remark }],
-    })
-  } catch {
-    // 静默失败，数据保留在本地
+    await persistence.save(itemId, toChecklistPatch(value))
+    runtime?.version.scheduleAutoSnapshot()
+    emit('save')
+  } catch (error) {
+    ElMessage.error(persistence.stateOf(itemId).lastError || '保存失败，数据已保留在本地，请稍后重试')
+    console.warn(`[GtK8SellingExpenses] save failed: ${itemId}`, error)
   }
-  scheduleAutoSnapshot()
 }
 
 // ─── TB自动取数（6601销售费用 — 损益类取发生额！） ─────────────────────────────
@@ -319,45 +315,18 @@ async function _loadTbData(): Promise<void> {
   }
 }
 
-// ─── selfLoad ────────────────────────────────────────────────────────────────
-/** 合并 render 输出的 responses */
-function _mergeResponses(map: Map<string, any>, src: any): void {
-  if (!src) return
-  if (Array.isArray(src)) {
-    for (const item of src) {
-      const id = item?.item_id ?? item?.itemId
-      if (id) map.set(id, item)
-    }
-  } else if (typeof src === 'object') {
-    for (const [k, v] of Object.entries(src)) map.set(k, v)
-  }
-}
-
+// ─── selfLoad（统一 Persistence Adapter） ─────────────────────────────────────
 async function selfLoad(): Promise<void> {
   try {
-    const map = new Map<string, any>()
-    if (props.htmlData) {
-      _mergeResponses(map, props.htmlData.responses_snapshot)
-      _mergeResponses(map, props.htmlData.allResponses)
-      _mergeResponses(map, props.htmlData.checklist_responses)
-    } else {
-      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'k8-selling-expenses' },
-        _silent: true,
-      } as any)
-      const data = res.data?.data || res.data
-      if (data?.sheets && Array.isArray(data.sheets)) {
-        for (const sheet of data.sheets) {
-          const hd = sheet.html_data
-          if (hd) {
-            _mergeResponses(map, hd.responses_snapshot)
-            _mergeResponses(map, hd.allResponses)
-            _mergeResponses(map, hd.checklist_responses)
-          }
-        }
-      }
-    }
-    allResponses.value = map
+    const snapshot = props.htmlData
+      ? collectChecklistResponses(
+          props.htmlData.responses_snapshot,
+          props.htmlData.allResponses,
+          props.htmlData.checklist_responses,
+        )
+      : []
+    if (snapshot.length > 0) persistence.hydrate(snapshot)
+    else await persistence.load()
   } catch (err) {
     console.warn('[GtK8SellingExpenses] selfLoad failed:', err)
   } finally {
@@ -365,24 +334,9 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[K8] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-
-const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-
-provide('versionTrail', versionToolbar)
-provide('k8VersionTrailRef', versionTrailRef)
-provide('k8OpenVersionHistory', openVersionHistory)
-
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
+onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
+
 onMounted(() => {
   void selfLoad()
   void _loadTbData()

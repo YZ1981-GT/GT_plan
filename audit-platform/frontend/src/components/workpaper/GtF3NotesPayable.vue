@@ -262,7 +262,7 @@
 
 
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
 
     </template>
 
@@ -286,7 +286,7 @@
 
  */
 
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 
 import { useF3FormData, type ChecklistResponse } from './composables/useF3FormData'
 
@@ -294,7 +294,7 @@ import { useF3CrossSheet } from './composables/useF3CrossSheet'
 
 import { useF3DualMode } from './composables/useF3DualMode'
 
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 
@@ -302,8 +302,6 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 
 
@@ -383,13 +381,16 @@ const crossSheet = useF3CrossSheet({
 
 
 
-const versionToolbar = useWorkpaperVersionToolbar({
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 
-  wpId: toRef(props, 'wpId'),
+const runtime = inject(WorkpaperRuntimeContextKey, null)
 
-  projectId: toRef(props, 'projectId'),
-
-})
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 
 const { versionTrailRef, openVersionHistory } = versionToolbar
 
@@ -462,13 +463,7 @@ const auditYear = computed(() => {
 
 
 
-function openReviewDialog(sectionId: string): void {
-
-  console.log('[F3] openReviewDialog:', sectionId)
-
-}
-
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
 provide('reloadWorkpaperData', () => formData.loadAll())
 

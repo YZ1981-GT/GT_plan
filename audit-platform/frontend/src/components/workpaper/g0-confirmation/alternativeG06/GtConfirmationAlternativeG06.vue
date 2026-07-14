@@ -20,7 +20,7 @@
           <el-tag size="small" type="info" effect="plain">共 {{ data.companies.value.length }} 家</el-tag>
         </div>
         <div class="gt-confirmation-alternative-g06__toolbar-right">
-          <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
           <GtReviewTrigger section-id="G0-6-alternative" label="复核" />
         </div>
       </div>
@@ -349,21 +349,11 @@
     <!-- 隐藏文件选择器 -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleImportFile" />
 
-    <!-- 版本链抽屉 -->
-    <GtWpVersionTrail
-      v-if="wpId"
-      ref="versionTrailRef"
-      :workpaper-id="wpId"
-      :project-id="projectId || ''"
-    />
-
-    <!-- 复核对话 -->
-    <GtWpReviewDialogHost />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
+import { ref, computed, inject, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
@@ -371,8 +361,10 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeG06Data } from './composables/useAlternativeG06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../../confirmation/alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_G06 } from './blockColumnConfigsG06'
-import { useWorkpaperVersionToolbar } from '../../composables/useWorkpaperVersionToolbar'
-import { useG0ReviewDialogProvide } from '../composables/useG0ReviewDialogProvide'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -383,8 +375,6 @@ import AlternativeD05Master from '../../confirmation/alternativeD05/AlternativeD
 import CheckBlock from '../../confirmation/alternativeD05/CheckBlock.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('../../version-trail/GtWpVersionTrail.vue'))
-const GtWpReviewDialogHost = defineAsyncComponent(() => import('../../GtWpReviewDialogHost.vue'))
 
 const props = defineProps<{
   htmlData: any
@@ -398,12 +388,9 @@ const props = defineProps<{
 const wpIdRef = computed(() => props.wpId ?? '')
 const projectIdRef = computed(() => props.projectId ?? '')
 
-// ─── 版本链集成（autoSnapshot on save + 版本历史抽屉）───────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
-
-// ─── 复核对话 provide（供 section 标题栏 GtReviewTrigger inject）─────────────
-useG0ReviewDialogProvide({ wpId: wpIdRef, projectId: projectIdRef })
+// ─── Runtime Boundary 统一提供版本链 + 复核（GtWpRenderer scaffold），本组件不再本地接线 ───
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 const emit = defineEmits<{
   (e: 'save', payload: any): void
@@ -782,7 +769,7 @@ function handleAiFill() {
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
 }
 
 // ─── 行级 OCR：上传证券单据 → contract-ocr 识别 → 确认 → merge 填入当前行 ────

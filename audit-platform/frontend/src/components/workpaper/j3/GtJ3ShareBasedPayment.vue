@@ -7,30 +7,13 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 双模式切换工具栏 -->
-      <div v-if="showModeToolbar" class="j3-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
-      </div>
-
-      <!-- OnlyOffice 模式 -->
-      <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
-        :key="ooSheetName"
-        :wp-id="props.wpId"
-        :sheet-name="ooSheetName"
-        :project-id="props.projectId"
-        :readonly="isReadonly"
-        @fallback="onOoFallback"
-      />
-
-      <template v-else>
       <!-- 底稿目录（默认页） -->
       <J3TabIndex
         v-if="!currentSheet || currentSheet === 'J3'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="props.isReadonly"
+        :all-responses="allResponses"
         @navigate-sheet="handleNavigateSheet"
       />
 
@@ -68,14 +51,21 @@
         :save-immediate="handleChildSave"
       />
 
+      <!-- IPO 股份支付监管审计要点（整合页，两个 sheet 共用） -->
+      <J3TabIpoFocus
+        v-else-if="currentSheet === 'J3-IPO'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :html-data="props.htmlData"
+        :all-responses="allResponses"
+        :is-readonly="props.isReadonly"
+        :save-immediate="handleChildSave"
+      />
+
       <!-- 兜底 OnlyOffice -->
       <div v-else class="j3-sheet-placeholder">
         <el-empty :description="`J3 未识别的 sheet: ${currentSheet}（将使用 OnlyOffice）`" />
       </div>
-
-      </template><!-- end HTML mode -->
-
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
     </template>
   </div>
 </template>
@@ -89,18 +79,21 @@
  *
  * Spec: .kiro/specs/j3-share-based-payment/
  */
-import { computed, ref, onMounted, defineAsyncComponent, provide, toRef } from 'vue'
-import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
-import { useJ3EntryDualMode, type J3RenderMode } from '../composables/useJ3EntryDualMode'
+import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent, toRef, inject, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  useChecklistPersistence,
+  type ChecklistResponse,
+} from '@/composables/workpaper/useChecklistPersistence'
+import { collectChecklistResponses } from '@/composables/workpaper/checklistPersistenceHelpers'
+import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
-import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
-import http from '@/utils/http'
 
 // defineAsyncComponent 懒加载
-const GtWpVersionTrail = defineAsyncComponent(() => import('../version-trail/GtWpVersionTrail.vue'))
 const J3TabIndex = defineAsyncComponent(() => import('./core/J3TabIndex.vue'))
 const J3TabDetail = defineAsyncComponent(() => import('./core/J3TabDetail.vue'))
 const J3TabCheck = defineAsyncComponent(() => import('./core/J3TabCheck.vue'))
+const J3TabIpoFocus = defineAsyncComponent(() => import('./core/J3TabIpoFocus.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -124,95 +117,69 @@ const isLoading = ref(true)
 const currentSheet = computed(() => {
   const sn = props.sheetName || ''
   if (/\bJ3A\b/.test(sn) || sn.includes('实质性程序表')) return 'J3A'
+  // IPO 监管要点 + 首发问答二 → 整合页
+  if (sn.includes('IPO') || sn.includes('股权激励工具') || sn.includes('首发')) return 'J3-IPO'
   const m = sn.match(/(J3-\d+)/)
   if (m) return m[1]
   if (sn.includes('目录') || sn === 'J3') return 'J3'
   return sn
 })
 
-// ─── Persistence: allResponses Map ──────────────────────────────────────────
-const allResponses = ref<Map<string, { item_id: string; conclusion: string | null; remark: string | null }>>(new Map())
-
-async function selfLoad() {
-  try {
-    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const items = res.data?.data || res.data || []
-    if (Array.isArray(items)) {
-      const map = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
-      for (const it of items) {
-        if (it.item_id) map.set(it.item_id, { item_id: it.item_id, conclusion: it.conclusion ?? null, remark: it.remark ?? null })
-      }
-      allResponses.value = map
-    }
-  } catch { /* silent */ }
-  if (props.htmlData) {
-    const snapshot = ((props.htmlData as any).responses_snapshot || (props.htmlData as any).checklist_responses) as any
-    if (Array.isArray(snapshot)) {
-      for (const it of snapshot) {
-        if (it.item_id && !allResponses.value.has(String(it.item_id))) {
-          allResponses.value.set(String(it.item_id), { item_id: String(it.item_id), conclusion: it.conclusion ?? null, remark: it.remark ?? null })
-        }
-      }
-    }
-  }
-}
-
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-async function handleChildSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
-  for (const it of items) allResponses.value.set(it.item_id, it)
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(async () => {
-    try {
-      await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
-      scheduleAutoSnapshot()
-    } catch { /* silent */ }
-  }, 800)
-}
-
-// ─── 版本追踪 ────────────────────────────────────────────────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-provide('j3VersionTrailRef', versionTrailRef)
-provide('j3OpenVersionHistory', openVersionHistory)
-
-// ─── 双模式切换（HTML ↔ OnlyOffice） ─────────────────────────────────────────
-const KNOWN_HTML_SHEETS = new Set(['J3', 'J3A', 'J3-1', 'J3-2'])
-
-const showModeToolbar = computed(() =>
-  KNOWN_HTML_SHEETS.has(currentSheet.value) || !currentSheet.value,
-)
-
-const dualMode = useJ3EntryDualMode({
+// ─── Runtime Boundary + Persistence Adapter ─────────────────────────────────
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const persistence = useChecklistPersistence({
   wpId: toRef(props, 'wpId'),
-  currentSheet,
-  reloadAllResponses: selfLoad,
+  projectId: computed(() => props.projectId || undefined),
+  debounceMs: 800,
+  onSaved: () => runtime?.version.scheduleAutoSnapshot(),
 })
+const allResponses = persistence.responses
 
-const ooSheetName = computed(() =>
-  dualMode.resolveOoSheetName() || props.sheetName || 'J3-1',
-)
+async function selfLoad(): Promise<void> {
+  const snapshot = collectChecklistResponses(
+    (props.htmlData as any)?.responses_snapshot,
+    (props.htmlData as any)?.allResponses,
+    (props.htmlData as any)?.checklist_responses,
+  )
+  if (snapshot.length > 0) persistence.hydrate(snapshot)
+  const fallback = new Map(allResponses.value)
+  try {
+    await persistence.load()
+  } catch {
+    if (fallback.size === 0) ElMessage.warning('J3 保存数据加载失败，请刷新后重试')
+  }
+  const merged = new Map(allResponses.value)
+  for (const [itemId, item] of fallback) {
+    if (!merged.has(itemId)) merged.set(itemId, item)
+  }
+  persistence.hydrate(merged)
+}
 
-const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: J3RenderMode) => { void dualMode.switchMode(v) },
-})
-
-const renderModeOptions = computed(() => [
-  { label: '结构化视图', value: 'html' as const },
-  {
-    label: '在线编辑',
-    value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
-  },
-])
-
-function onOoFallback(): void {
-  void dualMode.switchMode('html')
+/**
+ * 子 tab 已完成业务序列化；统一交给 Adapter 管理逐 item debounce/flush/error。
+ * 返回 Promise 以兼容子 composable 的 `saveImmediate(items).catch(...)` 契约。
+ */
+async function handleChildSave(items: ChecklistResponse[]): Promise<void> {
+  for (const { item_id, ...patch } of items) {
+    persistence.saveDebounced(item_id, patch)
+  }
 }
 
 function handleNavigateSheet(sheetName: string) {
   emit('navigate-sheet', sheetName)
 }
+
+// sheet 切换时主动 flush 待保存 section。
+watch(currentSheet, async (nextSheet, prevSheet) => {
+  if (nextSheet === prevSheet) return
+  try {
+    await persistence.flush()
+  } catch {
+    ElMessage.error('J3 切换底稿时保存失败，数据已保留，可返回后重试')
+  }
+})
+
+onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
 
 onMounted(async () => {
   await selfLoad()
@@ -227,12 +194,6 @@ onMounted(async () => {
 }
 .loading-container {
   padding: 24px;
-}
-.j3-mode-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
 }
 .j3-sheet-placeholder {
   display: flex;

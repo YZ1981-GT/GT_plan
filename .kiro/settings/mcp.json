@@ -100,7 +100,12 @@
         "ghcr.io/github/github-mcp-server:latest"
       ],
       "envFile": "D:/GT_plan/.cursor/mcp.env",
-      "disabled": false
+      "disabled": false,
+      "autoApprove": [
+        "get_file_contents",
+        "get_latest_release",
+        "get_file_contents"
+      ]
     },
     "gt-plan": {
       "command": "D:/GT_plan/.venv/Scripts/python.exe",

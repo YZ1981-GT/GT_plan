@@ -15,6 +15,93 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
+# 审定表分类（对齐前端 useJ1Adjudication 的 category 枚举）
+_CAT_SHORT_TERM = "short_term"
+_CAT_POST_EMPLOYMENT = "post_employment"
+_CAT_SEVERANCE = "severance"
+
+
+def _classify_by_name(name: str) -> str:
+    """按科目名称关键词归类到审定表分类（code 前缀无法判定时的兜底）。"""
+    if "辞退" in name:
+        return _CAT_SEVERANCE
+    if any(k in name for k in ("设定提存", "养老", "失业", "年金", "离职后", "设定受益")):
+        return _CAT_POST_EMPLOYMENT
+    return _CAT_SHORT_TERM
+
+
+def _classify_code(code: str, name: str) -> str:
+    """2211.XX 二级段 → 审定表分类：01短期薪酬 / 02设定提存 / 07离职后福利。"""
+    parts = code.split(".")
+    seg2 = parts[1] if len(parts) >= 2 else ""
+    if seg2 == "01":
+        return _CAT_SHORT_TERM
+    if seg2 in ("02", "07"):
+        return _CAT_POST_EMPLOYMENT
+    return _classify_by_name(name)
+
+
+async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
+    """无持久化审定数据时，从 tb_balance 科目 2211 明细子科目预填审定表行。
+
+    - 优先取三级明细（2211.01.04 社会保险 等）；无三级则退到二级（2211.01 短期薪酬）；
+      再无则用一级 2211 单行兜底。
+    - begin_unadj=期初余额、end_unadj=期末余额（负债取绝对值，规避借正贷负口径差异）。
+    - 分类按 code 二级段（01/02/07）优先，兜底按名称关键词。
+    key 对齐前端 useJ1Adjudication.initFromHtmlData 的 snake_case 字段。
+    """
+    from app.models.audit_platform_models import TbBalance
+    from app.services.dataset_query import get_active_filter
+
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code,
+                TbBalance.account_name,
+                TbBalance.opening_balance,
+                TbBalance.closing_balance,
+            ).where(active_filter)
+        )
+        rows = result.fetchall()
+    except Exception as e:  # noqa: BLE001 — 预填失败按空处理，不阻塞渲染
+        logger.warning("J1 审定表预填 tb_balance 查询失败: %s", e)
+        return []
+
+    # 归集 2211 各级明细
+    by_level: dict[int, list] = {1: [], 2: [], 3: []}
+    for r in rows:
+        code = (r.account_code or "").strip()
+        if code != ACCOUNT_CODE and not code.startswith(ACCOUNT_CODE + "."):
+            continue
+        opening = abs(float(r.opening_balance or 0))
+        closing = abs(float(r.closing_balance or 0))
+        if opening == 0 and closing == 0:
+            continue
+        seg = code.split(".")
+        lvl = len(seg)  # 2211=1 / 2211.01=2 / 2211.01.04=3
+        if lvl in by_level:
+            by_level[lvl].append((code, (r.account_name or "").strip(), opening, closing))
+
+    # 选最深可用层级（3 级优先，退 2 级，再退 1 级）
+    chosen = by_level[3] or by_level[2] or by_level[1]
+    prefill: list[dict] = []
+    for code, name, opening, closing in chosen:
+        label = name.split("_")[-1] if name else code
+        prefill.append({
+            "id": f"tb-{code}",
+            "label": label,
+            "category": _classify_code(code, name),
+            "begin_unadj": opening,
+            "begin_aje": 0,
+            "end_unadj": closing,
+            "end_aje": 0,
+            "analysis": "",
+        })
+    return prefill
+
 J1_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "j1-employee-compensation"},
     {"sheet_name": "应付职工薪酬实质性程序表 J1A", "component_type": "j1-employee-compensation"},
@@ -84,6 +171,9 @@ async def render(ctx: RenderContext) -> dict | None:
 
     # ─── 解析审定表数据 ───────────────────────────────────────────────────
     adjudication_rows = _extract_json(responses_snapshot, "J1-adjudication-data", [])
+    # 无持久化审定数据 → 从 tb_balance 2211 明细子科目预填项目实际余额（期初/期末未审数）
+    if not adjudication_rows:
+        adjudication_rows = await _build_adjudication_prefill(ctx)
 
     # ─── 解析明细表数据 ───────────────────────────────────────────────────
     detail_rows = _extract_json(responses_snapshot, "J1-detail-data", [])

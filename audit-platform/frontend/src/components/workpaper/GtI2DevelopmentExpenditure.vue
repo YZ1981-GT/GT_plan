@@ -296,9 +296,9 @@
  * Spec: .kiro/specs/i2-development-expenditure/ Task 1.1, Phase 6
  * Requirements: 1.1-1.10, 9.1-9.5, 11.1-11.3, 12.1-12.3
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI2CrossSheet } from './composables/useI2CrossSheet'
 import { useI2DualMode } from './composables/useI2DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -366,7 +366,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(I2-\d+)/)
   if (m) return m[1]
   // 底稿目录 I2（无后缀）
-  if (/\bI2\b/.test(name) && !/I2-/.test(name) && !/I2A/.test(name)) return 'I2'
+  if (/底稿目录/.test(name) || (/\bI2\b/.test(name) && !/I2-/.test(name) && !/I2A/.test(name))) return 'I2'
   return ''
 })
 
@@ -451,15 +451,13 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[I2] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('i2VersionTrailRef', versionTrailRef)
 provide('i2OpenVersionHistory', openVersionHistory)
 

@@ -161,7 +161,7 @@
         />
       </template>
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -179,13 +179,13 @@
  * Spec: .kiro/specs/h4-engineering-materials/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+// 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 
 // core
@@ -251,7 +251,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H4-\d+)/)
   if (m) return m[1]
   // 底稿目录 H4（无后缀）
-  if (/\bH4\b/.test(name) && !/H4-/.test(name) && !/H4A/.test(name)) return 'H4'
+  if (/底稿目录/.test(name) || (/\bH4\b/.test(name) && !/H4-/.test(name) && !/H4A/.test(name))) return 'H4'
   return ''
 })
 
@@ -299,17 +299,16 @@ async function selfLoad(): Promise<void> {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H4] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 // TB 取数种子（H4-1 审定表 inject 消费，科目1605 未审数/审定数只读核对）
 provide('h4TbValues', tbValues)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h4VersionTrailRef', versionTrailRef)
 provide('h4OpenVersionHistory', openVersionHistory)
 

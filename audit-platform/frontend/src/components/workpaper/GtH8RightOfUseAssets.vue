@@ -291,9 +291,9 @@
  * Spec: .kiro/specs/h8-right-of-use-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -408,7 +408,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H8-\d+)/)
   if (m) return m[1]
   // 底稿目录 H8（无后缀）
-  if (/\bH8\b/.test(name) && !/H8-/.test(name) && !/H8A/.test(name)) return 'H8'
+  if (/底稿目录/.test(name) || (/\bH8\b/.test(name) && !/H8-/.test(name) && !/H8A/.test(name))) return 'H8'
   return ''
 })
 
@@ -487,9 +487,11 @@ provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h8VersionTrailRef', versionTrailRef)
 provide('h8OpenVersionHistory', openVersionHistory)
 

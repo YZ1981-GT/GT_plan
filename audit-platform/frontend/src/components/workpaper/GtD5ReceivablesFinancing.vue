@@ -117,10 +117,7 @@
       :section-id="d5ReviewSection.id"
       :section-label="d5ReviewSection.label"
     />
-    <GtWpReviewDialogHost />
-
-    <!-- 版本链 drawer -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+    <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
   </div>
 </template>
 
@@ -128,17 +125,15 @@
 /**
  * GtD5ReceivablesFinancing.vue — D5 应收款项融资底稿主入口（比照 D4）
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD5FormData } from './composables/useD5FormData'
 import { useD5CrossSheet } from './composables/useD5CrossSheet'
 import { useD5EntryDualMode, type D5RenderMode } from './composables/useD5EntryDualMode'
 import { resolveD5SheetCode } from './composables/useD5SheetRouting'
-import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
-import GtWpReviewDialogHost from './GtWpReviewDialogHost.vue'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD5ReviewThreads } from './composables/useD5ReviewThreads'
 import { parseNum } from './composables/useD5FormulaEngine'
 import D5TabIndex from './d5/D5TabIndex.vue'
@@ -150,7 +145,6 @@ const D5TabDetail = defineAsyncComponent(() => import('./d5/D5TabDetail.vue'))
 const D5TabAdjustment = defineAsyncComponent(() => import('./d5/D5TabAdjustment.vue'))
 const D5TabFairValue = defineAsyncComponent(() => import('./d5/D5TabFairValue.vue'))
 const D5TabDisclosure = defineAsyncComponent(() => import('./d5/D5TabDisclosure.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -184,15 +178,11 @@ const {
 
 const crossSheet = useD5CrossSheet({ allResponses })
 
-// ─── 版本链接入 ───────────────────────────────────────────────────────────
-const {
-  versionTrailRef,
-  openVersionHistory,
-  scheduleAutoSnapshot,
-} = useWorkpaperVersionToolbar({
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-})
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 const currentSheet = computed(() => resolveD5SheetCode(props.sheetName || 'D5'))
 const d5ReviewSection = computed(() => resolveCycleReviewSection('D5', currentSheet.value))
@@ -202,8 +192,6 @@ const availableSheets = computed(() =>
 )
 
 const wpIdRefForReview = toRef(props, 'wpId')
-const projectIdRefForReview = toRef(props, 'projectId')
-useWorkpaperReviewProvide({ wpId: wpIdRefForReview, projectId: projectIdRefForReview })
 
 const { getThreadDot, getRowDot } = useD5ReviewThreads(wpIdRefForReview)
 provide('getThreadDot', getThreadDot)

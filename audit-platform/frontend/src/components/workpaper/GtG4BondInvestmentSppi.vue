@@ -19,7 +19,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -79,7 +79,7 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -94,14 +94,13 @@
  * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
  * selfLoad：htmlData为null时自动调用 render-config 获取数据
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, inject, defineAsyncComponent } from 'vue'
 import { useG4SppiDualMode } from '@/composables/useG4SppiDualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import http from '@/utils/http'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const G4TabBusinessModel = defineAsyncComponent(
   () => import('./g4-bond-investment-sppi/classification/G4TabBusinessModel.vue'),
 )
@@ -166,15 +165,11 @@ const dualMode = useG4SppiDualMode({
   sheetName: computed(() => props.sheetName || ''),
 })
 
-// ─── 版本历史集成 ───────────────────────────────────────────────────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 
-// ─── provide openReviewDialog 供子组件 inject ────────────────────────────────
-function openReviewDialog(sectionId: string): void {
-  console.log('[G4-sppi] openReviewDialog:', sectionId)
-}
-provide('openReviewDialog', openReviewDialog)
+// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
 async function selfLoad(): Promise<void> {

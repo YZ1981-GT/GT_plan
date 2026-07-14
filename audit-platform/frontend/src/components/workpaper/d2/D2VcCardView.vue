@@ -15,6 +15,8 @@
  */
 import { ref, computed, inject } from 'vue'
 import type { VoucherCheckRow } from '../composables/useD2VoucherCheckEnhanced'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   rows: VoucherCheckRow[]
@@ -28,9 +30,7 @@ const emit = defineEmits<{
 }>()
 
 // ─── Display Prefs ───────────────────────────────────────────────────────────
-const displayPrefs = inject<{ fmtAmount: (v: number) => string }>('displayPrefs', {
-  fmtAmount: (v: number) => (v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })),
-})
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Expanded State ──────────────────────────────────────────────────────────
 const expandedRowIds = ref<Set<string>>(new Set())

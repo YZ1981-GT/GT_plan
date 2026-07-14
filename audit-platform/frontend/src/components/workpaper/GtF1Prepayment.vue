@@ -182,11 +182,7 @@
         </el-tabs>
       </template>
 
-      <GtWpVersionTrail
-        ref="versionTrailRef"
-        :workpaper-id="props.wpId"
-        :project-id="props.projectId"
-      />
+      <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -201,12 +197,12 @@
  * 科目覆盖：1123 预付账款（贷方科目/负债类）
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config 加载数据。
  */
-import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
 import { useF1DualMode } from './composables/useF1DualMode'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── Async sub-components ────────────────────────────────────────────────────
 
@@ -221,7 +217,6 @@ const F1TabComprehensiveCheck = defineAsyncComponent(() => import('./f1/F1TabCom
 const F1TabDisclosureListed = defineAsyncComponent(() => import('./f1/F1TabDisclosureListed.vue'))
 const F1TabDisclosureSoe = defineAsyncComponent(() => import('./f1/F1TabDisclosureSoe.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const F1TabProcedure = defineAsyncComponent(() => import('./f1/F1TabProcedure.vue'))
 
@@ -279,7 +274,14 @@ const {
   projectId: projectIdRef,
 })
 
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionToolbar = runtime?.version ?? {
+  versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
+  openVersionHistory: () => undefined,
+  scheduleAutoSnapshot: () => undefined,
+  wrapSaveImmediate: (<T,>(fn: T): T => fn),
+}
 const { versionTrailRef, openVersionHistory } = versionToolbar
 const saveImmediate = versionToolbar.wrapSaveImmediate(rawSaveImmediate)
 
@@ -294,13 +296,7 @@ const crossSheet = useF1CrossSheet({ allResponses })
 
 const dualMode = useF1DualMode({ wpId: wpIdRef, activeTab })
 
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
-
-function openReviewDialog(sectionId: string): void {
-  console.log('[F1] openReviewDialog:', sectionId)
-}
-
-provide('openReviewDialog', openReviewDialog)
+// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', loadAll)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────

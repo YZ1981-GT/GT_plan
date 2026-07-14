@@ -7,7 +7,7 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- ─── 工具栏：双模式 + 版本历史（六大集成标准） ─── -->
+      <!-- ─── 工具栏：双模式（六大集成标准，版本历史由 Runtime Boundary 统一 GtWpToolbar 提供） ─── -->
       <div v-if="isHtmlSheet" class="n1-toolbar">
         <el-segmented
           v-model="dualMode.mode.value"
@@ -15,7 +15,6 @@
           size="small"
           @change="(val: any) => dualMode.switchMode(val)"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOOHealthy.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -111,18 +110,6 @@
       />
     </template>
 
-    <!-- 复核对话组件 -->
-    <GtReviewDialog
-      v-if="reviewDialogVisible"
-      :wp-id="props.wpId"
-      :section-id="reviewDialogSectionId"
-      :section-label="reviewDialogSectionLabel"
-      :current-user="currentUser"
-      :related-data="{ wpCode: 'N1', projectId: props.projectId }"
-    />
-
-    <!-- 版本历史抽屉 -->
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -149,11 +136,10 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useAuthStore } from '@/stores/auth'
 import { eventBus } from '@/utils/eventBus'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useN1DualMode } from './composables/useN1DualMode'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -173,8 +159,6 @@ const N1TabLossCheck = defineAsyncComponent(() => import('./n1/calc/N1TabLossChe
 // Shared
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtReviewDialog = defineAsyncComponent(() => import('@/components/collaboration/GtReviewDialog.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -206,15 +190,6 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
-
-// ─── Auth (for review dialog) ────────────────────────────────────────────────
-
-const authStore = useAuthStore()
-const currentUser = computed(() => ({
-  id: authStore.userId || '',
-  name: authStore.user?.full_name || authStore.username || '',
-  role: (authStore.user?.role || '审计助理') as any,
-}))
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 
@@ -259,40 +234,14 @@ const currentSheet = computed(() => {
   return name
 })
 
-// ─── Provide openReviewDialog ────────────────────────────────────────────────
-
-/** 复核对话状态 */
-const reviewDialogVisible = ref(false)
-const reviewDialogSectionId = ref('')
-const reviewDialogSectionLabel = ref('')
-
-/**
- * 子组件 inject 后在 section 标题栏右侧放复核按钮。
- * 点击调用 openReviewDialog(sectionId, sectionLabel?) 打开复核对话面板。
- */
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  reviewDialogSectionId.value = sectionId
-  reviewDialogSectionLabel.value = sectionLabel || sectionId
-  reviewDialogVisible.value = true
-}
-
-provide('openReviewDialog', openReviewDialog)
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-
+// ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
+// 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
+// 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
 
-provide('versionTrail', versionToolbar)
-provide('openVersionHistory', () => versionToolbar.openVersionHistory())
-provide('n1VersionTrailRef', versionTrailRef)
-provide('n1OpenVersionHistory', openVersionHistory)
-
-// ─── provide scheduleAutoSnapshot → 子组件保存后触发自动快照 ─────────────────
-
-provide('scheduleAutoSnapshot', versionToolbar.scheduleAutoSnapshot)
+// ─── provide scheduleAutoSnapshot → 子组件保存后触发自动快照（版本链来自 Runtime Boundary） ─────
+provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 
 // ─── 双模式 useN1DualMode（结构化/矩阵/OnlyOffice）─────────────────────────
 
@@ -307,7 +256,7 @@ const isHtmlSheet = computed(() => {
 // ─── 监听 n1:save-items → 保存后自动快照 ────────────────────────────────────
 
 function handleN1SaveItems(_e: Event): void {
-  versionToolbar.scheduleAutoSnapshot()
+  runtime?.version.scheduleAutoSnapshot()
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────

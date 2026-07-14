@@ -159,7 +159,6 @@
       </template>
     </template>
 
-    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
   </div>
 </template>
 
@@ -180,14 +179,19 @@
  * Spec: .kiro/specs/k5-provisions/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
+import {
+  WorkpaperRuntimeContextKey,
+  type WorkpaperRuntimeContext,
+} from './composables/useWorkpaperScaffold'
+import { collectK5Responses, toK5PersistencePatch } from './k5/k5Persistence'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
-const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core
 const K5TabIndex = defineAsyncComponent(() => import('./k5/core/K5TabIndex.vue'))
@@ -223,7 +227,14 @@ const emit = defineEmits<{
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
-const allResponses = ref<Map<string, any>>(new Map())
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)
+const persistence = useChecklistPersistence({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+})
+const allResponses = persistence.responses
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const tbData = ref({
   unadjusted2701: 0,
   audited2701: 0,
@@ -307,37 +318,21 @@ const currentSheet = computed(() => {
   const m = name.match(/(K5-\d+)/)
   if (m) return m[1]
   // 底稿目录 K5（无后缀）
-  if (/\bK5\b/.test(name) && !/K5-/.test(name) && !/K5A/.test(name)) return 'K5'
+  if (/底稿目录/.test(name) || (/\bK5\b/.test(name) && !/K5-/.test(name) && !/K5A/.test(name))) return 'K5'
   return ''
 })
 
-// ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
-async function handleChildSave(itemId: string, value: any): Promise<void> {
+// ─── 子组件 save 回调（统一 Persistence Adapter） ─────────────────────────────
+async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   if (!props.wpId) return
-  // 🔴 解包 {remark, conclusion}：子 composable 统一传 { remark: <json/string> }（可含 conclusion）。
-  // 若再整体 JSON.stringify 会造成双层包裹（存 {"remark":"[...]"}），reload 时解析成对象非数组导致数据丢失。
-  let remark: string | null = null
-  let conclusion: string | null = null
-  if (value != null && typeof value === 'object' && !Array.isArray(value) && ('remark' in value || 'conclusion' in value)) {
-    const r = (value as any).remark
-    remark = r != null ? (typeof r === 'string' ? r : JSON.stringify(r)) : null
-    const c = (value as any).conclusion
-    conclusion = c != null ? (typeof c === 'string' ? c : JSON.stringify(c)) : null
-  } else {
-    remark = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  }
-  // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion, remark })
   try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion, remark }],
-    })
-  } catch {
-    // 静默失败，数据保留在本地
+    await persistence.save(itemId, toK5PersistencePatch(value))
+    runtime?.version.scheduleAutoSnapshot()
+    emit('save')
+  } catch (error) {
+    ElMessage.error(persistence.stateOf(itemId).lastError || '保存失败，数据已保留在本地，请稍后重试')
+    console.warn(`[GtK5Provisions] save failed: ${itemId}`, error)
   }
-  // 保存后触发版本快照（autoSnapshot）
-  scheduleAutoSnapshot()
 }
 
 // ─── TB自动取数（2701预计负债） ─────────────────────────────────────────────────
@@ -365,69 +360,27 @@ async function _loadTbData(): Promise<void> {
 }
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
-/** 合并 render 输出的 responses（兼容 responses_snapshot / allResponses / checklist_responses 三种键名，dict 或 array）*/
-function _mergeResponses(map: Map<string, any>, src: any): void {
-  if (!src) return
-  if (Array.isArray(src)) {
-    for (const item of src) {
-      const id = item?.item_id ?? item?.itemId
-      if (id) map.set(id, item)
-    }
-  } else if (typeof src === 'object') {
-    for (const [k, v] of Object.entries(src)) map.set(k, v)
-  }
-}
-
 async function selfLoad(): Promise<void> {
   try {
-    const map = new Map<string, any>()
-    if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses（后端 render 输出键为 responses_snapshot）
-      _mergeResponses(map, props.htmlData.responses_snapshot)
-      _mergeResponses(map, props.htmlData.allResponses)
-      _mergeResponses(map, props.htmlData.checklist_responses)
+    const snapshot = props.htmlData
+      ? collectK5Responses(
+          props.htmlData.responses_snapshot,
+          props.htmlData.allResponses,
+          props.htmlData.checklist_responses,
+        )
+      : []
+
+    if (snapshot.length > 0) {
+      persistence.hydrate(snapshot)
     } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'k5-provisions' },
-        _silent: true,
-      } as any)
-      const data = res.data?.data || res.data
-      if (data?.sheets && Array.isArray(data.sheets)) {
-        for (const sheet of data.sheets) {
-          const hd = sheet.html_data
-          if (hd) {
-            _mergeResponses(map, hd.responses_snapshot)
-            _mergeResponses(map, hd.allResponses)
-            _mergeResponses(map, hd.checklist_responses)
-          }
-        }
-      }
+      await persistence.load()
     }
-    allResponses.value = map
-  } catch (err) {
-    console.warn('[GtK5Provisions] selfLoad failed:', err)
+  } catch (error) {
+    console.warn('[GtK5Provisions] selfLoad failed:', error)
   } finally {
     isLoading.value = false
   }
 }
-
-// ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, _sectionLabel?: string): void {
-  console.log('[K5] openReviewDialog:', sectionId, _sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-
-const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: wpIdRef, projectId: projectIdRef })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
-
-provide('versionTrail', versionToolbar)
-provide('k5VersionTrailRef', versionTrailRef)
-provide('k5OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {

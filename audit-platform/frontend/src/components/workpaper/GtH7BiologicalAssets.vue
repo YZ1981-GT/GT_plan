@@ -353,7 +353,7 @@
  */
 import { ref, computed, onMounted, provide, toRef, inject, watch, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
-import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -457,7 +457,7 @@ const currentSheet = computed(() => {
   const m = name.match(/(H7-\d+)/)
   if (m) return m[1]
   // 底稿目录 H7（无后缀）
-  if (/\bH7\b/.test(name) && !/H7-/.test(name) && !/H7A/.test(name)) return 'H7'
+  if (/底稿目录/.test(name) || (/\bH7\b/.test(name) && !/H7-/.test(name) && !/H7A/.test(name))) return 'H7'
   return ''
 })
 
@@ -571,9 +571,11 @@ provide('saveResponse', persistResponse)
 
 // H7 为 H 循环底稿，审计说明/结论采用纯 textarea，不接 AI（遵循 H6 先例 + fghi spec P7）。
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const versionToolbar = useWorkpaperVersionToolbar({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const { versionTrailRef, openVersionHistory, scheduleAutoSnapshot } = versionToolbar
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h7VersionTrailRef', versionTrailRef)
 provide('h7OpenVersionHistory', openVersionHistory)
 

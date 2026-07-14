@@ -8,18 +8,19 @@ PUT /api/workpapers/{wp_id}/checklist-responses — 批量保存（单次提交�
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_wp_edit_permission
 from app.models.core import User
 from app.services.review_rbac_guard import check_rbac, check_sign_lock, extract_base_level
 
@@ -37,15 +38,16 @@ router = APIRouter(
 
 
 class ChecklistResponseItem(BaseModel):
-    """单条核对表响应"""
+    """单条核对表响应。if_match 缺省时保持兼容的 last-write-wins。"""
     item_id: str
     conclusion: Optional[str] = None  # 'Y'/'N'/'NA'/null
     remark: Optional[str] = None
     wp_ref: Optional[str] = None
+    if_match: Optional[str] = None
 
 
 class ChecklistResponseOut(BaseModel):
-    """返回给前端的响应"""
+    """返回给前端的稳定响应，version 可用于下一次 if_match。"""
     id: uuid.UUID
     item_id: str
     conclusion: Optional[str] = None
@@ -53,6 +55,8 @@ class ChecklistResponseOut(BaseModel):
     wp_ref: Optional[str] = None
     updated_by: Optional[uuid.UUID] = None
     updated_at: Optional[str] = None
+    version: Optional[str] = None
+    overwritten: bool = False
 
 
 class BatchSaveRequest(BaseModel):
@@ -66,13 +70,24 @@ class BatchSaveRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _version_of(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _collection_etag(items: list[ChecklistResponseOut]) -> str:
+    material = "\n".join(f"{item.item_id}:{item.version or ''}" for item in items)
+    digest = hashlib.sha256(material.encode("utf-8")).hexdigest()
+    return f'W/"{digest}"'
+
+
 @router.get("", response_model=list[ChecklistResponseOut])
 async def get_checklist_responses(
     wp_id: uuid.UUID,
+    response: Response,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取指定底稿的所有核对表填写响应（含章节适用性）"""
+    """获取指定底稿的所有核对表填写响应（含稳定版本和集合 ETag）。"""
     result = await db.execute(
         text("""
             SELECT id, item_id, conclusion, remark, wp_ref, updated_by, updated_at
@@ -83,7 +98,7 @@ async def get_checklist_responses(
         {"wp_id": str(wp_id)},
     )
     rows = result.fetchall()
-    return [
+    items = [
         ChecklistResponseOut(
             id=row.id,
             item_id=row.item_id,
@@ -91,10 +106,13 @@ async def get_checklist_responses(
             remark=row.remark,
             wp_ref=row.wp_ref,
             updated_by=row.updated_by,
-            updated_at=row.updated_at.isoformat() if row.updated_at else None,
+            updated_at=_version_of(row.updated_at),
+            version=_version_of(row.updated_at),
         )
         for row in rows
     ]
+    response.headers["ETag"] = _collection_etag(items)
+    return items
 
 
 # ---------------------------------------------------------------------------
@@ -107,80 +125,208 @@ async def batch_save_checklist_responses(
     wp_id: uuid.UUID,
     body: BatchSaveRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_wp_edit_permission()),
 ):
-    """批量保存核对表填写数据（UPSERT by wp_id + item_id）
+    """原子批量 UPSERT；可选 if_match 冲突保护，缺省保持 LWW 兼容。"""
+    import time as _time
+    from app.services.wp_metrics import wp_metrics
 
-    支持条目级填写和章节适用性（item_id 前缀 TOC-S01 等）。
-    """
     if not body.items:
         return []
 
-    # --- 自动解析 project_id（如果前端未传） ---
-    resolved_project_id = body.project_id
-    if not resolved_project_id:
-        pid_row = await db.execute(
-            text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
-            {"wp_id": str(wp_id)},
-        )
-        pid_val = pid_row.scalar_one_or_none()
-        if pid_val:
-            resolved_project_id = pid_val
-        else:
-            raise HTTPException(status_code=400, detail="无法确定 project_id，请确认底稿存在")
+    _save_t0 = _time.perf_counter()
+    _save_status = "success"
 
-    # --- Review-checklist RBAC + Sign-Lock 前置校验 ---
-    # 从 wp_index 获取 wp_code，判断是否为复核表
-    wp_code_row = await db.execute(
+    context_result = await db.execute(
         text("""
-            SELECT wi.wp_code FROM wp_index wi
-            JOIN working_paper wp ON wp.wp_index_id = wi.id
+            SELECT wp.project_id, wi.wp_code, p.audit_year
+            FROM working_paper wp
+            LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
+            LEFT JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
             LIMIT 1
         """),
         {"wp_id": str(wp_id)},
     )
-    wp_code_val = wp_code_row.scalar_one_or_none()
+    context = context_result.fetchone()
+    if context is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
 
+    resolved_project_id = context.project_id
+    if body.project_id and str(body.project_id) != str(resolved_project_id):
+        raise HTTPException(status_code=422, detail={
+            "code": "project_mismatch",
+            "message": "project_id 与目标底稿所属项目不一致",
+            "atomic": True,
+        })
+
+    duplicate_ids = sorted({
+        item.item_id for item in body.items
+        if sum(candidate.item_id == item.item_id for candidate in body.items) > 1
+    })
+    if duplicate_ids:
+        raise HTTPException(status_code=422, detail={
+            "code": "duplicate_item",
+            "item_id": duplicate_ids[0],
+            "message": "同一批次不得重复提交相同 item_id",
+            "atomic": True,
+        })
+
+    # 复核表继续叠加既有专项 RBAC/签字锁；通用编辑权已由依赖统一校验。
+    wp_code_val = context.wp_code
     if wp_code_val and extract_base_level(wp_code_val):
-        # 是 A2[1-5] 复核表 → 执行 guard
         rbac_denied = await check_rbac(db, current_user.id, resolved_project_id, wp_code_val)
         if rbac_denied:
             raise HTTPException(status_code=403, detail="无权编辑此级别复核表")
-
         locked, _, _ = await check_sign_lock(db, resolved_project_id, wp_code_val)
         if locked:
             raise HTTPException(status_code=403, detail="复核表已锁定")
 
-    now = datetime.now(timezone.utc)
-
-    # UPSERT: INSERT ... ON CONFLICT (wp_id, item_id) DO UPDATE
-    upsert_sql = text("""
-        INSERT INTO checklist_responses (project_id, wp_id, item_id, conclusion, remark, wp_ref, updated_by, created_at, updated_at)
-        VALUES (:project_id, :wp_id, :item_id, :conclusion, :remark, :wp_ref, :updated_by, :now, :now)
-        ON CONFLICT (wp_id, item_id) DO UPDATE SET
-            conclusion = EXCLUDED.conclusion,
-            remark = EXCLUDED.remark,
-            wp_ref = EXCLUDED.wp_ref,
-            updated_by = EXCLUDED.updated_by,
-            updated_at = EXCLUDED.updated_at
-        RETURNING id, item_id, conclusion, remark, wp_ref, updated_by, updated_at
-    """)
-
     try:
-        results = await _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolved_project_id)
-    except HTTPException:
+        existing_versions = await _lock_and_check_versions(db, wp_id, body.items)
+        results = await _do_batch_save(
+            db,
+            wp_id,
+            body,
+            current_user,
+            datetime.now(timezone.utc),
+            resolved_project_id,
+            existing_versions,
+        )
+        await db.commit()
+    except HTTPException as exc:
+        await db.rollback()
+        _save_status = "conflict" if exc.status_code == 409 else "error"
+        _elapsed_ms = (_time.perf_counter() - _save_t0) * 1000
+        wp_metrics.observe_save(_elapsed_ms, status=_save_status)
+        if not isinstance(exc.detail, dict):
+            exc.detail = {
+                "code": "invalid_item" if exc.status_code == 422 else "save_failed",
+                "item_id": _infer_error_item_id(body.items, str(exc.detail)),
+                "message": str(exc.detail),
+                "atomic": True,
+            }
         raise
-    except Exception as e:
-        logger.error("checklist_responses batch_save 未预期异常: wp_id=%s error=%s", wp_id, e, exc_info=True)
-        raise HTTPException(status_code=500, detail=f"保存异常: {type(e).__name__}: {str(e)[:200]}")
+    except Exception as exc:
+        await db.rollback()
+        _save_status = "error"
+        _elapsed_ms = (_time.perf_counter() - _save_t0) * 1000
+        wp_metrics.observe_save(_elapsed_ms, status=_save_status)
+        logger.error(
+            "checklist_responses batch_save 未预期异常: wp_id=%s error=%s",
+            wp_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail={
+            "code": "save_failed",
+            "message": f"保存异常: {type(exc).__name__}",
+            "atomic": True,
+        }) from exc
 
-    await db.commit()
+    # 成功路径：记录指标
+    _elapsed_ms = (_time.perf_counter() - _save_t0) * 1000
+    wp_metrics.observe_save(_elapsed_ms, status="success")
+
+    await _publish_checklist_saved(
+        project_id=resolved_project_id,
+        wp_id=wp_id,
+        wp_code=wp_code_val,
+        year=context.audit_year,
+        item_ids=[item.item_id for item in body.items],
+    )
     return results
 
 
-async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolved_project_id):
-    """实际执行批量保存逻辑（从主函数抽出以支持全局 try/except）。"""
+def _infer_error_item_id(items: list[ChecklistResponseItem], detail: str) -> str | None:
+    for item in items:
+        if item.conclusion is not None and repr(item.conclusion) in detail:
+            return item.item_id
+    return items[0].item_id if items else None
+
+
+async def _lock_and_check_versions(
+    db: AsyncSession,
+    wp_id: uuid.UUID,
+    items: list[ChecklistResponseItem],
+) -> dict[str, str]:
+    """按稳定顺序锁定现存行，并在任何写入前完成整批冲突预检。"""
+    existing: dict[str, str] = {}
+    for item_id in sorted(item.item_id for item in items):
+        row = (
+            await db.execute(
+                text("""
+                    SELECT updated_at
+                    FROM checklist_responses
+                    WHERE wp_id = :wp_id AND item_id = :item_id
+                    FOR UPDATE
+                """),
+                {"wp_id": str(wp_id), "item_id": item_id},
+            )
+        ).fetchone()
+        if row and row.updated_at:
+            existing[item_id] = _version_of(row.updated_at) or ""
+
+    for item in items:
+        if item.if_match is None:
+            continue
+        server_version = existing.get(item.item_id)
+        if item.if_match != server_version:
+            raise HTTPException(status_code=409, detail={
+                "code": "version_conflict",
+                "item_id": item.item_id,
+                "client_version": item.if_match,
+                "server_version": server_version,
+                "message": "底稿条目已被其他客户端修改",
+                "atomic": True,
+            })
+    return existing
+
+
+async def _publish_checklist_saved(
+    *,
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    wp_code: str | None,
+    year: int | None,
+    item_ids: list[str],
+) -> None:
+    """提交成功后接入既有 WORKPAPER_SAVED；失败不回滚已提交数据。"""
+    try:
+        from app.models.audit_platform_schemas import EventPayload, EventType
+        from app.services.event_bus import event_bus
+
+        await event_bus.publish(EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=project_id,
+            year=year,
+            extra={
+                "wp_id": str(wp_id),
+                "wp_code": wp_code,
+                "trigger": "checklist_response_save",
+                "item_ids": item_ids,
+                "atomic": True,
+            },
+        ))
+    except Exception as exc:  # 事件是提交后副作用，不得反向破坏持久化
+        logger.warning(
+            "checklist save event publish failed wp=%s items=%d: %s",
+            wp_id,
+            len(item_ids),
+            exc,
+        )
+
+
+async def _do_batch_save(
+    db,
+    wp_id,
+    body,
+    current_user,
+    now,
+    resolved_project_id,
+    existing_versions: dict[str, str],
+):
+    """实际执行批量保存；只写/flush，不 commit，由路由统一控制原子事务。"""
 
     # UPSERT: INSERT ... ON CONFLICT (wp_id, item_id) DO UPDATE
     upsert_sql = text("""
@@ -409,6 +555,18 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
                 # JSON 打包进 remark，conclusion 通常为 null；偶有评价结果字符串），
                 # 跳过白名单校验
                 pass
+            elif item.item_id.startswith((
+                "L1-", "L2-", "L3-", "L4-", "L5-", "L6-", "L7-", "L8-",
+                "M1-", "M2-", "M3-", "M4-", "M5-", "M6-", "M7-", "M8-", "M9-", "M10-",
+                "N1-", "N2-", "N3-", "N4-", "N5-",
+            )):
+                # L 筹资/负债循环（短期借款/应付利息/长期借款/应付债券/长期应付款/专项应付款/
+                # 其他非流动负债/财务费用）、M 权益循环（应付股利/实收资本/库存股/资本公积/盈余
+                # 公积/未分配利润/专项储备/一般风险准备/其他综合收益/其他权益工具）、N 税金循环
+                # （递延所得税资产/应交税费/递延所得税负债/税金及附加/所得税费用）专属组件：
+                # 审定数/明细行/测算表/审计说明/审计结论/检查项等均以自由文本或 JSON 存入
+                # conclusion 或 remark，跳过白名单校验（与 G/K/S 循环同范式）。
+                pass
             else:
                 allowed = ("Y", "N", "X/I", "X/W", "N/A")
                 if item.item_id.endswith("-sign-status"):
@@ -448,6 +606,7 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
             )
             raise HTTPException(status_code=500, detail=f"保存失败: {item.item_id}: {str(e)[:200]}")
         r = row.fetchone()
+        version = _version_of(r.updated_at)
         results.append(
             ChecklistResponseOut(
                 id=r.id,
@@ -456,9 +615,13 @@ async def _do_batch_save(db, wp_id, body, current_user, upsert_sql, now, resolve
                 remark=r.remark,
                 wp_ref=r.wp_ref,
                 updated_by=r.updated_by,
-                updated_at=r.updated_at.isoformat() if r.updated_at else None,
+                updated_at=version,
+                version=version,
+                overwritten=(
+                    item.if_match is None and item.item_id in existing_versions
+                ),
             )
         )
 
-    await db.commit()
+    await db.flush()
     return results
