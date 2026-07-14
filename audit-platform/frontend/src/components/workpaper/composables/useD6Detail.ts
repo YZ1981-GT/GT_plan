@@ -400,6 +400,34 @@ export function useD6Detail(options: UseD6DetailOptions) {
     persistRows()
   }
 
+  /**
+   * 以完整数据新增一行（供弹窗依次录入使用）。
+   * 自动分配序号、执行公式链重算并持久化。
+   */
+  function addRowWithData(data: Partial<DetailRow>): void {
+    const nextSeqNo = rows.value.length > 0
+      ? Math.max(...rows.value.map(r => r.seqNo)) + 1
+      : 1
+    const base = createEmptyRow(nextSeqNo)
+    const merged = normalizeRow({ ...base, ...data, rowId: base.rowId, seqNo: nextSeqNo })
+    rows.value = [...rows.value, recalcRow(merged)]
+    persistRows()
+  }
+
+  /**
+   * 以完整数据更新一行（供弹窗编辑使用）。保留 rowId/seqNo，重算公式链后持久化。
+   */
+  function updateRowWithData(rowId: string, data: Partial<DetailRow>): void {
+    const idx = rows.value.findIndex(r => r.rowId === rowId)
+    if (idx === -1) return
+    const original = rows.value[idx]
+    const merged = normalizeRow({ ...original, ...data, rowId: original.rowId, seqNo: original.seqNo })
+    const newRows = [...rows.value]
+    newRows[idx] = recalcRow(merged)
+    rows.value = newRows
+    persistRows()
+  }
+
   // ─── removeRow ───────────────────────────────────────────────────────
 
   function removeRow(rowId: string): void {
@@ -522,6 +550,8 @@ export function useD6Detail(options: UseD6DetailOptions) {
     classificationRows,
     totalRow,
     addRow,
+    addRowWithData,
+    updateRowWithData,
     removeRow,
     updateCell,
     importFromAuxBalance,

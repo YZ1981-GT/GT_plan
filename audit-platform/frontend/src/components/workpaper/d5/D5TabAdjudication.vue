@@ -45,7 +45,7 @@
 
     <!-- 审定表主体 -->
     <el-table
-      :data="rows"
+      :data="displayRows"
       size="small"
       border
       stripe
@@ -189,7 +189,7 @@
           type="textarea"
           :autosize="{ minRows: 4, maxRows: 8 }"
           :disabled="isReadonly"
-          placeholder="分析应收款项融资本期变动原因，结合公允价值测算评价合理性..."
+          placeholder="（1）应收款项融资本期较上期增加（负数为减少）：&#10;主要原因（变动率超过30%需说明）："
         />
       </div>
 
@@ -275,6 +275,11 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+// 表格仅展示审定过程行；"试算平衡表数/差异数"由底部"与试算平衡表核对"行体现，避免重复
+const displayRows = computed(() =>
+  rows.value.filter(r => r.rowKey !== 'trial-balance' && r.rowKey !== 'difference'),
+)
+
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
 
 const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
@@ -287,6 +292,7 @@ async function genExplanation() {
   const text = await generateAndConfirm('adj-change-analysis', auditNotes.value.explanation, {
     task: '应收款项融资本期变动分析',
     trialBalanceDiff: trialBalanceDiff.value,
+    outputFormat: '按两点式输出：（1）应收款项融资本期较上期增加（负数为减少）多少金额及百分比；主要原因（变动率超过30%需说明具体成因）',
   }, 'AI · 变动分析')
   if (text) auditNotes.value.explanation = text
 }

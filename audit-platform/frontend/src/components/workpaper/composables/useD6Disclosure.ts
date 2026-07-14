@@ -148,11 +148,12 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     }))
 
     return [
-      { sectionKey: 'listed-1', label: '(一) 合同资产分类', rows: section1Rows },
-      { sectionKey: 'listed-2', label: '(二) 减值计提情况', rows: section2Rows },
-      { sectionKey: 'listed-3', label: '(三) 按单项计提坏账准备的合同资产', rows: section3Rows },
-      { sectionKey: 'listed-4', label: '(四) 按组合计提坏账准备的合同资产', rows: section4Rows },
-      { sectionKey: 'listed-5', label: '(五) 本期计提、转回或收回的坏账准备', rows: section5Rows },
+      { sectionKey: 'listed-1', label: '1、合同资产', rows: section1Rows },
+      { sectionKey: 'listed-major-change', label: '(1) 本期合同资产账面价值的重大变动', rows: majorChangeRows.value },
+      { sectionKey: 'listed-2', label: '(2) 合同资产减值准备计提情况', rows: section2Rows },
+      { sectionKey: 'listed-3', label: '　　按单项计提坏账准备的合同资产', rows: section3Rows },
+      { sectionKey: 'listed-4', label: '　　按组合计提坏账准备的合同资产', rows: section4Rows },
+      { sectionKey: 'listed-5', label: '(3) 本期计提、收回或转回的合同资产减值准备情况', rows: section5Rows },
     ]
   })
 
@@ -163,14 +164,19 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     const impData = crossSheet.impairmentChangesForDisclosure.value || {}
 
     // (1) 合同资产情况
+    // (1) 合同资产情况：期末/期初 各含 账面余额/减值准备/账面价值（对齐源模板6列）
     const section1Rows: DisclosureRow[] = (adjData.classificationRows || []).map((r: any, idx: number) => ({
       rowId: `soe1-${idx}`,
       label: r.label || '',
-      endAmount: parseNum(r.endOriginal),
-      priorAmount: parseNum(r.priorOriginal),
+      endBookBalance: parseNum(r.endOriginal),
+      endImpairment: parseNum(r.endImpairment),
+      endBookValue: parseNum(r.endOriginal) - parseNum(r.endImpairment),
+      priorBookBalance: parseNum(r.priorOriginal),
+      priorImpairment: parseNum(r.priorImpairment),
+      priorBookValue: parseNum(r.priorOriginal) - parseNum(r.priorImpairment),
     }))
 
-    // (2) 减值准备
+    // (2) 合同资产减值准备：项目/期初/计提/转回/转销核销/期末/原因
     const section2Rows: DisclosureRow[] = (impData.changes || []).map((r: any, idx: number) => ({
       rowId: `soe2-${idx}`,
       label: r.itemName || '',
@@ -179,15 +185,13 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
       reversal: parseNum(r.reversal),
       writeOff: parseNum(r.writeOff),
       endBalance: parseNum(r.endAudited),
+      reason: r.reason || '',
     }))
 
-    // (3) 本期账面价值重大变动
-    const section3Rows: DisclosureRow[] = []
-
     return [
-      { sectionKey: 'soe-1', label: '(一) 合同资产情况', rows: section1Rows },
-      { sectionKey: 'soe-2', label: '(二) 坏账准备', rows: section2Rows },
-      { sectionKey: 'soe-3', label: '(三) 本期账面价值重大变动说明', rows: section3Rows },
+      { sectionKey: 'soe-1', label: '(1) 合同资产情况', rows: section1Rows },
+      { sectionKey: 'soe-2', label: '(2) 合同资产减值准备', rows: section2Rows },
+      { sectionKey: 'soe-3', label: '(1) 本期合同资产账面价值的重大变动【国资委格式未要求披露】', rows: [] },
     ]
   })
 
@@ -281,6 +285,53 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     persistGroupedDetails()
   }
 
+  // ─── (1) 本期合同资产账面价值的重大变动 ──────────────────────────────
+
+  const majorChangeRows = ref<DisclosureRow[]>([])
+
+  watch(
+    () => allResponses.value.get('D6-note-listed-major-change')?.remark,
+    (jsonStr) => {
+      const parsed = safeParseArray(jsonStr)
+      majorChangeRows.value = parsed.map((r: any) => ({
+        rowId: r.rowId || generateRowId(),
+        label: r.label || r.item || '',
+        amount: parseNum(r.amount),
+        reason: r.reason || '',
+      }))
+    },
+    { immediate: true },
+  )
+
+  function persistMajorChange(): void {
+    debouncedSave('D6-note-listed-major-change', {
+      remark: JSON.stringify(majorChangeRows.value),
+    })
+  }
+
+  function addMajorChangeRow(): void {
+    majorChangeRows.value = [
+      ...majorChangeRows.value,
+      { rowId: generateRowId(), label: '', amount: 0, reason: '' },
+    ]
+    persistMajorChange()
+  }
+
+  function updateMajorChangeCell(rowId: string, field: string, value: any): void {
+    majorChangeRows.value = majorChangeRows.value.map(r => {
+      if (r.rowId !== rowId) return r
+      const updated = { ...r }
+      updated[field] = field === 'amount' ? parseNum(value) : value
+      return updated
+    })
+    persistMajorChange()
+  }
+
+  function removeMajorChangeRow(rowId: string): void {
+    majorChangeRows.value = majorChangeRows.value.filter(r => r.rowId !== rowId)
+    persistMajorChange()
+  }
+
   // ─── Note Texts (说明文本 + EventBus) ────────────────────────────────
 
   const noteTexts = ref<Record<string, string>>({})
@@ -288,6 +339,7 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
   // Load note texts
   const NOTE_TEXT_KEYS = [
     'D6-note-listed-text-1',
+    'D6-note-listed-text-major-change',
     'D6-note-listed-text-2',
     'D6-note-listed-text-3',
     'D6-note-listed-text-4',
@@ -354,6 +406,10 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     updateGroupName,
     updateGroupedCell,
     removeGroupedRow,
+    majorChangeRows,
+    addMajorChangeRow,
+    updateMajorChangeCell,
+    removeMajorChangeRow,
     noteTexts,
   }
 }

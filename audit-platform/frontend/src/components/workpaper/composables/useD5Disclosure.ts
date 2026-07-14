@@ -192,7 +192,7 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
 
   const listedSection1: ComputedRef<DisclosureSection> = computed(() => ({
     sectionKey: 'listed-classification',
-    label: '(1) 应收款项融资分类',
+    label: '应收款项融资分项目列示',
     rows: listedSection1Rows.value,
   }))
 
@@ -270,7 +270,7 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
 
   const listedSection2: ComputedRef<DisclosureSection> = computed(() => ({
     sectionKey: 'listed-impairment',
-    label: '(2) 减值准备变动',
+    label: '(1) 本期计提、收回或转回的减值准备情况',
     rows: listedSection2Rows.value,
     totalRow: listedSection2TotalRow.value,
   }))
@@ -279,7 +279,7 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
 
   const listedSection3: ComputedRef<DisclosureSection> = computed(() => ({
     sectionKey: 'listed-notes',
-    label: '(3) 披露说明',
+    label: '',
     rows: [],
   }))
 

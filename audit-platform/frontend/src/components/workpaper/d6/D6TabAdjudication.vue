@@ -437,7 +437,7 @@ async function genConclusion() {
 // ─── Display Helpers ─────────────────────────────────────────────────────────
 
 function getBlockDisplayRows(block: AdjudicationBlock): AdjudicationRow[] {
-  return [...block.rows, block.subtotalRow, block.deductionRow, block.blockTotalRow]
+  return [...block.rows, block.subtotalRow, block.deductionRow, block.blockTotalRow].filter(Boolean) as AdjudicationRow[]
 }
 
 function fmtAmount(val: number | null | undefined): string {
@@ -466,7 +466,8 @@ function amtCellClass(row: AdjudicationRow): Record<string, boolean> {
   return { 'cross-sheet-cell': row.isFromCrossSheet }
 }
 
-function adjRowClassName({ row }: { row: AdjudicationRow }): string {
+function adjRowClassName(row: AdjudicationRow): string {
+  if (!row) return ''
   if (row.isDeduction) return 'deduction-row'
   if (row.rowType === 'block_total') return 'block-total-row'
   return ''

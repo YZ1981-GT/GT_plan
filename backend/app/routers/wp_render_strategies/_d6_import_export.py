@@ -39,6 +39,8 @@ _ROW_LIMIT = 500
 
 _SUPPORTED_SHEETS: set[str] = {
     "D6-2", "D6-3", "D6-5", "D6-6-period", "D6-6-post", "D6-8", "D6-9-reversal", "D6-9-writeoff",
+    # 附注可编辑表
+    "D6-note-major-change", "D6-note-groups",
 }
 
 _SHEET_HEADERS: dict[str, list[str]] = {
@@ -85,6 +87,14 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "客户名称", "核销金额", "核销原因", "核销程序",
         "是否关联方", "合理性分析", "索引号", "备注",
     ],
+    # 附注(1)本期合同资产账面价值的重大变动
+    "D6-note-major-change": [
+        "项目", "变动金额", "变动原因",
+    ],
+    # 附注按组合计提坏账准备（组合名称列扁平化）
+    "D6-note-groups": [
+        "组合名称", "账龄", "合同资产", "坏账准备", "损失率%",
+    ],
 }
 
 _SHEET_ITEM_ID: dict[str, str] = {
@@ -96,6 +106,8 @@ _SHEET_ITEM_ID: dict[str, str] = {
     "D6-8": "D6-8-single-rows",
     "D6-9-reversal": "D6-9-reversal-rows",
     "D6-9-writeoff": "D6-9-writeoff-rows",
+    "D6-note-major-change": "D6-note-listed-major-change",
+    "D6-note-groups": "D6-note-listed-section4-groups",
 }
 
 
@@ -193,9 +205,20 @@ async def d6_export_data(
     ws.append(headers)
     ws.freeze_panes = "A2"
 
-    for data_row in rows_data:
-        row_values = _export_row(sheet, data_row, headers)
-        ws.append(row_values)
+    if sheet == "D6-note-groups":
+        # 嵌套结构 [{groupName, rows:[...]}] 扁平化：每账龄行带组合名称列
+        for group in rows_data:
+            gname = _safe_str(group.get("groupName")) if isinstance(group, dict) else ""
+            for r in (group.get("rows") or []) if isinstance(group, dict) else []:
+                ws.append([
+                    gname, _safe_str(r.get("label")),
+                    _safe_float(r.get("balance")), _safe_float(r.get("provision")),
+                    _safe_float(r.get("lossRate")),
+                ])
+    else:
+        for data_row in rows_data:
+            row_values = _export_row(sheet, data_row, headers)
+            ws.append(row_values)
 
     buffer = io.BytesIO()
     wb.save(buffer)
@@ -264,24 +287,63 @@ async def d6_import_data(
         if row_count > _ROW_LIMIT:
             truncated = True
             break
-        rows_data.append(_parse_row(sheet, row, actual_headers))
+        if sheet == "D6-note-groups":
+            # 扁平行（含组合名称列），稍后按组合名重组为嵌套结构
+            rows_data.append({
+                "groupName": _safe_str(_col_val(row, actual_headers, "组合名称")),
+                "label": _safe_str(_col_val(row, actual_headers, "账龄")),
+                "balance": _safe_float(_col_val(row, actual_headers, "合同资产")),
+                "provision": _safe_float(_col_val(row, actual_headers, "坏账准备")),
+                "lossRate": _safe_float(_col_val(row, actual_headers, "损失率%")),
+            })
+        else:
+            rows_data.append(_parse_row(sheet, row, actual_headers))
 
     wb.close()
 
+    # 组合明细：扁平行按"组合名称"重组为嵌套 [{groupName, rows:[...]}]
+    if sheet == "D6-note-groups":
+        grouped: dict[str, list[dict]] = {}
+        order: list[str] = []
+        for r in rows_data:
+            gname = r.get("groupName") or ""
+            if gname not in grouped:
+                grouped[gname] = []
+                order.append(gname)
+            grouped[gname].append({
+                "rowId": str(uuid4()),
+                "label": r.get("label", ""),
+                "balance": r.get("balance", 0),
+                "provision": r.get("provision", 0),
+                "lossRate": r.get("lossRate", 0),
+            })
+        rows_data = [{"groupName": g, "rows": grouped[g]} for g in order]
+
     # 写入 checklist_responses
     import sqlalchemy as sa
+
+    # project_id 为 NOT NULL 列：即使 ON CONFLICT DO UPDATE，PG 仍先校验 INSERT 行的 NOT NULL
+    pid_row = (
+        await db.execute(
+            sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+            {"wp_id": wp_id},
+        )
+    ).fetchone()
+    if pid_row is None:
+        raise HTTPException(404, "底稿不存在")
+    project_id = str(pid_row[0])
 
     item_id = _SHEET_ITEM_ID[sheet]
     remark_json = json.dumps(rows_data, ensure_ascii=False)
 
     await db.execute(
         sa.text("""
-            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            INSERT INTO checklist_responses (id, wp_id, project_id, item_id, remark, updated_at)
+            VALUES (:id, :wp_id, :project_id, :item_id, :remark, NOW())
             ON CONFLICT (wp_id, item_id)
             DO UPDATE SET remark = :remark, updated_at = NOW()
         """),
-        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+        {"id": str(uuid4()), "wp_id": wp_id, "project_id": project_id, "item_id": item_id, "remark": remark_json},
     )
     await db.commit()
 
@@ -507,6 +569,11 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_str(data.get("isRelatedParty")), _safe_str(data.get("reasonabilityAnalysis")),
             _safe_str(data.get("indexRef")), _safe_str(data.get("remark")),
         ]
+    elif sheet == "D6-note-major-change":
+        return [
+            _safe_str(data.get("label")), _safe_float(data.get("amount")),
+            _safe_str(data.get("reason")),
+        ]
     else:  # D6-8
         return [
             _safe_str(data.get("debtorName")), _safe_float(data.get("auditedBalance")),
@@ -518,6 +585,13 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
 
 def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
     """按sheet类型解析导入行"""
+    if sheet == "D6-note-major-change":
+        return {
+            "rowId": str(uuid4()),
+            "label": _safe_str(_col_val(row, actual_headers, "项目")),
+            "amount": _safe_float(_col_val(row, actual_headers, "变动金额")),
+            "reason": _safe_str(_col_val(row, actual_headers, "变动原因")),
+        }
     if sheet == "D6-2":
         prior_unadj = _safe_float(_col_val(row, actual_headers, "期初未审数"))
         prior_aje = _safe_float(_col_val(row, actual_headers, "期初AJE"))

@@ -30,7 +30,7 @@
         clearable
       />
       <el-segmented v-model="columnGroup" :options="columnGroupOptions" size="small" />
-      <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加明细行</el-button>
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="openAddDialog">+ 添加明细行</el-button>
       <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
       <GtReviewTrigger section-id="D6-2-header" />
     </div>
@@ -249,6 +249,7 @@
 
       <template v-if="showAgingCols && isColVisible('aging1y')">
         <el-table-column label="期初≤1年" width="100" align="right">
+          <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal">
               <span class="subtotal-amount">{{ fmtAmount(row.agePrior1y) }}</span>
             </template>
@@ -551,21 +552,23 @@
         </template>
       </el-table-column>
 
-      <el-table-column v-if="!isReadonly" label="操作" width="60" fixed="right" align="center">
+      <el-table-column v-if="!isReadonly" label="操作" width="100" fixed="right" align="center">
         <template #default="{ row }">
-          <el-button
-            v-if="!row._isSubtotal && !row._isTotal"
-            type="danger"
-            text
-            size="small"
-            @click="removeRow(row.rowId)"
-          >
-            删除
-          </el-button>
+          <template v-if="!row._isSubtotal && !row._isTotal">
+            <el-button type="primary" text size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button type="danger" text size="small" @click="removeRow(row.rowId)">删除</el-button>
+          </template>
         </template>
       </el-table-column>
     </el-table>
   </div>
+
+  <!-- 弹窗录入/编辑明细 -->
+  <D6DetailRowDialog
+    v-model:visible="dialogVisible"
+    :edit-row="dialogEditRow"
+    @confirm="onDialogConfirm"
+  />
 
   <!-- 审计意见区（卡片式） -->
   <el-card class="opinion-card" shadow="never">
@@ -624,6 +627,7 @@ import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpe
 import { calcSubtotal } from '../composables/useD6FormulaEngine'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
+import D6DetailRowDialog from './D6DetailRowDialog.vue'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -676,6 +680,8 @@ const showAgingCols = computed(() => columnGroup.value === 'full')
 
 const {
   addRow,
+  addRowWithData,
+  updateRowWithData,
   removeRow,
   updateCell,
   importFromAuxBalance,
@@ -688,6 +694,28 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
 })
+
+// ─── Row Dialog (弹窗新增/编辑) ──────────────────────────────────────────────
+const dialogVisible = ref(false)
+const dialogEditRow = ref<DetailRow | null>(null)
+
+function openAddDialog() {
+  dialogEditRow.value = null
+  dialogVisible.value = true
+}
+
+function openEditDialog(row: DetailRow) {
+  dialogEditRow.value = row
+  dialogVisible.value = true
+}
+
+function onDialogConfirm(data: Partial<DetailRow>) {
+  if (dialogEditRow.value) {
+    updateRowWithData(dialogEditRow.value.rowId, data)
+  } else {
+    addRowWithData(data)
+  }
+}
 
 interface DisplayRow extends DetailRow {
   _isSubtotal?: boolean

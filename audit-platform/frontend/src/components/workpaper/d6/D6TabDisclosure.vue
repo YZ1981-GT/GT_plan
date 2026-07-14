@@ -23,13 +23,13 @@
   </div>
 
   <!-- 上市公司版 -->
-  <template v-if="displayVariant === 'listed' && showListed">
+  <template v-if="displayVariant === 'listed'">
     <div v-for="section in listedSections" :key="section.sectionKey" class="disclosure-card">
       <h4 class="section-title">{{ section.label }}</h4>
 
       <!-- Section 1: 分类 -->
       <template v-if="section.sectionKey === 'listed-1'">
-        <el-table :data="section.rows" size="small" border>
+        <el-table :data="padRows(section.rows)" size="small" border>
           <el-table-column prop="label" label="项目" width="200" />
           <el-table-column label="期末账面余额" width="120" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookBalance) }}</span></template>
@@ -52,9 +52,67 @@
         </el-table>
       </template>
 
+      <!-- (1) 本期合同资产账面价值的重大变动 -->
+      <template v-else-if="section.sectionKey === 'listed-major-change'">
+        <div class="sub-toolbar">
+          <el-dropdown v-if="!isReadonly" size="small" trigger="click">
+            <el-button size="small">导入导出 ▾</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="majorChangeIe.exportTemplate">导出模板</el-dropdown-item>
+                <el-dropdown-item @click="majorChangeIe.exportData">导出数据</el-dropdown-item>
+                <el-dropdown-item>
+                  <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="majorChangeIe.importing.value"
+                    @change="(f: any) => onMajorChangeImport(f.raw || f)"><span>导入数据</span></el-upload>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+        <el-table :data="padRows(majorChangeRows)" size="small" border>
+          <el-table-column label="项目" min-width="200">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small" placeholder="变动项目"
+                @change="(v: string) => updateMajorChangeCell(row.rowId, 'label', v)" />
+              <span v-else>{{ row.label }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="变动金额" width="160" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.amount" :controls="false" size="small" style="width:100%"
+                @change="(v: number) => updateMajorChangeCell(row.rowId, 'amount', v ?? 0)" />
+              <span v-else>{{ row._isPad ? '' : fmtAmt(row.amount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="变动原因" min-width="240">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.reason" size="small" placeholder="变动原因"
+                @change="(v: string) => updateMajorChangeCell(row.rowId, 'reason', v)" />
+              <span v-else>{{ row.reason }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ row }">
+              <el-button v-if="!row._isPad" type="danger" text size="small" @click="removeMajorChangeRow(row.rowId)">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-button v-if="!isReadonly" size="small" style="margin-top:8px" @click="addMajorChangeRow">添加行</el-button>
+        <!-- 重大变动情形说明（准则指引） -->
+        <details class="amber-context">
+          <summary>📖 重大变动情形说明（CAS14）</summary>
+          <div class="amber-content">
+            <p>履行履约义务的时间与通常的付款时间之间的关系，以及此类因素对合同资产（如果对合同负债产生影响在合同负债科目下说明）账面价值的影响。本期内发生的重大变动的情形包括：</p>
+            <p>① 企业合并导致的变动；</p>
+            <p>② 对收入进行累积追溯调整导致的相关合同资产和合同负债的变动，此类调整可能源于估计履约进度的变化、估计交易价格的变化（包括对于可变对价是否受到限制的评估发生变化）或者合同变更；</p>
+            <p>③ 对合同对价的权利成为无条件权利（即，合同资产重分类为应收款项）的时间安排发生变化。</p>
+          </div>
+        </details>
+      </template>
+
       <!-- Section 2: 减值计提情况 -->
       <template v-else-if="section.sectionKey === 'listed-2'">
-        <el-table :data="section.rows" size="small" border>
+        <el-table :data="padRows(section.rows)" size="small" border>
           <el-table-column prop="label" label="类别" width="180" />
           <el-table-column label="期末余额" width="120" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBalance) }}</span></template>
@@ -73,7 +131,7 @@
 
       <!-- Section 3: 单项明细 -->
       <template v-else-if="section.sectionKey === 'listed-3'">
-        <el-table :data="section.rows" size="small" border>
+        <el-table :data="padRows(section.rows)" size="small" border>
           <el-table-column prop="label" label="名称" min-width="160" />
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.balance) }}</span></template>
@@ -90,6 +148,21 @@
 
       <!-- Section 4: 按组合明细 -->
       <template v-else-if="section.sectionKey === 'listed-4'">
+        <div class="sub-toolbar">
+          <el-dropdown v-if="!isReadonly" size="small" trigger="click">
+            <el-button size="small">导入导出 ▾</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="groupsIe.exportTemplate">导出模板</el-dropdown-item>
+                <el-dropdown-item @click="groupsIe.exportData">导出数据</el-dropdown-item>
+                <el-dropdown-item>
+                  <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="groupsIe.importing.value"
+                    @change="(f: any) => onGroupsImport(f.raw || f)"><span>导入数据</span></el-upload>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
         <div v-for="(group, gIdx) in groupedDetails" :key="gIdx" class="group-block">
           <div class="group-header">
             <el-input
@@ -103,34 +176,34 @@
             <span v-else class="group-name">{{ group.groupName || `组合${gIdx + 1}` }}</span>
             <el-button v-if="!isReadonly" size="small" @click="addGroupedDetailRow(group.groupName)">添加行</el-button>
           </div>
-          <el-table :data="group.rows" size="small" border>
+          <el-table :data="padRows(group.rows)" size="small" border>
             <el-table-column label="账龄" width="120">
               <template #default="{ row }">
-                <el-input v-if="!isReadonly" :model-value="row.label" size="small" @change="(v: string) => updateGroupedCell(gIdx, row.rowId, 'label', v)" />
+                <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small" @change="(v: string) => updateGroupedCell(gIdx, row.rowId, 'label', v)" />
                 <span v-else>{{ row.label }}</span>
               </template>
             </el-table-column>
             <el-table-column label="合同资产" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="row.balance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'balance', v ?? 0)" />
-                <span v-else>{{ fmtAmt(row.balance) }}</span>
+                <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.balance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'balance', v ?? 0)" />
+                <span v-else>{{ row._isPad ? '' : fmtAmt(row.balance) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="坏账准备" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="row.provision" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'provision', v ?? 0)" />
-                <span v-else>{{ fmtAmt(row.provision) }}</span>
+                <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.provision" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'provision', v ?? 0)" />
+                <span v-else>{{ row._isPad ? '' : fmtAmt(row.provision) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="损失率%" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="row.lossRate" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'lossRate', v ?? 0)" />
-                <span v-else>{{ fmtPct100(row.lossRate) }}</span>
+                <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.lossRate" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'lossRate', v ?? 0)" />
+                <span v-else>{{ row._isPad ? '' : fmtPct100(row.lossRate) }}</span>
               </template>
             </el-table-column>
             <el-table-column v-if="!isReadonly" label="" width="50" align="center">
               <template #default="{ row }">
-                <el-button type="danger" text size="small" @click="removeGroupedRow(gIdx, row.rowId)">删</el-button>
+                <el-button v-if="!row._isPad" type="danger" text size="small" @click="removeGroupedRow(gIdx, row.rowId)">删</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -140,7 +213,7 @@
 
       <!-- Section 5: 计提转回核销 -->
       <template v-else-if="section.sectionKey === 'listed-5'">
-        <el-table :data="section.rows" size="small" border>
+        <el-table :data="padRows(section.rows)" size="small" border>
           <el-table-column prop="label" label="项目" width="180" />
           <el-table-column label="本期计提" width="120" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.provision) }}</span></template>
@@ -170,51 +243,124 @@
   </template>
 
   <!-- 国企版 -->
-  <template v-if="displayVariant === 'soe' && showSoe">
+  <template v-if="displayVariant === 'soe'">
     <div v-for="section in soeSections" :key="section.sectionKey" class="disclosure-card">
       <h4 class="section-title">{{ section.label }}</h4>
 
+      <!-- (1) 合同资产情况：期末/期初 各含 账面余额/减值准备/账面价值 -->
       <template v-if="section.sectionKey === 'soe-1'">
-        <el-table :data="section.rows" size="small" border>
-          <el-table-column prop="label" label="项目" width="200" />
-          <el-table-column label="期末数" width="140" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endAmount) }}</span></template>
+        <el-table :data="padRows(section.rows)" size="small" border>
+          <el-table-column prop="label" label="项目" width="200" fixed />
+          <el-table-column label="期末数" align="center">
+            <el-table-column label="账面余额" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookBalance) }}</span></template>
+            </el-table-column>
+            <el-table-column label="减值准备" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endImpairment) }}</span></template>
+            </el-table-column>
+            <el-table-column label="账面价值" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookValue) }}</span></template>
+            </el-table-column>
           </el-table-column>
-          <el-table-column label="期初数" width="140" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorAmount) }}</span></template>
+          <el-table-column label="期初数" align="center">
+            <el-table-column label="账面余额" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBookBalance) }}</span></template>
+            </el-table-column>
+            <el-table-column label="减值准备" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorImpairment) }}</span></template>
+            </el-table-column>
+            <el-table-column label="账面价值" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBookValue) }}</span></template>
+            </el-table-column>
           </el-table-column>
         </el-table>
       </template>
 
+      <!-- (2) 合同资产减值准备：项目/期初/本期变动(计提/转回/转销核销)/期末/原因 -->
       <template v-else-if="section.sectionKey === 'soe-2'">
-        <el-table :data="section.rows" size="small" border>
-          <el-table-column prop="label" label="项目" width="160" />
+        <el-table :data="padRows(section.rows)" size="small" border>
+          <el-table-column prop="label" label="项目" width="150" fixed />
           <el-table-column label="期初数" width="110" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBalance) }}</span></template>
           </el-table-column>
-          <el-table-column label="本期计提" width="110" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.provision) }}</span></template>
-          </el-table-column>
-          <el-table-column label="本期转回" width="110" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.reversal) }}</span></template>
-          </el-table-column>
-          <el-table-column label="本期核销" width="110" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.writeOff) }}</span></template>
+          <el-table-column label="本期变动金额" align="center">
+            <el-table-column label="计提" width="110" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.provision) }}</span></template>
+            </el-table-column>
+            <el-table-column label="转回" width="110" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.reversal) }}</span></template>
+            </el-table-column>
+            <el-table-column label="转销/核销" width="110" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.writeOff) }}</span></template>
+            </el-table-column>
           </el-table-column>
           <el-table-column label="期末数" width="110" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBalance) }}</span></template>
           </el-table-column>
+          <el-table-column label="原因" min-width="160">
+            <template #default="{ row }">{{ row._isPad ? '' : row.reason }}</template>
+          </el-table-column>
         </el-table>
       </template>
 
+      <!-- (1) 本期合同资产账面价值的重大变动【国资委格式未要求披露】 -->
       <template v-else>
-        <el-empty v-if="!section.rows.length" description="暂无重大变动事项" :image-size="60" />
-        <el-table v-else :data="section.rows" size="small" border>
-          <el-table-column prop="label" label="项目" />
+        <div class="sub-toolbar">
+          <el-dropdown v-if="!isReadonly" size="small" trigger="click">
+            <el-button size="small">导入导出 ▾</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item @click="majorChangeIe.exportTemplate">导出模板</el-dropdown-item>
+                <el-dropdown-item @click="majorChangeIe.exportData">导出数据</el-dropdown-item>
+                <el-dropdown-item>
+                  <el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="majorChangeIe.importing.value"
+                    @change="(f: any) => onMajorChangeImport(f.raw || f)"><span>导入数据</span></el-upload>
+                </el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+        </div>
+        <el-table :data="padRows(majorChangeRows)" size="small" border>
+          <el-table-column label="项目" min-width="200">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small" placeholder="变动项目"
+                @change="(v: string) => updateMajorChangeCell(row.rowId, 'label', v)" />
+              <span v-else>{{ row.label }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="变动金额" width="160" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.amount" :controls="false" size="small" style="width:100%"
+                @change="(v: number) => updateMajorChangeCell(row.rowId, 'amount', v ?? 0)" />
+              <span v-else>{{ row._isPad ? '' : fmtAmt(row.amount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="变动原因" min-width="240">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.reason" size="small" placeholder="变动原因"
+                @change="(v: string) => updateMajorChangeCell(row.rowId, 'reason', v)" />
+              <span v-else>{{ row.reason }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ row }">
+              <el-button v-if="!row._isPad" type="danger" text size="small" @click="removeMajorChangeRow(row.rowId)">删</el-button>
+            </template>
+          </el-table-column>
         </el-table>
+        <el-button v-if="!isReadonly" size="small" style="margin-top:8px" @click="addMajorChangeRow">添加行</el-button>
+        <details class="amber-context">
+          <summary>📖 重大变动情形说明（CAS14）</summary>
+          <div class="amber-content">
+            <p>履行履约义务的时间与通常的付款时间之间的关系，以及此类因素对合同资产（如果对合同负债产生影响在合同负债科目下说明）账面价值的影响。本期内发生的重大变动的情形包括：</p>
+            <p>① 企业合并导致的变动；</p>
+            <p>② 对收入进行累积追溯调整导致的相关合同资产和合同负债的变动，此类调整可能源于估计履约进度的变化、估计交易价格的变化（包括对于可变对价是否受到限制的评估发生变化）或者合同变更；</p>
+            <p>③ 对合同对价的权利成为无条件权利（即，合同资产重分类为应收款项）的时间安排发生变化。</p>
+          </div>
+        </details>
       </template>
 
-      <div class="note-block">
+      <div v-if="section.sectionKey !== 'soe-3'" class="note-block">
         <div class="note-label">说明：</div>
         <el-input
           :model-value="noteTexts[getSoeNoteKey(section.sectionKey)]"
@@ -234,8 +380,9 @@
 /**
  * D6TabDisclosure.vue — 附注披露（上市5子节 / 国企3子节）
  */
-import { computed, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { useD6Disclosure } from '../composables/useD6Disclosure'
+import { useD6ImportExport } from '../composables/useD6ImportExport'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
 
@@ -257,6 +404,7 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const {
   listedSections, soeSections, showListed, showSoe, activeVariant,
   groupedDetails, addGroup, addGroupedDetailRow, updateGroupName, updateGroupedCell, removeGroupedRow,
+  majorChangeRows, addMajorChangeRow, updateMajorChangeCell, removeMajorChangeRow,
   noteTexts,
 } = useD6Disclosure({
   allResponses: allResponsesRef,
@@ -270,6 +418,26 @@ const {
 if (props.variant) {
   activeVariant.value = props.variant
 }
+
+// ─── 导入导出（参照 D4-2）：重大变动表 + 组合明细表 ─────────────────────
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
+
+const majorChangeIe = useD6ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D6-note-major-change',
+  sheetLabel: '重大变动',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+const groupsIe = useD6ImportExport({
+  wpId: wpIdRef,
+  sheetCode: 'D6-note-groups',
+  sheetLabel: '组合明细',
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
+})
+
+async function onMajorChangeImport(file: File) { await majorChangeIe.importData(file) }
+async function onGroupsImport(file: File) { await groupsIe.importData(file) }
 
 const displayVariant = computed(() => {
   if (props.variant) return props.variant
@@ -287,6 +455,7 @@ const variantOptions = computed(() => {
 
 const LISTED_NOTE_MAP: Record<string, string> = {
   'listed-1': 'D6-note-listed-text-1',
+  'listed-major-change': 'D6-note-listed-text-major-change',
   'listed-2': 'D6-note-listed-text-2',
   'listed-3': 'D6-note-listed-text-3',
   'listed-4': 'D6-note-listed-text-4',
@@ -316,6 +485,17 @@ function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+/** 空表补足占位空行（至少2行），避免"No Data"太丑；占位行 _isPad=true 不渲染输入控件 */
+function padRows<T extends { rowId?: string }>(rows: T[], min = 2): any[] {
+  const out: any[] = [...(rows || [])]
+  let i = 0
+  while (out.length < min) {
+    out.push({ rowId: `__pad-${i}__`, _isPad: true })
+    i++
+  }
+  return out
 }
 
 function fmtPct(rate: number): string {
@@ -387,7 +567,20 @@ function fmtPct100(rate: number): string {
   border-radius: 6px;
 }
 .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #303133; }
+
+/* 重大变动情形说明（准则指引琥珀块） */
+.amber-context {
+  margin-top: 12px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.amber-context summary { cursor: pointer; font-weight: 500; color: #e6a23c; }
+.amber-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.7; }
+.amber-content p { margin: 4px 0; }
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; cursor: help; }
+.sub-toolbar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .group-block { margin-bottom: 12px; }
 .group-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); }

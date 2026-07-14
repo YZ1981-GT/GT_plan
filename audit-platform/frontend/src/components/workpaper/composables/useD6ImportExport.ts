@@ -14,6 +14,8 @@ export type D6ImportableSheet =
   | 'D6-8'
   | 'D6-9-reversal'
   | 'D6-9-writeoff'
+  | 'D6-note-major-change'
+  | 'D6-note-groups'
 
 export interface D6ImportResult {
   success: boolean
